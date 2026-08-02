@@ -2866,7 +2866,7 @@
       "BookDelete": "Delete book",
       "BookBulkMetadataRefresh": "Refresh book metadata",
       "BookBulkDelete": "Delete books",
-      "BookBulkMove": "Bücher verschieben",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Re-extract book covers",
       "BookBulkSetStatus": "Set book status",
       "BookBulkSetRating": "Set book rating",
@@ -3366,13 +3366,13 @@
       "description": "Dadurch werden das Buch sowie alle zugehörigen Metadaten, Dateien, Lesefortschritte und Lesezeichen dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Verschiebe # Buch in Bibliothek} one {Verschiebe # Buch in Bibliothek} other {Verschiebe # Bücher in Bibliothek}}",
-      "description": "Die Dateien werden in den Ordner der Ziel-Bibliothek verschoben. Lesefortschritt, Anmerkungen und Sammlungen bleiben den Büchern erhalten.",
-      "targetLibrary": "Ziel-Bibliothek",
-      "targetFolder": "Ziel-Ordner",
-      "selectLibrary": "Bibliothek auswählen…",
-      "selectFolder": "Ordner auswählen…",
-      "move": "Verschieben"
+      "title": "{count, plural, =0 {Move # book to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Metadaten bearbeiten - # Buch} one {Metadaten bearbeiten - # Buch} other {Metadaten bearbeiten - # Bücher}}",
@@ -3638,7 +3638,7 @@
         "primary": "Primär",
         "peek": "Vorschau",
         "sendViaEmail": "Per E-Mail senden",
-        "moveToLibrary": "In Bibliothek verschieben",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Persönliche Rezension",
           "toggleAria": "Persönliche Rezension ein- oder ausblenden",
@@ -4525,7 +4525,7 @@
       "lockAll": "Alle sperren",
       "unlockAll": "Alle entsperren",
       "exportMetadata": "Metadaten exportieren",
-      "moveToLibrary": "In Bibliothek verschieben",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Auswahl löschen",
       "exitSelection": "Auswahl beenden",
       "downloadFilesZipLabel": "Dateien als ZIP herunterladen:",

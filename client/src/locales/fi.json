@@ -2866,7 +2866,7 @@
       "BookDelete": "Poista kirja",
       "BookBulkMetadataRefresh": "Päivitä kirjan metatiedot",
       "BookBulkDelete": "Poista kirjat",
-      "BookBulkMove": "Siirrä kirjat",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Uusintauutteen kannet",
       "BookBulkSetStatus": "Aseta kirjan tila",
       "BookBulkSetRating": "Aseta kirjan arvostelu",
@@ -3366,13 +3366,13 @@
       "description": "Tämä poistaa pysyvästi kirjan ja kaikki sen metatiedot, tiedostot, lukemisen edistymisen ja kirjanmerkit. Tätä ei voi peruuttaa."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Siirrä # kirja kirjastoon} one {Siirrä # kirja kirjastoon} other {Siirrä # kirjaa kirjastoon}}",
-      "description": "Tiedostot siirretään kohdekirjaston kansioon. Lukemisen edistyminen, merkinnät ja kokoelmat säilyvät kirjoilla.",
-      "targetLibrary": "Kohdekirjasto",
-      "targetFolder": "Kohdekansio",
-      "selectLibrary": "Valitse kirjasto…",
-      "selectFolder": "Valitse kansio…",
-      "move": "Siirrä"
+      "title": "{count, plural, =0 {Move # book to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Muokkaa metatietoja - # kirja} one {Muokkaa metatietoja - # kirja} other {Muokkaa metatietoja - # kirjoja}}",
@@ -3638,7 +3638,7 @@
         "primary": "Ensisijainen",
         "peek": "Tirkistys",
         "sendViaEmail": "Lähetä sähköpostitse",
-        "moveToLibrary": "Siirrä kirjastoon",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Henkilökohtainen Arvostelu",
           "toggleAria": "Ota henkilökohtainen arvostelu käyttöön",
@@ -4525,7 +4525,7 @@
       "lockAll": "Lukitse kaikki",
       "unlockAll": "Avaa kaikki",
       "exportMetadata": "Vie metatiedot",
-      "moveToLibrary": "Siirrä kirjastoon",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Poista valitut",
       "exitSelection": "Poistu valinnasta",
       "downloadFilesZipLabel": "Lataa tiedostot ZIP:",

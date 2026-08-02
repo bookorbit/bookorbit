@@ -2866,7 +2866,7 @@
       "BookDelete": "删除书",
       "BookBulkMetadataRefresh": "刷新书籍元数据",
       "BookBulkDelete": "删除书",
-      "BookBulkMove": "移动书籍",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "重新提取书封面",
       "BookBulkSetStatus": "设置书状状态",
       "BookBulkSetRating": "设置书评分数",
@@ -3366,13 +3366,13 @@
       "description": "这将永久删除该书及其所有元数据、文件、阅读进度和书签。无法撤消。"
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {移动 # 本书到书库} other {移动 # 本书到书库}}",
-      "description": "文件将移动到目标书库的文件夹中。阅读进度、批注和收藏将随书保留。",
-      "targetLibrary": "目标书库",
-      "targetFolder": "目标文件夹",
-      "selectLibrary": "选择书库…",
-      "selectFolder": "选择文件夹…",
-      "move": "移动"
+      "title": "{count, plural, =0 {Move # books to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {编辑元数据-# 书} one {编辑元数据-# 书} other {编辑元数据-# 书}}",
@@ -3638,7 +3638,7 @@
         "primary": "主要的",
         "peek": "佩克",
         "sendViaEmail": "通过电子邮件发送",
-        "moveToLibrary": "移动到书库",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "个人评论",
           "toggleAria": "切换个人评论",
@@ -4525,7 +4525,7 @@
       "lockAll": "锁定所有",
       "unlockAll": "解锁所有",
       "exportMetadata": "导出元数据",
-      "moveToLibrary": "移动到书库",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "删除选中的",
       "exitSelection": "退出选择",
       "downloadFilesZipLabel": "以ZIP下载文件：",

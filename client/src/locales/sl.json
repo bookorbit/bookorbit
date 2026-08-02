@@ -2866,7 +2866,7 @@
       "BookDelete": "Izbriši knjigo",
       "BookBulkMetadataRefresh": "Osveži metapodatke knjige",
       "BookBulkDelete": "Izbriši knjige",
-      "BookBulkMove": "Premakni knjige",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Ponovno izlušči naslovnice knjig",
       "BookBulkSetStatus": "Nastavi stanje knjige",
       "BookBulkSetRating": "Nastavi oceno knjige",
@@ -3366,13 +3366,13 @@
       "description": "S tem boste trajno izbrisali knjigo ter vse njene metapodatke, datoteke, napredek branja in zaznamke. Tega dejanja ni mogoče razveljaviti."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Premakni # knjig v knjižnico} one {Premakni # knjigo v knjižnico} two {Premakni # knjigi v knjižnico} few {Premakni # knjige v knjižnico} other {Premakni # knjig v knjižnico}}",
-      "description": "Datoteke se premaknejo v mapo ciljne knjižnice. Napredek branja, opombe in zbirke ostanejo pri knjigah.",
-      "targetLibrary": "Ciljna knjižnica",
-      "targetFolder": "Ciljna mapa",
-      "selectLibrary": "Izberi knjižnico…",
-      "selectFolder": "Izberi mapo…",
-      "move": "Premakni"
+      "title": "{count, plural, =0 {Move # book to library} few {Move # books to library} one {Move # book to library} two {Move # books to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Uredi metapodatke - # knjiga} one {Uredi metapodatke - # knjiga} two {Uredi metapodatke - # knjig} few {Uredi metapodatke - # knjig} other {Uredi metapodatke - # knjig}}",
@@ -3638,7 +3638,7 @@
         "primary": "Primarno",
         "peek": "Hitri pogled",
         "sendViaEmail": "Pošlji po e-pošti",
-        "moveToLibrary": "Premakni v knjižnico",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Osebna ocena",
           "toggleAria": "Preklopi osebno oceno",
@@ -4525,7 +4525,7 @@
       "lockAll": "Zakleni vse",
       "unlockAll": "Odkleni vse",
       "exportMetadata": "Izvozi metapodatke",
-      "moveToLibrary": "Premakni v knjižnico",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Izbriši izbrano",
       "exitSelection": "Zapri izbiranje",
       "downloadFilesZipLabel": "Prenesi datoteke kot ZIP:",

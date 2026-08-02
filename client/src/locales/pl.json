@@ -2866,7 +2866,7 @@
       "BookDelete": "Usuń książkę",
       "BookBulkMetadataRefresh": "Odśwież metadane książki",
       "BookBulkDelete": "Usuń książki",
-      "BookBulkMove": "Przenieś książki",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Wyjmij ponownie okładki książek",
       "BookBulkSetStatus": "Ustaw stan książki",
       "BookBulkSetRating": "Ustaw ocenę książki",
@@ -3366,13 +3366,13 @@
       "description": "Spowoduje to trwałe usunięcie książki wraz ze wszystkimi jej metadanymi, plikami, postępem czytania i zakładkami. Tego nie można cofnąć."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Przenieś # książek do biblioteki} one {Przenieś # książkę do biblioteki} few {Przenieś # książki do biblioteki} many {Przenieś # książek do biblioteki} other {Przenieś # książki do biblioteki}}",
-      "description": "Pliki są przenoszone do folderu biblioteki docelowej. Postęp czytania, adnotacje i kolekcje pozostają przy książkach.",
-      "targetLibrary": "Biblioteka docelowa",
-      "targetFolder": "Folder docelowy",
-      "selectLibrary": "Wybierz bibliotekę…",
-      "selectFolder": "Wybierz folder…",
-      "move": "Przenieś"
+      "title": "{count, plural, =0 {Move # book to library} few {Move # books to library} many {Move # books to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Edytuj metadane - # książka} one {Edytuj metadane - # książka} other {Edytuj metadane - # książki} few {Edytuj metadane - # książki} many {Edytuj metadane - # książek}}",
@@ -3638,7 +3638,7 @@
         "primary": "Główny",
         "peek": "Zerknij",
         "sendViaEmail": "Wyślij e-mailem",
-        "moveToLibrary": "Przenieś do biblioteki",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Recenzja osobista",
           "toggleAria": "Przełącz recenzję osobistą",
@@ -4525,7 +4525,7 @@
       "lockAll": "Zablokuj wszystko",
       "unlockAll": "Odblokuj wszystko",
       "exportMetadata": "Eksportuj metadane",
-      "moveToLibrary": "Przenieś do biblioteki",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Usuń wybrane",
       "exitSelection": "Wyjdź z wyboru",
       "downloadFilesZipLabel": "Pobierz pliki w formacie ZIP:",

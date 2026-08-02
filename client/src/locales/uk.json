@@ -2866,7 +2866,7 @@
       "BookDelete": "Видалити книгу",
       "BookBulkMetadataRefresh": "Оновити метадані книги",
       "BookBulkDelete": "Видалити книги",
-      "BookBulkMove": "Перемістити книги",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Повторно витягти обкладинки книги",
       "BookBulkSetStatus": "Встановити статус книги",
       "BookBulkSetRating": "Встановити рейтинг",
@@ -3366,13 +3366,13 @@
       "description": "Це остаточно видалить книгу та всі метадані, файли читання, мерти та закладки. Цю дію неможливо скасувати."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Перемістити # книг до бібліотеки} one {Перемістити # книгу до бібліотеки} few {Перемістити # книги до бібліотеки} many {Перемістити # книг до бібліотеки} other {Перемістити # книги до бібліотеки}}",
-      "description": "Файли переміщуються до теки цільової бібліотеки. Прогрес читання, анотації та колекції залишаються з книгами.",
-      "targetLibrary": "Цільова бібліотека",
-      "targetFolder": "Цільова тека",
-      "selectLibrary": "Виберіть бібліотеку…",
-      "selectFolder": "Виберіть теку…",
-      "move": "Перемістити"
+      "title": "{count, plural, =0 {Move # book to library} few {Move # books to library} many {Move # books to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Редагувати метадані - # книга} one {Редагувати метадані - # книга} few {Редагувати метадані - # книг} many {Редагувати метадані - # книг} other {Редагувати метадані - # книг}}",
@@ -3638,7 +3638,7 @@
         "primary": "Первинний",
         "peek": "Пік",
         "sendViaEmail": "Надіслати через ел. пошту",
-        "moveToLibrary": "Перемістити до бібліотеки",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Особистий Відгук",
           "toggleAria": "Переключити персональний огляд",
@@ -4525,7 +4525,7 @@
       "lockAll": "Заблокувати все",
       "unlockAll": "Розблокувати всі",
       "exportMetadata": "Експорт метаданих",
-      "moveToLibrary": "Перемістити до бібліотеки",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Видалити вибране",
       "exitSelection": "Вийти з вибору",
       "downloadFilesZipLabel": "Завантажити файли як ZIP:",

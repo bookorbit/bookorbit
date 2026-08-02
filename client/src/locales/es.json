@@ -2866,7 +2866,7 @@
       "BookDelete": "Eliminar libro",
       "BookBulkMetadataRefresh": "Actualizar metadatos del libro",
       "BookBulkDelete": "Eliminar libros",
-      "BookBulkMove": "Mover libros",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Volver a extraer portadas de libros",
       "BookBulkSetStatus": "Establecer estado del libro",
       "BookBulkSetRating": "Establecer calificación de libro",
@@ -3366,13 +3366,13 @@
       "description": "Esto eliminará permanentemente el libro y todos sus metadatos, archivos, progreso de lectura y marcadores. Esto no se puede deshacer."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Mover # libro a la biblioteca} one {Mover # libro a la biblioteca} many {Mover # libros a la biblioteca} other {Mover # libros a la biblioteca}}",
-      "description": "Los archivos se mueven a la carpeta de la biblioteca de destino. El progreso de lectura, las anotaciones y las colecciones permanecen con los libros.",
-      "targetLibrary": "Biblioteca de destino",
-      "targetFolder": "Carpeta de destino",
-      "selectLibrary": "Seleccionar una biblioteca…",
-      "selectFolder": "Seleccionar una carpeta…",
-      "move": "Mover"
+      "title": "{count, plural, =0 {Move # book to library} many {Move # books to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Editar metadatos - # libro} one {Editar metadatos - # libro} other {Editar metadatos - # libros} many {Editar metadatos - # libros}}",
@@ -3638,7 +3638,7 @@
         "primary": "Principal",
         "peek": "vistazo",
         "sendViaEmail": "Enviar por correo electrónico",
-        "moveToLibrary": "Mover a la biblioteca",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Opinión personal",
           "toggleAria": "Alternar revisión personal",
@@ -4525,7 +4525,7 @@
       "lockAll": "bloquear todo",
       "unlockAll": "Desbloquear todo",
       "exportMetadata": "Exportar metadatos",
-      "moveToLibrary": "Mover a la biblioteca",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Eliminar seleccionado",
       "exitSelection": "Salir de la selección",
       "downloadFilesZipLabel": "Descargar archivos como ZIP:",

@@ -2866,7 +2866,7 @@
       "BookDelete": "Ta bort bok",
       "BookBulkMetadataRefresh": "Uppdatera bokens metadata",
       "BookBulkDelete": "Ta bort böcker",
-      "BookBulkMove": "Flytta böcker",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Återextrahera bokomslag",
       "BookBulkSetStatus": "Ange bokens status",
       "BookBulkSetRating": "Ange bokens betyg",
@@ -3366,13 +3366,13 @@
       "description": "Detta kommer att permanent ta bort boken och alla dess metadata, filer, läsframsteg och bokmärken. Detta kan inte ångras."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Flytta # bok till bibliotek} one {Flytta # bok till bibliotek} other {Flytta # böcker till bibliotek}}",
-      "description": "Filerna flyttas till målbibliotekets mapp. Läsförlopp, anteckningar och samlingar följer med böckerna.",
-      "targetLibrary": "Målbibliotek",
-      "targetFolder": "Målmapp",
-      "selectLibrary": "Välj ett bibliotek…",
-      "selectFolder": "Välj en mapp…",
-      "move": "Flytta"
+      "title": "{count, plural, =0 {Move # book to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Redigera metadata - # bok} one {Redigera metadata - # bok} other {Redigera metadata - # böcker}}",
@@ -3638,7 +3638,7 @@
         "primary": "Primär",
         "peek": "Tydlig",
         "sendViaEmail": "Skicka via e-post",
-        "moveToLibrary": "Flytta till bibliotek",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Personlig granskning",
           "toggleAria": "Växla personlig granskning",
@@ -4525,7 +4525,7 @@
       "lockAll": "Lås alla",
       "unlockAll": "Lås upp alla",
       "exportMetadata": "Exportera metadata",
-      "moveToLibrary": "Flytta till bibliotek",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Ta bort markerade",
       "exitSelection": "Avsluta markering",
       "downloadFilesZipLabel": "Ladda ner filer som ZIP:",

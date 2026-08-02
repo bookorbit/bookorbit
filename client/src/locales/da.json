@@ -2866,7 +2866,7 @@
       "BookDelete": "Slet bog",
       "BookBulkMetadataRefresh": "Opdater bogmetadata",
       "BookBulkDelete": "Slet bøger",
-      "BookBulkMove": "Flyt bøger",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Bogomslag til genudtræk",
       "BookBulkSetStatus": "Sæt bogstatus",
       "BookBulkSetRating": "Sæt bog rating",
@@ -3366,13 +3366,13 @@
       "description": "Dette vil permanent slette bogen og alle dens metadata, filer, læse fremskridt og bogmærker. Dette kan ikke fortrydes."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Flyt # bog til bibliotek} one {Flyt # bog til bibliotek} other {Flyt # bøger til bibliotek}}",
-      "description": "Filerne flyttes til målbibliotekets mappe. Læsefremskridt, annotationer og samlinger bliver hos bøgerne.",
-      "targetLibrary": "Målbibliotek",
-      "targetFolder": "Målmappe",
-      "selectLibrary": "Vælg et bibliotek…",
-      "selectFolder": "Vælg en mappe…",
-      "move": "Flyt"
+      "title": "{count, plural, =0 {Move # book to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Rediger metadata - # bog} one {Rediger metadata - # bog} other {Rediger metadata - # bøger}}",
@@ -3638,7 +3638,7 @@
         "primary": "Primær",
         "peek": "Peek",
         "sendViaEmail": "Send via e-mail",
-        "moveToLibrary": "Flyt til bibliotek",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Personlig Anmeldelse",
           "toggleAria": "Skift personlig anmeldelse",
@@ -4525,7 +4525,7 @@
       "lockAll": "Lås alle",
       "unlockAll": "Lås alle op",
       "exportMetadata": "Eksporter metadata",
-      "moveToLibrary": "Flyt til bibliotek",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Slet valgte",
       "exitSelection": "Afslut markering",
       "downloadFilesZipLabel": "Download filer som ZIP:",

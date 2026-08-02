@@ -2866,7 +2866,7 @@
       "BookDelete": "Delete book",
       "BookBulkMetadataRefresh": "Refresh book metadata",
       "BookBulkDelete": "Delete books",
-      "BookBulkMove": "Boeken verplaatsen",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Re-extract book covers",
       "BookBulkSetStatus": "Set book status",
       "BookBulkSetRating": "Set book rating",
@@ -3366,13 +3366,13 @@
       "description": "Hiermee worden het boek en alle bijbehorende metadata, bestanden, leesvoortgang en bladwijzers permanent verwijderd. Dit kan niet ongedaan worden gemaakt."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Verplaats # boek naar bibliotheek} one {Verplaats # boek naar bibliotheek} other {Verplaats # boeken naar bibliotheek}}",
-      "description": "De bestanden worden naar de map van de doelbibliotheek verplaatst. Leesvoortgang, annotaties en collecties blijven bij de boeken.",
-      "targetLibrary": "Doelbibliotheek",
-      "targetFolder": "Doelmap",
-      "selectLibrary": "Selecteer een bibliotheek…",
-      "selectFolder": "Selecteer een map…",
-      "move": "Verplaatsen"
+      "title": "{count, plural, =0 {Move # book to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Metadata bewerken - # boek} one {Metadata bewerken - # boek} other {Metadata bewerken - # boeken}}",
@@ -3638,7 +3638,7 @@
         "primary": "Primair",
         "peek": "Voorvertoning",
         "sendViaEmail": "Verzenden via e-mail",
-        "moveToLibrary": "Verplaatsen naar bibliotheek",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Persoonlijke recensie",
           "toggleAria": "Persoonlijke recensie in- of uitklappen",
@@ -4525,7 +4525,7 @@
       "lockAll": "Alles vergrendelen",
       "unlockAll": "Alles ontgrendelen",
       "exportMetadata": "Metadata exporteren",
-      "moveToLibrary": "Verplaatsen naar bibliotheek",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Selectie verwijderen",
       "exitSelection": "Selectie afsluiten",
       "downloadFilesZipLabel": "Bestanden downloaden als ZIP:",

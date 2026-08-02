@@ -2866,7 +2866,7 @@
       "BookDelete": "Odstranit knihu",
       "BookBulkMetadataRefresh": "Obnovit metadata knihy",
       "BookBulkDelete": "Odstranit knihy",
-      "BookBulkMove": "Přesunout knihy",
+      "BookBulkMove": "Move books",
       "BookBulkCoverReextract": "Přepravní obaly knih",
       "BookBulkSetStatus": "Nastavit stav knihy",
       "BookBulkSetRating": "Nastavit hodnocení knihy",
@@ -3366,13 +3366,13 @@
       "description": "Tímto trvale smažete knihu a všechna její metadata, soubory, postup čtení a záložky. Tuto akci nelze vrátit zpět."
     },
     "moveDialog": {
-      "title": "{count, plural, =0 {Přesunout # knih do knihovny} one {Přesunout # knihu do knihovny} few {Přesunout # knihy do knihovny} many {Přesunout # knihy do knihovny} other {Přesunout # knih do knihovny}}",
-      "description": "Soubory se přesunou do složky cílové knihovny. Průběh čtení, poznámky a sbírky zůstanou u knih.",
-      "targetLibrary": "Cílová knihovna",
-      "targetFolder": "Cílová složka",
-      "selectLibrary": "Vyberte knihovnu…",
-      "selectFolder": "Vyberte složku…",
-      "move": "Přesunout"
+      "title": "{count, plural, =0 {Move # book to library} few {Move # books to library} many {Move # books to library} one {Move # book to library} other {Move # books to library}}",
+      "description": "Files are moved into the target library's folder. Reading progress, annotations, and collections stay with the books.",
+      "targetLibrary": "Target library",
+      "targetFolder": "Target folder",
+      "selectLibrary": "Select a library…",
+      "selectFolder": "Select a folder…",
+      "move": "Move"
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Upravte metadata - # kniha} one {Upravte metadata - # kniha} few {Upravte metadata - # knih} many {Upravte metadata - # knih} other {Upravte metadata - # knih}}",
@@ -3638,7 +3638,7 @@
         "primary": "Primární",
         "peek": "Prohlížení",
         "sendViaEmail": "Odeslat e-mailem",
-        "moveToLibrary": "Přesunout do knihovny",
+        "moveToLibrary": "Move to Library",
         "personalReview": {
           "title": "Osobní recenze",
           "toggleAria": "Přepnout osobní recenzi",
@@ -4525,7 +4525,7 @@
       "lockAll": "Zamknout vše",
       "unlockAll": "Odemknout vše",
       "exportMetadata": "Exportovat metadata",
-      "moveToLibrary": "Přesunout do knihovny",
+      "moveToLibrary": "Move to library",
       "deleteSelected": "Odstranit vybrané",
       "exitSelection": "Ukončit výběr",
       "downloadFilesZipLabel": "Stáhnout soubory jako ZIP:",
