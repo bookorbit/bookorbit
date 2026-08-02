@@ -238,4 +238,71 @@ describe('BookSortBuilder', () => {
     expect(result).toHaveLength(2);
     expect(raw).not.toHaveBeenCalled();
   });
+
+  describe('custom metadata field sorts', () => {
+    it.each([
+      ['text', 'value_text'],
+      ['url', 'value_text'],
+      ['number', 'value_number'],
+      ['date', 'value_date'],
+      ['boolean', 'value_boolean'],
+    ] as const)('orders %s fields by %s', (type, column) => {
+      const raw = (sql as unknown as { raw: vi.Mock }).raw;
+
+      const result = service.build([{ field: 'custom:7', dir: 'asc' }], 42, new Map([[7, type]]));
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({ type: 'sql', text: expect.stringContaining('FROM book_custom_metadata_values v') });
+      expect(result[0]?.text).toContain(' NULLS LAST');
+      expect(raw).toHaveBeenCalledWith(column);
+      expect(raw).toHaveBeenCalledWith('ASC');
+    });
+
+    it('binds the field id as a parameter rather than inlining it', () => {
+      const result = service.build([{ field: 'custom:7', dir: 'desc' }], 42, new Map([[7, 'text']]));
+
+      expect(result[0]?.values).toContain(7);
+    });
+
+    it('drops the tier when the field is archived or deleted, falling back to the default order', () => {
+      const raw = (sql as unknown as { raw: vi.Mock }).raw;
+
+      const result = service.build([{ field: 'custom:7', dir: 'asc' }], 42, new Map());
+
+      expect(result).toHaveLength(2);
+      expect(raw).not.toHaveBeenCalled();
+    });
+
+    it('drops the tier when no field types were resolved at all', () => {
+      const result = service.build([{ field: 'custom:7', dir: 'asc' }], 42);
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('keeps the remaining tiers when one custom field no longer resolves', () => {
+      const raw = (sql as unknown as { raw: vi.Mock }).raw;
+
+      const result = service.build(
+        [
+          { field: 'custom:7', dir: 'asc' },
+          { field: 'title', dir: 'desc' },
+        ],
+        42,
+        new Map(),
+      );
+
+      expect(result).toHaveLength(2);
+      expect(raw).toHaveBeenCalledTimes(1);
+      expect(raw).toHaveBeenCalledWith('DESC');
+    });
+
+    it('ignores custom-looking fields that are not valid references', () => {
+      const raw = (sql as unknown as { raw: vi.Mock }).raw;
+
+      const result = service.build([{ field: 'custom:0 OR 1=1', dir: 'asc' } as never], 42, new Map([[0, 'text']]));
+
+      expect(result).toHaveLength(2);
+      expect(raw).not.toHaveBeenCalled();
+    });
+  });
 });

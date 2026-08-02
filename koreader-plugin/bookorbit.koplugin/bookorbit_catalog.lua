@@ -234,6 +234,16 @@ function BookOrbitCatalog:init()
     self.client = BookOrbitApi.new(self.api)
     self.stack = {}
     self.settings = self.settings or {}
+    CatalogWidgets.setAssetIconFiles({
+        on_device = self:pluginAssetFile("bookorbit.on-device.svg"),
+        shuffle = self:pluginAssetFile("bookorbit.shuffle.svg"),
+        in_progress = self:pluginAssetFile("bookorbit.in-progress.svg"),
+        collections = self:pluginAssetFile("bookorbit.collections.svg"),
+        stat_today = self:pluginAssetFile("bookorbit.stat-today.svg"),
+        stat_week = self:pluginAssetFile("bookorbit.stat-week.svg"),
+        stat_streak = self:pluginAssetFile("bookorbit.stat-streak.svg"),
+        stat_goal = self:pluginAssetFile("bookorbit.stat-goal.svg"),
+    })
     self:initThumbnailCache()
     self:initBulkDownloadState()
     self.view_mode = self.settings.catalog_view_mode == "list" and "list" or "mosaic"
@@ -276,12 +286,15 @@ function BookOrbitCatalog:init()
     end)
 end
 
-function BookOrbitCatalog:downloadIconPath()
+function BookOrbitCatalog:pluginAssetFile(name)
     local source_dir = self.path or (self._manager and self._manager.path)
-    if source_dir then
-        local path = source_dir .. "/assets/" .. DOWNLOAD_ICON_FILE
-        if lfs.attributes(path, "mode") == "file" then return path end
-    end
+    if not source_dir then return nil end
+    local path = source_dir .. "/assets/" .. name
+    if lfs.attributes(path, "mode") == "file" then return path end
+end
+
+function BookOrbitCatalog:downloadIconPath()
+    return self:pluginAssetFile(DOWNLOAD_ICON_FILE)
 end
 
 function BookOrbitCatalog:isBulkSelectionActive()
@@ -390,7 +403,7 @@ function BookOrbitCatalog:refreshCurrent()
         self:evictCachedCovers(self.dashboardBooks(context.dashboard))
         self:loadDashboardRoot(true)
     elseif context.kind == "section" then
-        self:loadSection(context.section, { page = context.page, q = context.q, replace = true })
+        self:reloadSection(context.section, { page = context.page })
     elseif context.kind == "detail" and context.detail then
         self:evictCachedCovers(self:detailThumbnailBooks(context.detail))
         self:runConnected(function()
@@ -559,6 +572,16 @@ end
 
 function BookOrbitCatalog:isOnDevice(book)
     return book ~= nil and book.id ~= nil and self.on_device[book.id] ~= nil
+end
+
+-- The local file a Continue-reading tap should resume: only when the
+-- tap-to-resume setting is on and the book is already on the device. Nil sends
+-- the tap to the detail page instead.
+function BookOrbitCatalog:dashboardResumePath(book)
+    if self.settings.catalog_dashboard_tap_resumes == false then return nil end
+    local path = book ~= nil and book.id ~= nil and self.on_device[book.id] or nil
+    if type(path) == "string" and path ~= "" then return path end
+    return nil
 end
 
 function BookOrbitCatalog:onDeviceFilePath(file)
@@ -862,8 +885,14 @@ function BookOrbitCatalog:loadSection(section, opts)
             table.insert(item_table, {
                 text = entry.title,
                 mandatory = entry.count and tostring(entry.count) or nil,
-                kind = "books",
+                kind = opts.dashboard_source_index and "dashboard-source" or "books",
                 params = entry_params,
+                dashboard_source_index = opts.dashboard_source_index,
+                dashboard_source = opts.dashboard_source_index and {
+                    type = section,
+                    sourceName = entry.title,
+                    params = entry_params,
+                } or nil,
             })
         end
 
@@ -882,11 +911,26 @@ function BookOrbitCatalog:loadSection(section, opts)
             paged = paged,
             has_next = body.hasNext == true,
             has_previous = page > 1,
+            dashboard_source_index = opts.dashboard_source_index,
         }, push)
     end)
 end
 
-function BookOrbitCatalog:promptSectionFilter(section, current_q)
+function BookOrbitCatalog:reloadSection(section, overrides)
+    local context = self.current_context or {}
+    local opts = {
+        q = context.q,
+        replace = true,
+        dashboard_source_index = context.dashboard_source_index,
+    }
+    for key, value in pairs(overrides or {}) do
+        if key ~= "clear_q" then opts[key] = value end
+    end
+    if overrides and overrides.clear_q then opts.q = nil end
+    return self:loadSection(section or context.section, opts)
+end
+
+function BookOrbitCatalog:promptSectionFilter(section, current_q, dashboard_source_index)
     local dialog
     dialog = InputDialog:new{
         title = _("Filter"),
@@ -905,7 +949,11 @@ function BookOrbitCatalog:promptSectionFilter(section, current_q)
                     text = _("Clear"),
                     callback = function()
                         UIManager:close(dialog)
-                        self:loadSection(section, { page = 1, q = nil, replace = true })
+                        self:reloadSection(section, {
+                            page = 1,
+                            clear_q = true,
+                            dashboard_source_index = dashboard_source_index,
+                        })
                     end,
                 },
                 {
@@ -914,7 +962,11 @@ function BookOrbitCatalog:promptSectionFilter(section, current_q)
                     callback = function()
                         local value = util.trim(dialog:getInputText() or "")
                         UIManager:close(dialog)
-                        self:loadSection(section, { page = 1, q = value ~= "" and value or nil, replace = true })
+                        self:reloadSection(section, {
+                            page = 1,
+                            q = value ~= "" and value or nil,
+                            dashboard_source_index = dashboard_source_index,
+                        })
                     end,
                 },
             },
@@ -1432,7 +1484,7 @@ function BookOrbitCatalog:showBookActions()
                 text = context.q and T(_("Filter: %1"), context.q) or _("Filter..."),
                 callback = function()
                     UIManager:close(dialog)
-                    self:promptSectionFilter(context.section, context.q)
+                    self:promptSectionFilter(context.section, context.q, context.dashboard_source_index)
                 end,
             },
             {
@@ -1440,7 +1492,7 @@ function BookOrbitCatalog:showBookActions()
                 enabled = context.q ~= nil,
                 callback = function()
                     UIManager:close(dialog)
-                    self:loadSection(context.section, { page = 1, q = nil, replace = true })
+                    self:reloadSection(context.section, { page = 1, clear_q = true })
                 end,
             },
         })
@@ -1665,7 +1717,8 @@ function BookOrbitCatalog:menuChromeHeight()
     if self:dashboardMode() then
         -- Reserve a deliberate bottom margin so the single-page dashboard does not
         -- run edge-to-edge (the pagination footer that normally fills this is hidden).
-        bottom_height = Screen:scaleBySize(40)
+        -- Kept modest: the rest of the page buys its cover sizes out of this.
+        bottom_height = Screen:scaleBySize(16)
     elseif self:detailMode() then
         local prev_book, next_book, current_idx = self:getAdjacentDetailBooks()
         local parent = self.stack[#self.stack]
@@ -1861,7 +1914,15 @@ end
 function BookOrbitCatalog:finishCustomUpdate(old_dimen, select_number)
     self:updatePageInfo(select_number)
     Menu.mergeTitleBarIntoLayout(self)
+    -- A view may narrow the e-ink refresh to the region it actually changed
+    -- (the dashboard does for row page turns); everything else refreshes the
+    -- whole menu as before.
+    local refresh_region = self.custom_refresh_region
+    self.custom_refresh_region = nil
     UIManager:setDirty(self.show_parent, function()
+        if refresh_region then
+            return "ui", refresh_region
+        end
         local refresh_dimen = old_dimen and old_dimen:combine(self.dimen) or self.dimen
         return "ui", refresh_dimen
     end)
@@ -2023,7 +2084,7 @@ function BookOrbitCatalog:onNextPage()
         end
         local context = self.current_context
         if context.has_next then
-            self:loadSection(context.section, { page = (context.page or 1) + 1, q = context.q, replace = true })
+            self:reloadSection(context.section, { page = (context.page or 1) + 1 })
         end
         return true
     elseif self:detailMode() then
@@ -2055,7 +2116,7 @@ function BookOrbitCatalog:onPrevPage()
         end
         local context = self.current_context
         if (context.page or 1) > 1 then
-            self:loadSection(context.section, { page = (context.page or 1) - 1, q = context.q, replace = true })
+            self:reloadSection(context.section, { page = (context.page or 1) - 1 })
         end
         return true
     elseif self:detailMode() then
@@ -2083,7 +2144,7 @@ function BookOrbitCatalog:onFirstPage()
         end
         local context = self.current_context
         if (context.page or 1) > 1 then
-            self:loadSection(context.section, { page = 1, q = context.q, replace = true })
+            self:reloadSection(context.section, { page = 1 })
         end
         return true
     elseif self:detailMode() then
@@ -2132,17 +2193,35 @@ function BookOrbitCatalog:onMenuSelect(item)
     if item.kind == "section" then
         self:loadSection(item.section)
     elseif item.kind == "dashboard-book" then
-        self:loadBookDetail(item.book_id)
+        -- Continue-reading heroes resume the book directly when it is on the
+        -- device; hold still opens the full action sheet.
+        local resume_path = item.resume and self:dashboardResumePath(item.book) or nil
+        if resume_path then
+            self:openDownloadedFile(resume_path)
+        else
+            self:loadBookDetail(item.book_id)
+        end
     elseif item.kind == "dashboard-highlight" then
         self:loadBookDetail(item.book_id)
     elseif item.kind == "dashboard-search" then
         self:promptSearch({})
     elseif item.kind == "dashboard-reroll" then
-        self:rerollDiscover()
+        self:rerollDiscover(item.section_index)
     elseif item.kind == "section-filter" then
-        self:promptSectionFilter(item.section, item.q)
+        local context = self.current_context or {}
+        self:promptSectionFilter(item.section, item.q, context.dashboard_source_index)
     elseif item.kind == "section-page" then
-        self:loadSection(item.section, { page = item.section_page, q = item.q, replace = true })
+        self:reloadSection(item.section, {
+            page = item.section_page,
+            q = item.q,
+        })
+    elseif item.kind == "dashboard-source" then
+        local source = item.dashboard_source
+        if source and type(source.sourceName) == "string" and source.sourceName ~= "" then
+            self:setDashboardSection(source, item.dashboard_source_index)
+            self:onReturn()
+            if self:dashboardMode() then self:refreshCurrent() end
+        end
     elseif item.kind == "on-device" then
         self:loadOnDevice()
     elseif item.kind == "books" then

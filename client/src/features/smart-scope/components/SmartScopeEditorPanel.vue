@@ -52,6 +52,7 @@ const draftName = ref('')
 const draftIcon = ref('')
 const draftFilter = ref<GroupRule | undefined>(undefined)
 const draftSort = ref<SortSpec[]>([])
+const draftIsPublic = ref(false)
 const draftSyncToKobo = ref(false)
 const saving = ref(false)
 const saveError = ref<string | null>(null)
@@ -70,6 +71,7 @@ watch(
       draftIcon.value = props.smartScope.icon ?? ''
       draftFilter.value = props.smartScope.filter ?? undefined
       draftSort.value = props.smartScope.defaultSort ? [...props.smartScope.defaultSort] : []
+      draftIsPublic.value = props.smartScope.isPublic
       draftSyncToKobo.value = props.smartScope.syncToKobo
       schedulePreview()
     }
@@ -116,6 +118,14 @@ function hasCompleteRules(group: GroupRule | undefined): boolean {
   return !!group?.rules.some((rule) => rule.type === 'rule' || hasCompleteRules(rule as GroupRule))
 }
 
+function toggleIsPublic() {
+  draftIsPublic.value = !draftIsPublic.value
+}
+
+function toggleSyncToKobo() {
+  draftSyncToKobo.value = !draftSyncToKobo.value
+}
+
 async function save() {
   if (!props.smartScope) return
   if (!trimmedDraftName.value) {
@@ -134,6 +144,7 @@ async function save() {
       icon: trimmedDraftIcon.value,
       filter: hasCompleteRules(draftFilter.value) ? draftFilter.value : undefined,
       defaultSort: draftSort.value,
+      isPublic: draftIsPublic.value,
       syncToKobo: draftSyncToKobo.value,
     })
     emit('saved')
@@ -203,16 +214,38 @@ async function save() {
 
             <div class="flex items-center justify-between py-1">
               <div>
+                <p class="text-sm font-medium text-foreground">{{ t('smartScope.visibleToAll') }}</p>
+                <p class="text-xs text-muted-foreground mt-0.5">{{ t('smartScope.visibleToAllHint') }}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-label="t('smartScope.visibleToAll')"
+                :aria-checked="draftIsPublic"
+                class="w-11 h-6 rounded-full transition-colors relative shrink-0"
+                :class="draftIsPublic ? 'bg-primary' : 'bg-muted'"
+                @click="toggleIsPublic"
+              >
+                <div
+                  class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"
+                  :class="draftIsPublic ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between py-1">
+              <div>
                 <p class="text-sm font-medium text-foreground">{{ t('smartScope.syncToKobo') }}</p>
                 <p class="text-xs text-muted-foreground mt-0.5">{{ t('smartScope.syncToKoboHint') }}</p>
               </div>
               <button
                 type="button"
                 role="switch"
+                :aria-label="t('smartScope.syncToKobo')"
                 :aria-checked="draftSyncToKobo"
                 class="w-11 h-6 rounded-full transition-colors relative shrink-0"
                 :class="draftSyncToKobo ? 'bg-primary' : 'bg-muted'"
-                @click="draftSyncToKobo = !draftSyncToKobo"
+                @click="toggleSyncToKobo"
               >
                 <div
                   class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"

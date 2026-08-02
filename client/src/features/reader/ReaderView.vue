@@ -283,7 +283,7 @@ onMounted(async () => {
   if (isAudioFormat || isPdfFormat || isComicFormat) return
 
   await customFonts.fetchFonts()
-  setFontFaceCSS(customFonts.generateFontFaceCSS())
+  await refreshFontFaces()
 
   await progress.load()
 
@@ -398,14 +398,18 @@ watch(showSettings, (open) => {
   setVisibilityLock(open)
 })
 
-watch(
-  () => customFonts.fonts.value,
-  () => {
-    setFontFaceCSS(customFonts.generateFontFaceCSS())
-    const renderer = getRenderer()
-    if (renderer && shouldApplyStyles.value) applyToRenderer(renderer, isFixedLayout.value ? { flow: 'paginated' } : undefined)
-  },
-)
+// Only the selected family is held in memory, so the blob URLs backing the injected
+// CSS have to be refreshed whenever either the selection or the font list changes.
+async function refreshFontFaces() {
+  await customFonts.ensureCssFamilyLoaded(state.value.fontFamily)
+  setFontFaceCSS(customFonts.generateFontFaceCSS())
+  const renderer = getRenderer()
+  if (renderer && shouldApplyStyles.value) applyToRenderer(renderer, isFixedLayout.value ? { flow: 'paginated' } : undefined)
+}
+
+watch(() => customFonts.fonts.value, refreshFontFaces)
+
+watch(() => state.value.fontFamily, refreshFontFaces)
 
 function handleDeleteAnnotation(id: number) {
   const ann = annotations.annotations.value.find((a) => a.id === id)

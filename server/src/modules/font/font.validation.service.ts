@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { parse } from 'opentype.js';
 import type { FontFormat, FontStyle } from '@bookorbit/types';
 import { FONT_FORMATS } from '@bookorbit/types';
+
+import { parseFontMetadata } from './font-metadata.parser';
 
 export interface FontMetadata {
   familyName: string | null;
@@ -78,14 +79,13 @@ export class FontValidationService {
 
   extractMetadata(buffer: Buffer, filename: string): FontMetadata {
     try {
-      const font = parse(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
-      const familyName = (font.names?.fontFamily as Record<string, string>)?.en ?? null;
-      const subfamilyName = ((font.names?.fontSubfamily as Record<string, string>)?.en ?? '').toLowerCase();
+      const metadata = parseFontMetadata(buffer);
+      const subfamilyName = (metadata.subfamilyName ?? '').toLowerCase();
 
-      const weight = this.resolveWeight(font.tables?.os2?.usWeightClass, subfamilyName, filename);
-      const style = this.resolveStyle(font.tables?.os2?.fsSelection, subfamilyName, filename);
+      const weight = this.resolveWeight(metadata.usWeightClass, subfamilyName, filename);
+      const style = this.resolveStyle(metadata.fsSelection, subfamilyName, filename);
 
-      return { familyName, weight, style };
+      return { familyName: metadata.familyName, weight, style };
     } catch (err) {
       this.logger.debug(
         `[font.extract_metadata] [fail] filename=${filename} error="${(err as Error).message}" - falling back to filename heuristics`,

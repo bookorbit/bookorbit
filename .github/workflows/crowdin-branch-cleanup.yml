@@ -1,0 +1,33 @@
+name: Crowdin Branch Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  delete-service-branch:
+    # Crowdin appends every export to the same service branch and never rebases it.
+    # A branch that outlives its pull request keeps its original merge base, so each
+    # later export diverges further from main and eventually conflicts on every
+    # catalog. Deleting it forces Crowdin to recreate it from the current main.
+    # This runs on close as well as merge, because Crowdin reuses the branch either way.
+    if: github.event.pull_request.head.ref == 'l10n_main' && github.event.pull_request.head.repo.full_name == github.repository
+    name: Delete l10n_main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete the Crowdin service branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: l10n_main
+        run: |
+          if gh api "repos/$REPO/git/refs/heads/$BRANCH" >/dev/null 2>&1; then
+            gh api -X DELETE "repos/$REPO/git/refs/heads/$BRANCH"
+            echo "Deleted $BRANCH; Crowdin will recreate it from main on the next export."
+          else
+            echo "$BRANCH is already absent; nothing to delete."
+          fi

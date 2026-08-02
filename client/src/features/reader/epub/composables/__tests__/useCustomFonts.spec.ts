@@ -67,16 +67,15 @@ describe('useCustomFonts', () => {
   })
 
   describe('fetchFonts', () => {
-    it('fetches fonts and pre-caches blob URLs for all font files', async () => {
+    it('fetches the font list without downloading any font file', async () => {
       setupFetchMock(mockFonts)
 
       await composable.fetchFonts()
 
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts')
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/1/file')
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/2/file')
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/3/file')
-      expect(URL.createObjectURL).toHaveBeenCalledTimes(3)
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith('/api/v1/fonts')
+      // Fonts can be tens of megabytes each; downloading the whole library on open
+      // would put gigabytes in tab memory.
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
       expect(composable.fonts.value).toHaveLength(3)
     })
 
@@ -89,7 +88,7 @@ describe('useCustomFonts', () => {
       expect(URL.createObjectURL).not.toHaveBeenCalled()
     })
 
-    it('continues when individual font file fetch fails', async () => {
+    it('keeps the list usable when a font file fetch fails', async () => {
       fetchMock.mockImplementation((url: unknown) => {
         if (url === '/api/v1/fonts') {
           return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFonts.slice(0, 1)) })
@@ -98,6 +97,7 @@ describe('useCustomFonts', () => {
       })
 
       await composable.fetchFonts()
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
 
       expect(composable.fonts.value).toHaveLength(1)
       expect(URL.createObjectURL).not.toHaveBeenCalled()
@@ -122,6 +122,7 @@ describe('useCustomFonts', () => {
     it('revokes blob URLs for fonts removed between fetches', async () => {
       setupFetchMock(mockFonts)
       await composable.fetchFonts()
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
 
       vi.clearAllMocks()
 
@@ -130,24 +131,19 @@ describe('useCustomFonts', () => {
         if (url === '/api/v1/fonts') {
           return Promise.resolve({ ok: true, json: () => Promise.resolve([mockFonts[2]]) })
         }
-        if (typeof url === 'string' && /\/api\/v1\/fonts\/(\d+)\/file/.test(url)) {
-          return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['font'])) })
-        }
         return Promise.resolve({ ok: false })
       })
 
       await composable.fetchFonts()
 
-      // Blob URLs for fonts 1 and 2 are revoked for removal; font 3's URL is also
-      // revoked and replaced because cacheFontBlobUrl always revokes before re-caching.
-      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3)
+      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2)
       expect(composable.fonts.value).toHaveLength(1)
       expect(composable.fonts.value[0]!.id).toBe(3)
     })
   })
 
   describe('uploadFont', () => {
-    it('uploads a font, adds it to the list, and caches its blob URL', async () => {
+    it('uploads a font and adds it to the list without downloading it back', async () => {
       const uploadResult: FontUploadResult = {
         font: mockFonts[0]!,
         suggestedFamilyName: 'Literata',
@@ -159,9 +155,6 @@ describe('useCustomFonts', () => {
         if (url === '/api/v1/fonts/upload') {
           return Promise.resolve({ ok: true, json: () => Promise.resolve(uploadResult) })
         }
-        if (url === '/api/v1/fonts/1/file') {
-          return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['font'])) })
-        }
         return Promise.resolve({ ok: false })
       })
 
@@ -169,8 +162,9 @@ describe('useCustomFonts', () => {
       const result = await composable.uploadFont(file)
 
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/upload', expect.objectContaining({ method: 'POST' }))
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/1/file')
-      expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+      // The client just sent these bytes; pulling them straight back wastes the transfer.
+      expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/fonts/1/file')
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
       expect(result).toEqual(uploadResult)
       expect(composable.fonts.value).toHaveLength(1)
     })
@@ -207,10 +201,127 @@ describe('useCustomFonts', () => {
     })
   })
 
+  describe('ensureCssFamilyLoaded', () => {
+    it('downloads only the requested family', async () => {
+      setupFetchMock(mockFonts)
+      await composable.fetchFonts()
+      vi.clearAllMocks()
+
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
+
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/1/file')
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/2/file')
+      expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/fonts/3/file')
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(2)
+    })
+
+    it('releases the previous family when switching, bounding memory to one family', async () => {
+      setupFetchMock(mockFonts)
+      await composable.fetchFonts()
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
+      vi.clearAllMocks()
+
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Georgia Pro'))
+
+      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2)
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/fonts/3/file')
+
+      const css = composable.generateFontFaceCSS()
+      expect(css).toContain('/api/v1/fonts/1/file')
+      expect(css).toContain('/api/v1/fonts/2/file')
+      expect(css).not.toContain('/api/v1/fonts/3/file')
+    })
+
+    it('does not re-download a family that is already loaded', async () => {
+      setupFetchMock(mockFonts)
+      await composable.fetchFonts()
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
+      vi.clearAllMocks()
+
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
+
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
+    })
+
+    it('releases everything when the selection is cleared', async () => {
+      setupFetchMock(mockFonts)
+      await composable.fetchFonts()
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
+      vi.clearAllMocks()
+
+      await composable.ensureCssFamilyLoaded(null)
+
+      expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2)
+      expect(composable.generateFontFaceCSS()).not.toContain('blob:')
+    })
+
+    it('ignores a family name that matches no font', async () => {
+      setupFetchMock(mockFonts)
+      await composable.fetchFonts()
+      vi.clearAllMocks()
+
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Nonexistent'))
+
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
+    })
+
+    it('keeps only the newest family when a switch interrupts an in-flight load', async () => {
+      const listResponse = { ok: true, json: () => Promise.resolve(mockFonts) }
+      const releaseFontFile = new Map<string, () => void>()
+
+      fetchMock.mockImplementation((url: unknown) => {
+        if (url === '/api/v1/fonts') return Promise.resolve(listResponse)
+        return new Promise((resolve) => {
+          releaseFontFile.set(url as string, () => resolve({ ok: true, blob: () => Promise.resolve(new Blob(['font'])) }))
+        })
+      })
+
+      await composable.fetchFonts()
+
+      // Start loading Literata, then switch to Georgia Pro before its files arrive.
+      const literata = composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
+      const georgia = composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Georgia Pro'))
+
+      releaseFontFile.get('/api/v1/fonts/3/file')!()
+      releaseFontFile.get('/api/v1/fonts/1/file')!()
+      releaseFontFile.get('/api/v1/fonts/2/file')!()
+      await Promise.all([literata, georgia])
+
+      // The abandoned family must not stay resident just because it finished late.
+      const css = composable.generateFontFaceCSS()
+      expect(css).toContain('/api/v1/fonts/1/file')
+      expect(css).toContain('/api/v1/fonts/2/file')
+      expect(css).not.toContain('/api/v1/fonts/3/file')
+    })
+
+    it('survives a failed font file download', async () => {
+      fetchMock.mockImplementation((url: unknown) => {
+        if (url === '/api/v1/fonts') {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFonts) })
+        }
+        if (url === '/api/v1/fonts/1/file') {
+          return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['font'])) })
+        }
+        return Promise.resolve({ ok: false })
+      })
+
+      await composable.fetchFonts()
+      await expect(composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))).resolves.toBeUndefined()
+
+      const css = composable.generateFontFaceCSS()
+      expect(css).toContain('blob:test/')
+      expect(css).toContain('/api/v1/fonts/2/file')
+    })
+  })
+
   describe('deleteFont', () => {
     it('removes a font from the list and revokes its blob URL on success', async () => {
       setupFetchMock(mockFonts)
       await composable.fetchFonts()
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
       vi.clearAllMocks()
 
       fetchMock.mockResolvedValue({ ok: true })
@@ -281,18 +392,22 @@ describe('useCustomFonts', () => {
   })
 
   describe('generateFontFaceCSS', () => {
-    it('uses blob URLs when available after fetchFonts', async () => {
+    it('uses blob URLs for the loaded family and API URLs for the rest', async () => {
       setupFetchMock(mockFonts)
       await composable.fetchFonts()
+      await composable.ensureCssFamilyLoaded(fontCssFamilyGroupName('Literata'))
 
       const css = composable.generateFontFaceCSS()
 
       expect(css).toContain('@font-face')
       expect(css).toContain(`"${fontCssFamilyGroupName('Literata')}"`)
       expect(css).toContain(`"${fontCssFamilyGroupName('Georgia Pro')}"`)
-      // Blob URLs should be used instead of API URLs
+      // The loaded family resolves through blobs so the reader iframe can fetch it
+      // without auth headers; the unloaded one stays on its cookie-authenticated URL.
       expect(css).toContain('blob:test/')
       expect(css).not.toContain('/api/v1/fonts/1/file')
+      expect(css).not.toContain('/api/v1/fonts/2/file')
+      expect(css).toContain('/api/v1/fonts/3/file')
       expect(css).toContain('font-weight: 400')
       expect(css).toContain('font-weight: 700')
       expect(css).toContain('format("truetype")')

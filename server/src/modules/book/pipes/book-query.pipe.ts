@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { z } from 'zod';
 
-import { SORT_FIELDS, type BookQuery, type JumpBucketsQuery } from '@bookorbit/types';
+import { isSortField, type BookQuery, type JumpBucketsQuery, type SortField } from '@bookorbit/types';
 
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../../common/constants/pagination.constants';
 import { groupRuleSchema } from '../utils/group-rule.validator';
+
+const sortFieldSchema = z.custom<SortField>((value) => typeof value === 'string' && isSortField(value), { message: 'Unsupported sort field' });
 
 const bookQuerySchema = z.object({
   collapseSeries: z.boolean().optional(),
@@ -13,7 +15,7 @@ const bookQuerySchema = z.object({
   sort: z
     .array(
       z.object({
-        field: z.enum(SORT_FIELDS as unknown as [string, ...string[]]),
+        field: sortFieldSchema,
         dir: z.enum(['asc', 'desc']),
       }),
     )

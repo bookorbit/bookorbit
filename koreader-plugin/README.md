@@ -2,7 +2,7 @@
 
 Syncs your KOReader reading life into BookOrbit:
 
-- **Catalog browsing**: a reading-first dashboard on the device with libraries, collections, SmartScopes, authors, series and search, plus one configurable book row you choose the source of. Mosaic or list view, read-status/format filters, downloads and bulk downloads, "On device" indicators, and a "Read" action for books already on the device.
+- **Catalog browsing**: a reading-first dashboard on the device with libraries, collections, SmartScopes, authors, series and search, built from four configurable sections you choose the sources of. Mosaic or list view, read-status/format filters, downloads and bulk downloads, "On device" indicators, and a "Read" action for books already on the device.
 - **Progress sync**: pulls progress on book open (with a conflict prompt), pushes periodically and on close/suspend.
 - **Reading statistics**: uploads KOReader's per-page time events; BookOrbit turns them into reading sessions and daily stats.
 - **Two-way highlights**: device highlights appear as native highlights on the web reader; highlights, edits and deletions made on the web come back to the device.
@@ -31,7 +31,7 @@ Re-downloading later (e.g. after changing your password or server address) and r
 1. Tools > BookOrbit > "Auto sync current book" to sync the open book automatically. Leave the stock "Progress sync" plugin unconfigured to avoid double syncing.
 2. Optional: Settings > Sync > "Periodically sync every # pages" (default 10, 0 disables mid-session pushes).
 3. Optional: Settings > Dashboard > "Open dashboard on startup".
-4. Optional: Settings > Dashboard > "Show below Continue reading" - pick Discover (the default), Recently added, Want to read, Up next in series, or one of your SmartScopes. Needs a server new enough to advertise the section capability; older servers keep showing Discover.
+4. Optional: Settings > Dashboard > Section 1-4 - pick each dashboard section's source: Stats, Continue reading, Discover, Browse, Highlight of the day, Recently added, In progress, Want to read, Up next in series, or a pick from the Libraries/Authors/Series/Collections/SmartScopes catalogs. Want to read and Up next in series need a server new enough to advertise the section capability; against an older server they render empty and stop being offered. "Tap Continue reading to open the book" (on by default) resumes an on-device book in one tap; hold for its actions.
 5. Optional: assign "BookOrbit: sync this book" / "sync all books" to gestures.
 
 The plugin manages `settings/reader_menu_order.lua` and `settings/filemanager_menu_order.lua` to keep its menu entry pinned below Calibre across updates; delete those files to reset your menu order.

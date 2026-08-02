@@ -59,10 +59,12 @@ package.loaded["ffi/util"] = {
     end,
 }
 package.loaded["gettext"] = setmetatable({}, { __call = function(_, value) return value end })
+local widget_stub = stubWidget()
 package.loaded["bookorbit_catalog_widgets"] = {
-    buildCoverWidget = function() end,
-    buildDetailPill = function() end,
-    buildDetailProgressBar = function() end,
+    buildCoverWidget = function() return widget_stub:new() end,
+    buildDetailPill = function() return widget_stub:new() end,
+    buildDetailProgressBar = function() return widget_stub:new() end,
+    detailRatingStarWidth = function() return 20 end,
     DetailRelatedCard = stubWidget(),
     DetailTabButton = stubWidget(),
     DetailRatingStar = stubWidget(),
@@ -198,5 +200,38 @@ assertEqual(menu:downloadButtonLabel({ { format = "epub", sizeBytes = 2411724 } 
     "the button carries the format and the size")
 assertEqual(menu:downloadButtonLabel({ { format = "epub" } }), "Download (EPUB)",
     "an unknown size leaves the original label untouched")
+
+-- Hero series line
+--
+-- Asserted through buildDetailHeader rather than against the helper directly:
+-- the helper is a plain function, and the header used to call it as a method,
+-- which passed the catalog as the detail and silently dropped the line from
+-- every book page. Only the real call path catches that.
+
+local header_menu = setmetatable({
+    available_height = 800,
+    inner_dimen = { w = 600, h = 900 },
+    on_device = {},
+    current_context = { supported_files = {} },
+}, { __index = CatalogDetail })
+function header_menu:thumbnailDisplay() return nil, "failed" end
+function header_menu:isOnDevice() return false end
+function header_menu:readStatusLabel() return nil end
+function header_menu:supportedFiles() return {} end
+function header_menu:onDeviceFilePath() return nil end
+function header_menu:downloadButtonLabel() return "Download" end
+
+header_menu:buildDetailHeader({
+    title = "The Left Hand of Darkness",
+    authors = { "Ursula K. Le Guin" },
+    seriesName = "Hainish Cycle",
+    seriesIndex = 4,
+}, 600)
+assertEqual(header_menu.detail_series_line ~= nil, true,
+    "a book in a series renders its hero series line")
+
+header_menu:buildDetailHeader({ title = "Standalone", authors = { "Someone" } }, 600)
+assertEqual(header_menu.detail_series_line, nil,
+    "a book with no series renders no series line")
 
 print("bookorbit_detail_info_rows_test.lua: ok")

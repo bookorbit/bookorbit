@@ -372,6 +372,94 @@ describe('SmartScopeService', () => {
     expect(result).toEqual({ ...updated, isOwner: false, koboSyncEnabled: false });
   });
 
+  describe('sharing an existing smartScope (issue #805)', () => {
+    it('update shares a private smartScope without recreating it', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const existing = makeSmartScope({ id: 3, userId: 12, isPublic: false });
+      const shared = { ...existing, isPublic: true };
+      smartScopeRepo.findById.mockResolvedValue([existing]);
+      smartScopeRepo.update.mockResolvedValue([shared]);
+
+      const result = await service.update(3, { isPublic: true }, makeUser({ id: 12 }));
+
+      expect(smartScopeRepo.update).toHaveBeenCalledWith(3, 12, expect.objectContaining({ isPublic: true }));
+      expect(result).toEqual({ ...shared, isOwner: true, koboSyncEnabled: false });
+    });
+
+    it('update unshares a public smartScope', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const existing = makeSmartScope({ id: 3, userId: 12, isPublic: true });
+      smartScopeRepo.findById.mockResolvedValue([existing]);
+      smartScopeRepo.update.mockResolvedValue([{ ...existing, isPublic: false }]);
+
+      const result = await service.update(3, { isPublic: false }, makeUser({ id: 12 }));
+
+      expect(smartScopeRepo.update).toHaveBeenCalledWith(3, 12, expect.objectContaining({ isPublic: false }));
+      expect(result).toEqual(expect.objectContaining({ isPublic: false }));
+    });
+
+    it('update leaves the sharing flag alone when the payload omits it', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const existing = makeSmartScope({ id: 3, userId: 12, isPublic: true });
+      smartScopeRepo.findById.mockResolvedValue([existing]);
+      smartScopeRepo.update.mockResolvedValue([existing]);
+
+      await service.update(3, { name: 'Renamed' }, makeUser({ id: 12 }));
+
+      const [, , values] = smartScopeRepo.update.mock.calls[0] as [number, number, Record<string, unknown>];
+      expect(values.isPublic).toBeUndefined();
+    });
+
+    it('update carries sharing and Kobo sync together without cross-writing either flag', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const existing = makeSmartScope({ id: 3, userId: 12, isPublic: false, syncToKobo: false });
+      const updated = { ...existing, isPublic: true, syncToKobo: true };
+      smartScopeRepo.findById.mockResolvedValue([existing]);
+      smartScopeRepo.update.mockResolvedValue([updated]);
+
+      const result = await service.update(3, { isPublic: true, syncToKobo: true }, makeUser({ id: 12 }));
+
+      expect(smartScopeRepo.update).toHaveBeenCalledWith(3, 12, expect.objectContaining({ isPublic: true, syncToKobo: true }));
+      expect(result).toEqual(expect.objectContaining({ isPublic: true, syncToKobo: true, koboSyncEnabled: true }));
+    });
+
+    it('update lets a superuser share another user smartScope against the owner row', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const existing = makeSmartScope({ id: 4, userId: 77, isPublic: false });
+      const shared = { ...existing, isPublic: true };
+      smartScopeRepo.findById.mockResolvedValue([existing]);
+      smartScopeRepo.update.mockResolvedValue([shared]);
+      smartScopeRepo.findKoboSubscribedScopeIds.mockResolvedValue([]);
+
+      const result = await service.update(4, { isPublic: true }, makeUser({ id: 1, isSuperuser: true }));
+
+      expect(smartScopeRepo.update).toHaveBeenCalledWith(4, 77, expect.objectContaining({ isPublic: true }));
+      // The superuser is not the owner, so the owner Kobo flag must not leak into their own sync state.
+      expect(result).toEqual(expect.objectContaining({ isOwner: false, koboSyncEnabled: false }));
+    });
+
+    it('update rejects a non-owner sharing someone else smartScope', async () => {
+      const { service, smartScopeRepo } = makeService();
+      smartScopeRepo.findById.mockResolvedValue([makeSmartScope({ id: 5, userId: 77, isPublic: false })]);
+
+      await expect(service.update(5, { isPublic: true }, makeUser({ id: 12, isSuperuser: false }))).rejects.toThrow(ForbiddenException);
+      expect(smartScopeRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('update reports the shared scope Kobo opt-in of the caller, not the owner flag', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const existing = makeSmartScope({ id: 6, userId: 77, isPublic: true, syncToKobo: true });
+      smartScopeRepo.findById.mockResolvedValue([existing]);
+      smartScopeRepo.update.mockResolvedValue([existing]);
+      smartScopeRepo.findKoboSubscribedScopeIds.mockResolvedValue([6]);
+
+      const result = await service.update(6, { name: 'Renamed by admin' }, makeUser({ id: 1, isSuperuser: true }));
+
+      expect(smartScopeRepo.findKoboSubscribedScopeIds).toHaveBeenCalledWith(1, [6]);
+      expect(result).toEqual(expect.objectContaining({ isOwner: false, koboSyncEnabled: true }));
+    });
+  });
+
   it('update rejects changes that would leave a smartScope without an icon', async () => {
     const { service, smartScopeRepo } = makeService();
     smartScopeRepo.findById.mockResolvedValue([makeSmartScope({ icon: null })]);

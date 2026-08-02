@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   centeredBottomScaleTransform,
+  centeredScaleShiftPercent,
   isSquareCoverRatio,
   resolveCoverStackAspectRatio,
   resolveCoverStackDisplayMode,
@@ -40,6 +41,9 @@ describe('cover-scale utilities', () => {
   })
 
   it('returns centered bottom transform only when scale exceeds 1', () => {
+    expect(centeredScaleShiftPercent(1)).toBe(0)
+    expect(centeredScaleShiftPercent(Number.NaN)).toBe(0)
+    expect(centeredScaleShiftPercent(1.25)).toBe(12.5)
     expect(centeredBottomScaleTransform(1)).toBeNull()
     expect(centeredBottomScaleTransform(Number.NaN)).toBeNull()
     expect(centeredBottomScaleTransform(1.25)).toEqual({

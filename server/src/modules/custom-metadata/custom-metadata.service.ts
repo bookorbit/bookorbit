@@ -4,6 +4,7 @@ import type {
   CustomMetadataFieldDefinition,
   CustomMetadataFieldSummary,
   CustomMetadataFieldType,
+  CustomMetadataFieldTypeMap,
   CustomMetadataPrimitiveValue,
 } from '@bookorbit/types';
 
@@ -56,6 +57,13 @@ export class CustomMetadataService {
       archivedAt: field.archivedAt?.toISOString() ?? null,
       enabledLibraryIds: enabledByFieldId.get(field.id) ?? [],
     }));
+  }
+
+  /** Resolves the requested field ids to their types, omitting ids that are archived or gone. */
+  async getActiveFieldTypes(fieldIds: number[]): Promise<CustomMetadataFieldTypeMap> {
+    if (fieldIds.length === 0) return new Map();
+    const rows = await this.repository.findActiveFieldTypes(fieldIds);
+    return new Map(rows.map((row) => [row.id, row.type]));
   }
 
   async createField(dto: CreateCustomMetadataFieldDto): Promise<CustomMetadataFieldDefinition> {

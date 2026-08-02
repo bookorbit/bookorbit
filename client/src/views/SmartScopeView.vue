@@ -48,7 +48,7 @@ import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import FilterSummary from '@/features/book/components/FilterSummary.vue'
-import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import { sortFieldLabel } from '@/features/book/lib/filter-labels'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
@@ -142,7 +142,7 @@ usePageTitle(pageTitle)
 const sortChip = computed(() => {
   const specs = smartScope.value?.defaultSort
   if (!specs?.length) return null
-  return specs.map((s) => `${SORT_FIELD_LABELS[s.field as SortField] ?? s.field} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', ')
+  return specs.map((s) => `${sortFieldLabel(s.field as SortField)} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', ')
 })
 
 const filterExpanded = smartScopeFilterExpanded

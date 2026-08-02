@@ -235,6 +235,93 @@ describe('extractCbzMetadata', () => {
       expect(r?.googleBooksId).toBe('google-1');
       expect(r?.hardcoverEditionId).toBe('8941973');
     });
+
+    describe('ComicVine ID extraction', () => {
+      it('extracts comicvineId from a Web field containing the canonical 4000-<id> issue URL', async () => {
+        const xml = `<ComicInfo><Web>https://comicvine.gamespot.com/amazing-series-1/4000-140529/</Web></ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBe('140529');
+      });
+
+      it('extracts comicvineId when Web holds multiple space-separated URLs', async () => {
+        const xml = `<ComicInfo><Web>https://www.example.com/other https://comicvine.gamespot.com/amazing-series-1/4000-140529/</Web></ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBe('140529');
+      });
+
+      it('falls back to the "[Issue ID N]" convention in Notes when Web has no ComicVine URL', async () => {
+        const xml = `<ComicInfo>
+          <Notes>Tagged with ComicTagger 1.3.2a5 using info from Comic Vine on 2022-04-16. [Issue ID 140529]</Notes>
+        </ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBe('140529');
+      });
+
+      it('ignores the Notes fallback when ComicTagger sourced the issue id from another provider', async () => {
+        const xml = `<ComicInfo>
+          <Notes>Tagged with ComicTagger 2.10.0 using info from Metron on 2024-01-02. [Issue ID 55123]</Notes>
+        </ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBeNull();
+      });
+
+      it('prefers the Web field over the Notes fallback when both are present', async () => {
+        const xml = `<ComicInfo>
+          <Web>https://comicvine.gamespot.com/amazing-series-1/4000-1/</Web>
+          <Notes>Tagged with ComicTagger 1.3.2a5 using info from Comic Vine on 2022-04-16. [Issue ID 999999]</Notes>
+        </ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBe('1');
+      });
+
+      it('prefers a managed [bookorbit:comicvineId] note over both Web and the Notes fallback', async () => {
+        const xml = `<ComicInfo>
+          <Web>https://comicvine.gamespot.com/amazing-series-1/4000-1/</Web>
+          <Notes>
+            [bookorbit:comicvineId] 42
+            Tagged with ComicTagger 1.3.2a5 using info from Comic Vine on 2022-04-16. [Issue ID 999999]
+          </Notes>
+        </ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBe('42');
+      });
+
+      it('returns null when neither Web nor Notes reference ComicVine', async () => {
+        const xml = `<ComicInfo><Title>No ComicVine reference</Title></ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBeNull();
+      });
+
+      it('does not confuse a ComicVine volume URL (4050-) with an issue URL (4000-)', async () => {
+        const xml = `<ComicInfo><Web>https://comicvine.gamespot.com/amazing-series/4050-9999/</Web></ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBeNull();
+      });
+
+      it('only matches 4000- at the start of a path segment', async () => {
+        const xml = `<ComicInfo><Web>https://comicvine.gamespot.com/amazing-series/14000-777/</Web></ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.comicvineId).toBeNull();
+      });
+    });
   });
 
   describe('ComicBookInfo/1.0 JSON comment fallback', () => {

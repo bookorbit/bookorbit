@@ -34,6 +34,7 @@ import { useCoverStack, MAX_VISIBLE as MAX_STACK_VISIBLE } from '../composables/
 import {
   PORTRAIT_STACK_FRAME_ASPECT_RATIO,
   centeredBottomScaleTransform,
+  centeredScaleShiftPercent,
   resolveCoverStackAspectRatio,
   resolveCoverStackDisplayMode,
   resolveCoverStackFrameAspectRatio,
@@ -251,9 +252,12 @@ const scaledLeadCoverStyles = computed(() =>
     const ratio = leadCoverRatioAt(index)
     const squareScale = resolveSquareCoverScale(ratio, SERIES_SQUARE_COVER_SCALE)
     const squareTransform = centeredBottomScaleTransform(squareScale)
+    const centerShiftPercent = centeredScaleShiftPercent(squareScale)
     const baseForRatio = {
       ...base,
       aspectRatio: resolveCoverStackAspectRatio(ratio),
+      '--lead-cover-hover-translate-y': `calc(-12px - ${centerShiftPercent}%)`,
+      '--lead-cover-hover-scale': String(1.03 * squareScale),
     }
     if (!squareTransform) return baseForRatio
     return {
@@ -747,7 +751,8 @@ defineOptions({ name: 'SeriesDetailView' })
 }
 
 .series-cover-stack-item:hover {
-  transform: perspective(1000px) rotateY(0deg) translateY(-12px) translateZ(40px) scale(1.03) !important;
+  transform: perspective(1000px) rotateY(0deg) translateY(var(--lead-cover-hover-translate-y, -12px)) translateZ(40px)
+    scale(var(--lead-cover-hover-scale, 1.03)) !important;
   z-index: 50 !important;
   box-shadow:
     0 20px 25px -5px rgba(0, 0, 0, 0.4),

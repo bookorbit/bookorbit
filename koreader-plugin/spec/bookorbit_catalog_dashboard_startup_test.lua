@@ -68,6 +68,7 @@ package.loaded["ui/size"] = {
     span = { horizontal_default = 4, vertical_default = 4 },
 }
 package.loaded["ui/widget/textboxwidget"] = widgetClass()
+package.loaded["ui/widget/textwidget"] = widgetClass()
 package.loaded["ui/uimanager"] = {
     show = function() end,
 }

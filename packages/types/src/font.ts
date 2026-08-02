@@ -42,7 +42,9 @@ export const FONT_FORMAT_CSS_FORMAT: Record<FontFormat, string> = {
   woff2: "woff2",
 };
 
-export const MAX_FONT_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+// Sized for CJK and other non-alphabetic fonts, which routinely exceed 30 MB because
+// they carry tens of thousands of glyphs.
+export const MAX_FONT_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 export const MAX_FONTS_PER_USER = 50;
 
 export const FONT_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900] as const;

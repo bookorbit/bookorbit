@@ -1,4 +1,5 @@
 import type { BookCard, BookMetadataLockField, CustomMetadataFieldSummary, CustomMetadataFieldType, SortField } from '@bookorbit/types'
+import { customSortField } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 
 function getPrimaryFile(book: BookCard) {
@@ -89,7 +90,7 @@ export function buildCustomColumnDef(field: CustomMetadataFieldSummary): ColumnD
     header: field.label,
     cellType: customFieldCellType(field.type),
     isEditable,
-    sortField: null,
+    sortField: customSortField(field.id),
     defaultWidth: 160,
     minWidth: 80,
     defaultVisible: false,

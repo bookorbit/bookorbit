@@ -45,6 +45,7 @@ export interface ParsedCbzMetadata {
   openLibraryId: string | null;
   ranobedbId: string | null;
   koboId: string | null;
+  comicvineId: string | null;
   lubimyczytacId: string | null;
   aladinId: string | null;
   itunesId: string | null;
@@ -106,6 +107,20 @@ function parseProviderIdsFromWebUrl(
   return {};
 }
 
+function parseComicVineIdFromWebUrl(webUrl: string | null): string | null {
+  if (!webUrl) return null;
+  // Web may hold multiple space-separated URLs, so scan rather than match a fixed prefix.
+  // 4000- must start a path segment, otherwise a segment merely ending in it, such as "14000-777", matches too.
+  return /comicvine\.gamespot\.com\/(?:[^\s]*\/)?4000-(\d+)/i.exec(webUrl)?.[1] ?? null;
+}
+
+function parseComicVineIdFromNotes(notes: string | null): string | null {
+  if (!notes) return null;
+  // ComicTagger writes "using info from <source> on <date>. [Issue ID 140529]" for every metadata
+  // source it supports, so the id only belongs to Comic Vine when that source names it.
+  return /using info from Comic\s*Vine\b[^[]*\[Issue ID (\d+)\]/i.exec(notes)?.[1] ?? null;
+}
+
 function parseCbxRating(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
@@ -145,8 +160,11 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       year !== null && month !== null && day !== null
         ? (parsePublishedDateKey(`${year}-${String(Math.floor(month)).padStart(2, '0')}-${String(Math.floor(day)).padStart(2, '0')}`) ?? null)
         : null;
-    const managedNotes = parseProjectxManagedNotes(str('Notes'));
-    const providerIdsFromWeb = parseProviderIdsFromWebUrl(str('Web'));
+    const notesText = str('Notes');
+    const webText = str('Web');
+    const managedNotes = parseProjectxManagedNotes(notesText);
+    const providerIdsFromWeb = parseProviderIdsFromWebUrl(webText);
+    const comicvineId = managedNotes.get('comicvineId') ?? parseComicVineIdFromWebUrl(webText) ?? parseComicVineIdFromNotes(notesText) ?? null;
 
     const genres = splitDelimited(str('Genre'));
     const tags = splitDelimited(str('Tags'));
@@ -201,6 +219,7 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       openLibraryId: managedNotes.get('openLibraryId') ?? providerIdsFromWeb.openLibraryId ?? null,
       ranobedbId: managedNotes.get('ranobedbId') ?? null,
       koboId: managedNotes.get('koboId') ?? providerIdsFromWeb.koboId ?? null,
+      comicvineId,
       lubimyczytacId: managedNotes.get('lubimyczytacId') ?? null,
       aladinId: managedNotes.get('aladinId') ?? null,
       itunesId: null,
@@ -271,6 +290,7 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
       openLibraryId: null,
       ranobedbId: null,
       koboId: null,
+      comicvineId: null,
       lubimyczytacId: null,
       aladinId: null,
       itunesId: null,

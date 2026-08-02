@@ -4,6 +4,9 @@ export type CustomMetadataFieldType = (typeof CUSTOM_METADATA_FIELD_TYPES)[numbe
 
 export type CustomMetadataPrimitiveValue = string | number | boolean | null;
 
+/** Active field id to type, resolved per query so sorting can pick the matching value column. */
+export type CustomMetadataFieldTypeMap = ReadonlyMap<number, CustomMetadataFieldType>;
+
 export interface CustomMetadataFieldDefinition {
   id: number;
   key: string;

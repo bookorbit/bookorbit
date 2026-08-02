@@ -12,7 +12,7 @@ import {
   type RuleOperator,
 } from '@bookorbit/types'
 import { READ_STATUSES } from '@bookorbit/types'
-import { FIELD_LABELS, OPERATOR_LABELS } from '@/features/book/lib/filter-labels'
+import { fieldLabel, operatorLabel } from '@/features/book/lib/filter-labels'
 import { providerIconPathSafe } from '@/features/book/lib/provider-icons'
 import { PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useLibraries } from '@/features/library/composables/useLibraries'
@@ -394,7 +394,7 @@ function showValueToInput(operator: RuleOperator): boolean {
           @change="onFieldChange(index)"
           class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary shrink-0"
         >
-          <option v-for="field in RULE_FIELDS" :key="field" :value="field">{{ FIELD_LABELS[field] }}</option>
+          <option v-for="field in RULE_FIELDS" :key="field" :value="field">{{ fieldLabel(field) }}</option>
         </select>
 
         <select
@@ -402,7 +402,7 @@ function showValueToInput(operator: RuleOperator): boolean {
           @change="onOperatorChange(index)"
           class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary shrink-0"
         >
-          <option v-for="op in FIELD_OPERATORS[node.rule.field]" :key="op" :value="op">{{ OPERATOR_LABELS[op] }}</option>
+          <option v-for="op in FIELD_OPERATORS[node.rule.field]" :key="op" :value="op">{{ operatorLabel(op) }}</option>
         </select>
 
         <div
@@ -417,7 +417,7 @@ function showValueToInput(operator: RuleOperator): boolean {
           />
           <select
             v-model="node.rule.provider"
-            class="h-7 bg-transparent text-foreground text-sm outline-none"
+            class="h-7 bg-background text-foreground text-sm outline-none"
             :aria-label="t('book.filter.communityRatingProvider')"
             @change="emitUpdate"
           >
@@ -454,7 +454,7 @@ function showValueToInput(operator: RuleOperator): boolean {
             </span>
             <select
               :value="''"
-              class="h-7 flex-1 min-w-32 bg-transparent text-foreground text-sm outline-none"
+              class="h-7 flex-1 min-w-32 bg-background text-foreground text-sm outline-none"
               @change="addLibraryChip(index, $event)"
             >
               <option value="" disabled>
@@ -490,11 +490,7 @@ function showValueToInput(operator: RuleOperator): boolean {
                 <X :size="10" />
               </button>
             </span>
-            <select
-              :value="''"
-              class="h-7 flex-1 min-w-32 bg-transparent text-foreground text-sm outline-none"
-              @change="addStatusChip(index, $event)"
-            >
+            <select :value="''" class="h-7 flex-1 min-w-32 bg-background text-foreground text-sm outline-none" @change="addStatusChip(index, $event)">
               <option value="" disabled>{{ t('book.filter.selectStatus') }}</option>
               <option v-for="status in READ_STATUSES" :key="status" :value="status" :disabled="node.rule.valueChips.includes(status)">
                 {{ READ_STATUS_LABELS[status] ?? status }}

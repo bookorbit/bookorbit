@@ -16,6 +16,7 @@ export function useCustomFonts() {
   const loading = ref(false)
   const uploading = ref(false)
   const fontBlobUrls = new Map<number, string>()
+  let requestedCssFamily: string | null = null
 
   function revokeFontBlobUrl(fontId: number) {
     const url = fontBlobUrls.get(fontId)
@@ -48,11 +49,43 @@ export function useCustomFonts() {
           if (!newFontIds.has(id)) revokeFontBlobUrl(id)
         }
         fonts.value = newFonts
-        await Promise.allSettled(fonts.value.map((f) => cacheFontBlobUrl(f.id)))
       }
     } finally {
       loading.value = false
     }
+  }
+
+  function variantsOf(cssFamilyName: string | null): UserFont[] {
+    if (!cssFamilyName) return []
+    return fonts.value.filter((f) => fontCssFamilyGroupName(f.familyName) === cssFamilyName)
+  }
+
+  /** Releases every blob URL not belonging to the most recently requested family. */
+  function revokeUnrequestedBlobUrls() {
+    const keep = new Set(variantsOf(requestedCssFamily).map((f) => f.id))
+    for (const id of fontBlobUrls.keys()) {
+      if (!keep.has(id)) revokeFontBlobUrl(id)
+    }
+  }
+
+  /**
+   * Loads blob URLs for one family and releases every other family's.
+   *
+   * Individual fonts run to tens of megabytes, so holding a whole library of them in
+   * memory is not viable. The reader renders one family at a time, and everywhere else
+   * (settings previews) runs in the main document, where generateFontFaceCSS falls back
+   * to the API URL and the browser fetches only what it actually renders.
+   */
+  async function ensureCssFamilyLoaded(cssFamilyName: string | null): Promise<void> {
+    requestedCssFamily = cssFamilyName
+    revokeUnrequestedBlobUrls()
+
+    const variants = variantsOf(cssFamilyName)
+    await Promise.allSettled(variants.filter((f) => !fontBlobUrls.has(f.id)).map((f) => cacheFontBlobUrl(f.id)))
+
+    // Switching families mid-download would otherwise leave the superseded family
+    // resident, since its downloads land after the newer request already pruned.
+    revokeUnrequestedBlobUrls()
   }
 
   async function uploadFont(file: File): Promise<FontUploadResult | null> {
@@ -70,7 +103,6 @@ export function useCustomFonts() {
       }
       const result: FontUploadResult = await res.json()
       fonts.value = [...fonts.value, result.font]
-      await cacheFontBlobUrl(result.font.id)
       return result
     } finally {
       uploading.value = false
@@ -117,8 +149,9 @@ export function useCustomFonts() {
   /**
    * Generates @font-face CSS where all variants of a family share one CSS
    * font-family name (differentiated by font-weight/font-style). This lets the
-   * browser automatically pick bold/italic variants. Uses pre-fetched blob URLs
-   * so the iframe can load fonts without needing auth headers in CSS url().
+   * browser automatically pick bold/italic variants. Prefers a blob URL when the
+   * family has been loaded via ensureCssFamilyLoaded, since the reader iframe cannot
+   * send auth headers in CSS url(); elsewhere the API URL authenticates by cookie.
    */
   function generateFontFaceCSS(): string {
     if (fonts.value.length === 0) return ''
@@ -160,6 +193,7 @@ export function useCustomFonts() {
     loading,
     uploading,
     fetchFonts,
+    ensureCssFamilyLoaded,
     uploadFont,
     updateFont,
     deleteFont,

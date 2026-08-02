@@ -65,9 +65,11 @@ package.loaded["ltn12"] = {
     },
 }
 
+local last_request_url
 package.loaded["socket.http"] = {
     request = function(request)
         request_ran_in_subprocess = in_subprocess
+        last_request_url = request.url
         if mock_http_body then
             request.sink(mock_http_body)
         end
@@ -156,6 +158,13 @@ body, err, errbody = client:auth()
 assertEqual(body, nil, "HTTP error has no decoded body")
 assertEqual(err, 503, "HTTP error preserves status code")
 assertEqual(errbody, nil, "invalid HTTP error body is ignored")
+
+mock_http_body = "{\"ok\":true}"
+mock_http_code = 200
+client:catalogDashboardSection("up-next-in-series")
+assertEqual(last_request_url,
+    "https://bookorbit.example.com/api/v1/koreader/plugin/catalog/dashboard/sections/up-next-in-series",
+    "the dashboard-section endpoint is addressed by source type")
 
 local wrapped = true
 local subprocess_calls = 0

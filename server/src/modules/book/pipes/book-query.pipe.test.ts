@@ -79,6 +79,18 @@ describe('BookQueryPipe', () => {
     expect(result.sort).toEqual([{ field: 'format', dir: 'desc' }]);
   });
 
+  it('accepts a custom metadata field reference as a sort field', () => {
+    const result = pipe.transform({ sort: [{ field: 'custom:12', dir: 'desc' }] });
+    expect(result.sort).toEqual([{ field: 'custom:12', dir: 'desc' }]);
+  });
+
+  it.each(['custom:', 'custom:0', 'custom:-1', 'custom:1.5', 'custom:1 OR 1=1', 'custom:1234567890'])(
+    'throws BadRequestException for malformed custom sort field %s',
+    (field) => {
+      expect(() => pipe.transform({ sort: [{ field, dir: 'asc' }] })).toThrow(BadRequestException);
+    },
+  );
+
   it('throws BadRequestException for more than 5 sort entries', () => {
     const sort = ['title', 'author', 'series', 'addedAt', 'publishedYear', 'pageCount'].map((field) => ({ field, dir: 'asc' }));
     expect(() => pipe.transform({ sort })).toThrow(BadRequestException);

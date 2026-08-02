@@ -64,8 +64,8 @@ type BatchProgressCandidate = BatchProgressRow & { percentage: number; updatedAt
 const CATALOG_BASE = '/api/v1/koreader/plugin/catalog';
 const AUTHOR_SERIES_PAGE_SIZE = 60;
 const DASHBOARD_CONTINUE_READING_LIMIT = 5;
-const DASHBOARD_DISCOVER_LIMIT = 10;
-const DASHBOARD_SECTION_LIMIT = 10;
+const DASHBOARD_DISCOVER_LIMIT = 12;
+const DASHBOARD_SECTION_LIMIT = 12;
 const DETAIL_RELATED_LIMIT = 8;
 const MANIFEST_DEFAULT_PAGE_SIZE = 100;
 const MANIFEST_CURSOR_VERSION = 1;
@@ -652,6 +652,7 @@ export class KoreaderCatalogService {
       seriesName: entry.seriesName,
       seriesIndex: entry.seriesIndex,
       progressPercentage: progress?.percentage ?? null,
+      lastReadAt: progress?.updatedAt ?? null,
       readStatus,
       formats,
       hasCover: entry.hasCover,
@@ -713,6 +714,7 @@ export class KoreaderCatalogService {
       seriesName: detail.seriesName,
       seriesIndex: detail.seriesIndex,
       progressPercentage: progress?.percentage ?? null,
+      lastReadAt: progress?.updatedAt ?? null,
       readStatus: detail.readStatus?.status ?? null,
       formats: this.uniqueFormats(files.map((file) => file.format)),
       hasCover: detail.coverSource !== null,

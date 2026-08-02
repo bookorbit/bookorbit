@@ -10,6 +10,8 @@ type Db = NodePgDatabase<typeof schema>;
 
 export interface StoredProviderIdsRow {
   libraryId: number;
+  seriesName: string | null;
+  seriesIndex: number | null;
   googleBooksId: string | null;
   goodreadsId: string | null;
   amazonId: string | null;
@@ -33,6 +35,8 @@ export class MetadataFetchRepository {
     const [row] = await this.db
       .select({
         libraryId: books.libraryId,
+        seriesName: bookMetadata.seriesName,
+        seriesIndex: bookMetadata.seriesIndex,
         googleBooksId: bookMetadata.googleBooksId,
         goodreadsId: bookMetadata.goodreadsId,
         amazonId: bookMetadata.amazonId,

@@ -69,6 +69,25 @@ describe('useSmartScopes', () => {
     expect(smartScopes.value).not.toBe(previous)
   })
 
+  it('patches the sharing flag and reflects the shared scope returned by the server', async () => {
+    const created = makeSmartScope({ isPublic: false })
+    const shared = makeSmartScope({ isPublic: true })
+    apiMock.mockResolvedValueOnce(makeResponse(created)).mockResolvedValueOnce(makeResponse(shared))
+
+    const { useSmartScopes } = await import('../useSmartScopes')
+    const { smartScopes, createSmartScope, updateSmartScope } = useSmartScopes()
+
+    await createSmartScope({ name: created.name, icon: 'Aperture', defaultSort: [] })
+    await updateSmartScope(created.id, { name: created.name, icon: 'Aperture', defaultSort: [], isPublic: true, syncToKobo: false })
+
+    expect(apiMock).toHaveBeenLastCalledWith('/api/v1/smart-scopes/11', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: created.name, icon: 'Aperture', defaultSort: [], isPublic: true, syncToKobo: false }),
+    })
+    expect(smartScopes.value).toEqual([shared])
+  })
+
   it('sends the Kobo sync opt-in and merges the response without dropping the cached book count', async () => {
     const shared = { ...makeSmartScope({ id: 11, userId: 4, isOwner: false, isPublic: true }), bookCount: 42 }
     apiMock

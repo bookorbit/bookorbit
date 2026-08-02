@@ -218,6 +218,7 @@ export class FileWriteRepository {
       openLibraryId: meta.openLibraryId,
       ranobedbId: meta.ranobedbId,
       koboId: meta.koboId,
+      comicvineId: meta.comicvineId,
       lubimyczytacId: meta.lubimyczytacId,
       aladinId: meta.aladinId,
       itunesId: meta.itunesId,

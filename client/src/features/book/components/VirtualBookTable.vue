@@ -38,7 +38,7 @@ import type { BookCard, Rule, SortSpec, TableLayoutState, TableViewType } from '
 import { BOOK_METADATA_LOCK_FIELDS } from '@bookorbit/types'
 import { isBookPlaceholder, type BookSlot } from '@/features/book/composables/useBookWindow'
 import { useNarratorSearch } from '@/features/book/composables/useNarratorSearch'
-import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import { sortFieldLabel } from '@/features/book/lib/filter-labels'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
 import { useI18n } from 'vue-i18n'
@@ -401,7 +401,7 @@ const activeSorts = computed(() =>
   props.sort.map((s) => ({
     field: s.field,
     dir: s.dir,
-    label: SORT_FIELD_LABELS[s.field] ?? s.field,
+    label: sortFieldLabel(s.field),
   })),
 )
 

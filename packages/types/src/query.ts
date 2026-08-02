@@ -189,8 +189,10 @@ export type GroupRule = {
  *
  * Fields marked "per-user, correlated subquery" require an authenticated userId and
  * execute a subquery per result row; they are slower on large result sets.
+ *
+ * User-defined custom metadata fields are sortable too, as `CustomSortField`.
  */
-export type SortField =
+export type StaticSortField =
   | "author"
   | "title"
   | "series"
@@ -213,7 +215,21 @@ export type SortField =
   | "language"
   | "metadataScore";
 
-export const SORT_FIELDS: SortField[] = [
+/**
+ * A user-defined custom metadata field, referenced by its numeric id.
+ *
+ * Values live in `book_custom_metadata_values`, which stores one typed column
+ * per value kind, so the server resolves the field's type at query time to pick
+ * the column to order by. Ids that no longer resolve to an active field are
+ * dropped from the sort rather than rejected, so a saved sort survives the
+ * field being archived or deleted.
+ */
+export type CustomSortField = `custom:${number}`;
+
+export type SortField = StaticSortField | CustomSortField;
+
+/** Built-in sort fields only. Custom fields are resolved at runtime, not enumerable here. */
+export const SORT_FIELDS: StaticSortField[] = [
   "author",
   "title",
   "series",
@@ -241,6 +257,36 @@ export type SortSpec = {
   field: SortField;
   dir: "asc" | "desc";
 };
+
+// Bounded to 9 digits so a parsed id always fits the int4 field id column.
+const CUSTOM_SORT_FIELD_PATTERN = /^custom:([1-9]\d{0,8})$/;
+
+export function customSortField(fieldId: number): CustomSortField {
+  return `custom:${fieldId}`;
+}
+
+export function isCustomSortField(field: string): field is CustomSortField {
+  return CUSTOM_SORT_FIELD_PATTERN.test(field);
+}
+
+/** Returns the custom metadata field id a sort field references, or null when it is not a custom sort. */
+export function parseCustomSortFieldId(field: string): number | null {
+  const match = CUSTOM_SORT_FIELD_PATTERN.exec(field);
+  return match ? Number(match[1]) : null;
+}
+
+export function isSortField(field: string): field is SortField {
+  return (SORT_FIELDS as string[]).includes(field) || isCustomSortField(field);
+}
+
+export function customSortFieldIds(sort: SortSpec[]): number[] {
+  const ids = new Set<number>();
+  for (const { field } of sort) {
+    const id = parseCustomSortFieldId(field);
+    if (id !== null) ids.add(id);
+  }
+  return [...ids];
+}
 
 export type BookQuery = {
   filter?: GroupRule;

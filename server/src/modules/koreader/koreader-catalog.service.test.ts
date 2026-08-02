@@ -330,7 +330,7 @@ describe('KoreaderCatalogService', () => {
 
     expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(7, 'recently_read', 1, 5, { readStatus: 'reading' }, false, user.contentFilters);
     expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(7, 'title_asc', 1, 1, {}, false, user.contentFilters);
-    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 10, false, user.contentFilters);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 12, false, user.contentFilters);
     expect(dashboard.sections.map((section) => section.id)).toContain('all-books');
     expect(dashboard.username).toBe('testuser');
     expect(dashboard.displayName).toBe('Test User');
@@ -373,7 +373,7 @@ describe('KoreaderCatalogService', () => {
 
     const dashboard = await service.getDashboard(user, { type: 'want-to-read' });
 
-    expect(dashboardService.getScrollerBookIds).toHaveBeenCalledWith('want-to-read', user, 10);
+    expect(dashboardService.getScrollerBookIds).toHaveBeenCalledWith('want-to-read', user, 12);
     expect(opdsBookService.getRandomBooks).not.toHaveBeenCalled();
     expect(dashboard.discover).toEqual([]);
     expect(dashboard.section).toEqual({ type: 'want-to-read', smartScopeId: null, books: [] });
@@ -408,7 +408,7 @@ describe('KoreaderCatalogService', () => {
 
     const { section } = await service.getDashboardSection(user, { type: 'smart-scope', smartScopeId: 3 });
 
-    expect(dashboardService.getSmartScopeBookIds).toHaveBeenCalledWith(3, user, 10);
+    expect(dashboardService.getSmartScopeBookIds).toHaveBeenCalledWith(3, user, 12);
     expect(dashboardService.getScrollerBookIds).not.toHaveBeenCalled();
     expect(section.smartScopeId).toBe(3);
   });
@@ -420,7 +420,7 @@ describe('KoreaderCatalogService', () => {
 
     const { section } = await service.getDashboardSection(user, { type: 'random' });
 
-    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 10, false, user.contentFilters);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 12, false, user.contentFilters);
     expect(dashboardService.getScrollerBookIds).not.toHaveBeenCalled();
     expect(section.books.map((book) => book.id)).toEqual([22]);
   });
@@ -460,7 +460,7 @@ describe('KoreaderCatalogService', () => {
 
     const result = await service.getDiscover(user);
 
-    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 10, false, user.contentFilters);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(7, 12, false, user.contentFilters);
     expect(result.discover).toHaveLength(1);
     expect(result.discover[0]).toEqual(expect.objectContaining({ id: 33, title: 'Frankenstein' }));
   });
@@ -596,6 +596,7 @@ describe('KoreaderCatalogService', () => {
         id: 10,
         title: 'Dune',
         progressPercentage: 47.4,
+        lastReadAt: '2026-03-01T00:00:00.000Z',
         readStatus: 'reading',
         formats: ['epub', 'pdf'],
         thumbnailUrl: '/api/v1/koreader/plugin/catalog/books/10/thumbnail',

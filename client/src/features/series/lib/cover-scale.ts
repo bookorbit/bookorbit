@@ -40,9 +40,14 @@ export function resolveCoverStackDisplayMode(ratio: number | null | undefined): 
   return isSquareCoverRatio(ratio) ? 'natural-bottom' : undefined
 }
 
+export function centeredScaleShiftPercent(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 1) return 0
+  return (scale - 1) * 50
+}
+
 export function centeredBottomScaleTransform(scale: number): { transformOrigin: string; transform: string } | null {
   if (!Number.isFinite(scale) || scale <= 1) return null
-  const centerShiftPercent = (scale - 1) * 50
+  const centerShiftPercent = centeredScaleShiftPercent(scale)
   return {
     transformOrigin: 'center bottom',
     transform: `translateY(-${centerShiftPercent}%) scale(${scale})`,

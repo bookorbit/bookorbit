@@ -2,8 +2,9 @@
 import { computed } from 'vue'
 import { ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronUp, Plus, Trash2 } from '@lucide/vue'
 import type { SortField, SortSpec } from '@bookorbit/types'
-import { SORT_FIELDS } from '@bookorbit/types'
-import { SORT_FIELD_LABELS } from '@/features/book/lib/filter-labels'
+import { SORT_FIELDS, customSortField } from '@bookorbit/types'
+import { sortFieldLabel } from '@/features/book/lib/filter-labels'
+import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 
@@ -17,10 +18,25 @@ const emit = defineEmits<{
   'update:modelValue': [value: SortSpec[]]
 }>()
 
+const { fields: customFields } = useActiveCustomFields()
+
+const customSortFields = computed<SortField[]>(() =>
+  customFields.value
+    .filter((f) => !f.archivedAt)
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label))
+    .map((f) => customSortField(f.id)),
+)
+
+const allFields = computed<SortField[]>(() => [...SORT_FIELDS, ...customSortFields.value])
+
 const usedFields = computed(() => new Set(props.modelValue.map((s) => s.field)))
 
 function availableFields(currentField: SortField): SortField[] {
   return SORT_FIELDS.filter((f) => f === currentField || !usedFields.value.has(f))
+}
+
+function availableCustomFields(currentField: SortField): SortField[] {
+  return customSortFields.value.filter((f) => f === currentField || !usedFields.value.has(f))
 }
 
 function updateField(index: number, field: SortField) {
@@ -52,12 +68,12 @@ function remove(index: number) {
 }
 
 function addTier() {
-  const nextField = SORT_FIELDS.find((f) => !usedFields.value.has(f))
+  const nextField = allFields.value.find((f) => !usedFields.value.has(f))
   if (!nextField) return
   emit('update:modelValue', [...props.modelValue, { field: nextField, dir: 'asc' }])
 }
 
-const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
+const canAddMore = computed(() => props.modelValue.length < allFields.value.length)
 </script>
 
 <template>
@@ -95,8 +111,13 @@ const canAddMore = computed(() => props.modelValue.length < SORT_FIELDS.length)
         class="flex-1 h-8 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
       >
         <option v-for="field in availableFields(spec.field)" :key="field" :value="field">
-          {{ SORT_FIELD_LABELS[field] }}
+          {{ sortFieldLabel(field) }}
         </option>
+        <optgroup v-if="customSortFields.length > 0" :label="t('book.sort.customFieldsGroup')">
+          <option v-for="field in availableCustomFields(spec.field)" :key="field" :value="field">
+            {{ sortFieldLabel(field) }}
+          </option>
+        </optgroup>
       </select>
       <Tooltip>
         <TooltipTrigger as-child>

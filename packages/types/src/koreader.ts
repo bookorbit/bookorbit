@@ -193,6 +193,8 @@ export interface KoreaderCatalogBookListItem {
   seriesName: string | null;
   seriesIndex: number | null;
   progressPercentage: number | null;
+  /** When reading progress was last recorded, so the plugin can show recency. */
+  lastReadAt: string | null;
   readStatus: string | null;
   formats: string[];
   hasCover: boolean;

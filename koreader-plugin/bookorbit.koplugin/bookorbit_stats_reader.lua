@@ -236,8 +236,9 @@ function Session:eventsAfter(ids, watermark, limit)
 end
 
 -- Aggregated local reading activity for the dashboard stats strip: seconds
--- read today and over the past 7 days, plus the current daily reading streak
--- (consecutive days with any reading, still counting if today has none yet).
+-- read today, over the past 7 days and per day of that week, plus the current
+-- daily reading streak (consecutive days with any reading, still counting if
+-- today has none yet).
 function Session:readingSummary()
     local today = os.date("*t")
     today.hour, today.min, today.sec = 0, 0, 0
@@ -247,6 +248,24 @@ function Session:readingSummary()
             "SELECT COALESCE(SUM(MIN(duration, 86400)), 0) FROM page_stat_data WHERE start_time >= ?;",
             { start_time })
         return res and tonumber(res[1][1]) or 0
+    end
+
+    -- Per-day totals for the strip's activity bars, oldest first, today last.
+    local day_seconds = { 0, 0, 0, 0, 0, 0, 0 }
+    local week_start = day_start - 6 * 86400
+    local day_res = self:select(
+        "SELECT date(start_time, 'unixepoch', 'localtime'), COALESCE(SUM(MIN(duration, 86400)), 0)"
+            .. " FROM page_stat_data WHERE start_time >= ? GROUP BY 1;",
+        { week_start })
+    if day_res then
+        local index_by_date = {}
+        for day = 1, 7 do
+            index_by_date[os.date("%Y-%m-%d", week_start + (day - 1) * 86400)] = day
+        end
+        for i = 1, #day_res[1] do
+            local day = index_by_date[day_res[1][i]]
+            if day then day_seconds[day] = tonumber(day_res[2][i]) or 0 end
+        end
     end
 
     local streak = 0
@@ -271,6 +290,7 @@ function Session:readingSummary()
     return {
         today_seconds = sumSince(day_start),
         week_seconds = sumSince(day_start - 6 * 86400),
+        day_seconds = day_seconds,
         streak_days = streak,
     }
 end

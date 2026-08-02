@@ -1,6 +1,6 @@
 import { computed, watch, type Ref } from 'vue'
 import type { SortSpec } from '@bookorbit/types'
-import { SORT_FIELD_LABELS } from '../lib/filter-labels'
+import { sortFieldLabel } from '../lib/filter-labels'
 
 const DEFAULT_SORT: SortSpec[] = [{ field: 'title', dir: 'asc' }]
 
@@ -45,7 +45,7 @@ export function useViewSort(sort: Ref<SortSpec[]>, keyPrefix: string, entityId: 
 
   const isDefaultSort = computed(() => sort.value.length === 1 && sort.value[0]?.field === 'title' && sort.value[0]?.dir === 'asc')
 
-  const sortSummary = computed(() => sort.value.map((s) => `${SORT_FIELD_LABELS[s.field]} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', '))
+  const sortSummary = computed(() => sort.value.map((s) => `${sortFieldLabel(s.field)} ${s.dir === 'asc' ? '↑' : '↓'}`).join(', '))
 
   return { sortModel, isDefaultSort, sortSummary, resetSort, saveSort }
 }

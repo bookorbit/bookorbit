@@ -24,6 +24,7 @@ export interface ParsedBookData {
   openLibraryId?: string | null;
   ranobedbId?: string | null;
   koboId?: string | null;
+  comicvineId?: string | null;
   lubimyczytacId?: string | null;
   aladinId?: string | null;
   itunesId?: string | null;

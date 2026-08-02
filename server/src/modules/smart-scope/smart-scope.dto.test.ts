@@ -51,6 +51,29 @@ describe('SmartScope DTO validation', () => {
     expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { icon: 'Aperture' }))).toBe(false);
   });
 
+  it('UpdateSmartScopeDto accepts both boolean sharing states and rejects non-boolean values', async () => {
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { isPublic: true }))).toBe(false);
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { isPublic: false }))).toBe(false);
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, {}))).toBe(false);
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { isPublic: 'yes' }))).toBe(true);
+    // A null would otherwise reach the NOT NULL column as a 500 instead of a 400.
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { isPublic: null }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { syncToKobo: null }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { syncToKobo: true }))).toBe(false);
+  });
+
+  it('UpdateSmartScopeDto accepts the full sharing payload the editor panel sends', async () => {
+    const dto = plainToInstance(UpdateSmartScopeDto, {
+      name: 'Shared Sci-Fi',
+      icon: 'Aperture',
+      defaultSort: [{ field: SORT_FIELDS[0], dir: 'asc' }],
+      isPublic: true,
+      syncToKobo: false,
+    });
+
+    expect(await hasErrors(dto)).toBe(false);
+  });
+
   it('UpdateSmartScopeDto accepts null filter to clear filters and rejects non-object filters', async () => {
     expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { filter: null }))).toBe(false);
     expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { filter: 'bad' }))).toBe(true);

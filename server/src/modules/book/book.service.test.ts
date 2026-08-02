@@ -209,6 +209,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     findByBookId: vi.fn().mockResolvedValue(null),
   };
   const customMetadataService = {
+    getActiveFieldTypes: vi.fn().mockResolvedValue(new Map()),
     getBookValues: vi.fn().mockResolvedValue([]),
     getCardValues: vi.fn().mockResolvedValue([]),
     getExportValues: vi.fn().mockResolvedValue(new Map()),
@@ -2658,7 +2659,7 @@ describe('BookService', () => {
       } as never);
 
       expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
-      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }], 42);
+      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }], 42, undefined);
       expect(bookRepo.findJumpBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ where: 'WHERE', field: 'title', kind: 'letter', userId: 42, maxBuckets: 24, orderBy: ['ORDER'] }),
       );
@@ -4376,7 +4377,7 @@ describe('BookService', () => {
 
       const result = await service.executeBooksQuery(12, undefined, query);
 
-      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith(query.sort, 12);
+      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith(query.sort, 12, undefined);
       expect(bookRepo.findCards).toHaveBeenCalledWith({
         where: undefined,
         orderBy: 'order-by',
@@ -4408,10 +4409,47 @@ describe('BookService', () => {
         limit: 25,
         offset: 25,
         userId: 12,
+        customFieldTypes: undefined,
       });
       expect(bookRepo.findCards).not.toHaveBeenCalled();
       expect(queryBuilder.buildOrderBy).not.toHaveBeenCalled();
       expect(result).toEqual({ items: [], total: 0, page: 1, size: 25 });
+    });
+
+    it('resolves custom metadata field types for custom sort fields', async () => {
+      const { service, bookRepo, queryBuilder, customMetadataService } = makeService();
+      const fieldTypes = new Map([[7, 'number' as const]]);
+      customMetadataService.getActiveFieldTypes.mockResolvedValue(fieldTypes);
+      bookRepo.findCards.mockResolvedValue(emptyCardQueryResult);
+      const query: BookQuery = {
+        pagination: { page: 0, size: 50 },
+        sort: [
+          { field: 'custom:7', dir: 'asc' },
+          { field: 'title', dir: 'asc' },
+        ],
+        filter: undefined,
+        collapseSeries: false,
+      };
+
+      await service.executeBooksQuery(12, undefined, query);
+
+      expect(customMetadataService.getActiveFieldTypes).toHaveBeenCalledWith([7]);
+      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith(query.sort, 12, fieldTypes);
+    });
+
+    it('does not query custom metadata field types when no custom sort is used', async () => {
+      const { service, bookRepo, customMetadataService } = makeService();
+      bookRepo.findCards.mockResolvedValue(emptyCardQueryResult);
+      const query: BookQuery = {
+        pagination: { page: 0, size: 50 },
+        sort: [{ field: 'title', dir: 'asc' }],
+        filter: undefined,
+        collapseSeries: false,
+      };
+
+      await service.executeBooksQuery(12, undefined, query);
+
+      expect(customMetadataService.getActiveFieldTypes).not.toHaveBeenCalled();
     });
 
     it('returns collapsed results when the filter only requires a series', async () => {

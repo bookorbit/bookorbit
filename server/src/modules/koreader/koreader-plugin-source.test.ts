@@ -87,49 +87,6 @@ describe('KOReader plugin update source wiring', () => {
     expect(syncSettingsBlock).not.toContain('text = _("Sync all books now")');
   });
 
-  it('keeps tall dashboard adaptation scoped to the measured configurable row', async () => {
-    const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
-
-    expect(dashboard).toContain('local DASHBOARD_TALL_ASPECT_RATIO = 1.55');
-    expect(dashboard).toContain('local SECTION_COMPACT_GAP = 6');
-    expect(dashboard).toContain('local SECTION_MAX_ROWS = 2');
-    expect(dashboard).toContain('local STATS_MIN_BODY_HEIGHT = 56');
-    expect(dashboard).toContain('function CatalogDashboard:dashboardTallLayout()');
-    expect(dashboard).toContain('function CatalogDashboard:addDashboardCoverGrid(');
-    expect(dashboard).toContain('math.floor((self.content_w - (slots - 1) * gap) / slots)');
-    expect(dashboard).toContain('local card_gap = slots > 1 and math.floor(math.max(0, self.content_w - slots * card_w) / (slots - 1)) or 0');
-    expect(dashboard).toContain('if slot > 1 then');
-    expect(dashboard).not.toContain('(slots + 1) * gap');
-    expect(dashboard).toContain('section_slots, section_card_w, section_row_h = self:sectionRowMetrics(#section_books, section_row_gap)');
-    expect(dashboard).toContain('if fixedHeight() > avail then');
-    expect(dashboard).toContain('section_rows * section_row_h + math.max(0, section_rows - 1) * inner_gap');
-    expect(dashboard).toContain('show_section and not section_pending and self:dashboardTallLayout() and section_slots > 0');
-    expect(dashboard).toContain('local section_page_size = math.max(1, section_slots * section_rows)');
-    expect(dashboard).not.toContain('catalog_dashboard_max_height');
-  });
-
-  it('renders the configurable dashboard row from a stored section choice', async () => {
-    const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
-    const sections = await readPluginFile('bookorbit_dashboard_sections.lua');
-    const api = await readPluginFile('bookorbit_api.lua');
-
-    // The stored value is a list even though one row is rendered, so adding a
-    // second configurable row later does not invalidate settings on device.
-    expect(sections).toContain('DashboardSections.SETTING_KEY = "catalog_dashboard_sections"');
-    expect(sections).toContain('DashboardSections.DEFAULT_TYPE = "random"');
-    expect(sections).toContain('function DashboardSections.normalize(value)');
-    expect(sections).toContain('function DashboardSections.signature(config)');
-
-    // The parameter is capability-gated: an older server rejects unknown query
-    // params outright rather than ignoring them.
-    expect(dashboard).toContain('DashboardSections.CAPABILITY');
-    expect(dashboard).toContain('Capabilities.markUnsupported(self.client, DashboardSections.CAPABILITY)');
-    expect(dashboard).toContain('function CatalogDashboard:dashboardCacheMatchesSection()');
-    expect(dashboard).toContain('function CatalogDashboard:dashboardSectionSupportsReroll(config)');
-    expect(api).toContain('function BookOrbitApi:catalogDashboard(section)');
-    expect(api).toContain('function BookOrbitApi:catalogDashboardSection(section)');
-  });
-
   it('renders the canonical account reading streak on the device dashboard', async () => {
     const dashboard = await readPluginFile('bookorbit_catalog_dashboard.lua');
     const catalogUtil = await readPluginFile('bookorbit_catalog_util.lua');
@@ -138,8 +95,8 @@ describe('KOReader plugin update source wiring', () => {
     expect(catalogUtil).toContain('dashboard and dashboard.readingStreak');
     expect(catalogUtil).toContain('reading_streak and tonumber(reading_streak.currentStreak)');
     expect(dashboard).toContain('local streak_days = readingStreakDays(dashboard, summary.streak_days)');
-    expect(dashboard).toContain('{ value = tostring(streak_days), label = _("Day streak") }');
-    expect(dashboard).not.toContain('{ value = tostring(summary.streak_days or 0), label = _("Day streak") }');
+    expect(dashboard).toContain('value = tostring(streak_days),\n            label = _("Day streak"),');
+    expect(dashboard).not.toContain('tostring(summary.streak_days');
   });
 
   it('uses tall detail space for measured related-book grids', async () => {
@@ -320,7 +277,7 @@ describe('KOReader plugin update source wiring', () => {
 
     expect(widgets).toContain('function CatalogWidgets.buildSelectionBadge(max_width)');
     expect(widgets).toContain('function CatalogWidgets.buildDownloadedBadge(max_width)');
-    expect(widgets).toContain('icon = "appbar.filebrowser"');
+    expect(widgets).toContain('local opts = iconOrFile("appbar.filebrowser", CatalogWidgets.assetIconFile("on_device"))');
     expect(widgets).toContain('function CatalogWidgets.buildCoverWithStateBadges');
     expect(widgets).toContain('local show_label = self.menu.mosaic_show_titles == true');
     expect(widgets).toContain('local label_text = shortText(book and book.title or _("Untitled"), 30)');

@@ -30,11 +30,11 @@ export class UpdateSmartScopeDto {
   @Type(() => SortSpecDto)
   defaultSort?: SortSpecDto[];
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   isPublic?: boolean;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   syncToKobo?: boolean;
 }

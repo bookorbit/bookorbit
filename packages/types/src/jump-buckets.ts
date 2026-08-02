@@ -1,4 +1,5 @@
-import type { BookQuery, SortField, SortSpec } from "./query";
+import { isCustomSortField } from "./query";
+import type { BookQuery, SortSpec, StaticSortField } from "./query";
 
 export type JumpBucketKind = "letter" | "temporal" | "category";
 
@@ -37,7 +38,7 @@ export type TemporalJumpBucketPrecision = "date" | "year";
 
 export type JumpRailStrategy = { kind: "letter" } | { kind: "temporal"; precision: TemporalJumpBucketPrecision } | { kind: "category" };
 
-const STRATEGY_BY_PRIMARY_SORT_FIELD: Partial<Record<SortField, JumpRailStrategy>> = {
+const STRATEGY_BY_PRIMARY_SORT_FIELD: Partial<Record<StaticSortField, JumpRailStrategy>> = {
   title: { kind: "letter" },
   author: { kind: "letter" },
   series: { kind: "letter" },
@@ -55,7 +56,9 @@ const STRATEGY_BY_PRIMARY_SORT_FIELD: Partial<Record<SortField, JumpRailStrategy
 };
 
 export function jumpRailStrategyForSort(sort: SortSpec[]): JumpRailStrategy | null {
-  const primary = sort[0] ?? { field: "title", dir: "asc" };
+  const primary = sort[0] ?? { field: "title" as const, dir: "asc" as const };
+  // Custom metadata fields carry no bucketing semantics, so the rail is hidden for them.
+  if (isCustomSortField(primary.field)) return null;
   return STRATEGY_BY_PRIMARY_SORT_FIELD[primary.field] ?? null;
 }
 

@@ -157,6 +157,23 @@ describe('buildComicInfoXml', () => {
     expect(notes).not.toContain('[bookorbit:subtitle] old');
   });
 
+  it('writes comicvineId into Web using the canonical 4000-<id> issue URL', () => {
+    const xml = buildComicInfoXml(null, { comicvineId: '140529' }, new Set(['comicvineId']));
+
+    const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
+
+    expect(parsed.ComicInfo.Web).toBe('https://comicvine.gamespot.com/-/4000-140529/');
+  });
+
+  it('keeps comicvineId in Notes when another provider id owns the single Web slot', () => {
+    const xml = buildComicInfoXml(null, { goodreadsId: '111', comicvineId: '140529' }, new Set(['goodreadsId', 'comicvineId']));
+
+    const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
+
+    expect(parsed.ComicInfo.Web).toBe('https://www.goodreads.com/book/show/111');
+    expect(parsed.ComicInfo.Notes).toContain('[bookorbit:comicvineId] 140529');
+  });
+
   it('does not overwrite provider-derived Web/Notes when provider fields are excluded from field mask', () => {
     const existing = `<?xml version="1.0"?><ComicInfo><Web>https://www.goodreads.com/book/show/111</Web><Notes>[bookorbit:goodreadsId] 111</Notes></ComicInfo>`;
 

@@ -69,6 +69,9 @@ do
     local today = os.date("%Y-%m-%d")
     local yesterday = os.date("%Y-%m-%d", os.time() - 86400)
     local Reader = load(function(sql)
+        if sql:find("GROUP BY 1", 1, true) then
+            return FakeSqlite.resultSet{ { yesterday, "600" }, { today, "1800" } }
+        end
         if sql:find("COALESCE(SUM(", 1, true) then
             return FakeSqlite.resultSet{ { "1800" } }
         end
@@ -82,6 +85,9 @@ do
     assertEqual(summary.today_seconds, 1800, "today's reading time is summed")
     assertEqual(summary.week_seconds, 1800, "the week window is summed too")
     assertEqual(summary.streak_days, 2, "consecutive reading days build the streak")
+    assertEqual(summary.day_seconds[7], 1800, "today lands in the last per-day bucket")
+    assertEqual(summary.day_seconds[6], 600, "yesterday lands in the bucket before it")
+    assertEqual(summary.day_seconds[1], 0, "days without reading stay zero")
 end
 
 -- A busy database gets one reopen before the query is given up on.

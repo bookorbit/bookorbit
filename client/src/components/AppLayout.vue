@@ -46,7 +46,9 @@ const viewKey = computed(() => {
       <AppHeader />
 
       <!-- 2. Independent View Area: Everything below the header scrolls here -->
-      <div class="app-shell-scroll px-(--shell-gap) pt-(--shell-gap) flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent">
+      <div
+        class="app-shell-scroll px-(--shell-content-gutter) pt-(--shell-gap) flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth bg-transparent"
+      >
         <router-view v-slot="{ Component }">
           <Transition name="page" mode="out-in">
             <KeepAlive :include="GRID_VIEW_NAMES" :max="10">

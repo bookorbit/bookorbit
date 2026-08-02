@@ -1,89 +1,27 @@
 import type { Rule, RuleField, RuleOperator, SortField } from '@bookorbit/types'
+import { parseCustomSortFieldId } from '@bookorbit/types'
+import { i18n } from '@/i18n'
+import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
 import { PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 
-export const SORT_FIELD_LABELS: Record<SortField, string> = {
-  author: 'Author',
-  title: 'Title',
-  series: 'Series',
-  seriesIndex: 'Series #',
-  addedAt: 'Date Added',
-  updatedAt: 'Date Updated',
-  publishedDate: 'Published Date',
-  publishedYear: 'Published Year',
-  pageCount: 'Page Count',
-  rating: 'Rating',
-  publisher: 'Publisher',
-  fileSize: 'File Size',
-  readProgress: 'Read Progress',
-  readStatus: 'Read Status',
-  format: 'Format',
-  language: 'Language',
-  metadataScore: 'Metadata Score',
-  lastReadAt: 'Last Read',
-  startedAt: 'Date Started',
-  finishedAt: 'Date Finished',
-  random: 'Random',
+// Resolved through the global composer rather than useI18n() because these helpers also run
+// outside a component setup (useViewSort, plain computeds). Composer.t tracks the active locale,
+// so computeds and templates calling these still re-evaluate on a language change.
+const t = i18n.global.t
+
+export function sortFieldLabel(field: SortField): string {
+  const customFieldId = parseCustomSortFieldId(field)
+  if (customFieldId === null) return t(`book.sort.fields.${field}`)
+  // Custom field labels are user-authored, so they are shown as-is rather than translated.
+  return activeCustomFieldLabel(customFieldId) ?? t('book.sort.customFieldFallback')
 }
 
-export const FIELD_LABELS: Record<RuleField, string> = {
-  title: 'Title',
-  publisher: 'Publisher',
-  language: 'Language',
-  series: 'Series',
-  seriesIndex: 'Series Index',
-  publishedDate: 'Published Date',
-  publishedYear: 'Published Year',
-  pageCount: 'Page Count',
-  author: 'Author',
-  genre: 'Genre',
-  tag: 'Tag',
-  collection: 'Collection',
-  library: 'Library',
-  format: 'Format',
-  addedAt: 'Added Date',
-  startedAt: 'Date Started',
-  finishedAt: 'Date Finished',
-  fileAvailability: 'File Availability',
-  rating: 'Rating',
-  communityRating: 'Community Rating',
-  readProgress: 'Reading Progress',
-  readStatus: 'Read Status',
-  description: 'Description',
-  isbn: 'ISBN',
-  metadataScore: 'Metadata Score',
-  cover: 'Cover',
-  lockStatus: 'Lock Status',
-  seriesStatus: 'Series Status',
+export function fieldLabel(field: RuleField): string {
+  return t(`book.filter.fields.${field}`)
 }
 
-export const OPERATOR_LABELS: Record<RuleOperator, string> = {
-  contains: 'contains',
-  notContains: 'does not contain',
-  startsWith: 'starts with',
-  endsWith: 'ends with',
-  eq: 'is',
-  notEq: 'is not',
-  isEmpty: 'is empty',
-  isNotEmpty: 'is not empty',
-  gt: 'greater than',
-  gte: 'at least',
-  lt: 'less than',
-  lte: 'at most',
-  between: 'between',
-  includesAny: 'includes any of',
-  includesAll: 'includes all of',
-  excludesAll: 'excludes all of',
-  before: 'before',
-  after: 'after',
-  withinLast: 'within last',
-  isMissing: 'is missing',
-  isPresent: 'is present',
-  isUnread: 'is unread',
-  isInProgress: 'is in progress',
-  isFinished: 'is finished',
-  isLocked: 'is locked',
-  isUnlocked: 'is unlocked',
-  isUpNext: 'is up next',
+export function operatorLabel(operator: RuleOperator): string {
+  return t(`book.filter.operators.${operator}`)
 }
 
 const NO_VALUE_OPS: RuleOperator[] = [
@@ -102,18 +40,15 @@ const NO_VALUE_OPS: RuleOperator[] = [
 function communityRatingProviderLabel(rule: Rule): string {
   if (rule.field !== 'communityRating') return ''
   const provider = rule.provider ?? 'any'
-  if (provider === 'any') return 'Any provider'
+  if (provider === 'any') return t('book.filter.anyProvider')
   return PROVIDER_SHORT_LABELS[provider] ?? provider
 }
 
 export function ruleToParts(rule: Rule): { field: string; operator: string; value: string | null } {
-  const field =
-    rule.field === 'communityRating'
-      ? `${FIELD_LABELS[rule.field] ?? rule.field} (${communityRatingProviderLabel(rule)})`
-      : (FIELD_LABELS[rule.field] ?? rule.field)
-  const operator = OPERATOR_LABELS[rule.operator] ?? rule.operator
+  const field = rule.field === 'communityRating' ? `${fieldLabel(rule.field)} (${communityRatingProviderLabel(rule)})` : fieldLabel(rule.field)
+  const operator = operatorLabel(rule.operator)
   if (NO_VALUE_OPS.includes(rule.operator)) return { field, operator, value: null }
-  if (rule.operator === 'withinLast') return { field, operator, value: `${rule.value} days` }
+  if (rule.operator === 'withinLast') return { field, operator, value: `${rule.value} ${t('book.filter.unit.days')}` }
   const val = Array.isArray(rule.value) ? (rule.value as string[]).join(', ') : String(rule.value ?? '')
   return { field, operator, value: rule.valueTo !== undefined ? `${val} - ${rule.valueTo}` : val }
 }

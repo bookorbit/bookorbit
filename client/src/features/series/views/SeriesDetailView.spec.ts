@@ -447,6 +447,8 @@ describe('SeriesDetailView', () => {
     expect(style).toContain('transform-origin: center bottom')
     expect(style).toContain('translateY(-12.5%)')
     expect(style).toContain('aspect-ratio: 1 / 1')
+    expect(style).toContain('--lead-cover-hover-translate-y: calc(-12px - 12.5%)')
+    expect(style).toContain('--lead-cover-hover-scale: 1.2875')
     expect(wrapper.get('[data-testid="lead-cover-artwork"]').attributes('data-mode')).toBe('natural-bottom')
     expect(wrapper.get('[data-testid="lead-cover-artwork"]').attributes('data-frame-aspect-ratio')).toBe('1/1')
 

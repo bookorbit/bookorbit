@@ -1,8 +1,27 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, sql } from 'drizzle-orm';
 
-import type { SortField, SortSpec } from '@bookorbit/types';
+import { parseCustomSortFieldId } from '@bookorbit/types';
+import type { CustomMetadataFieldType, CustomMetadataFieldTypeMap, SortField, SortSpec } from '@bookorbit/types';
 import { bookMetadata, books } from '../../db/schema';
+
+const CUSTOM_VALUE_COLUMNS: Record<CustomMetadataFieldType, string> = {
+  text: 'value_text',
+  url: 'value_text',
+  number: 'value_number',
+  date: 'value_date',
+  boolean: 'value_boolean',
+};
+
+/**
+ * Column of `book_custom_metadata_values` holding this field's values, or null
+ * when the id does not resolve to an active field (archived or deleted since
+ * the sort was saved).
+ */
+export function customMetadataValueColumn(fieldId: number, fieldTypes: CustomMetadataFieldTypeMap | undefined): string | null {
+  const type = fieldTypes?.get(fieldId);
+  return type ? (CUSTOM_VALUE_COLUMNS[type] ?? null) : null;
+}
 
 const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
   title: bookMetadata.title,
@@ -18,12 +37,12 @@ const SORT_FIELD_MAP: Partial<Record<SortField, AnyColumn>> = {
 
 @Injectable()
 export class BookSortBuilder {
-  build(sort: SortSpec[], userId?: number): SQL[] {
+  build(sort: SortSpec[], userId?: number, customFieldTypes?: CustomMetadataFieldTypeMap): SQL[] {
     const result: SQL[] = [];
     for (const { field, dir } of sort) {
       const D = this.normalizeDir(dir);
       if (!D) continue;
-      this.appendField(result, field, D, sort, userId);
+      this.appendField(result, field, D, sort, userId, customFieldTypes);
     }
     if (result.length === 0) result.push(sql`${bookMetadata.title} ASC NULLS LAST`);
     result.push(sql`${books.id} ASC`);
@@ -35,7 +54,24 @@ export class BookSortBuilder {
     return d === 'ASC' || d === 'DESC' ? d : null;
   }
 
-  private appendField(result: SQL[], field: SortField, D: 'ASC' | 'DESC', allSorts: SortSpec[], userId?: number): void {
+  private appendField(
+    result: SQL[],
+    field: SortField,
+    D: 'ASC' | 'DESC',
+    allSorts: SortSpec[],
+    userId?: number,
+    customFieldTypes?: CustomMetadataFieldTypeMap,
+  ): void {
+    const customFieldId = parseCustomSortFieldId(field);
+    if (customFieldId !== null) {
+      const column = customMetadataValueColumn(customFieldId, customFieldTypes);
+      if (!column) return;
+      result.push(
+        sql`(SELECT v.${sql.raw(column)} FROM book_custom_metadata_values v WHERE v.book_id = books.id AND v.field_id = ${customFieldId}) ${sql.raw(D)} NULLS LAST`,
+      );
+      return;
+    }
+
     switch (field) {
       case 'author':
         result.push(sql`${books.primaryAuthorSortName} ${sql.raw(D)} NULLS LAST`);

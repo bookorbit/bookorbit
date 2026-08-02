@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
   ContentFilterRules,
+  CustomMetadataFieldTypeMap,
   JumpBucketKind,
   JumpBucketsResponse,
   SortField,
@@ -726,7 +727,14 @@ export class BookRepository {
     });
   }
 
-  async findCardsCollapsed(opts: { where: SQL | undefined; sort: SortSpec[]; limit: number; offset: number; userId: number }): Promise<{
+  async findCardsCollapsed(opts: {
+    where: SQL | undefined;
+    sort: SortSpec[];
+    limit: number;
+    offset: number;
+    userId: number;
+    customFieldTypes?: CustomMetadataFieldTypeMap;
+  }): Promise<{
     rows: Array<{
       id: number;
       status: string;
@@ -780,7 +788,7 @@ export class BookRepository {
   }> {
     const { where, sort, limit, offset, userId } = opts;
     const whereFragment = this.visibleWhere(where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes);
 
     const result = await this.db.execute<CollapsedRawRow>(sql`
       WITH base_rows AS (
@@ -1104,11 +1112,12 @@ export class BookRepository {
     sort: SortSpec[];
     userId: number;
     maxBuckets: number;
+    customFieldTypes?: CustomMetadataFieldTypeMap;
   }): Promise<JumpBucketsResponse> {
     const source = collapsedDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
     const whereFragment = this.visibleWhere(opts.where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes);
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
     const result = await this.db.execute<DiscreteJumpBucketRawRow>(

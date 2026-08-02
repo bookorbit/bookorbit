@@ -38,6 +38,11 @@ export function useActiveCustomFields() {
   return { fields, loading, initialized, refresh }
 }
 
+/** Label lookup for already-loaded fields. Reactive, and never triggers a fetch of its own. */
+export function activeCustomFieldLabel(fieldId: number): string | null {
+  return fields.value.find((f) => f.id === fieldId)?.label ?? null
+}
+
 // For testing: resets the singleton state so tests are isolated.
 export function _resetActiveCustomFieldsState(): void {
   fields.value = []

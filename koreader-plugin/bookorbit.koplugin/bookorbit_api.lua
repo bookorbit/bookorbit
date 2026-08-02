@@ -547,24 +547,22 @@ function BookOrbitApi:catalogRoot()
     return self:request("GET", "/koreader/plugin/catalog/root")
 end
 
--- Naming a section is opt-in: without it the server returns the pre-section
--- dashboard, which is what an older server understands.
-function BookOrbitApi:catalogDashboard(section)
-    local params
-    if section and section.type then
-        params = { section = section.type, smartScopeId = section.smartScopeId }
-    end
-    return self:request("GET", self:query("/koreader/plugin/catalog/dashboard", params))
+-- The dashboard body carries the stats, Continue reading and Discover the
+-- shelves are built from. Each configured shelf is then fetched through the
+-- ordinary catalog endpoints, so nothing here is section-aware.
+function BookOrbitApi:catalogDashboard()
+    return self:request("GET", "/koreader/plugin/catalog/dashboard")
 end
 
 function BookOrbitApi:catalogDiscover()
     return self:request("GET", "/koreader/plugin/catalog/dashboard/discover")
 end
 
-function BookOrbitApi:catalogDashboardSection(section)
-    if not section or not section.type then return nil, 400 end
-    local path = "/koreader/plugin/catalog/dashboard/sections/" .. util.urlEncode(section.type)
-    return self:request("GET", self:query(path, { smartScopeId = section.smartScopeId }))
+-- One server-composed dashboard section (want-to-read, up-next-in-series).
+-- Only valid against servers advertising the catalogDashboardSections
+-- capability; older ones answer 404.
+function BookOrbitApi:catalogDashboardSection(section_type)
+    return self:request("GET", "/koreader/plugin/catalog/dashboard/sections/" .. util.urlEncode(tostring(section_type)))
 end
 
 function BookOrbitApi:catalogSection(section, params)

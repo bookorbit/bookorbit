@@ -34,7 +34,11 @@ function buildComicMetadata(issue: ComicVineIssue): ComicMetadataFields {
   };
 }
 
-function buildTitle(issue: ComicVineIssue): string {
+function buildTitle(issue: ComicVineIssue): string | undefined {
+  return issue.name?.trim() || undefined;
+}
+
+function buildDisplayTitle(issue: ComicVineIssue): string {
   const parts = [issue.volume.name, `#${issue.issue_number}`];
   if (issue.name) parts.push(`- ${issue.name}`);
   return parts.join(' ');
@@ -49,7 +53,7 @@ export function mapIssueToCandidate(issue: ComicVineIssue): MetadataCandidate {
     provider: MetadataProviderKey.COMICVINE,
     providerId: String(issue.id),
     title: buildTitle(issue),
-    subtitle: issue.name ?? undefined,
+    displayTitle: buildDisplayTitle(issue),
     authors: writers,
     description: issue.description ?? issue.deck ?? undefined,
     publishedDate,

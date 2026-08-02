@@ -45,6 +45,94 @@ local function sq(path)
     return "'" .. path:gsub("'", "'\\''") .. "'"
 end
 
+-- Names of the entries directly under `dir`, excluding "." and "..".
+local function childNames(dir)
+    local names = {}
+    local ok, iterator, dir_obj = pcall(lfs.dir, dir)
+    if not ok or not iterator then return names end
+    for name in iterator, dir_obj do
+        if name ~= "." and name ~= ".." then
+            names[#names + 1] = name
+        end
+    end
+    return names
+end
+
+-- Extracts every entry of `zip_path` below `raw_dir` with KOReader's Archiver.
+-- Returns true, or nil + error string.
+local function extractWithArchiver(Archiver, zip_path, raw_dir)
+    local arc = Archiver.Reader:new()
+    if not arc:open(zip_path) then
+        local open_err = arc.err
+        arc:close()
+        return nil, tostring(open_err or "could not open update archive")
+    end
+    for entry in arc:iterate() do
+        if not arc:extractToPath(entry.path, raw_dir .. "/" .. entry.path) then
+            break
+        end
+    end
+    local err = arc.err
+    arc:close()
+    if err then return nil, tostring(err) end
+    return true
+end
+
+-- Renames the extracted tree to `staging`, dropping the archive's single
+-- top-level directory when it has one. Returns true, or nil + error string.
+local function stripRootInto(raw_dir, staging)
+    local names = childNames(raw_dir)
+    local root = names[1]
+    if #names == 1 and lfs.attributes(raw_dir .. "/" .. root, "mode") == "directory" then
+        if not os.rename(raw_dir .. "/" .. root, staging) then
+            return nil, "could not move extracted plugin into place"
+        end
+        os.execute("rm -rf " .. sq(raw_dir))
+        return true
+    end
+    if not os.rename(raw_dir, staging) then
+        return nil, "could not move extracted plugin into place"
+    end
+    return true
+end
+
+-- Extracts the update zip into `staging`, stripping the zip's root folder.
+--
+-- KOReader dropped `Device:unpackArchive` in koreader/koreader@751b4978 (July
+-- 2026) after its own callers moved to the `ffi/archiver` module, so prefer
+-- Archiver and keep the old helper for readers that predate the module. Both
+-- are probed at runtime: neither is guaranteed to exist on a given build.
+local function unpackUpdate(zip_path, staging, raw_dir)
+    local has_archiver, Archiver = pcall(require, "ffi/archiver")
+    if has_archiver and type(Archiver) == "table" and Archiver.Reader then
+        os.execute("rm -rf " .. sq(raw_dir))
+        if not lfs.mkdir(raw_dir) and lfs.attributes(raw_dir, "mode") ~= "directory" then
+            return nil, "could not create update staging directory"
+        end
+        local ok, err = extractWithArchiver(Archiver, zip_path, raw_dir)
+        if ok then
+            ok, err = stripRootInto(raw_dir, staging)
+        end
+        if not ok then
+            os.execute("rm -rf " .. sq(raw_dir))
+            return nil, err
+        end
+        return true
+    end
+
+    if type(Device.unpackArchive) ~= "function" then
+        return nil, "this KOReader build provides no archive extraction support"
+    end
+    if not lfs.mkdir(staging) and lfs.attributes(staging, "mode") ~= "directory" then
+        return nil, "could not create update staging directory"
+    end
+    local ok, err = Device:unpackArchive(zip_path, staging, true)
+    if not ok then
+        return nil, tostring(err or "archive extraction failed")
+    end
+    return true
+end
+
 -- Downloads the plugin zip from the server and atomically replaces `plugin_dir`.
 --
 -- Strategy: extract into a staging directory, backup the current plugin dir,
@@ -70,10 +158,11 @@ function BookOrbitUpdater.apply(api, plugin_dir, opts)
 
     local tmp_zip  = parent_dir .. "/bookorbit-update.zip"
     local staging  = parent_dir .. "/" .. plugin_name .. ".update"
+    local raw_dir  = parent_dir .. "/" .. plugin_name .. ".unpack"
     local backup   = parent_dir .. "/" .. plugin_name .. ".bak"
 
-    -- Remove any leftover staging dir from a previous failed attempt.
-    os.execute("rm -rf " .. sq(staging))
+    -- Remove any leftover staging dirs from a previous failed attempt.
+    os.execute("rm -rf " .. sq(staging) .. " " .. sq(raw_dir))
 
     Transfer.sweepStale(parent_dir)
     local ok, err = Transfer.run{
@@ -90,15 +179,10 @@ function BookOrbitUpdater.apply(api, plugin_dir, opts)
         return nil, tostring(err or "download failed")
     end
 
-    if not lfs.mkdir(staging) and lfs.attributes(staging, "mode") ~= "directory" then
-        os.remove(tmp_zip)
-        return nil, "could not create update staging directory"
-    end
-
     -- Extract into a staging directory so a partial unpack never touches the
-    -- live plugin directory. Use KOReader's archive helper instead of the
+    -- live plugin directory. Use KOReader's archive helpers instead of the
     -- platform unzip command: unzip warning exit codes vary by platform.
-    local ok_unpack, unpack_err = Device:unpackArchive(tmp_zip, staging, true)
+    local ok_unpack, unpack_err = unpackUpdate(tmp_zip, staging, raw_dir)
     os.remove(tmp_zip)
 
     if not ok_unpack then

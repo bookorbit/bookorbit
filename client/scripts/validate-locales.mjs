@@ -58,7 +58,9 @@ async function sourceMessageKeys() {
 const localeTypes = await readFile(localeTypesPath, 'utf8')
 const supportedMatch = localeTypes.match(/SUPPORTED_LOCALES\s*=\s*(\[[\s\S]*?\])\s+as const/)
 if (!supportedMatch) throw new Error('Unable to read SUPPORTED_LOCALES from packages/types/src/locale.ts')
-const supportedLocales = JSON.parse(supportedMatch[1])
+// Prettier wraps the array once the locale list outgrows the print width, which
+// adds a trailing comma that JSON.parse rejects.
+const supportedLocales = JSON.parse(supportedMatch[1].replace(/,(\s*])$/, '$1'))
 
 const localeFiles = (await readdir(localesDirectory)).filter((file) => file.endsWith('.json')).sort()
 const expectedFiles = supportedLocales.map((locale) => `${locale}.json`).sort()

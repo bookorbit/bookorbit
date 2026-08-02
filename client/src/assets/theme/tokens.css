@@ -70,9 +70,10 @@
   /* Shape */
   --radius: 0.625rem;
 
-  /* App shell (sidebar + header) — one gutter, one material.
+  /* App shell (sidebar + header): one card gap, one material.
      --shell-surface-opacity is user-controlled and overwritten on <html>. */
   --shell-gap: 0.75rem;
+  --shell-content-gutter: 0.75rem;
   --shell-surface-opacity: 92%;
   --shell-surface: color-mix(in oklch, var(--sidebar) var(--shell-surface-opacity), transparent);
   /* Accent ladder: four steps, used for every tinted fill and border in the shell. */
@@ -106,6 +107,18 @@
   --audit-collections: oklch(0.55 0.09 255);
   --audit-integrations: oklch(0.58 0.15 150);
   --audit-settings: oklch(0.55 0.15 25);
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --shell-content-gutter: 1rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --shell-content-gutter: 1.5rem;
+  }
 }
 
 .dark {

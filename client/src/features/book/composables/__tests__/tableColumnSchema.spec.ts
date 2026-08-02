@@ -364,8 +364,8 @@ describe('buildCustomColumnDef', () => {
     expect(buildCustomColumnDef(makeField()).lockField).toBeUndefined()
   })
 
-  it('has no sortField', () => {
-    expect(buildCustomColumnDef(makeField()).sortField).toBeNull()
+  it('sorts by the custom field reference', () => {
+    expect(buildCustomColumnDef(makeField({ id: 42 })).sortField).toBe('custom:42')
   })
 
   it('accessor returns the value from book.customMetadata for the matching fieldId', () => {

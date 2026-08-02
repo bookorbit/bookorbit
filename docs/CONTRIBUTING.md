@@ -113,13 +113,13 @@ Refer to [DEVELOPMENT.md](DEVELOPMENT.md) for architecture details, project stru
 
 Testing expectations depend on what you changed:
 
-| Change type             | What is expected                                |
-| ----------------------- | ----------------------------------------------- |
-| Bug fix                 | Regression test proving the bug is fixed        |
-| New backend feature/API | Server unit tests for the new behavior          |
-| New frontend logic      | Client unit tests (composables, utilities)      |
-| UI-only change          | Manual verification evidence (screenshot/video) |
-| Refactor                | Existing tests stay green, no new tests needed  |
+| Change type             | What is expected                               |
+| ----------------------- | ---------------------------------------------- |
+| Bug fix                 | Regression test proving the bug is fixed       |
+| New backend feature/API | Server unit tests for the new behavior         |
+| New frontend logic      | Client unit tests (composables, utilities)     |
+| UI-only change          | Screenshots, plus a recording for interactions |
+| Refactor                | Existing tests stay green, no new tests needed |
 
 Run the full test suite:
 
@@ -170,13 +170,13 @@ git push origin BO-123-your-feature-name
 
 When creating the PR:
 
-- **Fill out the PR template.** It asks for a summary, testing evidence, screenshots (if UI changed), and non-obvious decisions.
+- **Fill out the PR template.** It asks for a summary, the commands you ran with their real output, what you did while manually testing, visual evidence for UI changes, and an authorship note covering any AI assistance.
 - **Use a Conventional Commit-style PR title** (for example: `fix(reader): correct page count for multi-volume PDFs`).
 - **Link your issue** with a GitHub closing keyword in the description (`close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`) and an issue reference (`#123` or `owner/repo#123`).
   Example:
 
   ```md
-  ## What does this PR do?
+  ## What changed
 
   Correct page count handling for multi-volume PDFs.
 
@@ -184,6 +184,7 @@ When creating the PR:
   ```
 
 - **Open as a draft** if you want early direction feedback before the code is complete.
+- **Attach visual evidence for UI changes.** Include screenshots for every UI change and a short screen recording when behavior or interaction changes. Ready-for-review PRs missing applicable visual evidence will be closed without review and may be resubmitted once complete.
 - **Disclose AI usage** if applicable. See [AI_POLICY.md](AI_POLICY.md) for the format and expectations.
 
 ### Phase 11: Respond to Review
@@ -216,7 +217,7 @@ Before marking your PR ready for review, confirm:
 - [ ] `pnpm verify` passes locally
 - [ ] Tests included per the [testing expectations table](#phase-7-write-and-run-tests)
 - [ ] Full-stack behavior manually validated
-- [ ] UI changes include screenshot or recording
+- [ ] UI changes include screenshots, plus a recording when behavior or interaction changed
 - [ ] PR template fully completed
 - [ ] No unintended files (build artifacts, `.env`, personal configs)
 - [ ] No unapproved new dependencies

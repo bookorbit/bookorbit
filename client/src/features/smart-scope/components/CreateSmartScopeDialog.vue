@@ -86,7 +86,7 @@ async function submit() {
 
           <label class="flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" v-model="isPublic" class="h-4 w-4 rounded border border-input accent-primary" />
-            <span class="text-sm text-foreground">{{ t('smartScope.createDialog.visibleToAll') }}</span>
+            <span class="text-sm text-foreground">{{ t('smartScope.visibleToAll') }}</span>
           </label>
 
           <label class="flex items-center gap-2.5 cursor-pointer select-none">

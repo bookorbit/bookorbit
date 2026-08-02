@@ -45,6 +45,13 @@ export class CustomMetadataRepository {
       .groupBy(bookCustomMetadataValues.fieldId);
   }
 
+  findActiveFieldTypes(fieldIds: number[]) {
+    return this.db
+      .select({ id: customMetadataFields.id, type: customMetadataFields.type })
+      .from(customMetadataFields)
+      .where(and(inArray(customMetadataFields.id, fieldIds), isNull(customMetadataFields.archivedAt)));
+  }
+
   async findFieldById(fieldId: number) {
     const [row] = await this.db.select().from(customMetadataFields).where(eq(customMetadataFields.id, fieldId)).limit(1);
     return row ?? null;

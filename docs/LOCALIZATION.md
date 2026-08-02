@@ -1,22 +1,33 @@
 # Localization
 
-BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the source language, and Crowdin is the source of truth for Dutch, French, German, Italian, Polish, Brazilian Portuguese, Slovenian, and Spanish translations.
+BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the source language, and Crowdin is the source of truth for every other catalog listed below.
 
 ## Supported Catalogs
 
 | Application locale   | Crowdin language ID | Catalog   |
 | -------------------- | ------------------- | --------- |
 | English              | Source language     | `en.json` |
+| Czech                | `cs`                | `cs.json` |
+| Danish               | `da`                | `da.json` |
 | German               | `de`                | `de.json` |
 | Spanish              | `es-ES`             | `es.json` |
+| Finnish              | `fi`                | `fi.json` |
 | French               | `fr`                | `fr.json` |
 | Italian              | `it`                | `it.json` |
 | Dutch                | `nl`                | `nl.json` |
 | Polish               | `pl`                | `pl.json` |
 | Brazilian Portuguese | `pt-BR`             | `pt.json` |
+| Russian              | `ru`                | `ru.json` |
 | Slovenian            | `sl`                | `sl.json` |
+| Swedish              | `sv-SE`             | `sv.json` |
+| Ukrainian            | `uk`                | `uk.json` |
+| Simplified Chinese   | `zh-CN`             | `zh.json` |
 
-Crowdin's `%two_letters_code%` placeholder maps Brazilian Portuguese to `pt`, which matches BookOrbit's existing application locale and filename.
+Crowdin's `%two_letters_code%` placeholder reduces the regional IDs above to BookOrbit's application locale and filename: `es-ES` to `es`, `pt-BR` to `pt`, `sv-SE` to `sv`, and `zh-CN` to `zh`.
+
+Verify every ID against Crowdin's language list rather than assuming the two-letter form exists. Several languages have no bare two-letter ID at all: Swedish is `sv-SE`, and `sv-FI` reduces to the same `sv.json`, so enabling both would collide.
+
+Chinese ships as Simplified only under the bare `zh` locale, so every `zh-*` browser resolves to it, including Traditional readers. Adding Traditional later means a new `zh-Hant` catalog with a `languages_mapping` entry for `zh-TW`; `zh` keeps its Simplified meaning, so no rename or stored-preference migration is needed. That addition also requires matching by script subtag in `client/src/stores/locale.ts`, because the current base-language fallback would send `zh-Hant` to `zh`.
 
 ## Adding User-Facing Copy
 
@@ -76,9 +87,11 @@ After an English source change reaches `main`:
 2. Translators update target strings in Crowdin.
 3. Crowdin exports the target catalogs to `l10n_main`.
 4. Crowdin opens a pull request to `main`.
-5. CI verifies that the pull request changes only the eight target catalogs and runs the normal client checks.
+5. CI verifies that the pull request changes only the fifteen target catalogs and runs the normal client checks.
 6. A maintainer reviews and squash-merges the pull request.
-7. The `l10n_main` service branch is deleted. Crowdin recreates it for the next export.
+7. The `.github/workflows/crowdin-branch-cleanup.yml` workflow deletes the `l10n_main` service branch. Crowdin recreates it from the current `main` for the next export.
+
+Deleting that branch is required, not tidiness. Crowdin appends every export to the same service branch and never rebases it, so a branch that outlives its pull request keeps its original merge base. Each later export then diverges further from `main` and eventually conflicts on every catalog. The workflow runs when a pull request from `l10n_main` is closed as well as merged, because Crowdin reuses the branch either way.
 
 Crowdin pull requests must retain the configured `i18n(client)` title and commit format. The `i18n` commit type produces a patch release and an Internationalization release-note section. Crowdin's default `[ci skip]` commit suffix is disabled so pull-request validation runs before merge.
 
@@ -122,7 +135,14 @@ Create `client/src/locales/<locale>.json` with the exact key structure from `en.
 
 A catalog may instead arrive already translated, for example from a bulk translation pass. That is allowed, but the translations then exist only in Git and Crowdin will overwrite them unless they are imported first. Follow "Seed existing translations into Crowdin" below before enabling export.
 
-Review `client/src/stores/locale.ts` and add browser-locale matching coverage to `client/src/stores/__tests__/locale.spec.ts`, especially for regional variants. Add every CLDR plural category reported for the locale to each ICU plural message and extend the exhaustive ICU runtime tests in `client/src/i18n/icu.spec.ts`.
+Review `client/src/stores/locale.ts` and add browser-locale matching coverage to `client/src/stores/__tests__/locale.spec.ts`, especially for regional variants.
+
+Each ICU plural message must carry exactly the CLDR categories reported for the locale, plus every exact selector such as `=0` from the English source. Both directions matter:
+
+- A missing category fails `validate:locales`. Czech, Russian, and Ukrainian need `few` and `many` added to every plural message, seeded from the English `other` branch because the source has no corresponding text.
+- An extra category leaves Crowdin nowhere to store it, because the editor renders only the categories the locale defines. Chinese has just `other`, so an inherited `one` branch produces a permanent difference that `scripts/crowdin-verify/verify.mjs --reconcile` can never close.
+
+Extend the exhaustive ICU runtime tests in `client/src/i18n/icu.spec.ts` with counts that reach every category. Derive them from `Intl.PluralRules` rather than by analogy, because languages that report the same category set do not map counts the same way: Russian and Ukrainian select `many` for 5 and reach `other` only through a fraction such as 1.5, while Czech selects `other` for 5 and reserves `many` for fractions.
 
 ### 4. Seed existing translations into Crowdin
 

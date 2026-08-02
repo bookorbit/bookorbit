@@ -34,7 +34,9 @@ import {
   DEFAULT_DOWNLOAD_PATTERN,
   MetadataProviderKey,
   Permission,
+  customSortFieldIds,
   isAudioFormat,
+  isSortField,
   jumpRailStrategyForSort,
   resolveUploadPath,
 } from '@bookorbit/types';
@@ -49,6 +51,7 @@ import type {
   BookQuery,
   BookWriteAndRenameResult,
   BooksPage,
+  CustomMetadataFieldTypeMap,
   FileRenameResult,
   GroupRule,
   JumpBucketsResponse,
@@ -56,6 +59,7 @@ import type {
   MetadataFetchDiagnostics,
   MetadataField,
   ReadStatus,
+  SortSpec,
   UserBookStatus,
   WriteResult,
 } from '@bookorbit/types';
@@ -586,10 +590,8 @@ export class BookService {
     if (!Array.isArray(sort)) return [];
     return sort
       .map((entry) => {
-        const field =
-          typeof (entry as { field?: unknown })?.field === 'string'
-            ? ((entry as { field: string }).field as BookQuery['sort'][number]['field'])
-            : null;
+        const rawField = (entry as { field?: unknown })?.field;
+        const field = typeof rawField === 'string' && isSortField(rawField) ? rawField : null;
         const dir =
           typeof (entry as { dir?: unknown })?.dir === 'string' ? ((entry as { dir: string }).dir as BookQuery['sort'][number]['dir']) : null;
         if (!field || !dir) return null;
@@ -1041,6 +1043,16 @@ export class BookService {
     return this.executeBooksQuery(user.id, where, query);
   }
 
+  /**
+   * Custom metadata sort tiers reference a field id; the value column depends on the
+   * field's type, so resolve it here. Only hit the database when a sort actually uses one.
+   */
+  private async resolveCustomSortFieldTypes(sort: SortSpec[]): Promise<CustomMetadataFieldTypeMap | undefined> {
+    const fieldIds = customSortFieldIds(sort);
+    if (fieldIds.length === 0) return undefined;
+    return this.customMetadataService.getActiveFieldTypes(fieldIds);
+  }
+
   async executeBooksQuery(
     userId: number,
     where: SQL | undefined,
@@ -1052,6 +1064,8 @@ export class BookService {
     const seriesSelectionFilter = collapseOptions ? collapseOptions.seriesSelectionFilter : query.filter;
     const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(seriesSelectionFilter);
 
+    const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
+
     if (shouldCollapse) {
       const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
         await this.bookRepo.findCardsCollapsed({
@@ -1060,6 +1074,7 @@ export class BookService {
           limit: size,
           offset: page * size,
           userId,
+          customFieldTypes,
         });
       // Collapsed rows render BookTableCollapsedSeriesCell which does not display custom metadata.
       const result = {
@@ -1087,7 +1102,7 @@ export class BookService {
       return result;
     }
 
-    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId);
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes);
     const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
       await this.bookRepo.findCards({
         where,
@@ -1177,9 +1192,16 @@ export class BookService {
           userId,
           maxBuckets: query.maxBuckets,
         };
+        // The primary sort decides bucket boundaries, but secondary tiers still order
+        // rows inside a bucket, so they can reference custom fields. The temporal path
+        // never applies the full sort, which is why this only matters here.
+        const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
         response = shouldCollapse
-          ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort })
-          : await this.bookRepo.findJumpBuckets({ ...discreteOpts, orderBy: this.queryBuilder.buildOrderBy(query.sort, userId) });
+          ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort, customFieldTypes })
+          : await this.bookRepo.findJumpBuckets({
+              ...discreteOpts,
+              orderBy: this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes),
+            });
       }
       this.logger.log(
         `[${event}] [end] userId=${userId} kind=${kind} collapse=${shouldCollapse} maxBuckets=${query.maxBuckets} durationMs=${Date.now() - start} bucketCount=${response.buckets.length} total=${response.total} - jump buckets computed`,
@@ -2607,6 +2629,8 @@ export class BookService {
         title: meta?.title ?? undefined,
         author: authorRows[0]?.name ?? undefined,
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+        seriesName: meta?.seriesName ?? undefined,
+        seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: providerIds,
         isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,
