@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { extname } from 'path';
 
+/** Uploadable book/audio formats. `imgdir` is scan-only (folder) and omitted here. */
 export const SUPPORTED_BOOK_FORMATS = new Set([
   'epub',
   'kepub',
@@ -11,13 +12,27 @@ export const SUPPORTED_BOOK_FORMATS = new Set([
   'cbz',
   'cbr',
   'cb7',
+  'zip',
   'fb2',
+  'txt',
   'm4b',
   'm4a',
   'mp3',
   'opus',
   'ogg',
+  'oga',
   'flac',
+  'mp4',
+  'aac',
+  'wma',
+  'aiff',
+  'aif',
+  'wav',
+  'webm',
+  'webma',
+  'mka',
+  'awb',
+  'caf',
 ]);
 
 @Injectable()

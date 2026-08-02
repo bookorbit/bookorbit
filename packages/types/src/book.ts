@@ -12,12 +12,31 @@ import { DEFAULT_FORMAT_PRIORITY } from "./library";
 export const BOOK_FORMATS = DEFAULT_FORMAT_PRIORITY;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
-const AUDIO_FORMATS = new Set<string>(["m4b", "mp3", "m4a", "opus", "ogg", "flac"]);
+const AUDIO_FORMATS = new Set<string>([
+  "m4b",
+  "mp3",
+  "m4a",
+  "opus",
+  "ogg",
+  "oga",
+  "flac",
+  "mp4",
+  "aac",
+  "wma",
+  "aiff",
+  "aif",
+  "wav",
+  "webm",
+  "webma",
+  "mka",
+  "awb",
+  "caf",
+]);
 export function isAudioFormat(format: string): boolean {
   return AUDIO_FORMATS.has(format.toLowerCase());
 }
 
-const COMIC_FORMATS = new Set<string>(["cbz", "cbr", "cb7", "cbx"]);
+const COMIC_FORMATS = new Set<string>(["cbz", "cbr", "cb7", "cbx", "zip", "imgdir"]);
 export function isComicFormat(format: string): boolean {
   return COMIC_FORMATS.has(format.toLowerCase());
 }

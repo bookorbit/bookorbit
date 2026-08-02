@@ -25,6 +25,9 @@ describe('book duplicate normalization', () => {
     expect(mediaFamilyForFormat('cbz')).toBe('comic');
     expect(mediaFamilyForFormat('m4b')).toBe('audiobook');
     expect(mediaFamilyForFormat(null)).toBe('unknown');
-    expect(mediaFamilyForFormat('txt')).toBe('unknown');
+    expect(mediaFamilyForFormat('txt')).toBe('ebook');
+    expect(mediaFamilyForFormat('zip')).toBe('comic');
+    expect(mediaFamilyForFormat('imgdir')).toBe('comic');
+    expect(mediaFamilyForFormat('wma')).toBe('audiobook');
   });
 });

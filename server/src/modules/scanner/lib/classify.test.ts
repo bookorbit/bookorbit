@@ -63,9 +63,12 @@ describe('classifyFile — metadata files', () => {
 
 describe('classifyFile — supplementary', () => {
   it('classifies unknown extensions as supplementary', () => {
-    expect(classifyFile('/books/Book/readme.txt').role).toBe('supplement');
     expect(classifyFile('/books/Book/notes.md').role).toBe('supplement');
     expect(classifyFile('/books/Book/data.xml').role).toBe('supplement');
+  });
+
+  it('classifies .txt as primary ebook content', () => {
+    expect(classifyFile('/books/Book/readme.txt')).toEqual({ format: 'txt', role: 'content' });
   });
 
   it('returns null format for files with no extension', () => {
@@ -93,7 +96,8 @@ describe('isPrimaryFormat', () => {
   it('returns false for non-primary files', () => {
     expect(isPrimaryFormat('/path/cover.jpg')).toBe(false);
     expect(isPrimaryFormat('/path/book.opf')).toBe(false);
-    expect(isPrimaryFormat('/path/readme.txt')).toBe(false);
+    expect(isPrimaryFormat('/path/notes.md')).toBe(false);
+    expect(isPrimaryFormat('/path/readme.txt')).toBe(true);
   });
 
   it('is case-insensitive', () => {

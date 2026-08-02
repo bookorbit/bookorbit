@@ -4,7 +4,37 @@ import type { BookDockFile } from '@bookorbit/types'
 
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
-export const SUPPORTED_FORMATS = ['epub', 'kepub', 'pdf', 'mobi', 'azw3', 'cbz', 'cbr', 'cb7', 'fb2', 'm4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac']
+export const SUPPORTED_FORMATS = [
+  'epub',
+  'kepub',
+  'pdf',
+  'mobi',
+  'azw3',
+  'cbz',
+  'cbr',
+  'cb7',
+  'zip',
+  'fb2',
+  'txt',
+  'm4b',
+  'm4a',
+  'mp3',
+  'opus',
+  'ogg',
+  'oga',
+  'flac',
+  'mp4',
+  'aac',
+  'wma',
+  'aiff',
+  'aif',
+  'wav',
+  'webm',
+  'webma',
+  'mka',
+  'awb',
+  'caf',
+]
 export const SUPPORTED_FORMATS_ACCEPT = SUPPORTED_FORMATS.map((f) => `.${f}`).join(',')
 
 export type FileUploadStatus = 'pending' | 'uploading' | 'done' | 'error'

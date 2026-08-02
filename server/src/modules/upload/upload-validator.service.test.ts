@@ -26,8 +26,12 @@ describe('UploadValidatorService', () => {
       expect(() => service.validateFormat('book.cbz', ['epub', 'pdf'])).toThrow(new BadRequestException('This library does not allow .cbz files'));
     });
 
-    it.each(['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'flac'])('accepts audio format .%s', (ext) => {
-      expect(service.validateFormat(`audio.${ext}`, [])).toBe(ext);
+    it.each(['m4b', 'm4a', 'mp3', 'opus', 'ogg', 'oga', 'flac', 'wav', 'aac', 'wma', 'mp4'])('accepts audio format .%s', (ext) => {
+      expect(service.validateFormat(`book.${ext}`, [])).toBe(ext);
+    });
+
+    it.each(['txt', 'zip'])('accepts bookoasis format .%s', (ext) => {
+      expect(service.validateFormat(`book.${ext}`, [])).toBe(ext);
     });
 
     it('rejects an audio format when blocked by library policy', () => {

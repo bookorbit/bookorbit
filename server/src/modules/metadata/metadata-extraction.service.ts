@@ -9,10 +9,30 @@ import type { FormatExtractor, ParsedBookData } from './extractors/format-extrac
 import { MobiFormatExtractor } from './extractors/mobi-format.extractor';
 import { OpfFormatExtractor } from './extractors/opf-format.extractor';
 import { PdfFormatExtractor } from './extractors/pdf-format.extractor';
+import { ImgdirFormatExtractor, TxtFormatExtractor } from './extractors/txt-format.extractor';
 import { extractCover } from './lib/cover';
 import type { PdfParseWarning } from './lib/pdf-parser';
 
-export const METADATA_AUDIO_FORMATS = ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'] as const;
+export const METADATA_AUDIO_FORMATS = [
+  'm4b',
+  'mp3',
+  'm4a',
+  'opus',
+  'ogg',
+  'oga',
+  'flac',
+  'mp4',
+  'aac',
+  'wma',
+  'aiff',
+  'aif',
+  'wav',
+  'webm',
+  'webma',
+  'mka',
+  'awb',
+  'caf',
+] as const;
 
 export interface MetadataExtractionResult {
   metadata: ParsedBookData | null;
@@ -39,7 +59,10 @@ export class MetadataExtractionService {
       ['cbz', new ComicFormatExtractor('cbz')],
       ['cbr', new ComicFormatExtractor('cbr')],
       ['cb7', new ComicFormatExtractor('cb7')],
+      ['zip', new ComicFormatExtractor('cbz')],
       ['fb2', new Fb2FormatExtractor()],
+      ['txt', new TxtFormatExtractor()],
+      ['imgdir', new ImgdirFormatExtractor()],
     ]);
 
     for (const format of METADATA_AUDIO_FORMATS) {

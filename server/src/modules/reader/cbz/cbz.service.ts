@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Readable } from 'stream';
-import { readFile } from 'fs/promises';
+import { createReadStream } from 'fs';
+import { readdir, readFile, stat } from 'fs/promises';
+import { basename, dirname, join } from 'path';
 import { createExtractorFromData, UnrarError } from 'node-unrar-js';
 import { getSevenZip } from '../../../common/sevenzip';
 import { imageContentTypeFromPath } from '../../../common/image-content-type';
@@ -68,6 +70,8 @@ export class CbzService {
   private readonly rarCache = new Map<number, RarCache>();
   // CB7: sorted page names per fileId (extracted files live in WASM VFS)
   private readonly sevenZPages = new Map<number, string[]>();
+  // imgdir: sorted absolute image paths per fileId
+  private readonly imgdirPages = new Map<number, string[]>();
   // Resolved actual format per fileId (magic bytes override stored extension)
   private readonly resolvedFormat = new Map<number, string>();
 
@@ -80,7 +84,9 @@ export class CbzService {
   private async resolveFormat(fileId: number, absolutePath: string, storedFmt: string | null): Promise<string> {
     if (!this.resolvedFormat.has(fileId)) {
       let resolved: string;
-      if (storedFmt === 'cbz' || storedFmt === 'cbr' || storedFmt === 'cb7') {
+      if (storedFmt === 'imgdir') {
+        resolved = 'imgdir';
+      } else if (storedFmt === 'cbz' || storedFmt === 'cbr' || storedFmt === 'cb7' || storedFmt === 'zip') {
         resolved = await detectComicContainerFormat(absolutePath, storedFmt);
       } else {
         resolved = storedFmt ?? '';
@@ -188,6 +194,30 @@ export class CbzService {
     return this.sevenZPages.get(fileId)!;
   }
 
+  // ── imgdir (loose image folder) ─────────────────────────────────────────────
+
+  private async getImgdirPages(fileId: number, primaryImagePath: string): Promise<string[]> {
+    if (!this.imgdirPages.has(fileId)) {
+      const folder = dirname(primaryImagePath);
+      const names = await readdir(folder);
+      const pages: string[] = [];
+      for (const name of names) {
+        if (isHidden(name) || !isImage(name)) continue;
+        const full = join(folder, name);
+        try {
+          const st = await stat(full);
+          if (!st.isFile()) continue;
+        } catch {
+          continue;
+        }
+        pages.push(full);
+      }
+      pages.sort((a, b) => naturalSort(basename(a), basename(b)));
+      this.imgdirPages.set(fileId, pages);
+    }
+    return this.imgdirPages.get(fileId)!;
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────────
 
   async getPageCount(fileId: number, user: RequestUser): Promise<number> {
@@ -197,6 +227,7 @@ export class CbzService {
     if (fmt === 'cbz') return (await this.getCbzIndex(fileId, file.absolutePath)).length;
     if (fmt === 'cbr') return (await this.getRarCache(fileId, file.absolutePath)).pages.length;
     if (fmt === 'cb7') return (await this.getSevenZPages(fileId, file.absolutePath)).length;
+    if (fmt === 'imgdir') return (await this.getImgdirPages(fileId, file.absolutePath)).length;
 
     throw new NotFoundException(`Unsupported comic format: ${fmt}`);
   }
@@ -231,6 +262,15 @@ export class CbzService {
       const sz = await getSevenZip();
       const data = sz.FS.readFile(`/p${fileId}/${pages[pageIndex]}`);
       return { stream: Readable.from(Buffer.from(data)), mimeType: mimeForExt(pages[pageIndex]) };
+    }
+
+    if (fmt === 'imgdir') {
+      const pages = await this.getImgdirPages(fileId, file.absolutePath);
+      if (pageIndex < 0 || pageIndex >= pages.length) {
+        throw new NotFoundException(`Page ${pageIndex} out of range`);
+      }
+      const pagePath = pages[pageIndex];
+      return { stream: createReadStream(pagePath), mimeType: mimeForExt(pagePath) };
     }
 
     throw new NotFoundException(`Unsupported comic format: ${fmt}`);

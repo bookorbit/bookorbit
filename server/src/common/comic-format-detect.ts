@@ -1,6 +1,6 @@
 import { open } from 'fs/promises';
 
-export type ComicContainerFormat = 'cbz' | 'cbr' | 'cb7';
+export type ComicContainerFormat = 'cbz' | 'cbr' | 'cb7' | 'zip';
 
 const RAR_SIGNATURES = [
   [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00],
@@ -24,14 +24,15 @@ function startsWithSignature(buf: Buffer, bytesRead: number, signature: readonly
  * as .cbr. Extension-based classification routes them to the wrong reader;
  * magic bytes always tell the truth.
  *
- * Only overrides the stored format for cbz/cbr (ZIP vs RAR are the common
+ * Only overrides the stored format for cbz/cbr/zip (ZIP vs RAR are the common
  * swap). CB7 (7-zip) has no overlap with either and is passed through as-is.
+ * Stored `zip` resolves to `cbz` when magic bytes confirm a ZIP archive.
  *
  * Falls back to storedFmt on any I/O error (file not found, permission denied,
  * truncated file) so callers get predictable behaviour and produce a clear
  * downstream error rather than an unexpected I/O exception.
  */
-export async function detectComicContainerFormat(absolutePath: string, storedFmt: ComicContainerFormat): Promise<ComicContainerFormat> {
+export async function detectComicContainerFormat(absolutePath: string, storedFmt: ComicContainerFormat): Promise<'cbz' | 'cbr' | 'cb7'> {
   if (storedFmt === 'cb7') return 'cb7';
 
   let fh: Awaited<ReturnType<typeof open>> | undefined;
@@ -42,10 +43,10 @@ export async function detectComicContainerFormat(absolutePath: string, storedFmt
     if (RAR_SIGNATURES.some((signature) => startsWithSignature(buf, bytesRead, signature))) return 'cbr';
     if (ZIP_SIGNATURES.some((signature) => startsWithSignature(buf, bytesRead, signature))) return 'cbz';
   } catch {
-    return storedFmt;
+    return storedFmt === 'zip' ? 'cbz' : storedFmt;
   } finally {
     await fh?.close();
   }
 
-  return storedFmt;
+  return storedFmt === 'zip' ? 'cbz' : storedFmt;
 }

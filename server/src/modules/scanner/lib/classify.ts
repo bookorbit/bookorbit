@@ -1,16 +1,36 @@
 import { extname, basename } from 'path';
-import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
-
-export const AUDIO_FORMATS = new Set(['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
+import { DEFAULT_FORMAT_PRIORITY, isAudioFormat as isAudioFormatFromTypes } from '@bookorbit/types';
 
 export function isAudioFormat(format: string): boolean {
-  return AUDIO_FORMATS.has(format.toLowerCase());
+  return isAudioFormatFromTypes(format);
 }
+
+/** @deprecated Prefer isAudioFormat from @bookorbit/types; kept for local scanner imports. */
+export const AUDIO_FORMATS = new Set([
+  'm4b',
+  'mp3',
+  'm4a',
+  'opus',
+  'ogg',
+  'oga',
+  'flac',
+  'mp4',
+  'aac',
+  'wma',
+  'aiff',
+  'aif',
+  'wav',
+  'webm',
+  'webma',
+  'mka',
+  'awb',
+  'caf',
+]);
 
 export { DEFAULT_FORMAT_PRIORITY };
 const PRIMARY_FORMATS = new Set<string>(DEFAULT_FORMAT_PRIORITY as readonly string[]);
 
-const COVER_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']);
+export const COVER_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']);
 const COVER_BASENAMES = new Set(['cover', 'folder', 'thumbnail', 'artwork', 'front']);
 const METADATA_EXTENSIONS = new Set(['opf', 'nfo']);
 
@@ -35,4 +55,8 @@ export function classifyFile(absolutePath: string): Classification {
 
 export function isPrimaryFormat(absolutePath: string): boolean {
   return PRIMARY_FORMATS.has(extname(absolutePath).toLowerCase().slice(1));
+}
+
+export function isImageFormat(format: string | null | undefined): boolean {
+  return !!format && COVER_EXTENSIONS.has(format.toLowerCase());
 }
