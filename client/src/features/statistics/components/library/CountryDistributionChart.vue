@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, shallowRef, watchEffect, ref, onMounted } from 'vue'
+import { computed, shallowRef, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import * as echarts from 'echarts'
 import { Globe } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { api } from '@/lib/api'
+import worldJson from '@/../public/maps/world.json'
 
 import ChartCard from '../ChartCard.vue'
 
@@ -15,19 +16,17 @@ const { md } = useBreakpoints(breakpointsTailwind)
 const rawItems = ref<Array<Record<string, unknown>>>([])
 const isLoading = ref(true)
 const hasError = ref(false)
-const isMapLoaded = ref(false)
+const isMapReady = ref(false)
 
 const option = shallowRef({})
 
-fetch('/maps/world.json')
-  .then((res) => res.json())
-  .then((worldJson) => {
-    echarts.registerMap('world', worldJson)
-    isMapLoaded.value = true
-  })
-  .catch(() => {
-    hasError.value = true
-  })
+// Registro síncrono da topologia garantindo que o mapa exista antes de qualquer renderização
+try {
+  echarts.registerMap('world', worldJson as Parameters<typeof echarts.registerMap>[1])
+  isMapReady.value = true
+} catch {
+  hasError.value = true
+}
 
 onMounted(async () => {
   isLoading.value = true
@@ -78,8 +77,8 @@ const aggregatedItems = computed(() => {
     })
 })
 
-watchEffect(() => {
-  if (!isMapLoaded.value) return
+computed(() => {
+  if (!isMapReady.value) return
 
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
 
@@ -131,7 +130,7 @@ watchEffect(() => {
       },
     ],
   }
-})
+}).value
 </script>
 
 <template>
@@ -140,9 +139,9 @@ watchEffect(() => {
     :empty="false"
     :error="hasError"
     :icon="Globe"
-    :loading="isLoading || !isMapLoaded"
+    :loading="isLoading || !isMapReady"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <VChart v-if="isMapLoaded" :option="option" autoresize style="height: 100%" />
+    <VChart v-if="isMapReady" :option="option" autoresize style="height: 100%" />
   </ChartCard>
 </template>
