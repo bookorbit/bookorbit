@@ -7,10 +7,11 @@ import * as echarts from 'echarts'
 import { Globe } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { api } from '@/lib/api'
+import { ECHARTS_COUNTRY_MAP } from '@/lib/country-map'
 
 import ChartCard from '../ChartCard.vue'
 
-const { t, getLocaleMessage } = useI18n()
+const { t } = useI18n()
 const { md } = useBreakpoints(breakpointsTailwind)
 const route = useRoute()
 
@@ -90,16 +91,14 @@ const aggregatedItems = computed(() => {
       const countryVal = item.country
       const code = typeof countryVal === 'string' ? countryVal.trim().toUpperCase() : ''
 
-      const enMessages = getLocaleMessage('en') as Record<string, Record<string, string>>
-      const englishName = enMessages?.countryCodes?.[code] || code
-
+      const echartsName = ECHARTS_COUNTRY_MAP[code] || code
       const localizedName = t(`countryCodes.${code}`, code)
 
       const countVal = item.count ?? item.value
       const value = typeof countVal === 'number' ? countVal : 0
 
       return {
-        name: englishName,
+        name: echartsName,
         value,
         localizedName,
       }
