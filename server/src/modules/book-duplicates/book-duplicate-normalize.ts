@@ -44,8 +44,14 @@ export function canonicalizeIsbn(isbn10: string | null, isbn13: string | null): 
 export function mediaFamilyForFormat(format: string | null): 'ebook' | 'comic' | 'audiobook' | 'unknown' {
   const normalized = format?.toLowerCase();
   if (!normalized) return 'unknown';
-  if (['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'].includes(normalized)) return 'audiobook';
-  if (['cbz', 'cbr', 'cb7', 'cbx'].includes(normalized)) return 'comic';
-  if (['epub', 'pdf', 'mobi', 'azw', 'azw3', 'fb2', 'kepub'].includes(normalized)) return 'ebook';
+  if (
+    ['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'oga', 'flac', 'mp4', 'aac', 'wma', 'aiff', 'aif', 'wav', 'webm', 'webma', 'mka', 'awb', 'caf'].includes(
+      normalized,
+    )
+  ) {
+    return 'audiobook';
+  }
+  if (['cbz', 'cbr', 'cb7', 'cbx', 'zip', 'imgdir'].includes(normalized)) return 'comic';
+  if (['epub', 'pdf', 'mobi', 'azw', 'azw3', 'fb2', 'kepub', 'txt'].includes(normalized)) return 'ebook';
   return 'unknown';
 }

@@ -34,11 +34,12 @@ import TranslationSheet from './epub/components/TranslationSheet.vue'
 import KeyboardShortcutsModal from './epub/components/KeyboardShortcutsModal.vue'
 import CbzReaderView from './cbz/CbzReaderView.vue'
 import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
+import TxtReaderView from './txt/TxtReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
 import type { FoliateLocationContext, FoliateRenderer } from './epub/composables/useFoliate'
 import type { EpubReaderSettings } from '@bookorbit/types'
 import { findMatchingCfiRange } from './epub/utils'
-import { getFormatGroup } from '@bookorbit/types'
+import { getFormatGroup, isComicFormat } from '@bookorbit/types'
 
 const PdfV4ReaderView = defineAsyncComponent(() => import('./pdf-v4/PdfV4ReaderView.vue'))
 
@@ -50,7 +51,8 @@ const fileId = Number(route.params.fileId)
 const fileFormat = (route.query.format as string) || 'epub'
 const isAudioFormat = getFormatGroup(fileFormat) === 'audio'
 const isPdfFormat = fileFormat === 'pdf'
-const isComicFormat = fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7'
+const isTxtFormat = fileFormat === 'txt' || getFormatGroup(fileFormat) === 'txt'
+const isComicFormatView = isComicFormat(fileFormat)
 const isPeekMode = computed(() => {
   const mode = route.query.mode
   return (Array.isArray(mode) ? mode[0] : mode) === 'peek'
@@ -280,7 +282,7 @@ setAnnotationClickHandler(handleAnnotationClick)
 
 onMounted(async () => {
   // Specialized readers own their own progress/settings/loading lifecycle.
-  if (isAudioFormat || isPdfFormat || isComicFormat) return
+  if (isAudioFormat || isPdfFormat || isComicFormatView || isTxtFormat) return
 
   await customFonts.fetchFonts()
   await refreshFontFaces()
@@ -561,8 +563,9 @@ watch(
 
 <template>
   <PdfV4ReaderView v-if="isPdfFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
-  <CbzReaderView v-else-if="isComicFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
+  <CbzReaderView v-else-if="isComicFormatView" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
   <AudiobookReaderView v-else-if="isAudioFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
+  <TxtReaderView v-else-if="isTxtFormat" :bookId="bookId" :fileId="fileId" :peek-mode="isPeekMode" />
   <div
     v-else
     class="fixed inset-0 overflow-hidden"

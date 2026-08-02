@@ -130,11 +130,24 @@ describe('MetadataExtractionService', () => {
   it('returns null for unsupported formats without invoking an extractor', async () => {
     const service = new MetadataExtractionService();
 
-    await expect(service.extract('/books/book.txt', 'txt')).resolves.toBeNull();
+    await expect(service.extract('/books/book.md', 'md')).resolves.toBeNull();
 
-    expect(service.supports('txt')).toBe(false);
+    expect(service.supports('txt')).toBe(true);
+    expect(service.supports('zip')).toBe(true);
+    expect(service.supports('imgdir')).toBe(true);
+    expect(service.supports('wma')).toBe(true);
+    expect(service.supports('md')).toBe(false);
     expect(mocks.epub).not.toHaveBeenCalled();
     expect(mocks.audio).not.toHaveBeenCalled();
+  });
+
+  it('extracts plain text title from filename', async () => {
+    const service = new MetadataExtractionService();
+    await expect(service.extract('/books/My Novel.txt', 'txt')).resolves.toMatchObject({
+      title: 'My Novel',
+      authors: [],
+      cover: null,
+    });
   });
 
   it('preserves null extraction results and propagates extractor failures', async () => {

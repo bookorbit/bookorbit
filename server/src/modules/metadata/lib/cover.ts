@@ -59,12 +59,21 @@ export async function extractCover(absolutePath: string, format: string): Promis
     case 'azw':
       return extractMobiCover(absolutePath);
     case 'cbz':
+    case 'zip':
     case 'cbr': {
-      const actual = await detectComicContainerFormat(absolutePath, format.toLowerCase() as 'cbz' | 'cbr');
+      const actual = await detectComicContainerFormat(absolutePath, format.toLowerCase() as 'cbz' | 'cbr' | 'zip');
       return actual === 'cbr' ? extractCbrCover(absolutePath) : extractCbzCover(absolutePath);
     }
     case 'cb7':
       return extractCb7Cover(absolutePath);
+    case 'imgdir': {
+      const { readFile } = await import('fs/promises');
+      try {
+        return await readFile(absolutePath);
+      } catch {
+        return null;
+      }
+    }
     case 'fb2':
       return extractFb2Cover(absolutePath);
     case 'pdf':

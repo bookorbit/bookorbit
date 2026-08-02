@@ -64,7 +64,19 @@ const AUDIO_MIME_TYPES: Record<string, string> = {
   mp3: 'audio/mpeg',
   opus: 'audio/ogg; codecs=opus',
   ogg: 'audio/ogg',
+  oga: 'audio/ogg',
   flac: 'audio/flac',
+  mp4: 'audio/mp4',
+  aac: 'audio/aac',
+  wma: 'audio/x-ms-wma',
+  aiff: 'audio/aiff',
+  aif: 'audio/aiff',
+  wav: 'audio/wav',
+  webm: 'audio/webm',
+  webma: 'audio/webm',
+  mka: 'audio/x-matroska',
+  awb: 'audio/amr-wb',
+  caf: 'audio/x-caf',
 };
 
 const BOOK_MIME_TYPES: Record<string, string> = {
@@ -75,9 +87,12 @@ const BOOK_MIME_TYPES: Record<string, string> = {
   azw: 'application/vnd.amazon.ebook',
   azw3: 'application/vnd.amazon.ebook',
   fb2: 'application/x-fictionbook+xml',
+  txt: 'text/plain; charset=utf-8',
   cbz: 'application/vnd.comicbook+zip',
   cbr: 'application/vnd.comicbook-rar',
   cb7: 'application/x-cb7',
+  zip: 'application/zip',
+  imgdir: 'application/x-bookorbit-imgdir',
 };
 
 function resolveAudioMimeType(format: string | null): string | null {

@@ -1,7 +1,7 @@
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
-import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
+import { classifyFile, isPrimaryFormat, isAudioFormat, isImageFormat, type FileRole } from './classify';
 
 export interface FileStat {
   absolutePath: string;
@@ -285,7 +285,23 @@ export async function findBookCandidates(
 
   for (const [dir, files] of byDir) {
     const primaryFiles = files.filter((f) => isPrimaryFormat(f.absolutePath));
-    if (primaryFiles.length === 0) continue;
+    if (primaryFiles.length === 0) {
+      // Image-only folders (BookOasis imgdir): non-root dir with images and no
+      // ebook/audio primaries becomes one comic book. Primary content file is the
+      // preferred cover image (or first sorted image) with format overridden to imgdir.
+      if (dir === libraryFolderPath) continue;
+      const imageFiles = files.filter((f) => isImageFormat(f.format));
+      if (imageFiles.length === 0) continue;
+
+      const coverPreferred =
+        imageFiles.find((f) => f.role === 'cover') ??
+        [...imageFiles].sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)))[0];
+      const primary: FileStat = { ...coverPreferred, format: 'imgdir', role: 'content' };
+      const rest = files.filter((f) => f.absolutePath !== primary.absolutePath);
+      const sortedRest = [...rest].sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)));
+      candidates.push({ folderPath: dir, files: [primary, ...sortedRest] });
+      continue;
+    }
 
     if (dir === libraryFolderPath) {
       // Root-level: each primary file is its own book. Sidecar files (non-primary)

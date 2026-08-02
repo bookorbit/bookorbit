@@ -34,19 +34,42 @@ export function xmlLink(rel: string, href: string, type: string, title?: string)
 export function fileMimeType(format: string): string {
   switch (format.toLowerCase()) {
     case 'epub':
+    case 'kepub':
       return 'application/epub+zip';
     case 'pdf':
       return 'application/pdf';
     case 'mobi':
       return 'application/x-mobipocket-ebook';
     case 'azw3':
+    case 'azw':
       return 'application/vnd.amazon.ebook';
     case 'fb2':
       return 'application/x-fictionbook+xml';
+    case 'txt':
+      return 'text/plain';
     case 'cbz':
+    case 'zip':
       return 'application/vnd.comicbook+zip';
     case 'cbr':
       return 'application/vnd.comicbook-rar';
+    case 'cb7':
+      return 'application/x-cb7';
+    case 'm4b':
+    case 'm4a':
+    case 'mp4':
+      return 'audio/mp4';
+    case 'mp3':
+      return 'audio/mpeg';
+    case 'opus':
+    case 'ogg':
+    case 'oga':
+      return 'audio/ogg';
+    case 'flac':
+      return 'audio/flac';
+    case 'aac':
+      return 'audio/aac';
+    case 'wav':
+      return 'audio/wav';
     default:
       return 'application/octet-stream';
   }

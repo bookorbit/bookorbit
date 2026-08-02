@@ -62,11 +62,23 @@ const AUDIO_SETTINGS_SCHEMA = z
   })
   .strict();
 
+const TXT_SETTINGS_SCHEMA = z
+  .object({
+    themeName: z.string().min(1),
+    isDark: z.boolean(),
+    fontFamily: z.string().min(1).nullable(),
+    fontSize: z.number().min(10).max(32),
+    lineHeight: z.number().min(0.8).max(3),
+    maxInlineSize: z.number().int().min(400).max(1600),
+  })
+  .strict();
+
 const FULL_SETTINGS_SCHEMA_BY_GROUP = {
   epub: EPUB_SETTINGS_SCHEMA,
   pdf: PDF_SETTINGS_SCHEMA,
   cbx: CBX_SETTINGS_SCHEMA,
   audio: AUDIO_SETTINGS_SCHEMA,
+  txt: TXT_SETTINGS_SCHEMA,
 } satisfies Record<ReaderFormatGroup, z.ZodTypeAny>;
 
 const PARTIAL_SETTINGS_SCHEMA_BY_GROUP = {
@@ -74,6 +86,7 @@ const PARTIAL_SETTINGS_SCHEMA_BY_GROUP = {
   pdf: PDF_SETTINGS_SCHEMA.partial(),
   cbx: CBX_SETTINGS_SCHEMA.partial(),
   audio: AUDIO_SETTINGS_SCHEMA.partial(),
+  txt: TXT_SETTINGS_SCHEMA.partial(),
 } satisfies Record<ReaderFormatGroup, z.ZodTypeAny>;
 
 function normalizeFormatGroup(formatGroup: string): ReaderFormatGroup {

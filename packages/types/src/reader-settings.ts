@@ -1,4 +1,4 @@
-export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
+export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio" | "txt";
 
 export const CBX_SPREAD_GAP_MIN = 0;
 export const CBX_SPREAD_GAP_MAX = 64;
@@ -11,19 +11,35 @@ export const READER_OPENABLE_FORMATS = new Set([
   "azw3",
   "azw",
   "fb2",
+  // plain text reader
+  "txt",
   // pdf reader
   "pdf",
   // comic reader
   "cbz",
   "cbr",
   "cb7",
+  "zip",
+  "imgdir",
   // audio reader
   "m4b",
   "mp3",
   "m4a",
   "opus",
   "ogg",
+  "oga",
   "flac",
+  "mp4",
+  "aac",
+  "wma",
+  "aiff",
+  "aif",
+  "wav",
+  "webm",
+  "webma",
+  "mka",
+  "awb",
+  "caf",
 ]);
 
 export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {
@@ -32,18 +48,32 @@ export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {
   azw3: "epub",
   azw: "epub",
   fb2: "epub",
-  txt: "epub",
+  txt: "txt",
   pdf: "pdf",
   cbx: "cbx",
   cbz: "cbx",
   cbr: "cbx",
   cb7: "cbx",
+  zip: "cbx",
+  imgdir: "cbx",
   m4b: "audio",
   mp3: "audio",
   m4a: "audio",
   opus: "audio",
   ogg: "audio",
+  oga: "audio",
   flac: "audio",
+  mp4: "audio",
+  aac: "audio",
+  wma: "audio",
+  aiff: "audio",
+  aif: "audio",
+  wav: "audio",
+  webm: "audio",
+  webma: "audio",
+  mka: "audio",
+  awb: "audio",
+  caf: "audio",
 };
 
 export function getFormatGroup(format: string): ReaderFormatGroup {
@@ -99,14 +129,29 @@ export interface AudioReaderSettings {
   skipForwardSeconds: number;
 }
 
+export interface TxtReaderSettings {
+  themeName: string;
+  isDark: boolean;
+  fontFamily: string | null;
+  fontSize: number;
+  lineHeight: number;
+  maxInlineSize: number;
+}
+
 export type ReaderSettingsMap = {
   epub: EpubReaderSettings;
   pdf: PdfReaderSettings;
   cbx: CbxReaderSettings;
   audio: AudioReaderSettings;
+  txt: TxtReaderSettings;
 };
 
-export type ReaderSettings = EpubReaderSettings | PdfReaderSettings | CbxReaderSettings | AudioReaderSettings;
+export type ReaderSettings =
+  | EpubReaderSettings
+  | PdfReaderSettings
+  | CbxReaderSettings
+  | AudioReaderSettings
+  | TxtReaderSettings;
 
 export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
   themeName: "default",
@@ -153,9 +198,19 @@ export const AUDIO_READER_DEFAULTS: AudioReaderSettings = {
   skipForwardSeconds: 30,
 };
 
+export const TXT_READER_DEFAULTS: TxtReaderSettings = {
+  themeName: "default",
+  isDark: true,
+  fontFamily: null,
+  fontSize: 18,
+  lineHeight: 1.6,
+  maxInlineSize: 720,
+};
+
 export const READER_GROUP_DEFAULTS: ReaderSettingsMap = {
   epub: EPUB_READER_DEFAULTS,
   pdf: PDF_READER_DEFAULTS,
   cbx: CBX_READER_DEFAULTS,
   audio: AUDIO_READER_DEFAULTS,
+  txt: TXT_READER_DEFAULTS,
 };
