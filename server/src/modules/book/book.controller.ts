@@ -52,7 +52,7 @@ import { SearchBooksDto } from './dto/search-books.dto';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
-import type { BookDeletionAuditMeta } from '@bookorbit/types';
+import type { BookDeletionAuditMeta, MoveBooksResponse } from '@bookorbit/types';
 import type { BookQuery } from '@bookorbit/types';
 import { UpdateBookMetadataLocksDto } from '../book-metadata-lock/dto/update-book-metadata-locks.dto';
 
@@ -143,10 +143,26 @@ export class BookController {
   @Auditable({
     action: AuditAction.BookBulkMove,
     resource: AuditResource.Book,
-    description: (req) => {
-      const body = req.body as { bookIds?: number[]; targetLibraryId?: number };
-      const count = body?.bookIds?.length ?? 0;
-      return `Moved ${count} book${count !== 1 ? 's' : ''} to library ${body?.targetLibraryId}`;
+    getMeta: (req, responseBody) => {
+      const body = req.body as { targetLibraryId?: number; targetFolderId?: number };
+      const { results } = responseBody as MoveBooksResponse;
+      return {
+        targetLibraryId: body?.targetLibraryId,
+        targetFolderId: body?.targetFolderId,
+        moved: results.filter((entry) => entry.status === 'moved').length,
+        skipped: results.filter((entry) => entry.status === 'skipped').length,
+        failed: results.filter((entry) => entry.status === 'failed').length,
+        results,
+      };
+    },
+    description: (req, responseBody) => {
+      const body = req.body as { targetLibraryId?: number };
+      const { results } = responseBody as MoveBooksResponse;
+      const moved = results.filter((entry) => entry.status === 'moved').length;
+      const skipped = results.filter((entry) => entry.status === 'skipped').length;
+      const failed = results.filter((entry) => entry.status === 'failed').length;
+      const parts = [skipped > 0 ? `${skipped} skipped` : null, failed > 0 ? `${failed} failed` : null].filter(Boolean).join(', ');
+      return `Moved ${moved} of ${results.length} book${results.length !== 1 ? 's' : ''} to library ${body?.targetLibraryId}${parts ? ` (${parts})` : ''}`;
     },
   })
   async moveBooks(@Body() dto: MoveBooksDto, @CurrentUser() user: RequestUser) {

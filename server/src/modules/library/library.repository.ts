@@ -176,6 +176,13 @@ export class LibraryRepository {
     return row !== undefined;
   }
 
+  async getUserAccessLevel(userId: number, libraryId: number): Promise<AccessLevel | null> {
+    const row = await this.db.query.userLibraryAccess.findFirst({
+      where: and(eq(schema.userLibraryAccess.userId, userId), eq(schema.userLibraryAccess.libraryId, libraryId)),
+    });
+    return row?.accessLevel ?? null;
+  }
+
   getAccess(libraryId: number) {
     return this.db.query.userLibraryAccess.findMany({
       where: eq(schema.userLibraryAccess.libraryId, libraryId),

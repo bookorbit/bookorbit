@@ -942,6 +942,32 @@ describe('BookController', () => {
       description: (req: { params: Record<string, string> }) => string;
     };
 
+    const moveAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.moveBooks) as {
+      getMeta: (
+        req: { body: Record<string, unknown> },
+        response: { results: { bookId: number; status: string; reason?: string }[] },
+      ) => Record<string, unknown>;
+      description: (req: { body: Record<string, unknown> }, response: { results: { bookId: number; status: string; reason?: string }[] }) => string;
+    };
+    const moveResponse = {
+      results: [
+        { bookId: 1, status: 'moved' },
+        { bookId: 2, status: 'skipped', reason: 'target path already exists on disk' },
+        { bookId: 3, status: 'failed', reason: 'database update failed' },
+      ],
+    };
+    expect(moveAudit.description({ body: { targetLibraryId: 7 } }, moveResponse)).toBe('Moved 1 of 3 books to library 7 (1 skipped, 1 failed)');
+    expect(moveAudit.description({ body: { targetLibraryId: 7 } }, { results: [{ bookId: 1, status: 'moved' }] })).toBe(
+      'Moved 1 of 1 book to library 7',
+    );
+    expect(moveAudit.getMeta({ body: { targetLibraryId: 7, targetFolderId: 9 } }, moveResponse)).toMatchObject({
+      targetLibraryId: 7,
+      targetFolderId: 9,
+      moved: 1,
+      skipped: 1,
+      failed: 1,
+    });
+
     const singleDeletion = { total: 1, books: [{ id: 1, title: 'Dune' }], omitted: 0 };
     const bulkDeletion = { total: 2, books: [{ id: 1, title: 'Dune' }], omitted: 1 };
     expect(deleteAudit.description({}, singleDeletion)).toBe('Deleted "Dune" (#1)');

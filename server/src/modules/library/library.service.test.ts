@@ -32,6 +32,7 @@ function dirent(name: string, kind: 'file' | 'dir') {
 describe('LibraryService', () => {
   const libraryRepo = {
     hasUserAccess: vi.fn(),
+    getUserAccessLevel: vi.fn(),
     findAll: vi.fn(),
     findAllForUser: vi.fn(),
     findAllIds: vi.fn(),
@@ -157,6 +158,28 @@ describe('LibraryService', () => {
   it('verifyUserAccess throws when user has no library access', async () => {
     libraryRepo.hasUserAccess.mockResolvedValue(false);
     await expect(service.verifyUserAccess(1, 2, false)).rejects.toThrow('No access to this library');
+  });
+
+  it('verifyUserAccessLevel bypasses lookup for superusers', async () => {
+    await service.verifyUserAccessLevel(1, 2, 'editor', true);
+    expect(libraryRepo.getUserAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it('verifyUserAccessLevel throws when the user has no access row at all', async () => {
+    libraryRepo.getUserAccessLevel.mockResolvedValue(null);
+    await expect(service.verifyUserAccessLevel(1, 2, 'editor', false)).rejects.toThrow('No access to this library');
+  });
+
+  it('verifyUserAccessLevel throws when the level is below the required one', async () => {
+    libraryRepo.getUserAccessLevel.mockResolvedValue('viewer');
+    await expect(service.verifyUserAccessLevel(1, 2, 'editor', false)).rejects.toThrow('Insufficient library access level');
+  });
+
+  it('verifyUserAccessLevel passes for the required level and above', async () => {
+    libraryRepo.getUserAccessLevel.mockResolvedValue('editor');
+    await expect(service.verifyUserAccessLevel(1, 2, 'editor', false)).resolves.toBeUndefined();
+    libraryRepo.getUserAccessLevel.mockResolvedValue('owner');
+    await expect(service.verifyUserAccessLevel(1, 2, 'editor', false)).resolves.toBeUndefined();
   });
 
   it('create applies defaults, inserts folders, and starts an async scan', async () => {

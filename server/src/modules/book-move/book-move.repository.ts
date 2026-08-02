@@ -136,9 +136,11 @@ export class BookMoveRepository {
       // books must be updated first: book_files_book_folder_consistency_fk references
       // books(id, library_folder_id) with ON UPDATE CASCADE, so the new folder id
       // propagates to the files; updating a file first violates the FK.
+      // updatedAt drives Kobo sync's LastModified; without the bump a moved
+      // book never reaches paired devices in the target library's sync scope.
       await tx
         .update(books)
-        .set({ libraryId: target.libraryId, libraryFolderId: target.libraryFolderId, folderPath: target.folderPath })
+        .set({ libraryId: target.libraryId, libraryFolderId: target.libraryFolderId, folderPath: target.folderPath, updatedAt: new Date() })
         .where(eq(books.id, bookId));
       for (const file of files) {
         await tx

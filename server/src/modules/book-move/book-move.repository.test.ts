@@ -129,7 +129,7 @@ describe('BookMoveRepository', () => {
     // books(id, library_folder_id) with ON UPDATE CASCADE, so updating a file's
     // library_folder_id while the book still points at the old folder violates the FK.
     expect(setCalls).toEqual([
-      { libraryId: 3, libraryFolderId: 9, folderPath: '/dst-lib/Frank Herbert/Dune' },
+      { libraryId: 3, libraryFolderId: 9, folderPath: '/dst-lib/Frank Herbert/Dune', updatedAt: expect.any(Date) },
       { absolutePath: '/dst-lib/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub', libraryFolderId: 9 },
       { absolutePath: '/dst-lib/Frank Herbert/Dune/cover.jpg', relPath: 'Frank Herbert/Dune/cover.jpg', libraryFolderId: 9 },
     ]);

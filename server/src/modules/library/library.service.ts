@@ -30,6 +30,10 @@ import { UpdateLibraryDto } from './dto/update-library.dto';
 import { DEFAULT_LIBRARY_COVER_ASPECT_RATIO, DEFAULT_LIBRARY_ORGANIZATION_MODE, LIBRARY_METADATA_PRECEDENCE_DEFAULT } from './library.constants';
 import { LibraryRepository } from './library.repository';
 
+// Mirrors the ranking in LibraryAccessGuard, which only covers route-param
+// library ids; service-side checks need the same semantics for body-provided ids.
+const ACCESS_RANK: Record<AccessLevel, number> = { viewer: 1, editor: 2, owner: 3 };
+
 interface LibraryMetadataWriteStreamOptions {
   onProgress?: (event: LibraryFileSyncProgressEvent) => void;
   isCancelled?: () => boolean;
@@ -64,6 +68,15 @@ export class LibraryService {
     if (isSuperuser) return;
     const hasAccess = await this.libraryRepo.hasUserAccess(userId, libraryId);
     if (!hasAccess) throw new ForbiddenException('No access to this library');
+  }
+
+  async verifyUserAccessLevel(userId: number, libraryId: number, requiredLevel: AccessLevel, isSuperuser: boolean): Promise<void> {
+    if (isSuperuser) return;
+    const level = await this.libraryRepo.getUserAccessLevel(userId, libraryId);
+    if (!level) throw new ForbiddenException('No access to this library');
+    if (ACCESS_RANK[level] < ACCESS_RANK[requiredLevel]) {
+      throw new ForbiddenException('Insufficient library access level');
+    }
   }
 
   async findAll(user: RequestUser) {

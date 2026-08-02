@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
-import { access, copyFile, mkdir, readdir, rename as fsRename, rmdir, unlink } from 'fs/promises';
-import { dirname, extname, join, relative } from 'path';
+import { access, constants as fsConstants, copyFile, link, mkdir, readdir, rmdir, unlink } from 'fs/promises';
+import { dirname, extname, isAbsolute, join, relative } from 'path';
 
 import type { MoveBookOutcome } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -9,6 +9,8 @@ import { FileLockService, bookOperationLockKey } from '../file-write/file-lock.s
 import { FileRenameService } from '../file-write/file-rename.service';
 import { LibraryService } from '../library/library.service';
 import { ScanGateway } from '../scanner/scan.gateway';
+import { ScannerService } from '../scanner/scanner.service';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import type { BookMoveBookData, BookMoveFileUpdate, BookMoveFolder, BookMoveLibrary } from './book-move.repository';
 import { BookMoveRepository } from './book-move.repository';
 
@@ -24,13 +26,17 @@ export class BookMoveService {
     private readonly lockService: FileLockService,
     private readonly fileRenameService: FileRenameService,
     private readonly scanGateway: ScanGateway,
+    private readonly scannerService: ScannerService,
+    private readonly selfWriteRegistry: SelfWriteRegistry,
   ) {}
 
   async moveBooks(bookIds: number[], targetLibraryId: number, targetFolderId: number | undefined, user: RequestUser): Promise<MoveBookOutcome[]> {
     const library = await this.moveRepo.findLibrary(targetLibraryId);
     if (!library) throw new BadRequestException(`Library ${targetLibraryId} not found`);
 
-    await this.libraryService.verifyUserAccess(user.id, targetLibraryId, user.isSuperuser);
+    // Moving writes files into the target library, so viewer access is not
+    // enough; every other write path requires editor level.
+    await this.libraryService.verifyUserAccessLevel(user.id, targetLibraryId, 'editor', user.isSuperuser);
     const folder = await this.resolveTargetFolder(targetLibraryId, targetFolderId);
 
     const results: MoveBookOutcome[] = [];
@@ -42,6 +48,9 @@ export class BookMoveService {
     }
 
     for (const [fromLibraryId, movedIds] of movedBySourceLibrary) {
+      // A move can race the source library's unavailable-books debounce; the
+      // scanner's own transfer path cancels the pending notification too.
+      this.scannerService.cancelBooksUnavailableNotification(fromLibraryId, movedIds);
       this.scanGateway.emitBookTransferred({ fromLibraryId, toLibraryId: library.id, bookIds: movedIds });
     }
     return results;
@@ -87,6 +96,7 @@ export class BookMoveService {
     }
 
     if (book.status === 'processing') return { bookId, status: 'skipped', reason: 'book is processing' };
+    if (book.status === 'missing') return { bookId, status: 'skipped', reason: 'book files are missing' };
     if (book.libraryId === library.id && book.libraryFolderId === folder.id) {
       return { bookId, status: 'skipped', reason: 'already in target library' };
     }
@@ -106,6 +116,17 @@ export class BookMoveService {
       return { id: file.id, absolutePath: join(folder.path, relPath), relPath };
     });
     const newFolderPath = join(folder.path, relative(book.libraryFolderPath, book.folderPath));
+
+    // A stored relPath (or a file row outside its folder root) can resolve to
+    // "../..", which would make the move write outside the target library. The
+    // folder path may equal the folder root itself (flat libraries), file
+    // paths must be strictly inside it.
+    const escapes =
+      fileUpdates.some((update) => !this.isContainedIn(folder.path, update.absolutePath)) || !this.isAtOrContainedIn(folder.path, newFolderPath);
+    if (escapes) {
+      this.logger.error(`[${BOOK_MOVE_EVENT}] bookId=${bookId} toFolderId=${folder.id} - resolved target path escapes the target folder`);
+      return { bookId, status: 'failed', reason: 'file path escapes target folder' };
+    }
 
     const existingPaths = await this.moveRepo.findExistingPaths(fileUpdates.map((update) => update.absolutePath));
     for (const update of fileUpdates) {
@@ -132,25 +153,35 @@ export class BookMoveService {
     }
 
     const moved: Array<{ from: string; to: string }> = [];
+    // Suppress watcher events for every touched path: without this the source
+    // library's watcher sees unlinks and the target's sees adds for a book
+    // whose row has already been re-parented, racing missing-marking and
+    // duplicate detection.
+    const suppressPaths = this.buildSuppressedMovePaths(book, fileUpdates, folder.path, newFolderPath);
+    this.selfWriteRegistry.begin(suppressPaths);
     try {
-      for (let i = 0; i < book.files.length; i++) {
-        const from = book.files[i].absolutePath;
-        const to = fileUpdates[i].absolutePath;
-        if (from === to) continue;
-        await mkdir(dirname(to), { recursive: true });
-        await this.moveFile(from, to);
-        moved.push({ from, to });
+      try {
+        for (let i = 0; i < book.files.length; i++) {
+          const from = book.files[i].absolutePath;
+          const to = fileUpdates[i].absolutePath;
+          if (from === to) continue;
+          await mkdir(dirname(to), { recursive: true });
+          await this.moveFile(from, to);
+          moved.push({ from, to });
+        }
+      } catch (error) {
+        const rolledBack = await this.rollback(bookId, book, moved, error);
+        const reason = error instanceof Error ? error.message : String(error);
+        return { bookId, status: 'failed', reason: rolledBack ? reason : `${reason} (rollback incomplete, manual check required)` };
       }
-    } catch (error) {
-      const rolledBack = await this.rollback(bookId, book, moved, error);
-      const reason = error instanceof Error ? error.message : String(error);
-      return { bookId, status: 'failed', reason: rolledBack ? reason : `${reason} (rollback incomplete, manual check required)` };
-    }
 
-    for (const { from } of moved) {
-      await this.tryRemoveEmptyDir(dirname(from));
+      for (const { from } of moved) {
+        await this.cleanupEmptyDirsUpTo(dirname(from), book.libraryFolderPath);
+      }
+      await this.cleanupEmptyDirsUpTo(book.folderPath, book.libraryFolderPath);
+    } finally {
+      this.selfWriteRegistry.end(suppressPaths);
     }
-    await this.tryRemoveEmptyDir(book.folderPath);
 
     const movedFromSource = movedBySourceLibrary.get(book.libraryId) ?? [];
     movedFromSource.push(bookId);
@@ -198,16 +229,49 @@ export class BookMoveService {
   }
 
   private async moveFile(from: string, to: string): Promise<void> {
+    // rename(2) silently overwrites the destination. link+unlink (or
+    // COPYFILE_EXCL on filesystems without hardlinks) makes a concurrent move
+    // that resolved the same target path fail with EEXIST instead of
+    // clobbering the other book's file.
     try {
-      await fsRename(from, to);
+      await link(from, to);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
-        await copyFile(from, to);
-        await unlink(from);
-        return;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'EXDEV' || code === 'EPERM' || code === 'ENOTSUP' || code === 'EACCES') {
+        await copyFile(from, to, fsConstants.COPYFILE_EXCL);
+      } else {
+        throw err;
       }
-      throw err;
     }
+    await unlink(from);
+  }
+
+  private buildSuppressedMovePaths(book: BookMoveBookData, fileUpdates: BookMoveFileUpdate[], targetRoot: string, newFolderPath: string): string[] {
+    const paths = new Set<string>();
+    const addWithParents = (path: string, root: string) => {
+      paths.add(path);
+      let current = dirname(path);
+      while (this.isContainedIn(root, current)) {
+        paths.add(current);
+        current = dirname(current);
+      }
+    };
+    for (let i = 0; i < book.files.length; i++) {
+      addWithParents(book.files[i].absolutePath, book.libraryFolderPath);
+      addWithParents(fileUpdates[i].absolutePath, targetRoot);
+    }
+    if (this.isContainedIn(book.libraryFolderPath, book.folderPath)) paths.add(book.folderPath);
+    if (this.isContainedIn(targetRoot, newFolderPath)) paths.add(newFolderPath);
+    return [...paths];
+  }
+
+  private isContainedIn(root: string, target: string): boolean {
+    const rel = relative(root, target);
+    return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+  }
+
+  private isAtOrContainedIn(root: string, target: string): boolean {
+    return relative(root, target) === '' || this.isContainedIn(root, target);
   }
 
   private async pathExists(path: string): Promise<boolean> {
@@ -219,14 +283,28 @@ export class BookMoveService {
     }
   }
 
-  private async tryRemoveEmptyDir(dirPath: string): Promise<void> {
+  // Removes empty directories from startDir upward, but never the library
+  // folder root itself: for flat libraries books.folderPath IS the folder root,
+  // and deleting it would break the library until someone recreates it.
+  private async cleanupEmptyDirsUpTo(startDir: string, stopDir: string): Promise<void> {
+    let current = startDir;
+    while (this.isContainedIn(stopDir, current)) {
+      const removed = await this.tryRemoveEmptyDir(current);
+      if (!removed) return;
+      current = dirname(current);
+    }
+  }
+
+  private async tryRemoveEmptyDir(dirPath: string): Promise<boolean> {
     try {
       const entries = await readdir(dirPath);
       if (entries.length === 0) {
         await rmdir(dirPath);
+        return true;
       }
     } catch {
       // Best effort.
     }
+    return false;
   }
 }

@@ -1,6 +1,6 @@
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
-import { access, copyFile, mkdir, readdir, rename as fsRename, rmdir, unlink } from 'fs/promises';
+import { access, constants as fsConstants, copyFile, link, mkdir, readdir, rmdir, unlink } from 'fs/promises';
 
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
@@ -10,7 +10,7 @@ vi.mock('fs/promises', async () => {
     copyFile: vi.fn(),
     mkdir: vi.fn(),
     readdir: vi.fn(),
-    rename: vi.fn(),
+    link: vi.fn(),
     rmdir: vi.fn(),
     unlink: vi.fn(),
   };
@@ -24,7 +24,7 @@ const mockAccess = access as MockedFunction<typeof access>;
 const mockCopyFile = copyFile as MockedFunction<typeof copyFile>;
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
-const mockRename = fsRename as MockedFunction<typeof fsRename>;
+const mockLink = link as MockedFunction<typeof link>;
 const mockRmdir = rmdir as MockedFunction<typeof rmdir>;
 const mockUnlink = unlink as MockedFunction<typeof unlink>;
 
@@ -88,14 +88,24 @@ function makeService() {
     findExistingPaths: vi.fn().mockResolvedValue(new Map()),
     applyMove: vi.fn().mockResolvedValue(undefined),
   };
-  const libraryService = { verifyUserAccess: vi.fn().mockResolvedValue(undefined) };
+  const libraryService = { verifyUserAccess: vi.fn().mockResolvedValue(undefined), verifyUserAccessLevel: vi.fn().mockResolvedValue(undefined) };
   const lockService = { withLock: vi.fn((_key: string, fn: () => unknown) => fn()) };
   const fileRenameService = { scheduleRename: vi.fn() };
   const scanGateway = { emitBookTransferred: vi.fn() };
+  const scannerService = { cancelBooksUnavailableNotification: vi.fn() };
+  const selfWriteRegistry = { begin: vi.fn(), end: vi.fn() };
 
-  const service = new BookMoveService(repo as never, libraryService as never, lockService as never, fileRenameService as never, scanGateway as never);
+  const service = new BookMoveService(
+    repo as never,
+    libraryService as never,
+    lockService as never,
+    fileRenameService as never,
+    scanGateway as never,
+    scannerService as never,
+    selfWriteRegistry as never,
+  );
 
-  return { service, repo, libraryService, lockService, fileRenameService, scanGateway };
+  return { service, repo, libraryService, lockService, fileRenameService, scanGateway, scannerService, selfWriteRegistry };
 }
 
 beforeEach(() => {
@@ -103,7 +113,7 @@ beforeEach(() => {
   // Default disk state: no target paths exist, source dirs empty after move.
   mockAccess.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
   mockMkdir.mockResolvedValue(undefined);
-  mockRename.mockResolvedValue(undefined);
+  mockLink.mockResolvedValue(undefined);
   mockReaddir.mockResolvedValue([] as never);
   mockRmdir.mockResolvedValue(undefined);
 });
@@ -120,8 +130,8 @@ describe('BookMoveService', () => {
         { id: 10, absolutePath: '/dst-lib/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub' },
         { id: 11, absolutePath: '/dst-lib/Frank Herbert/Dune/cover.jpg', relPath: 'Frank Herbert/Dune/cover.jpg' },
       ]);
-      expect(mockRename).toHaveBeenCalledWith('/src-lib/Frank Herbert/Dune/Dune.epub', '/dst-lib/Frank Herbert/Dune/Dune.epub');
-      expect(mockRename).toHaveBeenCalledWith('/src-lib/Frank Herbert/Dune/cover.jpg', '/dst-lib/Frank Herbert/Dune/cover.jpg');
+      expect(mockLink).toHaveBeenCalledWith('/src-lib/Frank Herbert/Dune/Dune.epub', '/dst-lib/Frank Herbert/Dune/Dune.epub');
+      expect(mockLink).toHaveBeenCalledWith('/src-lib/Frank Herbert/Dune/cover.jpg', '/dst-lib/Frank Herbert/Dune/cover.jpg');
     });
 
     it('schedules a pattern rename in the target library after a successful move', async () => {
@@ -132,18 +142,18 @@ describe('BookMoveService', () => {
       expect(fileRenameService.scheduleRename).toHaveBeenCalledWith(5, 7);
     });
 
-    it('verifies user access to both the source and the target library', async () => {
+    it('requires editor access on the target library and viewer access on the source', async () => {
       const { service, libraryService } = makeService();
 
       await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(7, 3, false);
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(7, 3, 'editor', false);
       expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(7, 1, false);
     });
 
-    it('rejects the whole request when the user has no access to the target library', async () => {
+    it('rejects the whole request when the user lacks editor access to the target library', async () => {
       const { service, libraryService, repo } = makeService();
-      libraryService.verifyUserAccess.mockRejectedValueOnce(new ForbiddenException());
+      libraryService.verifyUserAccessLevel.mockRejectedValueOnce(new ForbiddenException('Insufficient library access level'));
 
       await expect(service.moveBooks([5], 3, 9, makeUser())).rejects.toBeInstanceOf(ForbiddenException);
       expect(repo.applyMove).not.toHaveBeenCalled();
@@ -151,20 +161,85 @@ describe('BookMoveService', () => {
 
     it('fails a single book (not the batch) when the user has no access to its source library', async () => {
       const { service, libraryService } = makeService();
-      libraryService.verifyUserAccess
-        .mockResolvedValueOnce(undefined) // target library
-        .mockRejectedValueOnce(new ForbiddenException()); // source library
+      libraryService.verifyUserAccess.mockRejectedValueOnce(new ForbiddenException()); // source library
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
       expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'no access to source library' }]);
     });
 
+    it('skips books whose files are missing without touching the database', async () => {
+      const { service, repo } = makeService();
+      repo.findBookForMove.mockResolvedValue(makeBook({ status: 'missing' }));
+
+      const results = await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'book files are missing' }]);
+      expect(repo.applyMove).not.toHaveBeenCalled();
+      expect(mockLink).not.toHaveBeenCalled();
+    });
+
+    it('fails a book whose resolved target path escapes the target folder', async () => {
+      const { service, repo } = makeService();
+      repo.findBookForMove.mockResolvedValue(
+        makeBook({
+          files: [
+            {
+              id: 10,
+              absolutePath: '/elsewhere/Dune.epub',
+              relPath: '../../elsewhere/Dune.epub',
+              format: 'epub',
+              role: 'primary',
+            },
+          ],
+        }),
+      );
+
+      const results = await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'file path escapes target folder' }]);
+      expect(repo.applyMove).not.toHaveBeenCalled();
+      expect(mockLink).not.toHaveBeenCalled();
+    });
+
+    it('never removes the library folder root when cleaning up a flat book', async () => {
+      const { service, repo } = makeService();
+      repo.findBookForMove.mockResolvedValue(
+        makeBook({
+          folderPath: '/src-lib',
+          files: [
+            {
+              id: 10,
+              absolutePath: '/src-lib/Dune.epub',
+              relPath: 'Dune.epub',
+              format: 'epub',
+              role: 'primary',
+            },
+          ],
+        }),
+      );
+
+      const results = await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(results).toEqual([{ bookId: 5, status: 'moved' }]);
+      expect(mockRmdir).not.toHaveBeenCalled();
+    });
+
+    it('cleans up nested empty directories up to but excluding the folder root', async () => {
+      const { service, repo } = makeService();
+      repo.findBookForMove.mockResolvedValue(makeBook());
+
+      const results = await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(results).toEqual([{ bookId: 5, status: 'moved' }]);
+      expect(mockRmdir).toHaveBeenCalledWith('/src-lib/Frank Herbert/Dune');
+      expect(mockRmdir).toHaveBeenCalledWith('/src-lib/Frank Herbert');
+      expect(mockRmdir).not.toHaveBeenCalledWith('/src-lib');
+    });
+
     it('fails a single book with a distinct reason when the source access check errors unexpectedly', async () => {
       const { service, libraryService } = makeService();
-      libraryService.verifyUserAccess
-        .mockResolvedValueOnce(undefined) // target library
-        .mockRejectedValueOnce(new Error('connection reset')); // source library, infra error
+      libraryService.verifyUserAccess.mockRejectedValueOnce(new Error('connection reset')); // source library, infra error
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
@@ -277,24 +352,68 @@ describe('BookMoveService', () => {
       expect(repo.applyMove).not.toHaveBeenCalled();
     });
 
-    it('falls back to copy+unlink when rename fails with EXDEV (cross-device move)', async () => {
+    it('falls back to exclusive copy+unlink when hardlinking fails with EXDEV (cross-device move)', async () => {
       const { service } = makeService();
-      mockRename.mockRejectedValue(Object.assign(new Error('cross-device'), { code: 'EXDEV' }));
+      mockLink.mockRejectedValue(Object.assign(new Error('cross-device'), { code: 'EXDEV' }));
       mockCopyFile.mockResolvedValue(undefined);
       mockUnlink.mockResolvedValue(undefined);
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
       expect(results).toEqual([{ bookId: 5, status: 'moved' }]);
-      expect(mockCopyFile).toHaveBeenCalledWith('/src-lib/Frank Herbert/Dune/Dune.epub', '/dst-lib/Frank Herbert/Dune/Dune.epub');
+      expect(mockCopyFile).toHaveBeenCalledWith(
+        '/src-lib/Frank Herbert/Dune/Dune.epub',
+        '/dst-lib/Frank Herbert/Dune/Dune.epub',
+        fsConstants.COPYFILE_EXCL,
+      );
       expect(mockUnlink).toHaveBeenCalledWith('/src-lib/Frank Herbert/Dune/Dune.epub');
+    });
+
+    it('fails the book instead of overwriting when a concurrent move already created the target file', async () => {
+      const { service } = makeService();
+      mockLink.mockRejectedValueOnce(Object.assign(new Error('file exists'), { code: 'EEXIST' }));
+
+      const results = await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'file exists' }]);
+      expect(mockCopyFile).not.toHaveBeenCalled();
+    });
+
+    it('suppresses watcher events for all touched paths during the physical move', async () => {
+      const { service, selfWriteRegistry } = makeService();
+
+      await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(selfWriteRegistry.begin).toHaveBeenCalledTimes(1);
+      const paths = selfWriteRegistry.begin.mock.calls[0][0] as string[];
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          '/src-lib/Frank Herbert/Dune/Dune.epub',
+          '/dst-lib/Frank Herbert/Dune/Dune.epub',
+          '/src-lib/Frank Herbert/Dune',
+          '/src-lib/Frank Herbert',
+          '/dst-lib/Frank Herbert/Dune',
+          '/dst-lib/Frank Herbert',
+        ]),
+      );
+      expect(paths).not.toContain('/src-lib');
+      expect(paths).not.toContain('/dst-lib');
+      expect(selfWriteRegistry.end).toHaveBeenCalledWith(paths);
+    });
+
+    it('cancels the source library unavailable notification for moved books', async () => {
+      const { service, scannerService } = makeService();
+
+      await service.moveBooks([5], 3, 9, makeUser());
+
+      expect(scannerService.cancelBooksUnavailableNotification).toHaveBeenCalledWith(1, [5]);
     });
 
     it('rolls back the DB update and already-moved files when a physical move fails', async () => {
       const { service, repo } = makeService();
       const book = makeBook();
       repo.findBookForMove.mockResolvedValue(book);
-      mockRename
+      mockLink
         .mockResolvedValueOnce(undefined) // first file moves fine
         .mockRejectedValueOnce(Object.assign(new Error('disk full'), { code: 'ENOSPC' })) // second file fails
         .mockResolvedValueOnce(undefined); // rollback of first file
@@ -303,7 +422,7 @@ describe('BookMoveService', () => {
 
       expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'disk full' }]);
       // Rollback: file 10 moved back.
-      expect(mockRename).toHaveBeenCalledWith('/dst-lib/Frank Herbert/Dune/Dune.epub', '/src-lib/Frank Herbert/Dune/Dune.epub');
+      expect(mockLink).toHaveBeenCalledWith('/dst-lib/Frank Herbert/Dune/Dune.epub', '/src-lib/Frank Herbert/Dune/Dune.epub');
       // Rollback: DB restored to source library values.
       expect(repo.applyMove).toHaveBeenLastCalledWith(5, { libraryId: 1, libraryFolderId: 2, folderPath: '/src-lib/Frank Herbert/Dune' }, [
         { id: 10, absolutePath: '/src-lib/Frank Herbert/Dune/Dune.epub', relPath: 'Frank Herbert/Dune/Dune.epub' },
@@ -314,7 +433,7 @@ describe('BookMoveService', () => {
     it('flags the outcome when the rollback itself fails and the book may be inconsistent', async () => {
       const { service, repo } = makeService();
       repo.findBookForMove.mockResolvedValue(makeBook());
-      mockRename
+      mockLink
         .mockResolvedValueOnce(undefined) // first file moves fine
         .mockRejectedValueOnce(Object.assign(new Error('disk full'), { code: 'ENOSPC' })) // second file fails
         .mockRejectedValueOnce(new Error('permission denied')); // rollback of first file fails too
