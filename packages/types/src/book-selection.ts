@@ -33,6 +33,14 @@ export interface MoveBookOutcome {
   reason?: MoveBookOutcomeReason;
 }
 
-export interface MoveBooksResponse {
-  results: MoveBookOutcome[];
+export interface MoveBooksSummary {
+  total: number;
+  moved: number;
+  skipped: number;
+  failed: number;
+  cancelled: boolean;
 }
+
+export type MoveBooksDoneEvent = { done: true } & MoveBooksSummary;
+
+export type MoveBooksProgressEvent = MoveBookOutcome | MoveBooksDoneEvent;

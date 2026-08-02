@@ -7,7 +7,9 @@ import {
   type BookCard,
   type BookDetail,
   type BookMetadataLockField,
-  type MoveBooksResponse,
+  type MoveBookOutcome,
+  type MoveBooksProgressEvent,
+  type MoveBooksSummary,
   type ReadStatus,
   type UserBookStatus,
 } from '@bookorbit/types'
@@ -399,7 +401,12 @@ export function useBookBulkActions(
       toast.error('No books selected to move')
       return false
     }
-    let results: MoveBooksResponse['results']
+    const total = querySelection?.value ? querySelection.value.total : selectedIds.value.size
+    inFlight.value = { label: 'Moving books', processed: 0, total, failed: 0 }
+    let moved = 0
+    let skipped = 0
+    let failed = 0
+    let summary: MoveBooksSummary | null = null
     try {
       const res = await api('/api/v1/books/move', {
         method: 'POST',
@@ -410,26 +417,59 @@ export function useBookBulkActions(
         toast.error('Failed to move books')
         return false
       }
-      ;({ results } = (await res.json()) as MoveBooksResponse)
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6)) as MoveBooksProgressEvent
+            if ('done' in data && data.done) {
+              summary = data
+              continue
+            }
+            const outcome = data as MoveBookOutcome
+            if (outcome.status === 'moved') {
+              moved++
+              onDeleted([outcome.bookId])
+            } else if (outcome.status === 'skipped') {
+              skipped++
+            } else {
+              failed++
+            }
+            const prev: InFlightOp = inFlight.value ?? { label: 'Moving books', processed: 0, total, failed: 0 }
+            inFlight.value = {
+              label: 'Moving books',
+              processed: prev.processed + 1,
+              total,
+              failed: (prev.failed ?? 0) + (outcome.status === 'failed' ? 1 : 0),
+            }
+          } catch {
+            // Ignore malformed stream lines; the done event carries the authoritative counts.
+          }
+        }
+      }
     } catch {
       toast.error('Failed to move books')
       return false
+    } finally {
+      inFlight.value = null
     }
-    const movedIds = results.filter((entry) => entry.status === 'moved').map((entry) => entry.bookId)
-    const skipped = results.filter((entry) => entry.status === 'skipped').length
-    const failed = results.filter((entry) => entry.status === 'failed').length
-    if (movedIds.length > 0) onDeleted(movedIds)
-    if (movedIds.length === results.length) {
-      toast.success(`Moved ${movedIds.length} book${movedIds.length === 1 ? '' : 's'}`)
+    const counts = summary ?? { total, moved, skipped, failed, cancelled: false }
+    const parts = [counts.skipped > 0 ? `${counts.skipped} skipped` : null, counts.failed > 0 ? `${counts.failed} failed` : null]
+      .filter(Boolean)
+      .join(', ')
+    if (counts.moved === counts.total) {
+      toast.success(`Moved ${counts.moved} book${counts.moved === 1 ? '' : 's'}`)
       return true
     }
-    if (movedIds.length === 0) {
-      const parts = [skipped > 0 ? `${skipped} skipped` : null, failed > 0 ? `${failed} failed` : null].filter(Boolean).join(', ')
+    if (counts.moved === 0) {
       toast.error(`No books were moved${parts ? ` (${parts})` : ''}`)
       return true
     }
-    const parts = [skipped > 0 ? `${skipped} skipped` : null, failed > 0 ? `${failed} failed` : null].filter(Boolean).join(', ')
-    toast.warning(`Moved ${movedIds.length} of ${results.length} books${parts ? ` (${parts})` : ''}`)
+    toast.warning(`Moved ${counts.moved} of ${counts.total} books${parts ? ` (${parts})` : ''}`)
     return true
   }
 

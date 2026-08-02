@@ -31,7 +31,15 @@ import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import type { BookDetail, BookKoboState, CustomMetadataBookValue, MoveBooksResponse, ReadStatus, UserBookStatus } from '@bookorbit/types'
+import type {
+  BookDetail,
+  BookKoboState,
+  CustomMetadataBookValue,
+  MoveBookOutcome,
+  MoveBooksProgressEvent,
+  ReadStatus,
+  UserBookStatus,
+} from '@bookorbit/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import DiscoverRow from '@/features/book/components/detail/DiscoverRow.vue'
@@ -927,6 +935,28 @@ function handleMoveFromMenu() {
   moveBookOpen.value = true
 }
 
+// The move endpoint streams one SSE event per book; for a single book the
+// first outcome event is the result.
+async function readSingleMoveOutcome(res: Response): Promise<MoveBookOutcome | null> {
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let outcome: MoveBookOutcome | null = null
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        const data = JSON.parse(line.slice(6)) as MoveBooksProgressEvent
+        if (!('done' in data && data.done) && outcome === null) outcome = data as MoveBookOutcome
+      } catch {
+        // Ignore malformed stream lines.
+      }
+    }
+  }
+  return outcome
+}
+
 async function confirmMoveBook(libraryId: number, folderId?: number) {
   if (movingBook.value) return
   movingBook.value = true
@@ -944,8 +974,7 @@ async function confirmMoveBook(libraryId: number, folderId?: number) {
       toast.error(t('book.detail.details.moveFailed'))
       return
     }
-    const { results } = (await res.json()) as MoveBooksResponse
-    const outcome = results[0]
+    const outcome = await readSingleMoveOutcome(res)
     if (outcome?.status !== 'moved') {
       toast.error(
         outcome?.reason

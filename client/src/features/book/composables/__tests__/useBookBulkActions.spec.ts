@@ -417,15 +417,13 @@ describe('useBookBulkActions', () => {
   })
 
   it('moves selected books and removes moved ids from the current view', async () => {
-    mocks.api.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        results: [
-          { bookId: 1, status: 'moved' },
-          { bookId: 2, status: 'skipped', reason: 'already in target library' },
-        ],
-      }),
-    } as never)
+    mocks.api.mockResolvedValue(
+      makeSseStream([
+        'data: {"bookId":1,"status":"moved"}',
+        'data: {"bookId":2,"status":"skipped","reason":"already_in_target"}',
+        'data: {"done":true,"total":2,"moved":1,"skipped":1,"failed":0,"cancelled":false}',
+      ]) as never,
+    )
     const selectedIds = ref(new Set([1, 2]))
     const onDeleted = vi.fn<(ids: number[]) => void>()
     const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
@@ -444,15 +442,13 @@ describe('useBookBulkActions', () => {
   })
 
   it('reports a plain success toast when every book moves', async () => {
-    mocks.api.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        results: [
-          { bookId: 1, status: 'moved' },
-          { bookId: 2, status: 'moved' },
-        ],
-      }),
-    } as never)
+    mocks.api.mockResolvedValue(
+      makeSseStream([
+        'data: {"bookId":1,"status":"moved"}',
+        'data: {"bookId":2,"status":"moved"}',
+        'data: {"done":true,"total":2,"moved":2,"skipped":0,"failed":0,"cancelled":false}',
+      ]) as never,
+    )
     const selectedIds = ref(new Set([1, 2]))
     const onDeleted = vi.fn<(ids: number[]) => void>()
     const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)
@@ -466,15 +462,18 @@ describe('useBookBulkActions', () => {
         body: JSON.stringify({ bookIds: [1, 2], targetLibraryId: 3 }),
       }),
     )
-    expect(onDeleted).toHaveBeenCalledWith([1, 2])
+    expect(onDeleted).toHaveBeenNthCalledWith(1, [1])
+    expect(onDeleted).toHaveBeenNthCalledWith(2, [2])
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Moved 2 books')
   })
 
   it('sends move requests using query selection payloads', async () => {
-    mocks.api.mockResolvedValue({
-      ok: true,
-      json: async () => ({ results: [{ bookId: 8, status: 'moved' }] }),
-    } as never)
+    mocks.api.mockResolvedValue(
+      makeSseStream([
+        'data: {"bookId":8,"status":"moved"}',
+        'data: {"done":true,"total":500,"moved":1,"skipped":0,"failed":0,"cancelled":false}',
+      ]) as never,
+    )
     const selectedIds = ref(new Set<number>())
     const onDeleted = vi.fn<(ids: number[]) => void>()
     const querySelection = ref<QuerySelectionState | null>({
@@ -537,10 +536,12 @@ describe('useBookBulkActions', () => {
   })
 
   it('shows an error toast when no book could be moved', async () => {
-    mocks.api.mockResolvedValue({
-      ok: true,
-      json: async () => ({ results: [{ bookId: 1, status: 'failed', reason: 'book not found' }] }),
-    } as never)
+    mocks.api.mockResolvedValue(
+      makeSseStream([
+        'data: {"bookId":1,"status":"failed","reason":"book_not_found"}',
+        'data: {"done":true,"total":1,"moved":0,"skipped":0,"failed":1,"cancelled":false}',
+      ]) as never,
+    )
     const selectedIds = ref(new Set([1]))
     const onDeleted = vi.fn<(ids: number[]) => void>()
     const { handleBulkMove } = useBookBulkActions(selectedIds, onDeleted)

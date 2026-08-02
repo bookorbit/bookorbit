@@ -57,6 +57,20 @@ describe('Book move between libraries (e2e)', () => {
     });
   }
 
+  // The endpoint streams SSE frames: one outcome event per book plus a final
+  // done summary. Parse the raw body back into structured results.
+  function parseMoveStream(body: string): { results: MoveBookOutcome[]; summary: Record<string, unknown> | null } {
+    const results: MoveBookOutcome[] = [];
+    let summary: Record<string, unknown> | null = null;
+    for (const line of body.split('\n')) {
+      if (!line.startsWith('data: ')) continue;
+      const event = JSON.parse(line.slice(6)) as Record<string, unknown>;
+      if (event.done === true) summary = event;
+      else results.push(event as unknown as MoveBookOutcome);
+    }
+    return { results, summary };
+  }
+
   it(
     'moves a book into another library, re-parenting rows, relocating files, and preserving user state',
     async () => {
@@ -69,9 +83,11 @@ describe('Book move between libraries (e2e)', () => {
 
       const response = await moveBooks({ bookIds: [book.bookId], targetLibraryId: dst.libraryId });
 
-      expect(response.statusCode).toBe(201);
-      const { results } = response.json() as { results: MoveBookOutcome[] };
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toBe('text/event-stream');
+      const { results, summary } = parseMoveStream(response.body);
       expect(results).toEqual([{ bookId: book.bookId, status: 'moved' }]);
+      expect(summary).toMatchObject({ done: true, total: 1, moved: 1, skipped: 0, failed: 0, cancelled: false });
 
       // Book row re-parented; this is the regression guard for
       // book_files_book_folder_consistency_fk (books must be updated before files).
@@ -109,8 +125,8 @@ describe('Book move between libraries (e2e)', () => {
 
       const response = await moveBooks({ bookIds: [book.bookId], targetLibraryId: dst.libraryId });
 
-      expect(response.statusCode).toBe(201);
-      const { results } = response.json() as { results: MoveBookOutcome[] };
+      expect(response.statusCode).toBe(200);
+      const { results } = parseMoveStream(response.body);
       expect(results).toEqual([{ bookId: book.bookId, status: 'skipped', reason: 'target_path_exists' }]);
 
       const [unchanged] = await ctx.db.select().from(books).where(eq(books.id, book.bookId));
@@ -157,8 +173,8 @@ describe('Book move between libraries (e2e)', () => {
 
       const response = await moveBooks({ bookIds: [book.bookId], targetLibraryId: dst.libraryId });
 
-      expect(response.statusCode).toBe(201);
-      const { results } = response.json() as { results: MoveBookOutcome[] };
+      expect(response.statusCode).toBe(200);
+      const { results } = parseMoveStream(response.body);
       expect(results).toEqual([{ bookId: book.bookId, status: 'skipped', reason: 'format_not_allowed' }]);
 
       const [unchanged] = await ctx.db.select().from(books).where(eq(books.id, book.bookId));

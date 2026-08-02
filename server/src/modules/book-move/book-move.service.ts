@@ -30,21 +30,60 @@ export class BookMoveService {
     private readonly selfWriteRegistry: SelfWriteRegistry,
   ) {}
 
-  async moveBooks(bookIds: number[], targetLibraryId: number, targetFolderId: number | undefined, user: RequestUser): Promise<MoveBookOutcome[]> {
+  // Validates the target before the controller opens the SSE stream, so user
+  // errors surface as regular JSON error responses instead of a broken stream.
+  async validateTarget(targetLibraryId: number, targetFolderId: number | undefined, user: RequestUser): Promise<void> {
     const library = await this.moveRepo.findLibrary(targetLibraryId);
     if (!library) throw new BadRequestException(`Library ${targetLibraryId} not found`);
 
     // Moving writes files into the target library, so viewer access is not
     // enough; every other write path requires editor level.
     await this.libraryService.verifyUserAccessLevel(user.id, targetLibraryId, 'editor', user.isSuperuser);
+    await this.resolveTargetFolder(targetLibraryId, targetFolderId);
+  }
+
+  async moveBooks(
+    bookIds: number[],
+    targetLibraryId: number,
+    targetFolderId: number | undefined,
+    user: RequestUser,
+    onProgress?: (event: MoveBookOutcome) => void,
+    options?: { isCancelled?: () => boolean },
+  ): Promise<MoveBookOutcome[]> {
+    const startedAt = Date.now();
+    const library = await this.moveRepo.findLibrary(targetLibraryId);
+    if (!library) throw new BadRequestException(`Library ${targetLibraryId} not found`);
+
+    await this.libraryService.verifyUserAccessLevel(user.id, targetLibraryId, 'editor', user.isSuperuser);
     const folder = await this.resolveTargetFolder(targetLibraryId, targetFolderId);
+
+    this.logger.log(
+      `[${BOOK_MOVE_EVENT}] [start] userId=${user.id} toLibraryId=${library.id} toFolderId=${folder.id} total=${bookIds.length} - bulk move started`,
+    );
 
     const results: MoveBookOutcome[] = [];
     const movedBySourceLibrary = new Map<number, number[]>();
+    let cancelled = false;
+    let callbackInterrupted = false;
     for (const bookId of bookIds) {
-      results.push(
-        await this.lockService.withLock(bookOperationLockKey(bookId), () => this.moveBook(bookId, library, folder, user, movedBySourceLibrary)),
+      if (options?.isCancelled?.()) {
+        cancelled = true;
+        break;
+      }
+      const outcome = await this.lockService.withLock(bookOperationLockKey(bookId), () =>
+        this.moveBook(bookId, library, folder, user, movedBySourceLibrary),
       );
+      results.push(outcome);
+      if (onProgress) {
+        try {
+          onProgress(outcome);
+        } catch {
+          // The client went away mid-stream; stop working but keep the
+          // outcomes so far for events and auditing.
+          callbackInterrupted = true;
+          break;
+        }
+      }
     }
 
     for (const [fromLibraryId, movedIds] of movedBySourceLibrary) {
@@ -53,6 +92,13 @@ export class BookMoveService {
       this.scannerService.cancelBooksUnavailableNotification(fromLibraryId, movedIds);
       this.scanGateway.emitBookTransferred({ fromLibraryId, toLibraryId: library.id, bookIds: movedIds });
     }
+
+    const moved = results.filter((entry) => entry.status === 'moved').length;
+    const skipped = results.filter((entry) => entry.status === 'skipped').length;
+    const failed = results.filter((entry) => entry.status === 'failed').length;
+    this.logger.log(
+      `[${BOOK_MOVE_EVENT}] [end] userId=${user.id} toLibraryId=${library.id} durationMs=${Date.now() - startedAt} total=${bookIds.length} moved=${moved} skipped=${skipped} failed=${failed} cancelled=${cancelled} callbackInterrupted=${callbackInterrupted} - bulk move completed`,
+    );
     return results;
   }
 

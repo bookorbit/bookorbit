@@ -401,6 +401,45 @@ describe('BookMoveService', () => {
       expect(selfWriteRegistry.end).toHaveBeenCalledWith(paths);
     });
 
+    it('emits one progress event per processed book', async () => {
+      const { service, repo } = makeService();
+      repo.findBookForMove.mockResolvedValueOnce(makeBook()).mockResolvedValueOnce(makeBook({ id: 6, status: 'missing' }));
+      const events: unknown[] = [];
+
+      await service.moveBooks([5, 6], 3, 9, makeUser(), (event) => events.push(event));
+
+      expect(events).toEqual([
+        { bookId: 5, status: 'moved' },
+        { bookId: 6, status: 'skipped', reason: 'book_missing' },
+      ]);
+    });
+
+    it('stops processing when the cancellation callback reports a closed stream', async () => {
+      const { service, repo } = makeService();
+      let calls = 0;
+
+      const results = await service.moveBooks([5, 6, 7], 3, 9, makeUser(), undefined, { isCancelled: () => ++calls > 1 });
+
+      expect(results).toHaveLength(1);
+      expect(repo.findBookForMove).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops processing and keeps prior outcomes when the progress callback throws', async () => {
+      const { service, repo, scanGateway } = makeService();
+      repo.findBookForMove.mockResolvedValue(makeBook());
+      const onProgress = vi
+        .fn()
+        .mockImplementationOnce(() => undefined)
+        .mockImplementationOnce(() => {
+          throw new Error('stream closed');
+        });
+
+      const results = await service.moveBooks([5, 6, 7], 3, 9, makeUser(), onProgress);
+
+      expect(results).toHaveLength(2);
+      expect(scanGateway.emitBookTransferred).toHaveBeenCalled();
+    });
+
     it('cancels the source library unavailable notification for moved books', async () => {
       const { service, scannerService } = makeService();
 
@@ -501,6 +540,36 @@ describe('BookMoveService', () => {
       await service.moveBooks([5], 3, 9, makeUser());
 
       expect(lockService.withLock).toHaveBeenCalledWith('book:5', expect.any(Function));
+    });
+  });
+
+  describe('validateTarget', () => {
+    it('passes for an accessible target library and folder', async () => {
+      const { service, libraryService } = makeService();
+
+      await expect(service.validateTarget(3, 9, makeUser())).resolves.toBeUndefined();
+      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(7, 3, 'editor', false);
+    });
+
+    it('rejects an unknown target library', async () => {
+      const { service, repo } = makeService();
+      repo.findLibrary.mockResolvedValue(null);
+
+      await expect(service.validateTarget(99, undefined, makeUser())).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a folder belonging to another library', async () => {
+      const { service, repo } = makeService();
+      repo.findFolder.mockResolvedValue({ id: 9, libraryId: 999, path: '/other' });
+
+      await expect(service.validateTarget(3, 9, makeUser())).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('propagates missing editor access', async () => {
+      const { service, libraryService } = makeService();
+      libraryService.verifyUserAccessLevel.mockRejectedValueOnce(new ForbiddenException('Insufficient library access level'));
+
+      await expect(service.validateTarget(3, 9, makeUser())).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });
