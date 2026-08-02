@@ -28,6 +28,7 @@ import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { basename, dirname, extname, join } from 'path';
+import { StatisticsService } from '../statistics/statistics.service';
 
 import {
   BOOK_METADATA_LOCK_FIELDS,
@@ -265,6 +266,7 @@ export class BookService {
     @Optional() private readonly fileRenameService: FileRenameService,
     @Optional() private readonly achievementEvents: AchievementEventsService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
+    @Optional() private readonly statisticsService?: StatisticsService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -1536,6 +1538,7 @@ export class BookService {
         const errorClass = reason instanceof Error ? reason.name : 'Error';
         const errorMessage = sanitizeLogValue(reason instanceof Error ? reason.message : String(reason));
         const pathValue = sanitizeLogValue(target.path);
+        this.statisticsService?.invalidateUserCache(user.id);
         this.logger.warn(
           `[${event}] [fail] userId=${user.id} path="${pathValue}" kind=${target.kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
         );
@@ -1798,6 +1801,7 @@ export class BookService {
         }
       }
       await this.scoreService.calculateAndSave(id);
+      this.statisticsService?.invalidateUserCache(user.id);
     }
 
     const detail = await this.getDetail(id, user);
@@ -2032,6 +2036,7 @@ export class BookService {
       } else {
         await this.userBookStatusService.autoUpdate(userId, file.bookId, percentage, library.readingThreshold, library.markAsFinishedPercentComplete);
       }
+      this.statisticsService?.invalidateUserCache(userId);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.warn(
@@ -2152,6 +2157,7 @@ export class BookService {
       Object.keys(dateKeys).length > 0
         ? await this.userBookStatusService.updateManual(user.id, bookId, patch, dateKeys)
         : await this.userBookStatusService.updateManual(user.id, bookId, patch);
+    this.statisticsService?.invalidateUserCache(user.id);
     return this.toDateOnlyReadStatus(updated, timeZone);
   }
 
@@ -2220,6 +2226,7 @@ export class BookService {
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} status=${status} durationMs=${Date.now() - startedAt} - bulk set status completed`,
     );
+    this.statisticsService?.invalidateUserCache(user.id);
   }
 
   async bulkSetRating(bookIds: number[], rating: number | null, user: RequestUser): Promise<void> {
@@ -3320,6 +3327,7 @@ export class BookService {
     }
 
     await this.scoreService.calculateAndSaveMany(bookIds);
+    this.statisticsService?.invalidateUserCache(userId);
   }
 
   private resolveChapters(

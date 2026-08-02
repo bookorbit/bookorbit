@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onActivated, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import * as echarts from 'echarts'
@@ -11,17 +12,17 @@ import ChartCard from '../ChartCard.vue'
 
 const { t, getLocaleMessage } = useI18n()
 const { md } = useBreakpoints(breakpointsTailwind)
+const route = useRoute()
 
 const rawItems = ref<Array<Record<string, unknown>>>([])
 const isLoading = ref(true)
 const hasError = ref(false)
 const isMapReady = ref(false)
 
-onMounted(async () => {
-  isLoading.value = true
+async function fetchMap() {
+  if (isMapReady.value) return
   try {
-    const [mapRes, apiRes] = await Promise.all([fetch('/maps/world.json'), api('/api/v1/statistics/country-distribution?libraryIds=1')])
-
+    const mapRes = await fetch('/maps/world.json', { cache: 'force-cache' })
     if (mapRes.ok) {
       const worldJson = await mapRes.json()
       echarts.registerMap('world', worldJson as echarts.GeoJSONSourceInput)
@@ -29,6 +30,19 @@ onMounted(async () => {
     } else {
       hasError.value = true
     }
+  } catch {
+    hasError.value = true
+  }
+}
+
+async function fetchStats() {
+  try {
+    const apiRes = await api('/api/v1/statistics/country-distribution?libraryIds=1', {
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    })
 
     if (apiRes.ok) {
       const json = (await apiRes.json()) as Record<string, unknown>
@@ -39,10 +53,29 @@ onMounted(async () => {
     }
   } catch {
     hasError.value = true
-  } finally {
-    isLoading.value = false
   }
-})
+}
+
+async function loadData() {
+  isLoading.value = true
+  hasError.value = false
+  await Promise.all([fetchMap(), fetchStats()])
+  isLoading.value = false
+}
+
+// Gatilhos de ciclo de vida nativos
+onMounted(loadData)
+onActivated(loadData)
+
+// Gatilho agressivo de navegação SPA: sempre que a rota mudar para esta tela, force o recarregamento.
+if (route) {
+  watch(
+    () => route.fullPath,
+    () => {
+      loadData()
+    },
+  )
+}
 
 const aggregatedItems = computed(() => {
   if (!rawItems.value.length) return []
@@ -74,7 +107,6 @@ const aggregatedItems = computed(() => {
 })
 
 const chartOption = computed(() => {
-  // Impede que o ECharts processe propriedades vazias prematuramente
   if (!isMapReady.value) return {}
 
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
@@ -139,7 +171,6 @@ const chartOption = computed(() => {
     :loading="isLoading || !isMapReady"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <!-- O v-if robusto garante que o renderizador canvas só suba com os dados em mãos -->
     <VChart v-if="isMapReady && chartOption.series" :option="chartOption" autoresize style="height: 100%" />
   </ChartCard>
 </template>

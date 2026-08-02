@@ -421,7 +421,12 @@ export class StatisticsService {
     return this.withStatisticsCache('country-distribution', user, query, async () => {
       const { items: raw, unknownCount } = await this.repo.countryDistribution(user.id, user.isSuperuser, user.contentFilters, query.libraryIds);
       const all = raw.flatMap((r) => (r.country ? [{ country: r.country, count: r.count }] : []));
-      return { items: this.clipCountsToTopN(all, (count) => ({ country: OTHER_BUCKET_LABEL, count })), unknownCount };
+
+      return { items: all, unknownCount };
     });
+  }
+
+  public invalidateUserCache(userId: number): void {
+    this.cache.clearForScope(String(userId));
   }
 }

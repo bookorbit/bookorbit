@@ -428,6 +428,13 @@
       "when": 1785645905307,
       "tag": "0060_add_book_move_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1785694150790,
+      "tag": "0061_add_book_origin_country",
+      "breakpoints": true
     }
   ]
 }
