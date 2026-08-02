@@ -3374,6 +3374,21 @@
       "selectFolder": "Select a folder…",
       "move": "Move"
     },
+    "moveOutcomes": {
+      "book_not_found": "Book not found",
+      "no_source_access": "No access to the source library",
+      "source_access_check_failed": "The source library access check failed",
+      "book_processing": "The book is still processing",
+      "book_missing": "The book's files are missing",
+      "already_in_target": "The book is already in the target library",
+      "format_not_allowed": "The book's format is not allowed in the target library",
+      "target_path_taken": "The target path is already used by another book",
+      "target_path_exists": "A file already exists at the target path",
+      "path_escapes_target": "The resolved file path leaves the target folder",
+      "database_update_failed": "The database update failed",
+      "file_move_failed": "Moving the files failed",
+      "file_move_failed_rollback_incomplete": "Moving the files failed and the rollback was incomplete, please verify the book"
+    },
     "bulkEdit": {
       "title": "{count, plural, =0 {Modifier les métadonnées - # livre} one {Modifier les métadonnées - # livre} other {Modifier les métadonnées - # livres} many {Modifier les métadonnées - # livres}}",
       "instructions": "Basculez les champs à modifier, puis configurez les valeurs. Seuls les champs basculés seront modifiés.",
@@ -3639,6 +3654,10 @@
         "peek": "Coup d'oeil",
         "sendViaEmail": "Envoyer par e-mail",
         "moveToLibrary": "Move to Library",
+        "moveSuccess": "Book moved",
+        "moveFailed": "Failed to move book",
+        "moveNotMoved": "Book was not moved",
+        "moveNotMovedWithReason": "Book was not moved: {reason}",
         "personalReview": {
           "title": "Examen personnel",
           "toggleAria": "Activer l'avis personnel",

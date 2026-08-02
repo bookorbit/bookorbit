@@ -80,25 +80,25 @@ export class BookMoveService {
     movedBySourceLibrary: Map<number, number[]>,
   ): Promise<MoveBookOutcome> {
     const book = await this.moveRepo.findBookForMove(bookId);
-    if (!book) return { bookId, status: 'failed', reason: 'book not found' };
+    if (!book) return { bookId, status: 'failed', reason: 'book_not_found' };
 
     try {
       await this.libraryService.verifyUserAccess(user.id, book.libraryId, user.isSuperuser);
     } catch (error) {
       if (error instanceof ForbiddenException) {
-        return { bookId, status: 'failed', reason: 'no access to source library' };
+        return { bookId, status: 'failed', reason: 'no_source_access' };
       }
       const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
       this.logger.error(
         `[${BOOK_MOVE_EVENT}] bookId=${bookId} userId=${user.id} errorClass=${error instanceof Error ? error.constructor.name : 'unknown'} error="${message}" - source library access check failed`,
       );
-      return { bookId, status: 'failed', reason: 'source library access check failed' };
+      return { bookId, status: 'failed', reason: 'source_access_check_failed' };
     }
 
-    if (book.status === 'processing') return { bookId, status: 'skipped', reason: 'book is processing' };
-    if (book.status === 'missing') return { bookId, status: 'skipped', reason: 'book files are missing' };
+    if (book.status === 'processing') return { bookId, status: 'skipped', reason: 'book_processing' };
+    if (book.status === 'missing') return { bookId, status: 'skipped', reason: 'book_missing' };
     if (book.libraryId === library.id && book.libraryFolderId === folder.id) {
-      return { bookId, status: 'skipped', reason: 'already in target library' };
+      return { bookId, status: 'skipped', reason: 'already_in_target' };
     }
 
     if (library.allowedFormats.length > 0) {
@@ -106,7 +106,10 @@ export class BookMoveService {
         if (file.role !== 'primary' && file.role !== 'content') continue;
         const format = (file.format ?? extname(file.absolutePath).slice(1)).toLowerCase();
         if (!library.allowedFormats.includes(format)) {
-          return { bookId, status: 'skipped', reason: `format ${format} not allowed in target library` };
+          this.logger.log(
+            `[${BOOK_MOVE_EVENT}] bookId=${bookId} toLibraryId=${library.id} format=${sanitizeLogValue(format)} - format not allowed in target library`,
+          );
+          return { bookId, status: 'skipped', reason: 'format_not_allowed' };
         }
       }
     }
@@ -125,20 +128,20 @@ export class BookMoveService {
       fileUpdates.some((update) => !this.isContainedIn(folder.path, update.absolutePath)) || !this.isAtOrContainedIn(folder.path, newFolderPath);
     if (escapes) {
       this.logger.error(`[${BOOK_MOVE_EVENT}] bookId=${bookId} toFolderId=${folder.id} - resolved target path escapes the target folder`);
-      return { bookId, status: 'failed', reason: 'file path escapes target folder' };
+      return { bookId, status: 'failed', reason: 'path_escapes_target' };
     }
 
     const existingPaths = await this.moveRepo.findExistingPaths(fileUpdates.map((update) => update.absolutePath));
     for (const update of fileUpdates) {
       const owner = existingPaths.get(update.absolutePath);
       if (owner !== undefined && owner !== bookId) {
-        return { bookId, status: 'skipped', reason: 'target path already taken by another book' };
+        return { bookId, status: 'skipped', reason: 'target_path_taken' };
       }
     }
 
     for (const update of fileUpdates) {
       if (await this.pathExists(update.absolutePath)) {
-        return { bookId, status: 'skipped', reason: 'target path already exists on disk' };
+        return { bookId, status: 'skipped', reason: 'target_path_exists' };
       }
     }
 
@@ -149,7 +152,7 @@ export class BookMoveService {
       this.logger.error(
         `[${BOOK_MOVE_EVENT}] bookId=${bookId} errorClass=${error instanceof Error ? error.constructor.name : 'unknown'} error="${message}" - database re-parent failed`,
       );
-      return { bookId, status: 'failed', reason: 'database update failed' };
+      return { bookId, status: 'failed', reason: 'database_update_failed' };
     }
 
     const moved: Array<{ from: string; to: string }> = [];
@@ -171,8 +174,11 @@ export class BookMoveService {
         }
       } catch (error) {
         const rolledBack = await this.rollback(bookId, book, moved, error);
-        const reason = error instanceof Error ? error.message : String(error);
-        return { bookId, status: 'failed', reason: rolledBack ? reason : `${reason} (rollback incomplete, manual check required)` };
+        const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+        this.logger.error(
+          `[${BOOK_MOVE_EVENT}] bookId=${bookId} rolledBack=${rolledBack} errorClass=${error instanceof Error ? error.constructor.name : 'unknown'} error="${message}" - physical file move failed`,
+        );
+        return { bookId, status: 'failed', reason: rolledBack ? 'file_move_failed' : 'file_move_failed_rollback_incomplete' };
       }
 
       for (const { from } of moved) {

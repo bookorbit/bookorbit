@@ -165,7 +165,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'no access to source library' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'no_source_access' }]);
     });
 
     it('skips books whose files are missing without touching the database', async () => {
@@ -174,7 +174,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'book files are missing' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'book_missing' }]);
       expect(repo.applyMove).not.toHaveBeenCalled();
       expect(mockLink).not.toHaveBeenCalled();
     });
@@ -197,7 +197,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'file path escapes target folder' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'path_escapes_target' }]);
       expect(repo.applyMove).not.toHaveBeenCalled();
       expect(mockLink).not.toHaveBeenCalled();
     });
@@ -243,7 +243,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'source library access check failed' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'source_access_check_failed' }]);
     });
 
     it('fails a single book (not the batch) when the database re-parent throws', async () => {
@@ -254,7 +254,7 @@ describe('BookMoveService', () => {
       const results = await service.moveBooks([5, 6], 3, 9, makeUser());
 
       expect(results).toEqual([
-        { bookId: 5, status: 'failed', reason: 'database update failed' },
+        { bookId: 5, status: 'failed', reason: 'database_update_failed' },
         { bookId: 6, status: 'moved' },
       ]);
       expect(scanGateway.emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 1, toLibraryId: 3, bookIds: [6] });
@@ -297,7 +297,7 @@ describe('BookMoveService', () => {
       const results = await service.moveBooks([404, 5], 3, 9, makeUser());
 
       expect(results).toEqual([
-        { bookId: 404, status: 'failed', reason: 'book not found' },
+        { bookId: 404, status: 'failed', reason: 'book_not_found' },
         { bookId: 5, status: 'moved' },
       ]);
     });
@@ -308,7 +308,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'book is processing' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'book_processing' }]);
       expect(repo.applyMove).not.toHaveBeenCalled();
     });
 
@@ -318,7 +318,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'already in target library' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'already_in_target' }]);
       expect(repo.applyMove).not.toHaveBeenCalled();
     });
 
@@ -328,7 +328,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'format epub not allowed in target library' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'format_not_allowed' }]);
       expect(repo.applyMove).not.toHaveBeenCalled();
     });
 
@@ -338,7 +338,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'target path already taken by another book' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'target_path_taken' }]);
       expect(repo.applyMove).not.toHaveBeenCalled();
     });
 
@@ -348,7 +348,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'target path already exists on disk' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'skipped', reason: 'target_path_exists' }]);
       expect(repo.applyMove).not.toHaveBeenCalled();
     });
 
@@ -375,7 +375,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'file exists' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'file_move_failed' }]);
       expect(mockCopyFile).not.toHaveBeenCalled();
     });
 
@@ -420,7 +420,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'disk full' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'file_move_failed' }]);
       // Rollback: file 10 moved back.
       expect(mockLink).toHaveBeenCalledWith('/dst-lib/Frank Herbert/Dune/Dune.epub', '/src-lib/Frank Herbert/Dune/Dune.epub');
       // Rollback: DB restored to source library values.
@@ -440,7 +440,7 @@ describe('BookMoveService', () => {
 
       const results = await service.moveBooks([5], 3, 9, makeUser());
 
-      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'disk full (rollback incomplete, manual check required)' }]);
+      expect(results).toEqual([{ bookId: 5, status: 'failed', reason: 'file_move_failed_rollback_incomplete' }]);
     });
 
     it('computes relPath from absolute paths when a file has no stored relPath', async () => {

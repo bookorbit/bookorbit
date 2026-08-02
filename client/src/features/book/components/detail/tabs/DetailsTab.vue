@@ -941,16 +941,20 @@ async function confirmMoveBook(libraryId: number, folderId?: number) {
       }),
     })
     if (!res.ok) {
-      toast.error('Failed to move book')
+      toast.error(t('book.detail.details.moveFailed'))
       return
     }
     const { results } = (await res.json()) as MoveBooksResponse
     const outcome = results[0]
     if (outcome?.status !== 'moved') {
-      toast.error(`Book was not moved${outcome?.reason ? `: ${outcome.reason}` : ''}`)
+      toast.error(
+        outcome?.reason
+          ? t('book.detail.details.moveNotMovedWithReason', { reason: t(`book.moveOutcomes.${outcome.reason}`) })
+          : t('book.detail.details.moveNotMoved'),
+      )
       return
     }
-    toast.success('Book moved')
+    toast.success(t('book.detail.details.moveSuccess'))
     const detailRes = await api(`/api/v1/books/${props.book.id}`)
     if (detailRes.ok) {
       emit('saved', (await detailRes.json()) as BookDetail)

@@ -111,7 +111,7 @@ describe('Book move between libraries (e2e)', () => {
 
       expect(response.statusCode).toBe(201);
       const { results } = response.json() as { results: MoveBookOutcome[] };
-      expect(results).toEqual([{ bookId: book.bookId, status: 'skipped', reason: 'target path already exists on disk' }]);
+      expect(results).toEqual([{ bookId: book.bookId, status: 'skipped', reason: 'target_path_exists' }]);
 
       const [unchanged] = await ctx.db.select().from(books).where(eq(books.id, book.bookId));
       expect(unchanged.libraryId).toBe(src.libraryId);
@@ -149,7 +149,7 @@ describe('Book move between libraries (e2e)', () => {
 
       expect(response.statusCode).toBe(201);
       const { results } = response.json() as { results: MoveBookOutcome[] };
-      expect(results).toEqual([{ bookId: book.bookId, status: 'skipped', reason: 'format epub not allowed in target library' }]);
+      expect(results).toEqual([{ bookId: book.bookId, status: 'skipped', reason: 'format_not_allowed' }]);
     },
     SCENARIO_TIMEOUT_MS,
   );

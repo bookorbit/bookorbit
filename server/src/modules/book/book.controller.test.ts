@@ -952,8 +952,8 @@ describe('BookController', () => {
     const moveResponse = {
       results: [
         { bookId: 1, status: 'moved' },
-        { bookId: 2, status: 'skipped', reason: 'target path already exists on disk' },
-        { bookId: 3, status: 'failed', reason: 'database update failed' },
+        { bookId: 2, status: 'skipped', reason: 'target_path_exists' },
+        { bookId: 3, status: 'failed', reason: 'database_update_failed' },
       ],
     };
     expect(moveAudit.description({ body: { targetLibraryId: 7 } }, moveResponse)).toBe('Moved 1 of 3 books to library 7 (1 skipped, 1 failed)');
