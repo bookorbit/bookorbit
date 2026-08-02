@@ -6,7 +6,6 @@ import * as echarts from 'echarts'
 import { Globe } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { api } from '@/lib/api'
-import worldJson from '../../../../public/maps/world.json'
 
 import ChartCard from '../ChartCard.vue'
 
@@ -16,26 +15,26 @@ const { md } = useBreakpoints(breakpointsTailwind)
 const rawItems = ref<Array<Record<string, unknown>>>([])
 const isLoading = ref(true)
 const hasError = ref(false)
-
-// Registra o mapa imediatamente de forma síncrona
-try {
-  if (worldJson) {
-    echarts.registerMap('world', worldJson as echarts.GeoJSONSourceInput)
-  }
-} catch {
-  hasError.value = true
-}
+const isMapReady = ref(false)
 
 const option = shallowRef({})
 
+// Carregamento e registro assíncrono blindado do mapa a partir da pasta public
 onMounted(async () => {
   isLoading.value = true
   try {
-    const endpoint = '/api/v1/statistics/country-distribution?libraryIds=1'
-    const res = await api(endpoint)
+    const [mapRes, apiRes] = await Promise.all([fetch('/maps/world.json'), api('/api/v1/statistics/country-distribution?libraryIds=1')])
 
-    if (res.ok) {
-      const json = (await res.json()) as Record<string, unknown>
+    if (mapRes.ok) {
+      const worldJson = await mapRes.json()
+      echarts.registerMap('world', worldJson as echarts.GeoJSONSourceInput)
+      isMapReady.value = true
+    } else {
+      hasError.value = true
+    }
+
+    if (apiRes.ok) {
+      const json = (await apiRes.json()) as Record<string, unknown>
       const items = json.items ?? json.data ?? (Array.isArray(json) ? json : [])
       rawItems.value = items as Array<Record<string, unknown>>
     } else {
@@ -78,6 +77,8 @@ const aggregatedItems = computed(() => {
 })
 
 computed(() => {
+  if (!isMapReady.value) return
+
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
 
   option.value = {
@@ -137,9 +138,9 @@ computed(() => {
     :empty="false"
     :error="hasError"
     :icon="Globe"
-    :loading="isLoading"
+    :loading="isLoading || !isMapReady"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <VChart :option="option" autoresize style="height: 100%" />
+    <VChart v-if="isMapReady" :option="option" autoresize style="height: 100%" />
   </ChartCard>
 </template>
