@@ -15,6 +15,7 @@ const { md } = useBreakpoints(breakpointsTailwind)
 const rawItems = ref<Array<Record<string, unknown>>>([])
 const isLoading = ref(true)
 const hasError = ref(false)
+const isMapLoaded = ref(false)
 
 const option = shallowRef({})
 
@@ -22,8 +23,11 @@ fetch('/maps/world.json')
   .then((res) => res.json())
   .then((worldJson) => {
     echarts.registerMap('world', worldJson)
+    isMapLoaded.value = true
   })
-  .catch(() => {})
+  .catch(() => {
+    hasError.value = true
+  })
 
 onMounted(async () => {
   isLoading.value = true
@@ -75,6 +79,8 @@ const aggregatedItems = computed(() => {
 })
 
 watchEffect(() => {
+  if (!isMapLoaded.value) return
+
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
 
   option.value = {
@@ -134,9 +140,9 @@ watchEffect(() => {
     :empty="false"
     :error="hasError"
     :icon="Globe"
-    :loading="isLoading"
+    :loading="isLoading || !isMapLoaded"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <VChart :option="option" autoresize style="height: 100%" />
+    <VChart v-if="isMapLoaded" :option="option" autoresize style="height: 100%" />
   </ChartCard>
 </template>
