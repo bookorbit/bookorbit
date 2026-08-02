@@ -548,6 +548,7 @@ export class ScannerRepository {
           lockedFields: bookMetadata.lockedFields,
           subtitle: bookMetadata.subtitle,
           publisher: bookMetadata.publisher,
+          originCountry: books.originCountry,
           pageCount: bookMetadata.pageCount,
           isbn13: bookMetadata.isbn13,
           hardcoverId: bookMetadata.hardcoverId,

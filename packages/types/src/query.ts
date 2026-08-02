@@ -24,6 +24,7 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
 export type RuleField =
   | "title"
   | "publisher"
+  | "originCountry"
   | "language"
   | "series"
   | "seriesIndex"
@@ -83,6 +84,7 @@ export type RuleOperator =
 export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   title: ["contains", "notContains", "startsWith", "endsWith", "eq", "notEq", "isEmpty", "isNotEmpty"],
   publisher: ["contains", "notContains", "eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
+  originCountry: ["eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   language: ["eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   series: ["contains", "notContains", "eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   author: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],

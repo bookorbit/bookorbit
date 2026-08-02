@@ -16,6 +16,7 @@ export const books = pgTable(
     primaryFileId: integer('primary_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
     primaryAuthorSortName: varchar('primary_author_sort_name', { length: 500 }),
     folderPath: varchar('folder_path', { length: 4096 }).notNull(),
+    originCountry: varchar('origin_country', { length: 2 }),
     status: varchar('status', { length: 20 }).notNull().default('present'),
     addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
