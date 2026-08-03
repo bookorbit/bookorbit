@@ -590,6 +590,31 @@ export class OpdsBookService {
       .orderBy(collections.name);
   }
 
+  // Badge counts only need the totals, so these skip the per-entity book counts
+  // their list siblings compute. Counting collections through getUserCollections
+  // would aggregate over collection_books just to read the row count back.
+  async countUserCollections(userId: number): Promise<number> {
+    const [row] = await this.db.select({ total: count() }).from(collections).where(eq(collections.userId, userId));
+    return Number(row?.total ?? 0);
+  }
+
+  async countUserSmartScopes(userId: number): Promise<number> {
+    const [row] = await this.db
+      .select({ total: count() })
+      .from(smartScopes)
+      .where(or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true)));
+    return Number(row?.total ?? 0);
+  }
+
+  // The scope is shared with getBooksPage so a count can never disagree with the
+  // list it labels, but nothing is fetched or hydrated to produce it.
+  async countBooks(userId: number, filters?: OpdsBookFilters, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<number> {
+    const scope = await this.buildCatalogScope(userId, filters, isSuperuser, contentFilters);
+    if (!scope) return 0;
+    const [row] = await this.db.select({ total: count() }).from(books).leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id)).where(scope.where);
+    return Number(row?.total ?? 0);
+  }
+
   async getUserSmartScopes(userId: number) {
     return this.db
       .select({

@@ -1135,7 +1135,15 @@
         "users": "Usuarios",
         "account-activity": "Actividad de la cuenta",
         "magic-links": "Enlaces mágicos",
-        "oidc": "OIDC/SSO"
+        "oidc": "OIDC/SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "No se pudo eliminar la familia de fuentes",
         "demoCannotManage": "La cuenta restringida de demostración no puede administrar fuentes",
         "fileAdded": "\"{name}\" añadido",
-        "uploadFailed": "Error al subir"
+        "uploadFailed": "Error al subir",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -3336,8 +3349,12 @@
         "isFinished": "está terminado",
         "isLocked": "está bloqueado",
         "isUnlocked": "está desbloqueado",
-        "isUpNext": "está arriba siguiente"
+        "isUpNext": "está arriba siguiente",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Cualquier proveedor",
       "communityRatingProvider": "Proveedor de calificación comunitaria",
       "loadingLibraries": "Cargando bibliotecas...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Serie",
         "moveUp": "Subir",
         "moveDown": "Bajar",
-        "removeSeries": "Quitar serie"
+        "removeSeries": "Quitar serie",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Configuración",
       "ariaLabel": "Configuración del lector",
-      "tabs": {
-        "appearance": "Apariencia",
-        "text": "Texto",
-        "layout": "Diseño"
-      },
-      "appearance": {
-        "mode": "Modo",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Luz",
-        "dark": "oscuro",
-        "colorTheme": "Tema de color"
+        "dark": "oscuro"
       },
-      "text": {
-        "fontSize": "Tamaño de fuente",
-        "fontSizeRange": "Rango: 10-32px",
-        "lineHeight": "altura de la línea",
-        "lineHeightRange": "Rango: 0,8-3,0",
-        "fontFamily": "Familia de fuentes",
-        "fontFamilyDescription": "Elija fuentes integradas o cargadas para el cuerpo del texto.",
-        "builtIn": "Incorporado",
-        "yourFonts": "Tus fuentes"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Incorporado",
+      "fontServer": "Server fonts",
+      "fontYours": "Tus fuentes",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Flujo de lectura",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Extensiones de página",
-        "pageSpreadsDescription": "Elija cómo este EPUB basado en imágenes empareja páginas.",
+      "pageSpreads": "Extensiones de página",
+      "pageSpreadsHint": "Elija cómo este EPUB basado en imágenes empareja páginas.",
+      "spread": {
         "bookDefault": "Reservar por defecto",
-        "singlePage": "Una sola página",
-        "readingFlow": "Flujo de lectura",
-        "readingFlowDescription": "Cambie entre desplazamiento paginado y continuo.",
-        "paginated": "paginado",
-        "scrolled": "Desplazado",
-        "textColumns": "Columnas de texto",
-        "textColumnsRange": "Rango: 1-10",
-        "columnGap": "Espacio de columna",
-        "columnGapRange": "Rango: 0-50%",
-        "maxWidth": "Ancho máximo",
-        "maxWidthRange": "Rango: 400-1600",
-        "justifyText": "Justificar texto",
-        "justifyTextDescription": "Habilite la alineación de párrafos de ancho completo.",
-        "hyphenation": "Separación de sílabas",
-        "hyphenationDescription": "Habilite la separación de palabras automática."
+        "singlePage": "Una sola página"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Espacio de columna",
+      "justifyText": "Justificar texto",
+      "hyphenation": "Separación de sílabas",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} de {total} leído ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Posibles lagunas:"
@@ -6968,7 +7013,8 @@
       "users": "Usuarios",
       "account-activity": "Actividad de la cuenta",
       "magic-links": "Enlaces mágicos",
-      "oidc": "OIDC/SSO"
+      "oidc": "OIDC/SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Nomenclatura de archivos",

@@ -1,6 +1,7 @@
 import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { MetadataProviderKey } from '@bookorbit/types';
+import { MAX_SERIES_TOTAL_BOOKS } from '../../../common/utils/series-total-books.utils';
 import { CustomMetadataValueDto } from '../../custom-metadata/dto/custom-metadata-value.dto';
 
 export class AudiobookChapterDto {
@@ -33,6 +34,9 @@ export class ComicMetadataDto {
 export class BookSeriesMembershipDto {
   @IsString() @MaxLength(500) seriesName!: string;
   @IsOptional() @IsNumber() seriesIndex?: number | null;
+  // Series-level rather than book-level: writing it changes the total for every book in the
+  // series and for every user. Bounds mirror the book_series range constraint.
+  @IsOptional() @IsInt() @Min(1) @Max(MAX_SERIES_TOTAL_BOOKS) expectedBookCount?: number | null;
 }
 
 export class CommunityRatingDto {

@@ -166,6 +166,7 @@ describe('mapBookWithEditions', () => {
       isbn13: '9780756404079',
       seriesName: 'The Kingkiller Chronicle',
       seriesIndex: 1,
+      seriesTotalBooks: 3,
       communityRating: 4.42,
       communityRatingCount: 12345,
       coverUrl: 'https://assets.hardcover.app/edition-cover.jpg',
@@ -176,6 +177,37 @@ describe('mapBookWithEditions', () => {
   it('returns empty array when editions is absent', () => {
     const book: HardcoverBookWithEditions = { ...baseBook, editions: undefined };
     expect(mapBookWithEditions(book)).toEqual([]);
+  });
+
+  describe('series total books', () => {
+    function withBooksCount(booksCount: unknown): HardcoverBookWithEditions {
+      return {
+        ...baseBook,
+        featured_book_series: {
+          series: { name: 'The Kingkiller Chronicle', books_count: booksCount as number | undefined },
+          position: 1,
+        },
+      };
+    }
+
+    it('maps the series book count Hardcover already returns', () => {
+      expect(mapBookWithEditions(withBooksCount(7))[0].seriesTotalBooks).toBe(7);
+    });
+
+    it('is undefined when Hardcover omits the count', () => {
+      expect(mapBookWithEditions(withBooksCount(undefined))[0].seriesTotalBooks).toBeUndefined();
+    });
+
+    it('is undefined when the series itself is absent', () => {
+      const book: HardcoverBookWithEditions = { ...baseBook, featured_book_series: undefined };
+      expect(mapBookWithEditions(book)[0].seriesTotalBooks).toBeUndefined();
+    });
+
+    it('rejects an out-of-range count rather than trusting the payload', () => {
+      expect(mapBookWithEditions(withBooksCount(0))[0].seriesTotalBooks).toBeUndefined();
+      expect(mapBookWithEditions(withBooksCount(-4))[0].seriesTotalBooks).toBeUndefined();
+      expect(mapBookWithEditions(withBooksCount(10_001))[0].seriesTotalBooks).toBeUndefined();
+    });
   });
 
   it('returns empty array when editions is empty', () => {

@@ -19,6 +19,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { extractEpubMetadata } from '../metadata/lib/epub';
@@ -267,6 +268,7 @@ export class BookService {
     @Optional() private readonly achievementEvents: AchievementEventsService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
     @Optional() private readonly statisticsService?: StatisticsService,
+    @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -1715,6 +1717,11 @@ export class BookService {
 
       if (dto.seriesMemberships !== undefined) {
         await this.seriesMemberships?.replaceForBook(id, dto.seriesMemberships, tx);
+        // After replaceForBook, because it is what creates any series row the editor named.
+        for (const membership of dto.seriesMemberships ?? []) {
+          if (membership.expectedBookCount === undefined) continue;
+          await this.seriesExpectedCount?.setManual(membership.seriesName, membership.expectedBookCount ?? null, tx);
+        }
       }
       this.throwIfMetadataUpdateFailpoint('afterSeriesMembershipsReplace');
 

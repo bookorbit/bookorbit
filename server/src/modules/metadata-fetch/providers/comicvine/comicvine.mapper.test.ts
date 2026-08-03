@@ -87,6 +87,23 @@ describe('mapIssueToCandidate', () => {
     expect(withoutName.subtitle).toBeUndefined();
   });
 
+  describe('series total books', () => {
+    it('takes the issue count from the volume the caller searched', () => {
+      const candidate = mapIssueToCandidate(makeIssue(), { volumeIssueCount: 50 });
+      expect(candidate.seriesTotalBooks).toBe(50);
+    });
+
+    it('stays undefined when no volume record was available, as on a general issue search', () => {
+      expect(mapIssueToCandidate(makeIssue()).seriesTotalBooks).toBeUndefined();
+      expect(mapIssueToCandidate(makeIssue(), {}).seriesTotalBooks).toBeUndefined();
+    });
+
+    it('rejects an out-of-range issue count', () => {
+      expect(mapIssueToCandidate(makeIssue(), { volumeIssueCount: 0 }).seriesTotalBooks).toBeUndefined();
+      expect(mapIssueToCandidate(makeIssue(), { volumeIssueCount: 10_001 }).seriesTotalBooks).toBeUndefined();
+    });
+  });
+
   describe('title', () => {
     it('uses the issue name verbatim, not a series/issue-number concatenation', () => {
       const candidate = mapIssueToCandidate(makeIssue({ name: 'The Origin', volume: { id: 10, name: 'Series Name' }, issue_number: '12.5' }));

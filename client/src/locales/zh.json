@@ -1135,7 +1135,15 @@
         "users": "用户",
         "account-activity": "帐户活动",
         "magic-links": "魔法链接",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "删除字体组失败",
         "demoCannotManage": "受模拟限制的帐户无法管理字体",
         "fileAdded": "\"{name}\" added",
-        "uploadFailed": "上传失败"
+        "uploadFailed": "上传失败",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "预约停靠栏",
@@ -3336,8 +3349,12 @@
         "isFinished": "已完成",
         "isLocked": "已锁定",
         "isUnlocked": "已解锁",
-        "isUpNext": "是下一个"
+        "isUpNext": "是下一个",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "任何提供商",
       "communityRatingProvider": "社区评分提供商",
       "loadingLibraries": "Loading libraries...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "系列",
         "moveUp": "上移",
         "moveDown": "向下移动",
-        "removeSeries": "删除系列"
+        "removeSeries": "删除系列",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "设置",
       "ariaLabel": "阅读器设置",
-      "tabs": {
-        "appearance": "外观",
-        "text": "文本",
-        "layout": "布局"
-      },
-      "appearance": {
-        "mode": "模式",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "亮色的",
-        "dark": "深色",
-        "colorTheme": "颜色主题"
+        "dark": "深色"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "范围: 10-32px",
-        "lineHeight": "行高度",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "字体类",
-        "fontFamilyDescription": "选择内置字体或上传字体。",
-        "builtIn": "内置",
-        "yourFonts": "您的字体"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "内置",
+      "fontServer": "Server fonts",
+      "fontYours": "您的字体",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "读取流程",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "页面扩展",
-        "pageSpreadsDescription": "选择这个基于图像的 EPUB 对应页面的方式。",
+      "pageSpreads": "页面扩展",
+      "pageSpreadsHint": "选择这个基于图像的 EPUB 对应页面的方式。",
+      "spread": {
         "bookDefault": "预约默认",
-        "singlePage": "单页",
-        "readingFlow": "读取流程",
-        "readingFlowDescription": "在分页和连续滚动之间切换。",
-        "paginated": "分页",
-        "scrolled": "已滚动",
-        "textColumns": "文本列",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "列间距",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "对齐文本",
-        "justifyTextDescription": "启用全宽段对齐。",
-        "hyphenation": "低温化",
-        "hyphenationDescription": "启用自动断字连字。"
+        "singlePage": "单页"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "列间距",
+      "justifyText": "对齐文本",
+      "hyphenation": "低温化",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} of {total} read ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "可能存在的差距："
@@ -6968,7 +7013,8 @@
       "users": "用户",
       "account-activity": "帐户活动",
       "magic-links": "魔法链接",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "文件名称",

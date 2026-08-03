@@ -50,6 +50,49 @@ describe('custom metadata sort fields', () => {
   })
 })
 
+describe('custom metadata filter fields', () => {
+  it('shows the user-authored field label verbatim', () => {
+    mockCustomFieldLabel('Shelf Location')
+
+    expect(fieldLabel('custom:7')).toBe('Shelf Location')
+    expect(activeCustomFieldLabel).toHaveBeenCalledWith(7)
+  })
+
+  it('falls back to a translated placeholder when the field no longer resolves', () => {
+    mockCustomFieldLabel(null)
+
+    expect(fieldLabel('custom:7')).toBe('Custom field')
+  })
+
+  it('does not treat a malformed custom reference as a custom field', () => {
+    mockCustomFieldLabel('Shelf Location')
+    vi.mocked(activeCustomFieldLabel).mockClear()
+
+    expect(fieldLabel('custom:0' as never)).toBe('book.filter.fields.custom:0')
+    expect(activeCustomFieldLabel).not.toHaveBeenCalled()
+  })
+
+  it('renders a custom field rule summary with its label and value', () => {
+    mockCustomFieldLabel('Shelf Location')
+
+    expect(ruleToParts({ type: 'rule', field: 'custom:7', operator: 'contains', value: 'A3' } as Rule)).toEqual({
+      field: 'Shelf Location',
+      operator: 'contains',
+      value: 'A3',
+    })
+  })
+
+  it('renders boolean custom field rules without a value', () => {
+    mockCustomFieldLabel('Signed')
+
+    expect(ruleToParts({ type: 'rule', field: 'custom:7', operator: 'isTrue' } as Rule)).toEqual({
+      field: 'Signed',
+      operator: 'is yes',
+      value: null,
+    })
+  })
+})
+
 describe('active locale', () => {
   afterEach(() => {
     activateI18nLocale('en')

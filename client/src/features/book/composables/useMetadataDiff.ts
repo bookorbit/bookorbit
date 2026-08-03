@@ -33,6 +33,7 @@ export type DiffFieldKey =
   | 'authors'
   | 'description'
   | 'publisher'
+  | 'originCountry'
   | 'publishedDate'
   | 'publishedYear'
   | 'language'
@@ -81,6 +82,7 @@ export interface MetadataPatch {
   subtitle?: string | null
   description?: string | null
   publisher?: string | null
+  originCountry?: string | null
   publishedDate?: string | null
   publishedYear?: number | null
   language?: string | null
@@ -121,6 +123,7 @@ export const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'authors', label: 'Authors' },
   { key: 'description', label: 'Description' },
   { key: 'publisher', label: 'Publisher' },
+  { key: 'originCountry', label: 'Origin Country' },
   { key: 'publishedDate', label: 'Published' },
   { key: 'language', label: 'Language' },
   { key: 'pageCount', label: 'Page Count' },

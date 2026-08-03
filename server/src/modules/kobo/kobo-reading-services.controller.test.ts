@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 
 import { KoboReadingServicesController } from './kobo-reading-services.controller';
+import { KoboContentNotFoundException } from './services/kobo-annotation-exchange.service';
 
 function makeReply() {
   return {
@@ -101,6 +102,18 @@ describe('KoboReadingServicesController', () => {
     expect(reply.send).not.toHaveBeenCalled();
   });
 
+  it('does not record a failure when a pulled content id is not a BookOrbit book', async () => {
+    exchangeService.getContentAnnotations.mockRejectedValueOnce(new KoboContentNotFoundException('1894971763'));
+    const reply = makeReply();
+
+    await expect(controller.getAnnotations('1894971763', undefined, { id: 8 } as never, { deviceId: 5 } as never, reply as never)).rejects.toThrow(
+      KoboContentNotFoundException,
+    );
+
+    expect(historyService.recordFailure).not.toHaveBeenCalled();
+    expect(reply.send).not.toHaveBeenCalled();
+  });
+
   it('records successful annotation pushes', async () => {
     exchangeService.patchContentAnnotations.mockResolvedValue({
       bookId: 42,
@@ -134,6 +147,16 @@ describe('KoboReadingServicesController', () => {
     );
 
     expect(historyService.recordFailure).toHaveBeenCalledWith(expect.objectContaining({ userId: 8, deviceId: 5, event: 'annotations_push' }), error);
+  });
+
+  it('does not record a failure when a pushed content id is not a BookOrbit book', async () => {
+    exchangeService.patchContentAnnotations.mockRejectedValueOnce(new KoboContentNotFoundException('1894971763'));
+
+    await expect(controller.patchAnnotations('1894971763', {}, { id: 8 } as never, { deviceId: 5 } as never)).rejects.toThrow(
+      KoboContentNotFoundException,
+    );
+
+    expect(historyService.recordFailure).not.toHaveBeenCalled();
   });
 
   it('delegates changed content and storage metadata without history rows', async () => {

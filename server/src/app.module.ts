@@ -61,6 +61,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { SeriesModule } from './modules/series/series.module';
 import { EntityManagerModule } from './modules/entity-manager/entity-manager.module';
 import { FontModule } from './modules/font/font.module';
+import { ServerFontModule } from './modules/server-font/server-font.module';
 import { KoreaderModule } from './modules/koreader/koreader.module';
 import { AppInfoModule } from './modules/app-info/app-info.module';
 import { ReleaseNotesModule } from './modules/release-notes/release-notes.module';
@@ -143,6 +144,7 @@ import { BookMoveModule } from './modules/book-move/book-move.module';
     SeriesModule,
     EntityManagerModule,
     FontModule,
+    ServerFontModule,
     KoreaderModule,
     AppInfoModule,
     ReleaseNotesModule,

@@ -1135,7 +1135,15 @@
         "users": "Brugere",
         "account-activity": "Konto Aktivitet",
         "magic-links": "Magiske Links",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Kunne ikke slette skrifttypefamilien",
         "demoCannotManage": "Demo-begrænset konto kan ikke administrere skrifttyper",
         "fileAdded": "\"{name}\" tilføjet",
-        "uploadFailed": "Upload mislykkedes"
+        "uploadFailed": "Upload mislykkedes",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -3336,8 +3349,12 @@
         "isFinished": "er færdig",
         "isLocked": "er låst",
         "isUnlocked": "er låst op",
-        "isUpNext": "er oppe næste"
+        "isUpNext": "er oppe næste",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Enhver udbyder",
       "communityRatingProvider": "Community rating provider",
       "loadingLibraries": "Indlæser biblioteker...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Serie",
         "moveUp": "Flyt op",
         "moveDown": "Flyt ned",
-        "removeSeries": "Fjern serier"
+        "removeSeries": "Fjern serier",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Indstillinger",
       "ariaLabel": "Læser indstillinger",
-      "tabs": {
-        "appearance": "Udseende",
-        "text": "Tekst",
-        "layout": "Layout"
-      },
-      "appearance": {
-        "mode": "Tilstand",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Lys",
-        "dark": "Mørk",
-        "colorTheme": "Farve tema"
+        "dark": "Mørk"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Interval: 10-32px",
-        "lineHeight": "Linje højde",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Skrifttype familie",
-        "fontFamilyDescription": "Vælg indbyggede eller uploadede skrifttyper til brødtekst.",
-        "builtIn": "Indbygget",
-        "yourFonts": "Dine skrifttyper"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Indbygget",
+      "fontServer": "Server fonts",
+      "fontYours": "Dine skrifttyper",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Læser flow",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Sidespreads",
-        "pageSpreadsDescription": "Vælg hvordan dette billede-baserede EPUB par sider.",
+      "pageSpreads": "Sidespreads",
+      "pageSpreadsHint": "Vælg hvordan dette billede-baserede EPUB par sider.",
+      "spread": {
         "bookDefault": "Bogs standard",
-        "singlePage": "Enkelt side",
-        "readingFlow": "Læser flow",
-        "readingFlowDescription": "Skift mellem sidekædet og kontinuerlig rulning.",
-        "paginated": "Pagineret",
-        "scrolled": "Rullet",
-        "textColumns": "Tekst kolonner",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Kolonne mellemrum",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Justér tekst",
-        "justifyTextDescription": "Aktivér justering af afsnit i fuld bredde.",
-        "hyphenation": "Hyphenation",
-        "hyphenationDescription": "Aktiver automatisk ordskift bindeling."
+        "singlePage": "Enkelt side"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Kolonne mellemrum",
+      "justifyText": "Justér tekst",
+      "hyphenation": "Hyphenation",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} af {total} læst ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Mulige huller:"
@@ -6968,7 +7013,8 @@
       "users": "Brugere",
       "account-activity": "Konto Aktivitet",
       "magic-links": "Magiske Links",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Navngivning Af Fil",

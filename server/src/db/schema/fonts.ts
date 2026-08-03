@@ -31,3 +31,37 @@ export const userFonts = pgTable(
 
 export type UserFontRow = typeof userFonts.$inferSelect;
 export type NewUserFont = typeof userFonts.$inferInsert;
+
+/**
+ * Administrator-curated fonts offered to every user of the web reader. Kept in its own
+ * table rather than as a nullable-owner variant of `user_fonts` so the per-user unique
+ * indexes stay strict and neither scope can constrain the other.
+ */
+export const serverFonts = pgTable(
+  'server_fonts',
+  {
+    id: serial('id').primaryKey(),
+    // Kept for auditing only. Nulled rather than cascaded so removing the administrator
+    // who uploaded a font does not take the font away from everyone else.
+    uploadedBy: integer('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+    familyName: varchar('family_name', { length: 200 }).notNull(),
+    originalFileName: varchar('original_file_name', { length: 500 }).notNull(),
+    storedFileName: varchar('stored_file_name', { length: 500 }).notNull(),
+    format: varchar('format', { length: 10 }).$type<'ttf' | 'otf' | 'woff' | 'woff2'>().notNull(),
+    weight: integer('weight').notNull().default(400),
+    style: varchar('style', { length: 10 }).$type<'normal' | 'italic'>().notNull().default('normal'),
+    fileSize: integer('file_size').notNull(),
+    fileHash: varchar('file_hash', { length: 64 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex('sf_hash_uidx').on(t.fileHash),
+    uniqueIndex('sf_family_weight_style_uidx').on(t.familyName, t.weight, t.style),
+    check('server_fonts_format_chk', sql`${t.format} in ('ttf', 'otf', 'woff', 'woff2')`),
+    check('server_fonts_weight_chk', sql`${t.weight} >= 100 and ${t.weight} <= 900 and ${t.weight} % 100 = 0`),
+    check('server_fonts_style_chk', sql`${t.style} in ('normal', 'italic')`),
+  ],
+);
+
+export type ServerFontRow = typeof serverFonts.$inferSelect;
+export type NewServerFont = typeof serverFonts.$inferInsert;

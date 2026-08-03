@@ -10,10 +10,10 @@ vi.mock('@/lib/api', () => ({
 
 function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
+    originCountry: null,
     id: 1,
     libraryId: 1,
     libraryName: 'Test Library',
-    originCountry: null,
     status: 'present',
     folderPath: '/books',
     addedAt: '2026-01-01T00:00:00.000Z',
@@ -180,7 +180,6 @@ describe('useMetadataEditor', () => {
           { provider: MetadataProviderKey.HARDCOVER, rating: 4.2, ratingCount: 6 },
           { provider: MetadataProviderKey.AMAZON, rating: 4.8, ratingCount: 104451 },
         ],
-        originCountry: null,
       },
       lockedFields: [],
     })

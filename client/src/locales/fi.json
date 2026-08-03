@@ -1135,7 +1135,15 @@
         "users": "Käyttäjät",
         "account-activity": "Tilin Toiminta",
         "magic-links": "Magic Linkit",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Kirjasinperheen poistaminen epäonnistui",
         "demoCannotManage": "Demo-rajoitettu tili ei voi hallita kirjasimia",
         "fileAdded": "\"{name}\" lisätty",
-        "uploadFailed": "Lähetys epäonnistui"
+        "uploadFailed": "Lähetys epäonnistui",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Kirja Telakka",
@@ -3336,8 +3349,12 @@
         "isFinished": "on valmis",
         "isLocked": "on lukittu",
         "isUnlocked": "on avattu",
-        "isUpNext": "on ylös seuraava"
+        "isUpNext": "on ylös seuraava",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Mikä tahansa tarjoaja",
       "communityRatingProvider": "Yhteisön luokituspalvelujen tarjoaja",
       "loadingLibraries": "Ladataan kirjastoja...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Sarja",
         "moveUp": "Siirrä ylös",
         "moveDown": "Siirrä alas",
-        "removeSeries": "Poista sarja"
+        "removeSeries": "Poista sarja",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Asetukset",
       "ariaLabel": "Lukijan asetukset",
-      "tabs": {
-        "appearance": "Ulkoasu",
-        "text": "Teksti",
-        "layout": "Asettelu"
-      },
-      "appearance": {
-        "mode": "Tila",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Vaalea",
-        "dark": "Tumma",
-        "colorTheme": "Teeman väri"
+        "dark": "Tumma"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Alue: 10-32px",
-        "lineHeight": "Viivan korkeus",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Kirjasinperhe",
-        "fontFamilyDescription": "Valitse sisäänrakennetut tai ladatut kirjasimet vartalotekstille.",
-        "builtIn": "Sisäänrakennettu",
-        "yourFonts": "Kirjasimesi"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Sisäänrakennettu",
+      "fontServer": "Server fonts",
+      "fontYours": "Kirjasimesi",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Lukemisen virta",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Sivun levitykset",
-        "pageSpreadsDescription": "Valitse, miten tämä kuvapohjainen EPUB paria sivut.",
+      "pageSpreads": "Sivun levitykset",
+      "pageSpreadsHint": "Valitse, miten tämä kuvapohjainen EPUB paria sivut.",
+      "spread": {
         "bookDefault": "Varaa oletus",
-        "singlePage": "Yksi sivu",
-        "readingFlow": "Lukemisen virta",
-        "readingFlowDescription": "Vaihda sivutun ja jatkuvan vierityksen välillä.",
-        "paginated": "Sivutettu",
-        "scrolled": "Vieritetty",
-        "textColumns": "Tekstin sarakkeet",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Sarakkeen väli",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Tasaa teksti",
-        "justifyTextDescription": "Ota koko leveyden kohdistus käyttöön.",
-        "hyphenation": "Hyfenaatio",
-        "hyphenationDescription": "Ota käyttöön automaattinen sananmurron vältys."
+        "singlePage": "Yksi sivu"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Sarakkeen väli",
+      "justifyText": "Tasaa teksti",
+      "hyphenation": "Hyfenaatio",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} of {total} read ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Mahdolliset puutteet:"
@@ -6968,7 +7013,8 @@
       "users": "Käyttäjät",
       "account-activity": "Tilin Toiminta",
       "magic-links": "Magic Linkit",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Tiedoston Nimeäminen",

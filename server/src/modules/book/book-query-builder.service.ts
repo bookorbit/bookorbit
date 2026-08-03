@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { parseCustomSortFieldId } from '@bookorbit/types';
+import { parseCustomRuleFieldId, parseCustomSortFieldId } from '@bookorbit/types';
 import type {
   CommunityRatingProvider,
   ContentFilterRules,
@@ -10,6 +10,7 @@ import type {
   GroupRule,
   ReadStatus,
   Rule,
+  RuleValue,
   SortSpec,
 } from '@bookorbit/types';
 import { DB } from '../../db';
@@ -22,6 +23,7 @@ import {
   audiobookProgress,
   authors,
   bookAuthors,
+  bookCustomMetadataValues,
   bookFiles,
   bookGenres,
   bookCommunityRatings,
@@ -141,6 +143,10 @@ export class BookQueryBuilder {
 
   private ruleToSql(rule: Rule, userId?: number, timeZone = 'UTC'): SQL {
     const { field, operator, value, valueTo } = rule;
+    const customFieldId = parseCustomRuleFieldId(field);
+    if (customFieldId !== null) {
+      return this.customFieldRuleToSql(customFieldId, operator, value, valueTo, timeZone);
+    }
     switch (field) {
       case 'title':
         return this.textRuleToSql(bookMetadata.title, operator, value as string);
@@ -281,6 +287,92 @@ export class BookQueryBuilder {
         return isNotNull(col);
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
+    }
+  }
+
+  /**
+   * User-defined custom metadata fields, addressed as `custom:<id>`.
+   *
+   * Negated operators negate the whole EXISTS so that books carrying no value for the field
+   * still match, the same way `notContains` treats a null column on a built-in field.
+   */
+  private customFieldRuleToSql(
+    fieldId: number,
+    operator: string,
+    value: RuleValue | undefined,
+    valueTo: string | number | undefined,
+    timeZone: string,
+  ): SQL {
+    const existsValue = (whereClause: SQL) => {
+      const sq = this.db
+        .select({ one: sql`1` })
+        .from(bookCustomMetadataValues)
+        .where(and(eq(bookCustomMetadataValues.bookId, books.id), eq(bookCustomMetadataValues.fieldId, fieldId), whereClause)!);
+      return sql`exists (${sq})`;
+    };
+
+    switch (operator) {
+      case 'isEmpty':
+        return not(existsValue(this.customValuePresentSql()));
+      case 'isNotEmpty':
+        return existsValue(this.customValuePresentSql());
+      case 'notContains':
+        return not(existsValue(this.customValueMatchSql('contains', value, valueTo, timeZone)));
+      case 'notEq':
+        return not(existsValue(this.customValueMatchSql('eq', value, valueTo, timeZone)));
+      default:
+        return existsValue(this.customValueMatchSql(operator, value, valueTo, timeZone));
+    }
+  }
+
+  /** True for a row holding a value of any kind, so presence is answered without knowing the field's type. */
+  private customValuePresentSql(): SQL {
+    return or(
+      isNotNull(bookCustomMetadataValues.valueText),
+      isNotNull(bookCustomMetadataValues.valueNumber),
+      isNotNull(bookCustomMetadataValues.valueDate),
+      isNotNull(bookCustomMetadataValues.valueBoolean),
+    )!;
+  }
+
+  /**
+   * Predicate over a single `book_custom_metadata_values` row.
+   *
+   * `book_custom_metadata_values` keeps one typed column per value kind, and a field's type is
+   * fixed at creation, so the column to compare follows from the operator. The operators more
+   * than one type offers (`eq`, `between`) split on the value's runtime type instead. A rule
+   * whose operator does not suit its field therefore reads a column that is always null and
+   * matches nothing, which is how an archived or deleted field behaves too.
+   */
+  private customValueMatchSql(operator: string, value: RuleValue | undefined, valueTo: string | number | undefined, timeZone: string): SQL {
+    switch (operator) {
+      case 'contains':
+      case 'startsWith':
+      case 'endsWith':
+        return this.textRuleToSql(bookCustomMetadataValues.valueText, operator, value as string);
+      case 'eq':
+        return typeof value === 'number'
+          ? this.numericRuleToSql(bookCustomMetadataValues.valueNumber, operator, value)
+          : this.textRuleToSql(bookCustomMetadataValues.valueText, operator, value as string);
+      case 'gt':
+      case 'gte':
+      case 'lt':
+      case 'lte':
+        return this.numericRuleToSql(bookCustomMetadataValues.valueNumber, operator, value as number, valueTo as number | undefined);
+      case 'between':
+        return typeof value === 'number'
+          ? this.numericRuleToSql(bookCustomMetadataValues.valueNumber, operator, value, valueTo as number | undefined)
+          : this.dateExprRuleToSql(sql`${bookCustomMetadataValues.valueDate}`, operator, value as string, valueTo, timeZone, 'custom metadata');
+      case 'before':
+      case 'after':
+      case 'withinLast':
+        return this.dateExprRuleToSql(sql`${bookCustomMetadataValues.valueDate}`, operator, value as string, valueTo, timeZone, 'custom metadata');
+      case 'isTrue':
+        return eq(bookCustomMetadataValues.valueBoolean, true);
+      case 'isFalse':
+        return eq(bookCustomMetadataValues.valueBoolean, false);
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for custom metadata field`);
     }
   }
 
@@ -611,6 +703,25 @@ export class BookQueryBuilder {
   private publishedDateRuleToSql(operator: string, value: string | number | undefined, valueTo: string | number | undefined, timeZone: string): SQL {
     const dateExpr = sql`coalesce(${bookMetadata.publishedDate}, make_date(${bookMetadata.publishedYear}, 1, 1))`;
     switch (operator) {
+      case 'isEmpty':
+        return and(isNull(bookMetadata.publishedDate), isNull(bookMetadata.publishedYear))!;
+      case 'isNotEmpty':
+        return or(isNotNull(bookMetadata.publishedDate), isNotNull(bookMetadata.publishedYear))!;
+      default:
+        return this.dateExprRuleToSql(dateExpr, operator, value, valueTo, timeZone, 'publishedDate');
+    }
+  }
+
+  /** Date comparisons shared by every date-valued expression: `publishedDate` and custom date fields. */
+  private dateExprRuleToSql(
+    dateExpr: SQL,
+    operator: string,
+    value: string | number | undefined,
+    valueTo: string | number | undefined,
+    timeZone: string,
+    fieldLabel: string,
+  ): SQL {
+    switch (operator) {
       case 'before':
         return sql`${dateExpr} < ${this.parseDateKey(value, operator, 'value', timeZone)}::date`;
       case 'after':
@@ -625,12 +736,8 @@ export class BookQueryBuilder {
         const shiftDays = wholeDays > 0 ? wholeDays - 1 : 0;
         return sql`${dateExpr} >= (timezone(${timeZone}, now())::date - ${shiftDays}::int)`;
       }
-      case 'isEmpty':
-        return and(isNull(bookMetadata.publishedDate), isNull(bookMetadata.publishedYear))!;
-      case 'isNotEmpty':
-        return or(isNotNull(bookMetadata.publishedDate), isNotNull(bookMetadata.publishedYear))!;
       default:
-        throw new BadRequestException(`Invalid operator '${operator}' for publishedDate field`);
+        throw new BadRequestException(`Invalid operator '${operator}' for ${fieldLabel} field`);
     }
   }
 

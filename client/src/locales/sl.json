@@ -1135,7 +1135,15 @@
         "users": "Uporabniki",
         "account-activity": "Dejavnost računov",
         "magic-links": "Čarobne povezave",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Brisanje družine pisav ni uspelo",
         "demoCannotManage": "Demo-omejeni račun ne more upravljati pisav",
         "fileAdded": "\"{name}\" dodano",
-        "uploadFailed": "Nalaganje ni uspelo"
+        "uploadFailed": "Nalaganje ni uspelo",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Odložišče knjig",
@@ -3336,8 +3349,12 @@
         "isFinished": "je zaključeno",
         "isLocked": "je zaklenjeno",
         "isUnlocked": "je odklenjeno",
-        "isUpNext": "je naslednje"
+        "isUpNext": "je naslednje",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Kateri koli ponudnik",
       "communityRatingProvider": "Ponudnik ocen skupnosti",
       "loadingLibraries": "Nalaganje knjižnic ...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Serija",
         "moveUp": "Premakni navzgor",
         "moveDown": "Premakni navzdol",
-        "removeSeries": "Odstrani serijo"
+        "removeSeries": "Odstrani serijo",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Nastavitve",
       "ariaLabel": "Nastavitve bralnika",
-      "tabs": {
-        "appearance": "Videz",
-        "text": "Besedilo",
-        "layout": "Postavitev"
-      },
-      "appearance": {
-        "mode": "Način",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Svetlo",
-        "dark": "Temno",
-        "colorTheme": "Barvna tema"
+        "dark": "Temno"
       },
-      "text": {
-        "fontSize": "Velikost pisave",
-        "fontSizeRange": "Obseg: 10-32px",
-        "lineHeight": "Višina vrstice",
-        "lineHeightRange": "Obseg: 0.8-3.0",
-        "fontFamily": "Družina pisav",
-        "fontFamilyDescription": "Izberite vgrajene ali naložene pisave za besedilo.",
-        "builtIn": "Vgrajeno",
-        "yourFonts": "Vaše pisave"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Vgrajeno",
+      "fontServer": "Server fonts",
+      "fontYours": "Vaše pisave",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Potek branja",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Razpon strani",
-        "pageSpreadsDescription": "Izberite, kako ta na slikah temelječ EPUB združuje strani.",
+      "pageSpreads": "Razpon strani",
+      "pageSpreadsHint": "Izberite, kako ta na slikah temelječ EPUB združuje strani.",
+      "spread": {
         "bookDefault": "Privzeto za knjigo",
-        "singlePage": "Ena stran",
-        "readingFlow": "Potek branja",
-        "readingFlowDescription": "Preklapljajte med branjem po straneh in neprekinjenim drsenjem.",
-        "paginated": "Po straneh",
-        "scrolled": "Drsenje",
-        "textColumns": "Stolpci besedila",
-        "textColumnsRange": "Obseg: 1-10",
-        "columnGap": "Razmik med stolpci",
-        "columnGapRange": "Obseg: 0-50%",
-        "maxWidth": "Največja širina",
-        "maxWidthRange": "Obseg: 400-1600",
-        "justifyText": "Poravnaj besedilo",
-        "justifyTextDescription": "Omogoči poravnavo odstavkov na polno širino.",
-        "hyphenation": "Deljenje besed",
-        "hyphenationDescription": "Omogoči samodejno deljenje besed."
+        "singlePage": "Ena stran"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Razmik med stolpci",
+      "justifyText": "Poravnaj besedilo",
+      "hyphenation": "Deljenje besed",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "prebranih {read} od {total} ({percentage} %)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Možne vrzeli:"
@@ -6968,7 +7013,8 @@
       "users": "Uporabniki",
       "account-activity": "Dejavnost računa",
       "magic-links": "Čarobne povezave",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Poimenovanje datotek",

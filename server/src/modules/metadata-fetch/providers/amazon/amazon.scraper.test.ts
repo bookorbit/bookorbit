@@ -103,6 +103,52 @@ describe('AmazonScraper', () => {
       expect(result.pageCount).toBe(1234);
     });
 
+    describe('series attributes', () => {
+      function seriesHtml(label: string, name = 'The Expanse'): string {
+        return `
+          <span id="productTitle">A Book</span>
+          <div id="rpi-attribute-book_details-series">
+            <span class="rpi-attribute-label"><span>${label}</span></span>
+            <span class="rpi-attribute-value"><a href="/dp/X"><span>${name}</span></a></span>
+          </div>
+        `;
+      }
+
+      it('reads the series name, position and length from one label', () => {
+        const result = parseBookPage(seriesHtml('Book 3 of 7'));
+
+        expect(result.seriesName).toBe('The Expanse');
+        expect(result.seriesIndex).toBe(3);
+        expect(result.seriesTotalBooks).toBe(7);
+      });
+
+      it('keeps a fractional position while still reading the length', () => {
+        const result = parseBookPage(seriesHtml('Book 2.5 of 9'));
+
+        expect(result.seriesIndex).toBe(2.5);
+        expect(result.seriesTotalBooks).toBe(9);
+      });
+
+      it('still yields the position when the label states no length', () => {
+        const result = parseBookPage(seriesHtml('Book 3 of'));
+
+        expect(result.seriesIndex).toBe(3);
+        expect(result.seriesTotalBooks).toBeUndefined();
+      });
+
+      it('yields nothing when the page has no series block', () => {
+        const result = parseBookPage('<span id="productTitle">A Book</span>');
+
+        expect(result.seriesName).toBeUndefined();
+        expect(result.seriesIndex).toBeUndefined();
+        expect(result.seriesTotalBooks).toBeUndefined();
+      });
+
+      it('rejects a length beyond the supported ceiling', () => {
+        expect(parseBookPage(seriesHtml('Book 1 of 10001')).seriesTotalBooks).toBeUndefined();
+      });
+    });
+
     it('rejects a negative rating value', () => {
       const html = `
         <span id="productTitle">Bad Rating Book</span>

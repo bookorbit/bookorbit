@@ -1,12 +1,12 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { createHash } from 'crypto';
-import { MAX_FONT_FILE_SIZE, MAX_FONTS_PER_USER, FONT_FORMATS, type FontFormat } from '@bookorbit/types';
+import { MAX_FONTS_PER_USER } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import type { UserFontRow } from '../../db/schema';
 import { FontRepository } from './font.repository';
 import { FontStorageService } from './font.storage.service';
-import { FontValidationService, familyNameFromFilename } from './font.validation.service';
+import { FontValidationService } from './font.validation.service';
+import { inspectFontUpload, resolveFontIdentity } from './font-upload.pipeline';
 import { toFontResponse } from './dto/font-response.dto';
 import type { UpdateFontDto } from './dto/update-font.dto';
 
@@ -31,14 +31,7 @@ export class FontService {
     this.logger.log(`[${event}] [start] userId=${user.id} filename=${originalFilename} sizeBytes=${buffer.length} - font upload started`);
 
     try {
-      if (buffer.length > MAX_FONT_FILE_SIZE) {
-        throw new BadRequestException(`Font file exceeds maximum size of ${MAX_FONT_FILE_SIZE / 1024 / 1024} MB`);
-      }
-
-      const format = this.resolveFormat(originalFilename);
-      this.validation.validateFormat(buffer, format);
-
-      const fileHash = createHash('sha256').update(buffer).digest('hex');
+      const { format, fileHash } = inspectFontUpload(this.validation, buffer, originalFilename);
 
       const existing = await this.repo.findByUserAndHash(user.id, fileHash);
       if (existing) {
@@ -50,8 +43,7 @@ export class FontService {
         throw new BadRequestException(`Maximum of ${MAX_FONTS_PER_USER} fonts per user reached`);
       }
 
-      const metadata = this.validation.extractMetadata(buffer, originalFilename);
-      const familyName = metadata.familyName ?? familyNameFromFilename(originalFilename) ?? 'Custom Font';
+      const { familyName, weight, style, suggestedFamilyName } = resolveFontIdentity(this.validation, buffer, originalFilename);
 
       const storedFileName = await this.storage.save(user.id, format, buffer);
 
@@ -63,8 +55,8 @@ export class FontService {
           originalFileName: originalFilename,
           storedFileName,
           format,
-          weight: metadata.weight,
-          style: metadata.style,
+          weight,
+          style,
           fileSize: buffer.length,
           fileHash,
         });
@@ -79,9 +71,9 @@ export class FontService {
 
       return {
         font: toFontResponse(row),
-        suggestedFamilyName: metadata.familyName,
-        suggestedWeight: metadata.weight,
-        suggestedStyle: metadata.style,
+        suggestedFamilyName,
+        suggestedWeight: weight,
+        suggestedStyle: style,
       };
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
@@ -134,13 +126,5 @@ export class FontService {
       throw new ForbiddenException('You do not own this font');
     }
     return font;
-  }
-
-  private resolveFormat(filename: string): FontFormat {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    if (ext && (FONT_FORMATS as readonly string[]).includes(ext)) {
-      return ext as FontFormat;
-    }
-    throw new BadRequestException(`Unsupported file extension. Supported formats: ${FONT_FORMATS.join(', ')}`);
   }
 }

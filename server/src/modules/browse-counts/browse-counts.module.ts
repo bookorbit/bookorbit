@@ -10,5 +10,6 @@ import { BrowseCountsService } from './browse-counts.service';
   imports: [AuthorsModule, SeriesModule, AnnotationModule],
   controllers: [BrowseCountsController],
   providers: [BrowseCountsService],
+  exports: [BrowseCountsService],
 })
 export class BrowseCountsModule {}

@@ -3,12 +3,16 @@ import { ADMIN_TABS, ADMIN_TAB_INFO, normalizeAdminTab } from '../lib/admin-tabs
 
 describe('admin-tabs', () => {
   describe('ADMIN_TABS', () => {
-    it('contains exactly users, account activity, oidc, and magic-links', () => {
-      expect(ADMIN_TABS).toEqual(['users', 'account-activity', 'oidc', 'magic-links'])
+    it('contains exactly users, account activity, oidc, magic-links, and server-fonts', () => {
+      expect(ADMIN_TABS).toEqual(['users', 'account-activity', 'oidc', 'magic-links', 'server-fonts'])
     })
 
-    it('has length 4', () => {
-      expect(ADMIN_TABS.length).toBe(4)
+    it('has length 5', () => {
+      expect(ADMIN_TABS.length).toBe(5)
+    })
+
+    it('places server-fonts immediately after magic-links', () => {
+      expect(ADMIN_TABS.indexOf('server-fonts')).toBe(ADMIN_TABS.indexOf('magic-links') + 1)
     })
   })
 
@@ -41,6 +45,11 @@ describe('admin-tabs', () => {
 
     it('magic-links entry is superuser-only', () => {
       expect(ADMIN_TAB_INFO['magic-links'].permission).toBeNull()
+    })
+
+    it('server-fonts entry has manage_app_settings permission', () => {
+      expect(ADMIN_TAB_INFO['server-fonts'].permission).toBe('manage_app_settings')
+      expect(ADMIN_TAB_INFO['server-fonts'].titleKey).toBe('titles.admin.server-fonts')
     })
   })
 
@@ -79,6 +88,10 @@ describe('admin-tabs', () => {
 
     it('returns magic-links when given "magic-links"', () => {
       expect(normalizeAdminTab('magic-links')).toBe('magic-links')
+    })
+
+    it('returns server-fonts when given "server-fonts"', () => {
+      expect(normalizeAdminTab('server-fonts')).toBe('server-fonts')
     })
 
     it('is case-sensitive (Users is not valid)', () => {

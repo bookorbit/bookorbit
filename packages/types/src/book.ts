@@ -117,6 +117,8 @@ export type BookSeriesMembership = {
   seriesName: string;
   seriesIndex: number | null;
   displayOrder: number;
+  /** Series-level, shared by every book in the series and by every user. */
+  expectedBookCount: number | null;
 };
 
 export type BookCard = {

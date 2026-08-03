@@ -33,6 +33,7 @@ local cloneParams = CatalogUtil.cloneParams
 local formatBytes = CatalogUtil.formatBytes
 local isSupportedFormat = CatalogUtil.isSupportedFormat
 local safeFilenameBase = CatalogUtil.safeFilenameBase
+local shortPath = CatalogUtil.shortPath
 local shortText = CatalogUtil.shortText
 
 local STEP_DELAY = 0.15
@@ -40,6 +41,7 @@ local NEXT_ITEM_DELAY = 0.02
 local PROGRESS_THROTTLE = 1
 local FAILED_TITLES_LIMIT = 8
 local TITLE_LINE_LENGTH = 38
+local FOLDER_LABEL_LENGTH = 32
 
 local MANIFEST_FEATURE = "catalogBulkManifest"
 local PAGE_SIZE = 100
@@ -411,6 +413,17 @@ function CatalogBulkDownload.install(Catalog)
         dialog = ButtonDialog:new{
             title = _("Bulk download settings"),
             buttons = {
+                {
+                    {
+                        text = T(_("Folder: %1"), BD.dirpath(shortPath(self:getCurrentDownloadDir(), FOLDER_LABEL_LENGTH))),
+                        callback = function()
+                            UIManager:close(dialog)
+                            self:chooseDownloadDir(function()
+                                self:showBulkDownloadSettings()
+                            end)
+                        end,
+                    },
+                },
                 {
                     {
                         text = T(_("Format: %1"), preset.label),

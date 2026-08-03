@@ -1135,7 +1135,15 @@
         "users": "Спільноти",
         "account-activity": "Активність облікового запису",
         "magic-links": "Магічні посилання",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Не вдалося вилучити сімейство шрифтів",
         "demoCannotManage": "Обмежений доступ до демо-ліміту не можна керувати шрифтами",
         "fileAdded": "\"{name}\" додано",
-        "uploadFailed": "Не вдалося завантажити"
+        "uploadFailed": "Не вдалося завантажити",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Книга док",
@@ -3336,8 +3349,12 @@
         "isFinished": "завершено",
         "isLocked": "заблокований",
         "isUnlocked": "розблоковано",
-        "isUpNext": "є наступним"
+        "isUpNext": "є наступним",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Будь-який постачальник",
       "communityRatingProvider": "Постачальник рейтингу спільноти",
       "loadingLibraries": "Завантаження бібліотеки...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Серія",
         "moveUp": "Посунути вгору",
         "moveDown": "Посунути вниз",
-        "removeSeries": "Видалити послідовність"
+        "removeSeries": "Видалити послідовність",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Налаштування",
       "ariaLabel": "Параметри читання",
-      "tabs": {
-        "appearance": "Зовнішній вигляд",
-        "text": "Текст",
-        "layout": "Макет"
-      },
-      "appearance": {
-        "mode": "Режим",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Світла",
-        "dark": "Темна",
-        "colorTheme": "Кольорова тема"
+        "dark": "Темна"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Діапазон: 10-32px",
-        "lineHeight": "Висота рядка",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Сімейство шрифтів",
-        "fontFamilyDescription": "Виберіть вбудовані або завантажені шрифти для тексту тексту.",
-        "builtIn": "Вбудована тема",
-        "yourFonts": "Ваші шрифти"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Вбудована тема",
+      "fontServer": "Server fonts",
+      "fontYours": "Ваші шрифти",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Потік читання",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Розгортання сторінки",
-        "pageSpreadsDescription": "Виберіть, як відображаються сторінки пар на основі зображень.",
+      "pageSpreads": "Розгортання сторінки",
+      "pageSpreadsHint": "Виберіть, як відображаються сторінки пар на основі зображень.",
+      "spread": {
         "bookDefault": "Книга за замовчуванням",
-        "singlePage": "Одна сторінка",
-        "readingFlow": "Потік читання",
-        "readingFlowDescription": "Перемикання між вивантаженими та безперервною прокручуванням.",
-        "paginated": "Розбивка на сторінки",
-        "scrolled": "Прокрутити",
-        "textColumns": "Текстові стовпці",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Розрив стовпчика",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "По ширині тексту",
-        "justifyTextDescription": "Увімкнути вирівнювання по повній ширині абзац.",
-        "hyphenation": "Дефікація",
-        "hyphenationDescription": "Enable automatic word-break hyphenation."
+        "singlePage": "Одна сторінка"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Розрив стовпчика",
+      "justifyText": "По ширині тексту",
+      "hyphenation": "Дефікація",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} від {total} прочитано ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Можливі прогалини:"
@@ -6968,7 +7013,8 @@
       "users": "Спільноти",
       "account-activity": "Активність облікового запису",
       "magic-links": "Магічні посилання",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Назва файлу",

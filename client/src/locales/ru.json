@@ -1135,7 +1135,15 @@
         "users": "Пользователи",
         "account-activity": "Активность аккаунта",
         "magic-links": "Волшебные ссылки",
-        "oidc": "OIDC / ССО"
+        "oidc": "OIDC / ССО",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Не удалось удалить семейство шрифтов",
         "demoCannotManage": "Ограниченный демо-аккаунт не может управлять шрифтами",
         "fileAdded": "\"{name}\" добавлен",
-        "uploadFailed": "Загрузка не удалась"
+        "uploadFailed": "Загрузка не удалась",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Книжный док-бар",
@@ -3336,8 +3349,12 @@
         "isFinished": "завершён",
         "isLocked": "заблокирован",
         "isUnlocked": "разблокирован",
-        "isUpNext": "дальше"
+        "isUpNext": "дальше",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Любой провайдер",
       "communityRatingProvider": "Поставщик рейтинга сообщества",
       "loadingLibraries": "Загрузка библиотек...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Серии",
         "moveUp": "Вверх",
         "moveDown": "Сдвинуть вниз",
-        "removeSeries": "Удалить серию"
+        "removeSeries": "Удалить серию",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Настройки",
       "ariaLabel": "Настройки чтения",
-      "tabs": {
-        "appearance": "Внешний вид",
-        "text": "Текст",
-        "layout": "Макет"
-      },
-      "appearance": {
-        "mode": "Режим",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Светлая",
-        "dark": "Тёмная",
-        "colorTheme": "Цветовая схема"
+        "dark": "Тёмная"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Диапазон: 10-32px",
-        "lineHeight": "Высота линии",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Семейство шрифтов",
-        "fontFamilyDescription": "Выберите встроенные или загруженные шрифты для текста тела.",
-        "builtIn": "Встроенный",
-        "yourFonts": "Ваши шрифты"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Встроенный",
+      "fontServer": "Server fonts",
+      "fontYours": "Ваши шрифты",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Чтение потока",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Спреды страниц",
-        "pageSpreadsDescription": "Выберите, как это пары страниц EPUB на основе образа.",
+      "pageSpreads": "Спреды страниц",
+      "pageSpreadsHint": "Выберите, как это пары страниц EPUB на основе образа.",
+      "spread": {
         "bookDefault": "Книга по умолчанию",
-        "singlePage": "Одна страница",
-        "readingFlow": "Чтение потока",
-        "readingFlowDescription": "Переключение между нагруженной и непрерывной прокруткой.",
-        "paginated": "Популярно",
-        "scrolled": "Прокрутка",
-        "textColumns": "Текстовые колонки",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Разрыв столбцов",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Выровнять текст по ширине",
-        "justifyTextDescription": "Включить выравнивание параграфов всей ширины.",
-        "hyphenation": "Перенос",
-        "hyphenationDescription": "Включить автоматическое перенос слов."
+        "singlePage": "Одна страница"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Разрыв столбцов",
+      "justifyText": "Выровнять текст по ширине",
+      "hyphenation": "Перенос",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} прочитанного {total} ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Возможные пробелы:"
@@ -6968,7 +7013,8 @@
       "users": "Пользователи",
       "account-activity": "Активность аккаунта",
       "magic-links": "Волшебные ссылки",
-      "oidc": "OIDC / ССО"
+      "oidc": "OIDC / ССО",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Именование файлов",

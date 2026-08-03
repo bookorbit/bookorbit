@@ -1414,9 +1414,11 @@ function DashboardBrowseRow:init()
             fgcolor = Blitbuffer.COLOR_DARK_GRAY,
         }
     end
-    -- Wide counts (a four-digit library) get the width they measure at instead
-    -- of being clipped to the nominal box.
-    local count_w = count_widget and math.max(count_box_w, count_widget:getSize().w + Size.padding.small) or 0
+    -- Counts are abbreviated to at most four characters upstream, so the column
+    -- only has to be wide enough for the widest of those rather than for an
+    -- arbitrary library total.
+    local count_pad = Size.padding.small
+    local count_w = count_widget and math.max(count_box_w, count_widget:getSize().w + count_pad) or 0
     local label_w = math.max(1, self.dimen.w - icon_box_w - gap - count_w)
 
     local left = HorizontalGroup:new{ align = "center" }
@@ -1443,10 +1445,13 @@ function DashboardBrowseRow:init()
         dimen = row_dimen:copy(),
         LeftContainer:new{ dimen = row_dimen:copy(), left },
     }
+    -- Right-aligned rather than centred in the count box: centring leaves each
+    -- badge a different distance from the edge, so a column of counts reads as
+    -- ragged even though every box ends in the same place.
     if count_widget then
         table.insert(row, RightContainer:new{
-            dimen = row_dimen:copy(),
-            CenterContainer:new{ dimen = Geom:new{ w = count_w, h = inner_h }, count_widget },
+            dimen = Geom:new{ w = math.max(1, row_dimen.w - count_pad), h = inner_h },
+            count_widget,
         })
     end
 

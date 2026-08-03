@@ -1135,7 +1135,15 @@
         "users": "Användare",
         "account-activity": "Konto aktivitet",
         "magic-links": "Magiska länkar",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Det gick inte att ta bort typsnittsfamilj",
         "demoCannotManage": "Demobegränsat konto kan inte hantera typsnitt",
         "fileAdded": "\"{name}\" tillagd",
-        "uploadFailed": "Uppladdningen misslyckades"
+        "uploadFailed": "Uppladdningen misslyckades",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Boka Docka",
@@ -3336,8 +3349,12 @@
         "isFinished": "är klar",
         "isLocked": "är låst",
         "isUnlocked": "är upplåst",
-        "isUpNext": "är uppe nästa"
+        "isUpNext": "är uppe nästa",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Valfri leverantör",
       "communityRatingProvider": "Gemenskapens betygsleverantör",
       "loadingLibraries": "Laddar bibliotek...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Serie",
         "moveUp": "Flytta upp",
         "moveDown": "Flytta ner",
-        "removeSeries": "Ta bort serie"
+        "removeSeries": "Ta bort serie",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Inställningar",
       "ariaLabel": "Inställningar för läsare",
-      "tabs": {
-        "appearance": "Utseende",
-        "text": "Text",
-        "layout": "Layout"
-      },
-      "appearance": {
-        "mode": "Läge",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Ljus",
-        "dark": "Mörk",
-        "colorTheme": "Färg tema"
+        "dark": "Mörk"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Räckvidd: 10-32px",
-        "lineHeight": "Linje höjd",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Typsnitt familj",
-        "fontFamilyDescription": "Välj inbyggda eller uppladdade teckensnitt för kroppstext.",
-        "builtIn": "Inbyggd",
-        "yourFonts": "Dina typsnitt"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Inbyggd",
+      "fontServer": "Server fonts",
+      "fontYours": "Dina typsnitt",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Läser flöde",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Sid spreads",
-        "pageSpreadsDescription": "Välj hur denna bildbaserade EPUB parar sidor.",
+      "pageSpreads": "Sid spreads",
+      "pageSpreadsHint": "Välj hur denna bildbaserade EPUB parar sidor.",
+      "spread": {
         "bookDefault": "Bokens standard",
-        "singlePage": "Enda sidan",
-        "readingFlow": "Läser flöde",
-        "readingFlowDescription": "Växla mellan sidrullning och kontinuerlig rullning.",
-        "paginated": "Sidnumrerad",
-        "scrolled": "Rullad",
-        "textColumns": "Text kolumner",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Kolumn mellanrum",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Justera text",
-        "justifyTextDescription": "Aktivera justering av punkt i full bredd.",
-        "hyphenation": "Hyfenering",
-        "hyphenationDescription": "Aktivera automatisk word-break bindestreck."
+        "singlePage": "Enda sidan"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Kolumn mellanrum",
+      "justifyText": "Justera text",
+      "hyphenation": "Hyfenering",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} av {total} läst ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Möjliga mellanrum:"
@@ -6968,7 +7013,8 @@
       "users": "Användare",
       "account-activity": "Konto aktivitet",
       "magic-links": "Magiska länkar",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Namngivning av fil",

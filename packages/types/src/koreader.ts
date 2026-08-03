@@ -300,11 +300,25 @@ export interface KoreaderCatalogDashboardSection {
   books: KoreaderCatalogBookListItem[];
 }
 
+// Totals behind the dashboard's Browse tiles. Optional so a plugin reading an
+// older server simply renders the tiles without badges. There is deliberately
+// no not-on-device total: which books are on a device is local KOReader state
+// the server never sees.
+export interface KoreaderCatalogBrowseCounts {
+  inProgress: number;
+  libraries: number;
+  authors: number;
+  series: number;
+  collections: number;
+  smartScopes: number;
+}
+
 export interface KoreaderCatalogDashboardResponse {
   generatedAt: string;
   username: string;
   displayName: string;
   totalBooks: number;
+  browseCounts?: KoreaderCatalogBrowseCounts;
   sections: KoreaderCatalogEntry[];
   continueReading: KoreaderCatalogBookListItem[];
   // Legacy Discover row. Populated only for requests that name no section, so a

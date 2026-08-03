@@ -608,6 +608,7 @@ export class BookRepository {
           seriesName: string;
           seriesIndex: number | null;
           displayOrder: number;
+          expectedBookCount: number | null;
         }[],
       };
     }
@@ -647,6 +648,7 @@ export class BookRepository {
             seriesName: bookSeries.name,
             seriesIndex: bookSeriesMemberships.seriesIndex,
             displayOrder: bookSeriesMemberships.displayOrder,
+            expectedBookCount: bookSeries.expectedBookCount,
           })
           .from(bookSeriesMemberships)
           .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
@@ -787,7 +789,14 @@ export class BookRepository {
       updatedAt: Date;
     }[];
     narratorRows: { bookId: number; name: string }[];
-    seriesMembershipRows: { bookId: number; seriesId: number; seriesName: string; seriesIndex: number | null; displayOrder: number }[];
+    seriesMembershipRows: {
+      bookId: number;
+      seriesId: number;
+      seriesName: string;
+      seriesIndex: number | null;
+      displayOrder: number;
+      expectedBookCount: number | null;
+    }[];
     total: number;
   }> {
     const { where, sort, limit, offset, userId } = opts;
@@ -1346,6 +1355,7 @@ export class BookRepository {
           seriesName: bookSeries.name,
           seriesIndex: bookSeriesMemberships.seriesIndex,
           displayOrder: bookSeriesMemberships.displayOrder,
+          expectedBookCount: bookSeries.expectedBookCount,
         })
         .from(bookSeriesMemberships)
         .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))

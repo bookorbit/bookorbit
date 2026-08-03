@@ -432,8 +432,22 @@
     {
       "idx": 61,
       "version": "7",
-      "when": 1785694150790,
-      "tag": "0061_add_book_origin_country",
+      "when": 1785695009216,
+      "tag": "0061_add_server_fonts",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1785712608966,
+      "tag": "0062_add_series_expected_book_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1785781468209,
+      "tag": "0063_add_book_origin_country",
       "breakpoints": true
     }
   ]

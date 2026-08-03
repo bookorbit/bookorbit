@@ -1,3 +1,4 @@
+import type { CustomMetadataFieldType } from "./custom-metadata";
 import type { CommunityRatingProviderKey } from "./metadata-fetch";
 
 /**
@@ -20,8 +21,10 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
  * - `publishedDate` - uses full dates when available and falls back to published year
  * - `lockStatus` - derived from `book_metadata.locked_fields` (non-empty array = locked)
  * - `seriesStatus` - computed per-user: "up next in series" (next unstarted book whose earlier series entries are all finished)
+ *
+ * User-defined custom metadata fields are filterable too, as `CustomRuleField`.
  */
-export type RuleField =
+export type StaticRuleField =
   | "title"
   | "publisher"
   | "originCountry"
@@ -52,6 +55,19 @@ export type RuleField =
   | "lockStatus"
   | "seriesStatus";
 
+/**
+ * A user-defined custom metadata field, referenced by its numeric id.
+ *
+ * Mirrors `CustomSortField`. Values live in `book_custom_metadata_values`, which stores one
+ * typed column per value kind; the column a rule targets follows from its operator (and, for
+ * the operators shared between types, the value's runtime type) rather than a database lookup,
+ * because a field's type is fixed at creation. Ids that no longer resolve to an active field
+ * simply match nothing, so a saved filter survives the field being archived or deleted.
+ */
+export type CustomRuleField = `custom:${number}`;
+
+export type RuleField = StaticRuleField | CustomRuleField;
+
 export type RuleOperator =
   | "contains"
   | "notContains"
@@ -79,9 +95,11 @@ export type RuleOperator =
   | "isFinished"
   | "isLocked"
   | "isUnlocked"
-  | "isUpNext";
+  | "isUpNext"
+  | "isTrue"
+  | "isFalse";
 
-export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
+export const FIELD_OPERATORS: Record<StaticRuleField, RuleOperator[]> = {
   title: ["contains", "notContains", "startsWith", "endsWith", "eq", "notEq", "isEmpty", "isNotEmpty"],
   publisher: ["contains", "notContains", "eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   originCountry: ["eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
@@ -113,7 +131,31 @@ export const FIELD_OPERATORS: Record<RuleField, RuleOperator[]> = {
   seriesStatus: ["isUpNext"],
 };
 
-export const RULE_FIELDS = Object.keys(FIELD_OPERATORS) as RuleField[];
+export const RULE_FIELDS = Object.keys(FIELD_OPERATORS) as StaticRuleField[];
+
+/**
+ * Operators offered for a custom metadata field, keyed by the field's type.
+ *
+ * `url` shares the text operators because both kinds store their value in `value_text`.
+ * Every list ends with the two presence operators, which are answered without reference
+ * to the field's type.
+ */
+export const CUSTOM_FIELD_TYPE_OPERATORS: Record<CustomMetadataFieldType, RuleOperator[]> = {
+  text: ["contains", "notContains", "startsWith", "endsWith", "eq", "notEq", "isEmpty", "isNotEmpty"],
+  url: ["contains", "notContains", "startsWith", "endsWith", "eq", "notEq", "isEmpty", "isNotEmpty"],
+  number: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
+  date: ["before", "after", "between", "withinLast", "isEmpty", "isNotEmpty"],
+  boolean: ["isTrue", "isFalse", "isEmpty", "isNotEmpty"],
+};
+
+/**
+ * Every operator any custom field type accepts. The server validates saved rules against this
+ * union because narrowing to the field's own type would need a database lookup; a rule whose
+ * operator does not suit its field matches nothing instead of being rejected.
+ */
+export const CUSTOM_FIELD_OPERATORS: RuleOperator[] = [
+  ...new Set(Object.values(CUSTOM_FIELD_TYPE_OPERATORS).flat()),
+];
 
 export const RULE_OPERATORS: RuleOperator[] = [
   "contains",
@@ -143,6 +185,8 @@ export const RULE_OPERATORS: RuleOperator[] = [
   "isLocked",
   "isUnlocked",
   "isUpNext",
+  "isTrue",
+  "isFalse",
 ];
 
 export type CommunityRatingProvider = CommunityRatingProviderKey | "any";
@@ -150,7 +194,7 @@ export type RuleValue = string | number | string[] | number[];
 
 export type StandardRule = {
   type: "rule";
-  field: Exclude<RuleField, "communityRating">;
+  field: Exclude<StaticRuleField, "communityRating">;
   operator: RuleOperator;
   value?: RuleValue;
   valueTo?: string | number;
@@ -165,7 +209,15 @@ export type CommunityRatingRule = {
   valueTo?: string | number;
 };
 
-export type Rule = StandardRule | CommunityRatingRule;
+export type CustomFieldRule = {
+  type: "rule";
+  field: CustomRuleField;
+  operator: RuleOperator;
+  value?: RuleValue;
+  valueTo?: string | number;
+};
+
+export type Rule = StandardRule | CommunityRatingRule | CustomFieldRule;
 
 export type GroupRule = {
   type: "group";
@@ -261,24 +313,45 @@ export type SortSpec = {
 };
 
 // Bounded to 9 digits so a parsed id always fits the int4 field id column.
-const CUSTOM_SORT_FIELD_PATTERN = /^custom:([1-9]\d{0,8})$/;
+const CUSTOM_FIELD_PATTERN = /^custom:([1-9]\d{0,8})$/;
+
+function parseCustomFieldId(field: string): number | null {
+  const match = CUSTOM_FIELD_PATTERN.exec(field);
+  return match ? Number(match[1]) : null;
+}
 
 export function customSortField(fieldId: number): CustomSortField {
   return `custom:${fieldId}`;
 }
 
 export function isCustomSortField(field: string): field is CustomSortField {
-  return CUSTOM_SORT_FIELD_PATTERN.test(field);
+  return CUSTOM_FIELD_PATTERN.test(field);
 }
 
 /** Returns the custom metadata field id a sort field references, or null when it is not a custom sort. */
 export function parseCustomSortFieldId(field: string): number | null {
-  const match = CUSTOM_SORT_FIELD_PATTERN.exec(field);
-  return match ? Number(match[1]) : null;
+  return parseCustomFieldId(field);
 }
 
 export function isSortField(field: string): field is SortField {
   return (SORT_FIELDS as string[]).includes(field) || isCustomSortField(field);
+}
+
+export function customRuleField(fieldId: number): CustomRuleField {
+  return `custom:${fieldId}`;
+}
+
+export function isCustomRuleField(field: string): field is CustomRuleField {
+  return CUSTOM_FIELD_PATTERN.test(field);
+}
+
+/** Returns the custom metadata field id a rule field references, or null when it is not a custom field rule. */
+export function parseCustomRuleFieldId(field: string): number | null {
+  return parseCustomFieldId(field);
+}
+
+export function isRuleField(field: string): field is RuleField {
+  return (RULE_FIELDS as string[]).includes(field) || isCustomRuleField(field);
 }
 
 export function customSortFieldIds(sort: SortSpec[]): number[] {

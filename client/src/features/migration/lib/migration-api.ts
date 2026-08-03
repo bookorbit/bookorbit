@@ -167,8 +167,13 @@ export function listSourcePathPrefixes(sourceId: number) {
 export function listTargetLibraryFolders() {
   return api('/api/v1/libraries').then(async (res) => {
     if (!res.ok) throw new Error('Failed to load libraries')
-    const libs = (await res.json()) as Array<{ id: number; name: string; folders: Array<{ id: number; path: string }> }>
-    return libs.flatMap((lib) => lib.folders.map((f) => ({ libraryName: lib.name, path: f.path })))
+    const libs = (await res.json()) as Array<{
+      id: number
+      name: string
+      originCountry?: string | null
+      folders: Array<{ id: number; path: string }>
+    }>
+    return libs.flatMap((lib) => lib.folders.map((f) => ({ libraryName: lib.name, originCountry: lib.originCountry ?? null, path: f.path })))
   })
 }
 

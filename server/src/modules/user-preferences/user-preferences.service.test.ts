@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Accent, DisplayPreferences, LocalePreferences, ThemePreferences } from '@bookorbit/types';
+import type { Accent, DisplayPreferences, LocalePreferences, ServerFontPreferences, ThemePreferences } from '@bookorbit/types';
+import { MAX_SERVER_FONTS } from '@bookorbit/types';
 
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { UserPreferencesService } from './user-preferences.service';
@@ -81,7 +82,10 @@ const validLocalePreferences: LocalePreferences = {
 };
 
 const repo = {
-  findByCategory: vi.fn<(...args: [number, string]) => Promise<{ data: ThemePreferences | DisplayPreferences | LocalePreferences } | undefined>>(),
+  findByCategory:
+    vi.fn<
+      (...args: [number, string]) => Promise<{ data: ThemePreferences | DisplayPreferences | LocalePreferences | ServerFontPreferences } | undefined>
+    >(),
   upsert: vi.fn<(...args: [number, string, Record<string, unknown>]) => Promise<void>>(),
   delete: vi.fn<(...args: [number, string]) => Promise<void>>(),
 };
@@ -492,5 +496,90 @@ describe('UserPreferencesService', () => {
   it('upsertWhatsNewPreferences rejects a non-boolean popupEnabled', async () => {
     await expect(service.upsertWhatsNewPreferences(11, { popupEnabled: 'yes' })).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  describe('server font preferences', () => {
+    it('defaults to hiding nothing when the reader has never set them', async () => {
+      repo.findByCategory.mockResolvedValue(undefined);
+
+      await expect(service.getServerFontPreferences(11)).resolves.toEqual({ hiddenFamilies: [] });
+      expect(repo.findByCategory).toHaveBeenCalledWith(11, 'server-fonts');
+    });
+
+    it('returns the stored opt-outs', async () => {
+      repo.findByCategory.mockResolvedValue({ data: { hiddenFamilies: ['OpenDyslexic'] } });
+
+      await expect(service.getServerFontPreferences(11)).resolves.toEqual({ hiddenFamilies: ['OpenDyslexic'] });
+    });
+
+    it('tolerates a malformed stored payload rather than failing the reader', async () => {
+      repo.findByCategory.mockResolvedValue({ data: { hiddenFamilies: 'OpenDyslexic' } as never });
+
+      await expect(service.getServerFontPreferences(11)).resolves.toEqual({ hiddenFamilies: [] });
+    });
+
+    it('persists the opt-out list under its own category', async () => {
+      await service.upsertServerFontPreferences(11, { hiddenFamilies: ['OpenDyslexic', 'Literata'] });
+
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'server-fonts', { hiddenFamilies: ['OpenDyslexic', 'Literata'] });
+    });
+
+    it('accepts an empty list, which is how a reader restores everything', async () => {
+      await service.upsertServerFontPreferences(11, { hiddenFamilies: [] });
+
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'server-fonts', { hiddenFamilies: [] });
+    });
+
+    it('deduplicates repeated family names', async () => {
+      await service.upsertServerFontPreferences(11, { hiddenFamilies: ['Literata', 'Literata', 'OpenDyslexic'] });
+
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'server-fonts', { hiddenFamilies: ['Literata', 'OpenDyslexic'] });
+    });
+
+    it('replaces rather than merges, so un-hiding actually removes an entry', async () => {
+      repo.findByCategory.mockResolvedValue({ data: { hiddenFamilies: ['Literata', 'OpenDyslexic'] } });
+
+      await service.upsertServerFontPreferences(11, { hiddenFamilies: ['Literata'] });
+
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'server-fonts', { hiddenFamilies: ['Literata'] });
+    });
+
+    it('rejects a missing hiddenFamilies key', async () => {
+      await expect(service.upsertServerFontPreferences(11, {})).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-string entries', async () => {
+      await expect(service.upsertServerFontPreferences(11, { hiddenFamilies: [42] })).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('rejects empty family names', async () => {
+      await expect(service.upsertServerFontPreferences(11, { hiddenFamilies: [''] })).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a family name longer than the column allows', async () => {
+      await expect(service.upsertServerFontPreferences(11, { hiddenFamilies: ['x'.repeat(201)] })).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a list longer than the server font cap', async () => {
+      const tooMany = Array.from({ length: MAX_SERVER_FONTS + 1 }, (_, i) => `Family ${i}`);
+
+      await expect(service.upsertServerFontPreferences(11, { hiddenFamilies: tooMany })).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it('accepts a list exactly at the cap', async () => {
+      const atCap = Array.from({ length: MAX_SERVER_FONTS }, (_, i) => `Family ${i}`);
+
+      await expect(service.upsertServerFontPreferences(11, { hiddenFamilies: atCap })).resolves.toBeUndefined();
+    });
+
+    it('rejects unknown keys', async () => {
+      await expect(service.upsertServerFontPreferences(11, { hiddenFamilies: [], sneaky: true })).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
   });
 });

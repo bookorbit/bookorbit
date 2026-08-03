@@ -1,6 +1,7 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { normalizeSeriesTotalBooks } from '../../../../common/utils/series-total-books.utils';
 import { HardcoverBookWithEditions, HardcoverCachedContributor, HardcoverEdition, HardcoverSearchDocument } from './hardcover.types';
 
 function parseYear(releaseYear: number | undefined | null, releaseDate: string | undefined): number | undefined {
@@ -111,6 +112,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     isbn13: edition.isbn_13,
     seriesName: book.featured_book_series?.series?.name,
     seriesIndex: book.featured_book_series?.position ?? undefined,
+    seriesTotalBooks: normalizeSeriesTotalBooks(book.featured_book_series?.series?.books_count),
     coverUrl: edition.image?.url ?? book.image?.url,
     sourceUrl: `https://hardcover.app/books/${book.slug}`,
     ...(communityRating !== undefined ? { communityRating } : {}),

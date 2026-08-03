@@ -10,7 +10,9 @@ import {
   CARD_INFO_MODES,
   CARD_OVERLAY_KEYS,
   COVER_SIZE_SCOPES,
+  FONT_FAMILY_NAME_MAX_LENGTH,
   GRID_CARD_LABEL_FIELDS,
+  MAX_SERVER_FONTS,
   RADIUS_IDS,
   SERIES_CARD_COVER_MODES,
   SUPPORTED_LOCALES,
@@ -20,6 +22,7 @@ import {
   THEME_IDS,
   type DisplayPreferences,
   type LocalePreferences,
+  type ServerFontPreferences,
   type ThemePreferences,
   type WhatsNewPreferences,
 } from '@bookorbit/types';
@@ -92,6 +95,13 @@ const WHATS_NEW_PREFERENCES_SCHEMA = z
 
 const WHATS_NEW_DEFAULTS: WhatsNewPreferences = { lastSeenVersion: null, popupEnabled: true };
 
+// Bounded by the server font cap: a reader cannot hide more families than can exist.
+const SERVER_FONT_PREFERENCES_SCHEMA = z
+  .object({
+    hiddenFamilies: z.array(z.string().min(1).max(FONT_FAMILY_NAME_MAX_LENGTH)).max(MAX_SERVER_FONTS),
+  })
+  .strict();
+
 @Injectable()
 export class UserPreferencesService {
   private readonly logger = new Logger(UserPreferencesService.name);
@@ -132,6 +142,42 @@ export class UserPreferencesService {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.error(
         `[user_preferences.upsert_whats_new] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert whats-new preferences failed`,
+      );
+      throw err;
+    }
+  }
+
+  async getServerFontPreferences(userId: number): Promise<ServerFontPreferences> {
+    const row = await this.repo.findByCategory(userId, 'server-fonts');
+    const stored = (row?.data ?? {}) as Partial<ServerFontPreferences>;
+    return { hiddenFamilies: Array.isArray(stored.hiddenFamilies) ? stored.hiddenFamilies : [] };
+  }
+
+  async upsertServerFontPreferences(userId: number, data: Record<string, unknown>): Promise<void> {
+    const start = Date.now();
+    this.logger.log(`[user_preferences.upsert_server_fonts] [start] userId=${userId} - upsert server font preferences started`);
+
+    const result = SERVER_FONT_PREFERENCES_SCHEMA.safeParse(data);
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : 'settings';
+      const issueMessage = firstIssue?.message ?? 'Invalid settings payload';
+      throw new BadRequestException(`Invalid server font preferences at "${issuePath}": ${issueMessage}`);
+    }
+
+    try {
+      const hiddenFamilies = [...new Set(result.data.hiddenFamilies)];
+      await this.repo.upsert(userId, 'server-fonts', { hiddenFamilies });
+      const durationMs = Date.now() - start;
+      this.logger.log(
+        `[user_preferences.upsert_server_fonts] [end] userId=${userId} durationMs=${durationMs} hiddenCount=${hiddenFamilies.length} - upsert server font preferences completed`,
+      );
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      const errorClass = err instanceof Error ? err.constructor.name : 'UnknownError';
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[user_preferences.upsert_server_fonts] [fail] userId=${userId} durationMs=${durationMs} errorClass=${errorClass} error="${error}" - upsert server font preferences failed`,
       );
       throw err;
     }

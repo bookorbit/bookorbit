@@ -1135,7 +1135,15 @@
         "users": "Użytkownicy",
         "account-activity": "Aktywność konta",
         "magic-links": "Magiczne linki",
-        "oidc": "OIDC / Jednokrotne logowanie"
+        "oidc": "OIDC / Jednokrotne logowanie",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Nie udało się usunąć rodziny czcionek",
         "demoCannotManage": "Konto z ograniczeniami demo nie może zarządzać czcionkami",
         "fileAdded": "Dodano „{name}”.",
-        "uploadFailed": "Przesyłanie nie powiodło się"
+        "uploadFailed": "Przesyłanie nie powiodło się",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -3336,8 +3349,12 @@
         "isFinished": "is finished",
         "isLocked": "is locked",
         "isUnlocked": "is unlocked",
-        "isUpNext": "is up next"
+        "isUpNext": "is up next",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Dowolny dostawca",
       "communityRatingProvider": "Dostawca ocen społecznościowych",
       "loadingLibraries": "Ładowanie bibliotek...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Seria",
         "moveUp": "Przesuń się w górę",
         "moveDown": "Przesuń w dół",
-        "removeSeries": "Usuń serię"
+        "removeSeries": "Usuń serię",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Ustawienia",
       "ariaLabel": "Ustawienia czytnika",
-      "tabs": {
-        "appearance": "Wygląd",
-        "text": "Tekst",
-        "layout": "Układ"
-      },
-      "appearance": {
-        "mode": "Tryb",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Światło",
-        "dark": "Ciemny",
-        "colorTheme": "Motyw koloru"
+        "dark": "Ciemny"
       },
-      "text": {
-        "fontSize": "Rozmiar czcionki",
-        "fontSizeRange": "Zakres: 10-32px",
-        "lineHeight": "Wysokość linii",
-        "lineHeightRange": "Zakres: 0,8-3,0",
-        "fontFamily": "Rodzina czcionek",
-        "fontFamilyDescription": "Wybierz wbudowane lub przesłane czcionki dla tekstu podstawowego.",
-        "builtIn": "Wbudowany",
-        "yourFonts": "Twoje czcionki"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Wbudowany",
+      "fontServer": "Server fonts",
+      "fontYours": "Twoje czcionki",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Czytanie",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Strona się rozprzestrzenia",
-        "pageSpreadsDescription": "Wybierz sposób, w jaki ten oparty na obrazie EPUB łączy strony w pary.",
+      "pageSpreads": "Strona się rozprzestrzenia",
+      "pageSpreadsHint": "Wybierz sposób, w jaki ten oparty na obrazie EPUB łączy strony w pary.",
+      "spread": {
         "bookDefault": "Książka domyślna",
-        "singlePage": "Pojedyncza strona",
-        "readingFlow": "Czytanie",
-        "readingFlowDescription": "Przełączanie pomiędzy przewijaniem stronicowanym i ciągłym.",
-        "paginated": "Paginowane",
-        "scrolled": "Przewinięte",
-        "textColumns": "Kolumny tekstowe",
-        "textColumnsRange": "Zakres: 1-10",
-        "columnGap": "Szczelina kolumny",
-        "columnGapRange": "Zakres: 0-50%",
-        "maxWidth": "Maksymalna szerokość",
-        "maxWidthRange": "Zakres: 400-1600",
-        "justifyText": "Justuj tekst",
-        "justifyTextDescription": "Włącz wyrównanie akapitu na całej szerokości.",
-        "hyphenation": "Dzielenie wyrazów",
-        "hyphenationDescription": "Włącz automatyczne dzielenie wyrazów."
+        "singlePage": "Pojedyncza strona"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Szczelina kolumny",
+      "justifyText": "Justuj tekst",
+      "hyphenation": "Dzielenie wyrazów",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} z {total} przeczytane ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Możliwe luki:"
@@ -6968,7 +7013,8 @@
       "users": "Użytkownicy",
       "account-activity": "Aktywność konta",
       "magic-links": "Magiczne linki",
-      "oidc": "OIDC / Jednokrotne logowanie"
+      "oidc": "OIDC / Jednokrotne logowanie",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Nazewnictwo plików",

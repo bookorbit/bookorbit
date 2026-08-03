@@ -1135,7 +1135,15 @@
         "users": "Users",
         "account-activity": "Account Activity",
         "magic-links": "Magic Links",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Failed to delete font family",
         "demoCannotManage": "Demo-restricted account cannot manage fonts",
         "fileAdded": "\"{name}\" added",
-        "uploadFailed": "Upload failed"
+        "uploadFailed": "Upload failed",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -3336,8 +3349,12 @@
         "isFinished": "is finished",
         "isLocked": "is locked",
         "isUnlocked": "is unlocked",
-        "isUpNext": "is up next"
+        "isUpNext": "is up next",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Any provider",
       "communityRatingProvider": "Community rating provider",
       "loadingLibraries": "Loading libraries...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Series",
         "moveUp": "Move up",
         "moveDown": "Move down",
-        "removeSeries": "Remove series"
+        "removeSeries": "Remove series",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Settings",
       "ariaLabel": "Reader settings",
-      "tabs": {
-        "appearance": "Appearance",
-        "text": "Text",
-        "layout": "Layout"
-      },
-      "appearance": {
-        "mode": "Mode",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Light",
-        "dark": "Dark",
-        "colorTheme": "Color theme"
+        "dark": "Dark"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Range: 10-32px",
-        "lineHeight": "Line height",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Font family",
-        "fontFamilyDescription": "Choose built-in or uploaded fonts for body text.",
-        "builtIn": "Built-in",
-        "yourFonts": "Your fonts"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Built-in",
+      "fontServer": "Server fonts",
+      "fontYours": "Your fonts",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Reading flow",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Page spreads",
-        "pageSpreadsDescription": "Choose how this image-based EPUB pairs pages.",
+      "pageSpreads": "Page spreads",
+      "pageSpreadsHint": "Choose how this image-based EPUB pairs pages.",
+      "spread": {
         "bookDefault": "Book default",
-        "singlePage": "Single page",
-        "readingFlow": "Reading flow",
-        "readingFlowDescription": "Switch between paged and continuous scrolling.",
-        "paginated": "Paginated",
-        "scrolled": "Scrolled",
-        "textColumns": "Text columns",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Column gap",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Justify text",
-        "justifyTextDescription": "Enable full-width paragraph alignment.",
-        "hyphenation": "Hyphenation",
-        "hyphenationDescription": "Enable automatic word-break hyphenation."
+        "singlePage": "Single page"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Column gap",
+      "justifyText": "Justify text",
+      "hyphenation": "Hyphenation",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} of {total} read ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Possible gaps:"
@@ -6968,7 +7013,8 @@
       "users": "Users",
       "account-activity": "Account Activity",
       "magic-links": "Magic Links",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "File Naming",

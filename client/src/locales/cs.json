@@ -1135,7 +1135,15 @@
         "users": "Uživatelé",
         "account-activity": "Aktivita účtu",
         "magic-links": "Kouzelné odkazy",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1671,7 +1679,12 @@
         "deleteFamilyFailed": "Nepodařilo se odstranit rodinu písem",
         "demoCannotManage": "Demo-limitovaný účet nemůže spravovat písma",
         "fileAdded": "\"{name}\" přidáno",
-        "uploadFailed": "Nahrávání se nezdařilo"
+        "uploadFailed": "Nahrávání se nezdařilo",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Dok knihy",
@@ -3336,8 +3349,12 @@
         "isFinished": "je dokončeno",
         "isLocked": "je uzamčen",
         "isUnlocked": "je odemčeno",
-        "isUpNext": "další"
+        "isUpNext": "další",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Jakýkoliv poskytovatel",
       "communityRatingProvider": "Poskytovatel hodnocení Společenství",
       "loadingLibraries": "Načítám knihovny...",
@@ -4082,7 +4099,11 @@
         "seriesPlaceholder": "Série",
         "moveUp": "Posunout nahoru",
         "moveDown": "Přesunout dolů",
-        "removeSeries": "Odstranit sérii"
+        "removeSeries": "Odstranit sérii",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -5939,46 +5960,66 @@
     "settings": {
       "title": "Nastavení",
       "ariaLabel": "Nastavení čtečky",
-      "tabs": {
-        "appearance": "Vzhled",
-        "text": "Text",
-        "layout": "Rozložení"
-      },
-      "appearance": {
-        "mode": "Režim",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Světlý",
-        "dark": "Tmavý",
-        "colorTheme": "Barevný motiv"
+        "dark": "Tmavý"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Rozsah: 10-32px",
-        "lineHeight": "Výška čáry",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Rodina písma",
-        "fontFamilyDescription": "Vyberte vestavěná nebo nahraná písma pro text těla.",
-        "builtIn": "Vestavěné",
-        "yourFonts": "Vaše písma"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Vestavěné",
+      "fontServer": "Server fonts",
+      "fontYours": "Vaše písma",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Měření průtoku",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Rozložení stránky",
-        "pageSpreadsDescription": "Vyberte si, jak tyto EPUB stránky založené na obrázcích.",
+      "pageSpreads": "Rozložení stránky",
+      "pageSpreadsHint": "Vyberte si, jak tyto EPUB stránky založené na obrázcích.",
+      "spread": {
         "bookDefault": "Výchozí rezervace",
-        "singlePage": "Jedna stránka",
-        "readingFlow": "Měření průtoku",
-        "readingFlowDescription": "Přepínání mezi stránkováním a spojitým rolováním.",
-        "paginated": "Stránkováno",
-        "scrolled": "Posunout",
-        "textColumns": "Sloupce textu",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Mezera sloupce",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Zarovnat text",
-        "justifyTextDescription": "Povolit zarovnání odstavce na celou šířku.",
-        "hyphenation": "Hyfenace",
-        "hyphenationDescription": "Povolit automatickou pomlčku slova."
+        "singlePage": "Jedna stránka"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Mezera sloupce",
+      "justifyText": "Zarovnat text",
+      "hyphenation": "Hyfenace",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -6160,6 +6201,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} z {total} přečteno ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Možné mezery:"
@@ -6968,7 +7013,8 @@
       "users": "Uživatelé",
       "account-activity": "Aktivita účtu",
       "magic-links": "Kouzelné odkazy",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "Pojmenování souborů",

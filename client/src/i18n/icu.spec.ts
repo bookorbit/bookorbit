@@ -34,13 +34,18 @@ function messageValues(message: string, count: number): Record<string, string | 
   return Object.fromEntries(argumentNames.map((name) => [name, name === 'count' ? count : 2]))
 }
 
+// Target catalogs hold only the keys Crowdin has translated, so they are a subset of the English
+// catalog rather than an exact match. Typing them against `typeof en` would fail a branch that
+// authors a new English key before its translations exist.
+type MessageTree = { [key: string]: string | MessageTree }
+
 // Mirrors the production setup in `@/i18n`, where the English catalog is always
 // loaded and `fallbackLocale` points at it. Without that, a key absent from a
 // target catalog resolves to the key name rather than English, so a catalog
 // carrying only translated keys would fail these tests instead of falling back
 // the way the running application does.
-function createCatalogI18n(locale: Locale, catalog: typeof en) {
-  const messages: Record<string, typeof en> = {
+function createCatalogI18n(locale: Locale, catalog: MessageTree) {
+  const messages: Record<string, MessageTree> = {
     en: compileIcuCatalog(en, 'en'),
     [locale]: compileIcuCatalog(catalog, locale),
   }

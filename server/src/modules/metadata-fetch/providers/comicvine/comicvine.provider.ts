@@ -137,7 +137,7 @@ export class ComicVineProvider implements IdentifiableProvider {
         : await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey);
       if (issues.length > 0) {
         const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey, signal)));
-        return enriched.map(mapIssueToCandidate);
+        return enriched.map((issue) => mapIssueToCandidate(issue, { volumeIssueCount: volume.count_of_issues }));
       }
     }
 
@@ -148,7 +148,7 @@ export class ComicVineProvider implements IdentifiableProvider {
   private async generalSearch(query: string, apiKey: string, maxCandidates: number, signal?: AbortSignal): Promise<MetadataCandidate[]> {
     const issues = signal ? await this.client.searchIssues(query, apiKey, signal) : await this.client.searchIssues(query, apiKey);
     const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey, signal)));
-    return enriched.map(mapIssueToCandidate);
+    return enriched.map((issue) => mapIssueToCandidate(issue));
   }
 
   private async enrichWithDetails(issue: ComicVineIssue, apiKey: string, signal?: AbortSignal): Promise<ComicVineIssue> {
