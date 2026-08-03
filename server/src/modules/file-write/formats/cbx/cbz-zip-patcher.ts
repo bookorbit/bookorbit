@@ -24,7 +24,7 @@ export async function writeComicInfoToZip(filePath: string, xmlContent: string):
   const xmlEntryPath = existing?.path ?? 'ComicInfo.xml';
 
   const tmpPath = join(dirname(filePath), `.cbx-write-${randomUUID()}`);
-  const archive = new ZipArchive({ zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 0 } });
   const output = createWriteStream(tmpPath);
 
   await new Promise<void>((resolve, reject) => {

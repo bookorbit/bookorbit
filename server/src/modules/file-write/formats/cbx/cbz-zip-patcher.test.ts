@@ -110,7 +110,7 @@ describe('cbz-zip-patcher', () => {
 
     await writeComicInfoToZip('/books/a.cbz', '<ComicInfo><Title>New</Title></ComicInfo>');
 
-    expect(ZipArchive).toHaveBeenCalledWith({ zlib: { level: 6 } });
+    expect(ZipArchive).toHaveBeenCalledWith({ zlib: { level: 0 } });
     expect(imageEntry.stream).toHaveBeenCalledTimes(1);
     expect(lastArchive.append).toHaveBeenCalledWith(expect.objectContaining({ pipe: expect.any(Function) }), { name: 'pages/001.jpg' });
     expect(lastArchive.append).toHaveBeenCalledWith(Buffer.from('<ComicInfo><Title>New</Title></ComicInfo>', 'utf-8'), {
