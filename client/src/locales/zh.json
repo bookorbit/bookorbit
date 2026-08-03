@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "标题",
         "publisher": "发布者",
+        "originCountry": "Origin Country",
         "language": "语言",
         "series": "系列",
         "seriesIndex": "系列索引",

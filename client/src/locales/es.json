@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Título",
         "publisher": "Editorial",
+        "originCountry": "Origin Country",
         "language": "Idioma",
         "series": "Serie",
         "seriesIndex": "Orden de serie",

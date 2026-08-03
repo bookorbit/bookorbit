@@ -24,6 +24,7 @@ describe('useMetadataDiff', () => {
     abridged: null,
     hardcoverEditionId: null,
     communityRatings: [],
+    originCountry: null,
   }
 
   const mockCandidate1: MetadataCandidate = {
@@ -253,6 +254,7 @@ describe('useMetadataDiff', () => {
         { provider: 'hardcover', rating: 4.25, ratingCount: 12345 },
         { provider: 'amazon', rating: 4.8, ratingCount: 104451 },
       ],
+      originCountry: null,
       hardcoverId: 'hardcover-book',
       amazonId: 'B00X47ZVXM',
     })

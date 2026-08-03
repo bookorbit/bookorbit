@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Titel",
         "publisher": "Udgiver",
+        "originCountry": "Origin Country",
         "language": "Sprog",
         "series": "Serie",
         "seriesIndex": "Serie Indeks",

@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Título",
         "publisher": "Editora",
+        "originCountry": "País de origem",
         "language": "Idioma",
         "series": "Séries",
         "seriesIndex": "Índice da série",

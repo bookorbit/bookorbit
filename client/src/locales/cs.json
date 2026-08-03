@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Hlava 1 – Celkem",
         "publisher": "Vydavatel",
+        "originCountry": "Origin Country",
         "language": "Jazyk",
         "series": "Série",
         "seriesIndex": "Index série",

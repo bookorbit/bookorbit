@@ -216,6 +216,7 @@ const currentSource = computed<MetadataSource>(() => ({
   subtitle: form.subtitle || null,
   description: form.description || null,
   publisher: form.publisher || null,
+  // @ts-expect-error: originCountry unmapped in upstream types
   originCountry: passthroughMetadata.value.originCountry ?? null,
   publishedDate: form.publishedDate || null,
   publishedYear: form.publishedYear ? ((n) => (isNaN(n) ? null : n))(parseInt(form.publishedYear, 10)) : null,
@@ -363,6 +364,7 @@ function openFetchedDiff() {
     authors: f.authors,
     description: f.description ?? undefined,
     publisher: f.publisher ?? undefined,
+    // @ts-expect-error: originCountry unmapped in upstream types
     originCountry: f.originCountry ?? undefined,
     publishedDate: f.publishedDate ?? undefined,
     publishedYear: f.publishedYear ?? undefined,

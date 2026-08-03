@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Заголовок",
         "publisher": "Издатель",
+        "originCountry": "Origin Country",
         "language": "Язык",
         "series": "Серии",
         "seriesIndex": "Индекс серий",

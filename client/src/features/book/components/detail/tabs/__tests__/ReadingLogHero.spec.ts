@@ -76,6 +76,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     id: 10,
     libraryId: 1,
     libraryName: 'My Library',
+    originCountry: null,
     status: 'ok',
     folderPath: '/books',
     addedAt: '2026-01-01T00:00:00.000Z',

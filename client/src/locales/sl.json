@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Naslov",
         "publisher": "Založnik",
+        "originCountry": "Origin Country",
         "language": "Jezik",
         "series": "Serija",
         "seriesIndex": "Številka v seriji",

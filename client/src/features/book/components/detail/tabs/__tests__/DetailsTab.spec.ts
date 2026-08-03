@@ -32,6 +32,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     id: 12,
     libraryId: 1,
     libraryName: 'Library',
+    originCountry: null,
     status: 'present',
     folderPath: '/books',
     addedAt: '2026-01-01T00:00:00.000Z',
@@ -374,6 +375,7 @@ describe('DetailsTab cover surface', () => {
           { provider: 'amazon', rating: 4.8, ratingCount: 104451, updatedAt: '2026-06-25T00:00:00.000Z' },
           { provider: 'hardcover', rating: 4.25, ratingCount: 12345, updatedAt: '2026-06-24T00:00:00.000Z' },
         ],
+        originCountry: null,
       }),
     )
     await flushPromises()

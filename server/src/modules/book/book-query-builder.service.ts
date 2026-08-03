@@ -148,6 +148,10 @@ export class BookQueryBuilder {
         return Array.isArray(value)
           ? this.textSetRuleToSql(bookMetadata.publisher, operator, value as string[])
           : this.textRuleToSql(bookMetadata.publisher, operator, value as string);
+      case 'originCountry':
+        return Array.isArray(value)
+          ? this.textSetRuleToSql(books.originCountry, operator, value as string[])
+          : this.textRuleToSql(books.originCountry, operator, value as string);
       case 'language':
         return Array.isArray(value)
           ? this.textSetRuleToSql(bookMetadata.language, operator, value as string[])

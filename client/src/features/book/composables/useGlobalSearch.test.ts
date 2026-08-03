@@ -21,6 +21,7 @@ function makeBook(id: number): BookCard {
     id,
     status: 'present',
     coverAspectRatio: '2/3',
+    originCountry: null,
     title: `Prey ${id}`,
     authors: ['Author'],
     seriesId: null,

@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Найменування",
         "publisher": "Автор",
+        "originCountry": "Origin Country",
         "language": "Language",
         "series": "Серія",
         "seriesIndex": "Індекс серії",

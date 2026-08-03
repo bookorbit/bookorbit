@@ -143,9 +143,9 @@ describe('listTargetLibraryFolders', () => {
     mockApi.mockResolvedValue(okResponse(libs))
     const result = await listTargetLibraryFolders()
     expect(result).toEqual([
-      { libraryName: 'Fiction', path: '/books/fiction' },
-      { libraryName: 'Non-Fiction', path: '/books/nonfiction' },
-      { libraryName: 'Non-Fiction', path: '/books/other' },
+      { libraryName: 'Fiction', originCountry: null, path: '/books/fiction' },
+      { libraryName: 'Non-Fiction', originCountry: null, path: '/books/nonfiction' },
+      { libraryName: 'Non-Fiction', originCountry: null, path: '/books/other' },
     ])
   })
 

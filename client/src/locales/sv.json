@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Titel",
         "publisher": "Utgivare",
+        "originCountry": "Origin Country",
         "language": "Språk",
         "series": "Serie",
         "seriesIndex": "Serie Index",

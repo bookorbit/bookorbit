@@ -81,9 +81,9 @@ describe('locale message validation', () => {
     const message = '{count, plural, one {# knjiga} other {# knjig}}'
 
     expect(validate('sl', reference, message)).toEqual([
-      'sl: ICU plural category two missing for books.count',
-      'sl: ICU plural category few missing for books.count',
-    ])
+        'sl: ICU plural category few missing for books.count',
+        'sl: ICU plural category two missing for books.count',
+      ])
   })
 
   it('reports invalid ICU and rejects legacy branches for migrated keys', () => {

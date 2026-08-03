@@ -138,6 +138,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     id: 1,
     status: 'present',
     coverAspectRatio: '2/3',
+    originCountry: null,
     title: 'Dune',
     authors: ['Frank Herbert'],
     seriesId: null,

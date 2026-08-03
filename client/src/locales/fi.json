@@ -3281,6 +3281,7 @@
       "fields": {
         "title": "Otsikko",
         "publisher": "Julkaisija",
+        "originCountry": "Origin Country",
         "language": "Kieli",
         "series": "Sarja",
         "seriesIndex": "Sarjan Indeksi",

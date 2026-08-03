@@ -28,6 +28,7 @@ function makeBook(id: number): BookCard {
     id,
     status: 'active',
     coverAspectRatio: '2/3',
+    originCountry: null,
     title: `Book ${id}`,
     authors: [],
     seriesName: null,
