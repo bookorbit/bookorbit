@@ -105,9 +105,10 @@ export type ReaderSettingsMap = {
   pdf: PdfReaderSettings;
   cbx: CbxReaderSettings;
   audio: AudioReaderSettings;
+  physical: Record<string, never>;
 };
 
-export type ReaderSettings = EpubReaderSettings | PdfReaderSettings | CbxReaderSettings | AudioReaderSettings;
+export type ReaderSettings = EpubReaderSettings | PdfReaderSettings | CbxReaderSettings | AudioReaderSettings | Record<string, never>;
 
 export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
   themeName: "default",
@@ -159,4 +160,5 @@ export const READER_GROUP_DEFAULTS: ReaderSettingsMap = {
   pdf: PDF_READER_DEFAULTS,
   cbx: CBX_READER_DEFAULTS,
   audio: AUDIO_READER_DEFAULTS,
+  physical: {},
 };
