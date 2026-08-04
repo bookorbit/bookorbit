@@ -3234,7 +3234,10 @@
       "setStatus": "Aseta Tila",
       "sendViaEmail": "Lähetä sähköpostitse",
       "rate": "Arvostele {star}",
-      "openAs": "Avaa nimellä {format}"
+      "openAs": "Avaa nimellä {format}",
+      "progress": "Progress",
+      "progressPagePlaceholder": "Page...",
+      "progressPercentPlaceholder": "%..."
     },
     "readStatus": {
       "unread": "Lukemattomat",
@@ -5537,6 +5540,18 @@
       "booksAdded": "{count, plural, =0 {kirjoja ei lisätty} one {# kirja lisätty} other {# kirjaa lisätty}}",
       "uploadedFailed": "{done} uploaded, {failed} failed",
       "progress": "{done} of {total} uploading...",
+      "physical": {
+        "checkboxLabel": "Add Physical / Manual Book (No digital file)",
+        "description": "Enter the essential details of the physical book for your catalog:",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "Ex: Meditations",
+        "authorLabel": "Author",
+        "authorPlaceholder": "Ex: Marcus Aurelius",
+        "isbnLabel": "ISBN-13 (Optional)",
+        "isbnPlaceholder": "Ex: 978...",
+        "successMsg": "Physical book added successfully!",
+        "submitBtn": "Add Book"
+      },
       "header": {
         "uploading": "Lähetetään...",
         "complete": "Lataus valmis",

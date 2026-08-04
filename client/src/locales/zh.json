@@ -3234,7 +3234,10 @@
       "setStatus": "设置状态",
       "sendViaEmail": "通过电子邮件发送",
       "rate": "Rate {star}",
-      "openAs": "Open as {format}"
+      "openAs": "Open as {format}",
+      "progress": "Progress",
+      "progressPagePlaceholder": "Page...",
+      "progressPercentPlaceholder": "%..."
     },
     "readStatus": {
       "unread": "未读",
@@ -5537,6 +5540,18 @@
       "booksAdded": "{count, plural, =0 {没有已添加的书} one {# 已添加的书} other {# 已添加的书}}",
       "uploadedFailed": "{done} uploaded, {failed} failed",
       "progress": "{done} of {total} uploading...",
+      "physical": {
+        "checkboxLabel": "Add Physical / Manual Book (No digital file)",
+        "description": "Enter the essential details of the physical book for your catalog:",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "Ex: Meditations",
+        "authorLabel": "Author",
+        "authorPlaceholder": "Ex: Marcus Aurelius",
+        "isbnLabel": "ISBN-13 (Optional)",
+        "isbnPlaceholder": "Ex: 978...",
+        "successMsg": "Physical book added successfully!",
+        "submitBtn": "Add Book"
+      },
       "header": {
         "uploading": "Uploading...",
         "complete": "上传完成",

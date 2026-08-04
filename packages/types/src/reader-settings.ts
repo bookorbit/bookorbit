@@ -1,4 +1,4 @@
-export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
+export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio" | "physical";
 
 export const CBX_SPREAD_GAP_MIN = 0;
 export const CBX_SPREAD_GAP_MAX = 64;
@@ -44,6 +44,7 @@ export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {
   opus: "audio",
   ogg: "audio",
   flac: "audio",
+  phy: "physical",
 };
 
 export function getFormatGroup(format: string): ReaderFormatGroup {

@@ -3234,7 +3234,10 @@
       "setStatus": "Ange status",
       "sendViaEmail": "Skicka via e-post",
       "rate": "Betygsätt {star}",
-      "openAs": "Öppna som {format}"
+      "openAs": "Öppna som {format}",
+      "progress": "Progress",
+      "progressPagePlaceholder": "Page...",
+      "progressPercentPlaceholder": "%..."
     },
     "readStatus": {
       "unread": "Olästa",
@@ -5537,6 +5540,18 @@
       "booksAdded": "{count, plural, =0 {inga böcker tillagda} one {# bok tillagda} other {# böcker tillagda}}",
       "uploadedFailed": "{done} uppladdad, {failed} misslyckades",
       "progress": "{done} för {total} uppladdning...",
+      "physical": {
+        "checkboxLabel": "Add Physical / Manual Book (No digital file)",
+        "description": "Enter the essential details of the physical book for your catalog:",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "Ex: Meditations",
+        "authorLabel": "Author",
+        "authorPlaceholder": "Ex: Marcus Aurelius",
+        "isbnLabel": "ISBN-13 (Optional)",
+        "isbnPlaceholder": "Ex: 978...",
+        "successMsg": "Physical book added successfully!",
+        "submitBtn": "Add Book"
+      },
       "header": {
         "uploading": "Uppladdar...",
         "complete": "Uppladdning slutförd",

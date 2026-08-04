@@ -31,7 +31,7 @@ import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import type { BookDetail, BookKoboState, CustomMetadataBookValue, ReadStatus, UserBookStatus } from '@bookorbit/types'
+import type { BookDetail, BookKoboState, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import DiscoverRow from '@/features/book/components/detail/DiscoverRow.vue'
@@ -128,9 +128,6 @@ const {
   cancelDelete,
   confirmDelete,
 } = useDeleteBook(() => {
-  // Not router.back(): the previous entry may be this same book, or absent
-  // entirely when the page was deep-linked or reloaded, which left the user
-  // looking at a book that no longer exists.
   void router.push({ name: 'dashboard' })
 })
 
@@ -144,7 +141,6 @@ const genreMeasureContainer = ref<HTMLElement | null>(null)
 const genreHiddenCount = ref(0)
 const visibleGenreCount = ref(0)
 const safeDescription = useSafeHtml(() => props.book.description)
-const filledCustomMetadata = computed(() => (props.book.customMetadata ?? []).filter((field) => field.value !== null && field.value !== ''))
 const displayedGenres = computed(() => {
   if (genresExpanded.value || genreHiddenCount.value === 0) return props.book.genres
   const count = visibleGenreCount.value > 0 ? visibleGenreCount.value : props.book.genres.length
@@ -248,12 +244,6 @@ function scheduleGenreOverflowMeasure() {
   })
 }
 
-function formatCustomMetadataValue(field: CustomMetadataBookValue): string {
-  if (field.value === null) return ''
-  if (field.type === 'boolean') return field.value ? t('common.yes') : t('common.no')
-  return String(field.value)
-}
-
 watch(
   () => `${props.book.id}:${props.book.genres.join('|')}`,
   () => {
@@ -331,6 +321,97 @@ const detailCoverAspectRatio = computed(() => {
   return `${coverImageRatio.value} / 1`
 })
 const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+
+// NEW PHY AND MANUAL PROGRESS LOGIC
+const isPhysical = computed(() => props.book.originType === 'manual_entry' || primaryFile.value?.format === 'phy')
+const isEditingManualProgress = ref(false)
+const manualProgress = ref<number | null>(null)
+const savingProgress = ref(false)
+
+const currentPhysicalProgressDisplay = computed(() => {
+  if (!primaryFile.value) return '-'
+  const prog = fileProgressById.value[primaryFile.value.id]
+  if (!prog || prog.percentage === 0) return '0%'
+
+  if (props.book.pageCount && props.book.pageCount > 0 && prog.pageNumber != null) {
+    return `${prog.pageNumber} / ${props.book.pageCount}`
+  }
+  return `${Math.round(prog.percentage)}%`
+})
+
+function startEditingManualProgress() {
+  if (!primaryFile.value) return
+  const prog = fileProgressById.value[primaryFile.value.id]
+  if (props.book.pageCount && props.book.pageCount > 0) {
+    manualProgress.value = prog?.pageNumber ?? 0
+  } else {
+    manualProgress.value = prog ? Math.round(prog.percentage) : 0
+  }
+  isEditingManualProgress.value = true
+}
+
+function cancelEditingManualProgress() {
+  isEditingManualProgress.value = false
+  manualProgress.value = null
+  savingProgress.value = false
+}
+
+async function saveManualProgress() {
+  if (manualProgress.value == null || !primaryFile.value) return
+  savingProgress.value = true
+
+  try {
+    let endPercentage = manualProgress.value
+    let endPageNumber: number | null = manualProgress.value
+
+    // Calculate percentage if the book has a pageCount, otherwise assume input is percentage
+    if (props.book.pageCount && props.book.pageCount > 0) {
+      endPercentage = Math.min(100, Math.round((manualProgress.value / props.book.pageCount) * 100))
+    } else {
+      endPageNumber = null
+    }
+
+    // Fetch previous progress to calculate the delta for the reading session
+    const previousProgress = fileProgressById.value[primaryFile.value.id]
+    const startPercentage = previousProgress?.percentage || 0
+    const startPageNumber = previousProgress?.pageNumber || 0
+
+    // If the progress hasn't changed, just close the edit mode
+    if (startPercentage === endPercentage && startPageNumber === endPageNumber) {
+      isEditingManualProgress.value = false
+      savingProgress.value = false
+      return
+    }
+
+    // Register a new reading session
+    // This triggers the backend to update progress, start/finish dates, and reading log heatmaps
+    await api(`/api/v1/books/${props.book.id}/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileId: primaryFile.value.id,
+        startPercentage,
+        endPercentage,
+        startPageNumber,
+        endPageNumber,
+        startCfi: null,
+        endCfi: null,
+        durationSeconds: 60, // Dummy 1-minute duration to register the interaction in stats
+        startedAt: new Date(Date.now() - 60000).toISOString(),
+        finishedAt: new Date().toISOString(),
+      }),
+    })
+
+    // Refresh visual components
+    await loadSupplemental()
+    isEditingManualProgress.value = false
+  } catch (error) {
+    console.error('Failed to save progress session', error)
+  } finally {
+    savingProgress.value = false
+  }
+}
+
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
@@ -1326,8 +1407,108 @@ watch(
       </div>
     </div>
 
-    <!-- Mobile action buttons: single row -->
-    <div class="flex gap-2 mt-3 pt-3 border-t border-border">
+    <!-- Mobile action buttons -->
+    <div v-if="isPhysical" class="flex flex-col gap-4 mt-3 pt-3 border-t border-border">
+      <div class="min-w-0">
+        <div class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.actions.progress') }}</div>
+        <template v-if="isEditingManualProgress">
+          <div class="mt-1 flex items-center gap-1.5">
+            <input
+              v-model="manualProgress"
+              type="number"
+              min="0"
+              :max="book.pageCount || 100"
+              class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground"
+              :placeholder="book.pageCount ? t('book.actions.progressPagePlaceholder') : t('book.actions.progressPercentPlaceholder')"
+              @keyup.enter="saveManualProgress"
+            />
+            <button
+              class="h-6 rounded bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              :disabled="savingProgress || manualProgress == null"
+              @click="saveManualProgress"
+            >
+              {{ savingProgress ? '...' : t('common.save') }}
+            </button>
+            <button
+              class="inline-flex h-6 w-6 items-center justify-center rounded border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+              :disabled="savingProgress"
+              @click="cancelEditingManualProgress"
+            >
+              <X class="size-3" />
+            </button>
+          </div>
+        </template>
+        <div v-else class="mt-0.5 flex items-center gap-1.5">
+          <span class="text-sm text-foreground">{{ currentPhysicalProgressDisplay }}</span>
+          <button
+            class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            :disabled="savingProgress"
+            @click="startEditingManualProgress"
+          >
+            <Pencil class="size-3" />
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button
+          class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+          :title="t('book.actions.addToCollection')"
+          :aria-label="t('book.actions.addToCollection')"
+          @click="addToCollectionOpen = true"
+        >
+          <Library class="size-3.5" />
+        </button>
+        <button
+          v-if="hasPermission('email_send')"
+          class="flex items-center justify-center h-9 w-9 shrink-0 rounded-md border border-input bg-background hover:bg-muted transition-colors"
+          :aria-label="t('book.detail.details.sendViaEmail')"
+          @click="handleSendFromMenu"
+        >
+          <Send class="size-3.5" />
+        </button>
+        <Popover
+          v-if="canEditMetadata || hasPermission('library_delete_books')"
+          :open="mobileMoreMenuOpen"
+          @update:open="(v) => (mobileMoreMenuOpen = v)"
+        >
+          <PopoverTrigger as-child>
+            <button
+              class="flex items-center justify-center h-9 w-9 shrink-0 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
+            >
+              <MoreVertical class="size-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent class="w-44 p-1" align="end">
+            <button
+              v-if="canEditMetadata"
+              class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
+              @click="handleOpenResetReadingState"
+            >
+              <RotateCcw class="size-3.5" />
+              Reset reading state
+            </button>
+            <button
+              v-if="hasPermission('library_edit_metadata')"
+              class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+              @click="handleMoveFromMenu"
+            >
+              <FolderInput class="size-3.5" />
+              {{ t('book.move.action') }}
+            </button>
+            <button
+              v-if="hasPermission('library_delete_books')"
+              class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+              @click="handleDeleteFromMenu"
+            >
+              <Trash2 class="size-3.5" />
+              {{ t('common.delete') }}
+            </button>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+    <div v-else class="flex gap-2 mt-3 pt-3 border-t border-border">
       <div v-if="hasMultipleFiles" class="flex flex-1 h-9 rounded-md overflow-hidden">
         <button
           class="flex flex-1 items-center justify-center gap-1.5 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
@@ -1418,7 +1599,7 @@ watch(
       >
         <PopoverTrigger as-child>
           <button
-            class="flex items-center justify-center h-9 w-9 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
+            class="flex items-center justify-center h-9 w-9 shrink-0 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
           >
             <MoreVertical class="size-3.5" />
           </button>
@@ -1494,7 +1675,105 @@ watch(
           />
         </BookCoverSurface>
 
-        <div class="mt-4 space-y-2">
+        <!-- Desktop action buttons -->
+        <div v-if="isPhysical" class="mt-4 space-y-4">
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.actions.progress') }}</div>
+            <template v-if="isEditingManualProgress">
+              <div class="mt-1 flex items-center gap-1.5">
+                <input
+                  v-model="manualProgress"
+                  type="number"
+                  min="0"
+                  :max="book.pageCount || 100"
+                  class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground"
+                  :placeholder="book.pageCount ? t('book.actions.progressPagePlaceholder') : t('book.actions.progressPercentPlaceholder')"
+                  @keyup.enter="saveManualProgress"
+                />
+                <button
+                  class="h-6 rounded bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  :disabled="savingProgress || manualProgress == null"
+                  @click="saveManualProgress"
+                >
+                  {{ savingProgress ? '...' : t('common.save') }}
+                </button>
+                <button
+                  class="inline-flex h-6 w-6 items-center justify-center rounded border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                  :disabled="savingProgress"
+                  @click="cancelEditingManualProgress"
+                >
+                  <X class="size-3" />
+                </button>
+              </div>
+            </template>
+            <div v-else class="mt-0.5 flex items-center gap-1.5">
+              <span class="text-sm text-foreground">{{ currentPhysicalProgressDisplay }}</span>
+              <button
+                class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                :disabled="savingProgress"
+                @click="startEditingManualProgress"
+              >
+                <Pencil class="size-3" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Secondary Buttons -->
+          <div class="flex gap-2">
+            <button
+              class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+              :title="t('book.actions.addToCollection')"
+              :aria-label="t('book.actions.addToCollection')"
+              @click="addToCollectionOpen = true"
+            >
+              <Library class="size-3.5" />
+            </button>
+            <button
+              v-if="hasPermission('email_send')"
+              class="flex flex-1 items-center justify-center h-9 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
+              :aria-label="t('book.detail.details.sendViaEmail')"
+              @click="handleSendFromMenu"
+            >
+              <Send class="size-3.5" />
+            </button>
+            <Popover v-if="canEditMetadata || hasPermission('library_delete_books')" :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
+              <PopoverTrigger as-child>
+                <button
+                  class="flex items-center justify-center h-9 w-9 shrink-0 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
+                >
+                  <MoreVertical class="size-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent class="w-44 p-1" align="end">
+                <button
+                  v-if="canEditMetadata"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
+                  @click="handleOpenResetReadingState"
+                >
+                  <RotateCcw class="size-3.5" />
+                  Reset reading state
+                </button>
+                <button
+                  v-if="hasPermission('library_edit_metadata')"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                  @click="handleMoveFromMenu"
+                >
+                  <FolderInput class="size-3.5" />
+                  {{ t('book.move.action') }}
+                </button>
+                <button
+                  v-if="hasPermission('library_delete_books')"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  @click="handleDeleteFromMenu"
+                >
+                  <Trash2 class="size-3.5" />
+                  Delete book
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        <div v-else class="mt-4 space-y-2">
           <div class="flex gap-2">
             <!-- Read/Play button: split when multiple files, plain when single -->
             <div v-if="hasMultipleFiles" class="flex flex-1 h-9 rounded-md overflow-hidden">
@@ -1589,7 +1868,7 @@ watch(
             <Popover v-if="canEditMetadata || hasPermission('library_delete_books')" :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
               <PopoverTrigger as-child>
                 <button
-                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
+                  class="flex items-center justify-center h-9 w-9 shrink-0 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
                 >
                   <MoreVertical class="size-3.5" />
                 </button>
@@ -1673,6 +1952,7 @@ watch(
         </Tooltip>
       </div>
     </div>
+    <!-- Faltou essa tag div de fechamento da coluna! -->
 
     <!-- Right column -->
     <div class="flex-1 min-w-0">
@@ -2162,79 +2442,6 @@ watch(
           </dd>
         </div>
       </dl>
-
-      <!-- Mobile-only: reading progress from left column -->
-      <div v-if="leftColumnProgressVisible.length || koboAnomaly" class="md:hidden mt-6 pt-5 border-t border-border space-y-3">
-        <div v-if="leftColumnProgressVisible.length" class="space-y-2">
-          <div v-for="row in leftColumnProgressVisible" :key="row.label" class="flex items-center gap-2 cursor-default">
-            <span
-              class="w-11 shrink-0 text-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
-              :style="row.badgeStyle"
-              >{{ row.label }}</span
-            >
-            <div class="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-              <div
-                class="h-full rounded-full"
-                :style="{
-                  width: `${Math.min(100, row.percentage)}%`,
-                  backgroundColor: row.finished ? 'rgb(34 197 94 / 0.8)' : row.color,
-                  opacity: row.finished ? '1' : '0.75',
-                }"
-              />
-            </div>
-            <span v-if="row.finished" class="text-[11px] font-medium text-green-500 shrink-0">{{ t('book.detail.details.finished') }}</span>
-            <span v-else class="text-[11px] text-muted-foreground shrink-0 w-7 text-right">{{ formatPercent(row.percentage) }}</span>
-            <Tooltip v-if="row.resetFileId != null">
-              <TooltipTrigger as-child>
-                <button
-                  class="ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  :aria-label="t('book.detail.details.resetFileProgress')"
-                  :disabled="isResettingFile(row.resetFileId)"
-                  @click.stop="void handleResetFileProgress(row)"
-                >
-                  <RotateCcw class="size-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{{
-                isResettingFile(row.resetFileId) ? t('book.detail.details.resetting') : t('book.detail.details.resetFileProgress')
-              }}</TooltipContent>
-            </Tooltip>
-          </div>
-          <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">
-            {{ t('book.detail.details.moreCount', { count: leftColumnProgressOverflow }) }}
-          </p>
-        </div>
-        <Tooltip v-if="koboAnomaly">
-          <TooltipTrigger as-child>
-            <div class="flex items-center gap-1.5 cursor-help" tabindex="0">
-              <TriangleAlert class="size-3 text-amber-500 shrink-0" />
-              <p class="text-[11px] text-amber-500">{{ koboAnomaly.label }}</p>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>{{ koboAnomaly.tooltip }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <div v-if="filledCustomMetadata.length > 0" class="mt-6 pt-5 border-t border-border">
-        <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">{{ t('book.detail.details.customMetadata') }}</p>
-        <dl class="grid gap-3 sm:grid-cols-2">
-          <div v-for="field in filledCustomMetadata" :key="field.fieldId" class="min-w-0">
-            <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ field.label }}</dt>
-            <dd class="mt-1 text-sm text-foreground break-words">
-              <a
-                v-if="field.type === 'url' && typeof field.value === 'string'"
-                :href="field.value"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-primary hover:underline"
-              >
-                {{ field.value }}
-              </a>
-              <span v-else>{{ formatCustomMetadataValue(field) }}</span>
-            </dd>
-          </div>
-        </dl>
-      </div>
 
       <!-- Synopsis -->
       <div class="mt-6 pt-5 border-t border-border">
