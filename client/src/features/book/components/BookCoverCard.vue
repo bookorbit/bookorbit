@@ -132,7 +132,9 @@ const showSendDialog = ref(false)
 
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
-const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && primaryFile.value?.format != null)
+const isPhysicalManual = computed(() => props.book.originType === 'manual_entry')
+const displayFormat = computed(() => (isPhysicalManual.value ? 'phy' : primaryFile.value?.format))
+const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && displayFormat.value != null)
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
 const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
 const metadataLocked = computed(() => props.book.hasMetadataLocks)
@@ -490,9 +492,9 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           >
             <span
               class="text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
-              :style="{ backgroundColor: getFormatColor(primaryFile!.format!) + 'cc' }"
+              :style="{ backgroundColor: getFormatColor(displayFormat!) + 'cc' }"
             >
-              {{ primaryFile!.format!.toUpperCase() }}
+              {{ displayFormat!.toUpperCase() }}
             </span>
           </div>
 

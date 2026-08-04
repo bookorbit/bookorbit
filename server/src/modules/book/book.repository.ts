@@ -83,6 +83,7 @@ type CollapsedRawRow = {
   hardcover_edition_id: string | null;
   publisher: string | null;
   origin_country: string | null;
+  origin_type: string;
   page_count: number | null;
   sort_title: string | null;
   sort_added_at: string | null;
@@ -558,6 +559,7 @@ export class BookRepository {
         subtitle: bookMetadata.subtitle,
         publisher: bookMetadata.publisher,
         originCountry: books.originCountry,
+        originType: books.originType,
         pageCount: bookMetadata.pageCount,
         isbn13: bookMetadata.isbn13,
         hardcoverId: bookMetadata.hardcoverId,
@@ -762,6 +764,7 @@ export class BookRepository {
       subtitle: string | null;
       publisher: string | null;
       originCountry: string | null;
+      originType: string;
       pageCount: number | null;
       isbn13: string | null;
       hardcoverId: string | null;
@@ -814,6 +817,7 @@ export class BookRepository {
           books.primary_author_sort_name,
           books.folder_path,
           books.origin_country,
+          books.origin_type,
           books.added_at,
           books.updated_at,
           book_metadata.title,
@@ -947,7 +951,8 @@ export class BookRepository {
           base.cover_aspect_ratio,
           base.primary_file_id,
           base.folder_path,
-          base.origin_country
+          base.origin_country,
+          base.origin_type,
           base.added_at,
           base.updated_at,
           base.title,
@@ -1031,6 +1036,7 @@ export class BookRepository {
       subtitle: r.subtitle,
       publisher: r.publisher,
       originCountry: r.origin_country,
+      originType: r.origin_type,
       pageCount: r.page_count !== null ? Number(r.page_count) : null,
       isbn13: r.isbn13,
       hardcoverId: r.hardcover_id,

@@ -139,6 +139,7 @@ export type BookCard = {
   rating: number | null;
   readingProgress: number | null;
   readStatus: UserBookStatus | null;
+  originType?: string;
   addedAt: string;
   updatedAt: string | null;
   metadataScore: number | null;
