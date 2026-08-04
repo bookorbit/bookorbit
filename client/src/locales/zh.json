@@ -4182,18 +4182,18 @@
       }
     },
     "move": {
-      "title": "{count, plural, other {Move # books}}",
+      "title": "{count, plural, one {Move # book} other {Move # books}}",
       "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
       "searchPlaceholder": "Search libraries",
       "currentLibrary": "Current",
-      "folderCount": "{count, plural, other {# folders}}",
+      "folderCount": "{count, plural, one {# folder} other {# folders}}",
       "continue": "Continue",
       "back": "Back",
-      "confirm": "{count, plural, other {Move # books}}",
+      "confirm": "{count, plural, one {Move # book} other {Move # books}}",
       "action": "Move to library",
       "review": {
         "ready": "{count} ready",
-        "collisions": "{count, plural, other {# name conflicts}}",
+        "collisions": "{count, plural, one {# name conflict} other {# name conflicts}}",
         "ineligible": "{count} cannot move",
         "alreadyThere": "{count} already there",
         "collisionsHeading": "Name conflicts",
@@ -5959,8 +5959,8 @@
       "reset": "Reset to defaults",
       "modeLabel": "Color mode",
       "mode": {
-        "light": "亮色的",
-        "dark": "深色"
+        "light": "Light",
+        "dark": "Dark"
       },
       "textSize": "Text size",
       "textSizeSmaller": "Smaller text",
@@ -5969,33 +5969,33 @@
       "percent": "{value}%",
       "pageColor": "Page color",
       "font": "Font",
-      "fontBuiltIn": "内置",
+      "fontBuiltIn": "Built-in",
       "fontServer": "Server fonts",
-      "fontYours": "您的字体",
+      "fontYours": "Your fonts",
       "lineSpacing": "Line spacing",
       "pageWidth": "Page width",
       "pageWidthNarrow": "Narrow",
       "pageWidthMedium": "Medium",
       "pageWidthWide": "Wide",
       "pageWidthFull": "Full",
-      "readingFlow": "读取流程",
+      "readingFlow": "Reading flow",
       "flow": {
         "paginated": "Pages",
         "scrolled": "Scroll"
       },
-      "pageSpreads": "页面扩展",
-      "pageSpreadsHint": "选择这个基于图像的 EPUB 对应页面的方式。",
+      "pageSpreads": "Page spreads",
+      "pageSpreadsHint": "Choose how this image-based EPUB pairs pages.",
       "spread": {
-        "bookDefault": "预约默认",
-        "singlePage": "单页"
+        "bookDefault": "Book default",
+        "singlePage": "Single page"
       },
       "advanced": "Advanced layout",
       "columns": "Columns",
       "columnsFewer": "Fewer columns",
       "columnsMore": "More columns",
-      "columnGap": "列间距",
-      "justifyText": "对齐文本",
-      "hyphenation": "低温化",
+      "columnGap": "Column gap",
+      "justifyText": "Justify text",
+      "hyphenation": "Hyphenation",
       "themes": {
         "default": "Default",
         "gray": "Gray",
