@@ -13,6 +13,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     originCountry: null,
     id: 1,
     libraryId: 1,
+    originType: 'file',
     libraryName: 'Test Library',
     status: 'present',
     folderPath: '/books',

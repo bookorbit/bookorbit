@@ -75,6 +75,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
     id: 10,
     libraryId: 1,
+    originType: 'file',
     libraryName: 'My Library',
     originCountry: null,
     status: 'ok',

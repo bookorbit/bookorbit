@@ -33,6 +33,7 @@ function makeBook(overrides = {}) {
   return {
     id: 10,
     libraryId: 1,
+    originType: 'file',
     libraryName: 'My Library',
     originCountry: null,
     status: 'ok',
