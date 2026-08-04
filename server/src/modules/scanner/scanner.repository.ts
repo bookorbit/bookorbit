@@ -278,7 +278,7 @@ export class ScannerRepository {
     return this.db
       .select()
       .from(books)
-      .where(and(inArray(books.libraryId, libraryIds), eq(books.status, 'missing')));
+      .where(and(inArray(books.libraryId, libraryIds), eq(books.status, 'missing'), ne(books.originType, 'manual_entry')));
   }
 
   async markBooksAsPresent(bookIds: number[]) {

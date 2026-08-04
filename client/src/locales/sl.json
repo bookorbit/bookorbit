@@ -3234,7 +3234,10 @@
       "setStatus": "Nastavi stanje",
       "sendViaEmail": "Pošlji po e-pošti",
       "rate": "Oceni {star}",
-      "openAs": "Odpri kot {format}"
+      "openAs": "Odpri kot {format}",
+      "progress": "Progress",
+      "progressPagePlaceholder": "Page...",
+      "progressPercentPlaceholder": "%..."
     },
     "readStatus": {
       "unread": "Neprebrano",
@@ -5537,6 +5540,18 @@
       "booksAdded": "{count, plural, =0 {ni dodanih knjig} one {# knjiga dodana} two {# knjig dodanih} few {# knjig dodanih} other {# knjig dodanih}}",
       "uploadedFailed": "{done} naloženih, {failed} neuspelih",
       "progress": "{done} od {total} nalaganje...",
+      "physical": {
+        "checkboxLabel": "Add Physical / Manual Book (No digital file)",
+        "description": "Enter the essential details of the physical book for your catalog:",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "Ex: Meditations",
+        "authorLabel": "Author",
+        "authorPlaceholder": "Ex: Marcus Aurelius",
+        "isbnLabel": "ISBN-13 (Optional)",
+        "isbnPlaceholder": "Ex: 978...",
+        "successMsg": "Physical book added successfully!",
+        "submitBtn": "Add Book"
+      },
       "header": {
         "uploading": "Nalaganje...",
         "complete": "Nalaganje končano",

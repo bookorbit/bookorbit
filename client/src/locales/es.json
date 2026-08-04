@@ -3234,7 +3234,10 @@
       "setStatus": "Establecer estado",
       "sendViaEmail": "Enviar por correo electrónico",
       "rate": "Califica {star}",
-      "openAs": "Abrir como {format}"
+      "openAs": "Abrir como {format}",
+      "progress": "Progress",
+      "progressPagePlaceholder": "Page...",
+      "progressPercentPlaceholder": "%..."
     },
     "readStatus": {
       "unread": "No leído",
@@ -5537,6 +5540,18 @@
       "booksAdded": "{count, plural, =0 {no se agregaron libros} one {# libro agregado} other {# libros añadidos} many {# libros añadidos}}",
       "uploadedFailed": "{done} subido, {failed} falló",
       "progress": "{done} de {total} subiendo...",
+      "physical": {
+        "checkboxLabel": "Add Physical / Manual Book (No digital file)",
+        "description": "Enter the essential details of the physical book for your catalog:",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "Ex: Meditations",
+        "authorLabel": "Author",
+        "authorPlaceholder": "Ex: Marcus Aurelius",
+        "isbnLabel": "ISBN-13 (Optional)",
+        "isbnPlaceholder": "Ex: 978...",
+        "successMsg": "Physical book added successfully!",
+        "submitBtn": "Add Book"
+      },
       "header": {
         "uploading": "Subiendo...",
         "complete": "Subida completa",

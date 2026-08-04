@@ -3234,7 +3234,10 @@
       "setStatus": "Установить статус",
       "sendViaEmail": "Отправить по электронной почте",
       "rate": "Оценить {star}",
-      "openAs": "Открыть как {format}"
+      "openAs": "Открыть как {format}",
+      "progress": "Progress",
+      "progressPagePlaceholder": "Page...",
+      "progressPercentPlaceholder": "%..."
     },
     "readStatus": {
       "unread": "Непрочитанные",
@@ -5537,6 +5540,18 @@
       "booksAdded": "{count, plural, =0 {Книги не добавлены} one {# Добавлена книга} few {# добавлено книг} many {# добавлено книг} other {# добавлено книг}}",
       "uploadedFailed": "{done} загружен, {failed} не удалось",
       "progress": "{done} от {total} загружается...",
+      "physical": {
+        "checkboxLabel": "Add Physical / Manual Book (No digital file)",
+        "description": "Enter the essential details of the physical book for your catalog:",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "Ex: Meditations",
+        "authorLabel": "Author",
+        "authorPlaceholder": "Ex: Marcus Aurelius",
+        "isbnLabel": "ISBN-13 (Optional)",
+        "isbnPlaceholder": "Ex: 978...",
+        "successMsg": "Physical book added successfully!",
+        "submitBtn": "Add Book"
+      },
       "header": {
         "uploading": "Загрузка...",
         "complete": "Загрузка завершена",

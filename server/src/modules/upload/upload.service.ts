@@ -1,4 +1,13 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { access as fsAccess, stat } from 'fs/promises';
 import { basename, dirname, extname, join, relative } from 'path';
@@ -10,7 +19,7 @@ import { formatSeriesIndex } from '../../common/utils/series-index-format.utils'
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { books, bookFiles, libraries, libraryFolders } from '../../db/schema';
+import { books, bookFiles, bookMetadata, libraries, libraryFolders } from '../../db/schema';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { LibraryService } from '../library/library.service';
@@ -116,6 +125,92 @@ export class UploadService {
     }
   }
 
+  async createManualBook(
+    libraryId: number,
+    payload: { title: string; author?: string; isbn13?: string },
+    user: RequestUser,
+  ): Promise<{ bookId: number; title: string }> {
+    const event = 'book.create_manual';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] libraryId=${libraryId} userId=${user.id} title="${sanitizeLogValue(payload.title)}" - manual book creation started`,
+    );
+
+    const isSuperuser = user.isSuperuser;
+    await this.findLibraryOrFail(libraryId);
+    await this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser);
+
+    if (!payload.title || !payload.title.trim()) {
+      throw new BadRequestException('Book title is required');
+    }
+
+    const folder = await this.resolveFolder(libraryId);
+
+    const result = await this.db.transaction(async (tx) => {
+      // Cria um caminho temporário aleatório para evitar colisão imediata
+      const tempPath = `manual-temp-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+      const [book] = await tx
+        .insert(books)
+        .values({
+          libraryId,
+          libraryFolderId: folder.id,
+          folderPath: tempPath,
+          originType: 'manual_entry',
+          status: 'present',
+        })
+        .returning({ id: books.id });
+
+      if (!book) throw new InternalServerErrorException('Failed to create manual book record');
+
+      // Agora que temos o ID, definimos o caminho definitivo e único
+      const finalFolderPath = `manual-entry/${book.id}`;
+
+      await tx.insert(bookMetadata).values({
+        bookId: book.id,
+        title: payload.title.trim(),
+        subtitle: null,
+        isbn13: payload.isbn13?.trim() || null,
+      });
+
+      // Insere o arquivo físico (phy) usando o caminho definitivo com o role correto
+      const [insertedFile] = await tx
+        .insert(bookFiles)
+        .values({
+          bookId: book.id,
+          libraryFolderId: folder.id,
+          absolutePath: `${finalFolderPath}/phy-${book.id}`,
+          relPath: `${finalFolderPath}/phy-${book.id}`,
+          ino: 0n,
+          sizeBytes: 0,
+          mtime: new Date(),
+          fileHash: `phy-manual-${book.id}`,
+          format: 'phy',
+          role: 'content', // <-- CORRIGIDO AQUI
+        })
+        .returning({ id: bookFiles.id });
+
+      // Atualiza o livro com a pasta definitiva e vincula o arquivo primário
+      if (insertedFile) {
+        await tx
+          .update(books)
+          .set({
+            primaryFileId: insertedFile.id,
+            folderPath: finalFolderPath,
+          })
+          .where(eq(books.id, book.id));
+      }
+
+      return { bookId: book.id, title: payload.title.trim() };
+    });
+
+    this.logger.log(
+      `[${event}] [end] libraryId=${libraryId} userId=${user.id} bookId=${result.bookId} durationMs=${Date.now() - startedAt} - manual book creation completed`,
+    );
+
+    return result;
+  }
+
   async addFileToBook(bookId: number, rawFilename: string, fileStream: Readable, user: RequestUser): Promise<AddBookFileResult> {
     const event = 'book.add_file';
     const startedAt = Date.now();
@@ -157,7 +252,7 @@ export class UploadService {
       throw new BadRequestException('File must not be empty');
     }
 
-    let destination: string | null = null;
+    const destination: string | null = null;
     let shouldCleanupDestination = false;
 
     try {
@@ -173,7 +268,7 @@ export class UploadService {
         throw new ConflictException('This file is already attached to this book');
       }
 
-      destination = join(bookRow.folderPath, filename);
+      const destination = join(bookRow.folderPath ?? '', filename);
 
       if (await this.destinationExists(destination)) {
         throw new ConflictException(`A file named "${filename}" already exists in this book's folder`);
@@ -181,9 +276,6 @@ export class UploadService {
 
       shouldCleanupDestination = true;
       await this.storage.moveToPath(tempPath, destination);
-      // File is on disk. Do not delete it on any subsequent failure — the scanner
-      // will reconcile any orphan. This also prevents the catch block from deleting
-      // a file that a concurrent upload may have written to the same path.
       shouldCleanupDestination = false;
 
       const fileStat = await stat(destination, { bigint: true });

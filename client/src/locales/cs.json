@@ -3234,7 +3234,10 @@
       "setStatus": "Nastavit stav",
       "sendViaEmail": "Odeslat e-mailem",
       "rate": "Ohodnoťte {star}",
-      "openAs": "Otevřít jako {format}"
+      "openAs": "Otevřít jako {format}",
+      "progress": "Progress",
+      "progressPagePlaceholder": "Page...",
+      "progressPercentPlaceholder": "%..."
     },
     "readStatus": {
       "unread": "Nepřečtené",
@@ -5537,6 +5540,18 @@
       "booksAdded": "{count, plural, =0 {žádné knihy nepřidaly} one {Kniha byla přidána} few {# knihy přidaly} many {# knihy přidaly} other {# knihy přidaly}}",
       "uploadedFailed": "{done} nahráno, {failed} se nezdařilo",
       "progress": "{done} z {total} nahrávání...",
+      "physical": {
+        "checkboxLabel": "Add Physical / Manual Book (No digital file)",
+        "description": "Enter the essential details of the physical book for your catalog:",
+        "titleLabel": "Title *",
+        "titlePlaceholder": "Ex: Meditations",
+        "authorLabel": "Author",
+        "authorPlaceholder": "Ex: Marcus Aurelius",
+        "isbnLabel": "ISBN-13 (Optional)",
+        "isbnPlaceholder": "Ex: 978...",
+        "successMsg": "Physical book added successfully!",
+        "submitBtn": "Add Book"
+      },
       "header": {
         "uploading": "Nahrávám...",
         "complete": "Nahrávání dokončeno",

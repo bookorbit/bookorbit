@@ -21,6 +21,9 @@ const emit = defineEmits<{ refetch: [] }>()
 const { t } = useI18n()
 const router = useRouter()
 
+// Filtra arquivos físicos da interface
+const visibleFiles = computed(() => props.book.files.filter((f) => f.format !== 'phy'))
+
 const { downloadFile: downloadBookFile } = useBookDownload()
 const { hasPermission } = usePermissions()
 
@@ -33,7 +36,8 @@ function isAudioFile(file: BookDetailFile): boolean {
 const audioTrackIndex = computed(() => {
   const map = new Map<number, number>()
   let track = 1
-  for (const file of props.book.files) {
+  for (const file of visibleFiles.value) {
+    // Utiliza visibleFiles
     if (isAudioFile(file)) {
       map.set(file.id, track++)
     }
@@ -66,7 +70,7 @@ function toggleSort(key: SortKey) {
 }
 
 const sortedFiles = computed(() => {
-  const files = [...props.book.files]
+  const files = [...visibleFiles.value] // Utiliza visibleFiles
   const dir = sortDir.value === 'asc' ? 1 : -1
   return files.sort((a, b) => {
     switch (sortKey.value) {
@@ -86,7 +90,8 @@ const fileSummary = computed(() => {
   const formats = new Map<string, number>()
   let totalBytes = 0
 
-  for (const file of props.book.files) {
+  for (const file of visibleFiles.value) {
+    // Utiliza visibleFiles
     if (file.sizeBytes != null) totalBytes += file.sizeBytes
     const format = file.format?.toUpperCase() ?? 'Unknown'
     formats.set(format, (formats.get(format) ?? 0) + 1)
@@ -271,7 +276,8 @@ async function toggleWriteLog() {
         <div class="min-w-0">
           <h1 class="text-base font-semibold tracking-tight text-foreground">{{ t('book.detail.files.title') }}</h1>
           <p class="truncate text-xs text-muted-foreground">
-            {{ t('book.detail.files.fileCount', { count: book.files.length }) }}
+            {{ t('book.detail.files.fileCount', { count: visibleFiles.length }) }}
+            <!-- Utiliza visibleFiles -->
             <span class="mx-1 opacity-40">·</span>
             {{ formatBytes(fileSummary.totalBytes) }}
             <template v-if="fileSummary.formats.length"> · {{ fileSummary.formats.join(' · ') }}</template>
@@ -559,3 +565,7 @@ async function toggleWriteLog() {
 
   <AddBookFileModal v-if="addFileModalOpen" :book-id="book.id" @close="closeAddFileModal" @uploaded="onFilesAdded" />
 </template>
+
+Tudo OK, agora só adicione as traduções onde foram inseridas palavras em inlgês como: "Progress", "Physical book", "Save", "Add to collection" e
+outras que achar necessário nas altereçoes feitas anteriormente para acompanhar o i18n da plataforma. Pode adicionar as chaves de tradução no en.json
+e se for facil já repasse no pt-br.json
