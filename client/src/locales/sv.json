@@ -5959,8 +5959,8 @@
       "reset": "Reset to defaults",
       "modeLabel": "Color mode",
       "mode": {
-        "light": "Ljus",
-        "dark": "Mörk"
+        "light": "Light",
+        "dark": "Dark"
       },
       "textSize": "Text size",
       "textSizeSmaller": "Smaller text",
@@ -5969,33 +5969,33 @@
       "percent": "{value}%",
       "pageColor": "Page color",
       "font": "Font",
-      "fontBuiltIn": "Inbyggd",
+      "fontBuiltIn": "Built-in",
       "fontServer": "Server fonts",
-      "fontYours": "Dina typsnitt",
+      "fontYours": "Your fonts",
       "lineSpacing": "Line spacing",
       "pageWidth": "Page width",
       "pageWidthNarrow": "Narrow",
       "pageWidthMedium": "Medium",
       "pageWidthWide": "Wide",
       "pageWidthFull": "Full",
-      "readingFlow": "Läser flöde",
+      "readingFlow": "Reading flow",
       "flow": {
         "paginated": "Pages",
         "scrolled": "Scroll"
       },
-      "pageSpreads": "Sid spreads",
-      "pageSpreadsHint": "Välj hur denna bildbaserade EPUB parar sidor.",
+      "pageSpreads": "Page spreads",
+      "pageSpreadsHint": "Choose how this image-based EPUB pairs pages.",
       "spread": {
-        "bookDefault": "Bokens standard",
-        "singlePage": "Enda sidan"
+        "bookDefault": "Book default",
+        "singlePage": "Single page"
       },
       "advanced": "Advanced layout",
       "columns": "Columns",
       "columnsFewer": "Fewer columns",
       "columnsMore": "More columns",
-      "columnGap": "Kolumn mellanrum",
-      "justifyText": "Justera text",
-      "hyphenation": "Hyfenering",
+      "columnGap": "Column gap",
+      "justifyText": "Justify text",
+      "hyphenation": "Hyphenation",
       "themes": {
         "default": "Default",
         "gray": "Gray",
