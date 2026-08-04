@@ -53,17 +53,21 @@ function resolveEditionPublishedDate(edition: HardcoverEdition, book: HardcoverB
 // subtitle in the title separated by a colon. Mirror Hardcover's own display
 // rule (confirmed by their developers): split on the first colon once the
 // title exceeds 60 characters. Short colon titles like "2001: A Space Odyssey"
-// stay untouched, and an API-provided subtitle always takes precedence.
+// stay untouched. An API-provided subtitle is kept verbatim: it blocks the
+// split unless it merely duplicates the embedded part, in which case the
+// title is trimmed so the subtitle does not appear twice.
 const SPLIT_TITLE_MIN_LENGTH = 60;
 
 function splitEmbeddedSubtitle(title: string | undefined, subtitle: string | undefined): { title: string | undefined; subtitle: string | undefined } {
-  if (!title || subtitle || title.length <= SPLIT_TITLE_MIN_LENGTH) return { title, subtitle };
+  if (!title || title.length <= SPLIT_TITLE_MIN_LENGTH) return { title, subtitle };
   const colonIndex = title.indexOf(':');
   if (colonIndex === -1) return { title, subtitle };
   const baseTitle = title.slice(0, colonIndex).trim();
   const embeddedSubtitle = title.slice(colonIndex + 1).trim();
   if (!baseTitle || !embeddedSubtitle) return { title, subtitle };
-  return { title: baseTitle, subtitle: embeddedSubtitle };
+  if (!subtitle) return { title: baseTitle, subtitle: embeddedSubtitle };
+  if (embeddedSubtitle.toLowerCase() === subtitle.trim().toLowerCase()) return { title: baseTitle, subtitle };
+  return { title, subtitle };
 }
 
 function normalizeCommunityRating(value: number | undefined): number | undefined {

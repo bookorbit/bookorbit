@@ -211,6 +211,39 @@ describe('mapSearchDocument', () => {
       expect(result.title).toBe(title);
       expect(result.subtitle).toBeUndefined();
     });
+
+    it('trims the title when the API subtitle duplicates the part after the colon', () => {
+      const doc: HardcoverSearchDocument = {
+        ...baseDocument,
+        title: "Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+        subtitle: "A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+      };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('Quantitative Momentum');
+      expect(result.subtitle).toBe("A Practitioner's Guide to Building a Momentum-Based Stock Selection System");
+    });
+
+    it('matches the duplicated subtitle case-insensitively and keeps the API value verbatim', () => {
+      const doc: HardcoverSearchDocument = {
+        ...baseDocument,
+        title: "Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+        subtitle: "A PRACTITIONER'S GUIDE TO BUILDING A MOMENTUM-BASED STOCK SELECTION SYSTEM",
+      };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('Quantitative Momentum');
+      expect(result.subtitle).toBe("A PRACTITIONER'S GUIDE TO BUILDING A MOMENTUM-BASED STOCK SELECTION SYSTEM");
+    });
+
+    it('does not trim short colon titles even when the subtitle matches', () => {
+      const doc: HardcoverSearchDocument = {
+        ...baseDocument,
+        title: '2001: A Space Odyssey',
+        subtitle: 'A Space Odyssey',
+      };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('2001: A Space Odyssey');
+      expect(result.subtitle).toBe('A Space Odyssey');
+    });
   });
 });
 
@@ -529,6 +562,36 @@ describe('mapBookWithEditions', () => {
       const [result] = mapBookWithEditions(book);
       expect(result.title).toBe('2001: A Space Odyssey');
       expect(result.subtitle).toBeUndefined();
+    });
+
+    it('trims the title when the edition subtitle duplicates the part after the colon', () => {
+      const fullTitle = "Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based Stock Selection System";
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        title: fullTitle,
+        subtitle: undefined,
+        editions: [
+          {
+            ...baseBook.editions![0],
+            title: fullTitle,
+            subtitle: "A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+          },
+        ],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe('Quantitative Momentum');
+      expect(result.subtitle).toBe("A Practitioner's Guide to Building a Momentum-Based Stock Selection System");
+    });
+
+    it('keeps the title untouched when the edition subtitle differs from the embedded one', () => {
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        subtitle: undefined,
+        editions: [{ ...baseBook.editions![0], title: longColonTitle, subtitle: 'A Completely Different Subtitle' }],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe(longColonTitle);
+      expect(result.subtitle).toBe('A Completely Different Subtitle');
     });
   });
 
