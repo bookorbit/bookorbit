@@ -224,7 +224,7 @@ export function assembleBookCards(
       subtitle: row.subtitle ?? null,
       publisher: row.publisher ?? null,
       originCountry: row.originCountry,
-      originType: row.originType,
+      originType: row.originType ?? undefined,
       pageCount: row.pageCount ?? null,
       isbn13: row.isbn13 ?? null,
       hardcoverId: row.hardcoverId ?? null,
