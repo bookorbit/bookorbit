@@ -5959,8 +5959,8 @@
       "reset": "Reset to defaults",
       "modeLabel": "Color mode",
       "mode": {
-        "light": "Lys",
-        "dark": "Mørk"
+        "light": "Light",
+        "dark": "Dark"
       },
       "textSize": "Text size",
       "textSizeSmaller": "Smaller text",
@@ -5969,32 +5969,32 @@
       "percent": "{value}%",
       "pageColor": "Page color",
       "font": "Font",
-      "fontBuiltIn": "Indbygget",
+      "fontBuiltIn": "Built-in",
       "fontServer": "Server fonts",
-      "fontYours": "Dine skrifttyper",
+      "fontYours": "Your fonts",
       "lineSpacing": "Line spacing",
       "pageWidth": "Page width",
       "pageWidthNarrow": "Narrow",
       "pageWidthMedium": "Medium",
       "pageWidthWide": "Wide",
       "pageWidthFull": "Full",
-      "readingFlow": "Læser flow",
+      "readingFlow": "Reading flow",
       "flow": {
         "paginated": "Pages",
         "scrolled": "Scroll"
       },
-      "pageSpreads": "Sidespreads",
-      "pageSpreadsHint": "Vælg hvordan dette billede-baserede EPUB par sider.",
+      "pageSpreads": "Page spreads",
+      "pageSpreadsHint": "Choose how this image-based EPUB pairs pages.",
       "spread": {
-        "bookDefault": "Bogs standard",
-        "singlePage": "Enkelt side"
+        "bookDefault": "Book default",
+        "singlePage": "Single page"
       },
       "advanced": "Advanced layout",
       "columns": "Columns",
       "columnsFewer": "Fewer columns",
       "columnsMore": "More columns",
-      "columnGap": "Kolonne mellemrum",
-      "justifyText": "Justér tekst",
+      "columnGap": "Column gap",
+      "justifyText": "Justify text",
       "hyphenation": "Hyphenation",
       "themes": {
         "default": "Default",
