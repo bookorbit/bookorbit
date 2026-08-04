@@ -21,7 +21,6 @@ const emit = defineEmits<{ refetch: [] }>()
 const { t } = useI18n()
 const router = useRouter()
 
-// Filtra arquivos físicos da interface
 const visibleFiles = computed(() => props.book.files.filter((f) => f.format !== 'phy'))
 
 const { downloadFile: downloadBookFile } = useBookDownload()
