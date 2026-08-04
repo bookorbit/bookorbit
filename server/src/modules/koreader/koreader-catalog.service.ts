@@ -697,7 +697,7 @@ export class KoreaderCatalogService {
     filePattern = DEFAULT_KOREADER_DEVICE_PATTERN,
     sanitizeForCrossPlatform = true,
   ): KoreaderCatalogBookDetail {
-    const title = detail.title ?? (basename(detail.folderPath) || `Book ${detail.id}`);
+    const title = detail.title ?? (basename(detail.folderPath ?? '') || `Book ${detail.id}`);
     const files = detail.files
       .filter((file) => file.role === 'primary' || file.role === 'content')
       .map<KoreaderCatalogFile>((file) => {

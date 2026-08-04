@@ -32,7 +32,7 @@ type BookRow = {
   subtitle: string | null;
   publisher: string | null;
   originCountry: string | null;
-  originType: string;
+  originType?: string | null;
   pageCount: number | null;
   isbn13: string | null;
   hardcoverId: string | null;
