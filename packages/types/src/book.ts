@@ -207,6 +207,7 @@ export type BookDetail = {
   language: string | null;
   pageCount: number | null;
   originCountry: string | null;
+  originType: "file" | "manual_entry" | string;
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
