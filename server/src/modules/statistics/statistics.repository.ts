@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, sql, type SQL } from 'drizzle-orm';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ChordDiagramData, ContentFilterRules, StatisticsDateRange, StatisticsGranularity } from '@bookorbit/types';
@@ -14,6 +14,7 @@ type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class StatisticsRepository {
+  private readonly logger = new Logger(StatisticsRepository.name);
   constructor(@Inject(DB) private readonly db: Db) {}
 
   private async getAccessibleLibraryIds(userId: number, isSuperuser: boolean): Promise<number[] | null> {
@@ -96,16 +97,49 @@ export class StatisticsRepository {
     );
     const filter = this.libraryFilter(this.intersectLibraryIds(accessible, resolvedFilterLibraryIds));
     const cfClauses = this.contentFilterClauses(isSuperuser, resolvedContentFilters);
-    return this.db
+
+    const subquery = this.db
       .select({
         format: bookFiles.format,
-        count: sql<number>`count(distinct ${bookFiles.bookId})::int`,
+        bookId: bookFiles.bookId,
       })
       .from(bookFiles)
       .innerJoin(books, eq(bookFiles.bookId, books.id))
-      .where(and(isNotNull(bookFiles.format), inArray(bookFiles.format, [...DEFAULT_FORMAT_PRIORITY]), filter, ...cfClauses))
-      .groupBy(bookFiles.format)
-      .orderBy(desc(sql<number>`count(distinct ${bookFiles.bookId})`));
+      .where(
+        and(
+          isNotNull(bookFiles.format),
+          inArray(bookFiles.format, [...DEFAULT_FORMAT_PRIORITY]),
+          ne(books.status, 'processing'),
+          filter,
+          ...cfClauses,
+        ),
+      )
+      .unionAll(
+        this.db
+          .select({
+            format: sql<string | null>`'phy'`,
+            bookId: books.id,
+          })
+          .from(books)
+          .where(and(sql`${books.originType} = 'manual_entry'`, ne(books.status, 'processing'), filter, ...cfClauses)),
+      );
+
+    const unionAlias = this.db.$with('format_union').as(subquery);
+
+    const result = await this.db
+      .with(unionAlias)
+      .select({
+        format: unionAlias.format,
+        count: sql<number>`count(distinct ${unionAlias.bookId})::int`,
+      })
+      .from(unionAlias)
+      .groupBy(unionAlias.format)
+      .orderBy(desc(sql<number>`count(distinct ${unionAlias.bookId})`));
+
+    // LOG DE DEBUG PARA CAPTURAR OS IDs / FORMATOS RETORNADOS
+    this.logger.warn(`[DEBUG_FORMAT_DISTRIBUTION] userId=${userId} results=${JSON.stringify(result)}`);
+
+    return result;
   }
 
   async languageDistribution(userId: number, isSuperuser: boolean, contentFilters?: ContentFilterRules | number[], filterLibraryIds?: number[]) {
@@ -579,7 +613,7 @@ export class StatisticsRepository {
     const [{ unknownCount }] = await this.db
       .select({ unknownCount: sql<number>`count(distinct ${books.id})::int` })
       .from(books)
-      .leftJoin(bookGenres, eq(bookGenres.bookId, books.id))
+      .leftJoin(bookGenres, eq(bookGenres.genreId, books.id))
       .where(and(isNull(bookGenres.genreId), filter, ...cfClauses));
 
     return { items, unknownCount };
@@ -786,7 +820,7 @@ export class StatisticsRepository {
       })
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
-      .where(and(filter, ...cfClauses));
+      .where(and(sql`${books.originType} is distinct from 'manual_entry'`, filter, ...cfClauses));
 
     return (
       row ?? {
