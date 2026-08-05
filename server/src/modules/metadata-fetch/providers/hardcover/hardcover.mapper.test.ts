@@ -168,6 +168,13 @@ describe('mapSearchDocument', () => {
       expect(result.subtitle).toBeUndefined();
     });
 
+    it('treats a blank API subtitle as absent and still splits', () => {
+      const doc: HardcoverSearchDocument = { ...baseDocument, title: longColonTitle, subtitle: '   ' };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('Babel, or The Necessity of Violence');
+      expect(result.subtitle).toBe("An Arcane History of the Oxford Translators' Revolution");
+    });
+
     it('does not split long titles without a colon', () => {
       const title = 'A'.repeat(70);
       const doc: HardcoverSearchDocument = { ...baseDocument, title, subtitle: undefined };
