@@ -3707,7 +3707,11 @@
         "koboNotSynced": "未同步",
         "koboNotSyncedTooltip": "下一个 Kobo 同步队列。",
         "filesNotFound": "找不到文件",
-        "filesNotFoundDescription": "无法在磁盘上找到此书的文件(s)。 元数据仍然可用。运行库扫描以确认或删除记录。"
+        "filesNotFoundDescription": "无法在磁盘上找到此书的文件(s)。 元数据仍然可用。运行库扫描以确认或删除记录。",
+        "addSession": "Add session",
+        "startedAt": "Started at",
+        "durationMin": "Duration (min)",
+        "endProgress": "End progress"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {没有字段} one {一个字段} other {# 字段}}",

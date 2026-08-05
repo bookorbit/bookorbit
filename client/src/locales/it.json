@@ -3707,7 +3707,11 @@
         "koboNotSynced": "Non sincronizzato",
         "koboNotSyncedTooltip": "In coda per la prossima sincronizzazione Kobo.",
         "filesNotFound": "File non trovati",
-        "filesNotFoundDescription": "I file per questo libro non possono più essere trovati sul disco. I metadati sono ancora disponibili. Esegui una scansione della libreria per confermare o rimuovere il record."
+        "filesNotFoundDescription": "I file per questo libro non possono più essere trovati sul disco. I metadati sono ancora disponibili. Esegui una scansione della libreria per confermare o rimuovere il record.",
+        "addSession": "Add session",
+        "startedAt": "Started at",
+        "durationMin": "Duration (min)",
+        "endProgress": "End progress"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {nessun campo} one {un campo} other {# campi} many {# campi}}",
