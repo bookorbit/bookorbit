@@ -1,6 +1,6 @@
 {
-  "id": "977300d8-7b69-4348-93b8-b3d2724cac49",
-  "prevId": "84eb6701-64b4-4e29-aeaa-6d5db3b67e5d",
+  "id": "a38931f7-4717-43aa-a292-7c4084e04a4d",
+  "prevId": "deb8c81d-04da-494c-a1a3-f8a5038e4625",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3326,7 +3326,7 @@
           "name": "library_folder_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "primary_file_id": {
           "name": "primary_file_id",
@@ -3344,7 +3344,20 @@
           "name": "folder_path",
           "type": "varchar(4096)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "origin_country": {
+          "name": "origin_country",
+          "type": "varchar(2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "origin_type": {
+          "name": "origin_type",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'file_system'"
         },
         "status": {
           "name": "status",
@@ -3583,6 +3596,10 @@
         "books_status_chk": {
           "name": "books_status_chk",
           "value": "\"books\".\"status\" in ('present', 'missing', 'processing')"
+        },
+        "books_origin_type_chk": {
+          "name": "books_origin_type_chk",
+          "value": "\"books\".\"origin_type\" in ('file_system', 'manual_entry')"
         }
       },
       "isRLSEnabled": false
