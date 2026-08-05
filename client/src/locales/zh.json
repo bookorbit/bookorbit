@@ -7,7 +7,7 @@
     "edit": "编辑",
     "close": "关闭",
     "confirm": "确认",
-    "loading": "Loading...",
+    "loading": "加载中…",
     "search": "搜索",
     "back": "后退",
     "next": "下一个",
@@ -48,7 +48,7 @@
         "narrators": "顶级用药器"
       },
       "confirm": {
-        "shareTitle": "Enable {level}?",
+        "shareTitle": "是否启用 {level}？",
         "shareDescription": "拥有权限的管理员可以看到以下信息。",
         "stopTitle": "停止分享阅读见解？",
         "stopDescription": "管理员的访问将立即被阻止。现有的访问记录仍在您的历史中。",
@@ -89,7 +89,7 @@
       },
       "pageTitle": "显示",
       "pageSubtitle": "控制主题、封面、布局以及您的知识库的显示方式。",
-      "mobileSummary": "Theme: {theme} • Accent: {accent} • Background: {background}",
+      "mobileSummary": "主题：{theme}・强调色：{accent}・背景：{background}",
       "themeMode": {
         "light": "亮色的",
         "dark": "深色",
@@ -259,7 +259,7 @@
           "hint": "网格、列表、表和仪表板缩略图下面的封面控制深度",
           "default": {
             "label": "默认设置",
-            "hint": "Current elevation and depth"
+            "hint": "当前层级与景深"
           },
           "strong": {
             "label": "强度",
@@ -352,7 +352,7 @@
             "label": "折叠系列封面",
             "hint": "选择当系列在书状网格中折叠时要显示的封面"
           },
-          "stack": "Stack",
+          "stack": "堆叠",
           "mosaic": "摩西文",
           "first": "第一页",
           "latest": "最新的",
@@ -410,14 +410,14 @@
         "selectedCount": "{count, plural, one {# 选择了} other {# 选择了}}",
         "clear": "清空",
         "deleteSelected": "删除选中的",
-        "loading": "Loading icons...",
+        "loading": "正在载入图标...",
         "emptySearch": "没有匹配您搜索的图标。",
         "emptyNoIcons": "尚未上传自定义图标。",
         "namePlaceholder": "名称",
-        "checkingUsage": "Checking usage...",
-        "usedBy": "Used by {count}",
+        "checkingUsage": "正在检查使用情况...",
+        "usedBy": "已有 {count} 处使用",
         "notUsedYet": "尚未使用",
-        "rename": "Rename",
+        "rename": "重命名",
         "replace": "替换",
         "usage": {
           "libraries": "{count, plural, =0 {没有库} one {# 库} other {# 库}}",
@@ -425,15 +425,15 @@
           "smartScopes": "{count, plural, =0 {没有智能范围} one {# 智能范围} other {# 智能范围}}"
         },
         "confirm": {
-          "deleteOne": "Delete \"{name}\"? Existing uses will fall back to their default icon.",
-          "deleteMany": "{count, plural, =0 {Delete no icons?} one {Delete # icon? Existing uses will fall back to their default icon.} other {Delete # icons? Existing uses will fall back to their default icon.}}"
+          "deleteOne": "删除 “{name}”？现有使用场景将回退为默认图标。",
+          "deleteMany": "{count, plural, =0 {不删除任何图标？} one {确定删除 # 个图标？现有使用场景将回退为默认图标。} other {确定删除 # 个图标？现有使用场景将回退为默认图标。}}"
         },
         "toasts": {
           "saved": "图标已保存",
           "updated": "图标已更新",
           "deleted": "图标已删除",
           "bulkDeleted": "{count, plural, =0 {删除没有图标} one {删除# 图标} other {删除# 图标}}",
-          "bulkDeletePartial": "Deleted {deleted}, {failed} failed"
+          "bulkDeletePartial": "已删除 {deleted} 项，{failed} 项失败"
         },
         "errors": {
           "load": "加载图标失败",
@@ -467,7 +467,7 @@
       },
       "feedback": {
         "unsavedChanges": "未保存的更改",
-        "discard": "Discard"
+        "discard": "放弃"
       },
       "profile": {
         "securityHeading": "个人资料与安全",
@@ -476,7 +476,7 @@
         "email": "电子邮件地址",
         "emailHint": "请联系管理员更改您的电子邮件地址。",
         "save": "保存配置文件",
-        "saving": "Saving...",
+        "saving": "正在保存…",
         "changePassword": "更改密码",
         "accountType": "帐户类型：",
         "accountTypeOidc": "OIDC / SSO",
@@ -508,12 +508,12 @@
       "avatar": {
         "title": "个人资料图片",
         "unknownUser": "未知用户",
-        "formatHint": "PNG/JPEG/WEBP up to {size} MB",
+        "formatHint": "PNG/JPEG/WEBP，最大 {size} MB",
         "upload": "上传图片",
         "replace": "替换图片",
-        "uploading": "Uploading...",
+        "uploading": "正在上传...",
         "remove": "移除图片",
-        "removing": "Removing...",
+        "removing": "正在删除...",
         "updated": "个人资料图片已更新",
         "uploadFailed": "上传个人资料图片失败",
         "removed": "个人资料图片已删除",
@@ -527,10 +527,10 @@
       "connectedAccounts": {
         "title": "已连接的账户",
         "unlink": "取消链接",
-        "unlinking": "Unlinking...",
+        "unlinking": "正在解绑...",
         "linkAdditional": "链接额外的提供商：",
-        "linkProvider": "Link {provider}",
-        "redirecting": "Redirecting...",
+        "linkProvider": "关联 {provider}",
+        "redirecting": "正在跳转授权…",
         "noneConfigured": "没有配置OIDC 提供商。请管理员设置SSO。",
         "linkStateFailed": "无法生成链接状态",
         "startLinkFailed": "启动 OIDC 链接失败",
@@ -538,12 +538,12 @@
         "unlinked": "身份未连接",
         "unlinkIdentityFailed": "取消链接身份失败",
         "unlinkDialog": {
-          "title": "Unlink {provider} identity?",
+          "title": "确定解绑 {provider} 账号？",
           "description": "输入您的密码以确认。您将无法使用此提供商登录。",
           "currentPassword": "当前密码"
         },
         "description": "使用关联到此帐户的外部身份提供商登录。",
-        "unlinkAria": "Unlink {provider}"
+        "unlinkAria": "解绑 {provider}"
       },
       "tour": {
         "title": "导游览",
@@ -584,7 +584,7 @@
       "subtitle": "为共享帐户创建可共享的登录链接。",
       "createLink": "创建链接",
       "noSharedAccounts": "未找到共享账户",
-      "noSharedAccountsHint": "Create a shared account from the {usersPage} first to generate magic links.",
+      "noSharedAccountsHint": "请先前往 {usersPage} 创建共享账号，方可生成免登录链接。",
       "activeLinks": "活动链接",
       "inactiveLinks": "非活动链接",
       "paused": "已暂停",
@@ -593,17 +593,17 @@
       "never": "没有记录的活动",
       "noExpiry": "无过期",
       "expired": "已过期",
-      "expiresOn": "Expires {date}",
-      "revokedOn": "Revoked {date}",
-      "expiredOn": "Expired {date}",
+      "expiresOn": "有效期至 {date}",
+      "revokedOn": "已于 {date} 撤销",
+      "expiredOn": "已于 {date} 过期",
       "usesCount": "{count, plural, =0 {没有使用} one {有人使用} other {# 使用}}",
       "copied": "已复制！",
       "copyLink": "复制链接",
       "pause": "暂停",
       "resume": "恢复",
       "revoke": "Revoke",
-      "revoking": "Revoking...",
-      "emptyState": "No magic links created yet. Click \"{action}\" to generate a shareable login URL.",
+      "revoking": "正在取消...",
+      "emptyState": "尚未创建任何免登录链接。点击 “{action}” 即可生成可分享的登录链接。",
       "columns": {
         "label": "标签",
         "account": "账户",
@@ -625,7 +625,7 @@
         "expiresAt": "过期时间",
         "optional": "(可选)",
         "create": "创建",
-        "creating": "Creating..."
+        "creating": "创建中..."
       },
       "revokeDialog": {
         "title": "撤销魔法链接？",
@@ -639,14 +639,14 @@
       },
       "usersPage": "用户页面",
       "emptyTitle": "尚未创建魔法链接",
-      "emptyHint": "Click \"{action}\" to generate a shareable login URL.",
+      "emptyHint": "点击 “{action}” 生成可分享的登录链接。",
       "noActiveTitle": "没有活动的魔法链接",
       "noActiveHint": "此页面生成的所有魔法链接都已过期或被撤销。",
-      "copyLinkAria": "Copy the link for {label}",
-      "pauseAria": "Pause {label}",
-      "resumeAria": "Resume {label}",
+      "copyLinkAria": "复制 {label} 的链接",
+      "pauseAria": "停用 {label}",
+      "resumeAria": "启用 {label}",
       "revokeAria": "Revoke {label}",
-      "lastUsedLabel": "Last used {date}"
+      "lastUsedLabel": "上次使用：{date}"
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -655,7 +655,7 @@
       "addProvider": "添加提供商",
       "editProvider": "编辑提供商",
       "configureNew": "配置一个新的 OIDC 提供程序。",
-      "editing": "Editing {slug}",
+      "editing": "正在编辑 {slug}",
       "enabled": "已启用",
       "disabled": "已禁用",
       "empty": {
@@ -678,14 +678,14 @@
         "issuerUri": "发行商URI",
         "issuerUriHint": "提供者的基础 URL。",
         "test": "测试",
-        "testing": "Testing...",
+        "testing": "测试中…",
         "clientId": "客户端ID",
         "clientSecret": "客户端密钥",
         "clientSecretPlaceholder": "留空以保持存在",
         "scopes": "范围",
         "claimMapping": "声明映射",
         "previewClaims": "预览求偿权",
-        "redirecting": "Redirecting...",
+        "redirecting": "正在跳转...",
         "mappedClaims": "3. 已冻结的索赔",
         "rawClaims": "原始索赔",
         "usernameClaim": "用户名请求",
@@ -701,12 +701,12 @@
         "defaultPermissionsHint": "授予第一个OIDC 登录的新用户的权限。",
         "createProvider": "创建提供商",
         "saveChanges": "保存更改",
-        "saving": "Saving...",
+        "saving": "保存中...",
         "deleteProvider": "删除提供商",
-        "deleting": "Deleting..."
+        "deleting": "删除中..."
       },
       "test": {
-        "connected": "Connected - {issuer}",
+        "connected": "已连接 — {issuer}",
         "connectionFailed": "连接失败",
         "hide": "隐藏",
         "details": "详细信息",
@@ -721,7 +721,7 @@
         "addMapping": "添加映射",
         "claimPlaceholder": "OIDC 群组索赔 (例如，管理员)",
         "add": "添加",
-        "adding": "Adding..."
+        "adding": "正在添加..."
       },
       "toasts": {
         "providerCreated": "提供者已创建",
@@ -763,9 +763,9 @@
         "migrationCompleted": "迁移完成",
         "migrationFailed": "迁移失败",
         "importDescription": "一次性导入书籍、元数据和从上一个书签安装中读取进度。",
-        "configuredDescription": "Source: {name}. No migration run yet - continue setup to run the import.",
-        "runningDescription": "Stage: {stage} - started {started}",
-        "completedDescription": "From {name} - completed {date}",
+        "configuredDescription": "数据源：{name}。尚未执行数据迁移，请完成剩余配置后再执行导入。",
+        "runningDescription": "环节：{stage}，已于 {started} 启动",
+        "completedDescription": "来自 {name}，已于 {date} 执行完成",
         "migrationErrorGeneric": "迁移过程中发生错误。",
         "stageInitializing": "初始化",
         "recently": "最近的",
@@ -776,24 +776,24 @@
         "refreshRecommendationHint": "使用您最新的库更改更新推荐引擎。此过程正在后台运行。",
         "booksQueuedForProcessing": "{count, plural, =0 {没有排队处理的书籍} one {# 处理中的书队列} other {# 排队处理中的书}}",
         "run": "运行",
-        "running": "Running...",
+        "running": "运行中...",
         "backfillAchievements": "倒退成就",
         "backfillAchievementsHint": "重新评估所有用户的成就。",
-        "backfillResult": "Processed {users} users; granted {awards} awards.",
+        "backfillResult": "已处理 {users} 位用户；已发放 {awards} 项奖励。",
         "runBackfill": "运行返回填充",
         "checkForUpdates": "检查更新",
         "checkForUpdatesHint": "启动时自动检查 GitHub 获取新版本，并在侧边栏显示一个指示器。",
         "updateChecksEnabled": "更新检查已启用",
         "updateChecksDisabled": "更新检查已禁用",
         "updateSettingFailed": "更新设置失败",
-        "booksQueuedForEmbedding": "{count, plural, =0 {no books queued for embedding} one {# book queued for embedding} other {# books queued for embedding}}",
+        "booksQueuedForEmbedding": "{count, plural, =0 {暂无待处理的图书向量化任务} one {# 本图书等待向量化处理} other {# 本图书等待向量化处理}}",
         "failed": "失败",
         "unknownError": "未知错误",
-        "rebuildEmbeddingsFailed": "Failed to rebuild embeddings: {error}",
+        "rebuildEmbeddingsFailed": "重建向量化数据失败：{error}",
         "achievementBackfillConfirm": "对所有用户的所有成就运行成绩回填？这可能需要一段时间。",
-        "achievementBackfillComplete": "Achievement backfill complete: {count} awards granted",
+        "achievementBackfillComplete": "成就数据补发完成：共发放 {count} 项奖励",
         "backfillRunFailed": "运行回填失败",
-        "achievementBackfillFailed": "Failed to run achievement backfill: {error}",
+        "achievementBackfillFailed": "执行成就数据补发失败：{error}",
         "uploadsGroup": "上传",
         "maxUploadSize": "上传文件大小限制",
         "maxUploadSizeHint": "配置全系统文件上传的最大尺寸限制。",
@@ -6948,7 +6948,7 @@
     "bookDock": "预约停靠栏",
     "whatsNew": "新功能",
     "annotations": "说明",
-    "achievements": "1. 成就",
+    "achievements": "成就",
     "statistics": "统计",
     "authors": "作者",
     "series": "系列",
@@ -7005,7 +7005,7 @@
     "admin": {
       "users": "用户",
       "account-activity": "帐户活动",
-      "magic-links": "魔法链接",
+      "magic-links": "免登录链接",
       "oidc": "OIDC / SSO",
       "server-fonts": "Server Fonts"
     },
