@@ -209,6 +209,13 @@ export class SmartScopeService {
     });
   }
 
+  async executeSmartScopeBookIds(id: number, user: RequestUser, size: number): Promise<number[]> {
+    const query: BookQuery = { sort: [], pagination: { page: 0, size } };
+    const prepared = await this.prepareBooksQuery(id, user, query);
+    if (!prepared) return [];
+    return this.bookService.executeBookIdsQuery(user.id, prepared.where, prepared.effectiveQuery);
+  }
+
   async queryBooks(id: number, user: RequestUser, query: BookQuery): Promise<BooksPage> {
     const start = Date.now();
     this.logger.debug(
@@ -262,11 +269,12 @@ export class SmartScopeService {
     const smartScope = await this.getSmartScopeOrThrow(id);
     this.assertReadAccess(smartScope, user);
 
-    if (!smartScope.filter) return null;
+    const scopeFilter = validateGroupRule(smartScope.filter);
+    if (!scopeFilter) return null;
 
     const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
-    const filter = this.combineFilters(smartScope.filter, query.filter);
+    const filter = this.combineFilters(scopeFilter, query.filter);
     const effectiveQuery: T = {
       ...query,
       filter,

@@ -92,6 +92,29 @@ describe('EntityManagerView selection', () => {
     vi.clearAllMocks()
   })
 
+  it('loads browse mode exactly once on mount', () => {
+    const entityManager = makeEntityManagerMock()
+    mocks.useEntityManager.mockReturnValue(entityManager)
+
+    shallowMount(EntityManagerView)
+
+    expect(entityManager.fetchBrowse).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes exactly once when an entity change also resets pagination', async () => {
+    const entityManager = makeEntityManagerMock()
+    entityManager.browsePage.value = 3
+    mocks.useEntityManager.mockReturnValue(entityManager)
+    shallowMount(EntityManagerView)
+    entityManager.fetchBrowse.mockClear()
+
+    entityManager.entityType.value = 'series'
+    entityManager.browsePage.value = 1
+    await nextTick()
+
+    expect(entityManager.fetchBrowse).toHaveBeenCalledTimes(1)
+  })
+
   it('routes ordinary browse selection events to single-item toggle', () => {
     const entityManager = makeEntityManagerMock()
     mocks.useEntityManager.mockReturnValue(entityManager)

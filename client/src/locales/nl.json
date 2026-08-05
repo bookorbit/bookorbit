@@ -6129,29 +6129,20 @@
       "cycleFooterMode": "Voettekstinfo wisselen"
     },
     "cbz": {
-      "tabs": {
-        "view": "Weergave",
-        "reading": "Lezen",
-        "layout": "Indeling"
-      },
       "fitMode": "Passingsmodus",
       "background": "Achtergrond",
       "scrollMode": "Scrollmodus",
       "scrollModeHint": "Gebruik \"Geen tussenruimte\" voor webtoons en verticale stroken.",
       "readingDirection": "Leesrichting",
       "pageView": "Paginaweergave",
-      "autoFallback": "Auto-terugval",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Spreaduitlijning",
-      "spreadAlignmentHint": "Spreaduitlijning is niet beschikbaar in de auto-terugvalmodus.",
       "spreadGap": "Spread gap",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Focus op tweepaginaschakelaar",
       "forceTwoPage": "Twee pagina's forceren",
-      "off": "Uit",
-      "on": "Aan",
       "widePages": "Brede pagina's",
-      "resetBookViewSettings": "Weergave-instellingen van boek herstellen",
-      "resetConfirm": "Weergave-instellingen voor dit boek herstellen naar je algemene standaardwaarden?",
       "firstPage": "Eerste pagina",
       "lastPage": "Laatste pagina",
       "fit": {

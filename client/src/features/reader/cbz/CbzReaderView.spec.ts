@@ -3,6 +3,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CbzReaderView from './CbzReaderView.vue'
+import CbzSettingsPanel from './components/CbzSettingsPanel.vue'
 
 const mocks = vi.hoisted(() => ({
   savedMode: 'infinite' as 'paginated' | 'infinite' | 'long-strip',
@@ -14,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   pageUrl: vi.fn<(page: number) => string>((page) => `/api/v1/cbz/files/22/pages/${page}`),
   progressSave: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   scrollToIndex: vi.fn<(index: number, options: { align: string }) => void>(),
+  updateBookSettings: vi.fn<(patch: unknown) => void>(),
+  resetBookSettings: vi.fn<() => void>(),
 }))
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -93,9 +96,10 @@ vi.mock('../shared/composables/useReaderSettings', () => ({
       widePageSingletonMode: 'auto',
       bgColor: 'black',
     })),
+    isCustomized: ref(false),
     load: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    updateBookSettings: vi.fn<(patch: unknown) => void>(),
-    resetBookSettings: vi.fn<() => void>(),
+    updateBookSettings: mocks.updateBookSettings,
+    resetBookSettings: mocks.resetBookSettings,
   }),
 }))
 
@@ -181,6 +185,35 @@ describe('CbzReaderView', () => {
     expect(wrapper.get('[data-spread-side="left"]').classes()).toContain('justify-end')
     expect(wrapper.get('[data-spread-side="right"]').classes()).toContain('justify-start')
     expect(wrapper.findAll('[data-spread-side] img')).toHaveLength(2)
+
+    wrapper.unmount()
+  })
+
+  it('routes settings panel updates and reset through the per-book settings store', async () => {
+    mocks.savedMode = 'paginated'
+    const wrapper = shallowMount(CbzReaderView, {
+      props: { bookId: 11, fileId: 22 },
+      global: {
+        stubs: {
+          Popover: { template: '<div><slot /></div>' },
+          PopoverTrigger: { template: '<div><slot /></div>' },
+          PopoverContent: { template: '<div><slot /></div>' },
+        },
+      },
+    })
+
+    await flushPromises()
+    await nextTick()
+
+    const panel = wrapper.getComponent(CbzSettingsPanel)
+    expect(panel.props('settings')).toMatchObject({ fitMode: 'fit-page', bgColor: 'black' })
+
+    panel.vm.$emit('update', { bgColor: 'white' })
+    await nextTick()
+    expect(mocks.updateBookSettings).toHaveBeenCalledWith({ bgColor: 'white' })
+
+    panel.vm.$emit('reset')
+    expect(mocks.resetBookSettings).toHaveBeenCalledOnce()
 
     wrapper.unmount()
   })

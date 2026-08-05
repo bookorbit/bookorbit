@@ -6129,29 +6129,20 @@
       "cycleFooterMode": "Modo de información de pie de página de ciclo"
     },
     "cbz": {
-      "tabs": {
-        "view": "Ver",
-        "reading": "leyendo",
-        "layout": "Diseño"
-      },
       "fitMode": "Modo de ajuste",
       "background": "Antecedentes",
       "scrollMode": "Modo de desplazamiento",
       "scrollModeHint": "Utilice \"Sin espacios\" para webtoons y tiras verticales.",
       "readingDirection": "dirección de lectura",
       "pageView": "Vista de página",
-      "autoFallback": "Modo alternativo automático",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Alineación extendida",
-      "spreadAlignmentHint": "La alineación de páginas no está disponible en el modo alternativo automático.",
       "spreadGap": "Brecha de propagación",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Alternar enfoque de dos páginas",
       "forceTwoPage": "Forzar dos páginas",
-      "off": "Apagado",
-      "on": "encendido",
       "widePages": "paginas anchas",
-      "resetBookViewSettings": "Restablecer la configuración de vista de libro",
-      "resetConfirm": "¿Restablecer la configuración de visualización de este libro a sus valores predeterminados globales?",
       "firstPage": "Primera pagina",
       "lastPage": "Última página",
       "fit": {

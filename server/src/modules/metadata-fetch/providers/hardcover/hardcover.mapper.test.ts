@@ -143,6 +143,115 @@ describe('mapSearchDocument', () => {
     const doc: HardcoverSearchDocument = { ...baseDocument, image: undefined };
     expect(mapSearchDocument(doc).coverUrl).toBeUndefined();
   });
+
+  describe('embedded subtitle split', () => {
+    const longColonTitle = "Babel, or The Necessity of Violence: An Arcane History of the Oxford Translators' Revolution";
+
+    it('splits a long colon title into title and subtitle when no subtitle is provided', () => {
+      const doc: HardcoverSearchDocument = { ...baseDocument, title: longColonTitle, subtitle: undefined };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('Babel, or The Necessity of Violence');
+      expect(result.subtitle).toBe("An Arcane History of the Oxford Translators' Revolution");
+    });
+
+    it('keeps the title untouched when the API provides a subtitle', () => {
+      const doc: HardcoverSearchDocument = { ...baseDocument, title: longColonTitle, subtitle: 'Provided Subtitle' };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe(longColonTitle);
+      expect(result.subtitle).toBe('Provided Subtitle');
+    });
+
+    it('does not split short colon titles', () => {
+      const doc: HardcoverSearchDocument = { ...baseDocument, title: '2001: A Space Odyssey', subtitle: undefined };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('2001: A Space Odyssey');
+      expect(result.subtitle).toBeUndefined();
+    });
+
+    it('treats a blank API subtitle as absent and still splits', () => {
+      const doc: HardcoverSearchDocument = { ...baseDocument, title: longColonTitle, subtitle: '   ' };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('Babel, or The Necessity of Violence');
+      expect(result.subtitle).toBe("An Arcane History of the Oxford Translators' Revolution");
+    });
+
+    it('does not split long titles without a colon', () => {
+      const title = 'A'.repeat(70);
+      const doc: HardcoverSearchDocument = { ...baseDocument, title, subtitle: undefined };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe(title);
+      expect(result.subtitle).toBeUndefined();
+    });
+
+    it('splits only titles longer than 60 characters', () => {
+      const at60 = `${'A'.repeat(30)}: ${'B'.repeat(28)}`;
+      const at61 = `${'A'.repeat(30)}: ${'B'.repeat(29)}`;
+      expect(mapSearchDocument({ ...baseDocument, title: at60, subtitle: undefined }).title).toBe(at60);
+      const result = mapSearchDocument({ ...baseDocument, title: at61, subtitle: undefined });
+      expect(result.title).toBe('A'.repeat(30));
+      expect(result.subtitle).toBe('B'.repeat(29));
+    });
+
+    it('splits at the first colon only', () => {
+      const doc: HardcoverSearchDocument = {
+        ...baseDocument,
+        title: 'How to Do Nothing: Resisting the Attention Economy: A Field Guide',
+        subtitle: undefined,
+      };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('How to Do Nothing');
+      expect(result.subtitle).toBe('Resisting the Attention Economy: A Field Guide');
+    });
+
+    it('does not split when nothing follows the colon', () => {
+      const title = `${'A'.repeat(70)}:`;
+      const doc: HardcoverSearchDocument = { ...baseDocument, title, subtitle: undefined };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe(title);
+      expect(result.subtitle).toBeUndefined();
+    });
+
+    it('does not split when the title starts with a colon', () => {
+      const title = `: ${'A'.repeat(70)}`;
+      const doc: HardcoverSearchDocument = { ...baseDocument, title, subtitle: undefined };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe(title);
+      expect(result.subtitle).toBeUndefined();
+    });
+
+    it('trims the title when the API subtitle duplicates the part after the colon', () => {
+      const doc: HardcoverSearchDocument = {
+        ...baseDocument,
+        title: "Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+        subtitle: "A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+      };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('Quantitative Momentum');
+      expect(result.subtitle).toBe("A Practitioner's Guide to Building a Momentum-Based Stock Selection System");
+    });
+
+    it('matches the duplicated subtitle case-insensitively and keeps the API value verbatim', () => {
+      const doc: HardcoverSearchDocument = {
+        ...baseDocument,
+        title: "Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+        subtitle: "A PRACTITIONER'S GUIDE TO BUILDING A MOMENTUM-BASED STOCK SELECTION SYSTEM",
+      };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('Quantitative Momentum');
+      expect(result.subtitle).toBe("A PRACTITIONER'S GUIDE TO BUILDING A MOMENTUM-BASED STOCK SELECTION SYSTEM");
+    });
+
+    it('does not trim short colon titles even when the subtitle matches', () => {
+      const doc: HardcoverSearchDocument = {
+        ...baseDocument,
+        title: '2001: A Space Odyssey',
+        subtitle: 'A Space Odyssey',
+      };
+      const result = mapSearchDocument(doc);
+      expect(result.title).toBe('2001: A Space Odyssey');
+      expect(result.subtitle).toBe('A Space Odyssey');
+    });
+  });
 });
 
 describe('mapBookWithEditions', () => {
@@ -401,6 +510,96 @@ describe('mapBookWithEditions', () => {
     const results = mapBookWithEditions(book);
     expect(results[0].isbn13).toBe('HASPAGES');
     expect(results[1].isbn13).toBe('NOPAGES');
+  });
+
+  describe('embedded subtitle split', () => {
+    const longColonTitle = "Babel, or The Necessity of Violence: An Arcane History of the Oxford Translators' Revolution";
+
+    it('splits a long colon title when neither edition nor book has a subtitle', () => {
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        subtitle: undefined,
+        editions: [{ ...baseBook.editions![0], title: longColonTitle, subtitle: undefined }],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe('Babel, or The Necessity of Violence');
+      expect(result.subtitle).toBe("An Arcane History of the Oxford Translators' Revolution");
+    });
+
+    it('keeps the title untouched when the edition provides its own subtitle', () => {
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        subtitle: undefined,
+        editions: [{ ...baseBook.editions![0], title: longColonTitle, subtitle: 'Edition Subtitle' }],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe(longColonTitle);
+      expect(result.subtitle).toBe('Edition Subtitle');
+    });
+
+    it('keeps the title untouched when the book subtitle fallback applies', () => {
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        subtitle: 'Book Subtitle',
+        editions: [{ ...baseBook.editions![0], title: longColonTitle, subtitle: undefined }],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe(longColonTitle);
+      expect(result.subtitle).toBe('Book Subtitle');
+    });
+
+    it('splits the book-title fallback when the edition has no title', () => {
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        title: longColonTitle,
+        subtitle: undefined,
+        editions: [{ ...baseBook.editions![0], title: undefined, subtitle: undefined }],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe('Babel, or The Necessity of Violence');
+      expect(result.subtitle).toBe("An Arcane History of the Oxford Translators' Revolution");
+    });
+
+    it('does not split short colon titles', () => {
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        subtitle: undefined,
+        editions: [{ ...baseBook.editions![0], title: '2001: A Space Odyssey', subtitle: undefined }],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe('2001: A Space Odyssey');
+      expect(result.subtitle).toBeUndefined();
+    });
+
+    it('trims the title when the edition subtitle duplicates the part after the colon', () => {
+      const fullTitle = "Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based Stock Selection System";
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        title: fullTitle,
+        subtitle: undefined,
+        editions: [
+          {
+            ...baseBook.editions![0],
+            title: fullTitle,
+            subtitle: "A Practitioner's Guide to Building a Momentum-Based Stock Selection System",
+          },
+        ],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe('Quantitative Momentum');
+      expect(result.subtitle).toBe("A Practitioner's Guide to Building a Momentum-Based Stock Selection System");
+    });
+
+    it('keeps the title untouched when the edition subtitle differs from the embedded one', () => {
+      const book: HardcoverBookWithEditions = {
+        ...baseBook,
+        subtitle: undefined,
+        editions: [{ ...baseBook.editions![0], title: longColonTitle, subtitle: 'A Completely Different Subtitle' }],
+      };
+      const [result] = mapBookWithEditions(book);
+      expect(result.title).toBe(longColonTitle);
+      expect(result.subtitle).toBe('A Completely Different Subtitle');
+    });
   });
 
   it('filters out contributors with no author name', () => {

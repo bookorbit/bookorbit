@@ -36,11 +36,8 @@ const bulkDeleteDefaultMode = computed<'soft' | 'hard'>(() =>
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 function refreshBrowseFromFirstPage(): void {
-  if (em.browsePage.value === 1) {
-    em.fetchBrowse()
-    return
-  }
   em.browsePage.value = 1
+  em.fetchBrowse()
 }
 
 watch(em.browseSearch, () => {
@@ -50,28 +47,12 @@ watch(em.browseSearch, () => {
   }, 300)
 })
 
-watch(em.browsePage, () => {
-  em.fetchBrowse()
-})
-
 watch(
-  em.mode,
-  (newMode) => {
+  [em.mode, em.entityType],
+  ([newMode]) => {
     if (newMode === 'browse') {
       em.fetchBrowse()
     } else if (newMode === 'duplicates') {
-      em.fetchScanStatus()
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  em.entityType,
-  () => {
-    if (em.mode.value === 'browse') {
-      em.fetchBrowse()
-    } else if (em.mode.value === 'duplicates') {
       em.fetchScanStatus()
     }
   },
@@ -114,6 +95,7 @@ function handleUpdateSearch(value: string): void {
 
 function handleUpdatePage(value: number): void {
   em.browsePage.value = value
+  em.fetchBrowse()
 }
 
 function handleBrowseSortChange(sortBy: 'name' | 'bookCount', sortOrder: 'asc' | 'desc'): void {

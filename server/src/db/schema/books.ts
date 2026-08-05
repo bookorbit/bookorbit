@@ -27,7 +27,7 @@ export const books = pgTable(
     uniqueIndex('books_library_id_folder_path_idx').on(t.libraryId, t.folderPath),
     unique('books_id_library_folder_id_unique').on(t.id, t.libraryFolderId),
     index('books_primary_file_id_idx').on(t.primaryFileId),
-    index('books_library_status_idx').on(t.libraryId, t.status),
+    index('books_library_status_id_idx').on(t.libraryId, t.status, t.id),
     index('books_library_added_at_idx').on(t.libraryId, sql`${t.addedAt} desc`),
     index('books_library_visible_added_id_idx')
       .on(t.libraryId, sql`${t.addedAt} desc`, t.id)

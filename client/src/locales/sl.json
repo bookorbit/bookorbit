@@ -6129,29 +6129,20 @@
       "cycleFooterMode": "Preklopi način nožne vrstice"
     },
     "cbz": {
-      "tabs": {
-        "view": "Pogled",
-        "reading": "Branje",
-        "layout": "Postavitev"
-      },
       "fitMode": "Način prilagajanja",
       "background": "Ozadje",
       "scrollMode": "Način drsenja",
       "scrollModeHint": "Uporabite \"Brez vrzeli\" za webtoone in navpične trakove.",
       "readingDirection": "Smer branja",
       "pageView": "Pogled strani",
-      "autoFallback": "Samodejni nadomestni način",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Poravnava razpona",
-      "spreadAlignmentHint": "Poravnava razpona ni na voljo v samodejnem nadomestnem načinu.",
       "spreadGap": "Razmik",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Preklop na dvostransko pogled",
       "forceTwoPage": "Vsili dve strani",
-      "off": "Izklopljeno",
-      "on": "Vklopljeno",
       "widePages": "Široke strani",
-      "resetBookViewSettings": "Ponastavi nastavitve pogleda knjige",
-      "resetConfirm": "Ali želite ponastaviti nastavitve pogleda za to knjigo na globalne privzete vrednosti?",
       "firstPage": "Prva stran",
       "lastPage": "Zadnja stran",
       "fit": {
