@@ -8621,7 +8621,6 @@
               [114.01542968750007, 22.51191406250001]
             ]
           ],
-          [],
           [
             [
               [118.4074218750001, 24.522119140624994],
@@ -8778,7 +8777,7 @@
           ]
         ]
       },
-      "properties": { "name": "Côte d'Ivoire", "childNum": 1 }
+      "properties": { "name": "C\u00f4te d'Ivoire", "childNum": 1 }
     },
     {
       "geometry": {
@@ -9617,7 +9616,7 @@
           ]
         ]
       },
-      "properties": { "name": "Curaçao", "childNum": 1 }
+      "properties": { "name": "Cura\u00e7ao", "childNum": 1 }
     },
     {
       "geometry": {
@@ -27146,7 +27145,7 @@
           ]
         ]
       },
-      "properties": { "name": "São Tomé and Principe", "childNum": 2 }
+      "properties": { "name": "S\u00e3o Tom\u00e9 and Principe", "childNum": 2 }
     },
     {
       "geometry": {

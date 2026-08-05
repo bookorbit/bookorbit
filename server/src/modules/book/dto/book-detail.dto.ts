@@ -44,6 +44,7 @@ export class BookDetailDto {
   isbn13: string | null;
   publisher: string | null;
   originCountry: string | null;
+  originType: string;
   publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;

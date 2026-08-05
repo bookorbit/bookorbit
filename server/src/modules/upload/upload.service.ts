@@ -252,7 +252,7 @@ export class UploadService {
       throw new BadRequestException('File must not be empty');
     }
 
-    const destination: string | null = null;
+    let destination: string | null = null;
     let shouldCleanupDestination = false;
 
     try {
@@ -268,7 +268,7 @@ export class UploadService {
         throw new ConflictException('This file is already attached to this book');
       }
 
-      const destination = join(bookRow.folderPath ?? '', filename);
+      destination = join(bookRow.folderPath ?? '', filename);
 
       if (await this.destinationExists(destination)) {
         throw new ConflictException(`A file named "${filename}" already exists in this book's folder`);

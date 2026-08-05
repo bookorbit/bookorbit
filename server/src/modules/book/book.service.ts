@@ -1521,6 +1521,7 @@ export class BookService {
       });
       const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
       await this.bookRepo.deleteByIds(bookIds);
+      this.statisticsService?.invalidateUserCache(user.id);
       const deleteTargets = [
         ...rows.map((row) => ({
           path: join(this.appDataPath, 'covers', String(row.id)),
@@ -1540,7 +1541,6 @@ export class BookService {
         const errorClass = reason instanceof Error ? reason.name : 'Error';
         const errorMessage = sanitizeLogValue(reason instanceof Error ? reason.message : String(reason));
         const pathValue = sanitizeLogValue(target.path);
-        this.statisticsService?.invalidateUserCache(user.id);
         this.logger.warn(
           `[${event}] [fail] userId=${user.id} path="${pathValue}" kind=${target.kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
         );
@@ -3030,6 +3030,7 @@ export class BookService {
       isbn13: meta?.isbn13 ?? null,
       publisher: meta?.publisher ?? null,
       originCountry: book.books.originCountry ?? null,
+      originType: book.books.originType ?? null,
       publishedDate: meta?.publishedDate ?? null,
       publishedYear: meta?.publishedYear ?? null,
       language: meta?.language ?? null,
