@@ -168,8 +168,7 @@
           "blush": "Blush"
         },
         "accentColor": {
-          "label": "Accent färg",
-          "hint": "Controls highlights and interactive elements"
+          "label": "Accent färg"
         },
         "cornerRadius": {
           "label": "Corner radius",
@@ -199,8 +198,7 @@
         "active": "Aktiv",
         "notAvailable": "Inte tillgänglig",
         "device": {
-          "title": "Endast denna enhet",
-          "description": "Preferences stay in your browser. Best if you want a different look on different devices."
+          "title": "Endast denna enhet"
         },
         "account": {
           "title": "Mitt konto",
@@ -482,7 +480,6 @@
         "accountTypeOidc": "OIDC / SSO",
         "accountTypeShared": "Delad",
         "accountTypeLocal": "Lokal",
-        "nameRequired": "Name is required",
         "updateFailed": "Det gick inte att uppdatera profil",
         "updated": "Profil uppdaterad",
         "usernameHint": "Ditt användarnamn kan inte ändras.",
@@ -715,7 +712,6 @@
       },
       "groupMappings": {
         "title": "Grupp Mappningar",
-        "description": "Map OIDC group claims to BookOrbit permissions. Synced on every login.",
         "noPermission": "Ingen behörighet",
         "empty": "Inga gruppmappningar konfigurerade.",
         "addMapping": "Lägg till mappning",
@@ -757,7 +753,6 @@
         "recommendationsGroup": "Rekommendationer",
         "achievementsGroup": "Prestationer",
         "updatesGroup": "Uppdateringar",
-        "importFromBooklore": "Import from Booklore",
         "bookloreImportConfigured": "Booklore import konfigurerad",
         "migrationRunning": "Migrering igång",
         "migrationCompleted": "Migration slutförd",
@@ -851,7 +846,6 @@
         "errorLoadSuggestions": "Misslyckades att ladda förslag på användarmappning",
         "requiredFields": "Värd, användare, databas och källnamn krävs",
         "connectionTestPassedWithWarnings": "Anslutningstest klarat med varningar",
-        "connectionTestPassedWithCount": "Connection test passed with {count} warning(s). First: {first}",
         "connectionTestPassed": "Anslutningstest godkänd",
         "connectionOkMissingTables": "Anslutning ok, men {count} obligatoriska tabell(er) saknas",
         "cannotTestMediaPathActiveRun": "Kan inte testa mediasökväg medan en körning är aktiv",
@@ -1133,15 +1127,7 @@
         "users": "Användare",
         "account-activity": "Konto aktivitet",
         "magic-links": "Magiska länkar",
-        "oidc": "OIDC / SSO",
-        "server-fonts": "Server Fonts"
-      },
-      "serverFonts": {
-        "title": "Server Fonts",
-        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
-        "listLabel": "Server fonts",
-        "noFontsYet": "No server fonts yet",
-        "noFontsHint": "Fonts you add here appear in every user's reader."
+        "oidc": "OIDC / SSO"
       }
     },
     "common": {
@@ -1295,8 +1281,7 @@
           "audnexus": "Gemenskapsdriven ljudbok metadata. Ingen installation krävs.",
           "comicvine": "Comic bok metadata från ComicVine. En gratis API-nyckel krävs från comicvine.gamespot.com.",
           "ranobedb": "Japansk ljusroman metadata från RanobeDB. Ingen installation krävs.",
-          "lubimyczytac": "Polsk bokkatalog (lubimyczytac.pl). Scrapes offentliga boksidor. Ingen installation krävs.",
-          "aladin": "Korean book metadata from Aladin (알라딘). A TTB Key from aladin.co.kr is required."
+          "lubimyczytac": "Polsk bokkatalog (lubimyczytac.pl). Scrapes offentliga boksidor. Ingen installation krävs."
         },
         "blocked": {
           "google": "Google Books kräver en API-nyckel innan den kan aktiveras",
@@ -1676,12 +1661,7 @@
         "deleteFamilyFailed": "Det gick inte att ta bort typsnittsfamilj",
         "demoCannotManage": "Demobegränsat konto kan inte hantera typsnitt",
         "fileAdded": "\"{name}\" tillagd",
-        "uploadFailed": "Uppladdningen misslyckades",
-        "serverFontsTitle": "Server fonts (shared by admin)",
-        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
-        "serverFontsShown": "{count} of {total} shown",
-        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
-        "serverFontVisibilityFailed": "Failed to update server font visibility"
+        "uploadFailed": "Uppladdningen misslyckades"
       },
       "bookDock": {
         "title": "Boka Docka",
@@ -1865,7 +1845,6 @@
         "markAsFinished": "Markera som slutförd",
         "markAsFinishedHint": "Procentuell tröskel för att markera en bok som \"Avslutad\".",
         "kepubLimit": "KEPUB konverteringsgräns",
-        "kepubLimitHint": "Books above this limit are sent as regular EPUBs, so BookOrbit will not sync their reader position back to Kobo.",
         "changesMustBeSaved": "Ändringar måste sparas för att träda i kraft.",
         "saving": "Sparar...",
         "saveSyncSettings": "Spara synkroniseringsinställningar",
@@ -2178,7 +2157,6 @@
           },
           "dismiss": "Avfärda",
           "dismissAll": "Avfärda alla",
-          "dismissing": "Dismissing...",
           "unlinking": "Avlänkar...",
           "unlinkConfirmTitle": "Avlänka KOReader boken?",
           "unlinkConfirmBody": "Framtida synkroniseringar för detta hash kommer sluta lösa {title} tills det är länkat igen. Synkroniserade värden kommer att stanna kvar på sin nuvarande bokbok.",
@@ -2886,7 +2864,6 @@
       "BookBulkUpdateTags": "Uppdatera boktaggar",
       "BookBulkSetMetadataLock": "Ställ in metadatafunktioner",
       "BookBulkEditMetadata": "Redigera bokens metadata",
-      "BookBulkMoveLibrary": "Move books to another library",
       "BookReadingStateReset": "Återställ läsläge",
       "BookWriteAndRename": "Skriv metadata och byt namn på fil",
       "CollectionCreate": "Skapa samling",
@@ -3119,10 +3096,8 @@
         "refreshedNoImage": "Metadata uppdaterad, men ingen författarbild hittades.",
         "refreshFailed": "Det gick inte att uppdatera författarens metadata",
         "bulkRefreshPartial": "Uppdaterade {updated} författare(er), {failed} misslyckades",
-        "bulkRefreshSuccess": "Refreshed metadata for {updated} author(s)",
         "bulkRefreshFailed": "Det gick inte att uppdatera valda författare",
-        "deleteSuccess": "{count, plural, =0 {Borttagna # författare; påverkade {books} böcker} one {Borttagna # författare; påverkade {books} böcker} other {Borttagna # författare; påverkade {books} böcker}}",
-        "deleteFailed": "Failed to delete author(s)"
+        "deleteSuccess": "{count, plural, =0 {Borttagna # författare; påverkade {books} böcker} one {Borttagna # författare; påverkade {books} böcker} other {Borttagna # författare; påverkade {books} böcker}}"
       }
     },
     "detail": {
@@ -3155,7 +3130,6 @@
         "confirmLabel": "Sammanfoga"
       },
       "mergeDialog": {
-        "title": "Merge {count} author(s) into \"{name}\"?",
         "titleFallback": "Slå ihop valda författare?",
         "description": "Detta kommer att sammanfoga valda författare till den nuvarande författaren och länka associerade böcker. Denna åtgärd kan inte ångras.",
         "descriptionEmpty": "Denna åtgärd kan inte ångras."
@@ -3345,12 +3319,8 @@
         "isFinished": "är klar",
         "isLocked": "är låst",
         "isUnlocked": "är upplåst",
-        "isUpNext": "är uppe nästa",
-        "isTrue": "is yes",
-        "isFalse": "is no"
+        "isUpNext": "är uppe nästa"
       },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
       "anyProvider": "Valfri leverantör",
       "communityRatingProvider": "Gemenskapens betygsleverantör",
       "loadingLibraries": "Laddar bibliotek...",
@@ -3715,7 +3685,6 @@
         "writeManualTooltip": "Skriv {fields} till {target} och byt namn på disk",
         "applyResult": "{skipped}, {updated}",
         "skippedLockedFields": "{count, plural, =0 {Hoppade över inga låsta fält} one {Hoppade över ett låst fält} other {Hoppade över # låsta fält}}",
-        "updatedFields": "{count, plural, =0 {updated no fields} one {updated one field} other {updated # fields}}",
         "wroteFieldsToFile": "Skrev {fields} till fil",
         "fileWriteFailedReason": "Filskrivning misslyckades: {reason}",
         "fileWriteFailed": "Filskrivning misslyckades",
@@ -4095,11 +4064,7 @@
         "seriesPlaceholder": "Serie",
         "moveUp": "Flytta upp",
         "moveDown": "Flytta ner",
-        "removeSeries": "Ta bort serie",
-        "seriesIndexLabel": "Position in series",
-        "totalLabel": "Books in series",
-        "totalPlaceholder": "of",
-        "totalHint": "Total books in this series. Shared with everyone who has this series."
+        "removeSeries": "Ta bort serie"
       }
     },
     "table": {
@@ -4179,69 +4144,6 @@
       },
       "text": {
         "openDetails": "Öppna detaljer"
-      }
-    },
-    "move": {
-      "title": "{count, plural, one {Move # book} other {Move # books}}",
-      "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
-      "searchPlaceholder": "Search libraries",
-      "currentLibrary": "Current",
-      "folderCount": "{count, plural, one {# folder} other {# folders}}",
-      "continue": "Continue",
-      "back": "Back",
-      "confirm": "{count, plural, one {Move # book} other {Move # books}}",
-      "action": "Move to library",
-      "review": {
-        "ready": "{count} ready",
-        "collisions": "{count, plural, one {# name conflict} other {# name conflicts}}",
-        "ineligible": "{count} cannot move",
-        "alreadyThere": "{count} already there",
-        "collisionsHeading": "Name conflicts",
-        "ineligibleHeading": "Cannot be moved",
-        "moreCollisions": "and {count} more"
-      },
-      "policy": {
-        "suggested": "Use suggested",
-        "keep_both": "Keep both",
-        "merge": "Merge",
-        "skip": "Skip"
-      },
-      "collision": {
-        "folder_path": "A book already uses this folder name",
-        "file_path": "A file already uses this path",
-        "hash_duplicate": "An identical copy is already in this library"
-      },
-      "ineligible": {
-        "book_not_present": "The files for this book are missing",
-        "no_content_file": "This book has no readable file",
-        "multi_file_target_per_file": "The destination stores one file per book, and this book has {detail} files",
-        "no_source_access": "You cannot edit the library this book is in",
-        "pattern_unresolved": "The destination library has no usable naming pattern",
-        "path_too_long": "The destination path would be too long",
-        "path_outside_target_root": "The destination path would fall outside the library folder"
-      },
-      "warning": {
-        "accessLoss": "{user} will stop seeing {count} of these books",
-        "koboImpact": "{count} books will leave {user}'s Kobo on the next sync",
-        "layout": {
-          "wrap_into_folder": "{count} books will each be placed in their own folder",
-          "dissolve_folder": "{count} book folders will be dissolved into single files"
-        },
-        "crossDevice": "Files move to another drive, so they are copied, verified, then removed."
-      },
-      "progress": {
-        "label": "Moving books to {library}",
-        "failed": "{count} failed"
-      },
-      "done": {
-        "summary": "Moved {count} books to {library}",
-        "merged": "{count} merged with copies already there",
-        "skipped": "{count} skipped",
-        "failed": "{count} failed"
-      },
-      "toast": {
-        "success": "Moved {count} books to {library}",
-        "partial": "Moved {moved} books, {failed} failed"
       }
     }
   },
@@ -4443,7 +4345,6 @@
       "name": "Namn",
       "icon": "Ikon",
       "iconPlaceholder": "Välj en ikon...",
-      "nameRequired": "Name is required",
       "iconRequired": "Välj en ikon",
       "creating": "Skapar...",
       "createFailed": "Det gick inte att skapa samling"
@@ -4706,7 +4607,6 @@
     "dropPrompt": "Släpp SVG-filer eller klicka för att bläddra",
     "fileLimit": "Upp till {max} filer, 128 KB vardera",
     "namePlaceholder": "Namn",
-    "nameRequired": "Name is required",
     "invalidSvg": "Ogiltig SVG",
     "invalidSvgFile": "Ogiltig SVG-fil",
     "identicalTo": "Identisk till \"{name}\"",
@@ -4721,7 +4621,6 @@
     "maxStaged": "Du kan iscensätta som mest {max} ikoner på en gång",
     "onlyMoreCanStage": "{count, plural, =0 {Inga fler ikoner kan iscensättas} one {Endast # fler ikoner kan iscensättas} other {Endast # fler ikoner kan iscensättas}}",
     "readFailed": "Det gick inte att läsa SVG-filer",
-    "uploadedCount": "{count, plural, =0 {No icons uploaded} one {Uploaded # icon} other {Uploaded # icons}}",
     "uploadedPartial": "Uppladdad {created}, {failed} misslyckades",
     "noIconsUploaded": "Inga ikoner uppladdade",
     "uploadFailed": "Misslyckades att ladda upp ikoner",
@@ -4775,14 +4674,6 @@
         "upNextInSeries": "Nästa i serien",
         "random": "Upptäck något nytt",
         "smartScope": "Smart omfattning"
-      },
-      "shelfLayout": {
-        "title": "Shelf layout",
-        "description": "Choose how shelves are arranged on larger screens.",
-        "wide": "Wide rows",
-        "wideDescription": "Show one shelf per row.",
-        "twoColumns": "Two columns",
-        "twoColumnsDescription": "Show two shelves per row."
       },
       "reorderHintWidget": "Dra för att ordna om. Växla för att visa eller dölja en widget.",
       "reorderHintShelf": "Dra för att ordna om. Växla för att visa eller dölja en hylla.",
@@ -5797,7 +5688,6 @@
       "loadSuggestionsFailed": "Misslyckades att ladda förslag på användarmappning",
       "sourceFieldsRequired": "Värd, användare, databas och källnamn krävs",
       "connectionPassedWithWarnings": "Anslutningstest klarat med varningar",
-      "connectionPassedWithWarningCount": "Connection test passed with {count} warning(s). First: {warning}",
       "connectionPassed": "Anslutningstest godkänd",
       "connectionMissingTables": "Anslutning ok, men {count} obligatoriska tabell(er) saknas",
       "cannotTestMediaWhileRunning": "Kan inte testa mediasökväg medan en körning är aktiv",
@@ -5956,67 +5846,22 @@
     "settings": {
       "title": "Inställningar",
       "ariaLabel": "Inställningar för läsare",
-      "reset": "Reset to defaults",
-      "modeLabel": "Color mode",
       "mode": {
         "light": "Ljus",
         "dark": "Mörk"
       },
-      "textSize": "Text size",
-      "textSizeSmaller": "Smaller text",
-      "textSizeLarger": "Larger text",
-      "pixels": "{value} px",
-      "percent": "{value}%",
-      "pageColor": "Page color",
-      "font": "Font",
       "fontBuiltIn": "Inbyggd",
-      "fontServer": "Server fonts",
       "fontYours": "Dina typsnitt",
-      "lineSpacing": "Line spacing",
-      "pageWidth": "Page width",
-      "pageWidthNarrow": "Narrow",
-      "pageWidthMedium": "Medium",
-      "pageWidthWide": "Wide",
-      "pageWidthFull": "Full",
       "readingFlow": "Läser flöde",
-      "flow": {
-        "paginated": "Pages",
-        "scrolled": "Scroll"
-      },
       "pageSpreads": "Sid spreads",
       "pageSpreadsHint": "Välj hur denna bildbaserade EPUB parar sidor.",
       "spread": {
         "bookDefault": "Bokens standard",
         "singlePage": "Enda sidan"
       },
-      "advanced": "Advanced layout",
-      "columns": "Columns",
-      "columnsFewer": "Fewer columns",
-      "columnsMore": "More columns",
       "columnGap": "Kolumn mellanrum",
       "justifyText": "Justera text",
-      "hyphenation": "Hyfenering",
-      "themes": {
-        "default": "Default",
-        "gray": "Gray",
-        "sepia": "Sepia",
-        "crimson": "Crimson",
-        "meadow": "Meadow",
-        "rosewood": "Rosewood",
-        "azure": "Azure",
-        "dawnlight": "Dawnlight",
-        "ember": "Ember",
-        "aurora": "Aurora",
-        "ocean": "Ocean",
-        "mist": "Mist",
-        "amoled": "AMOLED"
-      },
-      "fonts": {
-        "bookDefault": "Book default",
-        "serif": "Serif",
-        "sansSerif": "Sans-serif",
-        "monospace": "Monospace"
-      }
+      "hyphenation": "Hyfenering"
     },
     "search": {
       "placeholder": "Sök i bok (min {min} chars)...",
@@ -6111,9 +5956,6 @@
       "scrollModeHint": "Använd \"Inga luckor\" för webtoons och vertikala remsor.",
       "readingDirection": "Läsa riktning",
       "pageView": "Sidvy",
-      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
-      "spreadSection": "Two-page spread",
-      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Sprid justering",
       "spreadGap": "Sprid mellanrum",
       "spreadGapValue": "{value}px",
@@ -6188,10 +6030,6 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} av {total} läst ({percentage}%)"
-    },
-    "ownership": {
-      "label": "In library",
-      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Möjliga mellanrum:"
@@ -6277,7 +6115,6 @@
       "namePlaceholder": "t.ex. olästa Sci-Fi",
       "icon": "Ikon",
       "iconPlaceholder": "Välj en ikon...",
-      "nameRequired": "Name is required",
       "iconRequired": "Välj en ikon",
       "create": "Skapa",
       "creating": "Skapar...",
@@ -6733,7 +6570,6 @@
       },
       "bulkDeleteModal": {
         "title": "Radera massa",
-        "confirm": "{count, plural, =0 {Are you sure you want to delete # selected entity?} one {Are you sure you want to delete # selected entity?} other {Are you sure you want to delete # selected entities?}}",
         "deleteButton": "Ta bort {count}"
       },
       "mergeModal": {
@@ -6997,8 +6833,7 @@
       "users": "Användare",
       "account-activity": "Konto aktivitet",
       "magic-links": "Magiska länkar",
-      "oidc": "OIDC / SSO",
-      "server-fonts": "Server Fonts"
+      "oidc": "OIDC / SSO"
     },
     "system": {
       "file-naming": "Namngivning av fil",

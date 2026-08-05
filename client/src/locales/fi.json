@@ -89,7 +89,6 @@
       },
       "pageTitle": "Näyttö",
       "pageSubtitle": "Hallitse teemoja, kansia, ulkoasua ja miten kirjastosi esitetään.",
-      "mobileSummary": "Theme: {theme} • Accent: {accent} • Background: {background}",
       "themeMode": {
         "light": "Vaalea",
         "dark": "Tumma",
@@ -168,8 +167,7 @@
           "blush": "Punastuminen"
         },
         "accentColor": {
-          "label": "Korostuksen väri",
-          "hint": "Controls highlights and interactive elements"
+          "label": "Korostuksen väri"
         },
         "cornerRadius": {
           "label": "Corner radius",
@@ -432,8 +430,7 @@
           "saved": "Kuvake tallennettu",
           "updated": "Kuvake päivitetty",
           "deleted": "Kuvake poistettu",
-          "bulkDeleted": "{count, plural, =0 {ei poistanut kuvakkeita} one {Poistettu # kuvake} other {Poistettu # kuvakkeita}}",
-          "bulkDeletePartial": "Deleted {deleted}, {failed} failed"
+          "bulkDeleted": "{count, plural, =0 {ei poistanut kuvakkeita} one {Poistettu # kuvake} other {Poistettu # kuvakkeita}}"
         },
         "errors": {
           "load": "Kuvakkeiden lataaminen epäonnistui",
@@ -594,7 +591,6 @@
       "noExpiry": "Ei vanhentunut",
       "expired": "Vanhentunut",
       "expiresOn": "Vanhenee {date}",
-      "revokedOn": "Revoked {date}",
       "expiredOn": "Vanhentunut {date}",
       "usesCount": "{count, plural, =0 {ei käytä} one {yksi käyttää} other {# käyttää}}",
       "copied": "Kopioitu!",
@@ -645,8 +641,7 @@
       "copyLinkAria": "Kopioi linkki kohteelle {label}",
       "pauseAria": "Keskeytä {label}",
       "resumeAria": "Jatka {label}",
-      "revokeAria": "Revoke {label}",
-      "lastUsedLabel": "Last used {date}"
+      "revokeAria": "Revoke {label}"
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -670,13 +665,11 @@
         "slug": "Slug",
         "slugHint": "Yksilöllinen tunniste (pienet kirjaimet, väliviivat). Myöhemmin ei voi muuttaa.",
         "displayName": "Näytön Nimi",
-        "displayNameHint": "Shown on the login button.",
         "iconUrl": "Kuvakkeen URL",
         "iconUrlHint": "Valinnainen logo näytetään kirjautumispainikkeen vieressä.",
         "iconPreviewAlt": "kuvakkeen esikatselu",
         "connection": "Yhteys",
         "issuerUri": "Myöntäjän URI",
-        "issuerUriHint": "The provider's base URL.",
         "test": "Testi",
         "testing": "Testataan...",
         "clientId": "Asiakkaan Tunnus",
@@ -715,7 +708,6 @@
       },
       "groupMappings": {
         "title": "Ryhmän Kartoitukset",
-        "description": "Map OIDC group claims to BookOrbit permissions. Synced on every login.",
         "noPermission": "Ei oikeuksia",
         "empty": "Ryhmämäärityksiä ei ole määritetty.",
         "addMapping": "Lisää kartoitus",
@@ -757,15 +749,12 @@
         "recommendationsGroup": "Suositukset",
         "achievementsGroup": "Saavutukset",
         "updatesGroup": "Päivitykset",
-        "importFromBooklore": "Import from Booklore",
         "bookloreImportConfigured": "Bookloren tuonti määritetty",
         "migrationRunning": "Siirtolaisuus käynnissä",
         "migrationCompleted": "Muuttoliike valmis",
         "migrationFailed": "Siirto epäonnistui",
         "importDescription": "Kertaluonteinen tuonti kirjoja, metadataa ja lukeminen edistymistä edellisen Booklore asennus.",
         "configuredDescription": "Lähde: {name}. Ei siirtolaisuutta vielä - jatka tuonnin käynnistämistä.",
-        "runningDescription": "Stage: {stage} - started {started}",
-        "completedDescription": "From {name} - completed {date}",
         "migrationErrorGeneric": "Siirron aikana tapahtui virhe.",
         "stageInitializing": "alustetaan",
         "recently": "äskettäin",
@@ -779,7 +768,6 @@
         "running": "Käynnissä...",
         "backfillAchievements": "Backfill saavutukset",
         "backfillAchievementsHint": "Arvioi saavutukset uudelleen kaikkien käyttäjien kesken.",
-        "backfillResult": "Processed {users} users; granted {awards} awards.",
         "runBackfill": "Suorita Backfill",
         "checkForUpdates": "Tarkista päivitykset",
         "checkForUpdatesHint": "Tarkista GitHub automaattisesti uuden version käynnistyksen yhteydessä ja näytä ilmaisin sivupalkissa, kun sellainen on saatavilla.",
@@ -829,7 +817,6 @@
         "badgeFailed": "Epäonnistui",
         "mediaPathRequired": "Vaaditaan kirjasivujen siirtämiseen.",
         "mediaPathAbsolute": "Käytä absoluuttista polkua (esimerkiksi /books). Suhteellisia polkuja ei tueta.",
-        "mediaPathConfigured": "Cover import path configured. Use Test Connection to verify access and Booklore images folder structure.",
         "issueSaveSource": "Tallenna lähdeyhteysasetukset",
         "issueValidateSource": "Vahvista lähdeyhteys",
         "issueSaveMappings": "Tallenna käyttäjän ja polun sidokset",
@@ -838,7 +825,6 @@
         "issueResolveDuplicates": "Ratkaise kaksoiskappaleet kohdekirjasta löydettävissä kuivan ajon aikana",
         "issueWaitActiveRun": "Odota aktiivista suoritusta lopettaaksesi",
         "sourceRecordId": "Lähdetietueen ID #{id}",
-        "byAuthorWithId": "by {author} (ID: {id})",
         "filePathWithId": "{path} (ID: {id})",
         "bookloreSourceId": "Booklore source ID: {id}",
         "libraryBookNum": "Kirjaston kirja #{id}",
@@ -851,9 +837,7 @@
         "errorLoadSuggestions": "Käyttäjän kartoitusehdotuksia ei voitu ladata",
         "requiredFields": "Isäntän, käyttäjän, tietokannan ja lähdekoodin nimi vaaditaan",
         "connectionTestPassedWithWarnings": "Yhteyden testi läpäisi varoitukset",
-        "connectionTestPassedWithCount": "Connection test passed with {count} warning(s). First: {first}",
         "connectionTestPassed": "Yhteyden testi ohitettu",
-        "connectionOkMissingTables": "Connection ok, but {count} required table(s) are missing",
         "cannotTestMediaPathActiveRun": "Mediareittiä ei voi testata, kun suoritus on aktiivinen",
         "mediaRootPathRequiredCover": "Media Root polkua tarvitaan kansi tuontiin.",
         "useAbsolutePath": "Käytä absoluuttista polkua (esimerkiksi /books).",
@@ -862,7 +846,6 @@
         "mediaPathValidationFailed": "Mediapolun vahvistus epäonnistui.",
         "connectionFailedBeforeMediaPath": "Yhteystesti epäonnistui ennen kuin mediapolun vahvistus voidaan suorittaa.",
         "cannotModifySourceActiveRun": "Lähdekoodia ei voi muokata, kun suoritus on aktiivinen",
-        "sourceSavedValidatedWarnings": "Source saved and validated with {count} warning(s)",
         "sourceSavedValidated": "Lähde tallennettu ja vahvistettu",
         "errorSaveValidateSource": "Lähdekoodin tallennus tai validointi epäonnistui",
         "cannotSaveMappingsActiveRun": "Yhdistämisiä ei voi tallentaa kun suoritus on aktiivinen",
@@ -874,7 +857,6 @@
         "errorSaveMappings": "Yhdistämisten tallennus epäonnistui",
         "cannotRunDryRunActiveRun": "Ei voida suorittaa kuivaajaa kun suoritus on aktiivinen",
         "saveMappingsFirst": "Tallenna kartoitukset ensin",
-        "dryRunCompleted": "Dry-run completed: {matched} matched, {unresolved} unresolved",
         "dryRunFailed": "Dry-run epäonnistui",
         "selectSourceForAllGroups": "Valitse lähdekirja kaikille {count} kaksoisryhmälle",
         "duplicatesResolved": "Kaksoiskappaleet ratkaistut",
@@ -908,7 +890,6 @@
         "strategyPathMapping": "Yhdistetty yhdistettyyn tiedostopolkuun",
         "strategyTitleAuthor": "Täsmätty otsikon ja tekijän mukaan",
         "strategyUnavailable": "Match strategia ei käytettävissä",
-        "userPreviewCounts": "{statuses} statuses, {progress} progress entries, {bookmarks} bookmarks, {annotations} annotations, {collections} collection entries",
         "connErrorUnreachable": "Ei saatu yhteyttä tietokantapalvelimeen. Tarkista isäntä ja portti.",
         "connErrorAuth": "Todennus epäonnistui. Tarkista käyttäjätunnus ja salasana.",
         "connErrorUnknownDatabase": "Tietokantaa ei löytynyt. Tarkista tietokannan nimi.",
@@ -951,9 +932,7 @@
         "selectTargetFolder": "Select target folder...",
         "remove": "Poista",
         "pathValidation": "Reitin vahvistus",
-        "pathValidationMapped": "{mapped} of {total} source books have a mapped path",
         "pathValidationUnmatched": "{count} yhdistettyä polkua ei löydy levyltä - nuo kirjat palaavat ISBN / otsikon täsmäytykseen",
-        "pathValidationAllMatched": "All {count} mapped paths found on disk",
         "saveMappings": "Tallenna Kartoitukset",
         "runDryRun": "Suorita Dry-Run",
         "matched": "Osumat:",
@@ -1024,11 +1003,9 @@
         "matchedBooksHint": "Näitä kuivausjuoksupisteitä käytettiin päättämään mitkä kirjaston kirjat vastaanottivat tuotuja tietoja.",
         "sourceBookFallback": "Lähdekirja {id}",
         "libraryBookFallback": "Kirjaston kirja {id}",
-        "unresolvedBooksHeading": "Unresolved books ({count})",
         "unresolvedBooksHint": "Nämä kirjat ovat olemassa lähteessä, mutta niitä ei voitu sovittaa mihinkään kirjaan kirjastostasi.",
         "mappedUsersHeading": "Kartoitetut käyttäjät ({count})",
         "mappedUsersHint": "Käyttäjän yhteenlasketut määrät tulevat kuivakäyttöisestä esikatselusta, joka välimuistissa siirtymissuunnitelmassa.",
-        "coverImportsFailed": "{count} cover import(s) failed. Detailed failure rows are not stored.",
         "backToSetup": "Takaisin asetuksiin"
       },
       "libraries": {
@@ -1075,11 +1052,8 @@
         "libraryUpdated": "Kirjasto \"{name}\" päivitetty",
         "libraryDeleted": "\"{name}\" poistettu",
         "deleteFailed": "Kirjaston poisto epäonnistui",
-        "scanningProgress": "Scanning {pct}% ({processed}/{total})",
-        "scanDone": "Done - {added} added, {updated} updated",
         "scanFailedWithError": "Epäonnistui: {error}",
         "scanFailed": "Skannaus epäonnistui",
-        "refreshingCovers": "Refreshing covers {pct}% ({processed}/{total})",
         "coversRefreshed": "Kattaa päivitetyt ({count} käsitelty)"
       },
       "authorEnrichment": {
@@ -1133,15 +1107,7 @@
         "users": "Käyttäjät",
         "account-activity": "Tilin Toiminta",
         "magic-links": "Magic Linkit",
-        "oidc": "OIDC / SSO",
-        "server-fonts": "Server Fonts"
-      },
-      "serverFonts": {
-        "title": "Server Fonts",
-        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
-        "listLabel": "Server fonts",
-        "noFontsYet": "No server fonts yet",
-        "noFontsHint": "Fonts you add here appear in every user's reader."
+        "oidc": "OIDC / SSO"
       }
     },
     "common": {
@@ -1226,7 +1192,6 @@
           "yesterday": "eilen",
           "daysAgo": "{count, plural, one {# päivä sitten} other {# päivää sitten}}",
           "label": "Viimeksi suoritettu: {when}",
-          "labelQueued": "Last run: {when} - queued {count} books",
           "labelNoneEligible": "Viimeksi käytetty: {when} - ei hyväksyttäviä kirjoja"
         },
         "conditions": {
@@ -1295,8 +1260,7 @@
           "audnexus": "Yhteisön ohjaamat äänikirjan metatiedot. Asennusta ei tarvita.",
           "comicvine": "Comic book metadata ComicVinesta. Ilmainen API-avain vaaditaan Comicvine.gamespot.com:lta.",
           "ranobedb": "Japanin kevyt uusi metatiedot RanobeDB. Ei asetuksia tarvita.",
-          "lubimyczytac": "Puolan kirjaluettelo (lubimyczytac.pl). Scrapes julkinen kirja-sivut. Ei asennus tarvita.",
-          "aladin": "Korean book metadata from Aladin (알라딘). A TTB Key from aladin.co.kr is required."
+          "lubimyczytac": "Puolan kirjaluettelo (lubimyczytac.pl). Scrapes julkinen kirja-sivut. Ei asennus tarvita."
         },
         "blocked": {
           "google": "Google Books vaatii API-avaimen ennen kuin se voidaan ottaa käyttöön",
@@ -1370,10 +1334,6 @@
           "classification": "Luokitus",
           "audiobook": "Äänikirja"
         },
-        "groupSummary": {
-          "base": "{fields} fields · {enabled} enabled",
-          "withOverrides": "{base} · {overrides} overrides"
-        },
         "table": {
           "field": "Kenttä",
           "activeProviders": "Aktiiviset Palveluntarjoajat (tilattu prioriteetin mukaan)",
@@ -1412,11 +1372,9 @@
         "add": "Lisää",
         "filterPlaceholder": "Suodata lohkolista",
         "entryCount": "{count, plural, one {# merkintä} other {# merkintää}}",
-        "filteredCount": "{shown} of {total}",
         "noFilterMatch": "Mikään estetty tyylilaji ei vastaa nykyistä suodatinta.",
         "emptyTitle": "Ei estettyjä tyylilajeja",
-        "emptyHint": "Lisää tarkat arvot, kuten Audiobook tai Adult pitämään ne poissa haetuista metatiedoista.",
-        "removeLabel": "Remove {genre}"
+        "emptyHint": "Lisää tarkat arvot, kuten Audiobook tai Adult pitämään ne poissa haetuista metatiedoista."
       },
       "customFields": {
         "label": "Tunniste",
@@ -1462,7 +1420,6 @@
         "preview": "Esikatselu",
         "sampleValue": "Näytteen arvo",
         "enabledLibraries": "Käytössä Olevat Kirjastot",
-        "countOf": "{selected} of {total}",
         "selectAll": "Valitse kaikki",
         "clear": "Tyhjennä",
         "noLibraries": "Kirjastoja ei ole vielä saatavilla.",
@@ -1530,7 +1487,6 @@
         "paginated": "Sivutettu",
         "scrolled": "Vieritetty",
         "fixedLayoutSpread": "Kiinteät asettelun sivut",
-        "fixedLayoutSpreadHint": "Default for manga, comics, and image-based EPUBs",
         "bookDefault": "Varaa oletus",
         "singlePage": "Yksi sivu",
         "columns": "Sarakkeet",
@@ -1649,7 +1605,6 @@
         "browse": "selaa",
         "fileTypesHint": "TTF, OTF, WOFF, WOFF2 - max 10 MB kukin",
         "yourFonts": "Sinun Fontit",
-        "fontsUsed": "{count} / {max} used",
         "noFontsYet": "Kirjasimia ei ole vielä ladattu",
         "noFontsHint": "Vedä kirjasintiedosto yläpuolelle päästäksesi alkuun.",
         "fileCount": "{count, plural, =0 {ei tiedostoja} one {# tiedosto} other {# tiedostoa}}",
@@ -1676,12 +1631,7 @@
         "deleteFamilyFailed": "Kirjasinperheen poistaminen epäonnistui",
         "demoCannotManage": "Demo-rajoitettu tili ei voi hallita kirjasimia",
         "fileAdded": "\"{name}\" lisätty",
-        "uploadFailed": "Lähetys epäonnistui",
-        "serverFontsTitle": "Server fonts (shared by admin)",
-        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
-        "serverFontsShown": "{count} of {total} shown",
-        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
-        "serverFontVisibilityFailed": "Failed to update server font visibility"
+        "uploadFailed": "Lähetys epäonnistui"
       },
       "bookDock": {
         "title": "Kirja Telakka",
@@ -1812,7 +1762,6 @@
         "tokenLanguage": "Kieli",
         "tokenOriginalFilename": "Alkuperäinen tiedostonimi (ilman laajennusta)",
         "tokenExtension": "Tiedostopääte (ilman pistettä)",
-        "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
         "browseTokensAndExamples": "Selaa kuponkeja ja esimerkkejä"
       },
       "kobo": {
@@ -1854,10 +1803,7 @@
         "twoWaySyncHint": "Synkronoi lukusijainti BookOrbitin ja Kobon välillä. Vaatii KEPUB-toimituksen tarkkojen sijaintien varalta ja luotettavan sivun palautuksen.",
         "syncHighlights": "Synkronoi BookOrbit kohokohdat Koboon",
         "syncHighlightsHint": "Lähetä BookOrbitissa tai KOReaderissa tehdyt kohokohdat Koboon. Kobo kohokohdat tuodaan BookOrbitiin, vaikka se olisi pois päältä. Yhdistetyt kommentit synkronoivat muokkauksia ja poistavat molemmat. Vaatii KEPUB-toimitusta; Kobon kirjan tulee olla KEPUB ladattu BookOrbitista.",
-        "convertKepub": "Convert to KEPUB",
-        "convertKepubHint": "Send eligible EPUBs as KEPUB. This stays on when progress sync or BookOrbit-to-Kobo highlights are enabled. On the next Kobo sync, affected books are offered again as KEPUB downloads; remove any old EPUB copy if Kobo keeps opening it.",
         "forceHyphenation": "Pakota välkkyminen",
-        "forceHyphenationHint": "Ensures consistent text justification. This will regenerate cached KEPUBs.",
         "progressThresholds": "Edistymisen Kynnysarvot",
         "progressThresholdsHint": "Määrittele kun Kobon lukeminen päivittää kirjaston tilaa.",
         "markAsReading": "Merkitse luetuksi",
@@ -1925,7 +1871,6 @@
           },
           "readingPositionSyncedTitle": "Lukeminen synkronoitu: {title}",
           "readingPositionSynced": "Lukeminen synkronoitu",
-          "labelWithTitle": "{label}: {title}",
           "updateCount": "{count, plural, one {# päivitys} other {# päivitystä}}",
           "directionToKobo": "Kirjankierto -> Kobo",
           "directionToBookOrbit": "Kobo - > Kirjankierto",
@@ -1934,7 +1879,6 @@
           "summary": {
             "noLibraryUpdatesPending": "Tälle laitteelle ei odoteta yhtään kirjastopäivitystä",
             "libraryUpdatesPrepared": "{count, plural, one {# kirjaston päivitys valmiina laitteelle} other {# kirjaston päivitystä valmiina laitteelle}}",
-            "bookDownloadedBy": "{title} was downloaded by {device}",
             "booksDownloaded": "{count, plural, one {# kirja ladattu} other {# kirjaa ladattu}}",
             "progressUpdatesSyncedFor": "{count, plural, one {# edistymispäivitystä synkronoitu {title}} other {# edistymispäivitystä synkronoitu {title}}}",
             "progressUpdatesSynced": "{count, plural, one {# edistymispäivitystä synkronoitu} other {# edistymispäivitystä synkronoitu}}",
@@ -1949,7 +1893,6 @@
             "highlightsImportedFromKoboFor": "{count, plural, one {# korostus tuotu Kobosta {title}} other {# kohokohtaa tuotu Kobosta {title}}}",
             "highlightsImportedFromKobo": "{count, plural, one {# korostus tuotu Kobosta} other {# kohokohtia tuotu Kobosta}}"
           },
-          "timeRange": "{from} to {to}",
           "eventsGrouped": "{count, plural, one {# tapahtuma ryhmitelty} other {# tapahtumaa ryhmitelty}}",
           "removedDevice": "Poistettu laite",
           "loadMoreFailed": "Ei voitu ladata lisää historiaa",
@@ -1966,8 +1909,7 @@
           "loadMore": "Lataa lisää toimintaa"
         },
         "howBooksSynced": {
-          "title": "Kuinka kirjat synkronoidaan",
-          "body": "To send books to your Kobo device, you must enable {syncToKobo} on the collections containing those books. Open any collection from the sidebar, click the Edit icon, and toggle {syncToKobo}. Books that are not part of an enabled collection will not sync."
+          "title": "Kuinka kirjat synkronoidaan"
         },
         "nextSteps": {
           "title": "Seuraavat Vaiheet",
@@ -2131,9 +2073,6 @@
           "loadingManual": "Ladataan manuaalisia tiivistelinkkejä...",
           "noUnmatched": "KOReader-kirjoja ei löytynyt.",
           "noManual": "Ei manuaalista KOReader-linkkiä.",
-          "pageOf": "Page {page} of {total}",
-          "showingRange": "Showing {start}-{end} of {total}",
-          "unknownFile": "Unknown KOReader file {hash}",
           "unknownAuthor": "Tuntematon tekijä",
           "noTitleOrAuthor": "Ei julkaistua otsikkoa tai kirjoittajaa",
           "bookNumber": "Kirjanorbit- kirja #{id}",
@@ -2210,7 +2149,6 @@
         "unmatchedBooks": "Vastaamattomat kirjat",
         "deviceRemoved": "Laite poistettu",
         "removeDeviceFailed": "Laitteen poistaminen epäonnistui",
-        "removeDeviceConfirmTitle": "Remove {device}?",
         "removeDeviceConfirmBody": "Tämä poistaa pysyvästi tämän laitteen synkronoidun etenemisen, lukemisen toiminnan, ja kaikki vastaamattomat kirjamerkinnät eivät enää ole toisen laitteen ilmoittamia. Jos laite synkronoi uudelleen myöhemmin, se ilmaantuu uudelleen uutena kohteena."
       },
       "opds": {
@@ -2283,15 +2221,11 @@
   },
   "achievements": {
     "title": "Saavutukset",
-    "tiersCount": "{earned} / {total} tiers",
     "loadFailed": "Saavutusten lataaminen epäonnistui",
     "tryAgain": "Yritä uudelleen",
     "noMatchFilter": "Suodatinta ei vastaa saavutuksia",
     "secretAchievement": "Salainen Saavutus",
-    "earnedOn": "Earned {date}",
     "whileReading": "Lukeessa “{title}”",
-    "tierProgress": "Tier {earned} of {total}",
-    "progressToNext": "{current} / {threshold} to {name}",
     "rarity": {
       "common": "Yleinen",
       "rare": "Harvinainen",
@@ -2361,8 +2295,7 @@
         "description": "Yritä muuttaa tai tyhjentää nykyiset suodattimet."
       },
       "pagination": {
-        "label": "Tilin toimintasivut",
-        "page": "Page {page} of {totalPages}"
+        "label": "Tilin toimintasivut"
       },
       "errors": {
         "load": "Tilin aktiviteetin lataaminen epäonnistui."
@@ -2373,7 +2306,6 @@
       "subtitle": "Lukeminen tätä käyttäjää vapaaehtoisesti päätti jakaa.",
       "auditNotice": "Pääsy tähän profiiliin on tallennettu ja näkyvä käyttäjälle.",
       "period": "Raportointijakso",
-      "periodDays": "Last {count} days",
       "durationMinutes": "{count, plural, one {# minuutti} other {# minuuttia}}",
       "durationHours": "{count, plural, one {# tunti} other {# tuntia}}",
       "metrics": {
@@ -2562,8 +2494,7 @@
         "filtered": "Yksikään käyttäjä ei vastaa nykyistä hakua ja suodattimia."
       },
       "pagination": {
-        "label": "Käyttäjien sivutus",
-        "page": "Page {page} of {totalPages}"
+        "label": "Käyttäjien sivutus"
       },
       "editUserAria": "Muokkaa {name}",
       "resetPasswordAria": "Nollaa salasana: {name}",
@@ -2592,8 +2523,7 @@
       "pageSelected": "Sivu valittu",
       "selectPage": "Valitse sivu",
       "clear": "Tyhjennä",
-      "recolorTo": "Suorita & {color}",
-      "restyleTo": "Restyle to {style}"
+      "recolorTo": "Suorita & {color}"
     },
     "chips": {
       "active": "Aktiivinen:",
@@ -2610,8 +2540,6 @@
       "clearAll": "Tyhjennä kaikki"
     },
     "pagination": {
-      "showing": "Showing {start}-{end} of {total}",
-      "pageOf": "Page {page} of {totalPages}",
       "firstPage": "Ensimmäinen sivu",
       "previousPage": "Edellinen sivu",
       "nextPage": "Seuraava sivu",
@@ -2675,7 +2603,6 @@
       "title": "Huomautukset",
       "totalCount": "{count} yhteensä",
       "bookCount": "{count, plural, =0 {ei kirjoja} one {# kirja} other {# kirjoja}}",
-      "noteCount": "{count, plural, =0 {no notes} one {# note} other {# notes}}",
       "export": "Vie",
       "exportMarkdown": "Markdown",
       "exportCsv": "CSV",
@@ -2756,10 +2683,8 @@
     "detailResource": "Resurssi: {value}",
     "detailResourceId": "Resurssitunnus: {value}",
     "deletedBooks": "Poistetut kirjat",
-    "deletedBookDetail": "{title} (book #{id})",
     "untitledBook": "Nimetön",
     "deletedBooksOmitted": "{count, plural, one {# ylimääräistä kirjaa jätettiin pois} other {# ylimääräistä kirjaa jätettiin pois}}",
-    "showing": "Showing {from}-{to} of {total}",
     "prev": "Edellinen",
     "chips": {
       "search": "Haku: {value}",
@@ -2849,7 +2774,6 @@
       "MagicLinkRevoke": "Peruuta maaginen linkki",
       "MagicLinkActivate": "Aktivoi magic linkki",
       "MagicLinkDeactivate": "Poista magic linkki käytöstä",
-      "OidcLogin": "Sign in with OIDC",
       "OidcUserProvisioned": "Provision OIDC käyttäjä",
       "OidcIdentityLinked": "Linkin OIDC henkilöllisyys",
       "OidcIdentityUnlinked": "Poista yhteys OIDC identiteettiin",
@@ -2886,7 +2810,6 @@
       "BookBulkUpdateTags": "Päivitä kirjan tunnisteet",
       "BookBulkSetMetadataLock": "Aseta metadatan lukitukset",
       "BookBulkEditMetadata": "Muokkaa kirjan metatietoja",
-      "BookBulkMoveLibrary": "Move books to another library",
       "BookReadingStateReset": "Palauta lukemisen tila",
       "BookWriteAndRename": "Kirjoita metatiedot ja uudelleennimeä tiedosto",
       "CollectionCreate": "Luo kokoelma",
@@ -3087,7 +3010,6 @@
       "desc": "Desc",
       "filters": "Suodattimet",
       "clear": "Tyhjennä",
-      "allLoaded": "All {total} authors loaded",
       "sort": {
         "name": "Nimi",
         "sortName": "Lajittele Nimi",
@@ -3118,8 +3040,6 @@
         "refreshed": "Tekijän metatiedot päivitetty",
         "refreshedNoImage": "Metatiedot päivitetty, mutta kirjoittajan kuvaa ei löytynyt.",
         "refreshFailed": "Kirjoittajan metatietojen päivitys epäonnistui",
-        "bulkRefreshPartial": "Refreshed {updated} author(s), {failed} failed",
-        "bulkRefreshSuccess": "Refreshed metadata for {updated} author(s)",
         "bulkRefreshFailed": "Valittujen kirjoittajien päivittäminen epäonnistui",
         "deleteSuccess": "{count, plural, =0 {Poistettu # tekijä, vaikutti {books} kirjat} one {Poistettu # tekijä, vaikutti {books} kirjat} other {Poistettu # tekijää; vaikutti {books} kirjoja}}",
         "deleteFailed": "Tekijän (kirjoittajien) poistaminen epäonnistui"
@@ -3149,13 +3069,11 @@
         "searchPlaceholder": "Etsi kirjoittajia yhdistääksesi tämän kirjoittajan",
         "searching": "Haetaan...",
         "bookCount": "{count, plural, =0 {ei kirjoja} one {# kirja} other {# kirjoja}}",
-        "selectedSummary": "Selected {count} author(s), approx. {books} books affected.",
         "merging": "Yhdistetään...",
         "mergeSelected": "Yhdistä Valitut",
         "confirmLabel": "Yhdistä"
       },
       "mergeDialog": {
-        "title": "Merge {count} author(s) into \"{name}\"?",
         "titleFallback": "Yhdistä valitut kirjoittajat?",
         "description": "Tämä yhdistää valitut kirjoittajat nykyiseen kirjoittajaan ja linkittää liittyvät kirjat. Tätä toimintoa ei voi perua.",
         "descriptionEmpty": "Tätä toimintoa ei voi peruuttaa."
@@ -3193,7 +3111,6 @@
         "imageUploadFailed": "Kuvan lataaminen ei onnistunut",
         "imageRemoved": "Kirjoittajan kuva poistettu",
         "imageRemoveFailed": "Kuvan poisto epäonnistui",
-        "mergeSuccess": "Merged {count} author(s); affected {books} books",
         "mergeFailed": "Tekijöiden yhdistäminen epäonnistui",
         "deleteSuccess": "Poistettu kirjailija; vaikuttaa {books} kirjoihin",
         "deleteFailed": "Käyttäjän poisto epäonnistui"
@@ -3345,12 +3262,8 @@
         "isFinished": "on valmis",
         "isLocked": "on lukittu",
         "isUnlocked": "on avattu",
-        "isUpNext": "on ylös seuraava",
-        "isTrue": "is yes",
-        "isFalse": "is no"
+        "isUpNext": "on ylös seuraava"
       },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
       "anyProvider": "Mikä tahansa tarjoaja",
       "communityRatingProvider": "Yhteisön luokituspalvelujen tarjoaja",
       "loadingLibraries": "Ladataan kirjastoja...",
@@ -3371,7 +3284,6 @@
       },
       "scoreRangePlaceholder": "0-100",
       "valuePlaceholder": "arvo",
-      "maxPlaceholder": "max",
       "to": "päättyen",
       "group": "Ryhmä",
       "addRule": "Lisää sääntö",
@@ -3493,7 +3405,6 @@
       "openIn": "Avaa nimellä {provider}",
       "pages": "{count, plural, =0 {# sivu} one {# sivu} other {# sivua}}",
       "primaryFile": "Ensisijainen Tiedosto",
-      "fileNumber": "File #{id}",
       "showLess": "Näytä vähemmän",
       "showMore": "Näytä lisää",
       "collections": "Kokoelmat",
@@ -3510,7 +3421,6 @@
       "booksSelected": "{count, plural, =0 {# kirja valittu} one {# kirja valittu} other {# kirjaa valittu}}",
       "loadingMoreBooks": "Ladataan lisää kirjoja",
       "sort": "Järjestä",
-      "refreshingMetadata": "Refreshing metadata {processed} / {total}",
       "failedCount": "{count} epäonnistui",
       "remainingCount": "{count} jäljellä",
       "readOnlyNotice": "Taulujen muokkaus on poistettu käytöstä pienemmillä ruudukoilla. Siirry listaan tai ruudukkoon nopeampia toimintoja varten.",
@@ -3521,7 +3431,6 @@
       "scrollToTop": "Vieritä ylös",
       "selectedStatus": "{count} valittu",
       "filtered": "Suodatettu",
-      "loadedStatus": "{loaded} of {total} loaded",
       "bookCount": "{count, plural, =0 {# kirja} one {# kirja} other {# kirjaa}}",
       "keyboardShortcutsTitle": "Näppäimistön pikakuvakkeet (?)",
       "showKeyboardShortcuts": "Näytä pöytänäppäimistön pikakuvakkeet",
@@ -3581,8 +3490,6 @@
         "done": "Valmis",
         "retry": "Yritä Uudelleen",
         "filesAdded": "{count, plural, =0 {mitään tiedostoja ei lisätty} one {yksi tiedosto lisättiin} other {# tiedostoa lisätty}}",
-        "uploadedFailed": "{done} uploaded, {failed} failed",
-        "uploadingProgress": "{done} of {total} uploading...",
         "renameAfter": "Nimeä kaikki kirjatiedostot uudelleen lähetyksen jälkeen",
         "uploadCount": "Lataa ({count})",
         "upload": "Lähetä"
@@ -3698,8 +3605,7 @@
         "koboRemovedByDeviceTooltip": "Kobo raportoi tästä kirjasta poistettu.",
         "koboNotSynced": "Ei synkronoitu",
         "koboNotSyncedTooltip": "Jonossa seuraavaa Kobon synkronointia varten.",
-        "filesNotFound": "Tiedostoja ei löytynyt",
-        "filesNotFoundDescription": "The file(s) for this book can no longer be found on disk. Metadata is still available. Run a library scan to confirm, or remove the record."
+        "filesNotFound": "Tiedostoja ei löytynyt"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {ei kenttiä} one {yksi kenttä} other {# kenttää}}",
@@ -3712,11 +3618,8 @@
         "writing": "Kirjoitetaan...",
         "saveInProgress": "Tallenna käynnissä",
         "writeManualLibraryDisabled": "Kirjoita metatiedot tiedostoon ja uudelleennimeä levylle; automaattinen kirjoitus-takaisinkirjaus on poistettu käytöstä tässä kirjastossa",
-        "writeManualTooltip": "Write {fields} to {target} and rename on disk",
-        "applyResult": "{skipped}, {updated}",
         "skippedLockedFields": "{count, plural, =0 {Ei lukittuja kenttiä} one {Ohitettu yksi lukittu kenttä} other {Ohitettu # lukittua kenttää}}",
         "updatedFields": "{count, plural, =0 {ei päivitetty kenttiä} one {päivitti yhtä kenttää} other {päivitti # kenttiä}}",
-        "wroteFieldsToFile": "Wrote {fields} to file",
         "fileWriteFailedReason": "Tiedoston kirjoittaminen epäonnistui: {reason}",
         "fileWriteFailed": "Tiedoston kirjoittaminen epäonnistui",
         "fileWriteSkippedReason": "Tiedostotyyppi ohitettu: {reason}",
@@ -3792,9 +3695,7 @@
           "fieldsSelected": "{count, plural, =0 {kenttiä ei ole valittu} one {yksi kenttä valittu} other {# kenttää valittu}}",
           "results": "Tulokset",
           "providerMatches": "{provider} osumaa",
-          "selectedOf": "Selected {selected} of {total}",
           "yearUnknown": "Tuntematon vuosi",
-          "indexOf": "{index} of {total}",
           "switchedResult": "Vaihdettu tulos. Tämän palveluntarjoajan aiemmat valinnat tyhjennettiin.",
           "selectFieldsToApply": "Valitse sovellettavat kentät",
           "copyMissing": "Kopioi Puuttuu",
@@ -3864,7 +3765,6 @@
         "renameFailed": "Tiedoston uudelleennimeäminen epäonnistui",
         "deleteFailed": "Tiedoston poistaminen epäonnistui",
         "addFile": "Lisää Tiedosto",
-        "lastSynced": "Last synced: {time}",
         "sort": {
           "label": "Järjestä:",
           "name": "Nimi",
@@ -3991,8 +3891,7 @@
           "eta": {
             "max": "99h+ loppuun",
             "minutes": "~{m}m loppuun",
-            "hours": "~{h}h loppuun",
-            "hoursMinutes": "~{h}h {m}m to finish"
+            "hours": "~{h}h loppuun"
           },
           "momentum": {
             "none": "Ei toimintaa kahden viimeksi kuluneen viikon aikana",
@@ -4059,8 +3958,7 @@
           "confirmDeleteTitle": "Klikkaa uudelleen vahvistaaksesi poisto",
           "confirmDeleteAria": "Vahvista istunnon poistaminen",
           "deleteAria": "Poista istunto",
-          "loadMore": "Lataa lisää",
-          "showing": "Showing {shown} of {total} sessions"
+          "loadMore": "Lataa lisää"
         }
       },
       "richDescription": {
@@ -4095,11 +3993,7 @@
         "seriesPlaceholder": "Sarja",
         "moveUp": "Siirrä ylös",
         "moveDown": "Siirrä alas",
-        "removeSeries": "Poista sarja",
-        "seriesIndexLabel": "Position in series",
-        "totalLabel": "Books in series",
-        "totalPlaceholder": "of",
-        "totalHint": "Total books in this series. Shared with everyone who has this series."
+        "removeSeries": "Poista sarja"
       }
     },
     "table": {
@@ -4174,74 +4068,10 @@
         "unread": "Lukemattomat"
       },
       "series": {
-        "bookCount": "{count, plural, =0 {(ei kirjoja)} one {(# kirja)} other {(# kirjaa)}}",
-        "readOfCount": "{read} of {total} read"
+        "bookCount": "{count, plural, =0 {(ei kirjoja)} one {(# kirja)} other {(# kirjaa)}}"
       },
       "text": {
         "openDetails": "Avaa tiedot"
-      }
-    },
-    "move": {
-      "title": "{count, plural, one {Move # book} other {Move # books}}",
-      "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
-      "searchPlaceholder": "Search libraries",
-      "currentLibrary": "Current",
-      "folderCount": "{count, plural, one {# folder} other {# folders}}",
-      "continue": "Continue",
-      "back": "Back",
-      "confirm": "{count, plural, one {Move # book} other {Move # books}}",
-      "action": "Move to library",
-      "review": {
-        "ready": "{count} ready",
-        "collisions": "{count, plural, one {# name conflict} other {# name conflicts}}",
-        "ineligible": "{count} cannot move",
-        "alreadyThere": "{count} already there",
-        "collisionsHeading": "Name conflicts",
-        "ineligibleHeading": "Cannot be moved",
-        "moreCollisions": "and {count} more"
-      },
-      "policy": {
-        "suggested": "Use suggested",
-        "keep_both": "Keep both",
-        "merge": "Merge",
-        "skip": "Skip"
-      },
-      "collision": {
-        "folder_path": "A book already uses this folder name",
-        "file_path": "A file already uses this path",
-        "hash_duplicate": "An identical copy is already in this library"
-      },
-      "ineligible": {
-        "book_not_present": "The files for this book are missing",
-        "no_content_file": "This book has no readable file",
-        "multi_file_target_per_file": "The destination stores one file per book, and this book has {detail} files",
-        "no_source_access": "You cannot edit the library this book is in",
-        "pattern_unresolved": "The destination library has no usable naming pattern",
-        "path_too_long": "The destination path would be too long",
-        "path_outside_target_root": "The destination path would fall outside the library folder"
-      },
-      "warning": {
-        "accessLoss": "{user} will stop seeing {count} of these books",
-        "koboImpact": "{count} books will leave {user}'s Kobo on the next sync",
-        "layout": {
-          "wrap_into_folder": "{count} books will each be placed in their own folder",
-          "dissolve_folder": "{count} book folders will be dissolved into single files"
-        },
-        "crossDevice": "Files move to another drive, so they are copied, verified, then removed."
-      },
-      "progress": {
-        "label": "Moving books to {library}",
-        "failed": "{count} failed"
-      },
-      "done": {
-        "summary": "Moved {count} books to {library}",
-        "merged": "{count} merged with copies already there",
-        "skipped": "{count} skipped",
-        "failed": "{count} failed"
-      },
-      "toast": {
-        "success": "Moved {count} books to {library}",
-        "partial": "Moved {moved} books, {failed} failed"
       }
     }
   },
@@ -4306,9 +4136,7 @@
       "failedToRetry": "Ei voitu yrittää uudelleen",
       "failedItemsRequeued": "Vaaditut kohteet",
       "bookComplete": "Metatietojen haku valmis - {done} kirjaa päivitetty",
-      "bookDoneWithFailures": "Metadata fetch done - {done} processed, {failed} failed",
-      "authorComplete": "Tekijän rikastus valmis - {done} kirjoittajaa päivitetty",
-      "authorDoneWithFailures": "Author enrichment done - {done} processed, {failed} failed"
+      "authorComplete": "Tekijän rikastus valmis - {done} kirjoittajaa päivitetty"
     }
   },
   "bookDock": {
@@ -4328,7 +4156,6 @@
     "destinationLibrary": "Kohteen Kirjasto",
     "destinationFolder": "Kohdekansio",
     "nFailed": "{count} epäonnistui",
-    "updatedOfFiles": "Updated {updated} of {total} files",
     "errorStatus": "Virhe {status}",
     "tab": {
       "all": "Kaikki",
@@ -4418,7 +4245,6 @@
       "renamePreview": "Nimeä esikatselu uudelleen",
       "moreFiles": "+{count} tiedostoa lisää",
       "start": "Aloita",
-      "filesFinalized": "{succeeded} of {total} files finalized",
       "checking": "Tarkistetaan valittuja tiedostoja...",
       "readyCount": "{count, plural, =0 {ei ole valmiita tiedostoja} one {# tiedosto valmis} other {# tiedostoa valmis}}",
       "duplicateCount": "{count, plural, =0 {ei ole jo kirjastossa} one {# jo kirjastossa} other {# jo kirjastossa}}",
@@ -4457,7 +4283,6 @@
       "syncToKobo": "Synkronoi Koboon",
       "syncToKoboHint": "Tämän kokoelman kirjat tulevat näkyviin Kobo-laitteellasi",
       "deleteCollection": "Poista kokoelma",
-      "confirmDelete": "Confirm?",
       "deleting": "Poistetaan...",
       "saving": "Tallennetaan...",
       "deleted": "\"{name}\" poistettu",
@@ -4474,10 +4299,8 @@
       "empty": "Ei vielä kokoelmia. Luo yksi yllä.",
       "done": "Valmis",
       "added": "Lisätty",
-      "allAdded": "All {total} added",
       "inCollection": "Tässä kokoelmassa",
       "allInCollection": "Kaikki {total} tässä kokoelmassa",
-      "partialInCollection": "{partial} of {total} in this collection",
       "bookCount": "{count, plural, =0 {ei kirjoja} one {yksi kirja} other {# kirjoja}}",
       "loadFailed": "Kokoelmien lataaminen epäonnistui",
       "createdAndAdded": "{count, plural, =0 {Luotu \"{name}\" eikä lisännyt kirjoja} one {Luotu \"{name}\" ja lisäsi yhden kirjan} other {Luotu \"{name}\" ja lisäsi # kirjoja}}",
@@ -4496,13 +4319,11 @@
       "searching": "Haetaan...",
       "noResults": "Ei tuloksia",
       "loadingMore": "Ladataan lisää...",
-      "loadMore": "Load more ({loaded}/{total})",
       "allMatchesShown": "{count, plural, =0 {Kaikki 1 ottelu näkyi} one {Kaikki 1 ottelu näkyi} other {Kaikki # osumaa näkyi}}",
       "bookCount": "{count, plural, =0 {ei kirjoja} one {# kirja} other {# kirjoja}}",
       "fileCount": "{count, plural, =0 {ei tiedostoja} one {# tiedosto} other {# tiedostoa}}",
       "uploadedToast": "Ladattu {uploaded}",
       "uploadFailedToast": "Lataaminen epäonnistui {failed} kohdalla",
-      "uploadPartialToast": "Uploaded {uploaded}, {failed} failed",
       "bookDock": "Kirja Telakka",
       "statistics": "Tilastot",
       "achievements": "Saavutukset",
@@ -4538,7 +4359,6 @@
       "tools": "Työkalut",
       "libraries": "Kirjastot",
       "newLibrary": "Uusi Kirjasto",
-      "scanProgress": "{processed} / {total} books",
       "smartScopes": "Älykkäät Kohteet",
       "newSmartScope": "Uusi Älykäs Laajuus",
       "noSmartScopes": "Ei vielä älykkäitä kopioita",
@@ -4559,7 +4379,6 @@
       },
       "noLibraries": "Ei vielä kirjastoja",
       "clearFilter": "Tyhjennä suodatin",
-      "filterSummary": "{shown} of {total} shown",
       "filterLibraries": "Suodata kirjastot",
       "filterLibrariesPlaceholder": "Suodata kirjastoja...",
       "filterSmartScopes": "Suodata älykkäitä soveltamisaloja",
@@ -4575,10 +4394,6 @@
       },
       "reorder": {
         "gripAria": "Järjestä {name}",
-        "lifted": "{name} lifted, position {position} of {total}. Use the arrow keys to move it.",
-        "moved": "{name}, position {position} of {total}",
-        "dropped": "{name} dropped at position {position} of {total}",
-        "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
         "filteredHint": "Tyhjennä suodatin järjestääksesi uudelleen"
       }
     },
@@ -4657,7 +4472,6 @@
     },
     "entityNotFound": {
       "title": "{entity} ei löytynyt",
-      "description": "This {entity} doesn't exist or has been deleted.",
       "goBack": "Mene takaisin"
     },
     "themePicker": {
@@ -4690,7 +4504,6 @@
       "ascending": "Nouseva",
       "descending": "Laskeva",
       "clearSearch": "Tyhjennä haku",
-      "resultCount": "{shown} of {total}",
       "noMatches": "Ei osumia",
       "noMatchesHint": "Kokeile toista hakutermiä.",
       "bookCount": "Kirjat: {count}",
@@ -4704,7 +4517,6 @@
     "dialogDescription": "Tarkista nimet ennen kuin lisäät ne kirjastoon.",
     "readingFiles": "Luetaan tiedostoja...",
     "dropPrompt": "Pudota SVG-tiedostot tai klikkaa selataksesi",
-    "fileLimit": "Up to {max} files, 128 KB each",
     "namePlaceholder": "Nimi",
     "nameRequired": "Nimi vaaditaan",
     "invalidSvg": "Virheellinen SVG",
@@ -4722,7 +4534,6 @@
     "onlyMoreCanStage": "{count, plural, =0 {Enää kuvakkeita ei voi lavastaa} one {Vain # lisää kuvaketta voidaan lavastaa} other {Vain # lisää kuvakkeita voidaan lavastaa}}",
     "readFailed": "SVG-tiedostoja ei voitu lukea",
     "uploadedCount": "{count, plural, =0 {Ei kuvakkeita ladattu} one {Ladattu # kuvake} other {Ladattu # kuvakkeita}}",
-    "uploadedPartial": "Uploaded {created}, {failed} failed",
     "noIconsUploaded": "Ei ladattuja kuvakkeita",
     "uploadFailed": "Kuvakkeiden lataaminen epäonnistui",
     "uploadFailedEntry": "Lähetys epäonnistui"
@@ -4775,14 +4586,6 @@
         "upNextInSeries": "Seuraava ylös Sarjassa",
         "random": "Löydä Jotain Uutta",
         "smartScope": "Älykäs Laajuus"
-      },
-      "shelfLayout": {
-        "title": "Shelf layout",
-        "description": "Choose how shelves are arranged on larger screens.",
-        "wide": "Wide rows",
-        "wideDescription": "Show one shelf per row.",
-        "twoColumns": "Two columns",
-        "twoColumnsDescription": "Show two shelves per row."
       },
       "reorderHintWidget": "Vedä järjestääksesi. Vaihda näyttääksesi tai piilottaaksesi widgetin.",
       "reorderHintShelf": "Vedä järjestääksesi. Vaihda näyttääksesi tai piilottaaksesi hyllyn.",
@@ -4950,7 +4753,6 @@
       "toggleSharing": "Vaihda jakaminen",
       "removeSystemBeforeDelete": "Poista järjestelmän tunnus ennen poistamista",
       "notesHeading": "Tarjoajan Muistiinpanot",
-      "notesBody": "The {system} provider (superuser only) is used for password reset emails. The {defaultProvider} provider is used when sending books with no explicit provider selected. Providers marked {shared} are available to all users.",
       "deleteTitle": "Poistetaanko tarjoaja?",
       "nameHostRequired": "Nimi ja isäntä vaaditaan",
       "created": "Tarjoaja luotu",
@@ -5160,21 +4962,18 @@
         "eligible": "tukikelpoiset kirjat"
       },
       "checkingPending": "Tarkistetaan odottavia kohteita...",
-      "pendingOf": "{pending} pending of {total} books.",
       "noBooksInScope": "Ei kirjoja synkronoidussa laajuudessa.",
       "allSynced": "Kaikki kirjat on jo synkronoitu.",
       "lastSyncedLabel": "Viimeksi synkronoitu",
       "lastSuccessfulSync": "Viimeisin onnistunut synkronointi",
       "syncing": "Synkronoi...",
-      "progressCount": "{synced} / {total} books",
       "unavailable": {
         "permissionDenied": "Sinulla ei ole oikeuksia käyttää Hardcover synkronointia.",
         "userDisabled": "Synkronointi on keskeytetty Hardcover asetuksissa."
       },
       "button": {
         "unavailable": "Sync unavailable",
-        "syncNow": "Synkronoi nyt",
-        "syncNowCount": "Sync now ({count})"
+        "syncNow": "Synkronoi nyt"
       },
       "lastSynced": {
         "justNow": "Juuri nyt",
@@ -5207,7 +5006,6 @@
         "skipped": "Ohitettu"
       },
       "result": {
-        "summary": "{applied} imported{progress}, {failed} failed",
         "progressUpdated": "{count} edistys päivitetty"
       },
       "toast": {
@@ -5218,7 +5016,6 @@
     },
     "review": {
       "title": "Kovakantinen tuontitarkastelu",
-      "subtitle": "{total} Hardcover books, {matched} matched.",
       "closeAriaLabel": "Sulje tuonnin arvostelu",
       "searchPlaceholder": "Etsi otsikko tai tekijä",
       "importProgress": "Tuonti edistyminen",
@@ -5226,7 +5023,6 @@
       "blank": "tyhjä",
       "noRows": "Mikään rivi ei vastaa nykyisiä suodattimia.",
       "selectRowAriaLabel": "Valitse {title}",
-      "selectionSummary": "{count} selected: {ready} ready, {reviewed} reviewed.",
       "selectedProgress": "{count, plural, =0 {ei edistymispäivityksiä} one {# edistymispäivitys} other {# edistymispäivitystä}}",
       "selectReady": "Valitse valmis",
       "selectPage": "Valitse sivu",
@@ -5235,7 +5031,6 @@
       "importSelected": "Tuo valitut",
       "previousPage": "Edellinen sivu",
       "nextPage": "Seuraava sivu",
-      "pageRange": "{start}-{end} of {total}",
       "tabs": {
         "all": "Kaikki",
         "ready": "Valmis",
@@ -5275,7 +5070,6 @@
     "creator": {
       "createTitle": "Luo Kirjasto",
       "editTitle": "Muokkaa: {name}",
-      "stepOf": "Step {current} of {total}",
       "unsaved": "Tallentamaton",
       "required": "Pakollinen",
       "closeAria": "Sulje kirjaston luoja",
@@ -5324,7 +5118,6 @@
         "manualEntry": "Syötä polku manuaalisesti",
         "absolutePath": "Absoluuttinen palvelimen polku",
         "addFolder": "Lisää kansio",
-        "removeFolder": "Remove {folder}",
         "manualCheckHint": "Manuaaliset polut on tarkistettu yhdessä muiden valittujen kansioiden kanssa.",
         "pathPlaceholder": "/polku/to/kirjat",
         "test": "Testi",
@@ -5497,7 +5290,6 @@
       "parentFolder": "Siirry ylempään kansioon",
       "newFolder": "Uusi kansio",
       "goUp": "Mene ylös",
-      "filterPlaceholder": "Filter folders…",
       "clearFilterAria": "Tyhjennä kansion suodatin",
       "newFolderNamePlaceholder": "Uuden kansion nimi",
       "create": "Luo",
@@ -5531,8 +5323,6 @@
       "viewInLibrary": "Näytä kirjastossa",
       "fileCount": "{count, plural, =0 {ei tiedostoja} one {# tiedosto} other {# tiedostoa}}",
       "booksAdded": "{count, plural, =0 {kirjoja ei lisätty} one {# kirja lisätty} other {# kirjaa lisätty}}",
-      "uploadedFailed": "{done} uploaded, {failed} failed",
-      "progress": "{done} of {total} uploading...",
       "header": {
         "uploading": "Lähetetään...",
         "complete": "Lataus valmis",
@@ -5540,8 +5330,7 @@
         "uploadBooks": "Lataa Kirjat"
       },
       "dropzone": {
-        "title": "Pudota tiedostot tähän tai klikkaa selataksesi",
-        "hint": "{formats} - up to {size} MB each"
+        "title": "Pudota tiedostot tähän tai klikkaa selataksesi"
       }
     }
   },
@@ -5594,7 +5383,6 @@
       "continueToMigration": "Jatka siirtolaisuuteen",
       "viewReport": "Näytä Raportti",
       "resetSetup": "Reset Setup",
-      "stepOf": "Step {current} of {total}",
       "backToSetup": "Takaisin asetuksiin"
     },
     "stages": {
@@ -5623,7 +5411,6 @@
       "mediaPath": {
         "hintRequired": "Vaaditaan kirjasivujen siirtämiseen.",
         "hintAbsolute": "Käytä absoluuttista polkua (esimerkiksi /books). Suhteellisia polkuja ei tueta.",
-        "hintConfigured": "Cover import path configured. Use Test Connection to verify access and Booklore images folder structure.",
         "buttonOk": "Polku OK",
         "buttonIssue": "Reitin Ongelma",
         "buttonTest": "Testaa Polku"
@@ -5657,9 +5444,7 @@
       "saveMappings": "Tallenna Kartoitukset",
       "pathValidation": {
         "title": "Reitin vahvistus",
-        "mappedSummary": "{mapped} of {total} source books have a mapped path",
-        "unmatched": "{count} yhdistettyä polkua ei löydy levyltä",
-        "allMatched": "All {count} mapped paths found on disk"
+        "unmatched": "{count} yhdistettyä polkua ei löydy levyltä"
       }
     },
     "dryRun": {
@@ -5678,7 +5463,6 @@
       "recommended": "Suositeltu",
       "resolveButton": "{count, plural, =0 {Ratkaise # kaksoiskappaletta} one {Ratkaise # kaksoiskappaletta} other {Ratkaise # kaksoiskappaletta}}",
       "sourceRecordId": "Lähdetietueen ID #{id}",
-      "byAuthor": "by {author} (ID: {id})",
       "byFilePath": "{filePath} (ID: {id})",
       "bookloreSourceId": "Booklore source ID: {id}",
       "libraryBookId": "Kirjaston kirja #{id}"
@@ -5750,12 +5534,9 @@
       "matchedBooksExplanation": "Näitä kuivausjuoksupisteitä käytettiin päättämään mitkä kirjaston kirjat vastaanottivat tuotuja tietoja.",
       "sourceBook": "Lähdekirja {id}",
       "libraryBook": "Kirjaston kirja {id}",
-      "unresolvedBooks": "Unresolved books ({count})",
       "unresolvedBooksExplanation": "Nämä kirjat ovat olemassa lähteessä, mutta niitä ei voitu sovittaa mihinkään kirjaan kirjastostasi.",
       "mappedUsers": "Kartoitetut käyttäjät ({count})",
-      "mappedUsersExplanation": "Käyttäjän yhteenlasketut määrät tulevat kuivakäyttöisestä esikatselusta, joka välimuistissa siirtymissuunnitelmassa.",
-      "coverFailures": "{count} cover import(s) failed. Detailed failure rows are not stored.",
-      "userPreviewCounts": "{statuses} statuses, {progress} progress entries, {sessions} reading sessions, {bookmarks} bookmarks, {annotations} annotations, {collections} collection entries"
+      "mappedUsersExplanation": "Käyttäjän yhteenlasketut määrät tulevat kuivakäyttöisestä esikatselusta, joka välimuistissa siirtymissuunnitelmassa."
     },
     "unresolvedReason": {
       "noTitleAuthorMatch": "Vastaavaa kirjaa ei löytynyt otsikon tai tekijän mukaan",
@@ -5797,9 +5578,7 @@
       "loadSuggestionsFailed": "Käyttäjän kartoitusehdotuksia ei voitu ladata",
       "sourceFieldsRequired": "Isäntän, käyttäjän, tietokannan ja lähdekoodin nimi vaaditaan",
       "connectionPassedWithWarnings": "Yhteyden testi läpäisi varoitukset",
-      "connectionPassedWithWarningCount": "Connection test passed with {count} warning(s). First: {warning}",
       "connectionPassed": "Yhteyden testi ohitettu",
-      "connectionMissingTables": "Connection ok, but {count} required table(s) are missing",
       "cannotTestMediaWhileRunning": "Mediareittiä ei voi testata, kun suoritus on aktiivinen",
       "mediaPathRequired": "Media Root polkua tarvitaan kansi tuontiin.",
       "mediaPathAbsolute": "Käytä absoluuttista polkua (esimerkiksi /books).",
@@ -5808,7 +5587,6 @@
       "mediaPathValidationFailed": "Mediapolun vahvistus epäonnistui.",
       "connectionFailedBeforeMedia": "Yhteystesti epäonnistui ennen kuin mediapolun vahvistus voidaan suorittaa.",
       "cannotModifySourceWhileRunning": "Lähdekoodia ei voi muokata, kun suoritus on aktiivinen",
-      "sourceSavedWithWarnings": "Source saved and validated with {count} warning(s)",
       "sourceSaved": "Lähde tallennettu ja vahvistettu",
       "saveSourceFailed": "Lähdekoodin tallennus tai validointi epäonnistui",
       "cannotSaveMappingsWhileRunning": "Yhdistämisiä ei voi tallentaa kun suoritus on aktiivinen",
@@ -5820,7 +5598,6 @@
       "saveMappingsFailed": "Yhdistämisten tallennus epäonnistui",
       "cannotDryRunWhileRunning": "Ei voida suorittaa kuivaajaa kun suoritus on aktiivinen",
       "saveMappingsFirst": "Tallenna kartoitukset ensin",
-      "dryRunCompleted": "Dry-run completed: {matched} matched, {unresolved} unresolved",
       "dryRunFailed": "Dry-run epäonnistui",
       "selectSourceForDuplicates": "Valitse lähdekirja kaikille {count} kaksoisryhmälle",
       "duplicatesResolved": "Kaksoiskappaleet ratkaistut",
@@ -5864,7 +5641,6 @@
         "personal": "Henkilökohtainen",
         "app": "Sovellusten päivitykset"
       },
-      "enabledCount": "{enabled} of {total} enabled",
       "categories": {
         "scanning": {
           "label": "Kirjaston skannaaminen",
@@ -5916,7 +5692,6 @@
   "reader": {
     "retry": "Yritä Uudelleen",
     "pdf": {
-      "openError": "Unable to open this PDF",
       "preparing": "Valmistellaan PDF-lukijaa",
       "opening": "Avataan PDF"
     },
@@ -5928,8 +5703,7 @@
       "startReading": "Aloita lukeminen"
     },
     "toast": {
-      "linkedHighlightError": "Linkitetyn korostuksen sijaintia ei voitu avata",
-      "resumed": "Resumed at {pct}% - {label}"
+      "linkedHighlightError": "Linkitetyn korostuksen sijaintia ei voitu avata"
     },
     "header": {
       "goBack": "Mene takaisin",
@@ -5956,72 +5730,25 @@
     "settings": {
       "title": "Asetukset",
       "ariaLabel": "Lukijan asetukset",
-      "reset": "Reset to defaults",
-      "modeLabel": "Color mode",
       "mode": {
         "light": "Vaalea",
         "dark": "Tumma"
       },
-      "textSize": "Text size",
-      "textSizeSmaller": "Smaller text",
-      "textSizeLarger": "Larger text",
-      "pixels": "{value} px",
-      "percent": "{value}%",
-      "pageColor": "Page color",
-      "font": "Font",
       "fontBuiltIn": "Sisäänrakennettu",
-      "fontServer": "Server fonts",
       "fontYours": "Kirjasimesi",
-      "lineSpacing": "Line spacing",
-      "pageWidth": "Page width",
-      "pageWidthNarrow": "Narrow",
-      "pageWidthMedium": "Medium",
-      "pageWidthWide": "Wide",
-      "pageWidthFull": "Full",
       "readingFlow": "Lukemisen virta",
-      "flow": {
-        "paginated": "Pages",
-        "scrolled": "Scroll"
-      },
       "pageSpreads": "Sivun levitykset",
       "pageSpreadsHint": "Valitse, miten tämä kuvapohjainen EPUB paria sivut.",
       "spread": {
         "bookDefault": "Varaa oletus",
         "singlePage": "Yksi sivu"
       },
-      "advanced": "Advanced layout",
-      "columns": "Columns",
-      "columnsFewer": "Fewer columns",
-      "columnsMore": "More columns",
       "columnGap": "Sarakkeen väli",
       "justifyText": "Tasaa teksti",
-      "hyphenation": "Hyfenaatio",
-      "themes": {
-        "default": "Default",
-        "gray": "Gray",
-        "sepia": "Sepia",
-        "crimson": "Crimson",
-        "meadow": "Meadow",
-        "rosewood": "Rosewood",
-        "azure": "Azure",
-        "dawnlight": "Dawnlight",
-        "ember": "Ember",
-        "aurora": "Aurora",
-        "ocean": "Ocean",
-        "mist": "Mist",
-        "amoled": "AMOLED"
-      },
-      "fonts": {
-        "bookDefault": "Book default",
-        "serif": "Serif",
-        "sansSerif": "Sans-serif",
-        "monospace": "Monospace"
-      }
+      "hyphenation": "Hyfenaatio"
     },
     "search": {
-      "placeholder": "Search in book (min {min} chars)...",
       "searching": "Etsitään…",
-      "tooShort": "Type at least {min} characters",
       "noResults": "Tuloksia ei löytynyt",
       "prompt": "Kirjoita haettavaksi",
       "resultCount": "{count, plural, =0 {ei tuloksia} one {# tulos} other {# tulokset}}"
@@ -6111,9 +5838,6 @@
       "scrollModeHint": "Käytä \"Ei aukkoja\" webtooneille ja pystysuorille nauhoille.",
       "readingDirection": "Lukemisen suunta",
       "pageView": "Sivun näkymä",
-      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
-      "spreadSection": "Two-page spread",
-      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Levityksen kohdistus",
       "spreadGap": "Leviämisen väli",
       "spreadGapValue": "{value}px",
@@ -6145,8 +5869,7 @@
         "shifted": "Siirretty"
       },
       "widePage": {
-        "auto": "Automaattinen",
-        "inSpreads": "In spreads"
+        "auto": "Automaattinen"
       },
       "bg": {
         "black": "Musta",
@@ -6182,17 +5905,9 @@
     }
   },
   "scanner": {
-    "filesProgress": "{processed}/{total} files",
     "booksFound": "{count, plural, =0 {kirjoja ei löytynyt} one {# kirja löytyi} other {# kirjaa löytyi}}"
   },
   "series": {
-    "completion": {
-      "readOfTotal": "{read} of {total} read ({percentage}%)"
-    },
-    "ownership": {
-      "label": "In library",
-      "ownedOfExpected": "{owned} of {expected} in library"
-    },
     "gaps": {
       "label": "Mahdolliset puutteet:"
     },
@@ -6320,8 +6035,7 @@
       "user": "Minun Lukemistani"
     },
     "filter": {
-      "allLibraries": "Kaikki Kirjastot",
-      "librarySelection": "{count} of {total} Libraries"
+      "allLibraries": "Kaikki Kirjastot"
     },
     "config": {
       "button": "Määritä",
@@ -6553,11 +6267,7 @@
         "chooseLibrary": "Valitse Kirjasto"
       },
       "completed": {
-        "title": "Bulk uudelleennimeäminen valmis",
-        "stats": "{succeeded} renamed, {failed} failed, {skipped} skipped ({processed} total)"
-      },
-      "pagination": {
-        "showing": "Showing {from}-{to} of {total}"
+        "title": "Bulk uudelleennimeäminen valmis"
       },
       "confirmDialog": {
         "title": "Vahvista Bulk Uudelleennimeä",
@@ -6598,14 +6308,12 @@
       "moreFiles": "+{count} lisää",
       "showDetails": "Näytä tiedot",
       "hideDetails": "Piilota tiedot",
-      "deleteSelected": "Delete {count} selected",
       "openBook": "Avaa tiedot kohteelle {title}",
       "unknownAuthor": "Tuntematon tekijä",
       "unknown": "Tuntematon",
       "none": "Ei Mitään",
       "accessDenied": "Sinulla ei ole lupaa käyttää kaksoiskappaletta kirjan työkalua.",
       "pairDetails": "Täsmää tiedot",
-      "pairLabel": "{first} and {second}",
       "fields": {
         "library": "Kirjasto",
         "isbn": "ISBN",
@@ -6642,8 +6350,7 @@
         "delete": "Valittuja kaksoiskirjoja ei voitu poistaa."
       },
       "pagination": {
-        "label": "Kahdenna ryhmien sivut",
-        "page": "Page {page} of {total}"
+        "label": "Kahdenna ryhmien sivut"
       }
     },
     "entityManager": {
@@ -6721,8 +6428,7 @@
         "newName": "Uusi nimi"
       },
       "deleteModal": {
-        "title": "Poista Entiteetti",
-        "confirm": "Are you sure you want to delete {name}?"
+        "title": "Poista Entiteetti"
       },
       "splitModal": {
         "title": "Jaa Entiteetti",
@@ -6733,7 +6439,6 @@
       },
       "bulkDeleteModal": {
         "title": "Bulk Poisto",
-        "confirm": "{count, plural, =0 {Are you sure you want to delete # selected entity?} one {Are you sure you want to delete # selected entity?} other {Are you sure you want to delete # selected entities?}}",
         "deleteButton": "Poista {count}"
       },
       "mergeModal": {
@@ -6817,7 +6522,6 @@
         "applied": "{count, plural, =0 {Ei sovellettu tiedostoihin} one {Sovelletaan yhteen tiedostoon} other {Sovelletaan # tiedostoon}}",
         "skippedEdited": "{count, plural, =0 {ohitti yhden tiedoston, koska ne ovat manuaalisesti muokanneet} one {ohitettu yksi tiedosto, koska se on manuaalisesti muokannut} other {ohitettu # tiedostoa, koska ne ovat manuaalisia muokkauksia}}",
         "skippedNoMetadata": "{count, plural, =0 {ohitti yhden tiedoston, koska niillä ei ole haettua metadataa} one {ohitettu yksi tiedosto, koska sillä ei ole haettua metadataa} other {ohitettu # tiedostoa, koska niillä ei ole haettua metadataa}}",
-        "noneApplied": "No files applied; {reasons}",
         "noneSelected": "Ei valittuja tiedostoja"
       }
     },
@@ -6862,7 +6566,6 @@
         "emptyLibraryHint": "Kun lisäät kirjoja tähän kirjastoon, ne näkyvät täällä."
       },
       "querySelection": {
-        "loadedSelected": "{selected} of {total} loaded books selected.",
         "selectAllMatching": "Valitse kaikki {total} vastaavat kirjat"
       }
     },
@@ -6881,7 +6584,6 @@
       "showControlsAria": "Näytä Smart Scope -toiminnot",
       "hideFilter": "Piilota suodatin",
       "showFilter": "Näytä suodatin",
-      "confirmDelete": "Confirm?",
       "loadError": "SmartScope ei voitu ladata",
       "toast": {
         "deleted": "\"{name}\" poistettu",
@@ -6913,7 +6615,6 @@
     "versions": "Versiot",
     "currentVersion": "Nykyinen versio",
     "youreHere": "Olet täällä",
-    "searchPlaceholder": "Search releases…",
     "noReleasesFound": "Julkaisuja ei löytynyt.",
     "noHighlights": "Ei kohokohtia tälle julkaisulle.",
     "showChangelog": "Näytä koko muutosloki",
@@ -6997,8 +6698,7 @@
       "users": "Käyttäjät",
       "account-activity": "Tilin Toiminta",
       "magic-links": "Magic Linkit",
-      "oidc": "OIDC / SSO",
-      "server-fonts": "Server Fonts"
+      "oidc": "OIDC / SSO"
     },
     "system": {
       "file-naming": "Tiedoston Nimeäminen",

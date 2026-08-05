@@ -637,7 +637,7 @@
         "update": "No se pudo actualizar el enlace mágico",
         "revoke": "No se pudo revocar"
       },
-      "usersPage": "pagina de usuarios",
+      "usersPage": "Página de Usuarios",
       "emptyTitle": "Aún no se han creado enlaces mágicos",
       "emptyHint": "Haga clic en \"{action}\" para generar un inicio de sesión compartible URL.",
       "noActiveTitle": "No hay enlaces mágicos activos",
@@ -1134,14 +1134,14 @@
         "account-activity": "Actividad de la cuenta",
         "magic-links": "Enlaces mágicos",
         "oidc": "OIDC/SSO",
-        "server-fonts": "Server Fonts"
+        "server-fonts": "Fuentes del servidor"
       },
       "serverFonts": {
-        "title": "Server Fonts",
-        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
-        "listLabel": "Server fonts",
-        "noFontsYet": "No server fonts yet",
-        "noFontsHint": "Fonts you add here appear in every user's reader."
+        "title": "Fuentes del servidor",
+        "subtitle": "Sube fuentes que cada usuario puede elegir en el lector de libros electrónicos, sin subir las suyas.",
+        "listLabel": "Fuentes del servidor",
+        "noFontsYet": "Aún no hay fuentes del servidor",
+        "noFontsHint": "Las fuentes que añadas aquí aparecen en el lector de cada usuario."
       }
     },
     "common": {
@@ -1527,7 +1527,7 @@
         "layout": "Diseño",
         "readingFlow": "Flujo de lectura",
         "readingFlowHint": "Paginado voltea páginas; el desplazamiento fluye continuamente",
-        "paginated": "paginado",
+        "paginated": "Paginado",
         "scrolled": "Desplazado",
         "fixedLayoutSpread": "Pliegos de página con diseño fijo",
         "fixedLayoutSpreadHint": "Predeterminado para manga, cómics y EPUB basados en imágenes",
@@ -1585,13 +1585,13 @@
         "view": "Ver",
         "readingMode": "Modo de lectura",
         "readingModeHint": "Cómo se navega por las páginas: utilice \"Infinito (sin espacios)\" para los webtoons",
-        "paginated": "paginado",
+        "paginated": "Paginado",
         "infiniteSpaced": "Infinito (espaciado)",
         "infiniteNoGaps": "Infinito (sin espacios)",
         "pageView": "Vista de página",
         "pageViewHint": "Mostrar una o dos páginas una al lado de la otra",
         "single": "soltero",
-        "twoPage": "dos páginas",
+        "twoPage": "Dos páginas",
         "fitMode": "Modo de ajuste",
         "fitModeHint": "Cómo se escalan las páginas para que se ajusten a la pantalla",
         "fitPage": "Página",
@@ -1677,11 +1677,11 @@
         "demoCannotManage": "La cuenta restringida de demostración no puede administrar fuentes",
         "fileAdded": "\"{name}\" añadido",
         "uploadFailed": "Error al subir",
-        "serverFontsTitle": "Server fonts (shared by admin)",
-        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
-        "serverFontsShown": "{count} of {total} shown",
-        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
-        "serverFontVisibilityFailed": "Failed to update server font visibility"
+        "serverFontsTitle": "Fuentes del servidor (compartidas por admin)",
+        "serverFontsHint": "Estas fuentes provienen del administrador de tu servidor. Desactiva una para mantenerla fuera de tu lector.",
+        "serverFontsShown": "{count} de {total} mostrados",
+        "serverFontsAllHidden": "Todas las fuentes del servidor están ocultas. Su lector sólo ofrecerá sus propias fuentes integradas y sus propias fuentes.",
+        "serverFontVisibilityFailed": "Error al actualizar la visibilidad de las fuentes del servidor"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -2612,8 +2612,8 @@
     "pagination": {
       "showing": "Mostrando {start}-{end} de {total}",
       "pageOf": "Página {page} de {totalPages}",
-      "firstPage": "Primera pagina",
-      "previousPage": "Pagina anterior",
+      "firstPage": "Primera página",
+      "previousPage": "Página anterior",
       "nextPage": "Página siguiente",
       "lastPage": "Última página"
     },
@@ -2886,7 +2886,7 @@
       "BookBulkUpdateTags": "Actualizar etiquetas de libros",
       "BookBulkSetMetadataLock": "Establecer bloqueos de metadatos",
       "BookBulkEditMetadata": "Editar metadatos del libro",
-      "BookBulkMoveLibrary": "Move books to another library",
+      "BookBulkMoveLibrary": "Mover libros a otra biblioteca",
       "BookReadingStateReset": "Restablecer el estado de lectura",
       "BookWriteAndRename": "Escribir metadatos y cambiar el nombre del archivo.",
       "CollectionCreate": "Crear colección",
@@ -3346,11 +3346,11 @@
         "isLocked": "está bloqueado",
         "isUnlocked": "está desbloqueado",
         "isUpNext": "está arriba siguiente",
-        "isTrue": "is yes",
-        "isFalse": "is no"
+        "isTrue": "es sí",
+        "isFalse": "es no"
       },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
+      "customFieldsGroup": "Campos personalizados",
+      "customFieldFallback": "Campo personalizado",
       "anyProvider": "Cualquier proveedor",
       "communityRatingProvider": "Proveedor de calificación comunitaria",
       "loadingLibraries": "Cargando bibliotecas...",
@@ -3669,7 +3669,7 @@
         "publisher": "Editor",
         "published": "Publicado",
         "language": "Idioma",
-        "pages": "paginas",
+        "pages": "Páginas",
         "duration": "Duración",
         "edition": "Edición",
         "abridged": "abreviado",
@@ -4096,10 +4096,10 @@
         "moveUp": "Subir",
         "moveDown": "Bajar",
         "removeSeries": "Quitar serie",
-        "seriesIndexLabel": "Position in series",
-        "totalLabel": "Books in series",
-        "totalPlaceholder": "of",
-        "totalHint": "Total books in this series. Shared with everyone who has this series."
+        "seriesIndexLabel": "Posición en serie",
+        "totalLabel": "Libros en serie",
+        "totalPlaceholder": "de",
+        "totalHint": "Total de libros en esta serie. Compartido con todos los que tienen esta serie."
       }
     },
     "table": {
@@ -4182,66 +4182,66 @@
       }
     },
     "move": {
-      "title": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
-      "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
-      "searchPlaceholder": "Search libraries",
-      "currentLibrary": "Current",
-      "folderCount": "{count, plural, one {# folder} many {# folders} other {# folders}}",
-      "continue": "Continue",
-      "back": "Back",
-      "confirm": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
-      "action": "Move to library",
+      "title": "{count, plural, one {Mueve # libro} many {Mueve # libros} other {Mueve # libros}}",
+      "subtitle": "Los archivos se mueven en el disco a la biblioteca de destino. Esto puede cambiar quién puede ver estos libros.",
+      "searchPlaceholder": "Buscar bibliotecas",
+      "currentLibrary": "Actual",
+      "folderCount": "{count, plural, one {# carpeta} many {# carpetas} other {# carpetas}}",
+      "continue": "Continuar",
+      "back": "Volver",
+      "confirm": "{count, plural, one {Mueve # libro} many {Mueve # libros} other {Mueve # libros}}",
+      "action": "Mover a la biblioteca",
       "review": {
-        "ready": "{count} ready",
-        "collisions": "{count, plural, one {# name conflict} many {# name conflicts} other {# name conflicts}}",
-        "ineligible": "{count} cannot move",
-        "alreadyThere": "{count} already there",
-        "collisionsHeading": "Name conflicts",
-        "ineligibleHeading": "Cannot be moved",
-        "moreCollisions": "and {count} more"
+        "ready": "{count} listos",
+        "collisions": "{count, plural, one {# conflicto de nombres} many {# conflictos de nombres} other {# conflictos de nombres}}",
+        "ineligible": "{count} no puede moverse",
+        "alreadyThere": "{count} ya existe",
+        "collisionsHeading": "Conflicto de nombres",
+        "ineligibleHeading": "No se puede mover",
+        "moreCollisions": "y {count} más"
       },
       "policy": {
-        "suggested": "Use suggested",
-        "keep_both": "Keep both",
-        "merge": "Merge",
-        "skip": "Skip"
+        "suggested": "Uso recomendado",
+        "keep_both": "Dejar ambos",
+        "merge": "Fusionar",
+        "skip": "Saltar"
       },
       "collision": {
-        "folder_path": "A book already uses this folder name",
-        "file_path": "A file already uses this path",
-        "hash_duplicate": "An identical copy is already in this library"
+        "folder_path": "Un libro ya utiliza este nombre de carpeta",
+        "file_path": "Un archivo ya utiliza esta ruta",
+        "hash_duplicate": "Ya existe una copia idéntica en esta biblioteca"
       },
       "ineligible": {
-        "book_not_present": "The files for this book are missing",
-        "no_content_file": "This book has no readable file",
-        "multi_file_target_per_file": "The destination stores one file per book, and this book has {detail} files",
-        "no_source_access": "You cannot edit the library this book is in",
-        "pattern_unresolved": "The destination library has no usable naming pattern",
-        "path_too_long": "The destination path would be too long",
-        "path_outside_target_root": "The destination path would fall outside the library folder"
+        "book_not_present": "Faltan los archivos de este libro",
+        "no_content_file": "Este libro no tiene un archivo legible",
+        "multi_file_target_per_file": "El destino almacena un archivo por libro, y este libro tiene archivos {detail}",
+        "no_source_access": "No puedes editar la biblioteca en la que está este libro",
+        "pattern_unresolved": "La biblioteca de destino no tiene patrón de nomenclatura utilizable",
+        "path_too_long": "La ruta de destino es demasiado larga",
+        "path_outside_target_root": "La ruta de destino cae fuera de la carpeta de librerías"
       },
       "warning": {
-        "accessLoss": "{user} will stop seeing {count} of these books",
-        "koboImpact": "{count} books will leave {user}'s Kobo on the next sync",
+        "accessLoss": "{user} dejará de ver {count} de estos libros",
+        "koboImpact": "{count} libros dejarán el Kobo de {user} en la próxima sincronización",
         "layout": {
-          "wrap_into_folder": "{count} books will each be placed in their own folder",
-          "dissolve_folder": "{count} book folders will be dissolved into single files"
+          "wrap_into_folder": "{count} libros serán colocados en su propia carpeta",
+          "dissolve_folder": "{count} carpetas de libros se disolverán en archivos individuales"
         },
-        "crossDevice": "Files move to another drive, so they are copied, verified, then removed."
+        "crossDevice": "Los archivos se mueven a otra unidad, por lo que se copian, se verifican y se eliminan."
       },
       "progress": {
-        "label": "Moving books to {library}",
-        "failed": "{count} failed"
+        "label": "Moviendo libros a {library}",
+        "failed": "{count} fallidos"
       },
       "done": {
-        "summary": "Moved {count} books to {library}",
-        "merged": "{count} merged with copies already there",
-        "skipped": "{count} skipped",
-        "failed": "{count} failed"
+        "summary": "{count} libros movidos a {library}",
+        "merged": "{count} fusionados con copias ya existentes",
+        "skipped": "{count} omitidos",
+        "failed": "{count} fallidos"
       },
       "toast": {
-        "success": "Moved {count} books to {library}",
-        "partial": "Moved {moved} books, {failed} failed"
+        "success": "{count} libros movidos a {library}",
+        "partial": "Movidos {moved} libros, {failed} fallidos"
       }
     }
   },
@@ -4777,12 +4777,12 @@
         "smartScope": "Alcance Inteligente"
       },
       "shelfLayout": {
-        "title": "Shelf layout",
-        "description": "Choose how shelves are arranged on larger screens.",
-        "wide": "Wide rows",
-        "wideDescription": "Show one shelf per row.",
-        "twoColumns": "Two columns",
-        "twoColumnsDescription": "Show two shelves per row."
+        "title": "Diseño de estantería",
+        "description": "Elige cómo se organizan los estantes en pantallas más grandes.",
+        "wide": "Filas anchas",
+        "wideDescription": "Mostrar una casilla por fila.",
+        "twoColumns": "Dos columnas",
+        "twoColumnsDescription": "Mostrar dos estantes por fila."
       },
       "reorderHintWidget": "Arrastre para reordenar. Alternar para mostrar u ocultar un widget.",
       "reorderHintShelf": "Arrastre para reordenar. Alternar para mostrar u ocultar un estante.",
@@ -4891,7 +4891,7 @@
         "trendUp": "Tendencia ascendente",
         "trendDown": "Tendencia a la baja",
         "trendSteady": "ritmo constante",
-        "pages": "paginas",
+        "pages": "páginas",
         "hours": "horas",
         "readCount": "{count} leer",
         "daysLeft": "{count}d queda"
@@ -5233,7 +5233,7 @@
       "clearPage": "Borrar página",
       "clearSelection": "Borrar selección",
       "importSelected": "Importar seleccionado",
-      "previousPage": "Pagina anterior",
+      "previousPage": "Página Anterior",
       "nextPage": "Página siguiente",
       "pageRange": "{start}-{end} de {total}",
       "tabs": {
@@ -5956,66 +5956,66 @@
     "settings": {
       "title": "Configuración",
       "ariaLabel": "Configuración del lector",
-      "reset": "Reset to defaults",
-      "modeLabel": "Color mode",
+      "reset": "Restablecer valores predeterminados",
+      "modeLabel": "Modo color",
       "mode": {
-        "light": "Luz",
-        "dark": "oscuro"
+        "light": "Claro",
+        "dark": "Oscuro"
       },
-      "textSize": "Text size",
-      "textSizeSmaller": "Smaller text",
-      "textSizeLarger": "Larger text",
+      "textSize": "Tamaño de texto",
+      "textSizeSmaller": "Texto más pequeño",
+      "textSizeLarger": "Texto más grande",
       "pixels": "{value} px",
       "percent": "{value}%",
-      "pageColor": "Page color",
-      "font": "Font",
-      "fontBuiltIn": "Incorporado",
-      "fontServer": "Server fonts",
+      "pageColor": "Color de página",
+      "font": "Fuente",
+      "fontBuiltIn": "Predefinido",
+      "fontServer": "Fuentes del servidor",
       "fontYours": "Tus fuentes",
-      "lineSpacing": "Line spacing",
-      "pageWidth": "Page width",
-      "pageWidthNarrow": "Narrow",
-      "pageWidthMedium": "Medium",
-      "pageWidthWide": "Wide",
-      "pageWidthFull": "Full",
+      "lineSpacing": "Interlineado",
+      "pageWidth": "Ancho de página",
+      "pageWidthNarrow": "Estrecho",
+      "pageWidthMedium": "Medio",
+      "pageWidthWide": "Ancho",
+      "pageWidthFull": "Lleno",
       "readingFlow": "Flujo de lectura",
       "flow": {
-        "paginated": "Pages",
-        "scrolled": "Scroll"
+        "paginated": "Páginas",
+        "scrolled": "Desplazar"
       },
       "pageSpreads": "Extensiones de página",
-      "pageSpreadsHint": "Elija cómo este EPUB basado en imágenes empareja páginas.",
+      "pageSpreadsHint": "Elige cómo se emparejan las páginas de este EPUB basado en imágenes.",
       "spread": {
-        "bookDefault": "Reservar por defecto",
-        "singlePage": "Una sola página"
+        "bookDefault": "Libro por defecto",
+        "singlePage": "Página única"
       },
-      "advanced": "Advanced layout",
-      "columns": "Columns",
-      "columnsFewer": "Fewer columns",
-      "columnsMore": "More columns",
+      "advanced": "Diseño avanzado",
+      "columns": "Columnas",
+      "columnsFewer": "Menos columnas",
+      "columnsMore": "Más Columnas",
       "columnGap": "Espacio de columna",
       "justifyText": "Justificar texto",
       "hyphenation": "Separación de sílabas",
       "themes": {
-        "default": "Default",
-        "gray": "Gray",
+        "default": "Por defecto",
+        "gray": "Gris",
         "sepia": "Sepia",
-        "crimson": "Crimson",
-        "meadow": "Meadow",
-        "rosewood": "Rosewood",
-        "azure": "Azure",
-        "dawnlight": "Dawnlight",
-        "ember": "Ember",
+        "crimson": "Carmesí",
+        "meadow": "Verde prado",
+        "rosewood": "Palo de rosa",
+        "azure": "Azul celeste ",
+        "dawnlight": "Luz del amanecer",
+        "ember": "Ascua",
         "aurora": "Aurora",
-        "ocean": "Ocean",
-        "mist": "Mist",
+        "ocean": "Océano",
+        "mist": "Niebla",
         "amoled": "AMOLED"
       },
       "fonts": {
-        "bookDefault": "Book default",
+        "bookDefault": "Libro por defecto",
         "serif": "Serif",
-        "sansSerif": "Sans-serif",
-        "monospace": "Monospace"
+        "sansSerif": "Sans Serif",
+        "monospace": "Monoespaciado"
       }
     },
     "search": {
@@ -6111,15 +6111,12 @@
       "scrollModeHint": "Utilice \"Sin espacios\" para webtoons y tiras verticales.",
       "readingDirection": "dirección de lectura",
       "pageView": "Vista de página",
-      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
-      "spreadSection": "Two-page spread",
-      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Alineación extendida",
       "spreadGap": "Brecha de propagación",
       "spreadGapValue": "{value}px",
       "forceTwoPage": "Forzar dos páginas",
-      "widePages": "paginas anchas",
-      "firstPage": "Primera pagina",
+      "widePages": "Páginas anchas",
+      "firstPage": "Primera página",
       "lastPage": "Última página",
       "fit": {
         "page": "Ajuste de página",
@@ -6132,7 +6129,7 @@
         "twoPage": "dos páginas"
       },
       "scroll": {
-        "paged": "paginado",
+        "paged": "Paginado",
         "infinite": "infinito",
         "noGaps": "Sin espacios"
       },
@@ -6190,8 +6187,8 @@
       "readOfTotal": "{read} de {total} leído ({percentage}%)"
     },
     "ownership": {
-      "label": "In library",
-      "ownedOfExpected": "{owned} of {expected} in library"
+      "label": "En la biblioteca",
+      "ownedOfExpected": "{owned} de {expected} en la biblioteca"
     },
     "gaps": {
       "label": "Posibles lagunas:"
@@ -6998,7 +6995,7 @@
       "account-activity": "Actividad de la cuenta",
       "magic-links": "Enlaces mágicos",
       "oidc": "OIDC/SSO",
-      "server-fonts": "Server Fonts"
+      "server-fonts": "Fuentes del servidor"
     },
     "system": {
       "file-naming": "Nomenclatura de archivos",
