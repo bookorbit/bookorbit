@@ -15,6 +15,17 @@ export function isBookPlaceholder(slot: BookSlot): slot is BookPlaceholder {
   return (slot as BookPlaceholder).placeholder === true
 }
 
+function canonicalizeQueryValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeQueryValue)
+  if (value === null || typeof value !== 'object') return value
+  const record = value as Record<string, unknown>
+  return Object.fromEntries(
+    Object.keys(record)
+      .sort()
+      .map((key) => [key, canonicalizeQueryValue(record[key])]),
+  )
+}
+
 /**
  * Placeholder-window store for book listings: holds a slot array sized to the
  * query total, where unloaded positions are placeholder objects rendered as
@@ -253,7 +264,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
     },
   })
 
-  const queryKey = computed(() => `${options.endpoint.value ?? ''}|${JSON.stringify(options.query.value)}`)
+  const queryKey = computed(() => `${options.endpoint.value ?? ''}|${JSON.stringify(canonicalizeQueryValue(options.query.value))}`)
 
   watch(queryKey, reset, { immediate: true })
 

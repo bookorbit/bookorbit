@@ -446,15 +446,8 @@
     {
       "idx": 63,
       "version": "7",
-      "when": 1785781468209,
-      "tag": "0063_add_book_origin_country",
-      "breakpoints": true
-    },
-    {
-      "idx": 64,
-      "version": "7",
-      "when": 1785794064911,
-      "tag": "0064_add_manual_books_support",
+      "when": 1785964221973,
+      "tag": "0063_add_dashboard_random_lookup_index",
       "breakpoints": true
     }
   ]

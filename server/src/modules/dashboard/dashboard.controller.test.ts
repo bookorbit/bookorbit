@@ -25,6 +25,7 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
 function makeController() {
   const dashboardService = {
     getScroller: vi.fn(),
+    getScrollers: vi.fn(),
   };
   const widgetService = {
     getReadingGoal: vi.fn(),
@@ -60,6 +61,19 @@ describe('DashboardController', () => {
       const result = await controller.getScroller('up-next-in-series', 33, 0, user);
 
       expect(dashboardService.getScroller).toHaveBeenCalledWith('up-next-in-series', user, 33, 0);
+      expect(result).toEqual(mockResult);
+    });
+
+    it('getScrollers delegates the bounded batch to dashboardService', async () => {
+      const { controller, dashboardService } = makeController();
+      const user = makeUser({ id: 7 });
+      const dto = { items: [{ id: 'one', type: 'recently-added' as const, limit: 20 }] };
+      const mockResult = { items: [{ id: 'one', books: [], failed: false }] };
+      dashboardService.getScrollers.mockResolvedValue(mockResult);
+
+      const result = await controller.getScrollers(user, dto);
+
+      expect(dashboardService.getScrollers).toHaveBeenCalledWith(dto, user);
       expect(result).toEqual(mockResult);
     });
   });

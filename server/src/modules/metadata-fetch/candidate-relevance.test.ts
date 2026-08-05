@@ -98,6 +98,13 @@ describe('candidate-relevance', () => {
       const result = filterAndRank(candidates, params);
       expect(result).toHaveLength(0);
     });
+
+    it('keeps a candidate whose embedded subtitle was split out by its provider mapper', () => {
+      const fullTitle = "Babel, or The Necessity of Violence: An Arcane History of the Oxford Translators' Revolution";
+      const candidates = [candidate('A Different Book Entirely'), candidate('Babel, or The Necessity of Violence')];
+      const result = filterAndRank(candidates, { title: fullTitle });
+      expect(result[0].title).toBe('Babel, or The Necessity of Violence');
+    });
   });
 
   describe('displayTitle fallback', () => {

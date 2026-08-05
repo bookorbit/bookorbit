@@ -6129,29 +6129,20 @@
       "cycleFooterMode": "Информация о нижнем колонтитуле"
     },
     "cbz": {
-      "tabs": {
-        "view": "Вид",
-        "reading": "Чтение",
-        "layout": "Макет"
-      },
       "fitMode": "По размеру",
       "background": "Справочная информация",
       "scrollMode": "Режим прокрутки",
       "scrollModeHint": "Используйте \"Без пробелов\" для вебсайтов и вертикальных полос.",
       "readingDirection": "Направление чтения",
       "pageView": "Вид страницы",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Распространение выравнивания",
-      "spreadAlignmentHint": "Спрэд выравнивание недоступно в режиме авто-резервного возврата.",
       "spreadGap": "Распространяемый разрыв",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Переключить фокус на две страницы",
       "forceTwoPage": "Принудительно две страницы",
-      "off": "Выкл",
-      "on": "На",
       "widePages": "Широкие страницы",
-      "resetBookViewSettings": "Сбросить настройки просмотра книги",
-      "resetConfirm": "Сбросить настройки просмотра этой книги к вашим глобальным настройкам?",
       "firstPage": "Первая страница",
       "lastPage": "Последняя страница",
       "fit": {

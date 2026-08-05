@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -89,6 +89,7 @@ watch(prefs, () => {
 
 const { searchQuery, debouncedQuery, clearSearch } = useViewSearch()
 const mainRef = ref<HTMLElement | null>(null)
+const scopeQueryReady = ref(false)
 const {
   booksProxy: books,
   slots,
@@ -125,6 +126,7 @@ const {
   railViewport: mainRef,
   collapseEnabled: collapseEnabledRef,
   q: debouncedQuery,
+  enabled: scopeQueryReady,
 })
 const { setBookContext } = useBookNavigation()
 useScrollRestoreOnActivate(mainRef)
@@ -299,8 +301,12 @@ async function handleBulkEditConfirm(fields: BulkEditFields) {
 
 watch(
   smartScope,
-  (scope) => {
+  async (scope) => {
+    scopeQueryReady.value = false
     tableSort.value = scope?.defaultSort?.length ? [...scope.defaultSort] : [{ field: 'title', dir: 'asc' }]
+    if (!scope) return
+    await nextTick()
+    if (smartScope.value?.id === scope.id) scopeQueryReady.value = true
   },
   { immediate: true },
 )

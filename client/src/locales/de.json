@@ -6129,29 +6129,20 @@
       "cycleFooterMode": "Fußzeilen-Infomodus wechseln"
     },
     "cbz": {
-      "tabs": {
-        "view": "Ansicht",
-        "reading": "Lesen",
-        "layout": "Layout"
-      },
       "fitMode": "Anpassungsmodus",
       "background": "Hintergrund",
       "scrollMode": "Scroll-Modus",
       "scrollModeHint": "Verwenden Sie \"Keine Lücken\" für Webtoons und vertikale Streifen.",
       "readingDirection": "Leserichtung",
       "pageView": "Seitenansicht",
-      "autoFallback": "Automatischer Rückfallmodus",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Doppelseitenausrichtung",
-      "spreadAlignmentHint": "Doppelseitenausrichtung ist im automatischen Rückfallmodus nicht verfügbar.",
       "spreadGap": "Spread gap",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Zweiseitenansicht fokussieren",
       "forceTwoPage": "Zwei Seiten erzwingen",
-      "off": "Aus",
-      "on": "Ein",
       "widePages": "Breite Seiten",
-      "resetBookViewSettings": "Ansichtseinstellungen des Buches zurücksetzen",
-      "resetConfirm": "Ansichtseinstellungen für dieses Buch auf Ihre globalen Standardwerte zurücksetzen?",
       "firstPage": "Erste Seite",
       "lastPage": "Letzte Seite",
       "fit": {

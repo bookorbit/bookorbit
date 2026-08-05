@@ -6129,29 +6129,20 @@
       "cycleFooterMode": "Cykel sidfotsinfo läge"
     },
     "cbz": {
-      "tabs": {
-        "view": "Visa",
-        "reading": "Läser",
-        "layout": "Layout"
-      },
       "fitMode": "Anpassa läge",
       "background": "Bakgrund",
       "scrollMode": "Rulla läge",
       "scrollModeHint": "Använd \"Inga luckor\" för webtoons och vertikala remsor.",
       "readingDirection": "Läsa riktning",
       "pageView": "Sidvy",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Sprid justering",
-      "spreadAlignmentHint": "Spread justering är inte tillgänglig i auto-reservläge.",
       "spreadGap": "Sprid mellanrum",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Fokusera tvåsidig växling",
       "forceTwoPage": "Tvinga två sidor",
-      "off": "Av",
-      "on": "På",
       "widePages": "Breda sidor",
-      "resetBookViewSettings": "Återställ bokvyn inställningar",
-      "resetConfirm": "Återställ vyinställningar för denna bok till dina globala standardinställningar?",
       "firstPage": "Första sidan",
       "lastPage": "Sista sidan",
       "fit": {

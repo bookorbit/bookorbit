@@ -381,6 +381,27 @@ describe('fetchUserPeakReadingHours', () => {
 
     await expect(fetchUserPeakReadingHours(filters)).rejects.toThrow('User peak hours request failed: 503')
   })
+
+  it('coalesces concurrent requests and starts a fresh request after settlement', async () => {
+    const data = [{ hour: 9, minutes: 60 }]
+    let resolveResponse: ((response: Response) => void) | undefined
+    mockedApi.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveResponse = resolve
+      }),
+    )
+
+    const first = fetchUserPeakReadingHours(filters)
+    const second = fetchUserPeakReadingHours(filters)
+    expect(mockedApi).toHaveBeenCalledTimes(1)
+
+    resolveResponse?.(mockOkResponse(data))
+    await expect(Promise.all([first, second])).resolves.toEqual([data, data])
+
+    mockedApi.mockResolvedValueOnce(mockOkResponse(data))
+    await expect(fetchUserPeakReadingHours(filters)).resolves.toEqual(data)
+    expect(mockedApi).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('fetchUserFavoriteReadingDays', () => {
@@ -420,6 +441,27 @@ describe('fetchUserCompletionTimeline', () => {
     mockedApi.mockResolvedValue(mockErrorResponse(503))
 
     await expect(fetchUserCompletionTimeline(filters)).rejects.toThrow('User completion timeline request failed: 503')
+  })
+
+  it('coalesces concurrent requests and starts a fresh request after settlement', async () => {
+    const data = [{ date: '2026-01-01', completedBooks: 1 }]
+    let resolveResponse: ((response: Response) => void) | undefined
+    mockedApi.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveResponse = resolve
+      }),
+    )
+
+    const first = fetchUserCompletionTimeline(filters)
+    const second = fetchUserCompletionTimeline(filters)
+    expect(mockedApi).toHaveBeenCalledTimes(1)
+
+    resolveResponse?.(mockOkResponse(data))
+    await expect(Promise.all([first, second])).resolves.toEqual([data, data])
+
+    mockedApi.mockResolvedValueOnce(mockOkResponse(data))
+    await expect(fetchUserCompletionTimeline(filters)).resolves.toEqual(data)
+    expect(mockedApi).toHaveBeenCalledTimes(2)
   })
 })
 

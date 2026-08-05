@@ -1,5 +1,5 @@
 {
-  "id": "deb8c81d-04da-494c-a1a3-f8a5038e4625",
+  "id": "5b7617c7-913b-499e-901b-f46da236d8ee",
   "prevId": "977300d8-7b69-4348-93b8-b3d2724cac49",
   "version": "7",
   "dialect": "postgresql",
@@ -3346,12 +3346,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "origin_country": {
-          "name": "origin_country",
-          "type": "varchar(2)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "varchar(20)",
@@ -3411,8 +3405,8 @@
           "method": "btree",
           "with": {}
         },
-        "books_library_status_idx": {
-          "name": "books_library_status_idx",
+        "books_library_status_id_idx": {
+          "name": "books_library_status_id_idx",
           "columns": [
             {
               "expression": "library_id",
@@ -3422,6 +3416,12 @@
             },
             {
               "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
