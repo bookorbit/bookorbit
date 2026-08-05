@@ -3707,7 +3707,11 @@
         "koboNotSynced": "Не синхронизировано",
         "koboNotSyncedTooltip": "Очередь для следующей синхронизации Kobo.",
         "filesNotFound": "Файлы не найдены",
-        "filesNotFoundDescription": "Файл(ы) для этой книги больше не могут быть найдены на диске. Метаданные все еще доступны. Запустите сканирование библиотеки для подтверждения или удаления записи."
+        "filesNotFoundDescription": "Файл(ы) для этой книги больше не могут быть найдены на диске. Метаданные все еще доступны. Запустите сканирование библиотеки для подтверждения или удаления записи.",
+        "addSession": "Add session",
+        "startedAt": "Started at",
+        "durationMin": "Duration (min)",
+        "endProgress": "End progress"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {нет полей} one {одно поле} few {# полей} many {# полей} other {# полей}}",
