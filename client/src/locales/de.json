@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Wo Sie lesen",
         "emptyTitle": "Noch keine Leseaktivität",
-        "emptyDescription": "Lesen Sie im Web, in KOReader oder auf Kobo, um Ihre Quellenverteilung zu sehen."
+        "emptyDescription": "Lesen Sie im Web, in KOReader oder auf Kobo, um Ihre Quellenverteilung zu sehen.",
+        "paper": "Paper"
       }
     }
   },

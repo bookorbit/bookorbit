@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Где вы читаете",
         "emptyTitle": "Нет действий для чтения",
-        "emptyDescription": "Читайте в Интернете, KOReader, или Kobo, чтобы увидеть ваш исходный код."
+        "emptyDescription": "Читайте в Интернете, KOReader, или Kobo, чтобы увидеть ваш исходный код.",
+        "paper": "Paper"
       }
     }
   },

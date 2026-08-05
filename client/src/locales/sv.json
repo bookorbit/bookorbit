@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Där du läser",
         "emptyTitle": "Ingen läsaktivitet än",
-        "emptyDescription": "Läs på webben, KOReader, eller Kobo för att se din källa dela."
+        "emptyDescription": "Läs på webben, KOReader, eller Kobo för att se din källa dela.",
+        "paper": "Paper"
       }
     }
   },

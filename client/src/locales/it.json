@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Dove leggi",
         "emptyTitle": "Nessuna attività di lettura ancora",
-        "emptyDescription": "Leggi sul Web, KOReader o Kobo per vedere la suddivisione della tua fonte."
+        "emptyDescription": "Leggi sul Web, KOReader o Kobo per vedere la suddivisione della tua fonte.",
+        "paper": "Paper"
       }
     }
   },
