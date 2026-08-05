@@ -16,7 +16,8 @@
     "yes": "Kyllä",
     "no": "Ei",
     "high": "High",
-    "low": "Low"
+    "low": "Low",
+    "add": "Add"
   },
   "settings": {
     "privacySharing": {
