@@ -59,11 +59,24 @@ watchEffect(() => {
         type: 'pie',
         radius: ['45%', '72%'],
         center: md.value ? ['38%', '50%'] : ['50%', '44%'],
-        data: data.value.slices.map((slice) => ({
-          name: READING_SESSION_SOURCE_BUCKET_LABELS[slice.bucket],
-          value: slice.readingSeconds,
-          itemStyle: { color: colors[slice.bucket] },
-        })),
+        data: data.value.slices.map((slice) => {
+          // Interceptação cirúrgica para forçar o rótulo e a cor de leituras físicas
+          const isPhysical = ['manual', 'phy', 'physical', 'paper'].includes(String(slice.bucket).toLowerCase())
+
+          const name = isPhysical
+            ? t('statistics.charts.sourceDistribution.paper', 'Papel')
+            : READING_SESSION_SOURCE_BUCKET_LABELS[slice.bucket as keyof typeof READING_SESSION_SOURCE_BUCKET_LABELS] || slice.bucket
+
+          const color = isPhysical
+            ? '#d97706' // Laranja Amadeirado
+            : colors[slice.bucket] || '#94a3b8'
+
+          return {
+            name,
+            value: slice.readingSeconds,
+            itemStyle: { color },
+          }
+        }),
         label: { show: false },
       },
     ],
@@ -76,12 +89,12 @@ watchEffect(() => {
     :title="t('statistics.charts.sourceDistribution.title')"
     :icon="MonitorSmartphone"
     :color-index="6"
-    :loading
-    :error
+    :loading="loading"
+    :error="error"
     :empty="isEmpty"
     :empty-title="t('statistics.charts.sourceDistribution.emptyTitle')"
     :empty-description="t('statistics.charts.sourceDistribution.emptyDescription')"
   >
-    <VChart :option autoresize style="height: 100%" />
+    <VChart :option="option" autoresize style="height: 100%" />
   </ChartCard>
 </template>

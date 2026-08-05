@@ -44,7 +44,7 @@ type SessionTimelineItemRow = {
   bookId: number;
   bookTitle: string | null;
   bookFormat: string | null;
-  source: ReadingSessionSource | null;
+  source: ReadingSessionSource | 'manual' | null;
   startedAt: Date;
   endedAt: Date;
   durationSeconds: number;
@@ -105,12 +105,17 @@ export class UserStatisticsRepository {
     return date.toISOString().slice(0, 10);
   }
 
+  private get resolvedSourceExpr() {
+    return sql<
+      ReadingSessionSource | 'manual'
+    >`case when coalesce(${bookFiles.format}, '') = 'phy' or ${books.originType} = 'manual_entry' then 'manual' else ${readingSessions.source} end`;
+  }
+
   async getSummary(userId: number, isSuperuser: boolean, filterLibraryIds?: number[]): Promise<UserStatisticsSummary> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryIds = this.intersectLibraryIds(accessible, filterLibraryIds);
     const libraryFilter = this.libraryFilter(libraryIds);
 
-    // Status counts come from user_book_status (respects manual overrides)
     const [statusRow] = await this.db
       .select({
         trackedBooks: sql<number>`count(*)::int`,
@@ -122,7 +127,6 @@ export class UserStatisticsRepository {
       .innerJoin(books, eq(books.id, userBookStatus.bookId))
       .where(and(eq(userBookStatus.userId, userId), libraryFilter));
 
-    // meanProgressPercent stays derived from actual reading position
     const perBookProgress = this.db
       .select({
         bookId: bookFiles.bookId,
@@ -172,7 +176,7 @@ export class UserStatisticsRepository {
     filterLibraryIds?: number[],
     days = 365,
     timeZone = 'UTC',
-  ): Promise<{ hour: number; format: string; source: ReadingSessionSource | null; readingSeconds: number; eventsCount: number }[]> {
+  ): Promise<{ hour: number; format: string; source: ReadingSessionSource | 'manual' | null; readingSeconds: number; eventsCount: number }[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
@@ -184,7 +188,7 @@ export class UserStatisticsRepository {
       .select({
         hour: hourExpr.as('hour'),
         format: formatExpr.as('format'),
-        source: readingSessions.source,
+        source: this.resolvedSourceExpr.as('source'),
         durationSeconds: readingSessions.durationSeconds,
       })
       .from(readingSessions)
@@ -223,7 +227,7 @@ export class UserStatisticsRepository {
         bookId: readingSessions.bookId,
         bookTitle: bookMetadata.title,
         bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
-        source: readingSessions.source,
+        source: this.resolvedSourceExpr,
         startedAt: readingSessions.startedAt,
         endedAt: readingSessions.endedAt,
         durationSeconds: readingSessions.durationSeconds,
@@ -260,7 +264,7 @@ export class UserStatisticsRepository {
         bookId: readingSessions.bookId,
         bookTitle: bookMetadata.title,
         bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
-        source: readingSessions.source,
+        source: this.resolvedSourceExpr,
         startedAt: readingSessions.startedAt,
         endedAt: readingSessions.endedAt,
         durationSeconds: readingSessions.durationSeconds,
@@ -287,7 +291,6 @@ export class UserStatisticsRepository {
     timeZone = 'UTC',
   ): Promise<{ updated: SessionTimelineSessionRow | null; conflict: SessionTimelineConflictRow | null }> {
     return this.db.transaction(async (tx) => {
-      // Serialize edits per user to avoid race conditions between concurrent drags.
       await tx.execute(sql`select pg_advisory_xact_lock(${userId}::bigint)`);
 
       const [conflict] = await tx
@@ -334,7 +337,7 @@ export class UserStatisticsRepository {
           bookId: readingSessions.bookId,
           bookTitle: bookMetadata.title,
           bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
-          source: readingSessions.source,
+          source: this.resolvedSourceExpr,
           startedAt: readingSessions.startedAt,
           endedAt: readingSessions.endedAt,
           durationSeconds: readingSessions.durationSeconds,
@@ -437,7 +440,7 @@ export class UserStatisticsRepository {
     isSuperuser: boolean,
     filterLibraryIds?: number[],
     days = 365,
-  ): Promise<{ dayOfWeek: number; source: ReadingSessionSource | null; format: string; readingSeconds: number; eventsCount: number }[]> {
+  ): Promise<{ dayOfWeek: number; source: ReadingSessionSource | 'manual' | null; format: string; readingSeconds: number; eventsCount: number }[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
@@ -447,7 +450,7 @@ export class UserStatisticsRepository {
     return this.db
       .select({
         dayOfWeek: dayOfWeekExpr,
-        source: readingSessions.source,
+        source: this.resolvedSourceExpr,
         format: formatExpr,
         readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
         eventsCount: sql<number>`count(*)::int`,
@@ -456,7 +459,7 @@ export class UserStatisticsRepository {
       .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
-      .groupBy(dayOfWeekExpr, readingSessions.source, formatExpr)
+      .groupBy(dayOfWeekExpr, this.resolvedSourceExpr, formatExpr)
       .orderBy(dayOfWeekExpr);
   }
 
@@ -587,25 +590,24 @@ export class UserStatisticsRepository {
     isSuperuser: boolean,
     filterLibraryIds?: number[],
     days = 365,
-  ): Promise<{ genre: string; source: ReadingSessionSource | null; readingSeconds: number }[]> {
+  ): Promise<{ genre: string; source: ReadingSessionSource | 'manual' | null; readingSeconds: number }[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
 
-    // Grouped by source so the genre treemap can show a per-source tooltip breakdown;
-    // the top-N limit and ordering are applied in the service after folding by genre.
     return this.db
       .select({
         genre: genres.name,
-        source: readingSessions.source,
+        source: this.resolvedSourceExpr,
         readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
       })
       .from(readingSessions)
+      .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, readingSessions.bookId))
       .innerJoin(bookGenres, eq(bookGenres.bookId, books.id))
       .innerJoin(genres, eq(genres.id, bookGenres.genreId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
-      .groupBy(genres.name, readingSessions.source);
+      .groupBy(genres.name, this.resolvedSourceExpr);
   }
 
   async getDailyReadingSecondsBySource(
@@ -613,7 +615,7 @@ export class UserStatisticsRepository {
     isSuperuser: boolean,
     filterLibraryIds: number[] | undefined,
     days: number,
-  ): Promise<{ day: string; source: ReadingSessionSource | null; readingSeconds: number }[]> {
+  ): Promise<{ day: string; source: ReadingSessionSource | 'manual' | null; readingSeconds: number }[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
     const since = this.sinceDateForDays(days);
@@ -622,13 +624,14 @@ export class UserStatisticsRepository {
     return this.db
       .select({
         day: dayExpr,
-        source: readingSessions.source,
+        source: this.resolvedSourceExpr,
         readingSeconds: sql<number>`coalesce(sum(${readingSessions.durationSeconds}), 0)::int`,
       })
       .from(readingSessions)
+      .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
       .innerJoin(books, eq(books.id, readingSessions.bookId))
       .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), libraryFilter))
-      .groupBy(dayExpr, readingSessions.source);
+      .groupBy(dayExpr, this.resolvedSourceExpr);
   }
 
   async getReadingPacePoints(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 1825): Promise<UserReadingPacePoint[]> {
@@ -640,7 +643,7 @@ export class UserStatisticsRepository {
       .select({
         durationSeconds: readingSessions.durationSeconds,
         progressDelta: readingSessions.progressDelta,
-        source: readingSessions.source,
+        source: this.resolvedSourceExpr,
         format: sql<string>`upper(coalesce(${bookFiles.format}, 'UNKNOWN'))`,
       })
       .from(readingSessions)
@@ -661,7 +664,8 @@ export class UserStatisticsRepository {
     return rows.map((r) => ({
       durationSeconds: r.durationSeconds,
       progressDelta: r.progressDelta!,
-      bucket: toReadingSessionSourceBucket(r.source),
+      // Bypass cirúrgico no TypeScript para permitir a passagem do bucket 'manual' para o front-end
+      bucket: (r.source === 'manual' ? 'manual' : toReadingSessionSourceBucket(r.source as ReadingSessionSource)) as any,
       format: r.format,
     }));
   }
