@@ -136,9 +136,6 @@ export class StatisticsRepository {
       .groupBy(unionAlias.format)
       .orderBy(desc(sql<number>`count(distinct ${unionAlias.bookId})`));
 
-    // LOG DE DEBUG PARA CAPTURAR OS IDs / FORMATOS RETORNADOS
-    this.logger.warn(`[DEBUG_FORMAT_DISTRIBUTION] userId=${userId} results=${JSON.stringify(result)}`);
-
     return result;
   }
 
