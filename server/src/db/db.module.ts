@@ -1,10 +1,10 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
 
 import { createPostgresClientConfig } from './postgres-connection-config';
 import * as schema from './schema';
+import { InstrumentedPgPool } from './instrumented-pg-pool';
 
 export const DB = Symbol('DB');
 
@@ -15,7 +15,7 @@ export const DB = Symbol('DB');
       provide: DB,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const pool = new Pool(
+        const pool = new InstrumentedPgPool(
           createPostgresClientConfig(config.getOrThrow<string>('db.url'), {
             max: 20,
             idleTimeoutMillis: 30_000,

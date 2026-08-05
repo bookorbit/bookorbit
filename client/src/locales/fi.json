@@ -6105,29 +6105,20 @@
       "cycleFooterMode": "Syklin alatunnisteen tiedot -tila"
     },
     "cbz": {
-      "tabs": {
-        "view": "Näytä",
-        "reading": "Luetaan",
-        "layout": "Asettelu"
-      },
       "fitMode": "Sovita tila",
       "background": "Tausta",
       "scrollMode": "Vieritystila",
       "scrollModeHint": "Käytä \"Ei aukkoja\" webtooneille ja pystysuorille nauhoille.",
       "readingDirection": "Lukemisen suunta",
       "pageView": "Sivun näkymä",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Levityksen kohdistus",
-      "spreadAlignmentHint": "Levityksen tasaus ei ole käytettävissä automaattisessa varmennustilassa.",
       "spreadGap": "Leviämisen väli",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Tarkenna kaksisivuiseen käyttöön",
       "forceTwoPage": "Pakota kaksisivu",
-      "off": "Pois",
-      "on": "Päällä",
       "widePages": "Laajat sivut",
-      "resetBookViewSettings": "Nollaa kirjan näkymäasetukset",
-      "resetConfirm": "Nollaa tämän kirjan asetukset globaaleihin oletuksiisi?",
       "firstPage": "Ensimmäinen sivu",
       "lastPage": "Viimeinen sivu",
       "fit": {

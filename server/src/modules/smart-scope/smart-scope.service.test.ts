@@ -69,6 +69,7 @@ function makeService() {
   };
   const bookService = {
     executeBooksQuery: vi.fn(),
+    executeBookIdsQuery: vi.fn(),
     executeJumpBucketsQuery: vi.fn(),
   };
 
@@ -578,6 +579,28 @@ describe('SmartScopeService', () => {
     expect(result).toEqual({ items: [], total: 0, page: 0, size: 25 });
   });
 
+  it('executeSmartScopeBookIds applies the saved filter and sort without hydrating cards', async () => {
+    const { service, smartScopeRepo, libraryService, queryBuilder, bookService } = makeService();
+    const smartScope = makeSmartScope({
+      id: 5,
+      userId: 12,
+      filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'test' }] },
+      defaultSort: [{ field: 'title', dir: 'asc' }],
+    });
+    smartScopeRepo.findById.mockResolvedValue([smartScope]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([9]);
+    queryBuilder.buildWhere.mockReturnValue('where');
+    bookService.executeBookIdsQuery.mockResolvedValue([7, 3]);
+
+    await expect(service.executeSmartScopeBookIds(5, makeUser({ id: 12 }), 20)).resolves.toEqual([7, 3]);
+    expect(bookService.executeBookIdsQuery).toHaveBeenCalledWith(12, 'where', {
+      filter: smartScope.filter,
+      sort: smartScope.defaultSort,
+      pagination: { page: 0, size: 20 },
+    });
+    expect(bookService.executeBooksQuery).not.toHaveBeenCalled();
+  });
+
   it('executeSmartScope seeds sort from the smartScope when the request does not override it', async () => {
     const { service, smartScopeRepo, libraryService, queryBuilder, bookService } = makeService();
     const smartScope = makeSmartScope({
@@ -774,6 +797,28 @@ describe('SmartScopeService', () => {
       });
 
       expect(result).toEqual({ items: [], total: 0, page: 3, size: 25 });
+      expect(libraryService.findAccessibleLibraryIds).not.toHaveBeenCalled();
+      expect(queryBuilder.buildWhere).not.toHaveBeenCalled();
+      expect(bookService.executeBooksQuery).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid stored filter before querying books', async () => {
+      const { service, smartScopeRepo, libraryService, queryBuilder, bookService } = makeService();
+      smartScopeRepo.findById.mockResolvedValue([
+        makeSmartScope({
+          id: 5,
+          userId: 12,
+          filter: { sort: 'newest', filter: 'downloaded' } as never,
+        }),
+      ]);
+
+      await expect(
+        service.queryBooks(5, makeUser({ id: 12 }), {
+          pagination: { page: 0, size: 50 },
+          sort: [],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
       expect(libraryService.findAccessibleLibraryIds).not.toHaveBeenCalled();
       expect(queryBuilder.buildWhere).not.toHaveBeenCalled();
       expect(bookService.executeBooksQuery).not.toHaveBeenCalled();

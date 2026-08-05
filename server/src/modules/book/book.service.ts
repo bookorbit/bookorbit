@@ -1141,6 +1141,18 @@ export class BookService {
     return result;
   }
 
+  async executeBookIdsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<number[]> {
+    const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes);
+    return this.bookRepo.findCardIds({
+      where,
+      orderBy,
+      limit: query.pagination.size,
+      offset: query.pagination.page * query.pagination.size,
+      userId,
+    });
+  }
+
   async queryJumpBucketsForLibrary(user: RequestUser, libraryId: number, query: JumpBucketsQuery): Promise<JumpBucketsResponse> {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const timeZone = this.resolveUserTimeZone(user);

@@ -6105,29 +6105,20 @@
       "cycleFooterMode": "Cyklus footer info tilstand"
     },
     "cbz": {
-      "tabs": {
-        "view": "Vis",
-        "reading": "Læser",
-        "layout": "Layout"
-      },
       "fitMode": "Tilpas tilstand",
       "background": "Baggrund",
       "scrollMode": "Rul tilstand",
       "scrollModeHint": "Brug \"Ingen huller\" til webtoons og lodrette strimler.",
       "readingDirection": "Læser retning",
       "pageView": "Side visning",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Spred justering",
-      "spreadAlignmentHint": "Spredning justering er utilgængelig i auto-fallback-tilstand.",
       "spreadGap": "Spred mellemrum",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Fokusér to-sidet skift",
       "forceTwoPage": "Gennemtving to-sidet",
-      "off": "Fra",
-      "on": "Til",
       "widePages": "Brede sider",
-      "resetBookViewSettings": "Nulstil indstillinger for bogvisning",
-      "resetConfirm": "Nulstil visningsindstillingerne for denne bog til dine globale standarder?",
       "firstPage": "Første side",
       "lastPage": "Sidste side",
       "fit": {

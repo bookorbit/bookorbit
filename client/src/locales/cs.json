@@ -6105,29 +6105,20 @@
       "cycleFooterMode": "Cykovat informační režim zápatí"
     },
     "cbz": {
-      "tabs": {
-        "view": "Zobrazit",
-        "reading": "Čtení",
-        "layout": "Rozložení"
-      },
       "fitMode": "Přizpůsobit režim",
       "background": "Pozadí",
       "scrollMode": "Režim rolování",
       "scrollModeHint": "Pro webové hračky a vertikální proužky použijte \"Žádné mezery\".",
       "readingDirection": "Směr čtení",
       "pageView": "Zobrazení stránky",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Zarovnání rozpětí",
-      "spreadAlignmentHint": "Zarovnání šíře není v režimu automatického záložního nastavení dostupné.",
       "spreadGap": "Rozšíření mezery",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Přepínání dvoustránkového režimu ostření",
       "forceTwoPage": "Vynutit dvoustránku",
-      "off": "Vypnuto",
-      "on": "Zapnuto",
       "widePages": "Široké stránky",
-      "resetBookViewSettings": "Obnovit nastavení zobrazení knihy",
-      "resetConfirm": "Obnovit nastavení zobrazení pro tuto knihu na vaše globální nastavení?",
       "firstPage": "První stránka",
       "lastPage": "Poslední stránka",
       "fit": {

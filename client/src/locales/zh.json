@@ -6105,29 +6105,20 @@
       "cycleFooterMode": "循环页脚信息模式"
     },
     "cbz": {
-      "tabs": {
-        "view": "查看",
-        "reading": "正在阅读",
-        "layout": "布局"
-      },
       "fitMode": "适合模式",
       "background": "二. 背景",
       "scrollMode": "滚动模式",
       "scrollModeHint": "对网络玩具和垂直条纹使用“无差距”。",
       "readingDirection": "阅读方向",
       "pageView": "页面视图",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "扩展对齐",
-      "spreadAlignmentHint": "在自动回退模式下，扩展对齐不可用。",
       "spreadGap": "2. 扩大差距",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "焦点两页切换",
       "forceTwoPage": "强制两页",
-      "off": "关闭",
-      "on": "开启",
       "widePages": "宽页面",
-      "resetBookViewSettings": "重置书签视图设置",
-      "resetConfirm": "将此书的视图设置重置为全局默认值？",
       "firstPage": "首页",
       "lastPage": "最后页",
       "fit": {

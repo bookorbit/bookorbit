@@ -1,10 +1,13 @@
 import { fileURLToPath, URL } from 'node:url'
+import { Agent } from 'node:http'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+const apiAgent = new Agent({ keepAlive: true })
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -141,6 +144,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
+        agent: apiAgent,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
             if (req.headers.host) proxyReq.setHeader('x-forwarded-host', req.headers.host)

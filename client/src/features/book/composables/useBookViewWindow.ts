@@ -32,6 +32,7 @@ export function useBookViewWindow(options: {
   railViewport?: Ref<HTMLElement | null>
   collapseEnabled?: Ref<boolean>
   q?: Ref<string>
+  enabled?: Ref<boolean>
 }) {
   const filter = ref<GroupRule | undefined>(undefined)
   const sort = ref<SortSpec[]>([{ field: 'title', dir: 'asc' }])
@@ -43,8 +44,13 @@ export function useBookViewWindow(options: {
     ...(options.q?.value.trim() ? { q: options.q.value.trim() } : {}),
   }))
 
-  const listEndpoint = computed(() => (isValidScopeId(options.scopeId.value) ? options.listEndpoint(options.scopeId.value) : null))
-  const bucketsEndpoint = computed(() => (isValidScopeId(options.scopeId.value) ? options.bucketsEndpoint(options.scopeId.value) : null))
+  const queryEnabled = computed(() => options.enabled?.value ?? true)
+  const listEndpoint = computed(() =>
+    queryEnabled.value && isValidScopeId(options.scopeId.value) ? options.listEndpoint(options.scopeId.value) : null,
+  )
+  const bucketsEndpoint = computed(() =>
+    queryEnabled.value && isValidScopeId(options.scopeId.value) ? options.bucketsEndpoint(options.scopeId.value) : null,
+  )
 
   const window = useBookWindow({ endpoint: listEndpoint, query })
 

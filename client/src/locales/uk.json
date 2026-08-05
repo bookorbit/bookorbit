@@ -6105,29 +6105,20 @@
       "cycleFooterMode": "Зміна режиму інформації в футері"
     },
     "cbz": {
-      "tabs": {
-        "view": "Дивитись",
-        "reading": "Читання",
-        "layout": "Макет"
-      },
       "fitMode": "За розміром",
       "background": "Фон",
       "scrollMode": "Режим прокрутки",
       "scrollModeHint": "Використовуйте \"Немає прогалин для вебтонів та вертикальних смуг.",
       "readingDirection": "Напрямок читання",
       "pageView": "Перегляд сторінки",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Поширення вирівнювання",
-      "spreadAlignmentHint": "Розширення вирівнювання недоступне в режимі авторезервування.",
       "spreadGap": "Поширити розрив",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Фокусуватися на двосторінках",
       "forceTwoPage": "Примусово використовувати дві сторінки",
-      "off": "Вимкнено",
-      "on": "Увімк",
       "widePages": "Широкі сторінки",
-      "resetBookViewSettings": "Скинути налаштування перегляду книги",
-      "resetConfirm": "Скинути параметри перегляду цієї книги до стандартних за замовчуванням?",
       "firstPage": "Перша сторінка",
       "lastPage": "Остання сторінка",
       "fit": {

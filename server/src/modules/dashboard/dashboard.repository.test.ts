@@ -1,5 +1,8 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
+import type { SQL } from 'drizzle-orm';
+
 import { DashboardRepository } from './dashboard.repository';
-import { audiobookProgress, bookFiles, readingProgress, userBookStatus } from '../../db/schema';
+import { audiobookProgress, bookFiles, books, readingProgress, userBookStatus } from '../../db/schema';
 
 function makeLimitChain<T>(rows: T) {
   const chain: Record<string, vi.Mock> = {
@@ -20,6 +23,16 @@ function makeLimitChain<T>(rows: T) {
   return chain;
 }
 
+function makeBoundsChain(minId: number | null, maxId: number | null) {
+  const chain = {
+    from: vi.fn(),
+    where: vi.fn(),
+  };
+  chain.from.mockReturnValue(chain);
+  chain.where.mockResolvedValue([{ minId, maxId }]);
+  return chain;
+}
+
 function collectValues(value: unknown, seen = new WeakSet<object>()): unknown[] {
   if (value === null || typeof value !== 'object') return [value];
   if (seen.has(value)) return [];
@@ -31,6 +44,13 @@ function collectValues(value: unknown, seen = new WeakSet<object>()): unknown[] 
     values.push(...collectValues((value as Record<string, unknown>)[key], seen));
   }
   return values;
+}
+
+function compileSql(value: unknown): string {
+  return new PgDialect()
+    .sqlToQuery(value as SQL)
+    .sql.replaceAll(/\s+/g, ' ')
+    .trim();
 }
 
 describe('DashboardRepository', () => {
@@ -117,40 +137,109 @@ describe('DashboardRepository', () => {
   });
 
   it('returns empty random ids when there are no candidates', async () => {
+    const boundsChain = makeBoundsChain(1, 100);
     const listChain = makeLimitChain([]);
-    const db = { select: vi.fn().mockReturnValue(listChain) };
+    const db = {
+      select: vi.fn().mockReturnValueOnce(boundsChain).mockReturnValue(listChain),
+      execute: vi.fn().mockResolvedValue({ rows: [] }),
+    };
     const repo = new DashboardRepository(db as never);
 
     const result = await repo.findRandomBookIds([5], 7, 20);
 
     expect(result).toEqual([]);
-    expect(db.select).toHaveBeenCalledTimes(1);
-    expect(listChain.leftJoin).toHaveBeenCalledTimes(3);
-    expect(listChain.leftJoin.mock.calls[0]?.[0]).toBe(bookFiles);
-    expect(listChain.leftJoin.mock.calls[1]?.[0]).toBe(readingProgress);
-    expect(listChain.leftJoin.mock.calls[2]?.[0]).toBe(userBookStatus);
-    expect(listChain.orderBy).toHaveBeenCalledTimes(1);
-    expect(listChain.limit).toHaveBeenCalledWith(20);
+    expect(db.select).toHaveBeenCalledTimes(5);
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(listChain.leftJoin).not.toHaveBeenCalled();
+    expect(listChain.orderBy).toHaveBeenCalledTimes(2);
+    expect(listChain.limit).toHaveBeenCalledTimes(2);
+    expect(listChain.limit).toHaveBeenNthCalledWith(1, 20);
+    expect(listChain.limit).toHaveBeenNthCalledWith(2, 20);
   });
 
-  it('maps random rows to id list and excludes active or finished read statuses', async () => {
-    const listChain = makeLimitChain([{ id: 21 }, { id: 3 }, { id: 15 }]);
-    const db = { select: vi.fn().mockReturnValue(listChain) };
+  it('samples random rows from independent pivots and excludes active or finished read statuses', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const boundsChain = makeBoundsChain(1, 100);
+    const subqueryChain = makeLimitChain([]);
+    const db = {
+      select: vi.fn().mockReturnValueOnce(boundsChain).mockReturnValue(subqueryChain),
+      execute: vi.fn().mockResolvedValue({
+        rows: [
+          { sampleIndex: 0, id: 21 },
+          { sampleIndex: 1, id: 3 },
+          { sampleIndex: 2, id: 15 },
+        ],
+      }),
+    };
     const repo = new DashboardRepository(db as never);
 
     const result = await repo.findRandomBookIds([5], 7, 3);
-    const whereArg = listChain.where.mock.calls[0]?.[0];
-    const whereValues = collectValues(whereArg);
+    const queryText = compileSql(db.execute.mock.calls[0]?.[0]);
+    const statusWhereValues = collectValues(subqueryChain.where.mock.calls[1]?.[0]);
 
     expect(result).toEqual([21, 3, 15]);
-    expect(db.select).toHaveBeenCalledTimes(1);
-    expect(listChain.leftJoin).toHaveBeenCalledTimes(3);
-    expect(listChain.leftJoin.mock.calls[0]?.[0]).toBe(bookFiles);
-    expect(listChain.leftJoin.mock.calls[1]?.[0]).toBe(readingProgress);
-    expect(listChain.leftJoin.mock.calls[2]?.[0]).toBe(userBookStatus);
-    expect(whereValues).toEqual(expect.arrayContaining(['reading', 'rereading', 'on_hold', 'read', 'skimmed', 'abandoned']));
-    expect(listChain.orderBy).toHaveBeenCalledTimes(1);
-    expect(listChain.limit).toHaveBeenCalledWith(3);
+    expect(db.select).toHaveBeenCalledTimes(3);
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(subqueryChain.offset).toHaveBeenCalledTimes(2);
+    expect(subqueryChain.offset).toHaveBeenNthCalledWith(1, 0);
+    expect(subqueryChain.offset).toHaveBeenNthCalledWith(2, 0);
+    expect(statusWhereValues).toEqual(expect.arrayContaining(['reading', 'rereading', 'on_hold', 'read', 'skimmed', 'abandoned']));
+    expect(queryText).toContain('not exists');
+    expect(queryText).not.toContain('left join "user_book_status"');
+    expect(queryText).toContain('where forward_candidate.id is null');
+    expect(queryText).toContain('order by "books"."id" desc');
+    expect(Math.random).toHaveBeenCalledTimes(9);
+  });
+
+  it('caps distributed candidate probes for large limits', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const boundsChain = makeBoundsChain(1, 1000);
+    const subqueryChain = makeLimitChain([]);
+    const db = {
+      select: vi.fn().mockReturnValueOnce(boundsChain).mockReturnValue(subqueryChain),
+      execute: vi.fn().mockResolvedValue({
+        rows: Array.from({ length: 50 }, (_, index) => ({ sampleIndex: index, id: index + 1 })),
+      }),
+    };
+    const repo = new DashboardRepository(db as never);
+
+    await expect(repo.findRandomBookIds([5], 7, 50)).resolves.toHaveLength(50);
+
+    expect(Math.random).toHaveBeenCalledTimes(60);
+  });
+
+  it('fills a sparse distributed sample from the nearest lower ids', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const boundsChain = makeBoundsChain(1, 100);
+    const subqueryChain = makeLimitChain([]);
+    const afterPivot = makeLimitChain([]);
+    const beforePivot = makeLimitChain([{ id: 9 }, { id: 2 }]);
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(boundsChain)
+        .mockReturnValueOnce(subqueryChain)
+        .mockReturnValueOnce(subqueryChain)
+        .mockReturnValueOnce(afterPivot)
+        .mockReturnValueOnce(beforePivot),
+      execute: vi.fn().mockResolvedValue({
+        rows: [
+          { sampleIndex: 0, id: 100 },
+          { sampleIndex: 1, id: 100 },
+          { sampleIndex: 2, id: 100 },
+        ],
+      }),
+    };
+    const repo = new DashboardRepository(db as never);
+
+    const result = await repo.findRandomBookIds([5], 7, 3);
+
+    expect(result).toEqual([100, 9, 2]);
+    expect(afterPivot.limit).toHaveBeenCalledWith(2);
+    expect(beforePivot.limit).toHaveBeenCalledWith(2);
+    expect(collectValues(afterPivot.orderBy.mock.calls[0]?.[0])).toContain(' asc');
+    expect(collectValues(beforePivot.orderBy.mock.calls[0]?.[0])).toContain(' desc');
+    expect(beforePivot.orderBy.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ queryChunks: expect.arrayContaining([books.id]) }));
   });
 
   it('returns empty random ids and does not query when limit is zero', async () => {
