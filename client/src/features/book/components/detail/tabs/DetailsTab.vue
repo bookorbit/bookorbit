@@ -332,9 +332,19 @@ const isEditingManualProgressDesktop = ref(false)
 const isEditingManualProgressMobile = ref(false)
 
 const manualProgress = ref<number | null>(null)
+const progressMode = ref<'percentage' | 'page'>('percentage')
 const savingProgress = ref(false)
 const sessionStartedAt = ref('')
 const sessionDurationMinutes = ref(30)
+
+watch(progressMode, (newMode, oldMode) => {
+  if (!props.book.pageCount || manualProgress.value == null) return
+  if (newMode === 'percentage' && oldMode === 'page') {
+    manualProgress.value = Math.round((manualProgress.value / props.book.pageCount) * 100)
+  } else if (newMode === 'page' && oldMode === 'percentage') {
+    manualProgress.value = Math.round((manualProgress.value / 100) * props.book.pageCount)
+  }
+})
 
 const currentPhysicalProgressDisplay = computed(() => {
   if (!primaryFile.value) return '-'
@@ -350,9 +360,12 @@ const currentPhysicalProgressDisplay = computed(() => {
 function startEditingManualProgress(isMobile = false) {
   if (!primaryFile.value) return
   const prog = fileProgressById.value[primaryFile.value.id]
+
   if (props.book.pageCount && props.book.pageCount > 0) {
-    manualProgress.value = prog?.pageNumber ?? 0
+    progressMode.value = 'page'
+    manualProgress.value = prog?.pageNumber ?? (prog ? Math.round((prog.percentage / 100) * props.book.pageCount) : 0)
   } else {
+    progressMode.value = 'percentage'
     manualProgress.value = prog ? Math.round(prog.percentage) : 0
   }
 
@@ -390,10 +403,16 @@ async function saveManualProgress() {
     const startedAtDate = new Date(sessionStartedAt.value)
 
     let calculatedPercentage = 0
-    if (props.book.pageCount && props.book.pageCount > 0) {
+    let calculatedPageNumber: number | null = null
+
+    if (progressMode.value === 'page' && props.book.pageCount && props.book.pageCount > 0) {
       calculatedPercentage = Math.min(100, Math.max(0, (inputVal / props.book.pageCount) * 100))
+      calculatedPageNumber = inputVal
     } else {
       calculatedPercentage = Math.min(100, Math.max(0, inputVal))
+      if (props.book.pageCount && props.book.pageCount > 0) {
+        calculatedPageNumber = Math.round((calculatedPercentage / 100) * props.book.pageCount)
+      }
     }
 
     const sessionPayload: Record<string, string | number> = {
@@ -417,7 +436,7 @@ async function saveManualProgress() {
     if (primaryFile.value) {
       const progressPayload = {
         percentage: calculatedPercentage,
-        pageNumber: props.book.pageCount && props.book.pageCount > 0 ? inputVal : null,
+        pageNumber: calculatedPageNumber,
         cfi: null,
       }
 
@@ -436,11 +455,21 @@ async function saveManualProgress() {
         [fileId]: {
           ...existingProg,
           percentage: calculatedPercentage,
-          pageNumber: props.book.pageCount && props.book.pageCount > 0 ? inputVal : null,
+          pageNumber: calculatedPageNumber,
           updatedAt: new Date().toISOString(),
         },
       }
     }
+
+    const updatedBookRes = await api(`/api/v1/books/${props.book.id}`)
+    if (updatedBookRes.ok) {
+      const freshBook = (await updatedBookRes.json()) as BookDetail
+      emit('saved', freshBook)
+    } else {
+      emit('saved', { ...props.book })
+    }
+
+    await loadSupplemental()
 
     isEditingManualProgressDesktop.value = false
     isEditingManualProgressMobile.value = false
@@ -582,6 +611,10 @@ function dateToDateKey(value: Date): string {
 function toDateInputValue(value: string | null | undefined): string {
   if (!value) return ''
   if (DATE_KEY_RE.test(value)) return value
+  // Remove "Timezone Offset Shift" (Atraso de Meia Noite UTC)
+  if (typeof value === 'string' && value.includes('T')) {
+    return value.split('T')[0]!
+  }
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ''
   return dateToDateKey(parsed)
@@ -1478,19 +1511,24 @@ watch(
                     <label class="text-[10px] uppercase font-bold text-muted-foreground">{{
                       t('book.detail.details.endProgress', 'End progress')
                     }}</label>
-                    <input
-                      v-model="manualProgress"
-                      type="number"
-                      min="0"
-                      :max="book.pageCount || 100"
-                      :placeholder="
-                        book.pageCount
-                          ? t('book.actions.progressPagePlaceholder', 'Current page')
-                          : t('book.actions.progressPercentPlaceholder', 'Percentage')
-                      "
-                      class="w-full h-8 rounded border border-input bg-background px-2 text-xs"
-                      @keyup.enter="saveManualProgress"
-                    />
+                    <div class="flex items-center gap-1.5">
+                      <input
+                        v-model="manualProgress"
+                        type="number"
+                        min="0"
+                        :max="progressMode === 'page' ? (book.pageCount ?? undefined) : 100"
+                        class="w-full h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                        @keyup.enter="saveManualProgress"
+                      />
+                      <select
+                        v-model="progressMode"
+                        :disabled="!book.pageCount"
+                        class="h-8 rounded-md border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                      >
+                        <option value="percentage">%</option>
+                        <option v-if="book.pageCount" value="page">{{ t('book.detail.details.pages') }}</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1782,19 +1820,24 @@ watch(
                         <label class="text-[10px] uppercase font-bold text-muted-foreground">{{
                           t('book.detail.details.endProgress', 'End progress')
                         }}</label>
-                        <input
-                          v-model="manualProgress"
-                          type="number"
-                          min="0"
-                          :max="book.pageCount || 100"
-                          :placeholder="
-                            book.pageCount
-                              ? t('book.actions.progressPagePlaceholder', 'Current page')
-                              : t('book.actions.progressPercentPlaceholder', 'Percentage')
-                          "
-                          class="w-full h-8 rounded border border-input bg-background px-2 text-xs"
-                          @keyup.enter="saveManualProgress"
-                        />
+                        <div class="flex items-center gap-1.5">
+                          <input
+                            v-model="manualProgress"
+                            type="number"
+                            min="0"
+                            :max="progressMode === 'page' ? (book.pageCount ?? undefined) : 100"
+                            class="w-full h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            @keyup.enter="saveManualProgress"
+                          />
+                          <select
+                            v-model="progressMode"
+                            :disabled="!book.pageCount"
+                            class="h-8 rounded-md border border-input bg-background px-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                          >
+                            <option value="percentage">%</option>
+                            <option v-if="book.pageCount" value="page">{{ t('book.detail.details.pages') }}</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1864,7 +1907,7 @@ watch(
                   @click="handleDeleteFromMenu"
                 >
                   <Trash2 class="size-3.5" />
-                  Delete book
+                  {{ t('common.delete') }}
                 </button>
               </PopoverContent>
             </Popover>
