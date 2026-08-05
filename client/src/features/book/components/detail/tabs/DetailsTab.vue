@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { formatBytes as formatFileSize } from '@/lib/formatting'
@@ -207,7 +208,7 @@ function measureGenreOverflow() {
 
   const containerRect = container.getBoundingClientRect()
   const containerWidth = container.clientWidth
-  const pillMetrics = pills.map((pill) => {
+  const pillMetrics = pills.map((pill: HTMLElement) => {
     const rect = pill.getBoundingClientRect()
     return {
       top: rect.top - containerRect.top,
@@ -253,7 +254,7 @@ watch(
   { immediate: true },
 )
 
-watch(genreMeasureContainer, (current, previous) => {
+watch(genreMeasureContainer, (current: HTMLElement | null, previous: HTMLElement | null) => {
   if (genreResizeObserver && previous) genreResizeObserver.unobserve(previous)
   if (genreResizeObserver && current) genreResizeObserver.observe(current)
   scheduleGenreOverflowMeasure()
@@ -280,7 +281,7 @@ const { hasPermission } = usePermissions()
 const { load: loadLocks, isLocked } = useMetadataLocks()
 watch(
   () => props.book,
-  (b) => loadLocks(b),
+  (b: BookDetail) => loadLocks(b),
   { immediate: true },
 )
 
@@ -510,7 +511,7 @@ const communityRatingByProvider = computed(() => {
 
 watch(
   () => props.book.rating,
-  (val) => {
+  (val: number | null) => {
     localRating.value = val ?? null
   },
   { immediate: true },
@@ -641,7 +642,7 @@ function startEditingReadingDate(field: 'startedAt' | 'finishedAt') {
 
 watch(
   draftReadingDates,
-  (value) => {
+  (value: { startedAt: string; finishedAt: string }) => {
     readingDatesError.value = validateReadingDates(value)
   },
   { deep: true },
@@ -658,7 +659,7 @@ function applyReadStatusUpdate(updatedReadStatus: UserBookStatus) {
 
 watch(
   () => props.book.readStatus,
-  (value) => {
+  (value: UserBookStatus | null) => {
     activeReadingDateField.value = null
     localReadStatus.value = value?.status ?? null
     const normalizedDates = normalizeReadStatusDates(value)
@@ -840,7 +841,7 @@ const providerLinks = computed<ProviderLink[]>(() => {
 })
 
 const communityRatingBadges = computed(() => {
-  const linkByKey = new Map(providerLinks.value.map((link) => [link.key, link]))
+  const linkByKey = new Map<string, ProviderLink>(providerLinks.value.map((link) => [link.key, link]))
   return props.book.communityRatings
     .filter((rating) => rating.rating != null && Number.isFinite(rating.rating))
     .map((rating) => {
@@ -952,15 +953,15 @@ function formatKoboDeviceNames(snapshots: BookKoboState['snapshots']): string {
 const koboAnomaly = computed(() => {
   if (!canViewKobo.value) return null
   const snapshots = koboState.value?.snapshots ?? []
-  const pendingDelete = snapshots.filter((snapshot) => snapshot.pendingDelete)
+  const pendingDelete = snapshots.filter((snapshot: BookKoboState['snapshots'][number]) => snapshot.pendingDelete)
   if (pendingDelete.length > 0) {
     return { label: `Pending delete on ${formatKoboDeviceNames(pendingDelete)}`, tooltip: 'Kobo will remove it on the next sync.' }
   }
-  const removedByDevice = snapshots.filter((snapshot) => snapshot.removedByDevice)
+  const removedByDevice = snapshots.filter((snapshot: BookKoboState['snapshots'][number]) => snapshot.removedByDevice)
   if (removedByDevice.length > 0) {
     return { label: `Removed on ${formatKoboDeviceNames(removedByDevice)}`, tooltip: 'Kobo reported this book removed.' }
   }
-  const unsynced = snapshots.filter((snapshot) => snapshot.synced === false)
+  const unsynced = snapshots.filter((snapshot: BookKoboState['snapshots'][number]) => snapshot.synced === false)
   if (unsynced.length > 0) {
     return { label: `Not synced on ${formatKoboDeviceNames(unsynced)}`, tooltip: 'Queued for the next Kobo sync.' }
   }
@@ -1133,7 +1134,7 @@ function setFileResetting(fileId: number, resetting: boolean): void {
     resettingFileIds.value = [...resettingFileIds.value, fileId]
     return
   }
-  resettingFileIds.value = resettingFileIds.value.filter((id) => id !== fileId)
+  resettingFileIds.value = resettingFileIds.value.filter((id: number) => id !== fileId)
 }
 
 async function handleResetFileProgress(row: ProgressRow) {
@@ -1210,7 +1211,9 @@ async function loadSupplemental() {
     collections.value = fetchedCollections.filter((collection) => (collection.memberCount ?? 0) > 0)
 
     if (canViewKobo.value) {
-      const fallbackSyncCollections = collections.value.filter((c) => c.syncToKobo && (c.memberCount ?? 0) > 0).map((c) => c.name)
+      const fallbackSyncCollections = collections.value
+        .filter((c: CollectionMembership) => c.syncToKobo && (c.memberCount ?? 0) > 0)
+        .map((c: CollectionMembership) => c.name)
       if (koboRes && koboRes.ok) {
         const data = (await koboRes.json()) as BookKoboState
         koboState.value = {
