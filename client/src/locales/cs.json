@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Kde čtete",
         "emptyTitle": "Zatím žádné čtení aktivity",
-        "emptyDescription": "Přečtěte si na webu, KOReader nebo Kobo, abyste viděli rozdělení vašeho zdroje."
+        "emptyDescription": "Přečtěte si na webu, KOReader nebo Kobo, abyste viděli rozdělení vašeho zdroje.",
+        "paper": "Paper"
       }
     }
   },

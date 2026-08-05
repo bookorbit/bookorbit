@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Waar je leest",
         "emptyTitle": "Nog geen leesactiviteit",
-        "emptyDescription": "Lees op het web, in KOReader of op Kobo om je bronverdeling te zien."
+        "emptyDescription": "Lees op het web, in KOReader of op Kobo om je bronverdeling te zien.",
+        "paper": "Paper"
       }
     }
   },

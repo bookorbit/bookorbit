@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Де ви читали",
         "emptyTitle": "Поки що читання активності немає",
-        "emptyDescription": "Читайте в Інтернеті, KOReader, або Кобо, щоб побачити свій вихідний розділ."
+        "emptyDescription": "Читайте в Інтернеті, KOReader, або Кобо, щоб побачити свій вихідний розділ.",
+        "paper": "Paper"
       }
     }
   },

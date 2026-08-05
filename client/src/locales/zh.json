@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "您阅读的地方",
         "emptyTitle": "尚无阅读活动",
-        "emptyDescription": "在网页上阅读，KOReader，或Kobo，看看你的源代码分割。"
+        "emptyDescription": "在网页上阅读，KOReader，或Kobo，看看你的源代码分割。",
+        "paper": "Paper"
       }
     }
   },

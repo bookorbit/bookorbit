@@ -6521,7 +6521,8 @@
       "sourceDistribution": {
         "title": "Missä Lukeit",
         "emptyTitle": "Ei vielä lukemisaktiviteettia",
-        "emptyDescription": "Lue verkosta, KOReaderista tai Kobosta nähdäksesi lähdekoodisi jakamisen."
+        "emptyDescription": "Lue verkosta, KOReaderista tai Kobosta nähdäksesi lähdekoodisi jakamisen.",
+        "paper": "Paper"
       }
     }
   },
