@@ -779,7 +779,7 @@
         "running": "Běhání...",
         "backfillAchievements": "Úspěchy nevyplňování",
         "backfillAchievementsHint": "Přehodnotit úspěchy všech uživatelů.",
-        "backfillResult": "Processed {users} users; granted {awards} awards.",
+        "backfillResult": "Zpracovaní uživatelé {users}; uděleno {awards} ocenění.",
         "runBackfill": "Spustit Backfill",
         "checkForUpdates": "Zkontrolovat aktualizace",
         "checkForUpdatesHint": "Automaticky zkontrolovat GitHub pro nové vydání při startu a zobrazit indikátor v postranním panelu, pokud je k dispozici.",
@@ -1140,7 +1140,7 @@
         "title": "Server Fonts",
         "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
         "listLabel": "Server fonts",
-        "noFontsYet": "No server fonts yet",
+        "noFontsYet": "Zatím žádná písma serveru",
         "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
@@ -3184,7 +3184,7 @@
       },
       "toast": {
         "refreshed": "Metadata autora obnovena",
-        "refreshedNoImage": "Metadata refreshed, but no author image was found.",
+        "refreshedNoImage": "Metadata byla aktualizována, ale nebyl nalezen žádný obrázek autora.",
         "refreshFailed": "Aktualizace metadat autora se nezdařila",
         "nameRequired": "Je vyžadováno jméno autora",
         "updated": "Autor byl aktualizován",
