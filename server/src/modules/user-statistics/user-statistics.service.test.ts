@@ -70,12 +70,13 @@ describe('UserStatisticsService', () => {
     const result = await service.getReadingSourceDistribution({ id: 123, isSuperuser: false } as any, { libraryIds: [] });
 
     expect(repo.getDailyReadingSecondsBySource).toHaveBeenCalledWith(123, false, [], 365);
-    // web + manual + null collapse into bookorbit; koreader has no activity and is omitted.
+    // web + manual + null collapse into bookorbit; koreader has no activity and is omitted, manual is included because it has activity; null source is ignored
     expect(result).toEqual({
       totalSeconds: 380,
       slices: [
-        { bucket: 'bookorbit', readingSeconds: 180 },
+        { bucket: 'bookorbit', readingSeconds: 130 },
         { bucket: 'kobo', readingSeconds: 200 },
+        { bucket: 'manual', readingSeconds: 50 },
       ],
     });
   });
