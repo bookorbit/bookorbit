@@ -16,7 +16,8 @@
     "yes": "否",
     "no": "否",
     "high": "High",
-    "low": "Low"
+    "low": "Low",
+    "add": "Add"
   },
   "settings": {
     "privacySharing": {

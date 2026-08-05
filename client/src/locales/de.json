@@ -16,7 +16,8 @@
     "yes": "Ja",
     "no": "Nein",
     "high": "High",
-    "low": "Low"
+    "low": "Low",
+    "add": "Add"
   },
   "settings": {
     "privacySharing": {
