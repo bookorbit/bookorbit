@@ -13,6 +13,7 @@ vi.mock('drizzle-orm', () => {
     eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
     inArray: vi.fn((left: unknown, values: unknown[]) => ({ op: 'inArray', left, values })),
     isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
+    max: vi.fn((value: unknown) => ({ op: 'max', value })),
     or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
     sql: sqlFn,
   };
@@ -205,9 +206,9 @@ describe('BookMetadataFetchQueueRepository', () => {
   it('getStatusSummary maps grouped counts by queue status', async () => {
     const { db, selectBuilder } = makeDb();
     selectBuilder.groupBy.mockResolvedValue([
-      { status: 'queued', cnt: '5' },
-      { status: 'processing', cnt: '2' },
-      { status: 'failed', cnt: '1' },
+      { status: 'queued', cnt: '5', latestUpdatedAt: new Date('2026-01-01T00:00:01.000Z') },
+      { status: 'processing', cnt: '2', latestUpdatedAt: new Date('2026-01-01T00:00:02.000Z') },
+      { status: 'failed', cnt: '1', latestUpdatedAt: new Date('2026-01-01T00:00:03.000Z') },
     ]);
     const repo = new BookMetadataFetchQueueRepository(db as never);
 
@@ -215,6 +216,7 @@ describe('BookMetadataFetchQueueRepository', () => {
       queued: 5,
       processing: 2,
       failed: 1,
+      latestFailureAt: '2026-01-01T00:00:03.000Z',
     });
   });
 

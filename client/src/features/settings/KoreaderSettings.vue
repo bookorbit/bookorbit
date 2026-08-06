@@ -106,7 +106,7 @@ const creating = ref(false)
 const showPassword = ref(false)
 const deleteConfirmOpen = ref(false)
 const helpOpen = ref(false)
-const urlCopied = ref(false)
+const copiedUrlTarget = ref<'plugin' | 'stock' | null>(null)
 const selectedUnmatched = ref<KoreaderUnmatchedBook | null>(null)
 const selectedManualLink = ref<KoreaderManualHashLink | null>(null)
 const linkSearchQuery = ref('')
@@ -132,13 +132,16 @@ const {
   clear: clearLinkSearch,
 } = useGlobalSearch(linkSearchQuery)
 
-let urlCopiedTimer: ReturnType<typeof setTimeout> | null = null
+let copiedUrlTimer: ReturnType<typeof setTimeout> | null = null
 
 onUnmounted(() => {
-  if (urlCopiedTimer) clearTimeout(urlCopiedTimer)
+  if (copiedUrlTimer) clearTimeout(copiedUrlTimer)
 })
 
 const syncUrl = computed(() => getSyncUrl())
+const stockSyncUrl = computed(() => new URL('/api/v1/koreader', syncUrl.value).toString())
+const urlCopied = computed(() => copiedUrlTarget.value === 'plugin')
+const stockUrlCopied = computed(() => copiedUrlTarget.value === 'stock')
 const hasCredentials = computed(() => !!credentials.value)
 const deviceCount = computed(() => syncStatus.value?.devices.length ?? 0)
 const totalSyncedBooks = computed(() => syncStatus.value?.totalSyncedBooks ?? 0)
@@ -346,20 +349,28 @@ async function handleDelete() {
   }
 }
 
-async function handleCopyUrl() {
-  const copied = await copyToClipboard(syncUrl.value)
+async function copyUrlWithFeedback(url: string, target: 'plugin' | 'stock') {
+  const copied = await copyToClipboard(url)
   if (!copied) {
     toast.error(t('settings.reader.koreader.syncUrlCopyFailed'))
     return
   }
 
-  urlCopied.value = true
+  copiedUrlTarget.value = target
   toast.success(t('settings.reader.koreader.syncUrlCopied'))
-  if (urlCopiedTimer) clearTimeout(urlCopiedTimer)
-  urlCopiedTimer = setTimeout(() => {
-    urlCopied.value = false
-    urlCopiedTimer = null
+  if (copiedUrlTimer) clearTimeout(copiedUrlTimer)
+  copiedUrlTimer = setTimeout(() => {
+    copiedUrlTarget.value = null
+    copiedUrlTimer = null
   }, 2000)
+}
+
+async function handleCopyUrl() {
+  await copyUrlWithFeedback(syncUrl.value, 'plugin')
+}
+
+async function handleCopyStockUrl() {
+  await copyUrlWithFeedback(stockSyncUrl.value, 'stock')
 }
 
 async function handleRefresh() {
@@ -744,10 +755,10 @@ async function handleDownloadPlugin() {
             <div class="px-4 py-4 bg-card md:px-5">
               <div class="mb-2 flex items-center gap-2">
                 <BookOpen :size="14" class="text-muted-foreground shrink-0" />
-                <p class="settings-label">{{ t('settings.reader.koreader.pluginServerUrl') }}</p>
+                <label for="koreader-plugin-server-url" class="settings-label">{{ t('settings.reader.koreader.pluginServerUrl') }}</label>
               </div>
               <div class="flex flex-col gap-2 md:flex-row md:items-center">
-                <input :value="syncUrl" readonly class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm" />
+                <input id="koreader-plugin-server-url" :value="syncUrl" readonly class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm" />
                 <button class="settings-btn-outline w-full min-h-10 justify-center md:w-auto md:min-h-0" @click="handleCopyUrl">
                   <Check v-if="urlCopied" :size="12" />
                   <Copy v-else :size="12" />
@@ -1103,12 +1114,31 @@ async function handleDownloadPlugin() {
               </div>
               <div>
                 <p class="font-medium text-foreground mb-2">{{ t('settings.reader.koreader.stockGuideTitle') }}</p>
-                <ol class="list-decimal list-inside space-y-2 pl-1">
+                <ol class="list-decimal list-outside space-y-2 pl-5">
                   <li>
                     {{ t('settings.reader.koreader.stockStep1Prefix') }}
                     <span class="font-mono text-foreground">Tools &gt; Progress sync</span>{{ t('settings.reader.koreader.stockStep1Suffix') }}
                   </li>
-                  <li>{{ t('settings.reader.koreader.stockStep2') }}</li>
+                  <li class="space-y-2">
+                    <label for="koreader-stock-server-url">{{ t('settings.reader.koreader.stockStep2InlineUrl') }}</label>
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        id="koreader-stock-server-url"
+                        :value="stockSyncUrl"
+                        readonly
+                        class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm"
+                      />
+                      <button
+                        id="koreader-stock-server-url-copy"
+                        class="settings-btn-outline w-full min-h-10 justify-center shrink-0 sm:w-auto sm:min-h-0"
+                        @click="handleCopyStockUrl"
+                      >
+                        <Check v-if="stockUrlCopied" :size="12" />
+                        <Copy v-else :size="12" />
+                        {{ stockUrlCopied ? t('settings.reader.koreader.copied') : t('settings.reader.koreader.copyUrl') }}
+                      </button>
+                    </div>
+                  </li>
                   <li>{{ t('settings.reader.koreader.stockStep3') }}</li>
                 </ol>
               </div>

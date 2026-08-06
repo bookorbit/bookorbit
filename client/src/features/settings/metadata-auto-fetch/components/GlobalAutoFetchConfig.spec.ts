@@ -11,6 +11,7 @@ const mockStatus = ref<BookMetadataFetchStatusEvent>({
   queued: 0,
   processing: 0,
   failed: 0,
+  latestFailureAt: null,
   paused: false,
   sessionTotal: 0,
   sessionDone: 0,
@@ -67,7 +68,7 @@ function makeConfig(overrides: Partial<BookMetadataFetchConfig> = {}): BookMetad
 }
 
 function idleStatus(): BookMetadataFetchStatusEvent {
-  return { queued: 0, processing: 0, failed: 0, paused: false, sessionTotal: 0, sessionDone: 0, currentItemName: null }
+  return { queued: 0, processing: 0, failed: 0, latestFailureAt: null, paused: false, sessionTotal: 0, sessionDone: 0, currentItemName: null }
 }
 
 describe('GlobalAutoFetchConfig', () => {

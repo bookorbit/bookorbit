@@ -1,10 +1,8 @@
-import { createWriteStream } from 'fs';
 import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
-import type { Readable } from 'stream';
 import * as unzipper from 'unzipper';
-import { ZipArchive, type Archiver } from 'archiver';
 import { replaceFileAtomically } from '../shared/atomic-file-replace';
+import { writeZipArchive, type ZipRewriteEntry } from '../shared/zip-rewrite';
 
 function isComicInfoEntry(entryPath: string): boolean {
   const normalized = entryPath.replace(/\\/g, '/').toLowerCase();
@@ -24,29 +22,16 @@ export async function writeComicInfoToZip(filePath: string, xmlContent: string):
   const xmlEntryPath = existing?.path ?? 'ComicInfo.xml';
 
   const tmpPath = join(dirname(filePath), `.cbx-write-${randomUUID()}`);
-  const archive = new ZipArchive({ zlib: { level: 6 } });
-  const output = createWriteStream(tmpPath);
-
-  await new Promise<void>((resolve, reject) => {
-    output.on('close', resolve);
-    output.on('error', reject);
-    archive.on('error', reject);
-    archive.pipe(output);
-
-    for (const entry of zip.files) {
-      if (isComicInfoEntry(entry.path)) continue;
-      appendEntryStream(archive, entry, reject);
-    }
-
-    archive.append(Buffer.from(xmlContent, 'utf-8'), { name: xmlEntryPath });
-    void archive.finalize();
-  });
+  await writeZipArchive(tmpPath, rewriteEntries(zip.files, xmlEntryPath, xmlContent));
 
   await replaceFileAtomically(tmpPath, filePath);
 }
 
-function appendEntryStream(archive: Archiver, entry: { path: string; stream: () => Readable }, reject: (error: Error) => void): void {
-  const source = entry.stream();
-  source.once('error', reject);
-  archive.append(source, { name: entry.path });
+function* rewriteEntries(files: readonly unzipper.File[], xmlEntryPath: string, xmlContent: string): Generator<ZipRewriteEntry> {
+  for (const entry of files) {
+    if (isComicInfoEntry(entry.path)) continue;
+    yield { name: entry.path, source: () => entry.stream() };
+  }
+
+  yield { name: xmlEntryPath, source: Buffer.from(xmlContent, 'utf-8') };
 }

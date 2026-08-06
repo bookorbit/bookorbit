@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import type { Locale } from '@bookorbit/types'
 import cs from '@/locales/cs.json'
@@ -18,6 +18,9 @@ import sv from '@/locales/sv.json'
 import uk from '@/locales/uk.json'
 import zh from '@/locales/zh.json'
 import { compileIcuCatalog, icuCountValues, isIcuPluralMessage, splitIcuCount } from './icu'
+import { i18n as applicationI18n } from './index'
+
+afterEach(() => vi.restoreAllMocks())
 
 function flattenMessages(value: unknown, prefix = '', output = new Map<string, string>()): Map<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return output
@@ -49,13 +52,37 @@ function createCatalogI18n(locale: Locale, catalog: MessageTree) {
     en: compileIcuCatalog(en, 'en'),
     [locale]: compileIcuCatalog(catalog, locale),
   }
-  return createI18n({ legacy: false, locale, fallbackLocale: 'en', messages })
+  return createI18n({ legacy: false, locale, fallbackLocale: 'en', missingWarn: false, fallbackWarn: false, messages })
 }
 
 describe('ICU message compilation', () => {
+  it('suppresses warnings for intentional English catalog fallback', () => {
+    expect(applicationI18n.global.missingWarn).toBe(false)
+    expect(applicationI18n.global.fallbackWarn).toBe(false)
+  })
+
   it('detects ICU plurals without treating ordinary interpolation as ICU', () => {
     expect(isIcuPluralMessage('{count, plural, one {One book} other {# books}}')).toBe(true)
     expect(isIcuPluralMessage('Hello, {name}!')).toBe(false)
+  })
+
+  it('uses English plural rules when a target catalog omits an ICU message', () => {
+    const testI18n = createCatalogI18n('zh', {})
+
+    expect(testI18n.global.t('book.move.title', { count: 1 })).toBe('Move 1 book')
+    expect(testI18n.global.t('book.move.title', { count: 2 })).toBe('Move 2 books')
+  })
+
+  it('falls back per key inside a partially translated branch without warning noise', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const testI18n = createCatalogI18n('cs', {
+      book: { move: { subtitle: 'Soubory se přesunou do cílové knihovny.' } },
+    })
+
+    expect(testI18n.global.t('book.move.subtitle')).toBe('Soubory se přesunou do cílové knihovny.')
+    expect(testI18n.global.t('book.move.searchPlaceholder')).toBe('Search libraries')
+    expect(testI18n.global.t('book.move.title', { count: 2 })).toBe('Move 2 books')
+    expect(warn).not.toHaveBeenCalled()
   })
 
   it('compiles ICU plurals while preserving ordinary Vue messages', () => {

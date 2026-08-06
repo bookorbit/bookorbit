@@ -84,7 +84,6 @@
     },
     "appearance": {
       "language": {
-        "title": "Language",
         "description": "Виберіть мову, яка використовується в інтерфейсі.",
         "label": "Мова інтерфейсу",
         "loadError": "Не вдалося завантажити вибрану мову",
@@ -92,7 +91,6 @@
       },
       "pageTitle": "Відображати",
       "pageSubtitle": "Контрольні теми, обкладинки, розмітки та те, як представлена ваша бібліотека.",
-      "mobileSummary": "Theme: {theme} • Accent: {accent} • Background: {background}",
       "themeMode": {
         "light": "Світла",
         "dark": "Темна",
@@ -171,8 +169,7 @@
           "blush": "Блаш"
         },
         "accentColor": {
-          "label": "Колір акценту",
-          "hint": "Controls highlights and interactive elements"
+          "label": "Колір акценту"
         },
         "cornerRadius": {
           "label": "Corner radius",
@@ -532,7 +529,6 @@
         "unlink": "Розірвання зв'язку",
         "unlinking": "Від'єднання...",
         "linkAdditional": "Додати додаткових постачальників:",
-        "linkProvider": "Link {provider}",
         "redirecting": "Перенаправлення...",
         "noneConfigured": "Не налаштовано жодного провайдера OIDC. Зверніться до адміністратора для налаштування SSO.",
         "linkStateFailed": "Не вдалося згенерувати стан посилань",
@@ -596,7 +592,6 @@
       "never": "Записи активності відсутні",
       "noExpiry": "Немає терміну дії",
       "expired": "Термін дії закінчився",
-      "expiresOn": "Expires {date}",
       "revokedOn": "Відкликано {date}",
       "expiredOn": "Минув термін дії {date}",
       "usesCount": "{count, plural, =0 {не використовує} one {один використовувати} few {# використовувати} many {# використовувати} other {# використовувати}}",
@@ -642,12 +637,10 @@
       },
       "usersPage": "Сторінка користувачів",
       "emptyTitle": "Поки що відсутні магічні посилання",
-      "emptyHint": "Click \"{action}\" to generate a shareable login URL.",
       "noActiveTitle": "Немає активних магічних посилань",
       "noActiveHint": "Всі згенеровані магічні посилання для цієї сторінки закінчилися або були відкликані.",
       "copyLinkAria": "Скопіювати посилання на {label}",
       "pauseAria": "Призупинити {label}",
-      "resumeAria": "Resume {label}",
       "revokeAria": "Revoke {label}",
       "lastUsedLabel": "Востаннє використано {date}"
     },
@@ -658,7 +651,6 @@
       "addProvider": "Постачальник",
       "editProvider": "Редагувати постачальника",
       "configureNew": "Налаштування нового постачальника OIDC.",
-      "editing": "Editing {slug}",
       "enabled": "Увімкнено",
       "disabled": "Вимкнено",
       "empty": {
@@ -718,7 +710,6 @@
       },
       "groupMappings": {
         "title": "Співставлення груп",
-        "description": "Map OIDC group claims to BookOrbit permissions. Synced on every login.",
         "noPermission": "Немає дозволу",
         "empty": "Не налаштовано групове зіставлення.",
         "addMapping": "Додати відображення",
@@ -760,14 +751,12 @@
         "recommendationsGroup": "Рекомендації",
         "achievementsGroup": "Досягнення",
         "updatesGroup": "Оновлення",
-        "importFromBooklore": "Import from Booklore",
         "bookloreImportConfigured": "Імпорт Booklore налаштований",
         "migrationRunning": "Міграція працює",
         "migrationCompleted": "Міграція завершена",
         "migrationFailed": "Міграція не вдалася",
         "importDescription": "Імпорт книг, метаданих та читання результатів з попереднього оновлення книг.",
         "configuredDescription": "Джерело: {name}. Перемог не запущено, поки що - продовжити налаштування для імпорту.",
-        "runningDescription": "Stage: {stage} - started {started}",
         "completedDescription": "З {name} - завершено {date}",
         "migrationErrorGeneric": "Сталася помилка під час міграції.",
         "stageInitializing": "ініціалізація",
@@ -782,7 +771,6 @@
         "running": "Працює...",
         "backfillAchievements": "Досягнення зворотного заповнення",
         "backfillAchievementsHint": "Повторне виконання досягнень для всіх користувачів.",
-        "backfillResult": "Processed {users} users; granted {awards} awards.",
         "runBackfill": "Запустити фонове заповнення",
         "checkForUpdates": "Перевірити наявність оновлень",
         "checkForUpdatesHint": "Автоматично перевіряйте GitHub на новий реліз при запуску і показуйте індикатор в бічній панелі, коли він доступний.",
@@ -794,9 +782,7 @@
         "unknownError": "Невідома помилка",
         "rebuildEmbeddingsFailed": "Не вдалося перебудувати вкладення: {error}",
         "achievementBackfillConfirm": "Запустити відновлення досягнень для всіх досягнень у всіх користувачах? Це може зайняти деякий час.",
-        "achievementBackfillComplete": "Achievement backfill complete: {count} awards granted",
         "backfillRunFailed": "Не вдалося виконати резервне заповнення",
-        "achievementBackfillFailed": "Failed to run achievement backfill: {error}",
         "uploadsGroup": "Вивантаження",
         "maxUploadSize": "Максимальний ліміт розміру файлу для завантаження",
         "maxUploadSizeHint": "Налаштування максимального розміру завантаження файлів по всій системі.",
@@ -843,7 +829,6 @@
         "sourceRecordId": "ID вихідного запису #{id}",
         "byAuthorWithId": "від {author} (ID: {id})",
         "filePathWithId": "{path} (ID: {id})",
-        "bookloreSourceId": "Booklore source ID: {id}",
         "libraryBookNum": "Бібліотечна книга #{id}",
         "errorInitialize": "Не вдалося ініціалізувати налаштування міграції",
         "errorLoadSourceTypes": "Не вдалося завантажити підтримувані типи міграції",
@@ -854,7 +839,6 @@
         "errorLoadSuggestions": "Не вдалося завантажити пропозиції зіставлень користувачів",
         "requiredFields": "Потрібно вказати ім'я хоста, ім'я бази даних, бази даних і початкового тексту",
         "connectionTestPassedWithWarnings": "Тестування підключення пройшло з попередженнями",
-        "connectionTestPassedWithCount": "Connection test passed with {count} warning(s). First: {first}",
         "connectionTestPassed": "Тестування з'єднання пройдено",
         "connectionOkMissingTables": "Підключення до ok, але {count} обов'язкова таблиця (ів) відсутня",
         "cannotTestMediaPathActiveRun": "Неможливо перевірити шлях до медіа, коли запускається",
@@ -865,7 +849,6 @@
         "mediaPathValidationFailed": "Помилка перевірки шляху медіа.",
         "connectionFailedBeforeMediaPath": "Помилка під час перевірки підключення до медіа-шляху.",
         "cannotModifySourceActiveRun": "Не вдалося змінити джерело, поки запускається",
-        "sourceSavedValidatedWarnings": "Source saved and validated with {count} warning(s)",
         "sourceSavedValidated": "Джерело збережено та перевірене",
         "errorSaveValidateSource": "Не вдалося зберегти або перевірити джерело",
         "cannotSaveMappingsActiveRun": "Не вдалося зберегти зіставлення, коли запускається",
@@ -935,7 +918,6 @@
         "saveAndValidate": "Зберегти та підтвердити",
         "sourceValidatedWithWarnings": "Джерело перевірене з попередженнями",
         "lastValidationSnapshot": "Остання перевірка, знімок",
-        "sourceVersion": "Source version: {version}",
         "unknown": "Не вказано",
         "missingRequiredTables": "Відсутні необхідні таблиці: {tables}",
         "suggestionsAutoLoad": "Завантаження пропозицій користувачів автоматично після перевірки джерела.",
@@ -988,7 +970,6 @@
         "refreshStatus": "Оновити статус",
         "statusPollingStopped": "Опитування стану зупинено через помилку.",
         "retry": "Повторити спробу",
-        "stageLabel": "Stage: {stage}",
         "stageInitializing": "ініціалізація",
         "endedLabel": "Завершено {date}",
         "stageCompleted": "Завершені",
@@ -1031,7 +1012,6 @@
         "unresolvedBooksHint": "Ці книги є у джерелі, але не можуть бути розміщені в будь-якій книзі у вашій бібліотеці.",
         "mappedUsersHeading": "Згорнуті користувачі ({count})",
         "mappedUsersHint": "Сукупності користувачів беруться з багатоосновного попереднього перегляду сушного схованки з планом міграції.",
-        "coverImportsFailed": "{count} cover import(s) failed. Detailed failure rows are not stored.",
         "backToSetup": "Назад до налаштувань"
       },
       "libraries": {
@@ -1056,7 +1036,6 @@
         "emptyTitle": "Немає бібліотек",
         "emptyHint": "Додайте бібліотеку, щоб почати організовувати свої книжки.",
         "addFirstLibrary": "Додайте вашу першу бібліотеку",
-        "deleteConfirmTitle": "Delete \"{name}\"?",
         "deleteConfirmBody": "Це остаточно видалить всі книги, метадата, операції читання, закладки та анотації в цій бібліотеці. Цю дію неможливо скасувати.",
         "deleteConfirmTypeName": "Введіть ім'я бібліотеки для підтвердження:",
         "deleting": "Видалення...",
@@ -1065,7 +1044,6 @@
         "syncConfirmBodyPrefix": "Це буде перезаписувати метадані всередині кожного підтримуваного файлу",
         "syncConfirmBodySuffix": "прямо на диску. Це неможливо скасувати.",
         "syncFiles": "Синхронізація файлів",
-        "metadataSynced": "Metadata synced to files for \"{name}\"",
         "fileWriteNotEnabled": "Запис файлу метаданих не увімкнено для цієї бібліотеки. Увімкніть його в налаштуваннях бібліотеки.",
         "fileSyncFailed": "Не вдалося синхронізувати файл для \"{name}\"",
         "scanStarted": "Сканування розпочато \"{name}\"",
@@ -1080,7 +1058,6 @@
         "deleteFailed": "Не вдалося вилучити бібліотеку",
         "scanningProgress": "Сканування {pct}% ({processed}/{total})",
         "scanDone": "Готово - {added} додано, {updated} оновлено",
-        "scanFailedWithError": "Failed: {error}",
         "scanFailed": "Помилка сканування",
         "refreshingCovers": "Оновлення обкладинки {pct}% ({processed}/{total})",
         "coversRefreshed": "Обкладинки оновлені ({count} оброблено)"
@@ -1136,15 +1113,7 @@
         "users": "Спільноти",
         "account-activity": "Активність облікового запису",
         "magic-links": "Магічні посилання",
-        "oidc": "OIDC / SSO",
-        "server-fonts": "Server Fonts"
-      },
-      "serverFonts": {
-        "title": "Server Fonts",
-        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
-        "listLabel": "Server fonts",
-        "noFontsYet": "No server fonts yet",
-        "noFontsHint": "Fonts you add here appear in every user's reader."
+        "oidc": "OIDC / SSO"
       }
     },
     "common": {
@@ -1175,7 +1144,6 @@
         "publisher": "Автор",
         "originCountry": "Origin country",
         "publishedYear": "Рік публікації",
-        "language": "Language",
         "pageCount": "Кількість сторінок",
         "communityRating": "Рейтинг спільноти",
         "seriesName": "Назва серії",
@@ -1225,8 +1193,6 @@
         },
         "lastRun": {
           "justNow": "прямо зараз",
-          "minutesAgo": "{count}m ago",
-          "hoursAgo": "{count}h ago",
           "yesterday": "вчора",
           "daysAgo": "{count, plural, one {# день тому} few {# днів тому} many {# днів тому} other {# днів тому}}",
           "label": "Останній запуск: {when}",
@@ -1267,7 +1233,6 @@
         "test": "Тест",
         "testing": "Тестування...",
         "enabled": "Увімкнено",
-        "retryIn": "Retry in {duration}",
         "runTestBeforeEnabling": "Запустіть тестове тестування перед увімкненням",
         "hardcoverEnableHint": "Запустити тест з поточним токеном щоб розблокувати перемикач включення.",
         "badge": {
@@ -1281,7 +1246,6 @@
           "cookie": "Печиво",
           "coverResolution": "Роздільна здатність обкладинки",
           "country": "Країна",
-          "language": "Language",
           "ttbKey": "TTB ключ"
         },
         "helpers": {
@@ -1299,8 +1263,7 @@
           "audnexus": "Метадані аудіосуд. не потрібно налаштувати.",
           "comicvine": "Для ComicVine потрібен безкоштовний ключ API з comicvine.gamespot.com.",
           "ranobedb": "Японські світлові метадані RanobeDB. Без налаштувань.",
-          "lubimyczytac": "Польський каталог книг (lubimyczytac.pl). публічні сторінки публічних книг. Не потрібна установка.",
-          "aladin": "Korean book metadata from Aladin (알라딘). A TTB Key from aladin.co.kr is required."
+          "lubimyczytac": "Польський каталог книг (lubimyczytac.pl). публічні сторінки публічних книг. Не потрібна установка."
         },
         "blocked": {
           "google": "Для активації модуля Google Books потрібен ключ API",
@@ -1349,8 +1312,7 @@
             "hint": "Збирайте та перекладайте жанри від кожного провайдера, призначеного для поля Жанрів, а не припиняйте на перший результат."
           },
           "storeProviderIds": {
-            "label": "Ідентифікатори провайдера магазину у книгах",
-            "hint": "When fetching metadata, save the returned provider IDs (ISBN, ASIN, Goodreads ID, etc.) on the book record for more accurate future lookups."
+            "label": "Ідентифікатори провайдера магазину у книгах"
           }
         },
         "library": {
@@ -1394,7 +1356,6 @@
         },
         "reservoir": {
           "disabled": "{provider} - вимкнено",
-          "notConfigured": "{provider} - not configured",
           "dragToAssign": "Перетягніть, щоб призначити {provider} для поля"
         },
         "sheet": {
@@ -1442,7 +1403,6 @@
         "searchAriaLabel": "Пошук настроюваних полів",
         "emptyTitle": "Немає настроюваних полів",
         "emptyHint": "Використовуйте форму вище, щоб визначити ваше перше поле метаданих.",
-        "noMatchTitle": "No fields match \"{query}\"",
         "noMatchHint": "Спробуйте іншу мітку, ключ або тип.",
         "clearSearchToReorder": "Очистити поле пошуку для зміни порядку",
         "dragToReorder": "Перетягніть для зміни порядку",
@@ -1451,7 +1411,6 @@
         "archive": "Архів",
         "archivedFields": "Архівні поля",
         "archivedSummary": "{count, plural, one {# archived field - restore or permanently delete.} few {# archived fields - restore or permanently delete.} many {# archived fields - restore or permanently delete.} other {# archived fields - restore or permanently delete.}}",
-        "archivedAt": "Archived {when}",
         "restore": "Відновити",
         "deleteForever": "Видалити назавжди",
         "deleteDialog": {
@@ -1680,12 +1639,7 @@
         "deleteFamilyFailed": "Не вдалося вилучити сімейство шрифтів",
         "demoCannotManage": "Обмежений доступ до демо-ліміту не можна керувати шрифтами",
         "fileAdded": "\"{name}\" додано",
-        "uploadFailed": "Не вдалося завантажити",
-        "serverFontsTitle": "Server fonts (shared by admin)",
-        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
-        "serverFontsShown": "{count} of {total} shown",
-        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
-        "serverFontVisibilityFailed": "Failed to update server font visibility"
+        "uploadFailed": "Не вдалося завантажити"
       },
       "bookDock": {
         "title": "Книга док",
@@ -1803,17 +1757,14 @@
         "crossPlatformSaveFailed": "Не вдалося зберегти крос-платформенне розташування",
         "librarySaved": "Шаблон збережено для {name}",
         "librarySaveFailed": "Не вдалося зберегти шаблон бібліотеки",
-        "saveLibraryPattern": "Save pattern for {name}",
         "resetLibraryPattern": "Скинути шаблон {name} на типовий",
         "tokenTitle": "Назва книги",
         "tokenSubtitle": "Підзаголовок книги",
-        "tokenAuthors": "Author(s), comma-separated",
         "tokenYear": "Рік публікації",
         "tokenSeries": "Назва серії",
         "tokenSeriesIndex": "Індекс серії (0 відкладено)",
         "tokenPublisher": "Автор",
         "tokenIsbn": "ІСБН-13",
-        "tokenLanguage": "Language",
         "tokenOriginalFilename": "Початкове ім'я файлу (без розширення)",
         "tokenExtension": "Розширення файлу (без крапки)",
         "patternHelpIntro": "Шаблони використовують токени типу {titleToken} і {authorsToken}, плюс модифікатори та додаткові сегменти.",
@@ -1825,8 +1776,6 @@
         "copy": "Копія",
         "never": "Ніколи",
         "justNow": "Щойно",
-        "minutesAgo": "{count}m ago",
-        "hoursAgo": "{count}h ago",
         "daysAgo": "{count}d тому",
         "loadFailed": "Не вдалося завантажити",
         "devicePaired": "Пристрій успішно сформовано",
@@ -1843,7 +1792,6 @@
         "deviceRegistered": "Пристрій \" зареєстровано{name}\"",
         "noDevicesYet": "У вас ще немає пристроїв",
         "noDevicesHint": "Додайте пристрій, щоб розпочати синхронізацію ваших книг до вашого Кобо.",
-        "lastSync": "Last sync: {time}",
         "renameDevice": "Перейменувати пристрій",
         "revokeAccess": "Скасувати доступ",
         "deviceRenamed": "Пристрій перейменовано",
@@ -1924,12 +1872,10 @@
             "freshHighlightData": "Дані свіжого підсвічування",
             "created": "Створено {count}",
             "updated": "{count} оновлено",
-            "deleted": "Видалено {count}",
-            "unchanged": "{count} unchanged"
+            "deleted": "Видалено {count}"
           },
           "readingPositionSyncedTitle": "Читання синхронізовано: {title}",
           "readingPositionSynced": "Читання позиції синхронізоване",
-          "labelWithTitle": "{label}: {title}",
           "updateCount": "{count, plural, one {# оновлення} few {# оновлень} many {# оновлень} other {# оновлень}}",
           "directionToKobo": "BookOrbit -> Кобо",
           "directionToBookOrbit": "Кобо -> BookOrbit",
@@ -1938,13 +1884,11 @@
           "summary": {
             "noLibraryUpdatesPending": "Немає оновлень бібліотеки для цього пристрою",
             "libraryUpdatesPrepared": "{count, plural, one {# оновлення бібліотеки підготовлене для пристрою} few {# оновлення бібліотек, які підготувалися до пристрою} many {# оновлення бібліотек, які підготувалися до пристрою} other {# оновлення бібліотек, які підготувалися до пристрою}}",
-            "bookDownloadedBy": "{title} was downloaded by {device}",
             "booksDownloaded": "{count, plural, one {# книг завантажена} few {# книг завантажені} many {# книг завантажені} other {# книг завантажені}}",
             "progressUpdatesSyncedFor": "{count, plural, one {#поступ синхронізоване для {title}} few {# оновлення поступу синхронізоване для {title}} many {# оновлення поступу синхронізоване для {title}} other {# оновлення поступу синхронізоване для {title}}}",
             "progressUpdatesSynced": "{count, plural, one {#поступ синхронізовано} few {# оновлення поступу синхронізовано} many {# оновлення поступу синхронізовано} other {# оновлення поступу синхронізовано}}",
             "newReadingPositionFor": "Кобо повідомив про нову позицію читання {title}",
             "newReadingPosition": "Кобо повідомив про нову позицію читання",
-            "noHighlightChangesNeededFor": "No highlight changes needed for {title}",
             "noHighlightChangesNeeded": "Не потрібні зміни підсвічування",
             "highlightsSentToKoboFor": "{count, plural, one {# підсвічування відправляється Кобо за {title}} few {# підсвічування відправляється до Кобо за {title}} many {# підсвічування відправляється до Кобо за {title}} other {# підсвічування відправляється до Кобо за {title}}}",
             "highlightsSentToKobo": "{count, plural, one {# highlight sent to Kobo} few {# highlights sent to Kobo} many {# highlights sent to Kobo} other {# highlights sent to Kobo}}",
@@ -2025,8 +1969,6 @@
         "loadFailed": "Не вдалося завантажити параметри KOReader",
         "never": "Ніколи",
         "justNow": "Щойно",
-        "minutesAgo": "{count}m ago",
-        "hoursAgo": "{count}h ago",
         "daysAgo": "{count}d тому",
         "unknown": "Не вказано",
         "updateAvailable": "Доступне оновлення",
@@ -2074,7 +2016,6 @@
         "noneYet": "Ще немає",
         "pluginActivity": "Активність плагінів",
         "noPluginActivity": "Ще не було повідомлено про активність плагіна.",
-        "lastFullSync": "Last full sync: {time}",
         "latestPluginSuffix": "- останній плагін v{version}",
         "matchedBooks": "Відповідні книги",
         "readingEvents": "Читання подій",
@@ -2171,13 +2112,11 @@
             "confirmTitle": "Підтвердити посилання KOReader",
             "koreader": "KOReader",
             "bookOrbit": "Книжкова орбіта",
-            "bookId": "Book ID: {id}",
             "syncedStatsNote": "Вже синхронізована статистика залишатиметься у своїй поточній книзі Книги Закладок.",
             "chooseDifferent": "Виберіть інше",
             "saving": "Збереження...",
             "confirmLink": "Підтвердити посилання",
             "unlinkTitle": "Від'єднати книгу KOReader?",
-            "unlinkBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
             "unlinking": "Від'єднання..."
           },
           "dismiss": "Відхилити",
@@ -2185,7 +2124,6 @@
           "dismissing": "Відключення...",
           "unlinking": "Від'єднання...",
           "unlinkConfirmTitle": "Від'єднати книгу KOReader?",
-          "unlinkConfirmBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
           "dismissConfirmTitle": "Відхилити {title}?",
           "dismissConfirmBody": "Це видалить його з вашого невідповідного списку книг. Якщо будь-який пристрій повідомить про цей хеш знову, він з'явиться знову як новий запис.",
           "dismissAllConfirmTitle": "{count, plural, =0 {no unmatched books} one {Dismiss all # unmatched book?} few {Dismiss all # unmatched books?} many {Dismiss all # unmatched books?} other {Dismiss all # unmatched books?}}",
@@ -2203,7 +2141,6 @@
           "loadMore": "Завантажити ще",
           "loadingMore": "Завантажується...",
           "confirmLinkTitle": "Підтвердити посилання KOReader",
-          "bookId": "Book ID: {id}",
           "syncedStatsNote": "Вже синхронізована статистика залишатиметься у своїй поточній книзі Книги Закладок.",
           "chooseDifferent": "Виберіть інше",
           "saving": "Збереження...",
@@ -2260,11 +2197,8 @@
         "urlCopyFailed": "Не вдалося скопіювати URL-адреси OPDS",
         "createUserFailed": "Не вдалося створити користувача OPDS",
         "userCreated": "Створено OPDS користувач \"{username}\"",
-        "sortOrderUpdated": "Sort order updated for \"{username}\"",
         "updateSortFailed": "Не вдалося оновити порядок сортування",
-        "userDeleted": "OPDS user \"{username}\" deleted",
         "deleteUserFailed": "Не вдалося видалити користувача OPDS",
-        "labelCopied": "{label} copied",
         "copyLabelFailed": "Не вдалося скопіювати {label}"
       },
       "tabs": {
@@ -2570,7 +2504,6 @@
         "page": "Сторінка {page} з {totalPages}"
       },
       "editUserAria": "Редагувати {name}",
-      "resetPasswordAria": "Reset the password for {name}",
       "deleteUserAria": "Видалити {name}",
       "moreActionsAria": "Додаткові дії для {name}"
     }
@@ -2654,7 +2587,6 @@
       "comfortableView": "Комфортний перегляд"
     },
     "listItem": {
-      "pageNumber": "p. {page}",
       "chapterNumber": "глава {chapter}",
       "selectAnnotation": "Вибрати анотацію",
       "collapse": "Згорнути",
@@ -2677,7 +2609,6 @@
     },
     "hub": {
       "title": "Анотації",
-      "totalCount": "{count} total",
       "bookCount": "{count, plural, =0 {жодної книги} one {# книга} few {# книг} many {# книг} other {# книг}}",
       "noteCount": "{count, plural, =0 {Нотатки немає} one {# примітка} few {# примітки} many {# примітки} other {# примітки}}",
       "export": "Експорт",
@@ -2724,7 +2655,6 @@
     "hideDetails": "Приховати подробиці",
     "refresh": "Оновити журнал аудиту",
     "loadError": "Не вдалося завантажити події аудиту.",
-    "removeFilter": "Remove filter: {value}",
     "allActions": "Всі дії",
     "allEventTypes": "Всі типи подій",
     "allActors": "Усі актори",
@@ -2755,10 +2685,8 @@
     "detailResourceIdLabel": "ID Ресурсу",
     "detailTargetTypeLabel": "Target type",
     "detailTargetIdLabel": "Target ID",
-    "detailAction": "Action: {value}",
     "detailIp": "IP: {value}",
     "detailResource": "Ресурс: {value}",
-    "detailResourceId": "Resource ID: {value}",
     "deletedBooks": "Видалені книги",
     "deletedBookDetail": "{title} (книга #{id})",
     "untitledBook": "Без назви",
@@ -2767,13 +2695,9 @@
     "prev": "Попередня",
     "chips": {
       "search": "Пошук: {value}",
-      "action": "Action: {value}",
-      "eventType": "Event type: {value}",
-      "actor": "Actor: {value}",
       "resource": "Ресурс: {value}",
       "targetType": "Target type: {value}",
       "user": "Користувач: {value}",
-      "from": "From: {value}",
       "to": "До: {value}"
     },
     "filterLabels": {
@@ -2832,7 +2756,6 @@
       "EmailRecipientGroup": "Група одержувача електронною поштою",
       "Narrator": "Оповідач",
       "Publisher": "Автор",
-      "Language": "Language",
       "Series": "Серія",
       "OidcIdentity": "Ідентичність OIDC",
       "MagicLinkToken": "Магічне посилання",
@@ -2890,7 +2813,6 @@
       "BookBulkUpdateTags": "Оновити теги книги",
       "BookBulkSetMetadataLock": "Призначені блоки метаданих",
       "BookBulkEditMetadata": "Редагувати метадані книги",
-      "BookBulkMoveLibrary": "Move books to another library",
       "BookReadingStateReset": "Скинути статус читання",
       "BookWriteAndRename": "Записати метадані і перейменувати файл",
       "CollectionCreate": "Створити колекцію",
@@ -2978,7 +2900,6 @@
     "oidc": {
       "loginFailed": "Помилка входу OIDC",
       "redirecting": "Перенаправлення...",
-      "signInWith": "Sign in with {provider}",
       "completingSignIn": "Завершення входу...",
       "tryAgain": "Спробуйте ще раз",
       "errors": {
@@ -3123,10 +3044,8 @@
         "refreshedNoImage": "Метадані оновлено, але зображення автора не було знайдено.",
         "refreshFailed": "Не вдалося оновити метадані автора",
         "bulkRefreshPartial": "Оновлено {updated} автора(ів), {failed} не вдалося",
-        "bulkRefreshSuccess": "Refreshed metadata for {updated} author(s)",
         "bulkRefreshFailed": "Не вдалося оновити вибрані автори",
-        "deleteSuccess": "{count, plural, =0 {Deleted # author; affected {books} books} one {Deleted # author; affected {books} books} few {Deleted # authors; affected {books} books} many {Deleted # authors; affected {books} books} other {Deleted # authors; affected {books} books}}",
-        "deleteFailed": "Failed to delete author(s)"
+        "deleteSuccess": "{count, plural, =0 {Deleted # author; affected {books} books} one {Deleted # author; affected {books} books} few {Deleted # authors; affected {books} books} many {Deleted # authors; affected {books} books} other {Deleted # authors; affected {books} books}}"
       }
     },
     "detail": {
@@ -3146,20 +3065,17 @@
         "uploadImage": "Вивантажити зображення",
         "removing": "Видалення...",
         "removeImage": "Remove image",
-        "imageHint": "PNG/JPEG/WEBP/GIF/BMP up to {size} MB",
         "saving": "Збереження..."
       },
       "merge": {
         "searchPlaceholder": "Пошук авторів, щоб об'єднати їх у цьому авторі",
         "searching": "Пошук...",
         "bookCount": "{count, plural, =0 {жодної книги} one {# книга} few {# книг} many {# книг} other {# книг}}",
-        "selectedSummary": "Selected {count} author(s), approx. {books} books affected.",
         "merging": "Злиття...",
         "mergeSelected": "Об'єднати вибрані",
         "confirmLabel": "Об'єднати"
       },
       "mergeDialog": {
-        "title": "Merge {count} author(s) into \"{name}\"?",
         "titleFallback": "Об'єднати вибраних авторів?",
         "description": "Це об’єднить вибраних авторів у поточного автора і повторно зв'яже асоційовані книги. Цю дію не можна скасувати.",
         "descriptionEmpty": "Цю дію не можна скасувати."
@@ -3197,7 +3113,6 @@
         "imageUploadFailed": "Не вдалося завантажити зображення автора",
         "imageRemoved": "Зображення автора видалено",
         "imageRemoveFailed": "Не вдалося видалити зображення автора",
-        "mergeSuccess": "Merged {count} author(s); affected {books} books",
         "mergeFailed": "Не вдалося об'єднати авторів",
         "deleteSuccess": "Вилучений автора; була врахована книга {books}",
         "deleteFailed": "Не вдалося видалити автора"
@@ -3281,7 +3196,6 @@
         "startedAt": "Дата початку",
         "finishedAt": "Дата завершення",
         "random": "Випадковий",
-        "language": "Language",
         "metadataScore": "Оцінка метаданих"
       },
       "customFieldsGroup": "Додаткові поля",
@@ -3353,12 +3267,8 @@
         "isFinished": "завершено",
         "isLocked": "заблокований",
         "isUnlocked": "розблоковано",
-        "isUpNext": "є наступним",
-        "isTrue": "is yes",
-        "isFalse": "is no"
+        "isUpNext": "є наступним"
       },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
       "anyProvider": "Будь-який постачальник",
       "communityRatingProvider": "Постачальник рейтингу спільноти",
       "loadingLibraries": "Завантаження бібліотеки...",
@@ -3426,10 +3336,8 @@
       "includeFilePaths": "Додати шляхи до файлу (додатково)",
       "includeContextMeta": "Включити контекстні метадані",
       "preflight": "Попереднє світло",
-      "scopeLabel": "Scope: {summary}",
       "calculatingSize": "Розрахунок розміру експорту...",
       "estimatedSize": "Розрахунковий розмір:",
-      "fileLabel": "File: {fileName}",
       "exportAction": "Експорт",
       "selectedRowsSummary": "{count, plural, =0 {# обраний рядок} one {# вибраний рядок} few {# вибраних рядків} many {# вибраних рядків} other {# вибраних рядків}}",
       "matchingRowsSummary": "{count, plural, =0 {# відповідний рядок} one {# відповідний рядок} few {! # відповідні рядки} many {! # відповідні рядки} other {! # відповідні рядки}}",
@@ -3498,7 +3406,6 @@
       "title": "Швидкий перегляд книги",
       "titleFor": "Швидкий перегляд для {title}",
       "description": "Перегляд відомостей про книгу та виконання швидких дій.",
-      "openIn": "Open in {provider}",
       "pages": "{count, plural, =0 {# сторінка} one {# сторінка} few {# сторінки} many {# сторінки} other {# сторінки}}",
       "primaryFile": "Основний файл",
       "fileNumber": "Файл #{id}",
@@ -3519,7 +3426,6 @@
       "loadingMoreBooks": "Завантаження інших книг",
       "sort": "Упорядкувати",
       "refreshingMetadata": "Оновлення метаданих {processed} / {total}",
-      "failedCount": "{count} failed",
       "remainingCount": "Залишилося {count}",
       "readOnlyNotice": "Редагування таблиць вимкнено на менших екранах. Перемкніться на список або сітка для виконання швидших дій.",
       "fetching": "Отримання...",
@@ -3671,12 +3577,10 @@
         "untitled": "Без назви",
         "metadataScore": "Оцінка метаданих",
         "primaryFormat": "Основний формат",
-        "openIn": "Open in {provider}",
         "showLess": "Показати менше",
         "showMore": "Показати більше",
         "publisher": "Автор",
         "published": "Опубліковано",
-        "language": "Language",
         "pages": "Сторінки",
         "duration": "Тривалість",
         "edition": "Видання",
@@ -3725,17 +3629,14 @@
         "saveInProgress": "Збереження в процесі",
         "writeManualLibraryDisabled": "Запис метаданих у файл і перейменування на диск; автоматичне резервне копіювання запису вимкнено в цій бібліотеці",
         "writeManualTooltip": "Записати {fields} в {target} та перейменувати на диску",
-        "applyResult": "{skipped}, {updated}",
         "skippedLockedFields": "{count, plural, =0 {Не пропуск заблокованих полів} one {Пропущене по одному заблокованому полі} few {Пропущені # заблоковані поля} many {Пропущені # заблоковані поля} other {Пропущені # заблоковані поля}}",
         "updatedFields": "{count, plural, =0 {updated no fields} one {updated one field} few {updated # fields} many {updated # fields} other {updated # fields}}",
-        "wroteFieldsToFile": "Wrote {fields} to file",
         "fileWriteFailedReason": "Помилка запису файлу: {reason}",
         "fileWriteFailed": "Не вдалося записати файл",
         "fileWriteSkippedReason": "Пропущений запис файлу: {reason}",
         "fileWriteSkipped": "Файл для запису пропущений",
         "metadataSaved": "Метадані збережені",
         "metadataWrittenToFile": "Метадані, записані в файл",
-        "savedButWriteFailedReason": "Metadata saved, but file write failed: {reason}",
         "savedButWriteFailed": "Метадані збережені, але запис файлу не вдалося",
         "savedWriteSkippedReason": "Метадані збережені, файл перезапису: {reason}",
         "savedWriteSkipped": "Метадані збережені, файл перезаписується",
@@ -3757,7 +3658,6 @@
         "fileWriteBackDetails": "Подробиці запису",
         "fileWriteBack": "Повернутися до змісту",
         "enabled": "Увімкнено",
-        "saveWritesMetadata": "'Save' writes metadata to {target}",
         "formats": "Формати",
         "bookFiles": "Файли книги",
         "supportedFields": "Підтримувані поля",
@@ -3774,7 +3674,6 @@
         "noProviderRatings": "Немає рейтингу провайдера",
         "seriesLabel": "Серія",
         "publisherLabel": "Автор",
-        "languageLabel": "Language",
         "yearLabel": "Рік",
         "pageCountLabel": "Кількість сторінок",
         "isbn13Label": "ІСБН-13",
@@ -3863,20 +3762,16 @@
       "files": {
         "title": "Файли книги",
         "fileCount": "{count, plural, =0 {Немає файлів} one {# файл} few {# файл} many {# файл} other {# файл}}",
-        "synced": "Synced {time}",
         "sortAria": "Сортування файлів",
         "syncHistory": "Історія синхронізації",
         "metadataWriteBack": "Метадані запису-назад",
         "relative": {
           "seconds": "{value}s тому",
-          "minutes": "{value}m ago",
-          "hours": "{value}h ago",
           "days": "{value}d тому"
         },
         "renameFailed": "Не вдалося перейменувати файл",
         "deleteFailed": "Не вдалося вилучити файл",
         "addFile": "Додати файл",
-        "lastSynced": "Last synced: {time}",
         "sort": {
           "label": "Сортувати:",
           "name": "Ім'я",
@@ -3909,8 +3804,7 @@
         },
         "saving": "Збереження...",
         "deleteModal": {
-          "title": "Видалити файл?",
-          "description": "Are you sure you want to delete \"{filename}\"? This action cannot be undone."
+          "title": "Видалити файл?"
         },
         "deleting": "Видалення..."
       },
@@ -3987,8 +3881,6 @@
           "notSet": "Не задано",
           "relative": {
             "seconds": "{count}s тому",
-            "minutes": "{count}m ago",
-            "hours": "{count}h ago",
             "days": "{count}d тому",
             "months": "{count, plural, =0 {# місяць тому} one {# місяць тому} few {# місяців тому} many {# місяців тому} other {# місяців тому}}",
             "years": "{count, plural, =0 {# рік тому} one {# рік тому} few {# роки тому} many {# роки тому} other {# роки тому}}"
@@ -4107,11 +3999,7 @@
         "seriesPlaceholder": "Серія",
         "moveUp": "Посунути вгору",
         "moveDown": "Посунути вниз",
-        "removeSeries": "Видалити послідовність",
-        "seriesIndexLabel": "Position in series",
-        "totalLabel": "Books in series",
-        "totalPlaceholder": "of",
-        "totalHint": "Total books in this series. Shared with everyone who has this series."
+        "removeSeries": "Видалити послідовність"
       }
     },
     "table": {
@@ -4195,65 +4083,10 @@
     },
     "move": {
       "title": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
-      "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
-      "searchPlaceholder": "Search libraries",
-      "currentLibrary": "Current",
       "folderCount": "{count, plural, one {# folder} few {# folders} many {# folders} other {# folders}}",
-      "continue": "Continue",
-      "back": "Back",
       "confirm": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
-      "action": "Move to library",
       "review": {
-        "ready": "{count} ready",
-        "collisions": "{count, plural, one {# name conflict} few {# name conflicts} many {# name conflicts} other {# name conflicts}}",
-        "ineligible": "{count} cannot move",
-        "alreadyThere": "{count} already there",
-        "collisionsHeading": "Name conflicts",
-        "ineligibleHeading": "Cannot be moved",
-        "moreCollisions": "and {count} more"
-      },
-      "policy": {
-        "suggested": "Use suggested",
-        "keep_both": "Keep both",
-        "merge": "Merge",
-        "skip": "Skip"
-      },
-      "collision": {
-        "folder_path": "A book already uses this folder name",
-        "file_path": "A file already uses this path",
-        "hash_duplicate": "An identical copy is already in this library"
-      },
-      "ineligible": {
-        "book_not_present": "The files for this book are missing",
-        "no_content_file": "This book has no readable file",
-        "multi_file_target_per_file": "The destination stores one file per book, and this book has {detail} files",
-        "no_source_access": "You cannot edit the library this book is in",
-        "pattern_unresolved": "The destination library has no usable naming pattern",
-        "path_too_long": "The destination path would be too long",
-        "path_outside_target_root": "The destination path would fall outside the library folder"
-      },
-      "warning": {
-        "accessLoss": "{user} will stop seeing {count} of these books",
-        "koboImpact": "{count} books will leave {user}'s Kobo on the next sync",
-        "layout": {
-          "wrap_into_folder": "{count} books will each be placed in their own folder",
-          "dissolve_folder": "{count} book folders will be dissolved into single files"
-        },
-        "crossDevice": "Files move to another drive, so they are copied, verified, then removed."
-      },
-      "progress": {
-        "label": "Moving books to {library}",
-        "failed": "{count} failed"
-      },
-      "done": {
-        "summary": "Moved {count} books to {library}",
-        "merged": "{count} merged with copies already there",
-        "skipped": "{count} skipped",
-        "failed": "{count} failed"
-      },
-      "toast": {
-        "success": "Moved {count} books to {library}",
-        "partial": "Moved {moved} books, {failed} failed"
+        "collisions": "{count, plural, one {# name conflict} few {# name conflicts} many {# name conflicts} other {# name conflicts}}"
       }
     }
   },
@@ -4293,7 +4126,6 @@
       "paused": "Призупинено",
       "remaining": "Залишилося {count}",
       "processing": "Обробка {count}",
-      "failed": "{count} failed",
       "rateLimited": "Обмежена ставка {count}"
     },
     "report": {
@@ -4319,8 +4151,7 @@
       "failedItemsRequeued": "Невдала спроба елементів",
       "bookComplete": "Метадані завершено - змінено {done} книг",
       "bookDoneWithFailures": "Метадані зроблено - {done} оброблений, {failed} невдалий",
-      "authorComplete": "Збагачення автора завершено - змінилося авторів {done}",
-      "authorDoneWithFailures": "Author enrichment done - {done} processed, {failed} failed"
+      "authorComplete": "Збагачення автора завершено - змінилося авторів {done}"
     }
   },
   "bookDock": {
@@ -4339,7 +4170,6 @@
     "commaSeparated": "відокремлені комами",
     "destinationLibrary": "Бібліотека призначення",
     "destinationFolder": "Тека призначення",
-    "nFailed": "{count} failed",
     "updatedOfFiles": "Оновлено {updated} з файлів {total}",
     "errorStatus": "Помилка {status}",
     "tab": {
@@ -4363,7 +4193,6 @@
       "publisher": "Автор",
       "publishedDate": "Дата публікації",
       "year": "Рік",
-      "language": "Language",
       "isbn13": "ІСБН-13",
       "isbn10": "ІЗБН-10",
       "series": "Серія",
@@ -4373,9 +4202,7 @@
       "description": "Опис"
     },
     "upload": {
-      "nDone": "{count} завершено",
-      "nFailed": "{count} failed",
-      "nTotal": "{count} total"
+      "nDone": "{count} завершено"
     },
     "fileList": {
       "emptyTitle": "Немає файлів в панелі книги",
@@ -4513,7 +4340,6 @@
       "bookCount": "{count, plural, =0 {жодної книги} one {# книга} few {# книг} many {# книг} other {# книг}}",
       "fileCount": "{count, plural, =0 {Немає файлів} one {# файл} few {# файл} many {# файл} other {# файл}}",
       "uploadedToast": "Вивантажено {uploaded}",
-      "uploadFailedToast": "Upload failed for {failed}",
       "uploadPartialToast": "Вивантажено {uploaded}, {failed} не вдалося",
       "bookDock": "Книга док",
       "statistics": "Статистика",
@@ -4540,8 +4366,7 @@
         "body": "Якщо BookOrbit допомагає у вашій бібліотеці, будь ласка, розгляньте можливість розміщення проекту на GitHub. Це допоможе більшій кількості людей знайти застосунок і підтримує постійний розвиток.",
         "cta": "Зоряна книгарня на GitHub"
       },
-      "surfaceOpacity": "Непрозорість поверхні",
-      "surfaceOpacityValue": "{value}%"
+      "surfaceOpacity": "Непрозорість поверхні"
     },
     "sidebar": {
       "dashboard": "Приладна дошка",
@@ -4565,7 +4390,6 @@
         "showAll": "Показати всі",
         "showCount": "Показати {count}",
         "rowsShown": "Відображати рядки",
-        "menuAria": "Section options for {section}",
         "reorder": "Змінити порядок",
         "doneReordering": "Перегрупування закінчено"
       },
@@ -4587,9 +4411,7 @@
       },
       "reorder": {
         "gripAria": "Замовити {name}",
-        "lifted": "{name} lifted, position {position} of {total}. Use the arrow keys to move it.",
         "moved": "{name}, позиція {position} {total}",
-        "dropped": "{name} dropped at position {position} of {total}",
         "cancelled": "Замовлення скасовано. {name} повернувся до позиції {position} {total}.",
         "filteredHint": "Очистити фільтр для зміни порядку"
       }
@@ -4678,8 +4500,7 @@
       "system": "Система"
     },
     "userAvatar": {
-      "profilePicture": "Зображення профілю",
-      "profilePictureOf": "{name} profile picture"
+      "profilePicture": "Зображення профілю"
     },
     "ui": {
       "sidebar": {
@@ -4705,7 +4526,6 @@
       "resultCount": "{shown} {total}",
       "noMatches": "Збігів немає",
       "noMatchesHint": "Спробуйте інший пошуковий термін.",
-      "bookCount": "Books: {count}",
       "librariesEmptyHint": "Створіть бібліотеку, щоб почати додавати книги.",
       "smartScopesEmptyHint": "Розумні області зберігають набір фільтрів, які ви часто використовуєте.",
       "collectionsEmptyHint": "Колекції згрупованих книг, які ви обираєте вручну."
@@ -4716,7 +4536,6 @@
     "dialogDescription": "Перегляньте імена перед додаванням їх до вашої бібліотеки.",
     "readingFiles": "Зчитування файлів...",
     "dropPrompt": "Перетягніть файли SVG або натисніть, щоб переглянути",
-    "fileLimit": "Up to {max} files, 128 KB each",
     "namePlaceholder": "Ім'я",
     "nameRequired": "Потрібне ім'я",
     "invalidSvg": "Неприпустимий SVG",
@@ -4730,7 +4549,6 @@
     "upload": "Вивантажити",
     "uploadCount": "Вивантажити {count}",
     "onlySvgSupported": "Підтримуються лише файли SVG",
-    "maxStaged": "You can stage at most {max} icons at once",
     "onlyMoreCanStage": "{count, plural, =0 {Більше значків не може бути проіндексовано} one {Ще # значка може бути проіндексовано} few {Решта іконок можуть бути розміщені на сцені} many {Решта іконок можуть бути розміщені на сцені} other {Решта іконок можуть бути розміщені на сцені}}",
     "readFailed": "Не вдалося прочитати файли SVG",
     "uploadedCount": "{count, plural, =0 {Немає завантажених значків} one {Завантажено # значок} few {Завантажено # значків} many {Завантажено # значків} other {Завантажено # значків}}",
@@ -4787,14 +4605,6 @@
         "upNextInSeries": "Наступне завдання серії",
         "random": "Відкрийте щось нове",
         "smartScope": "Розумна область видимості"
-      },
-      "shelfLayout": {
-        "title": "Shelf layout",
-        "description": "Choose how shelves are arranged on larger screens.",
-        "wide": "Wide rows",
-        "wideDescription": "Show one shelf per row.",
-        "twoColumns": "Two columns",
-        "twoColumnsDescription": "Show two shelves per row."
       },
       "reorderHintWidget": "Перетягніть щоб змінити порядок. Ввімкніть, щоб показати або приховати віджет.",
       "reorderHintShelf": "Перетягніть щоб змінити порядок. Ввімкніть, щоб показати або приховати полицю.",
@@ -4856,8 +4666,6 @@
       "neglectedGems": {
         "title": "Забуті коштовні камені",
         "empty": "Всі ваші рейтингові книги були прочитані!",
-        "rating": "{rating}/5",
-        "daysWaiting": "{count}d waiting",
         "queued": "Поставлено в чергу",
         "addToQueue": "Додати до черги",
         "shuffle": "Випадковий порядок"
@@ -4887,8 +4695,7 @@
         "title": "Читання Rhythm",
         "empty": "Почніть читати, щоб побачити форму ритму",
         "activeDays": "{count, plural, =0 {немає активних днів} one {# активний день} few {# активних днів} many {# активних днів} other {# активних днів}}",
-        "consistency": "{activeDays} · {percent}% послідовності",
-        "avgPerDay": "avg {time}/day"
+        "consistency": "{activeDays} · {percent}% послідовності"
       },
       "readingStreak": {
         "title": "Читання серії",
@@ -4905,8 +4712,7 @@
         "trendSteady": "Стійкий темп",
         "pages": "сторінок",
         "hours": "годин",
-        "readCount": "{count} прочитано",
-        "daysLeft": "{count}d left"
+        "readCount": "{count} прочитано"
       }
     }
   },
@@ -4947,7 +4753,6 @@
       "username": "Ім'я користувача",
       "password": "Пароль",
       "passwordEdit": "Пароль (залиште порожнім, щоб зберігати поточний)",
-      "fromName": "From Name",
       "fromNamePlaceholder": "Моя бібліотека",
       "fromAddress": "Домашня адреса",
       "authentication": "Автентифікація",
@@ -4996,7 +4801,6 @@
       "useAccountDefault": "Стандартні налаштування",
       "kindleNote": "Отримувачі Kindle автоматично отримувати електронні листи з темою \"convert\" в режимі перетворення формату.",
       "empty": "Одержувачів поки немає.",
-      "prefersFormat": "prefers {format}",
       "deleteTitle": "Видалити отримувача?",
       "nameEmailRequired": "Ім'я та пошта обов'язкові",
       "created": "Створено одержувачем",
@@ -5042,7 +4846,6 @@
       "editTemplate": "Редагувати шаблон",
       "empty": "Ще немає шаблонів.",
       "notesHeading": "Примітки шаблону",
-      "notesBody": "System templates cannot be deleted. Administrators can edit them. Use variables like {variable} in subjects and bodies - they are replaced with book details at send time.",
       "deleteTitle": "Видалити шаблон?",
       "nameSubjectRequired": "Ім'я та тема є обов'язковими",
       "created": "Шаблон створений",
@@ -5172,7 +4975,6 @@
         "eligible": "правомірні книги"
       },
       "checkingPending": "Перевірка очікуваних елементів...",
-      "pendingOf": "{pending} pending of {total} books.",
       "noBooksInScope": "Немає книг для синхронізації.",
       "allSynced": "Всі книги вже синхронізовані.",
       "lastSyncedLabel": "Остання синхронізація",
@@ -5190,7 +4992,6 @@
       },
       "lastSynced": {
         "justNow": "Щойно",
-        "minutesAgo": "{count} min ago",
         "hoursAgo": "{count, plural, =0 {# годину тому} one {# годину тому} few {# годин тому} many {# годин тому} other {# годин тому}}",
         "daysAgo": "{count, plural, =0 {# день тому} one {# день тому} few {# днів тому} many {# днів тому} other {# днів тому}}"
       }
@@ -5230,7 +5031,6 @@
     },
     "review": {
       "title": "Перегляд імпорту апаратних ковлин",
-      "subtitle": "{total} Hardcover books, {matched} matched.",
       "closeAriaLabel": "Закрити відгук про імпорт",
       "searchPlaceholder": "Пошук заголовку або автора",
       "importProgress": "Прогрес імпорту",
@@ -5286,7 +5086,6 @@
   "library": {
     "creator": {
       "createTitle": "Створити бібліотеку",
-      "editTitle": "Edit: {name}",
       "stepOf": "Крок {current} з {total}",
       "unsaved": "Не збережено",
       "required": "Обов'язково",
@@ -5307,7 +5106,6 @@
       "actions": {
         "saving": "Збереження…",
         "saveChanges": "Зберегти зміни",
-        "creating": "Creating…",
         "createLibrary": "Створити бібліотеку"
       },
       "details": {
@@ -5347,7 +5145,6 @@
         "overlapsWith": "Перекривається на \"{library}\"",
         "noneAdded": "Немає папок ще не додано",
         "runPrescanHint": "Запустити прес-сервер для перевірки шляхів перед збереженням.",
-        "scanning": "Scanning…",
         "prescan": "Прескан"
       },
       "scanner": {
@@ -5479,7 +5276,6 @@
         "title": "Контроль доступу",
         "description": "Суперкористувачі завжди мають повний доступ. Надайте доступ іншим користувачам нижче.",
         "notYetCreated": "Доступ можна налаштувати після створення бібліотеки.",
-        "selectUser": "Select a user…",
         "grant": "Грант",
         "empty": "Користувачів ще не надано доступ.",
         "loading": "Завантаження параметрів доступу...",
@@ -5509,7 +5305,6 @@
       "parentFolder": "Перейти до батьківської папки",
       "newFolder": "Нова папка",
       "goUp": "Догори",
-      "filterPlaceholder": "Filter folders…",
       "clearFilterAria": "Очистити фільтр тек",
       "newFolderNamePlaceholder": "Назва нової папки",
       "create": "Створити",
@@ -5659,7 +5454,6 @@
       },
       "snapshot": {
         "title": "Остання перевірка, знімок",
-        "sourceVersion": "Source version: {version}",
         "unknown": "Не вказано",
         "missingTables": "Відсутні необхідні таблиці: {tables}"
       }
@@ -5704,7 +5498,6 @@
       "sourceRecordId": "ID вихідного запису #{id}",
       "byAuthor": "від {author} (ID: {id})",
       "byFilePath": "{filePath} (ID: {id})",
-      "bookloreSourceId": "Booklore source ID: {id}",
       "libraryBookId": "Бібліотечна книга #{id}"
     },
     "preflight": {
@@ -5737,7 +5530,6 @@
       "refreshStatus": "Оновити статус",
       "pollingStopped": "Опитування стану зупинено через помилку.",
       "retry": "Повторити спробу",
-      "stage": "Stage: {stage}",
       "initializing": "ініціалізація",
       "ended": "Завершено {time}"
     },
@@ -5778,7 +5570,6 @@
       "unresolvedBooksExplanation": "Ці книги є у джерелі, але не можуть бути розміщені в будь-якій книзі у вашій бібліотеці.",
       "mappedUsers": "Згорнуті користувачі ({count})",
       "mappedUsersExplanation": "Сукупності користувачів беруться з багатоосновного попереднього перегляду сушного схованки з планом міграції.",
-      "coverFailures": "{count} cover import(s) failed. Detailed failure rows are not stored.",
       "userPreviewCounts": "{statuses} статуси, пункти поступу {progress} - {sessions} сесій, {bookmarks} закладки, {annotations} анотації, {collections} запис в колекції"
     },
     "unresolvedReason": {
@@ -5821,7 +5612,6 @@
       "loadSuggestionsFailed": "Не вдалося завантажити пропозиції зіставлень користувачів",
       "sourceFieldsRequired": "Потрібно вказати ім'я хоста, ім'я бази даних, бази даних і початкового тексту",
       "connectionPassedWithWarnings": "Тестування підключення пройшло з попередженнями",
-      "connectionPassedWithWarningCount": "Connection test passed with {count} warning(s). First: {warning}",
       "connectionPassed": "Тестування з'єднання пройдено",
       "connectionMissingTables": "Підключення до ok, але {count} обов'язкова таблиця (ів) відсутня",
       "cannotTestMediaWhileRunning": "Неможливо перевірити шлях до медіа, коли запускається",
@@ -5832,7 +5622,6 @@
       "mediaPathValidationFailed": "Помилка перевірки шляху медіа.",
       "connectionFailedBeforeMedia": "Помилка під час перевірки підключення до медіа-шляху.",
       "cannotModifySourceWhileRunning": "Не вдалося змінити джерело, поки запускається",
-      "sourceSavedWithWarnings": "Source saved and validated with {count} warning(s)",
       "sourceSaved": "Джерело збережено та перевірене",
       "saveSourceFailed": "Не вдалося зберегти або перевірити джерело",
       "cannotSaveMappingsWhileRunning": "Не вдалося зберегти зіставлення, коли запускається",
@@ -5946,7 +5735,6 @@
     },
     "loadingBook": "Завантаження книги…",
     "failedToLoadBook": "Не вдалося завантажити книгу",
-    "chapterNumber": "Chapter {number}",
     "peek": {
       "badge": "Пікінг",
       "startReading": "Почни читати"
@@ -5980,72 +5768,26 @@
     "settings": {
       "title": "Налаштування",
       "ariaLabel": "Параметри читання",
-      "reset": "Reset to defaults",
-      "modeLabel": "Color mode",
       "mode": {
         "light": "Світла",
         "dark": "Темна"
       },
-      "textSize": "Text size",
-      "textSizeSmaller": "Smaller text",
-      "textSizeLarger": "Larger text",
-      "pixels": "{value} px",
-      "percent": "{value}%",
-      "pageColor": "Page color",
-      "font": "Font",
       "fontBuiltIn": "Вбудована тема",
-      "fontServer": "Server fonts",
       "fontYours": "Ваші шрифти",
-      "lineSpacing": "Line spacing",
-      "pageWidth": "Page width",
-      "pageWidthNarrow": "Narrow",
-      "pageWidthMedium": "Medium",
-      "pageWidthWide": "Wide",
-      "pageWidthFull": "Full",
       "readingFlow": "Потік читання",
-      "flow": {
-        "paginated": "Pages",
-        "scrolled": "Scroll"
-      },
       "pageSpreads": "Розгортання сторінки",
       "pageSpreadsHint": "Виберіть, як відображаються сторінки пар на основі зображень.",
       "spread": {
         "bookDefault": "Книга за замовчуванням",
         "singlePage": "Одна сторінка"
       },
-      "advanced": "Advanced layout",
-      "columns": "Columns",
-      "columnsFewer": "Fewer columns",
-      "columnsMore": "More columns",
       "columnGap": "Розрив стовпчика",
       "justifyText": "По ширині тексту",
-      "hyphenation": "Дефікація",
-      "themes": {
-        "default": "Default",
-        "gray": "Gray",
-        "sepia": "Sepia",
-        "crimson": "Crimson",
-        "meadow": "Meadow",
-        "rosewood": "Rosewood",
-        "azure": "Azure",
-        "dawnlight": "Dawnlight",
-        "ember": "Ember",
-        "aurora": "Aurora",
-        "ocean": "Ocean",
-        "mist": "Mist",
-        "amoled": "AMOLED"
-      },
-      "fonts": {
-        "bookDefault": "Book default",
-        "serif": "Serif",
-        "sansSerif": "Sans-serif",
-        "monospace": "Monospace"
-      }
+      "hyphenation": "Дефікація"
     },
     "search": {
       "placeholder": "Пошук у книзі (min {min} символів)...",
       "searching": "Пошук…",
-      "tooShort": "Type at least {min} characters",
       "noResults": "Нічого не знайдено",
       "prompt": "Введіть для пошуку",
       "resultCount": "{count, plural, =0 {немає результатів} one {# результат} few {# результат} many {# результат} other {# результат}}"
@@ -6095,8 +5837,7 @@
       "apply": "Прийняти"
     },
     "note": {
-      "title": "Додати примітку",
-      "placeholder": "Write your note…"
+      "title": "Додати примітку"
     },
     "dictionary": {
       "noDefinition": "Не знайдено визначення",
@@ -6135,9 +5876,6 @@
       "scrollModeHint": "Використовуйте \"Немає прогалин для вебтонів та вертикальних смуг.",
       "readingDirection": "Напрямок читання",
       "pageView": "Перегляд сторінки",
-      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
-      "spreadSection": "Two-page spread",
-      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Поширення вирівнювання",
       "spreadGap": "Поширити розрив",
       "spreadGapValue": "{value}px",
@@ -6195,7 +5933,6 @@
       "endOfChapter": "Кінець розділу",
       "noChaptersAvailable": "Розділи відсутні",
       "extend15": "+ 15 хвилин",
-      "timeLeft": "({time} left)",
       "playbackSpeed": "Швидкість відтворення",
       "noChapters": "Розділи відсутні.",
       "noBookmarks": "Ще немає закладок.",
@@ -6212,10 +5949,6 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} від {total} прочитано ({percentage}%)"
-    },
-    "ownership": {
-      "label": "In library",
-      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Можливі прогалини:"
@@ -6447,34 +6180,27 @@
         "title": "Топ 50 Серії"
       },
       "booksCompleted": {
-        "title": "Книги завершені",
-        "notEnoughData": "Need at least {count} completed books for this chart."
+        "title": "Книги завершені"
       },
       "completionLatency": {
-        "title": "Затримка завершення",
-        "notEnoughData": "Need at least {count} completed books for this chart."
+        "title": "Затримка завершення"
       },
       "completionTimeline": {
-        "title": "Історія завершень",
-        "notEnoughData": "Need at least {count} completed books for this chart."
+        "title": "Історія завершень"
       },
       "favoriteReadingDays": {
-        "title": "Улюблені Дні Читання",
-        "notEnoughData": "Need at least {count} reading events for this chart."
+        "title": "Улюблені Дні Читання"
       },
       "genreReadingTime": {
-        "title": "Час читання жанрів",
-        "notEnoughData": "Need at least {count} genres with reading time for this chart."
+        "title": "Час читання жанрів"
       },
       "goalTrajectory": {
         "title": "Темп проти мети",
         "noCompletedTitle": "Ще немає завершених книг",
-        "noCompletedDescription": "Завершіть книгу за цей період, щоб порівняти темпи роботи з вашою річною метою.",
-        "notEnoughData": "Need at least {count} completed books for this chart."
+        "noCompletedDescription": "Завершіть книгу за цей період, щоб порівняти темпи роботи з вашою річною метою."
       },
       "peakReadingHours": {
-        "title": "Години піку для читання",
-        "notEnoughData": "Need at least {count} reading events for this chart."
+        "title": "Години піку для читання"
       },
       "progressFunnel": {
         "title": "Прогрес вонель",
@@ -6482,21 +6208,17 @@
         "modeCounts": "Лічильники",
         "modeDropoff": "Виключення",
         "started": "Запущено {count}",
-        "notEnoughData": "Need at least {count} started books for this chart.",
         "noDropOffTitle": "Жодних випадаючих списків",
         "noDropOffDescription": "Кожна початкова книга переросла через всі воронки в цей період."
       },
       "readingClock": {
-        "title": "Читання годинника",
-        "notEnoughData": "Need at least {count} reading sessions for this chart."
+        "title": "Читання годинника"
       },
       "readingHeatmap": {
-        "title": "Читання карти",
-        "notEnoughData": "Need activity on at least {count} days for this chart."
+        "title": "Читання карти"
       },
       "readingPace": {
-        "title": "Читаюча фігура",
-        "notEnoughData": "Need at least {count} sessions with progress data for this chart."
+        "title": "Читаюча фігура"
       },
       "readingSessionTimeline": {
         "title": "Читання часової шкали сесії",
@@ -6504,7 +6226,6 @@
         "dragOff": "Дракон: Вимкнено",
         "prev": "Попередня",
         "next": "Уперед",
-        "week": "Week {week}",
         "dragHint": "Перетягніть смужки для переміщення сесій. Тривалість заблокована і проєднуються сесії відхилено.",
         "noSessionsTitle": "Цього тижня немає сеансів",
         "noSessionsDescription": "Використовуйте попередній / Наступний або тижневий селектор для перегляду іншого тижня.",
@@ -6571,7 +6292,6 @@
       "summary": {
         "label": "Summary",
         "toRename": "{count} для перейменування",
-        "unchanged": "{count} unchanged",
         "collisions": "{count, plural, =0 {# зіткнення} one {# зіткнення} few {# зіткнень} many {# зіткнень} other {# зіткнень}}",
         "errors": "{count, plural, =0 {# помилка} one {# помилка} few {# помилок} many {# помилок} other {# помилок}}"
       },
@@ -6627,7 +6347,6 @@
       "showDetails": "Детальніше про твіт",
       "hideDetails": "Приховати подробиці",
       "deleteSelected": "Видалити вибране {count}",
-      "openBook": "Open details for {title}",
       "unknownAuthor": "Невідомий автор",
       "unknown": "Не вказано",
       "none": "Без ефекту",
@@ -6677,7 +6396,6 @@
     "entityManager": {
       "unknown": "Не вказано",
       "bookCount": "{count, plural, =0 {жодної книги} one {# книга} few {# книг} many {# книг} other {# книг}}",
-      "sortPrefix": "· sort: {sortName}",
       "selectTargetToKeep": "Виберіть ціль для утримання",
       "writeToFiles": "Запис до файлів",
       "writeChangesToFiles": "Записати зміни до файлів",
@@ -6725,8 +6443,6 @@
         "noEntities": "Сутності не знайдено",
         "mergeCount": "Об'єднати ({count})",
         "deleteCount": "Видалити ({count})",
-        "totalCount": "{count} total",
-        "sortLabel": "sort: {sortName}",
         "sort": {
           "nameAsc": "Ім'я А-Я",
           "nameDesc": "Назва Z-A",
@@ -6820,8 +6536,7 @@
         "editMetadata": "Редагувати метадані · {base}",
         "edit": "Редагувати · {base}",
         "files": "Файли · {base}",
-        "readingLog": "Журнал читання · {base}",
-        "highlights": "Highlights · {base}"
+        "readingLog": "Журнал читання · {base}"
       }
     },
     "bookDock": {
@@ -6833,7 +6548,6 @@
       "dropFiles": "Перетягніть файли до панелі книг",
       "supportedFormats": "Підтримка: {formats}",
       "empty": {
-        "noSearchMatch": "No files match \"{query}\"",
         "noStatusFiles": "Немає файлів {status}",
         "uploadPrompt": "Завантажити файли або кинути їх у папку Доку Книги"
       },
@@ -6845,7 +6559,6 @@
         "applied": "{count, plural, =0 {Застосовується до без файлів} one {Застосовується до одного файлу} few {Застосовується до # файлів} many {Застосовується до # файлів} other {Застосовується до # файлів}}",
         "skippedEdited": "{count, plural, =0 {Пропущено один файл, тому що вони мають ручні редагування} one {пропускається один файл, тому що він має ручні редагування} few {Пропущено # файли, тому що вони мають ручні редагування} many {Пропущено # файли, тому що вони мають ручні редагування} other {Пропущено # файли, тому що вони мають ручні редагування}}",
         "skippedNoMetadata": "{count, plural, =0 {Пропущено один файл, тому що вони не мають отриманих метаданих} one {пропускається один файл, тому що він не має метаданих} few {Пропущено # файлів, тому що вони не мають вивантажених метаданих} many {Пропущено # файлів, тому що вони не мають вивантажених метаданих} other {Пропущено # файлів, тому що вони не мають вивантажених метаданих}}",
-        "noneApplied": "No files applied; {reasons}",
         "noneSelected": "Не вибрано жодного файлу"
       }
     },
@@ -6915,8 +6628,7 @@
         "deleted": "\"{name}\" видалено",
         "deleteFailed": "Не вдалося вилучити \"{name}\"",
         "koboSyncEnabled": "\"{name}\" тепер синхронізується з вашим Кобо",
-        "koboSyncDisabled": "\"{name}\" більше не синхронізується з вашим Кобо",
-        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
+        "koboSyncDisabled": "\"{name}\" більше не синхронізується з вашим Кобо"
       },
       "empty": {
         "noRules": "Немає налаштованих правил",
@@ -6941,7 +6653,6 @@
     "versions": "Версії",
     "currentVersion": "Поточна версія",
     "youreHere": "Ви знаходитесь тут",
-    "searchPlaceholder": "Search releases…",
     "noReleasesFound": "Не знайдено жодного релізу.",
     "noHighlights": "Немає відміток для цього релізу.",
     "showChangelog": "Показати весь журнал змін",
@@ -7025,8 +6736,7 @@
       "users": "Спільноти",
       "account-activity": "Активність облікового запису",
       "magic-links": "Магічні посилання",
-      "oidc": "OIDC / SSO",
-      "server-fonts": "Server Fonts"
+      "oidc": "OIDC / SSO"
     },
     "system": {
       "file-naming": "Назва файлу",

@@ -348,6 +348,15 @@ describe('KoreaderSettings', () => {
     await buttonByText(wrapper, 'KOReader setup steps')!.trigger('click')
 
     expect(wrapper.text()).toContain('Download the preconfigured plugin above.')
+    const stockUrlInput = wrapper.find('#koreader-stock-server-url')
+    expect(wrapper.find('label[for="koreader-stock-server-url"]').text()).toBe('Set the custom sync server to the following URL:')
+    expect((stockUrlInput.element as HTMLInputElement).value).toBe('https://bookorbit.example/api/v1/koreader')
+
+    const copyButton = wrapper.find('#koreader-stock-server-url-copy')
+    await copyButton.trigger('click')
+
+    expect(vi.mocked(copyToClipboard)).toHaveBeenLastCalledWith('https://bookorbit.example/api/v1/koreader')
+    expect(copyButton.text()).toContain('Copied')
   })
 
   it('shows current plugin state without an update warning when reported devices are current', async () => {

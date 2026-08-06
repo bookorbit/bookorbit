@@ -95,8 +95,7 @@
       "mobileSummary": "Thema: {theme} • Accent: {accent} • Achtergrond: {background}",
       "themeMode": {
         "light": "Licht",
-        "dark": "Donker",
-        "system": "System"
+        "dark": "Donker"
       },
       "theme": {
         "title": "Thema",
@@ -105,70 +104,8 @@
           "hint": "Lichte of donkere interface"
         },
         "accents": {
-          "grey": "Grey",
-          "scarlet": "Scarlet",
-          "vermilion": "Vermilion",
-          "rose": "Rose",
-          "copper": "Copper",
-          "orange": "Orange",
-          "chartreuse": "Chartreuse",
-          "marigold": "Marigold",
-          "wasabi": "Wasabi",
-          "amber": "Amber",
-          "malachite": "Malachite",
-          "yellow": "Yellow",
-          "viridian": "Viridian",
-          "turquoise": "Turquoise",
-          "lime": "Lime",
-          "green": "Green",
-          "acid-green": "Acid Green",
-          "emerald": "Emerald",
-          "teal": "Teal",
-          "electric-blue": "Electric Blue",
-          "cyan": "Cyan",
-          "jade": "Jade",
-          "ultramarine": "Ultramarine",
           "iris": "Iris",
-          "purple": "Paars",
-          "blue": "Blue",
-          "indigo": "Indigo",
-          "violet": "Violet",
-          "amethyst": "Amethyst",
-          "fuchsia": "Fuchsia",
-          "raspberry": "Raspberry",
-          "pink": "Pink",
-          "white": "White",
-          "rosewater": "Rosewater",
-          "salmon": "Salmon",
-          "coral": "Coral",
-          "sand": "Sand",
-          "peach": "Peach",
-          "pear": "Pear",
-          "flax": "Flax",
-          "sprout": "Sprout",
-          "butter": "Butter",
-          "aloe": "Aloe",
-          "lemon": "Lemon",
-          "foam": "Foam",
-          "aqua": "Aqua",
-          "celadon": "Celadon",
-          "sage": "Sage",
-          "pistachio": "Pistachio",
-          "mint": "Mint",
-          "seafoam": "Seafoam",
-          "baby-blue": "Baby Blue",
-          "powder": "Powder",
-          "sea-glass": "Sea Glass",
-          "bluebell": "Bluebell",
-          "cornflower": "Cornflower",
-          "thistle": "Thistle",
-          "periwinkle": "Periwinkle",
-          "wisteria": "Wisteria",
-          "lavender": "Lavender",
-          "mauve": "Mauve",
-          "orchid": "Orchid",
-          "rose-quartz": "Rose Quartz",
-          "blush": "Blush"
+          "purple": "Paars"
         },
         "accentColor": {
           "label": "Accentkleur",
@@ -469,8 +406,7 @@
         "notice": "Demo-beperkt account: het bewerken van profiel, wachtwoord, avatar en gekoppelde identiteiten is uitgeschakeld."
       },
       "feedback": {
-        "unsavedChanges": "Niet-opgeslagen wijzigingen",
-        "discard": "Discard"
+        "unsavedChanges": "Niet-opgeslagen wijzigingen"
       },
       "profile": {
         "securityHeading": "Profiel & Beveiliging",
@@ -487,11 +423,7 @@
         "accountTypeLocal": "Lokaal",
         "nameRequired": "Naam is verplicht",
         "updateFailed": "Bijwerken van profiel mislukt",
-        "updated": "Profiel bijgewerkt",
-        "usernameHint": "Your username cannot be changed.",
-        "passwordHint": "Change the password you use to sign in.",
-        "passwordHintOidc": "Your password is managed by your identity provider.",
-        "passwordHintShared": "Shared accounts sign in through a magic link and have no password."
+        "updated": "Profiel bijgewerkt"
       },
       "readingPreferences": {
         "title": "Leesvoorkeuren",
@@ -499,10 +431,7 @@
         "timezone": "Tijdzone",
         "save": "Voorkeuren opslaan",
         "enableAchievements": "Prestaties inschakelen",
-        "enableAchievementsHint": "Houd de voortgang van prestaties bij en toon prestatiegerelateerde onderdelen. Beheer prestatiemeldingen afzonderlijk onder Meldingen.",
-        "achievementsEnabled": "Achievements enabled",
-        "achievementsDisabled": "Achievements disabled",
-        "achievementsSaveFailed": "Failed to update the achievement preference"
+        "enableAchievementsHint": "Houd de voortgang van prestaties bij en toon prestatiegerelateerde onderdelen. Beheer prestatiemeldingen afzonderlijk onder Meldingen."
       },
       "preferences": {
         "saveFailed": "Opslaan van voorkeuren mislukt",
@@ -544,9 +473,7 @@
           "title": "{provider}-identiteit ontkoppelen?",
           "description": "Voer je wachtwoord in om te bevestigen. Je kunt daarna niet meer inloggen met deze provider.",
           "currentPassword": "Huidig wachtwoord"
-        },
-        "description": "Sign in with an external identity provider linked to this account.",
-        "unlinkAria": "Unlink {provider}"
+        }
       },
       "tour": {
         "title": "Rondleiding",
@@ -575,11 +502,6 @@
           "title": "Geblokkeerde genres",
           "description": "Boeken met een van deze genres worden voor je verborgen."
         }
-      },
-      "groups": {
-        "profile": "Profile",
-        "preferences": "Preferences",
-        "security": "Security & access"
       }
     },
     "magicLinks": {
@@ -615,8 +537,7 @@
         "uses": "Gebruik",
         "created": "Gemaakt",
         "status": "Status",
-        "totalUses": "Totaal gebruik",
-        "actions": "Actions"
+        "totalUses": "Totaal gebruik"
       },
       "createDialog": {
         "title": "Magic link maken",
@@ -644,12 +565,7 @@
       "emptyTitle": "Nog geen magische links aangemaakt",
       "emptyHint": "Klik op \"{action}\" om een deelbare login-URL te genereren.",
       "noActiveTitle": "Geen actieve magische links",
-      "noActiveHint": "Alle gegenereerde magische links voor deze pagina zijn verlopen of ingetrokken.",
-      "copyLinkAria": "Copy the link for {label}",
-      "pauseAria": "Pause {label}",
-      "resumeAria": "Resume {label}",
-      "revokeAria": "Revoke {label}",
-      "lastUsedLabel": "Last used {date}"
+      "noActiveHint": "Alle gegenereerde magische links voor deze pagina zijn verlopen of ingetrokken."
     },
     "oidc": {
       "title": "OIDC / SSO",
@@ -1136,15 +1052,7 @@
         "users": "Gebruikers",
         "account-activity": "Accountactiviteit",
         "magic-links": "Magische links",
-        "oidc": "OIDC / SSO",
-        "server-fonts": "Server Fonts"
-      },
-      "serverFonts": {
-        "title": "Server Fonts",
-        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
-        "listLabel": "Server fonts",
-        "noFontsYet": "No server fonts yet",
-        "noFontsHint": "Fonts you add here appear in every user's reader."
+        "oidc": "OIDC / SSO"
       }
     },
     "common": {
@@ -1610,9 +1518,6 @@
         "spreadAlignmentHint": "Verschuif de koppeling met één pagina na de omslag voor scans die net verschoven zijn",
         "alignmentNormal": "Normaal",
         "alignmentShifted": "Verschoven",
-        "spreadGap": "Spread gap",
-        "spreadGapHint": "Space between pages in two-page view",
-        "spreadGapValue": "{value}px",
         "widePageHandling": "Verwerking van brede pagina's",
         "widePageHandlingHint": "Auto toont brede scans alleen in gepagineerde modus met twee pagina's",
         "widePageAuto": "Auto",
@@ -1680,12 +1585,7 @@
         "deleteFamilyFailed": "Kan lettertypefamilie niet verwijderen",
         "demoCannotManage": "Demo-beperkt account kan geen lettertypen beheren",
         "fileAdded": "\"{name}\" toegevoegd",
-        "uploadFailed": "Uploaden mislukt",
-        "serverFontsTitle": "Server fonts (shared by admin)",
-        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
-        "serverFontsShown": "{count} of {total} shown",
-        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
-        "serverFontVisibilityFailed": "Failed to update server font visibility"
+        "uploadFailed": "Uploaden mislukt"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -1788,36 +1688,9 @@
         "copyPatternFailed": "Kan patroon niet kopiëren",
         "labelCopied": "{label} gekopieerd naar klembord",
         "copyLabelFailed": "Kan {label} niet kopiëren",
-        "patternHelp": "Pattern help",
-        "patternHelpDescription": "Tokens, modifiers and ready-made patterns you can copy into any field.",
-        "copyPreview": "Copy {label}",
-        "copyExample": "Copy the {label} pattern",
-        "invalidCharacters": "Pattern contains invalid characters",
-        "fileAsBookSaved": "File as Book default saved",
-        "folderAsBookSaved": "Folder as Book default saved",
-        "downloadPatternSaved": "Download pattern saved",
-        "savePatternFailed": "Failed to save pattern",
-        "saveDownloadPatternFailed": "Failed to save download pattern",
-        "crossPlatformEnabled": "Cross-platform path sanitization enabled",
-        "crossPlatformDisabled": "Cross-platform path sanitization disabled",
-        "crossPlatformSaveFailed": "Failed to save cross-platform path sanitization",
-        "librarySaved": "Pattern saved for {name}",
-        "librarySaveFailed": "Failed to save library pattern",
-        "saveLibraryPattern": "Save pattern for {name}",
-        "resetLibraryPattern": "Reset {name} to the default pattern",
         "tokenTitle": "Titel",
-        "tokenSubtitle": "Book subtitle",
-        "tokenAuthors": "Author(s), comma-separated",
-        "tokenYear": "Publication year",
-        "tokenSeries": "Series name",
-        "tokenSeriesIndex": "Series index (zero-padded)",
-        "tokenPublisher": "Publisher",
         "tokenIsbn": "ISBN-13",
-        "tokenLanguage": "Taal",
-        "tokenOriginalFilename": "Original filename (without extension)",
-        "tokenExtension": "File extension (without dot)",
-        "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
-        "browseTokensAndExamples": "Browse tokens and examples"
+        "tokenLanguage": "Taal"
       },
       "kobo": {
         "title": "Kobo-synchronisatie",
@@ -2512,8 +2385,7 @@
         "username": "Gebruikersnaam",
         "email": "E-mail",
         "access": "Toegang",
-        "status": "Status",
-        "actions": "Actions"
+        "status": "Status"
       },
       "adminBadge": "Beheer",
       "permissionCount": "{count, plural, =0 {geen rechten} one {één recht} other {# rechten}}",
@@ -2532,8 +2404,7 @@
       "deleting": "Verwijderen...",
       "errors": {
         "load": "Laden mislukt",
-        "deleteUser": "Gebruiker verwijderen mislukt",
-        "resetPassword": "Failed to create a password reset link"
+        "deleteUser": "Gebruiker verwijderen mislukt"
       },
       "defaultLibraryAccess": {
         "title": "Standaard bibliotheektoegang",
@@ -2544,35 +2415,9 @@
         "saving": "Opslaan...",
         "saveError": "Opslaan van standaard bibliotheektoegang mislukt"
       },
-      "filters": {
-        "search": "Search users",
-        "searchPlaceholder": "Search by name, username or email",
-        "sort": "Sort users",
-        "usernameAsc": "Username A-Z",
-        "nameAsc": "Name A-Z",
-        "newest": "Newest first",
-        "oldest": "Oldest first",
-        "apply": "Apply",
-        "clear": "Clear",
-        "state": "Filter users",
-        "allUsers": "All users",
-        "admins": "Administrators",
-        "active": "Active",
-        "inactive": "Inactive"
-      },
-      "empty": {
-        "title": "No users yet",
-        "description": "Create the first account to get started.",
-        "filtered": "No users match the current search and filters."
-      },
       "pagination": {
-        "label": "Users pagination",
         "page": "Pagina {page} van {totalPages}"
-      },
-      "editUserAria": "Edit {name}",
-      "resetPasswordAria": "Reset the password for {name}",
-      "deleteUserAria": "Delete {name}",
-      "moreActionsAria": "More actions for {name}"
+      }
     }
   },
   "annotations": {
@@ -2722,221 +2567,34 @@
     "showLess": "Minder tonen",
     "details": "Details",
     "hideDetails": "Details verbergen",
-    "refresh": "Refresh audit log",
     "loadError": "Kan geen audit gebeurtenissen laden.",
-    "removeFilter": "Remove filter: {value}",
-    "allActions": "All actions",
-    "allEventTypes": "All event types",
-    "allActors": "All actors",
-    "noActionsFound": "No matching actions",
-    "noActorsFound": "No matching actors",
-    "noResourcesFound": "No matching target types",
-    "unknownAction": "Unknown action",
-    "unknownResource": "Other target type",
-    "allResources": "All resources",
-    "allTargetTypes": "All target types",
-    "quickDates": "Quick dates",
-    "today": "Today",
-    "sevenDays": "7 days",
-    "thirtyDays": "30 days",
-    "userId": "User #{id}",
-    "userIdCompact": "#{id}",
-    "targetAdditional": "and {count, plural, one {# more target} other {# more targets}}",
     "bookImpact": "{count, plural, one {# book} other {# books}}",
-    "entryDetailsLabel": "Details for audit event #{id}",
-    "detailEventId": "Event ID",
-    "detailOccurredAt": "Occurred",
-    "detailActor": "Actor",
-    "detailCategory": "Category",
-    "detailActionLabel": "Action",
-    "detailEventTypeLabel": "Event type",
-    "detailIpLabel": "IP address",
-    "detailResourceLabel": "Resource",
-    "detailResourceIdLabel": "Resource ID",
-    "detailTargetTypeLabel": "Target type",
-    "detailTargetIdLabel": "Target ID",
     "detailAction": "Actie: {value}",
     "detailIp": "IP: {value}",
-    "detailResource": "Resource: {value}",
-    "detailResourceId": "Resource ID: {value}",
-    "deletedBooks": "Deleted books",
-    "deletedBookDetail": "{title} (book #{id})",
-    "untitledBook": "Untitled",
-    "deletedBooksOmitted": "{count, plural, one {# additional book omitted} other {# additional books omitted}}",
     "showing": "{from}-{to} van {total} weergegeven",
     "prev": "Vorige",
     "chips": {
-      "search": "Search: {value}",
       "action": "Actie: {value}",
-      "eventType": "Event type: {value}",
-      "actor": "Actor: {value}",
-      "resource": "Resource: {value}",
-      "targetType": "Target type: {value}",
       "user": "Gebruiker: {value}",
       "from": "Van: {value}",
       "to": "Tot: {value}"
     },
     "filterLabels": {
-      "search": "Search events",
       "action": "Actie",
-      "eventType": "Event type (what happened)",
-      "actor": "Actor",
-      "resource": "Resource",
-      "targetType": "Target type (what was affected)",
       "userId": "Gebruikers-ID",
       "from": "Van",
       "to": "Tot"
     },
     "filterPlaceholders": {
-      "search": "Description, actor, target, or ID",
-      "actor": "Username",
       "action": "bijv. auth.login",
       "userId": "bijv. 1"
     },
     "columns": {
       "when": "Wanneer",
-      "actor": "Actor",
-      "event": "Event",
-      "target": "Target",
-      "impact": "Impact",
       "user": "Gebruiker",
       "action": "Actie",
       "description": "Beschrijving",
       "ip": "IP"
-    },
-    "categories": {
-      "authentication": "Authentication",
-      "books": "Books",
-      "users": "Users",
-      "libraries": "Libraries",
-      "collections": "Collections",
-      "integrations": "Integrations",
-      "settings": "Settings",
-      "other": "Other"
-    },
-    "resourceLabels": {
-      "User": "User",
-      "Library": "Library",
-      "Book": "Book",
-      "Collection": "Collection",
-      "SmartScope": "Smart scope",
-      "BookDockFile": "Book Dock file",
-      "Author": "Author",
-      "AppSettings": "Application settings",
-      "Genre": "Genre",
-      "Tag": "Tag",
-      "KoboDevice": "Kobo device",
-      "EmailProvider": "Email provider",
-      "EmailTemplate": "Email template",
-      "EmailRecipient": "Email recipient",
-      "EmailRecipientGroup": "Email recipient group",
-      "Narrator": "Narrator",
-      "Publisher": "Publisher",
-      "Language": "Language",
-      "Series": "Series",
-      "OidcIdentity": "OIDC identity",
-      "MagicLinkToken": "Magic link",
-      "ReadingInsightsProfile": "Reading insights profile"
-    },
-    "actionLabels": {
-      "AuthRegister": "Register account",
-      "AuthLogin": "Sign in",
-      "AuthLoginFailed": "Failed sign-in",
-      "AuthLogout": "Sign out",
-      "AuthPasswordChange": "Change password",
-      "AuthPasswordResetRequest": "Request password reset",
-      "AuthPasswordReset": "Reset password",
-      "AuthPasswordAdminReset": "Reset user password",
-      "AuthSessionRevoke": "Revoke session",
-      "MagicLinkCreate": "Create magic link",
-      "MagicLinkLogin": "Sign in with magic link",
-      "MagicLinkRevoke": "Revoke magic link",
-      "MagicLinkActivate": "Activate magic link",
-      "MagicLinkDeactivate": "Deactivate magic link",
-      "OidcLogin": "Sign in with OIDC",
-      "OidcUserProvisioned": "Provision OIDC user",
-      "OidcIdentityLinked": "Link OIDC identity",
-      "OidcIdentityUnlinked": "Unlink OIDC identity",
-      "UserCreate": "Create user",
-      "UserUpdate": "Update user",
-      "UserSelfUpdate": "Update own profile",
-      "UserDelete": "Delete user",
-      "UserPermissionSet": "Update user permissions",
-      "UserSuperuserEnable": "Enable superuser access",
-      "UserSuperuserDisable": "Disable superuser access",
-      "UserContentFiltersSet": "Update content filters",
-      "ReadingInsightsSharingUpdate": "Update insight sharing",
-      "ReadingInsightsProfileView": "View shared insights",
-      "LibraryCreate": "Create library",
-      "LibraryUpdate": "Update library",
-      "LibraryDelete": "Delete library",
-      "LibraryFolderAdd": "Add library folder",
-      "LibraryFolderRemove": "Remove library folder",
-      "LibraryAccessGrant": "Grant library access",
-      "LibraryAccessUpdate": "Update library access",
-      "LibraryAccessRevoke": "Revoke library access",
-      "LibraryWriteMetadataToFiles": "Write metadata to files",
-      "LibraryBulkRename": "Rename library files",
-      "BookUpload": "Upload book",
-      "BookMetadataUpdate": "Update book metadata",
-      "BookMetadataLocksUpdate": "Update metadata locks",
-      "BookDelete": "Delete book",
-      "BookBulkMetadataRefresh": "Refresh book metadata",
-      "BookBulkDelete": "Delete books",
-      "BookBulkCoverReextract": "Re-extract book covers",
-      "BookBulkSetStatus": "Set book status",
-      "BookBulkSetRating": "Set book rating",
-      "BookBulkSetMetadata": "Set book metadata",
-      "BookBulkUpdateTags": "Update book tags",
-      "BookBulkSetMetadataLock": "Set metadata locks",
-      "BookBulkEditMetadata": "Edit book metadata",
-      "BookBulkMoveLibrary": "Move books to another library",
-      "BookReadingStateReset": "Reset reading state",
-      "BookWriteAndRename": "Write metadata and rename file",
-      "CollectionCreate": "Create collection",
-      "CollectionUpdate": "Update collection",
-      "CollectionDelete": "Delete collection",
-      "CollectionBooksAdd": "Add books to collection",
-      "CollectionBooksRemove": "Remove books from collection",
-      "SmartScopeCreate": "Create smart scope",
-      "SmartScopeUpdate": "Update smart scope",
-      "SmartScopeDelete": "Delete smart scope",
-      "BookDockFinalize": "Finalize Book Dock file",
-      "AuthorUpdate": "Update author",
-      "AuthorDelete": "Delete author",
-      "AuthorMerge": "Merge authors",
-      "AuthorEnrichmentConfigUpdate": "Update author enrichment",
-      "AuthorEnrichmentPause": "Pause author enrichment",
-      "AuthorEnrichmentResume": "Resume author enrichment",
-      "AuthorEnrichmentCancel": "Cancel author enrichment",
-      "EntityManagerMerge": "Merge entities",
-      "EntityManagerRename": "Rename entity",
-      "EntityManagerDelete": "Delete entity",
-      "EntityManagerSplit": "Split entity",
-      "EntityManagerDismiss": "Dismiss duplicate",
-      "EntityManagerUndismiss": "Restore dismissed duplicate",
-      "AppSettingsUpdate": "Update app settings",
-      "KoboDeviceRegister": "Register Kobo device",
-      "KoboDeviceRename": "Rename Kobo device",
-      "KoboDeviceRemove": "Remove Kobo device",
-      "EmailProviderCreate": "Create email provider",
-      "EmailProviderUpdate": "Update email provider",
-      "EmailProviderDelete": "Delete email provider",
-      "EmailProviderSetDefault": "Set default email provider",
-      "EmailProviderSetSystem": "Set system email provider",
-      "EmailProviderClearSystem": "Clear system email provider",
-      "EmailTemplateCreate": "Create email template",
-      "EmailTemplateUpdate": "Update email template",
-      "EmailTemplateDelete": "Delete email template",
-      "EmailTemplateSetDefault": "Set default email template",
-      "EmailRecipientCreate": "Create email recipient",
-      "EmailRecipientUpdate": "Update email recipient",
-      "EmailRecipientDelete": "Delete email recipient",
-      "EmailRecipientGroupCreate": "Create recipient group",
-      "EmailRecipientGroupUpdate": "Update recipient group",
-      "EmailRecipientGroupDelete": "Delete recipient group",
-      "EmailRecipientGroupMemberAdd": "Add recipient to group",
-      "EmailRecipientGroupMemberRemove": "Remove recipient from group"
     }
   },
   "auth": {
@@ -3261,31 +2919,6 @@
       "moveDown": "Omlaag verplaatsen",
       "ascending": "Oplopend",
       "descending": "Aflopend",
-      "fields": {
-        "author": "Author",
-        "title": "Title",
-        "series": "Series",
-        "seriesIndex": "Series #",
-        "addedAt": "Date Added",
-        "updatedAt": "Date Updated",
-        "publishedDate": "Published Date",
-        "publishedYear": "Published Year",
-        "pageCount": "Page Count",
-        "rating": "Rating",
-        "publisher": "Publisher",
-        "fileSize": "File Size",
-        "readProgress": "Read Progress",
-        "readStatus": "Read Status",
-        "format": "Format",
-        "lastReadAt": "Last Read",
-        "startedAt": "Date Started",
-        "finishedAt": "Date Finished",
-        "random": "Random",
-        "language": "Language",
-        "metadataScore": "Metadata Score"
-      },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
       "remove": "Verwijderen",
       "emptyState": "Geen sortering ingesteld. Titel oplopend wordt gebruikt.",
       "addLevel": "Sorteerniveau toevoegen"
@@ -3490,9 +3123,7 @@
     },
     "jumpRail": {
       "jumpToSection": "Naar sectie springen",
-      "jumpTo": "Naar {label} springen",
-      "unknownDate": "Unknown date",
-      "unknownValue": "Unknown value"
+      "jumpTo": "Naar {label} springen"
     },
     "quickView": {
       "title": "Snelweergave boek",
@@ -4107,11 +3738,7 @@
         "seriesPlaceholder": "Reeks",
         "moveUp": "Omhoog",
         "moveDown": "Omlaag",
-        "removeSeries": "Reeks verwijderen",
-        "seriesIndexLabel": "Position in series",
-        "totalLabel": "Books in series",
-        "totalPlaceholder": "of",
-        "totalHint": "Total books in this series. Shared with everyone who has this series."
+        "removeSeries": "Reeks verwijderen"
       }
     },
     "table": {
@@ -4191,69 +3818,6 @@
       },
       "text": {
         "openDetails": "Details openen"
-      }
-    },
-    "move": {
-      "title": "{count, plural, one {Move # book} other {Move # books}}",
-      "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
-      "searchPlaceholder": "Search libraries",
-      "currentLibrary": "Current",
-      "folderCount": "{count, plural, one {# folder} other {# folders}}",
-      "continue": "Continue",
-      "back": "Back",
-      "confirm": "{count, plural, one {Move # book} other {Move # books}}",
-      "action": "Move to library",
-      "review": {
-        "ready": "{count} ready",
-        "collisions": "{count, plural, one {# name conflict} other {# name conflicts}}",
-        "ineligible": "{count} cannot move",
-        "alreadyThere": "{count} already there",
-        "collisionsHeading": "Name conflicts",
-        "ineligibleHeading": "Cannot be moved",
-        "moreCollisions": "and {count} more"
-      },
-      "policy": {
-        "suggested": "Use suggested",
-        "keep_both": "Keep both",
-        "merge": "Merge",
-        "skip": "Skip"
-      },
-      "collision": {
-        "folder_path": "A book already uses this folder name",
-        "file_path": "A file already uses this path",
-        "hash_duplicate": "An identical copy is already in this library"
-      },
-      "ineligible": {
-        "book_not_present": "The files for this book are missing",
-        "no_content_file": "This book has no readable file",
-        "multi_file_target_per_file": "The destination stores one file per book, and this book has {detail} files",
-        "no_source_access": "You cannot edit the library this book is in",
-        "pattern_unresolved": "The destination library has no usable naming pattern",
-        "path_too_long": "The destination path would be too long",
-        "path_outside_target_root": "The destination path would fall outside the library folder"
-      },
-      "warning": {
-        "accessLoss": "{user} will stop seeing {count} of these books",
-        "koboImpact": "{count} books will leave {user}'s Kobo on the next sync",
-        "layout": {
-          "wrap_into_folder": "{count} books will each be placed in their own folder",
-          "dissolve_folder": "{count} book folders will be dissolved into single files"
-        },
-        "crossDevice": "Files move to another drive, so they are copied, verified, then removed."
-      },
-      "progress": {
-        "label": "Moving books to {library}",
-        "failed": "{count} failed"
-      },
-      "done": {
-        "summary": "Moved {count} books to {library}",
-        "merged": "{count} merged with copies already there",
-        "skipped": "{count} skipped",
-        "failed": "{count} failed"
-      },
-      "toast": {
-        "success": "Moved {count} books to {library}",
-        "partial": "Moved {moved} books, {failed} failed"
       }
     }
   },
@@ -4539,9 +4103,7 @@
         "title": "Vind je BookOrbit leuk?",
         "body": "Als BookOrbit je helpt met je bibliotheek, overweeg dan om het project een ster te geven op GitHub. Het helpt meer mensen de app te ontdekken en ondersteunt de doorlopende ontwikkeling.",
         "cta": "Geef BookOrbit een ster op GitHub"
-      },
-      "surfaceOpacity": "Surface opacity",
-      "surfaceOpacityValue": "{value}%"
+      }
     },
     "sidebar": {
       "dashboard": "Dashboard",
@@ -4562,36 +4124,8 @@
       "supportAria": "BookOrbit ondersteunen op Ko-fi",
       "sectionHeader": {
         "add": "Toevoegen",
-        "showAll": "Show all",
-        "showCount": "Show {count}",
-        "rowsShown": "Rows shown",
-        "menuAria": "Section options for {section}",
         "reorder": "Herschikken",
         "doneReordering": "Klaar met herschikken"
-      },
-      "noLibraries": "No libraries yet",
-      "clearFilter": "Clear filter",
-      "filterSummary": "{shown} of {total} shown",
-      "filterLibraries": "Filter libraries",
-      "filterLibrariesPlaceholder": "Filter libraries...",
-      "filterSmartScopes": "Filter smart scopes",
-      "filterSmartScopesPlaceholder": "Filter smart scopes...",
-      "filterCollections": "Filter collections",
-      "filterCollectionsPlaceholder": "Filter collections...",
-      "seeAllLibraries": "See all libraries ({count})",
-      "seeAllSmartScopes": "See all smart scopes ({count})",
-      "seeAllCollections": "See all collections ({count})",
-      "updateAvailable": "Update {version}",
-      "zones": {
-        "browse": "Browse"
-      },
-      "reorder": {
-        "gripAria": "Reorder {name}",
-        "lifted": "{name} lifted, position {position} of {total}. Use the arrow keys to move it.",
-        "moved": "{name}, position {position} of {total}",
-        "dropped": "{name} dropped at position {position} of {total}",
-        "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}.",
-        "filteredHint": "Clear the filter to reorder"
       }
     },
     "selectionActionBar": {
@@ -4647,7 +4181,6 @@
         "display": "Weergave",
         "coverSize": "Omslaggrootte",
         "gridGap": "Rasterafstand",
-        "showJumpRails": "Show jump rails",
         "columnsHint": "Gebruik het paneel voor kolomzichtbaarheid in de tabelkop om kolommen te tonen of te verbergen.",
         "coverShape": "Omslagvorm",
         "circle": "Cirkel",
@@ -4674,8 +4207,7 @@
     },
     "themePicker": {
       "light": "Licht",
-      "dark": "Donker",
-      "system": "System"
+      "dark": "Donker"
     },
     "userAvatar": {
       "profilePicture": "Profielfoto",
@@ -4691,24 +4223,6 @@
         "typeAndEnter": "Typ en druk op Enter om toe te voegen",
         "pressEnter": "Druk op Enter om toe te voegen"
       }
-    },
-    "entityIndex": {
-      "sortBy": "Sort by",
-      "sort": {
-        "custom": "Custom order",
-        "name": "Name",
-        "bookCount": "Book count"
-      },
-      "ascending": "Ascending",
-      "descending": "Descending",
-      "clearSearch": "Clear search",
-      "resultCount": "{shown} of {total}",
-      "noMatches": "No matches",
-      "noMatchesHint": "Try a different search term.",
-      "bookCount": "Books: {count}",
-      "librariesEmptyHint": "Create a library to start adding books.",
-      "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
-      "collectionsEmptyHint": "Collections group books you pick by hand."
     }
   },
   "customIcons": {
@@ -4764,37 +4278,6 @@
       "tabs": {
         "widgets": "Widgets",
         "shelves": "Planken"
-      },
-      "widgetNames": {
-        "readingStreak": "Reading Streak",
-        "currentlyReading": "Currently Reading",
-        "readingGoal": "Reading Goal",
-        "readingDna": "Reading DNA",
-        "monthlyChallenge": "Monthly Challenge",
-        "highlightOfTheDay": "Highlight of the Day",
-        "neglectedGems": "Neglected Gems",
-        "readingRhythm": "Reading Rhythm",
-        "diversityScore": "Diversity Score",
-        "libraryOverview": "Library Overview",
-        "yearProjection": "Year Projection",
-        "longWait": "The Long Wait"
-      },
-      "shelfNames": {
-        "recentlyAdded": "Recently Added",
-        "continueReading": "Continue Reading",
-        "continueListening": "Continue Listening",
-        "wantToRead": "Want to Read",
-        "upNextInSeries": "Up Next in Series",
-        "random": "Discover Something New",
-        "smartScope": "Smart Scope"
-      },
-      "shelfLayout": {
-        "title": "Shelf layout",
-        "description": "Choose how shelves are arranged on larger screens.",
-        "wide": "Wide rows",
-        "wideDescription": "Show one shelf per row.",
-        "twoColumns": "Two columns",
-        "twoColumnsDescription": "Show two shelves per row."
       },
       "reorderHintWidget": "Sleep om te herordenen. Schakel in of uit om een widget te tonen of verbergen.",
       "reorderHintShelf": "Sleep om te herordenen. Schakel in of uit om een plank te tonen of verbergen.",
@@ -5410,11 +4893,6 @@
           "hint": "Schrijft metadata naar het OPF-bestand in het EPUB-archief.",
           "toggleAria": "EPUB-metadata schrijven"
         },
-        "fb2": {
-          "title": "FictionBook (FB2)",
-          "hint": "Rewrites the description block inside FB2 files, leaving the book text untouched.",
-          "toggleAria": "Write FB2 metadata"
-        },
         "pdf": {
           "title": "PDF",
           "hint": "Sluit metadata in de PDF Info-dictionary en XMP-stream in.",
@@ -5424,11 +4902,6 @@
           "title": "Striparchieven (CBX)",
           "hint": "Schrijft ComicInfo.xml naar CBZ- en CB7-archieven.",
           "toggleAria": "Metadata naar striparchieven schrijven"
-        },
-        "kindle": {
-          "title": "Kindle (MOBI, AZW3)",
-          "hint": "Writes metadata into the EXTH header of MOBI, AZW3, and AZW files.",
-          "toggleAria": "Write Kindle metadata"
         },
         "audio": {
           "title": "Audio",
@@ -5880,61 +5353,7 @@
       "saveFailed": "Opslaan van voorkeuren mislukt",
       "savePreferenceFailed": "Opslaan van voorkeur mislukt",
       "whatsNewToggle": "\"Wat is er nieuw\" tonen na updates",
-      "whatsNewToggleHint": "Een popup die nieuwe functies benadrukt nadat de app is bijgewerkt. Het archief blijft hoe dan ook beschikbaar.",
-      "groups": {
-        "library": "Library",
-        "files": "Files",
-        "integrations": "Integrations",
-        "personal": "Personal",
-        "app": "App updates"
-      },
-      "enabledCount": "{enabled} of {total} enabled",
-      "categories": {
-        "scanning": {
-          "label": "Library scanning",
-          "description": "When a library scan finishes, fails, or finds missing books."
-        },
-        "metadata": {
-          "label": "Metadata fetching",
-          "description": "When metadata lookups for your books complete or fail."
-        },
-        "authorEnrichment": {
-          "label": "Author enrichment",
-          "description": "When author biographies and photos finish being fetched."
-        },
-        "fileWriteBack": {
-          "label": "File write-back",
-          "description": "When edited metadata is written back into book files on disk."
-        },
-        "fileRename": {
-          "label": "File rename",
-          "description": "When a single book file is renamed to match your naming pattern."
-        },
-        "bulkRename": {
-          "label": "Bulk rename",
-          "description": "When a bulk rename across many books completes or fails."
-        },
-        "migration": {
-          "label": "Data migration",
-          "description": "When an import from another library tool completes or fails."
-        },
-        "bookDock": {
-          "label": "Book Dock",
-          "description": "When files dropped into the dock are ready to review or finalized."
-        },
-        "koboSync": {
-          "label": "Kobo sync",
-          "description": "When a Kobo device finishes syncing with your library."
-        },
-        "email": {
-          "label": "Email delivery",
-          "description": "When sending a book to an email address succeeds or fails."
-        },
-        "achievements": {
-          "label": "Achievements",
-          "description": "When you unlock a new reading achievement."
-        }
-      }
+      "whatsNewToggleHint": "Een popup die nieuwe functies benadrukt nadat de app is bijgewerkt. Het archief blijft hoe dan ook beschikbaar."
     }
   },
   "reader": {
@@ -5980,67 +5399,22 @@
     "settings": {
       "title": "Instellingen",
       "ariaLabel": "Lezerinstellingen",
-      "reset": "Reset to defaults",
-      "modeLabel": "Color mode",
       "mode": {
         "light": "Licht",
         "dark": "Donker"
       },
-      "textSize": "Text size",
-      "textSizeSmaller": "Smaller text",
-      "textSizeLarger": "Larger text",
-      "pixels": "{value} px",
-      "percent": "{value}%",
-      "pageColor": "Page color",
-      "font": "Font",
       "fontBuiltIn": "Ingebouwd",
-      "fontServer": "Server fonts",
       "fontYours": "Jouw lettertypen",
-      "lineSpacing": "Line spacing",
-      "pageWidth": "Page width",
-      "pageWidthNarrow": "Narrow",
-      "pageWidthMedium": "Medium",
-      "pageWidthWide": "Wide",
-      "pageWidthFull": "Full",
       "readingFlow": "Leesstroom",
-      "flow": {
-        "paginated": "Pages",
-        "scrolled": "Scroll"
-      },
       "pageSpreads": "Paginaspreads",
       "pageSpreadsHint": "Kies hoe deze op afbeeldingen gebaseerde EPUB pagina's koppelt.",
       "spread": {
         "bookDefault": "Standaard van boek",
         "singlePage": "Enkele pagina"
       },
-      "advanced": "Advanced layout",
-      "columns": "Columns",
-      "columnsFewer": "Fewer columns",
-      "columnsMore": "More columns",
       "columnGap": "Kolomtussenruimte",
       "justifyText": "Tekst uitvullen",
-      "hyphenation": "Woordafbreking",
-      "themes": {
-        "default": "Default",
-        "gray": "Gray",
-        "sepia": "Sepia",
-        "crimson": "Crimson",
-        "meadow": "Meadow",
-        "rosewood": "Rosewood",
-        "azure": "Azure",
-        "dawnlight": "Dawnlight",
-        "ember": "Ember",
-        "aurora": "Aurora",
-        "ocean": "Ocean",
-        "mist": "Mist",
-        "amoled": "AMOLED"
-      },
-      "fonts": {
-        "bookDefault": "Book default",
-        "serif": "Serif",
-        "sansSerif": "Sans-serif",
-        "monospace": "Monospace"
-      }
+      "hyphenation": "Woordafbreking"
     },
     "search": {
       "placeholder": "Zoeken in boek (min. {min} tekens)...",
@@ -6135,12 +5509,7 @@
       "scrollModeHint": "Gebruik \"Geen tussenruimte\" voor webtoons en verticale stroken.",
       "readingDirection": "Leesrichting",
       "pageView": "Paginaweergave",
-      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
-      "spreadSection": "Two-page spread",
-      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Spreaduitlijning",
-      "spreadGap": "Spread gap",
-      "spreadGapValue": "{value}px",
       "forceTwoPage": "Twee pagina's forceren",
       "widePages": "Brede pagina's",
       "firstPage": "Eerste pagina",
@@ -6212,10 +5581,6 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} van {total} gelezen ({percentage}%)"
-    },
-    "ownership": {
-      "label": "In library",
-      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Mogelijke hiaten:"
@@ -6294,8 +5659,6 @@
   "smartScope": {
     "syncToKobo": "Synchroniseren met Kobo",
     "syncToKoboHint": "Boeken die aan dit bereik voldoen, verschijnen op uw Kobo-apparaat",
-    "visibleToAll": "Visible to all users",
-    "visibleToAllHint": "Every user can see and use this smart scope",
     "dialog": {
       "name": "Naam",
       "namePlaceholder": "bijv. Ongelezen sci-fi",
@@ -6525,8 +5888,7 @@
   "tools": {
     "header": {
       "entityManager": "Entiteitenbeheer",
-      "bulkRename": "Bulk hernoemen",
-      "duplicateBooks": "Duplicate Books"
+      "bulkRename": "Bulk hernoemen"
     },
     "entityTypes": {
       "authors": "Auteurs",
@@ -6538,8 +5900,6 @@
       "series": "Reeksen"
     },
     "bulkRename": {
-      "previewToolbar": "Rename preview",
-      "renameSettings": "Rename settings",
       "library": "Bibliotheek",
       "selectLibraryPlaceholder": "Selecteer een bibliotheek...",
       "noEligibleLibraries": "Geen bibliotheken hebben bestand hernoemen ingeschakeld. Schakel het in bij Bibliotheekinstellingen.",
@@ -6594,84 +5954,11 @@
       }
     },
     "bookDuplicates": {
-      "scanSettings": "Scan settings",
-      "title": "Duplicate Books",
-      "description": "Scan files and metadata for potential duplicate records. Nothing is deleted during a scan.",
-      "scope": "Library scope",
-      "allLibraries": "All accessible libraries",
-      "similarity": "Similar-title threshold",
-      "explainSimilarity": "Explain the similar-title threshold",
-      "similarityHelp": "Only for Similar title and author matches. At least one author and the book type must also match. Lower finds more possible duplicates; higher requires closer titles. Identical files, ISBN, and exact metadata are checked separately.",
-      "runScan": "Run scan",
-      "rescan": "Rescan",
-      "status": {
-        "queued": "Scan queued",
-        "running": "Scanning books"
-      },
       "groupsFound": "{count, plural, =0 {No duplicate groups} one {One duplicate group} other {# duplicate groups}}",
-      "filter": "Match type",
-      "allReasons": "All match types",
-      "reasons": {
-        "file_hash": "Identical file set",
-        "isbn": "Same ISBN",
-        "exact_metadata": "Exact title and authors",
-        "fuzzy_metadata": "Similar title and author"
-      },
-      "similarityValue": "{percent}% title similarity",
-      "notDuplicates": "Not duplicates",
-      "keepThis": "Keep this book",
-      "discardThis": "Discard this book",
-      "selectKeeperFirst": "Select a keeper first",
-      "noDirectMatch": "No direct match with keeper",
-      "moreFiles": "+{count} more",
-      "showDetails": "Show details",
-      "hideDetails": "Hide details",
-      "deleteSelected": "Delete {count} selected",
-      "openBook": "Open details for {title}",
-      "unknownAuthor": "Unknown author",
-      "unknown": "Unknown",
-      "none": "None",
-      "accessDenied": "You do not have permission to use the duplicate book tool.",
-      "pairDetails": "Match details",
-      "pairLabel": "{first} and {second}",
-      "fields": {
-        "library": "Library",
-        "isbn": "ISBN",
-        "formats": "Formats",
-        "fileLocation": "File",
-        "files": "Files",
-        "readingStatus": "Reading status",
-        "progress": "Progress",
-        "path": "Library path",
-        "collections": "Collections",
-        "added": "Added",
-        "updated": "Updated"
-      },
-      "initial": {
-        "title": "Find duplicate books",
-        "description": "Choose a library scope and similarity level, then run a scan. No books are changed until you explicitly confirm a deletion."
-      },
-      "empty": {
-        "title": "No duplicate groups found",
-        "description": "No books matched the current scope, similarity level, and match filter."
-      },
       "deleteDialog": {
-        "title": "Permanently delete duplicate books?",
         "description": "{count, plural, =0 {This will permanently delete # selected book and its files.} one {This will permanently delete # selected book and its files.} other {This will permanently delete # selected books and their files.}}",
-        "warning": "Metadata, collections, reading data, and device state are not transferred to the kept book. Associated data for other users is also removed.",
         "confirm": "{count, plural, =0 {Delete # book} one {Delete # book} other {Delete # books}}",
         "success": "{count, plural, =0 {No books deleted} one {One duplicate book deleted} other {# duplicate books deleted}}"
-      },
-      "errors": {
-        "start": "Could not start the duplicate scan.",
-        "status": "Could not load scan progress.",
-        "scan": "The duplicate scan failed. Try running it again.",
-        "results": "Could not load duplicate groups.",
-        "delete": "Could not delete the selected duplicate books."
-      },
-      "pagination": {
-        "label": "Duplicate groups pages",
-        "page": "Page {page} of {total}"
       }
     },
     "entityManager": {
@@ -6901,11 +6188,6 @@
       "defaultName": "Smart scope",
       "filter": "Filter",
       "edit": "Smart Scope bewerken",
-      "koboSync": {
-        "label": "Sync to my Kobo",
-        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
-        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
-      },
       "showControlsAria": "Smart Scope-bediening tonen",
       "hideFilter": "Filter verbergen",
       "showFilter": "Filter tonen",
@@ -6913,10 +6195,7 @@
       "loadError": "Kan deze SmartScope niet laden",
       "toast": {
         "deleted": "\"{name}\" verwijderd",
-        "deleteFailed": "Verwijderen van \"{name}\" mislukt",
-        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
-        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
-        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
+        "deleteFailed": "Verwijderen van \"{name}\" mislukt"
       },
       "empty": {
         "noRules": "Geen regels ingesteld",
@@ -6973,7 +6252,6 @@
     "series": "Reeksen",
     "entityManager": "Entiteitenbeheer",
     "bulkRename": "Bulksgewijs hernoemen",
-    "duplicateBooks": "Duplicate Books",
     "notFound": "Niet gevonden",
     "signIn": "Inloggen",
     "initialSetup": "Eerste installatie",
@@ -7025,8 +6303,7 @@
       "users": "Gebruikers",
       "account-activity": "Accountactiviteit",
       "magic-links": "Magische links",
-      "oidc": "OIDC / SSO",
-      "server-fonts": "Server Fonts"
+      "oidc": "OIDC / SSO"
     },
     "system": {
       "file-naming": "Bestandsnaamgeving",

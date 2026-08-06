@@ -1137,14 +1137,14 @@
         "account-activity": "Activité du compte",
         "magic-links": "Liens magiques",
         "oidc": "OIDC / SSO",
-        "server-fonts": "Server Fonts"
+        "server-fonts": "Polices du serveur"
       },
       "serverFonts": {
-        "title": "Server Fonts",
-        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
-        "listLabel": "Server fonts",
-        "noFontsYet": "No server fonts yet",
-        "noFontsHint": "Fonts you add here appear in every user's reader."
+        "title": "Polices du serveur",
+        "subtitle": "Téléversez des polices directement disponibles pour tous les utilisateurs dans le lecteur d'eBook.",
+        "listLabel": "Polices du serveur",
+        "noFontsYet": "Aucune police disponible sur le serveur pour le moment",
+        "noFontsHint": "Les polices que vous ajoutez ici sont disponibles dans le lecteur de tous les utilisateurs."
       }
     },
     "common": {
@@ -1681,11 +1681,11 @@
         "demoCannotManage": "Le compte restreint à la démo ne peut pas gérer les polices",
         "fileAdded": "\"{name}\" ajouté",
         "uploadFailed": "Échec du téléchargement",
-        "serverFontsTitle": "Server fonts (shared by admin)",
-        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
-        "serverFontsShown": "{count} of {total} shown",
-        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
-        "serverFontVisibilityFailed": "Failed to update server font visibility"
+        "serverFontsTitle": "Polices du serveur (partagées par l'admin)",
+        "serverFontsHint": "Ces polices proviennent de l'admin du serveur. Désactivez-en une pour qu'elle ne soit plus disponible dans votre lecteur.",
+        "serverFontsShown": "{count} sur {total} disponibles",
+        "serverFontsAllHidden": "Toutes les polices du serveur sont désactivées. Votre lecteur ne proposera que les polices intégrées et vos propres polices.",
+        "serverFontVisibilityFailed": "Échec de mise à jour des polices disponibles sur le serveur"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -2890,7 +2890,7 @@
       "BookBulkUpdateTags": "Mettre à jour les balises du livre",
       "BookBulkSetMetadataLock": "Définir des verrous de métadonnées",
       "BookBulkEditMetadata": "Modifier les métadonnées du livre",
-      "BookBulkMoveLibrary": "Move books to another library",
+      "BookBulkMoveLibrary": "Déplacer les livres vers une autre bibliothèque",
       "BookReadingStateReset": "Réinitialiser l'état de lecture",
       "BookWriteAndRename": "Écrire les métadonnées et renommer le fichier",
       "CollectionCreate": "Créer une collection",
@@ -3354,11 +3354,11 @@
         "isLocked": "est verrouillé",
         "isUnlocked": "n'est pas verrouillé",
         "isUpNext": "est à la suite",
-        "isTrue": "is yes",
-        "isFalse": "is no"
+        "isTrue": "est Vrai",
+        "isFalse": "est Faux"
       },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
+      "customFieldsGroup": "Champs personnalisés",
+      "customFieldFallback": "Champ personalisé",
       "anyProvider": "N'importe quel fournisseur",
       "communityRatingProvider": "Fournisseur de notation communautaire",
       "loadingLibraries": "Chargement des bibliothèques...",
@@ -4108,10 +4108,10 @@
         "moveUp": "Monter",
         "moveDown": "Descendre",
         "removeSeries": "Supprimer la série",
-        "seriesIndexLabel": "Position in series",
-        "totalLabel": "Books in series",
-        "totalPlaceholder": "of",
-        "totalHint": "Total books in this series. Shared with everyone who has this series."
+        "seriesIndexLabel": "Position dans les séries",
+        "totalLabel": "Livres dans la série",
+        "totalPlaceholder": "sur",
+        "totalHint": "Nombre de tomes dans cette série. Partagé avec tous ceux qui ont cette série."
       }
     },
     "table": {
@@ -4194,66 +4194,66 @@
       }
     },
     "move": {
-      "title": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
-      "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
-      "searchPlaceholder": "Search libraries",
-      "currentLibrary": "Current",
+      "title": "{count, plural, one {Déplacez # livre} many {Déplacez # livres} other {Déplacez # livres}}",
+      "subtitle": "Les fichiers sont déplacés sur le disque vers la bibliothèque choisie. Cela peut changer la visibilité de ces livres pour les utilisateurs.",
+      "searchPlaceholder": "Rechercher dans les bibliothèques",
+      "currentLibrary": "Actuelle",
       "folderCount": "{count, plural, one {# folder} many {# folders} other {# folders}}",
-      "continue": "Continue",
-      "back": "Back",
-      "confirm": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
-      "action": "Move to library",
+      "continue": "Continuer",
+      "back": "Précédent",
+      "confirm": "{count, plural, one {Déplacer # book} many {Déplacer # books} other {Déplacer # books}}",
+      "action": "Déplacer vers la bibliothèque",
       "review": {
-        "ready": "{count} ready",
-        "collisions": "{count, plural, one {# name conflict} many {# name conflicts} other {# name conflicts}}",
-        "ineligible": "{count} cannot move",
-        "alreadyThere": "{count} already there",
-        "collisionsHeading": "Name conflicts",
-        "ineligibleHeading": "Cannot be moved",
-        "moreCollisions": "and {count} more"
+        "ready": "{count} prêt",
+        "collisions": "{count, plural, one {# conflit de nom} many {# conflits de nom} other {# conflits de nom}}",
+        "ineligible": "{count} ne peut pas être déplacé",
+        "alreadyThere": "{count} déjà présent",
+        "collisionsHeading": "Conflit de noms",
+        "ineligibleHeading": "Ne peut pas être déplacé",
+        "moreCollisions": "et {count} autres"
       },
       "policy": {
-        "suggested": "Use suggested",
-        "keep_both": "Keep both",
-        "merge": "Merge",
-        "skip": "Skip"
+        "suggested": "Utiliser la suggestion",
+        "keep_both": "Garder les deux",
+        "merge": "Fusionner",
+        "skip": "Passer"
       },
       "collision": {
-        "folder_path": "A book already uses this folder name",
-        "file_path": "A file already uses this path",
-        "hash_duplicate": "An identical copy is already in this library"
+        "folder_path": "Un livre utilise déjà ce nom de dossier",
+        "file_path": "Un fichier utilise déjà ce chemin",
+        "hash_duplicate": "Une copie identique existe déjà dans cette bibliothèque"
       },
       "ineligible": {
-        "book_not_present": "The files for this book are missing",
-        "no_content_file": "This book has no readable file",
-        "multi_file_target_per_file": "The destination stores one file per book, and this book has {detail} files",
-        "no_source_access": "You cannot edit the library this book is in",
-        "pattern_unresolved": "The destination library has no usable naming pattern",
-        "path_too_long": "The destination path would be too long",
-        "path_outside_target_root": "The destination path would fall outside the library folder"
+        "book_not_present": "Les fichiers de ce livre sont manquants",
+        "no_content_file": "Ce livre n'a aucun fichier lisible",
+        "multi_file_target_per_file": "La destination stocke un fichier par livre, et ce livre a {detail} fichiers",
+        "no_source_access": "Vous ne pouvez pas modifier la bibliothèque dans laquelle se trouve ce livre",
+        "pattern_unresolved": "La bibliothèque de destination n'a pas de motif de nommage utilisable",
+        "path_too_long": "Le chemin de destination est trop long",
+        "path_outside_target_root": "Le chemin de destination est en hors du dossier de la bibliothèque"
       },
       "warning": {
-        "accessLoss": "{user} will stop seeing {count} of these books",
-        "koboImpact": "{count} books will leave {user}'s Kobo on the next sync",
+        "accessLoss": "{user} ne verra plus {count} de ces livres",
+        "koboImpact": "{count} livres seront supprimés de la Kobo de {user} lors de la prochaine synchronisation",
         "layout": {
-          "wrap_into_folder": "{count} books will each be placed in their own folder",
-          "dissolve_folder": "{count} book folders will be dissolved into single files"
+          "wrap_into_folder": "{count} livres seront placés dans leur propre dossier",
+          "dissolve_folder": "{count} dossiers de livres seront changés en fichiers uniques"
         },
-        "crossDevice": "Files move to another drive, so they are copied, verified, then removed."
+        "crossDevice": "Les fichiers sont déplacés vers un autre lecteur : ils sont copiés, vérifiés, puis supprimés."
       },
       "progress": {
-        "label": "Moving books to {library}",
-        "failed": "{count} failed"
+        "label": "Déplacement des livres vers {library}",
+        "failed": "{count} en échec"
       },
       "done": {
-        "summary": "Moved {count} books to {library}",
-        "merged": "{count} merged with copies already there",
-        "skipped": "{count} skipped",
-        "failed": "{count} failed"
+        "summary": "{count} livres déplacés vers {library}",
+        "merged": "{count} fusionnés avec des copies existantes",
+        "skipped": "{count} ignorés",
+        "failed": "{count} en échec"
       },
       "toast": {
-        "success": "Moved {count} books to {library}",
-        "partial": "Moved {moved} books, {failed} failed"
+        "success": "{count} livres déplacés vers {library}",
+        "partial": "{moved} livres déplacés, {failed} en échec"
       }
     }
   },
@@ -4789,12 +4789,12 @@
         "smartScope": "Collection Intelligente"
       },
       "shelfLayout": {
-        "title": "Shelf layout",
-        "description": "Choose how shelves are arranged on larger screens.",
-        "wide": "Wide rows",
-        "wideDescription": "Show one shelf per row.",
-        "twoColumns": "Two columns",
-        "twoColumnsDescription": "Show two shelves per row."
+        "title": "Disposition de l'étagère",
+        "description": "Choisissez comment les étagères sont disposées sur des écrans plus grands.",
+        "wide": "Large rangées",
+        "wideDescription": "Afficher une étagère par ligne.",
+        "twoColumns": "Deux colonnes",
+        "twoColumnsDescription": "Afficher une étagère par ligne."
       },
       "reorderHintWidget": "Faites glisser pour réorganiser. Basculez pour afficher ou masquer un widget.",
       "reorderHintShelf": "Faites glisser pour réorganiser. Basculez pour afficher ou masquer une étagère.",
@@ -5980,65 +5980,65 @@
     "settings": {
       "title": "Paramètres",
       "ariaLabel": "Paramètres du lecteur",
-      "reset": "Reset to defaults",
-      "modeLabel": "Color mode",
+      "reset": "Rétablir les valeurs par défaut",
+      "modeLabel": "Style de couleur",
       "mode": {
-        "light": "Lumière",
+        "light": "Clair",
         "dark": "Sombre"
       },
-      "textSize": "Text size",
-      "textSizeSmaller": "Smaller text",
-      "textSizeLarger": "Larger text",
+      "textSize": "Taille du texte",
+      "textSizeSmaller": "Texte plus petits",
+      "textSizeLarger": "Texte plus grand",
       "pixels": "{value} px",
       "percent": "{value}%",
-      "pageColor": "Page color",
-      "font": "Font",
-      "fontBuiltIn": "Intégré",
-      "fontServer": "Server fonts",
+      "pageColor": "Couleur de la page",
+      "font": "Police",
+      "fontBuiltIn": "Intégrée",
+      "fontServer": "Polices du serveur",
       "fontYours": "Vos polices",
-      "lineSpacing": "Line spacing",
-      "pageWidth": "Page width",
-      "pageWidthNarrow": "Narrow",
-      "pageWidthMedium": "Medium",
-      "pageWidthWide": "Wide",
-      "pageWidthFull": "Full",
-      "readingFlow": "Flux de lecture",
+      "lineSpacing": "Interligne",
+      "pageWidth": "Largeur de page",
+      "pageWidthNarrow": "Étroite",
+      "pageWidthMedium": "Moyenne",
+      "pageWidthWide": "Large",
+      "pageWidthFull": "Pleine",
+      "readingFlow": "Mode de lecture",
       "flow": {
         "paginated": "Pages",
-        "scrolled": "Scroll"
+        "scrolled": "Défilement"
       },
-      "pageSpreads": "Pages doubles",
-      "pageSpreadsHint": "Choisissez comment ce EPUB basé sur des images associe les pages.",
+      "pageSpreads": "Double-pages",
+      "pageSpreadsHint": "Choisissez comment cet EPUB d'images affiche les pages.",
       "spread": {
-        "bookDefault": "Livre par défaut",
+        "bookDefault": "Par défaut",
         "singlePage": "Page unique"
       },
-      "advanced": "Advanced layout",
-      "columns": "Columns",
-      "columnsFewer": "Fewer columns",
-      "columnsMore": "More columns",
-      "columnGap": "Écart de colonne",
+      "advanced": "Mise en page Avancée",
+      "columns": "Colonnes",
+      "columnsFewer": "Moins de colonnes",
+      "columnsMore": "Plus de colonnes",
+      "columnGap": "Espace de colonne",
       "justifyText": "Justifier le texte",
       "hyphenation": "Césure",
       "themes": {
-        "default": "Default",
-        "gray": "Gray",
-        "sepia": "Sepia",
-        "crimson": "Crimson",
-        "meadow": "Meadow",
-        "rosewood": "Rosewood",
-        "azure": "Azure",
-        "dawnlight": "Dawnlight",
-        "ember": "Ember",
-        "aurora": "Aurora",
-        "ocean": "Ocean",
-        "mist": "Mist",
+        "default": "Par défaut",
+        "gray": "Gris",
+        "sepia": "Sépia",
+        "crimson": "Cramoisi",
+        "meadow": "Prairie",
+        "rosewood": "Rose-rouge",
+        "azure": "Azur",
+        "dawnlight": "Aube",
+        "ember": "Ambre",
+        "aurora": "Aurore",
+        "ocean": "Océan",
+        "mist": "Brume",
         "amoled": "AMOLED"
       },
       "fonts": {
-        "bookDefault": "Book default",
+        "bookDefault": "Police du livre par défaut",
         "serif": "Serif",
-        "sansSerif": "Sans-serif",
+        "sansSerif": "Sans Serif",
         "monospace": "Monospace"
       }
     },
@@ -6135,9 +6135,6 @@
       "scrollModeHint": "Utilisez \"Pas d'espaces\" pour les webtoons et les bandes verticales.",
       "readingDirection": "Sens de lecture",
       "pageView": "Affichage des pages",
-      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
-      "spreadSection": "Two-page spread",
-      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Alignement de la propagation",
       "spreadGap": "Écart de propagation",
       "spreadGapValue": "{value}px",
@@ -6214,8 +6211,8 @@
       "readOfTotal": "{read} sur {total} lu ({percentage}%)"
     },
     "ownership": {
-      "label": "In library",
-      "ownedOfExpected": "{owned} of {expected} in library"
+      "label": "Dans la bibliothèque",
+      "ownedOfExpected": "{owned} de {expected} dans la bibliothèque"
     },
     "gaps": {
       "label": "Lacunes possibles :"
@@ -7026,7 +7023,7 @@
       "account-activity": "Activité du compte",
       "magic-links": "Liens magiques",
       "oidc": "OIDC / SSO",
-      "server-fonts": "Server Fonts"
+      "server-fonts": "Polices du serveur"
     },
     "system": {
       "file-naming": "Nom du fichier",

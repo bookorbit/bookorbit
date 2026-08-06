@@ -5,6 +5,7 @@ import en from '@/locales/en.json'
 import { compileIcuCatalog } from './icu'
 
 export type MessageSchema = typeof en
+type LocaleMessageTree = { [key: string]: string | LocaleMessageTree }
 
 // `legacy: false` selects the Composition API overload, so `i18n.global` is a Composer
 // and `i18n.global.locale` is a writable ref.
@@ -12,6 +13,8 @@ export const i18n = createI18n({
   legacy: false,
   locale: DEFAULT_LOCALE,
   fallbackLocale: DEFAULT_LOCALE,
+  missingWarn: false,
+  fallbackWarn: false,
   messages: { en: compileIcuCatalog(en, DEFAULT_LOCALE) },
 })
 
@@ -19,8 +22,9 @@ const loaded = new Set<Locale>([DEFAULT_LOCALE])
 
 export async function loadLocaleMessages(locale: Locale): Promise<void> {
   if (loaded.has(locale)) return
-  const messages = (await import(`../locales/${locale}.json`)) as { default: MessageSchema }
-  i18n.global.setLocaleMessage(locale, compileIcuCatalog(messages.default, locale))
+  const messages = (await import(`../locales/${locale}.json`)) as { default: LocaleMessageTree }
+  const compiled = compileIcuCatalog(messages.default, locale)
+  i18n.global.setLocaleMessage(locale, compiled as MessageSchema)
   loaded.add(locale)
 }
 

@@ -7,6 +7,7 @@ const status = ref<BookMetadataFetchStatusEvent>({
   queued: 0,
   processing: 0,
   failed: 0,
+  latestFailureAt: null,
   paused: false,
   sessionTotal: 0,
   sessionDone: 0,
@@ -53,6 +54,6 @@ export function disconnectBookMetadataFetchSocket() {
     socket.disconnect()
     socket = null
   }
-  status.value = { queued: 0, processing: 0, failed: 0, paused: false, sessionTotal: 0, sessionDone: 0, currentItemName: null }
+  status.value = { queued: 0, processing: 0, failed: 0, latestFailureAt: null, paused: false, sessionTotal: 0, sessionDone: 0, currentItemName: null }
   socketConnected.value = true
 }

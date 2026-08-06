@@ -61,7 +61,7 @@ AI assistance is welcome on this project; unreviewed AI output is not. See the
 - [ ] I read every line of the final diff
 - [ ] `pnpm verify` passes against the final diff
 - [ ] Tests added or updated per the [testing expectations](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md#phase-7-write-and-run-tests)
-- [ ] User-facing text is localized and accessibility was checked, where applicable
+- [ ] User-facing text uses Vue I18n keys added only to `client/src/locales/en.json`; non-English catalogs are unchanged, and accessibility was checked
 - [ ] Documentation updated, where applicable
 - [ ] No unintended files, secrets, build artifacts, or personal configuration included
 - [ ] No new dependencies, or the addition was discussed and approved in the linked issue

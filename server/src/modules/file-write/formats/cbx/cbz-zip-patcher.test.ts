@@ -46,6 +46,8 @@ let lastArchive: EventEmitter & {
   finalize: vi.Mock;
 };
 
+const processedEntries: string[] = [];
+
 vi.mock('archiver', () => ({
   ZipArchive: vi.fn(function () {
     let output: EventEmitter | null = null;
@@ -54,7 +56,15 @@ vi.mock('archiver', () => ({
       pipe: vi.Mock;
       finalize: vi.Mock;
     };
-    emitter.append = vi.fn();
+    // The real archiver emits `entry` once it has consumed and written an appended source.
+    emitter.append = vi.fn((source: unknown, data: { name: string }) => {
+      if (source instanceof Readable) source.resume();
+      setImmediate(() => {
+        processedEntries.push(data.name);
+        emitter.emit('entry', data);
+      });
+      return emitter;
+    });
     emitter.pipe = vi.fn((out: EventEmitter) => {
       output = out;
     });
@@ -76,10 +86,11 @@ const streamFrom = (value: string) => Readable.from([Buffer.from(value)]);
 describe('cbz-zip-patcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    processedEntries.length = 0;
     mockRandomUuid.mockReturnValue('uuid-1234');
     mockRename.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
-    mockCreateWriteStream.mockImplementation(() => new EventEmitter() as never);
+    mockCreateWriteStream.mockImplementation(() => new PassThrough() as never);
   });
 
   it('readComicInfoFromZip finds comicinfo case-insensitively in root or nested paths', async () => {
@@ -117,6 +128,25 @@ describe('cbz-zip-patcher', () => {
       name: 'metadata/ComicInfo.xml',
     });
     expect(mockRename).toHaveBeenCalledWith('/books/.cbx-write-uuid-1234', '/books/a.cbz');
+  });
+
+  it('opens each page stream only after the previous page was written', async () => {
+    const openedAfter: string[][] = [];
+    const pages = ['pages/001.jpg', 'pages/002.jpg', 'pages/003.jpg'].map((path) => ({
+      path,
+      stream: vi.fn(() => {
+        openedAfter.push([...processedEntries]);
+        return streamFrom(path);
+      }),
+    }));
+
+    mockOpenFile.mockResolvedValue({ files: pages } as never);
+
+    await writeComicInfoToZip('/books/a.cbz', '<ComicInfo/>');
+
+    expect(openedAfter).toEqual([[], ['pages/001.jpg'], ['pages/001.jpg', 'pages/002.jpg']]);
+    expect(processedEntries).toEqual(['pages/001.jpg', 'pages/002.jpg', 'pages/003.jpg', 'ComicInfo.xml']);
+    for (const page of pages) expect(page.stream).toHaveBeenCalledTimes(1);
   });
 
   it('rejects when a source entry stream errors while patching', async () => {

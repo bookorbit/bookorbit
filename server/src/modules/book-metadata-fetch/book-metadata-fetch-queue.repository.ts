@@ -7,7 +7,7 @@ import type {
   MetadataField,
 } from '@bookorbit/types';
 import type { SQL } from 'drizzle-orm';
-import { and, asc, count, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -24,6 +24,8 @@ import {
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+
+type BookMetadataFetchStatusSummary = Pick<BookMetadataFetchStatus, 'queued' | 'processing' | 'failed' | 'latestFailureAt'>;
 
 const PROCESSING_STALE_AFTER_MS = 10 * 60 * 1000;
 const QUEUE_STATUS = {
@@ -143,18 +145,21 @@ export class BookMetadataFetchQueueRepository {
     return updated.length;
   }
 
-  async getStatusSummary(): Promise<Pick<BookMetadataFetchStatus, 'queued' | 'processing' | 'failed'>> {
+  async getStatusSummary(): Promise<BookMetadataFetchStatusSummary> {
     const rows = await this.db
-      .select({ status: bookMetadataFetchQueue.status, cnt: count() })
+      .select({ status: bookMetadataFetchQueue.status, cnt: count(), latestUpdatedAt: max(bookMetadataFetchQueue.updatedAt) })
       .from(bookMetadataFetchQueue)
       .groupBy(bookMetadataFetchQueue.status);
 
-    const summary = { queued: 0, processing: 0, failed: 0 };
+    const summary: BookMetadataFetchStatusSummary = { queued: 0, processing: 0, failed: 0, latestFailureAt: null };
     for (const row of rows) {
       const value = Number(row.cnt);
       if (row.status === QUEUE_STATUS.QUEUED) summary.queued = value;
       else if (row.status === QUEUE_STATUS.PROCESSING) summary.processing = value;
-      else if (row.status === QUEUE_STATUS.FAILED) summary.failed = value;
+      else if (row.status === QUEUE_STATUS.FAILED) {
+        summary.failed = value;
+        summary.latestFailureAt = row.latestUpdatedAt?.toISOString() ?? null;
+      }
     }
     return summary;
   }
