@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 
-import { bookSeries, bookSeriesMemberships } from '../../../db/schema';
+import { bookMetadata, bookSeries, bookSeriesMemberships } from '../../../db/schema';
 import { OpdsBookService } from '../opds-book.service';
 
 type BookPageResult = { entries: unknown[]; total: number };
@@ -209,7 +209,7 @@ describe('OpdsBookService', () => {
   });
 
   it('returns distinct authors and membership-backed series with and without access', async () => {
-    const { service, db } = makeService([[{ name: 'Frank Herbert', bookCount: 2 }], [{ id: 42, name: 'Dune', bookCount: 2 }]]);
+    const { service, db } = makeService([[{ name: 'Frank Herbert', bookCount: 2 }], [{ id: 42, name: 'Dune', bookCount: 2, coverBookId: 7 }]]);
     const accessSpy = vi.spyOn(service, 'getAccessibleLibraryIds');
 
     accessSpy.mockResolvedValueOnce([]);
@@ -219,12 +219,13 @@ describe('OpdsBookService', () => {
     await expect(service.getDistinctAuthors(1)).resolves.toEqual([{ name: 'Frank Herbert', bookCount: 2 }]);
 
     accessSpy.mockResolvedValueOnce([1]);
-    await expect(service.getDistinctSeries(1)).resolves.toEqual([{ id: 42, name: 'Dune', bookCount: 2 }]);
+    await expect(service.getDistinctSeries(1)).resolves.toEqual([{ id: 42, name: 'Dune', bookCount: 2, coverBookId: 7 }]);
 
     const chains = (db.select as ReturnType<typeof vi.fn>).mock.results.map((r) => r.value as Record<string, unknown>);
     const seriesChain = chains.at(-1)!;
     expect(seriesChain.from).toHaveBeenCalledWith(bookSeries);
     expect(seriesChain.innerJoin).toHaveBeenCalledWith(bookSeriesMemberships, expect.anything());
+    expect(seriesChain.leftJoin).toHaveBeenCalledWith(bookMetadata, expect.anything());
   });
 
   it('returns user collections and smartScopes', async () => {

@@ -89,7 +89,10 @@ export class OpdsController {
   @Get('series')
   async series(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
     const items = await this.opdsBookService.getDistinctSeries(user.userId, user.isSuperuser, user.contentFilters);
-    const xml = this.opdsService.generateSeriesNavigation(items.filter((s): s is { id: number; name: string; bookCount: number } => s.name !== null));
+    const xml = this.opdsService.generateSeriesNavigation(
+      items.filter((s): s is { id: number; name: string; bookCount: number; coverBookId: number | null } => s.name !== null),
+      user.coverToken,
+    );
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 

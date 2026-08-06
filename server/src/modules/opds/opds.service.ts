@@ -71,17 +71,19 @@ export class OpdsService {
     return this.wrapFeed('Authors', 'urn:bookorbit:authors', now, [xmlLink('self', `${BASE}/authors`, OPDS_MIME_NAV)], entries);
   }
 
-  generateSeriesNavigation(items: { id?: number; name: string; bookCount: number }[]): string {
+  generateSeriesNavigation(items: { id?: number; name: string; bookCount: number; coverBookId?: number | null }[], coverToken: string): string {
     const now = new Date().toISOString();
-    const entries = items.map((s) =>
-      this.navEntry(
-        `urn:bookorbit:series:${s.id ?? encodeURIComponent(s.name)}`,
-        s.name,
-        `${s.bookCount} books`,
-        s.id != null ? `${BASE}/catalog?seriesId=${s.id}` : `${BASE}/catalog?series=${encodeURIComponent(s.name)}`,
-        now,
-      ),
-    );
+    const entries = items.map((s) => {
+      const href = s.id != null ? `${BASE}/catalog?seriesId=${s.id}` : `${BASE}/catalog?series=${encodeURIComponent(s.name)}`;
+      const coverLinks =
+        s.coverBookId != null
+          ? [
+              xmlLink('http://opds-spec.org/image', `${BASE}/${s.coverBookId}/cover?t=${encodeURIComponent(coverToken)}`, 'image/jpeg'),
+              xmlLink('http://opds-spec.org/image/thumbnail', `${BASE}/${s.coverBookId}/thumbnail?t=${encodeURIComponent(coverToken)}`, 'image/jpeg'),
+            ]
+          : [];
+      return this.navEntry(`urn:bookorbit:series:${s.id ?? encodeURIComponent(s.name)}`, s.name, `${s.bookCount} books`, href, now, coverLinks);
+    });
     return this.wrapFeed('Series', 'urn:bookorbit:series', now, [xmlLink('self', `${BASE}/series`, OPDS_MIME_NAV)], entries);
   }
 
@@ -189,7 +191,7 @@ export class OpdsService {
     return lines.join('\n');
   }
 
-  private navEntry(id: string, title: string, content: string, href: string, updated: string): string {
+  private navEntry(id: string, title: string, content: string, href: string, updated: string, extraLinks: string[] = []): string {
     return [
       '<entry>',
       `  ${xmlEl('title', title)}`,
@@ -197,6 +199,7 @@ export class OpdsService {
       `  ${xmlEl('updated', updated)}`,
       `  <content type="text">${esc(content)}</content>`,
       `  ${xmlLink('subsection', href, OPDS_MIME_NAV)}`,
+      ...extraLinks.map((link) => `  ${link}`),
       '</entry>',
     ].join('\n');
   }
