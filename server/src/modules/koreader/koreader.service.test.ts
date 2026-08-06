@@ -817,6 +817,49 @@ describe('KoreaderService', () => {
       ]);
     });
 
+    it('flags devices whose plugin cannot install its own updates', async () => {
+      vi.spyOn(service, 'getCredentials').mockResolvedValue(null);
+      mockRepo.getTotalSyncedBooks.mockResolvedValue(0);
+      mockPackageService.getVersionInfo.mockResolvedValue({ pluginVersion: '1.5.0', serverVersion: '1.0.0' });
+      mockPluginRepo.listSweeps.mockResolvedValue([
+        {
+          deviceId: 'stuck-device',
+          deviceModel: 'Kobo Libra 2',
+          pluginVersion: '1.3.0',
+          lastSweepAt: new Date('2026-02-01T10:00:00.000Z'),
+          lastSweepBooksMatched: 0,
+          lastSweepPageStats: 0,
+          lastSweepAnnotations: 0,
+        },
+        {
+          deviceId: 'healthy-device',
+          deviceModel: 'Kobo Clara',
+          pluginVersion: '1.4.0',
+          lastSweepAt: new Date('2026-02-01T11:00:00.000Z'),
+          lastSweepBooksMatched: 0,
+          lastSweepPageStats: 0,
+          lastSweepAnnotations: 0,
+        },
+        {
+          deviceId: 'silent-device',
+          deviceModel: 'Kobo Sage',
+          pluginVersion: null,
+          lastSweepAt: new Date('2026-02-01T12:00:00.000Z'),
+          lastSweepBooksMatched: 0,
+          lastSweepPageStats: 0,
+          lastSweepAnnotations: 0,
+        },
+      ]);
+
+      const result = await service.getSyncStatus(7);
+
+      expect(result.sweeps).toEqual([
+        expect.objectContaining({ deviceId: 'stuck-device', requiresManualUpdate: true }),
+        expect.objectContaining({ deviceId: 'healthy-device', requiresManualUpdate: false }),
+        expect.objectContaining({ deviceId: 'silent-device', requiresManualUpdate: true }),
+      ]);
+    });
+
     it('keeps plugin update state unknown when the server cannot report a plugin version', async () => {
       vi.spyOn(service, 'getCredentials').mockResolvedValue(null);
       mockRepo.getTotalSyncedBooks.mockResolvedValue(0);

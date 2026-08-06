@@ -2030,6 +2030,8 @@
         "daysAgo": "{count}d ago",
         "unknown": "Unknown",
         "updateAvailable": "Update available",
+        "manualUpdateRequired": "Manual update required",
+        "manualUpdateExplanation": "This plugin version cannot install its own updates. Download the plugin and copy bookorbit.koplugin to koreader/plugins/ on this device.",
         "upToDate": "Up to date",
         "versionUnknown": "Version unknown",
         "latestPlugin": "Latest plugin: v{version}",
