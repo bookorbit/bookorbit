@@ -254,6 +254,24 @@ describe('KoreaderPackageService', () => {
       expect(result.pluginVersion).toBe('unknown');
     });
 
+    // A blank version is the one blocker whose own value is falsy, so it is the
+    // case a truthiness check on the blocker would wrongly let through.
+    it('withholds the plugin version when a device reported a blank version', async () => {
+      mockPluginRepo.listDevicePluginVersions.mockResolvedValue(['']);
+
+      const result = await service.getVersionInfoForSelfUpdate(7);
+
+      expect(result.pluginVersion).toBe('unknown');
+    });
+
+    it('still withholds when a blank version sits alongside current devices', async () => {
+      mockPluginRepo.listDevicePluginVersions.mockResolvedValue(['1.5.0', '']);
+
+      const result = await service.getVersionInfoForSelfUpdate(7);
+
+      expect(result.pluginVersion).toBe('unknown');
+    });
+
     it('still reports serverVersion and capabilities while withholding the plugin version', async () => {
       mockPluginRepo.listDevicePluginVersions.mockResolvedValue(['1.3.0']);
 

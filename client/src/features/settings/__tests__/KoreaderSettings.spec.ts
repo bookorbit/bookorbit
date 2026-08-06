@@ -99,14 +99,14 @@ function makeSyncStatus(overrides: Partial<KoreaderSyncStatus> = {}): KoreaderSy
     ],
     totalSyncedBooks: 14,
     lastSyncAt: '2026-01-02T00:00:00.000Z',
-    latestPluginVersion: '0.5.0',
+    latestPluginVersion: '1.6.0',
     pluginUpdateAvailable: true,
     sweeps: [
       {
         deviceId: 'device-1',
         deviceModel: 'Kobo Libra 2',
-        pluginVersion: '0.3.0',
-        latestPluginVersion: '0.5.0',
+        pluginVersion: '1.4.0',
+        latestPluginVersion: '1.6.0',
         updateAvailable: true,
         requiresManualUpdate: false,
         lastSweepAt: '2026-01-02T00:00:00.000Z',
@@ -325,9 +325,9 @@ describe('KoreaderSettings', () => {
     expect(syncUrlInput.value).toBe('https://bookorbit.example')
     expect(wrapper.text()).toContain('Kobo Libra 2')
     expect(wrapper.text()).toContain('Project Hail Mary')
-    expect(wrapper.text()).toContain('Latest plugin: v0.5.0')
+    expect(wrapper.text()).toContain('Latest plugin: v1.6.0')
     expect(wrapper.text()).toContain('Update available')
-    expect(wrapper.text()).toContain('latest plugin v0.5.0')
+    expect(wrapper.text()).toContain('latest plugin v1.6.0')
     expect(wrapper.text()).toContain('Matched books')
     expect(wrapper.text()).toContain('No unmatched KOReader books.')
     expect(wrapper.text()).toContain('No manual KOReader links.')
@@ -367,8 +367,8 @@ describe('KoreaderSettings', () => {
         {
           deviceId: 'device-1',
           deviceModel: 'Kobo Libra 2',
-          pluginVersion: '0.5.0',
-          latestPluginVersion: '0.5.0',
+          pluginVersion: '1.6.0',
+          latestPluginVersion: '1.6.0',
           updateAvailable: false,
           requiresManualUpdate: false,
           lastSweepAt: '2026-01-02T00:00:00.000Z',
@@ -384,9 +384,9 @@ describe('KoreaderSettings', () => {
     const wrapper = mountComponent()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Latest plugin: v0.5.0')
+    expect(wrapper.text()).toContain('Latest plugin: v1.6.0')
     expect(wrapper.text()).toContain('Up to date')
-    expect(wrapper.text()).not.toContain('latest plugin v0.5.0')
+    expect(wrapper.text()).not.toContain('latest plugin v1.6.0')
   })
 
   it('tells the user to install by hand when the device plugin cannot update itself', async () => {
@@ -426,7 +426,7 @@ describe('KoreaderSettings', () => {
         {
           deviceId: 'device-1',
           deviceModel: 'Kobo Libra 2',
-          pluginVersion: '0.5.0',
+          pluginVersion: '1.6.0',
           latestPluginVersion: null,
           updateAvailable: null,
           requiresManualUpdate: false,

@@ -99,24 +99,30 @@ export class KoreaderPackageService {
    * is the safe direction, and it clears once the old device is updated by hand.
    */
   async getVersionInfoForSelfUpdate(userId: number): Promise<KoreaderPluginVersionInfo> {
+    const startedAt = Date.now();
     const info = await this.getVersionInfo();
+    // Only `null` means "every device can self-update". A device that reported a
+    // blank version is a blocker whose label is falsy, so testing truthiness here
+    // would open the gate for exactly the unparseable case it exists to catch.
     const blockedBy = await this.findSelfUpdateBlocker(userId);
-    if (!blockedBy) return info;
+    if (blockedBy === null) return info;
 
     this.logger.log(
-      `[${SELF_UPDATE_GATE_EVENT}] userId=${userId} devicePluginVersion="${sanitizeLogValue(blockedBy)}" minVersion=${SELF_UPDATE_MIN_PLUGIN_VERSION} - withholding plugin version, device cannot self-update`,
+      `[${SELF_UPDATE_GATE_EVENT}] [end] userId=${userId} devicePluginVersion="${sanitizeLogValue(blockedBy)}" minVersion=${SELF_UPDATE_MIN_PLUGIN_VERSION} durationMs=${Date.now() - startedAt} - withholding plugin version, device cannot self-update`,
     );
     return { ...info, pluginVersion: 'unknown' };
   }
 
   /**
    * The reported plugin version of one device that cannot self-update, or null
-   * when every device can.
+   * when every device can. Versions that are absent or blank report as
+   * `unreported` so the caller never receives a falsy blocker.
    */
   private async findSelfUpdateBlocker(userId: number): Promise<string | null> {
     const versions = await this.pluginRepo.listDevicePluginVersions(userId);
     const blocked = versions.find(pluginRequiresManualUpdate);
-    return blocked === undefined ? null : (blocked ?? 'unreported');
+    if (blocked === undefined) return null;
+    return blocked || 'unreported';
   }
 
   private async readPluginVersion(): Promise<string> {
