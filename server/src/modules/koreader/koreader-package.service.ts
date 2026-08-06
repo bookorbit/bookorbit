@@ -8,9 +8,12 @@ import { join, resolve } from 'path';
 import type { KoreaderPluginCapability, KoreaderPluginVersionInfo } from '@bookorbit/types';
 import { appConfig } from '../../config/config';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { KoreaderPluginRepository } from './koreader-plugin.repository';
+import { SELF_UPDATE_MIN_PLUGIN_VERSION, pluginRequiresManualUpdate } from './koreader-plugin-update.util';
 import { KoreaderRepository } from './koreader.repository';
 
 const PACKAGE_EVENT = 'koreader.plugin_package';
+const SELF_UPDATE_GATE_EVENT = 'koreader.plugin_self_update_gate';
 const PLUGIN_FOLDER = 'bookorbit.koplugin';
 const PROVISION_FILE = 'bookorbit_provision.lua';
 
@@ -25,6 +28,7 @@ export class KoreaderPackageService {
 
   constructor(
     private readonly repo: KoreaderRepository,
+    private readonly pluginRepo: KoreaderPluginRepository,
     @Inject(appConfig.KEY) private readonly config: ConfigType<typeof appConfig>,
   ) {}
 
@@ -82,6 +86,37 @@ export class KoreaderPackageService {
       serverVersion: this.config.version,
       capabilities: [...SERVER_CAPABILITIES],
     };
+  }
+
+  /**
+   * Version info for the plugin's own update check.
+   *
+   * Withholds `pluginVersion` from users who still run a plugin that would crash
+   * KOReader trying to apply the update. Those clients treat "unknown" as "the
+   * server could not tell me" and show a message instead of the update prompt,
+   * so the crashing path stays unreachable. The endpoint carries no device id,
+   * only the user, so one stale device parks self-update for all of theirs; that
+   * is the safe direction, and it clears once the old device is updated by hand.
+   */
+  async getVersionInfoForSelfUpdate(userId: number): Promise<KoreaderPluginVersionInfo> {
+    const info = await this.getVersionInfo();
+    const blockedBy = await this.findSelfUpdateBlocker(userId);
+    if (!blockedBy) return info;
+
+    this.logger.log(
+      `[${SELF_UPDATE_GATE_EVENT}] userId=${userId} devicePluginVersion="${sanitizeLogValue(blockedBy)}" minVersion=${SELF_UPDATE_MIN_PLUGIN_VERSION} - withholding plugin version, device cannot self-update`,
+    );
+    return { ...info, pluginVersion: 'unknown' };
+  }
+
+  /**
+   * The reported plugin version of one device that cannot self-update, or null
+   * when every device can.
+   */
+  private async findSelfUpdateBlocker(userId: number): Promise<string | null> {
+    const versions = await this.pluginRepo.listDevicePluginVersions(userId);
+    const blocked = versions.find(pluginRequiresManualUpdate);
+    return blocked === undefined ? null : (blocked ?? 'unreported');
   }
 
   private async readPluginVersion(): Promise<string> {

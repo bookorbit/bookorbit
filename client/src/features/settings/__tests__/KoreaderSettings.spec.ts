@@ -108,6 +108,7 @@ function makeSyncStatus(overrides: Partial<KoreaderSyncStatus> = {}): KoreaderSy
         pluginVersion: '0.3.0',
         latestPluginVersion: '0.5.0',
         updateAvailable: true,
+        requiresManualUpdate: false,
         lastSweepAt: '2026-01-02T00:00:00.000Z',
         lastSweepBooksMatched: 12,
         lastSweepPageStats: 30,
@@ -369,6 +370,7 @@ describe('KoreaderSettings', () => {
           pluginVersion: '0.5.0',
           latestPluginVersion: '0.5.0',
           updateAvailable: false,
+          requiresManualUpdate: false,
           lastSweepAt: '2026-01-02T00:00:00.000Z',
           lastSweepBooksMatched: 12,
           lastSweepPageStats: 30,
@@ -387,6 +389,35 @@ describe('KoreaderSettings', () => {
     expect(wrapper.text()).not.toContain('latest plugin v0.5.0')
   })
 
+  it('tells the user to install by hand when the device plugin cannot update itself', async () => {
+    const status = makeSyncStatus({
+      sweeps: [
+        {
+          deviceId: 'device-1',
+          deviceModel: 'Kobo Libra 2',
+          pluginVersion: '1.3.0',
+          latestPluginVersion: '1.5.0',
+          updateAvailable: true,
+          requiresManualUpdate: true,
+          lastSweepAt: '2026-01-02T00:00:00.000Z',
+          lastSweepBooksMatched: 12,
+          lastSweepPageStats: 30,
+          lastSweepAnnotations: 8,
+        },
+      ],
+    })
+    koreaderMock.credentials.value = status.credentials
+    koreaderMock.syncStatus.value = status
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Manual update required')
+    expect(wrapper.text()).toContain('cannot install its own updates')
+    // The device badge must not also claim a self-update is on offer.
+    expect(wrapper.text()).not.toContain('latest plugin v1.5.0')
+  })
+
   it('keeps plugin update state explicit when the server cannot report the latest version', async () => {
     const status = makeSyncStatus({
       latestPluginVersion: null,
@@ -398,6 +429,7 @@ describe('KoreaderSettings', () => {
           pluginVersion: '0.5.0',
           latestPluginVersion: null,
           updateAvailable: null,
+          requiresManualUpdate: false,
           lastSweepAt: '2026-01-02T00:00:00.000Z',
           lastSweepBooksMatched: 12,
           lastSweepPageStats: 30,

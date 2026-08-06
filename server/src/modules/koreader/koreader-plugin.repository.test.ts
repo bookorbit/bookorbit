@@ -170,4 +170,20 @@ describe('KoreaderPluginRepository', () => {
       expect(db.insert).not.toHaveBeenCalled();
     });
   });
+
+  describe('listDevicePluginVersions', () => {
+    it('returns the reported version of every device, including unreported ones', async () => {
+      const chain = makeQueryChain([{ pluginVersion: '1.4.0' }, { pluginVersion: null }, { pluginVersion: '1.3.0' }]);
+      db.selectDistinct = vi.fn().mockReturnValue(chain);
+
+      await expect(repo.listDevicePluginVersions(7)).resolves.toEqual(['1.4.0', null, '1.3.0']);
+      expect(chain.where).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns an empty list for a user with no devices', async () => {
+      db.selectDistinct = vi.fn().mockReturnValue(makeQueryChain([]));
+
+      await expect(repo.listDevicePluginVersions(7)).resolves.toEqual([]);
+    });
+  });
 });

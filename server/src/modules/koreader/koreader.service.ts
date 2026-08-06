@@ -11,6 +11,7 @@ import { KoreaderRepository, type DeviceProgressUpsert } from './koreader.reposi
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderPackageService } from './koreader-package.service';
+import { pluginRequiresManualUpdate } from './koreader-plugin-update.util';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { BookService } from '../book/book.service';
 import { PositionConverterService } from '../position-converter/position-converter.service';
@@ -390,6 +391,7 @@ export class KoreaderService {
         pluginVersion: row.pluginVersion,
         latestPluginVersion,
         updateAvailable: isSemverNewer(latestPluginVersion, row.pluginVersion),
+        requiresManualUpdate: pluginRequiresManualUpdate(row.pluginVersion),
         lastSweepAt: row.lastSweepAt.toISOString(),
         lastSweepBooksMatched: row.lastSweepBooksMatched,
         lastSweepPageStats: row.lastSweepPageStats,

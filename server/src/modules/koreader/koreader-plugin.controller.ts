@@ -89,8 +89,8 @@ export class KoreaderPluginController {
   }
 
   @Get('version')
-  getVersion() {
-    return this.packageService.getVersionInfo();
+  getVersion(@CurrentUser() user: RequestUser) {
+    return this.packageService.getVersionInfoForSelfUpdate(user.id);
   }
 
   @Get('package')
