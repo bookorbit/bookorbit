@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'fs/promises';
+import { access, mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { PassThrough, Readable } from 'stream';
@@ -214,6 +214,8 @@ describe('writeZipArchive', () => {
     ]);
 
     await expect(failing).rejects.toThrow('read failed');
-    await expect(rm(target, { force: true })).resolves.toBeUndefined();
+    // the writer must actually be closed before cleanup unlinks it, or this leaves
+    // tmpPath behind on Windows, where an open handle makes unlink fail silently
+    await expect(access(target)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
