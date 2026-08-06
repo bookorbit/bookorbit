@@ -90,6 +90,51 @@ describe('KoboProxyService', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://storeapi.kobo.com/v1/affiliate', expect.objectContaining({ method: 'GET', body: undefined }));
   });
 
+  it('preserves Kobo reading-state PUT payload and authentication when proxying', async () => {
+    const service = new KoboProxyService();
+    const upstream = {
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode('{"RequestResult":"Success"}').buffer),
+    };
+    const fetchMock = vi.fn().mockResolvedValue(upstream);
+    vi.stubGlobal('fetch', fetchMock);
+    const entitlementId = 'baee12cd-e85f-4d98-be7f-ac5ec1289fb5';
+    const body = { ReadingStates: [{ EntitlementId: entitlementId, CurrentBookmark: { ProgressPercent: 6 } }] };
+    const req = {
+      method: 'PUT',
+      url: `/api/v1/kobo/device-1/v1/library/${entitlementId}/state`,
+      headers: {
+        accept: 'application/json',
+        authorization: 'Bearer kobo-oauth-token',
+        'content-type': 'application/json',
+        'user-agent': 'Kobo Touch',
+        'x-kobo-appversion': '4.45.23697',
+        'x-kobo-deviceid': 'device-id',
+        host: 'bookorbit.example.com',
+      },
+      body,
+    };
+    const reply = makeReply();
+
+    await service.forward(req as never, reply as never, 'device-1');
+
+    expect(fetchMock).toHaveBeenCalledWith(`https://storeapi.kobo.com/v1/library/${entitlementId}/state`, {
+      method: 'PUT',
+      headers: {
+        accept: 'application/json',
+        authorization: 'Bearer kobo-oauth-token',
+        'content-type': 'application/json',
+        'user-agent': 'Kobo Touch',
+        'x-kobo-appversion': '4.45.23697',
+        'x-kobo-deviceid': 'device-id',
+      },
+      body: JSON.stringify(body),
+    });
+    expect(reply.status).toHaveBeenCalledWith(200);
+    expect(reply.send).toHaveBeenCalledWith(Buffer.from('{"RequestResult":"Success"}'));
+  });
+
   it('returns 502 when upstream call fails', async () => {
     const service = new KoboProxyService();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));

@@ -4,6 +4,7 @@ import { createExtractorFromData, UnrarError } from 'node-unrar-js';
 import { extractCbzZipEntry, isSupportedCbzZipCompression, readCbzZipIndex } from '../../../common/cbz-zip-reader';
 import { getSevenZip } from '../../../common/sevenzip';
 import { parsePublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
+import { normalizeSeriesTotalBooks } from '../../../common/utils/series-total-books.utils';
 import { cleanupSevenZipArtifacts, createSevenZipTempId, type SevenZipInstance } from './sevenzip-vfs';
 
 export interface ParsedCbzComicMetadata {
@@ -25,6 +26,8 @@ export interface ParsedCbzMetadata {
   subtitle: string | null;
   seriesName: string | null;
   seriesIndex: number | null;
+  /** Total books the tagger recorded for the series, from ComicInfo Count or ComicBookInfo numberOfIssues. */
+  seriesTotalBooks: number | null;
   description: string | null;
   publisher: string | null;
   publishedDate: string | null;
@@ -199,6 +202,7 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       subtitle: managedNotes.get('subtitle') ?? null,
       seriesName: str('Series'),
       seriesIndex: num('Number'),
+      seriesTotalBooks: normalizeSeriesTotalBooks(num('Count')) ?? null,
       description: str('Summary') ?? str('Description'),
       publisher: str('Publisher'),
       publishedDate,
@@ -270,6 +274,7 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
       subtitle: null,
       seriesName: (cbi['series'] as string) ?? null,
       seriesIndex: cbi['issue'] != null ? (Number.isFinite(Number(cbi['issue'])) ? Number(cbi['issue']) : null) : null,
+      seriesTotalBooks: normalizeSeriesTotalBooks(cbi['numberOfIssues']) ?? null,
       description: (cbi['comments'] as string) ?? null,
       publisher: (cbi['publisher'] as string) ?? null,
       publishedDate,

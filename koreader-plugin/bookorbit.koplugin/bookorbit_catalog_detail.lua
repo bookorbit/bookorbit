@@ -708,10 +708,13 @@ end
 function CatalogDetail:showSetStatusDialog(detail)
     local dialog
     local buttons = {}
+    -- A book with no status row comes back with readStatus nil, which the header
+    -- already renders as Unread. Fold it here too so the Unread row is marked.
+    local current = detail.readStatus or "unread"
     for _, status in ipairs(SETTABLE_READ_STATUSES) do
         table.insert(buttons, {
             {
-                text = status.text .. (detail.readStatus == status.id and " *" or ""),
+                text = status.text .. (current == status.id and " *" or ""),
                 callback = function()
                     UIManager:close(dialog)
                     self:applyReadStatus(detail, status.id)

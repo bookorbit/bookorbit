@@ -1,0 +1,108 @@
+name: Crowdin Translation Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      allowed_translation_losses:
+        description: "Comma-separated locale:message.key acknowledgements for intentional translation removals"
+        required: false
+        type: string
+  schedule:
+    - cron: "47 5 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crowdin-translation-sync
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_VERSION: "24"
+  PNPM_VERSION: "10"
+
+jobs:
+  synchronize:
+    name: Validate and propose translations
+    if: github.repository == 'bookorbit/bookorbit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+          prefetch: "true"
+
+      - name: Check synchronization credentials
+        env:
+          CROWDIN_TOKEN: ${{ secrets.CROWDIN_TOKEN }}
+          CROWDIN_PR_TOKEN: ${{ secrets.CROWDIN_PR_TOKEN }}
+        run: |
+          if [ -z "$CROWDIN_TOKEN" ]; then
+            echo "::error::CROWDIN_TOKEN is required."
+            exit 1
+          fi
+          if [ -z "$CROWDIN_PR_TOKEN" ]; then
+            echo "::error::CROWDIN_PR_TOKEN is required so pull request workflows are triggered."
+            exit 1
+          fi
+
+      - name: Build sparse translation catalogs
+        env:
+          CROWDIN_ALLOWED_TRANSLATION_LOSSES: ${{ inputs.allowed_translation_losses }}
+          CROWDIN_PROJECT_ID: ${{ vars.CROWDIN_PROJECT_ID }}
+          CROWDIN_TOKEN: ${{ secrets.CROWDIN_TOKEN }}
+        run: pnpm --filter client sync:crowdin
+
+      - name: Validate translation catalogs
+        run: pnpm --filter client validate:locales
+
+      - name: Test localization runtime and synchronization
+        run: >-
+          pnpm --filter client exec vitest run
+          scripts/locale-catalog-validation.spec.mjs
+          scripts/sync-crowdin-translations.spec.mjs
+          src/i18n/icu.spec.ts
+
+      - name: Create translation pull request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.CROWDIN_PR_TOKEN }}
+          add-paths: |
+            client/src/locales/cs.json
+            client/src/locales/da.json
+            client/src/locales/de.json
+            client/src/locales/es.json
+            client/src/locales/fi.json
+            client/src/locales/fr.json
+            client/src/locales/it.json
+            client/src/locales/nl.json
+            client/src/locales/pl.json
+            client/src/locales/pt.json
+            client/src/locales/ru.json
+            client/src/locales/sl.json
+            client/src/locales/sv.json
+            client/src/locales/uk.json
+            client/src/locales/zh.json
+          commit-message: |-
+            i18n(client): sync translations from Crowdin
+
+            Keep sparse translated catalogs synchronized with reviewed Crowdin content.
+          committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          branch: l10n_main
+          delete-branch: true
+          base: main
+          title: "i18n(client): sync translations from Crowdin"
+          body: |-
+            Automated sparse translation export from Crowdin.
+
+            Untranslated entries are omitted so Vue I18n falls back to the English catalog.

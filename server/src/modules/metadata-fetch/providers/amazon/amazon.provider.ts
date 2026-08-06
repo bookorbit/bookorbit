@@ -88,6 +88,7 @@ export class AmazonProvider implements IdentifiableProvider {
       pageCount: data.pageCount,
       seriesName: data.seriesName,
       seriesIndex: data.seriesIndex,
+      seriesTotalBooks: data.seriesTotalBooks,
       coverUrl: data.coverUrl,
       genres: data.tags?.length ? data.tags : undefined,
       sourceUrl: url.toString(),

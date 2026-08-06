@@ -82,6 +82,8 @@ export class MetadataFetchController {
       title: normalizeSearchTitle(dto.title),
       author: dto.author,
       isbn: dto.isbn,
+      seriesName: storedContext?.seriesName ?? undefined,
+      seriesIndex: storedContext?.seriesIndex ?? undefined,
       existingProviderIds,
       isAudiobook,
     };

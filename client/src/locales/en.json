@@ -1133,7 +1133,15 @@
         "users": "Users",
         "account-activity": "Account Activity",
         "magic-links": "Magic Links",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Server Fonts"
+      },
+      "serverFonts": {
+        "title": "Server Fonts",
+        "subtitle": "Upload fonts that every user can pick in the eBook reader, without uploading their own.",
+        "listLabel": "Server fonts",
+        "noFontsYet": "No server fonts yet",
+        "noFontsHint": "Fonts you add here appear in every user's reader."
       }
     },
     "common": {
@@ -1668,7 +1676,12 @@
         "deleteFamilyFailed": "Failed to delete font family",
         "demoCannotManage": "Demo-restricted account cannot manage fonts",
         "fileAdded": "\"{name}\" added",
-        "uploadFailed": "Upload failed"
+        "uploadFailed": "Upload failed",
+        "serverFontsTitle": "Server fonts (shared by admin)",
+        "serverFontsHint": "These fonts come from your server administrator. Turn one off to keep it out of your reader.",
+        "serverFontsShown": "{count} of {total} shown",
+        "serverFontsAllHidden": "All server fonts are hidden. Your reader will only offer built-in and your own fonts.",
+        "serverFontVisibilityFailed": "Failed to update server font visibility"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -2080,6 +2093,7 @@
         "stockGuideTitle": "Stock progress sync plugin",
         "stockStep1Prefix": "On your KOReader device, go to",
         "stockStep1Suffix": ".",
+        "stockStep2": "Set the custom sync server to the URL shown above.",
         "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Enter the username and password you created, then tap Login.",
         "locationNote": "BookOrbit saves KOReader-compatible EPUB locations from the web reader. Restore should land close to the same position, though exact line placement can vary by reader and EPUB layout.",
@@ -2873,6 +2887,7 @@
       "BookBulkUpdateTags": "Update book tags",
       "BookBulkSetMetadataLock": "Set metadata locks",
       "BookBulkEditMetadata": "Edit book metadata",
+      "BookBulkMoveLibrary": "Move books to another library",
       "BookReadingStateReset": "Reset reading state",
       "BookWriteAndRename": "Write metadata and rename file",
       "CollectionCreate": "Create collection",
@@ -3331,8 +3346,12 @@
         "isFinished": "is finished",
         "isLocked": "is locked",
         "isUnlocked": "is unlocked",
-        "isUpNext": "is up next"
+        "isUpNext": "is up next",
+        "isTrue": "is yes",
+        "isFalse": "is no"
       },
+      "customFieldsGroup": "Custom fields",
+      "customFieldFallback": "Custom field",
       "anyProvider": "Any provider",
       "communityRatingProvider": "Community rating provider",
       "loadingLibraries": "Loading libraries...",
@@ -4077,7 +4096,11 @@
         "seriesPlaceholder": "Series",
         "moveUp": "Move up",
         "moveDown": "Move down",
-        "removeSeries": "Remove series"
+        "removeSeries": "Remove series",
+        "seriesIndexLabel": "Position in series",
+        "totalLabel": "Books in series",
+        "totalPlaceholder": "of",
+        "totalHint": "Total books in this series. Shared with everyone who has this series."
       }
     },
     "table": {
@@ -4157,6 +4180,69 @@
       },
       "text": {
         "openDetails": "Open details"
+      }
+    },
+    "move": {
+      "title": "{count, plural, one {Move # book} other {Move # books}}",
+      "subtitle": "Files move on disk into the destination library. This can change who can see these books.",
+      "searchPlaceholder": "Search libraries",
+      "currentLibrary": "Current",
+      "folderCount": "{count, plural, one {# folder} other {# folders}}",
+      "continue": "Continue",
+      "back": "Back",
+      "confirm": "{count, plural, one {Move # book} other {Move # books}}",
+      "action": "Move to library",
+      "review": {
+        "ready": "{count} ready",
+        "collisions": "{count, plural, one {# name conflict} other {# name conflicts}}",
+        "ineligible": "{count} cannot move",
+        "alreadyThere": "{count} already there",
+        "collisionsHeading": "Name conflicts",
+        "ineligibleHeading": "Cannot be moved",
+        "moreCollisions": "and {count} more"
+      },
+      "policy": {
+        "suggested": "Use suggested",
+        "keep_both": "Keep both",
+        "merge": "Merge",
+        "skip": "Skip"
+      },
+      "collision": {
+        "folder_path": "A book already uses this folder name",
+        "file_path": "A file already uses this path",
+        "hash_duplicate": "An identical copy is already in this library"
+      },
+      "ineligible": {
+        "book_not_present": "The files for this book are missing",
+        "no_content_file": "This book has no readable file",
+        "multi_file_target_per_file": "The destination stores one file per book, and this book has {detail} files",
+        "no_source_access": "You cannot edit the library this book is in",
+        "pattern_unresolved": "The destination library has no usable naming pattern",
+        "path_too_long": "The destination path would be too long",
+        "path_outside_target_root": "The destination path would fall outside the library folder"
+      },
+      "warning": {
+        "accessLoss": "{user} will stop seeing {count} of these books",
+        "koboImpact": "{count} books will leave {user}'s Kobo on the next sync",
+        "layout": {
+          "wrap_into_folder": "{count} books will each be placed in their own folder",
+          "dissolve_folder": "{count} book folders will be dissolved into single files"
+        },
+        "crossDevice": "Files move to another drive, so they are copied, verified, then removed."
+      },
+      "progress": {
+        "label": "Moving books to {library}",
+        "failed": "{count} failed"
+      },
+      "done": {
+        "summary": "Moved {count} books to {library}",
+        "merged": "{count} merged with copies already there",
+        "skipped": "{count} skipped",
+        "failed": "{count} failed"
+      },
+      "toast": {
+        "success": "Moved {count} books to {library}",
+        "partial": "Moved {moved} books, {failed} failed"
       }
     }
   },
@@ -4650,6 +4736,10 @@
       "cover": "Cover",
       "bookCover": "Book cover"
     },
+    "libraryLoad": {
+      "errorTitle": "Unable to load your libraries",
+      "errorDescription": "BookOrbit could not retrieve your libraries. Your library data has not been removed."
+    },
     "scroller": {
       "failedToLoad": "Failed to load.",
       "empty": {
@@ -4690,6 +4780,14 @@
         "upNextInSeries": "Up Next in Series",
         "random": "Discover Something New",
         "smartScope": "Smart Scope"
+      },
+      "shelfLayout": {
+        "title": "Shelf layout",
+        "description": "Choose how shelves are arranged on larger screens.",
+        "wide": "Wide rows",
+        "wideDescription": "Show one shelf per row.",
+        "twoColumns": "Two columns",
+        "twoColumnsDescription": "Show two shelves per row."
       },
       "reorderHintWidget": "Drag to reorder. Toggle to show or hide a widget.",
       "reorderHintShelf": "Drag to reorder. Toggle to show or hide a shelf.",
@@ -5863,46 +5961,66 @@
     "settings": {
       "title": "Settings",
       "ariaLabel": "Reader settings",
-      "tabs": {
-        "appearance": "Appearance",
-        "text": "Text",
-        "layout": "Layout"
-      },
-      "appearance": {
-        "mode": "Mode",
+      "reset": "Reset to defaults",
+      "modeLabel": "Color mode",
+      "mode": {
         "light": "Light",
-        "dark": "Dark",
-        "colorTheme": "Color theme"
+        "dark": "Dark"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Range: 10-32px",
-        "lineHeight": "Line height",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Font family",
-        "fontFamilyDescription": "Choose built-in or uploaded fonts for body text.",
-        "builtIn": "Built-in",
-        "yourFonts": "Your fonts"
+      "textSize": "Text size",
+      "textSizeSmaller": "Smaller text",
+      "textSizeLarger": "Larger text",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Page color",
+      "font": "Font",
+      "fontBuiltIn": "Built-in",
+      "fontServer": "Server fonts",
+      "fontYours": "Your fonts",
+      "lineSpacing": "Line spacing",
+      "pageWidth": "Page width",
+      "pageWidthNarrow": "Narrow",
+      "pageWidthMedium": "Medium",
+      "pageWidthWide": "Wide",
+      "pageWidthFull": "Full",
+      "readingFlow": "Reading flow",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Scroll"
       },
-      "layout": {
-        "pageSpreads": "Page spreads",
-        "pageSpreadsDescription": "Choose how this image-based EPUB pairs pages.",
+      "pageSpreads": "Page spreads",
+      "pageSpreadsHint": "Choose how this image-based EPUB pairs pages.",
+      "spread": {
         "bookDefault": "Book default",
-        "singlePage": "Single page",
-        "readingFlow": "Reading flow",
-        "readingFlowDescription": "Switch between paged and continuous scrolling.",
-        "paginated": "Paginated",
-        "scrolled": "Scrolled",
-        "textColumns": "Text columns",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Column gap",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Justify text",
-        "justifyTextDescription": "Enable full-width paragraph alignment.",
-        "hyphenation": "Hyphenation",
-        "hyphenationDescription": "Enable automatic word-break hyphenation."
+        "singlePage": "Single page"
+      },
+      "advanced": "Advanced layout",
+      "columns": "Columns",
+      "columnsFewer": "Fewer columns",
+      "columnsMore": "More columns",
+      "columnGap": "Column gap",
+      "justifyText": "Justify text",
+      "hyphenation": "Hyphenation",
+      "themes": {
+        "default": "Default",
+        "gray": "Gray",
+        "sepia": "Sepia",
+        "crimson": "Crimson",
+        "meadow": "Meadow",
+        "rosewood": "Rosewood",
+        "azure": "Azure",
+        "dawnlight": "Dawnlight",
+        "ember": "Ember",
+        "aurora": "Aurora",
+        "ocean": "Ocean",
+        "mist": "Mist",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Book default",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -5992,29 +6110,20 @@
       "cycleFooterMode": "Cycle footer info mode"
     },
     "cbz": {
-      "tabs": {
-        "view": "View",
-        "reading": "Reading",
-        "layout": "Layout"
-      },
       "fitMode": "Fit mode",
       "background": "Background",
       "scrollMode": "Scroll mode",
       "scrollModeHint": "Use \"No gaps\" for webtoons and vertical strips.",
       "readingDirection": "Reading direction",
       "pageView": "Page view",
-      "autoFallback": "Auto-fallback",
+      "twoPagePagedOnly": "Two pages are shown only in paged mode.",
+      "spreadSection": "Two-page spread",
+      "spreadFallbackHint": "This screen is too narrow for two pages, so single pages are shown.",
       "spreadAlignmentLabel": "Spread alignment",
-      "spreadAlignmentHint": "Spread alignment is unavailable in auto-fallback mode.",
       "spreadGap": "Spread gap",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Focus two-page toggle",
       "forceTwoPage": "Force two-page",
-      "off": "Off",
-      "on": "On",
       "widePages": "Wide pages",
-      "resetBookViewSettings": "Reset book view settings",
-      "resetConfirm": "Reset view settings for this book to your global defaults?",
       "firstPage": "First page",
       "lastPage": "Last page",
       "fit": {
@@ -6084,6 +6193,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} of {total} read ({percentage}%)"
+    },
+    "ownership": {
+      "label": "In library",
+      "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
       "label": "Possible gaps:"
@@ -6889,7 +7002,8 @@
       "users": "Users",
       "account-activity": "Account Activity",
       "magic-links": "Magic Links",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server Fonts"
     },
     "system": {
       "file-naming": "File Naming",

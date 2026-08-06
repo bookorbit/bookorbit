@@ -13,6 +13,8 @@ import {
 export type EditableSeriesMembership = {
   seriesName: string
   seriesIndex: number | null
+  /** Series-level: saving it changes the total for every book in the series and every user. */
+  expectedBookCount: number | null
 }
 
 const ROOT_FIELDS = [
@@ -79,7 +81,7 @@ export function normalizeSeriesMemberships(values: readonly EditableSeriesMember
     const key = seriesName.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ seriesName, seriesIndex: value.seriesIndex ?? null })
+    out.push({ seriesName, seriesIndex: value.seriesIndex ?? null, expectedBookCount: value.expectedBookCount ?? null })
   }
   return out
 }
@@ -87,9 +89,15 @@ export function normalizeSeriesMemberships(values: readonly EditableSeriesMember
 function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[] {
   const memberships = book.seriesMemberships ?? []
   if (memberships.length > 0) {
-    return normalizeSeriesMemberships(memberships.map((membership) => ({ seriesName: membership.seriesName, seriesIndex: membership.seriesIndex })))
+    return normalizeSeriesMemberships(
+      memberships.map((membership) => ({
+        seriesName: membership.seriesName,
+        seriesIndex: membership.seriesIndex,
+        expectedBookCount: membership.expectedBookCount ?? null,
+      })),
+    )
   }
-  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex }] : []
+  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null }] : []
 }
 
 function changedCustomMetadataPayload(

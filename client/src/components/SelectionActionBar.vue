@@ -5,6 +5,7 @@ import {
   BookOpen,
   Download,
   FileSpreadsheet,
+  FolderInput,
   FolderMinus,
   FolderPlus,
   ImageDown,
@@ -84,6 +85,7 @@ const emit = defineEmits<{
   'set-rating': [rating: number | null]
   'set-field': [field: BulkEditableField, value: BulkEditableValue]
   'lock-metadata': [locked: boolean]
+  'move-to-library': []
   delete: []
   exit: []
 }>()
@@ -105,7 +107,8 @@ const hasCustomContent = computed(() => Boolean(slots.content))
 const canBulkActions = computed(() => !isDemoRestrictedAccount.value)
 const canDownload = computed(() => hasPermission('library_download') && canBulkActions.value)
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
-const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value)
+const canMoveToLibrary = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
+const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value || canMoveToLibrary.value)
 const canShare = computed(() => hasPermission('email_send') || canDownload.value)
 const numericFieldSelected = computed(() => bulkField.value === 'publishedYear')
 const arrayFieldSelected = computed(() => (BULK_EDITABLE_ARRAY_FIELDS as readonly string[]).includes(bulkField.value))
@@ -177,6 +180,11 @@ function onRefreshMetadata() {
 function onReExtractCover() {
   if (props.count === 0) return
   emit('re-extract-cover')
+}
+
+function onMoveToLibrary() {
+  if (props.count === 0) return
+  emit('move-to-library')
 }
 
 function resetFieldEditor() {
@@ -440,6 +448,13 @@ watch(
                         <DropdownMenuItem data-testid="action-export-metadata" @click="emit('export-metadata')">
                           <FileSpreadsheet :size="14" />
                           <span>{{ t('components.selectionActionBar.exportMetadata') }}</span>
+                        </DropdownMenuItem>
+                      </template>
+                      <template v-if="canMoveToLibrary">
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem data-testid="action-move-to-library" @click="onMoveToLibrary">
+                          <FolderInput :size="14" />
+                          <span>{{ t('book.move.action') }}</span>
                         </DropdownMenuItem>
                       </template>
                     </DropdownMenuContent>

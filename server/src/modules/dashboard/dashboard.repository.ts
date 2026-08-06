@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, max, min, notExists, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { BOOK_FORMATS, isAudioFormat, type ContentFilterRules, type ReadStatus } from '@bookorbit/types';
 
@@ -10,12 +10,19 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 
 type Db = NodePgDatabase<typeof schema>;
 type UpNextInSeriesRow = { id: number };
+type RandomCandidateRow = { sampleIndex: number; id: number };
 const AUDIO_FORMATS = BOOK_FORMATS.filter(isAudioFormat);
 const CONTINUE_READING_EXCLUDED_READ_STATUSES = ['unread', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
 const DISCOVERY_EXCLUDED_READ_STATUSES = ['reading', 'rereading', 'on_hold', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
+// Three independent pivots per requested row tolerate moderate collisions from
+// sparse eligibility. The ceiling prevents large requests from multiplying probes.
+const RANDOM_PIVOT_MULTIPLIER = 3;
+const RANDOM_MAX_PIVOTS = 60;
 
 @Injectable()
 export class DashboardRepository {
+  private readonly randomIdBounds = new Map<string, { minId: number; maxId: number; expiresAt: number }>();
+
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findRecentlyAddedBookIds(accessibleLibraryIds: number[], limit: number, contentFilters?: ContentFilterRules): Promise<number[]> {
@@ -229,25 +236,117 @@ export class DashboardRepository {
     if (accessibleLibraryIds.length === 0) return [];
     if (limit <= 0) return [];
 
+    const bounds = await this.findRandomIdBounds(accessibleLibraryIds);
+    if (!bounds) return [];
     const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
-    const rows = await this.db
-      .select({ id: books.id })
-      .from(books)
-      .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-      .leftJoin(readingProgress, and(eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
-      .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)))
-      .where(
-        and(
-          inArray(books.libraryId, accessibleLibraryIds),
-          eq(books.status, 'present'),
-          or(isNull(readingProgress.bookFileId), eq(readingProgress.percentage, 0)),
-          or(isNull(userBookStatus.bookId), notInArray(userBookStatus.status, [...DISCOVERY_EXCLUDED_READ_STATUSES])),
-          ...cfClauses,
-        ),
-      )
-      .orderBy(sql`random()`)
-      .limit(limit);
+    // OFFSET 0 keeps these as correlated index lookups. Without it PostgreSQL
+    // can flatten them into anti-joins that rescan a user's full status set.
+    const hasNoProgress = notExists(
+      this.db
+        .select({ one: sql`1` })
+        .from(readingProgress)
+        .where(and(eq(readingProgress.bookFileId, books.primaryFileId), eq(readingProgress.userId, userId), sql`${readingProgress.percentage} <> 0`))
+        .offset(0),
+    );
+    const hasNoExcludedReadStatus = notExists(
+      this.db
+        .select({ one: sql`1` })
+        .from(userBookStatus)
+        .where(
+          and(
+            eq(userBookStatus.bookId, books.id),
+            eq(userBookStatus.userId, userId),
+            inArray(userBookStatus.status, [...DISCOVERY_EXCLUDED_READ_STATUSES]),
+          ),
+        )
+        .offset(0),
+    );
+    const eligibility = and(
+      inArray(books.libraryId, accessibleLibraryIds),
+      eq(books.status, 'present'),
+      hasNoProgress,
+      hasNoExcludedReadStatus,
+      ...cfClauses,
+    )!;
 
-    return rows.map((row) => row.id);
+    // Independent indexed pivots distribute membership across the id range without
+    // paying for a full ORDER BY random() or returning one scan-order neighborhood.
+    const pivotCount = Math.min(limit * RANDOM_PIVOT_MULTIPLIER, RANDOM_MAX_PIVOTS);
+    const pivots = Array.from({ length: pivotCount }, () => this.randomPivot(bounds));
+    const sampledIds = [...new Set(await this.findDistributedRandomCandidates(pivots, eligibility))];
+    if (sampledIds.length >= limit) return sampledIds.slice(0, limit);
+
+    const fallbackPivot = this.randomPivot(bounds);
+    const findFallbackCandidates = (idPredicate: SQL, orderBy: SQL, candidateLimit: number) =>
+      this.db
+        .select({ id: books.id })
+        .from(books)
+        .where(and(eligibility, sampledIds.length > 0 ? notInArray(books.id, sampledIds) : undefined, idPredicate))
+        .orderBy(orderBy)
+        .limit(candidateLimit);
+
+    const remaining = limit - sampledIds.length;
+    const fallbackRows = await findFallbackCandidates(gte(books.id, fallbackPivot), asc(books.id), remaining);
+    if (fallbackRows.length < remaining) {
+      fallbackRows.push(...(await findFallbackCandidates(lt(books.id, fallbackPivot), desc(books.id), remaining - fallbackRows.length)));
+    }
+
+    return [...sampledIds, ...fallbackRows.map((row) => row.id)].slice(0, limit);
+  }
+
+  private async findDistributedRandomCandidates(pivots: number[], eligibility: SQL): Promise<number[]> {
+    const pivotValues = sql.join(
+      pivots.map((pivot, sampleIndex) => sql`(${sampleIndex}::integer, ${pivot}::integer)`),
+      sql`, `,
+    );
+    const result = await this.db.execute<RandomCandidateRow>(sql`
+      with pivots(sample_index, pivot_id) as (
+        values ${pivotValues}
+      )
+      select p.sample_index as "sampleIndex", coalesce(forward_candidate.id, wrap_candidate.id) as id
+      from pivots p
+      left join lateral (
+        select ${books.id} as id
+        from ${books}
+        where ${eligibility} and ${books.id} >= p.pivot_id
+        order by ${books.id} asc
+        limit 1
+      ) forward_candidate on true
+      left join lateral (
+        select ${books.id} as id
+        from ${books}
+        where forward_candidate.id is null
+          and ${eligibility}
+          and ${books.id} < p.pivot_id
+        order by ${books.id} desc
+        limit 1
+      ) wrap_candidate on true
+      where coalesce(forward_candidate.id, wrap_candidate.id) is not null
+      order by p.sample_index
+    `);
+
+    return result.rows.map((row) => row.id);
+  }
+
+  private randomPivot(bounds: { minId: number; maxId: number }): number {
+    return bounds.minId + Math.floor(Math.random() * (bounds.maxId - bounds.minId + 1));
+  }
+
+  private async findRandomIdBounds(accessibleLibraryIds: number[]): Promise<{ minId: number; maxId: number } | null> {
+    const now = Date.now();
+    const cacheKey = [...accessibleLibraryIds].sort((left, right) => left - right).join(',');
+    const cached = this.randomIdBounds.get(cacheKey);
+    if (cached && cached.expiresAt > now) return cached;
+
+    const [row] = await this.db
+      .select({ minId: min(books.id), maxId: max(books.id) })
+      .from(books)
+      .where(and(inArray(books.libraryId, accessibleLibraryIds), eq(books.status, 'present')));
+    if (row?.minId == null || row.maxId == null) return null;
+
+    const bounds = { minId: row.minId, maxId: row.maxId, expiresAt: now + 60_000 };
+    this.randomIdBounds.set(cacheKey, bounds);
+    if (this.randomIdBounds.size > 100) this.randomIdBounds.delete(this.randomIdBounds.keys().next().value!);
+    return bounds;
   }
 }

@@ -23,6 +23,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const GET_EVENT = 'kobo.annotation_get';
 const PATCH_EVENT = 'kobo.annotation_patch';
 
+/**
+ * Raised when a content id the device asks about is not a BookOrbit book. Kobo devices route every
+ * annotation request through us, including their own store content, so this is expected traffic
+ * rather than a sync failure. The 404 matters: the device reconciles by omission (see the deletion
+ * note in getContentAnnotations), so answering with an empty set would wipe its local annotations.
+ */
+export class KoboContentNotFoundException extends NotFoundException {
+  constructor(contentId: string) {
+    super(`Kobo content ${contentId} not found`);
+  }
+}
+
 export interface ServedAckPlan {
   entries: { annotationId: number; version: number; externalKey: string; externalCreatedAt: string | null }[];
   tombstoneStateIds: number[];
@@ -68,7 +80,7 @@ export class KoboAnnotationExchangeService {
   ): Promise<KoboContentAnnotationsResult> {
     const startedAtMs = Date.now();
     const bookId = await this.resolveBookIdByContentId(userId, contentId);
-    if (bookId === null) throw new NotFoundException(`Kobo content ${contentId} not found`);
+    if (bookId === null) throw new KoboContentNotFoundException(contentId);
 
     const kepub = await this.kepubContextService.resolveForBook(userId, bookId);
     const includeAllOrigins = kepub.settings?.syncBookOrbitAnnotationsToKobo ?? false;
@@ -167,7 +179,7 @@ export class KoboAnnotationExchangeService {
   async patchContentAnnotations(userId: number, contentId: string, body: unknown, deviceId: number): Promise<KoboPatchAnnotationsResult> {
     const startedAtMs = Date.now();
     const bookId = await this.resolveBookIdByContentId(userId, contentId);
-    if (bookId === null) throw new NotFoundException(`Kobo content ${contentId} not found`);
+    if (bookId === null) throw new KoboContentNotFoundException(contentId);
 
     const operations = extractKoboAnnotationOperations(body);
     if (operations.length === 0) return { bookId, created: 0, updated: 0, unchanged: 0, deleted: 0, kepubReady: false };

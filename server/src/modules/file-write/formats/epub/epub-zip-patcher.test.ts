@@ -37,6 +37,8 @@ let lastArchive: EventEmitter & {
   finalize: vi.Mock;
 };
 
+const processedEntries: string[] = [];
+
 vi.mock('archiver', () => ({
   ZipArchive: vi.fn(function () {
     let output: EventEmitter | null = null;
@@ -45,7 +47,15 @@ vi.mock('archiver', () => ({
       pipe: vi.Mock;
       finalize: vi.Mock;
     };
-    emitter.append = vi.fn();
+    // The real archiver emits `entry` once it has consumed and written an appended source.
+    emitter.append = vi.fn((source: unknown, data: { name: string }) => {
+      if (source instanceof Readable) source.resume();
+      setImmediate(() => {
+        processedEntries.push(data.name);
+        emitter.emit('entry', data);
+      });
+      return emitter;
+    });
     emitter.pipe = vi.fn((out: EventEmitter) => {
       output = out;
     });
@@ -66,7 +76,8 @@ const streamFrom = (value: string) => Readable.from([Buffer.from(value)]);
 describe('epub-zip-patcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCreateWriteStream.mockImplementation(() => new EventEmitter() as never);
+    processedEntries.length = 0;
+    mockCreateWriteStream.mockImplementation(() => new PassThrough() as never);
     mockRename.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
   });
@@ -114,6 +125,25 @@ describe('epub-zip-patcher', () => {
     expect(lastArchive.append).toHaveBeenCalledWith(expect.objectContaining({ pipe: expect.any(Function) }), { name: 'OPS/ch1.xhtml' });
     expect(lastArchive.append).toHaveBeenCalledWith(Buffer.from('new-cover'), { name: 'OPS/images/cover.jpg' });
     expect(mockRename).toHaveBeenCalledWith('/book.epub.tmp', '/book.epub');
+  });
+
+  it('opens each carried-over entry stream only after the previous entry was written', async () => {
+    const openedAfter: string[][] = [];
+    const carried = ['OPS/ch1.xhtml', 'OPS/ch2.xhtml', 'OPS/ch3.xhtml'].map((path) => ({
+      path,
+      stream: vi.fn(() => {
+        openedAfter.push([...processedEntries]);
+        return streamFrom(path);
+      }),
+    }));
+
+    mockOpenFile.mockResolvedValue({ files: carried } as never);
+
+    await patch('/book.epub', new Map());
+
+    expect(openedAfter).toEqual([['mimetype'], ['mimetype', 'OPS/ch1.xhtml'], ['mimetype', 'OPS/ch1.xhtml', 'OPS/ch2.xhtml']]);
+    expect(processedEntries).toEqual(['mimetype', 'OPS/ch1.xhtml', 'OPS/ch2.xhtml', 'OPS/ch3.xhtml']);
+    for (const entry of carried) expect(entry.stream).toHaveBeenCalledTimes(1);
   });
 
   it('rejects when a source entry stream errors while patching', async () => {

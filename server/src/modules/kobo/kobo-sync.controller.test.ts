@@ -72,6 +72,7 @@ describe('KoboSyncController', () => {
     expect(resources.image_host).toBe('https://reader.example.com');
     expect(resources.image_url_template).toContain('/api/v1/kobo/device-token/v1/books/{ImageId}/thumbnail/{Width}/{Height}/false/image.jpg');
     expect(resources.library_sync).toBe('https://reader.example.com/api/v1/kobo/device-token/v1/library/sync');
+    expect(resources.reading_state).toBe('https://reader.example.com/api/v1/kobo/device-token/v1/library/{Ids}/state');
     expect(resources.get_tests_request).toBe('https://reader.example.com/api/v1/kobo/device-token/v1/analytics/gettests');
     expect(resources.post_analytics_event).toBe('https://reader.example.com/api/v1/kobo/device-token/v1/analytics/event');
   });
@@ -94,6 +95,7 @@ describe('KoboSyncController', () => {
 
     expect(resources.image_host).toBe('http://192.168.8.134:5173');
     expect(resources.library_sync).toBe('http://192.168.8.134:5173/api/v1/kobo/dev/v1/library/sync');
+    expect(resources.reading_state).toBe('http://192.168.8.134:5173/api/v1/kobo/dev/v1/library/{Ids}/state');
   });
 
   it('initialization does not append x-forwarded-port when it is the default for the scheme', () => {
@@ -395,6 +397,86 @@ describe('KoboSyncController', () => {
     );
     expect(historyService.countsForBook).toHaveBeenCalledWith(8, 77, { progressUpdates: 1, twoWayProgressSync: true });
     expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+  });
+
+  it('handles reading-state updates locally for mapped Kobo entitlement ids', async () => {
+    const entitlementId = '8285b8bd-cf7c-4653-9191-8c9f6e87842b';
+    const state = { EntitlementId: entitlementId, CurrentBookmark: { ProgressPercent: 56 } };
+    const req = {
+      method: 'PUT',
+      url: `/api/v1/kobo/dev77/v1/library/${entitlementId}/state`,
+      body: { ReadingStates: [state] },
+    };
+    const reply = makeReply();
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(77);
+    settingsService.getSettings.mockResolvedValue({
+      readingThreshold: 1,
+      finishedThreshold: 99,
+      convertToKepub: true,
+      forceEnableHyphenation: false,
+      kepubConversionLimitMb: 100,
+      twoWayProgressSync: true,
+    });
+    readingStateService.upsertState.mockResolvedValue({ RequestResult: 'Success' });
+
+    await controller.updateReadingState(
+      entitlementId,
+      req.body,
+      { id: 8 } as never,
+      { deviceId: 77, deviceToken: 'dev77' } as never,
+      req as never,
+      reply as never,
+    );
+
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(8, entitlementId);
+    expect(readingStateService.upsertState).toHaveBeenCalledWith(8, 77, state, 1, 99, true, 77);
+    expect(proxyService.forward).not.toHaveBeenCalled();
+    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+  });
+
+  it('proxies reading-state updates for unmapped Kobo Store entitlement ids', async () => {
+    const entitlementId = 'baee12cd-e85f-4d98-be7f-ac5ec1289fb5';
+    const body = { ReadingStates: [{ EntitlementId: entitlementId, CurrentBookmark: { ProgressPercent: 6 } }] };
+    const req = {
+      method: 'PUT',
+      url: `/api/v1/kobo/dev77/v1/library/${entitlementId}/state`,
+      headers: { authorization: 'Bearer kobo-oauth-token' },
+      body,
+    };
+    const reply = makeReply();
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(null);
+
+    await controller.updateReadingState(
+      entitlementId,
+      body,
+      { id: 8 } as never,
+      { deviceId: 77, deviceToken: 'dev77' } as never,
+      req as never,
+      reply as never,
+    );
+
+    expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'dev77');
+    expect(settingsService.getSettings).not.toHaveBeenCalled();
+    expect(readingStateService.upsertState).not.toHaveBeenCalled();
+    expect(historyService.recordSuccess).not.toHaveBeenCalled();
+    expect(historyService.recordFailure).not.toHaveBeenCalled();
+  });
+
+  it('proxies comma-separated reading-state ids without partially handling the batch', async () => {
+    const ids = '8285b8bd-cf7c-4653-9191-8c9f6e87842b,baee12cd-e85f-4d98-be7f-ac5ec1289fb5';
+    const req = {
+      method: 'GET',
+      url: `/api/v1/kobo/dev77/v1/library/${ids}/state`,
+      headers: { authorization: 'Bearer kobo-oauth-token' },
+    };
+    const reply = makeReply();
+    bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(null);
+
+    await controller.getReadingState(ids, { id: 8 } as never, { deviceId: 77, deviceToken: 'dev77' } as never, req as never, reply as never);
+
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(8, ids);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'dev77');
+    expect(readingStateService.getRawState).not.toHaveBeenCalled();
   });
 
   it('records failed reading-state updates before rethrowing', async () => {

@@ -18,6 +18,7 @@ import {
   Send,
   Star,
   StickyNote,
+  FolderInput,
   Trash2,
   TriangleAlert,
   X,
@@ -45,6 +46,7 @@ import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
 import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/composables/usePersonalNote'
 import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import ResetReadingStateDialog from '@/features/book/components/ResetReadingStateDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
@@ -93,11 +95,12 @@ type SeriesDisplayLink = {
 }
 
 const props = defineProps<{ book: BookDetail }>()
-const emit = defineEmits<{ saved: [BookDetail] }>()
+const emit = defineEmits<{ saved: [BookDetail]; moved: [] }>()
 const { t } = useI18n()
 const router = useRouter()
 
 const addToCollectionOpen = ref(false)
+const moveToLibraryOpen = ref(false)
 const scoreBreakdownOpen = ref(false)
 const mobileScoreBreakdownOpen = ref(false)
 const moreMenuOpen = ref(false)
@@ -125,7 +128,10 @@ const {
   cancelDelete,
   confirmDelete,
 } = useDeleteBook(() => {
-  router.back()
+  // Not router.back(): the previous entry may be this same book, or absent
+  // entirely when the page was deep-linked or reloaded, which left the user
+  // looking at a book that no longer exists.
+  void router.push({ name: 'dashboard' })
 })
 
 const coverLoaded = ref(false)
@@ -909,6 +915,22 @@ function handleEditMetadataFromScore() {
   router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
 }
 
+function handleMoveFromMenu() {
+  moreMenuOpen.value = false
+  mobileMoreMenuOpen.value = false
+  moveToLibraryOpen.value = true
+}
+
+function handleMoveOpenChange(open: boolean) {
+  moveToLibraryOpen.value = open
+}
+
+// The book still exists after a move, it just lives elsewhere, so refresh the
+// detail rather than navigating away.
+function handleBookMoved() {
+  emit('moved')
+}
+
 function handleDeleteFromMenu() {
   moreMenuOpen.value = false
   mobileMoreMenuOpen.value = false
@@ -1396,7 +1418,7 @@ watch(
       >
         <PopoverTrigger as-child>
           <button
-            class="flex items-center justify-center h-9 w-9 rounded-md border border-destructive/30 bg-background text-destructive hover:bg-destructive/10 transition-colors"
+            class="flex items-center justify-center h-9 w-9 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
           >
             <MoreVertical class="size-3.5" />
           </button>
@@ -1404,11 +1426,19 @@ watch(
         <PopoverContent class="w-44 p-1" align="end">
           <button
             v-if="canEditMetadata"
-            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
             @click="handleOpenResetReadingState"
           >
             <RotateCcw class="size-3.5" />
             Reset reading state
+          </button>
+          <button
+            v-if="hasPermission('library_edit_metadata')"
+            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+            @click="handleMoveFromMenu"
+          >
+            <FolderInput class="size-3.5" />
+            {{ t('book.move.action') }}
           </button>
           <button
             v-if="hasPermission('library_delete_books')"
@@ -1559,7 +1589,7 @@ watch(
             <Popover v-if="canEditMetadata || hasPermission('library_delete_books')" :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
               <PopoverTrigger as-child>
                 <button
-                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-destructive/30 bg-background text-destructive hover:bg-destructive/10 transition-colors"
+                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
                 >
                   <MoreVertical class="size-3.5" />
                 </button>
@@ -1567,11 +1597,19 @@ watch(
               <PopoverContent class="w-44 p-1" align="end">
                 <button
                   v-if="canEditMetadata"
-                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
                   @click="handleOpenResetReadingState"
                 >
                   <RotateCcw class="size-3.5" />
                   Reset reading state
+                </button>
+                <button
+                  v-if="hasPermission('library_edit_metadata')"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                  @click="handleMoveFromMenu"
+                >
+                  <FolderInput class="size-3.5" />
+                  {{ t('book.move.action') }}
                 </button>
                 <button
                   v-if="hasPermission('library_delete_books')"
@@ -2238,6 +2276,15 @@ watch(
   />
 
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+
+  <MoveToLibrarySheet
+    :open="moveToLibraryOpen"
+    :selection-payload="{ bookIds: [book.id] }"
+    :selected-count="1"
+    :current-library-id="book.libraryId"
+    @update:open="handleMoveOpenChange"
+    @moved="handleBookMoved"
+  />
 
   <ResetReadingStateDialog
     :open="resetReadingStateDialogOpen"

@@ -216,6 +216,18 @@
     "useGuards": []
   },
   {
+    "file": "server/src/modules/dashboard/dashboard.controller.ts",
+    "className": "DashboardController",
+    "methodName": "getScrollers",
+    "httpMethod": "POST",
+    "path": "/dashboard/scrollers/batch",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
     "file": "server/src/modules/email/email-admin-log.controller.ts",
     "className": "EmailAdminLogController",
     "methodName": "findAll",

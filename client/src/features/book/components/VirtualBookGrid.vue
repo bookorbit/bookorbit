@@ -10,7 +10,7 @@ import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover
 import { isBookPlaceholder, type BookSlot } from '../composables/useBookWindow'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 
 const props = withDefaults(
   defineProps<{
@@ -24,6 +24,7 @@ const props = withDefaults(
     squareCoverScale?: number
     railGutter?: boolean
     railGutterKind?: JumpBucketKind | null
+    allowMoveToLibrary?: boolean
   }>(),
   {
     selectionMode: false,
@@ -284,6 +285,7 @@ defineExpose({ scrollToIndex })
           :cover-aspect-ratio="staticCoverAspectRatio(book)"
           :selection-mode="selectionMode"
           :selected="isSelected?.(book.id) ?? false"
+          :allow-move-to-library="allowMoveToLibrary"
           @action="emit('action', book, $event)"
           @select="emit('select', book.id, $event)"
           @update:book="emit('update:book', $event)"
@@ -300,6 +302,7 @@ defineExpose({ scrollToIndex })
           :show-label="showLabel"
           :selection-mode="selectionMode"
           :selected="isSelected?.(book.id) ?? false"
+          :allow-move-to-library="allowMoveToLibrary"
           @action="emit('action', book, $event)"
           @select="emit('select', book.id, $event)"
           @update:book="emit('update:book', $event)"
@@ -332,6 +335,7 @@ defineExpose({ scrollToIndex })
             :show-label="showLabel"
             :selection-mode="selectionMode"
             :selected="isSelected?.(item.id) ?? false"
+            :allow-move-to-library="allowMoveToLibrary"
             @action="emit('action', asBook(item), $event)"
             @select="emit('select', item.id, $event)"
             @update:book="emit('update:book', $event)"

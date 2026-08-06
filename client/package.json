@@ -30,6 +30,7 @@
     "lint:oxlint:fix": "oxlint src --fix",
     "lint:eslint:check": "eslint src --cache",
     "lint:eslint:fix": "eslint src --fix --cache",
+    "sync:crowdin": "node ./scripts/sync-crowdin-translations.mjs",
     "validate:locales": "node ./scripts/validate-locales.mjs",
     "validate:styles": "node ./scripts/validate-styles.mjs",
     "format": "prettier --write --experimental-cli src/",

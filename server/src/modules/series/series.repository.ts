@@ -28,6 +28,7 @@ type SeriesDetailRow = {
   name: string;
   bookCount: number;
   readCount: number;
+  expectedBookCount: number | null;
   authors: string[];
   indices: number[];
 };
@@ -192,6 +193,7 @@ export class SeriesRepository {
       .select({
         id: bookSeries.id,
         name: bookSeries.name,
+        expectedBookCount: bookSeries.expectedBookCount,
         bookCount: sql<number>`count(distinct ${books.id})::int`,
         readCount: sql<number>`count(distinct CASE WHEN ${userBookStatus.status} = 'read' THEN ${books.id} END)::int`,
       })
@@ -201,7 +203,7 @@ export class SeriesRepository {
       .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(and(eq(bookSeries.id, params.seriesId), libraryFilter, ...filterClauses))
-      .groupBy(bookSeries.id, bookSeries.name);
+      .groupBy(bookSeries.id, bookSeries.name, bookSeries.expectedBookCount);
 
     if (rows.length === 0) return null;
 
@@ -225,6 +227,7 @@ export class SeriesRepository {
       name: row.name,
       bookCount: row.bookCount,
       readCount: row.readCount,
+      expectedBookCount: row.expectedBookCount ?? null,
       authors: authorsMap.get(params.seriesId) ?? [],
       indices,
     };

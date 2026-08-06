@@ -47,7 +47,9 @@ const SKELETONS = Array.from({ length: 8 })
 const PORTRAIT_COVER_WIDTH_CLASS = 'w-[120px]'
 const SQUARE_COVER_WIDTH_CLASS = 'w-[150px]'
 
-type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+// 'move-to-library' is part of the shared card contract; this view does not
+// opt in, so it never fires here.
+type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'move-to-library' | 'delete'
 
 const quickViewBookId = ref<number | null>(null)
 const quickViewOpen = ref(false)

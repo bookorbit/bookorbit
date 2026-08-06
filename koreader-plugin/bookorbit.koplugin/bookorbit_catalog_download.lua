@@ -113,6 +113,27 @@ function CatalogDownload.install(Catalog)
         return G_reader_settings:readSetting("download_dir") or G_reader_settings:readSetting("lastdir")
     end
 
+    -- Single and bulk downloads share one destination, KOReader's own
+    -- download_dir, so the chooser is shared too rather than each dialog
+    -- keeping its own idea of where files land.
+    function Catalog:chooseDownloadDir(on_chosen)
+        require("ui/downloadmgr"):new{
+            onConfirm = function(path)
+                logger.dbg("BookOrbit: download folder set to", path)
+                if self._manager and self._manager.ui and self._manager.ui.folder_shortcuts
+                    and self._manager.ui.folder_shortcuts.updateShortcut then
+                    self._manager.ui.folder_shortcuts:updateShortcut("download_dir", path)
+                end
+                G_reader_settings:saveSetting("download_dir", path)
+                if on_chosen then
+                    UIManager:nextTick(function()
+                        on_chosen(path)
+                    end)
+                end
+            end,
+        }:chooseDir(self:getCurrentDownloadDir())
+    end
+
     function Catalog:getLocalDownloadPath(filename, filetype, device_path, filename_override)
         local download_dir = self:getCurrentDownloadDir()
         local relative = resolveRelativeDownloadPath(download_dir, filename, filetype, device_path, filename_override)
@@ -200,19 +221,9 @@ function CatalogDownload.install(Catalog)
                         text = _("Choose folder"),
                         callback = function()
                             UIManager:close(dialog)
-                            require("ui/downloadmgr"):new{
-                                onConfirm = function(path)
-                                    logger.dbg("BookOrbit: download folder set to", path)
-                                    if self._manager and self._manager.ui and self._manager.ui.folder_shortcuts
-                                        and self._manager.ui.folder_shortcuts.updateShortcut then
-                                        self._manager.ui.folder_shortcuts:updateShortcut("download_dir", path)
-                                    end
-                                    G_reader_settings:saveSetting("download_dir", path)
-                                    UIManager:nextTick(function()
-                                        self:showDownloadDialog(detail, file, filename_overridden and filename or nil)
-                                    end)
-                                end,
-                            }:chooseDir(self:getCurrentDownloadDir())
+                            self:chooseDownloadDir(function()
+                                self:showDownloadDialog(detail, file, filename_overridden and filename or nil)
+                            end)
                         end,
                     },
                     {

@@ -23,6 +23,7 @@ import {
 } from '../../common/utils/metadata-text-normalize.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
+import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import { BookEmbedderService } from '../embedding/book-embedder.service';
@@ -77,6 +78,7 @@ export class MetadataService {
     @Optional() private readonly metadataEvents?: MetadataEventsService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
+    @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -717,6 +719,10 @@ export class MetadataService {
     if (filtered.comicMetadata) {
       await this.comicMetadataRepository.upsert(bookId, filtered.comicMetadata);
     }
+
+    // ComicInfo Count describes the series the file names, so it is read from the parsed file
+    // rather than the lock-filtered patch: a locked seriesName still leaves the count truthful.
+    await this.seriesExpectedCount?.record(data.seriesName, data.seriesTotalBooks);
 
     this.logger.debug(
       `[metadata.persist_book] [end] bookId=${bookId} format=${format} title="${sanitizeLogValue(data.title ?? '')}" - book metadata persisted`,

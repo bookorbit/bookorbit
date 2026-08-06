@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Wtyczka synchronizacji postępu akcji",
         "stockStep1Prefix": "Na urządzeniu KOReader przejdź do",
         "stockStep1Suffix": ".",
-        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
+        "stockStep2": "Ustaw niestandardowy serwer synchronizacji na URL pokazany powyżej.",
         "stockStep3": "Wprowadź utworzoną nazwę użytkownika i hasło, a następnie dotknij opcji Zaloguj.",
         "locationNote": "BookOrbit zapisuje lokalizacje KOReader kompatybilne z EPUB z czytnika internetowego. Przywrócenie powinno wylądować blisko tej samej pozycji, chociaż dokładne rozmieszczenie linii może się różnić w zależności od czytnika i układu EPUB.",
         "dangerZone": "Strefa zagrożenia",
@@ -3240,31 +3240,6 @@
       "moveDown": "Przesuń w dół",
       "ascending": "Rosnąco",
       "descending": "Malejąco",
-      "fields": {
-        "author": "Author",
-        "title": "Title",
-        "series": "Series",
-        "seriesIndex": "Series #",
-        "addedAt": "Date Added",
-        "updatedAt": "Date Updated",
-        "publishedDate": "Published Date",
-        "publishedYear": "Published Year",
-        "pageCount": "Page Count",
-        "rating": "Rating",
-        "publisher": "Publisher",
-        "fileSize": "File Size",
-        "readProgress": "Read Progress",
-        "readStatus": "Read Status",
-        "format": "Format",
-        "lastReadAt": "Last Read",
-        "startedAt": "Date Started",
-        "finishedAt": "Date Finished",
-        "random": "Random",
-        "language": "Language",
-        "metadataScore": "Metadata Score"
-      },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
       "remove": "Usuń",
       "emptyState": "Nie skonfigurowano sortowania. Tytuł będzie używany w kolejności rosnącej.",
       "addLevel": "Dodaj poziom sortowania"
@@ -3275,63 +3250,7 @@
       "any": "KAŻDY",
       "ofFollowingRules": "poniższych zasad",
       "fields": {
-        "title": "Title",
-        "publisher": "Publisher",
-        "language": "Language",
-        "series": "Series",
-        "seriesIndex": "Series Index",
-        "publishedDate": "Published Date",
-        "publishedYear": "Published Year",
-        "pageCount": "Page Count",
-        "author": "Author",
-        "genre": "Genre",
-        "tag": "Tag",
-        "collection": "Collection",
-        "library": "Library",
-        "format": "Format",
-        "addedAt": "Added Date",
-        "startedAt": "Date Started",
-        "finishedAt": "Date Finished",
-        "fileAvailability": "File Availability",
-        "rating": "Rating",
-        "communityRating": "Community Rating",
-        "readProgress": "Reading Progress",
-        "readStatus": "Read Status",
-        "description": "Description",
-        "isbn": "ISBN",
-        "metadataScore": "Metadata Score",
-        "cover": "Cover",
-        "lockStatus": "Lock Status",
-        "seriesStatus": "Series Status"
-      },
-      "operators": {
-        "contains": "contains",
-        "notContains": "does not contain",
-        "startsWith": "starts with",
-        "endsWith": "ends with",
-        "eq": "is",
-        "notEq": "is not",
-        "isEmpty": "is empty",
-        "isNotEmpty": "is not empty",
-        "gt": "greater than",
-        "gte": "at least",
-        "lt": "less than",
-        "lte": "at most",
-        "between": "between",
-        "includesAny": "includes any of",
-        "includesAll": "includes all of",
-        "excludesAll": "excludes all of",
-        "before": "before",
-        "after": "after",
-        "withinLast": "within last",
-        "isMissing": "is missing",
-        "isPresent": "is present",
-        "isUnread": "is unread",
-        "isInProgress": "is in progress",
-        "isFinished": "is finished",
-        "isLocked": "is locked",
-        "isUnlocked": "is unlocked",
-        "isUpNext": "is up next"
+        "series": "Seria"
       },
       "anyProvider": "Dowolny dostawca",
       "communityRatingProvider": "Dostawca ocen społecznościowych",
@@ -4158,6 +4077,14 @@
       "text": {
         "openDetails": "Otwórz szczegóły"
       }
+    },
+    "move": {
+      "title": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
+      "folderCount": "{count, plural, one {# folder} few {# folders} many {# folders} other {# folders}}",
+      "confirm": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
+      "review": {
+        "collisions": "{count, plural, one {# name conflict} few {# name conflicts} many {# name conflicts} other {# name conflicts}}"
+      }
     }
   },
   "bookMetadataFetch": {
@@ -4667,29 +4594,6 @@
       "tabs": {
         "widgets": "Widżety",
         "shelves": "Półki"
-      },
-      "widgetNames": {
-        "readingStreak": "Reading Streak",
-        "currentlyReading": "Currently Reading",
-        "readingGoal": "Reading Goal",
-        "readingDna": "Reading DNA",
-        "monthlyChallenge": "Monthly Challenge",
-        "highlightOfTheDay": "Highlight of the Day",
-        "neglectedGems": "Neglected Gems",
-        "readingRhythm": "Reading Rhythm",
-        "diversityScore": "Diversity Score",
-        "libraryOverview": "Library Overview",
-        "yearProjection": "Year Projection",
-        "longWait": "The Long Wait"
-      },
-      "shelfNames": {
-        "recentlyAdded": "Recently Added",
-        "continueReading": "Continue Reading",
-        "continueListening": "Continue Listening",
-        "wantToRead": "Want to Read",
-        "upNextInSeries": "Up Next in Series",
-        "random": "Discover Something New",
-        "smartScope": "Smart Scope"
       },
       "reorderHintWidget": "Przeciągnij, aby zmienić kolejność. Przełącz, aby pokazać lub ukryć widżet.",
       "reorderHintShelf": "Przeciągnij, aby zmienić kolejność. Przełącz, aby pokazać lub ukryć półkę.",
@@ -5863,47 +5767,22 @@
     "settings": {
       "title": "Ustawienia",
       "ariaLabel": "Ustawienia czytnika",
-      "tabs": {
-        "appearance": "Wygląd",
-        "text": "Tekst",
-        "layout": "Układ"
-      },
-      "appearance": {
-        "mode": "Tryb",
+      "mode": {
         "light": "Światło",
-        "dark": "Ciemny",
-        "colorTheme": "Motyw koloru"
+        "dark": "Ciemny"
       },
-      "text": {
-        "fontSize": "Rozmiar czcionki",
-        "fontSizeRange": "Zakres: 10-32px",
-        "lineHeight": "Wysokość linii",
-        "lineHeightRange": "Zakres: 0,8-3,0",
-        "fontFamily": "Rodzina czcionek",
-        "fontFamilyDescription": "Wybierz wbudowane lub przesłane czcionki dla tekstu podstawowego.",
-        "builtIn": "Wbudowany",
-        "yourFonts": "Twoje czcionki"
-      },
-      "layout": {
-        "pageSpreads": "Strona się rozprzestrzenia",
-        "pageSpreadsDescription": "Wybierz sposób, w jaki ten oparty na obrazie EPUB łączy strony w pary.",
+      "fontBuiltIn": "Wbudowany",
+      "fontYours": "Twoje czcionki",
+      "readingFlow": "Czytanie",
+      "pageSpreads": "Strona się rozprzestrzenia",
+      "pageSpreadsHint": "Wybierz sposób, w jaki ten oparty na obrazie EPUB łączy strony w pary.",
+      "spread": {
         "bookDefault": "Książka domyślna",
-        "singlePage": "Pojedyncza strona",
-        "readingFlow": "Czytanie",
-        "readingFlowDescription": "Przełączanie pomiędzy przewijaniem stronicowanym i ciągłym.",
-        "paginated": "Paginowane",
-        "scrolled": "Przewinięte",
-        "textColumns": "Kolumny tekstowe",
-        "textColumnsRange": "Zakres: 1-10",
-        "columnGap": "Szczelina kolumny",
-        "columnGapRange": "Zakres: 0-50%",
-        "maxWidth": "Maksymalna szerokość",
-        "maxWidthRange": "Zakres: 400-1600",
-        "justifyText": "Justuj tekst",
-        "justifyTextDescription": "Włącz wyrównanie akapitu na całej szerokości.",
-        "hyphenation": "Dzielenie wyrazów",
-        "hyphenationDescription": "Włącz automatyczne dzielenie wyrazów."
-      }
+        "singlePage": "Pojedyncza strona"
+      },
+      "columnGap": "Szczelina kolumny",
+      "justifyText": "Justuj tekst",
+      "hyphenation": "Dzielenie wyrazów"
     },
     "search": {
       "placeholder": "Szukaj w książce (min. {min} znaków)...",
@@ -5992,29 +5871,17 @@
       "cycleFooterMode": "Tryb informacyjny stopki cyklu"
     },
     "cbz": {
-      "tabs": {
-        "view": "Zobacz",
-        "reading": "Czytanie",
-        "layout": "Układ"
-      },
       "fitMode": "Tryb dopasowania",
       "background": "Tło",
       "scrollMode": "Tryb przewijania",
       "scrollModeHint": "W przypadku webtoonów i pasków pionowych użyj opcji „Bez przerw”.",
       "readingDirection": "Kierunek czytania",
       "pageView": "Widok strony",
-      "autoFallback": "Automatyczny tryb zastępczy",
       "spreadAlignmentLabel": "Wyrównanie rozprzestrzeniania się",
-      "spreadAlignmentHint": "Wyrównanie rozkładówki jest niedostępne w automatycznym trybie zastępczym.",
       "spreadGap": "Rozłóż lukę",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Przełącznik fokusu na dwie strony",
       "forceTwoPage": "Wymuś dwie strony",
-      "off": "Wyłączone",
-      "on": "Włączone",
       "widePages": "Szerokie strony",
-      "resetBookViewSettings": "Zresetuj ustawienia widoku książki",
-      "resetConfirm": "Zresetować ustawienia widoku tej książki do ustawień globalnych?",
       "firstPage": "Pierwsza strona",
       "lastPage": "Ostatnia strona",
       "fit": {
@@ -6162,8 +6029,6 @@
   "smartScope": {
     "syncToKobo": "Synchronizuj z Kobo",
     "syncToKoboHint": "Książki pasujące do tego zakresu pojawią się na Twoim urządzeniu Kobo",
-    "visibleToAll": "Visible to all users",
-    "visibleToAllHint": "Every user can see and use this smart scope",
     "dialog": {
       "name": "Imię",
       "namePlaceholder": "np. Nieprzeczytane science-fiction",
@@ -6765,11 +6630,6 @@
       "defaultName": "Inteligentny zakres",
       "filter": "Filtruj",
       "edit": "Edytuj inteligentny zakres",
-      "koboSync": {
-        "label": "Sync to my Kobo",
-        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
-        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
-      },
       "showControlsAria": "Pokaż elementy sterujące inteligentnego zakresu",
       "hideFilter": "Ukryj filtr",
       "showFilter": "Pokaż filtr",
@@ -6777,10 +6637,7 @@
       "loadError": "Nie można załadować tego SmartScope",
       "toast": {
         "deleted": "„{name}” usunięty",
-        "deleteFailed": "Nie udało się usunąć „{name}”",
-        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
-        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
-        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
+        "deleteFailed": "Nie udało się usunąć „{name}”"
       },
       "empty": {
         "noRules": "Nie skonfigurowano żadnych reguł",

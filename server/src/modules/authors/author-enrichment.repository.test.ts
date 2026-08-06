@@ -6,6 +6,7 @@ vi.mock('drizzle-orm', () => ({
   inArray: vi.fn((left: unknown, right: unknown[]) => ({ op: 'inArray', left, right })),
   isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
   lte: vi.fn((left: unknown, right: unknown) => ({ op: 'lte', left, right })),
+  max: vi.fn((value: unknown) => ({ op: 'max', value })),
   or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
@@ -276,11 +277,11 @@ describe('AuthorEnrichmentRepository', () => {
   it('getStatusSummary maps grouped queue statuses to typed counters', async () => {
     const { db, selectBuilder } = makeDb();
     selectBuilder.groupBy.mockResolvedValue([
-      { status: 'queued', cnt: 4 },
-      { status: 'processing', cnt: 1 },
-      { status: 'rate_limited', cnt: 2 },
-      { status: 'failed', cnt: 3 },
-      { status: 'done', cnt: 10 },
+      { status: 'queued', cnt: 4, latestUpdatedAt: new Date('2026-01-01T00:00:01.000Z') },
+      { status: 'processing', cnt: 1, latestUpdatedAt: new Date('2026-01-01T00:00:02.000Z') },
+      { status: 'rate_limited', cnt: 2, latestUpdatedAt: new Date('2026-01-01T00:00:03.000Z') },
+      { status: 'failed', cnt: 3, latestUpdatedAt: new Date('2026-01-01T00:00:04.000Z') },
+      { status: 'done', cnt: 10, latestUpdatedAt: new Date('2026-01-01T00:00:05.000Z') },
     ]);
 
     const repo = new AuthorEnrichmentRepository(db as never);
@@ -289,6 +290,7 @@ describe('AuthorEnrichmentRepository', () => {
       processing: 1,
       rateLimited: 2,
       failed: 3,
+      latestFailureAt: '2026-01-01T00:00:04.000Z',
       done: 0,
       total: 10,
     });

@@ -2080,7 +2080,7 @@
         "stockGuideTitle": "Plugin nativo de sincronização de progresso",
         "stockStep1Prefix": "No seu dispositivo KOReader, vá até",
         "stockStep1Suffix": ".",
-        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
+        "stockStep2": "Defina o servidor de sincronização personalizado como a URL exibida acima.",
         "stockStep3": "Insira o nome de usuário e a senha que você criou, e depois toque em Entrar (Login).",
         "locationNote": "O BookOrbit salva localizações de EPUB compatíveis com o KOReader a partir do leitor web. A restauração deve cair bem perto da mesma posição, embora a colocação exata da linha possa variar conforme o leitor e o layout do EPUB.",
         "dangerZone": "Zona de Perigo",
@@ -4158,6 +4158,14 @@
       "text": {
         "openDetails": "Abrir detalhes"
       }
+    },
+    "move": {
+      "title": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
+      "folderCount": "{count, plural, one {# folder} many {# folders} other {# folders}}",
+      "confirm": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
+      "review": {
+        "collisions": "{count, plural, one {# name conflict} many {# name conflicts} other {# name conflicts}}"
+      }
     }
   },
   "bookMetadataFetch": {
@@ -5863,47 +5871,22 @@
     "settings": {
       "title": "Configurações",
       "ariaLabel": "Configurações do Leitor",
-      "tabs": {
-        "appearance": "Aparência",
-        "text": "Texto",
-        "layout": "Layout"
-      },
-      "appearance": {
-        "mode": "Modo",
+      "mode": {
         "light": "Claro",
-        "dark": "Escuro",
-        "colorTheme": "Tema de cor"
+        "dark": "Escuro"
       },
-      "text": {
-        "fontSize": "Tamanho da fonte",
-        "fontSizeRange": "Intervalo: 10-32px",
-        "lineHeight": "Altura da linha",
-        "lineHeightRange": "Intervalo: 0.8-3.0",
-        "fontFamily": "Família de fontes",
-        "fontFamilyDescription": "Escolha as fontes internas ou importadas para o corpo do texto.",
-        "builtIn": "Internas",
-        "yourFonts": "Suas fontes"
-      },
-      "layout": {
-        "pageSpreads": "Disposição das páginas",
-        "pageSpreadsDescription": "Escolha como esse EPUB baseado em imagem emparelha as páginas.",
+      "fontBuiltIn": "Internas",
+      "fontYours": "Suas fontes",
+      "readingFlow": "Fluxo de leitura",
+      "pageSpreads": "Disposição das páginas",
+      "pageSpreadsHint": "Escolha como esse EPUB baseado em imagem emparelha as páginas.",
+      "spread": {
         "bookDefault": "Padrão do livro",
-        "singlePage": "Página única",
-        "readingFlow": "Fluxo de leitura",
-        "readingFlowDescription": "Alterne entre rolagem contínua e páginas separadas.",
-        "paginated": "Paginado",
-        "scrolled": "Rolar",
-        "textColumns": "Colunas de texto",
-        "textColumnsRange": "Intervalo: 1-10",
-        "columnGap": "Espaçamento das colunas",
-        "columnGapRange": "Intervalo: 0-50%",
-        "maxWidth": "Largura máxima",
-        "maxWidthRange": "Intervalo: 400-1600",
-        "justifyText": "Justificar texto",
-        "justifyTextDescription": "Habilitar alinhamento de parágrafos para a largura completa.",
-        "hyphenation": "Hifenização",
-        "hyphenationDescription": "Habilitar hifenização automática na quebra de linha."
-      }
+        "singlePage": "Página única"
+      },
+      "columnGap": "Espaçamento das colunas",
+      "justifyText": "Justificar texto",
+      "hyphenation": "Hifenização"
     },
     "search": {
       "placeholder": "Buscar no livro (mín. de {min} letras)...",
@@ -5992,29 +5975,17 @@
       "cycleFooterMode": "Alternar modo de rodapé"
     },
     "cbz": {
-      "tabs": {
-        "view": "Ver",
-        "reading": "Leitura",
-        "layout": "Layout"
-      },
       "fitMode": "Modo de preenchimento",
       "background": "Fundo",
       "scrollMode": "Modo de rolagem",
       "scrollModeHint": "Use \"Sem lacunas\" para webtoons e tiras verticais.",
       "readingDirection": "Direção de leitura",
       "pageView": "Visualização da página",
-      "autoFallback": "Preenchimento automático (fallback)",
       "spreadAlignmentLabel": "Alinhamento das páginas",
-      "spreadAlignmentHint": "O alinhamento das páginas não está disponível no modo de fallback automático.",
       "spreadGap": "Espalhar espaço",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Alternar para focar em duas páginas",
       "forceTwoPage": "Forçar duas páginas",
-      "off": "Desligado",
-      "on": "Ligado",
       "widePages": "Páginas largas",
-      "resetBookViewSettings": "Redefinir configurações de exibição do livro",
-      "resetConfirm": "Redefinir as configurações de visualização deste livro para os seus padrões globais?",
       "firstPage": "Primeira página",
       "lastPage": "Última página",
       "fit": {

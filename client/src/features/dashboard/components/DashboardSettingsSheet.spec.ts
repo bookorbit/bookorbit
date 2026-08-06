@@ -113,6 +113,22 @@ describe('DashboardSettingsSheet', () => {
     expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(en.dashboard.settings.shelfNames).sort())
   })
 
+  it('offers wide-row and two-column shelf layouts', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    const wideButton = wrapper.findAll('button').find((button) => button.text().includes(en.dashboard.settings.shelfLayout.wide))
+    const twoColumnButton = wrapper.findAll('button').find((button) => button.text().includes(en.dashboard.settings.shelfLayout.twoColumns))
+
+    expect(wideButton?.attributes('aria-pressed')).toBe('true')
+    expect(twoColumnButton?.attributes('aria-pressed')).toBe('false')
+
+    await twoColumnButton?.trigger('click')
+
+    expect(wideButton?.attributes('aria-pressed')).toBe('false')
+    expect(twoColumnButton?.attributes('aria-pressed')).toBe('true')
+  })
+
   it('translates the shelf selector when the locale changes', async () => {
     const wrapper = await openSheet()
     await openShelvesTab(wrapper)

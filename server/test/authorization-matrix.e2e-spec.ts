@@ -98,6 +98,10 @@ const routeInventory = loadRouteInventory();
 
 const supportedMethods = new Set<SupportedHttpMethod>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
+function isSupportedMethod(method: string): method is SupportedHttpMethod {
+  return supportedMethods.has(method as SupportedHttpMethod);
+}
+
 function loadRouteInventory(): RouteInventory {
   const inventoryDir = join(currentDir, 'e2e/authorization-matrix/route-inventory');
   const manifest = JSON.parse(readFileSync(join(inventoryDir, 'manifest.json'), 'utf8')) as RouteInventoryManifest;
@@ -111,6 +115,36 @@ function loadRouteInventory(): RouteInventory {
     byLibraryAccess: manifest.byLibraryAccess,
     routes,
   };
+}
+
+function liveRouteLabels(app: NestFastifyApplication): string[] {
+  const allMethodPaths = new Set(routeInventory.routes.filter((route) => route.httpMethod === 'ALL').map((route) => route.path));
+  const labels = new Set<string>();
+  const printedRoutes = app.getHttpAdapter().getInstance().printRoutes({ commonPrefix: false });
+  const pathAtDepth: string[] = [];
+
+  // This test-only parser intentionally follows Fastify's printRoutes tree layout.
+  // A Fastify formatting change should fail parity and be updated here explicitly.
+  for (const line of printedRoutes.split('\n')) {
+    const match = line.match(/^((?:│ {3}| {4})*)[├└]── (.+?)(?: \(([^)]+)\))?$/);
+    if (!match) continue;
+    const [, indentation = '', pathPart, rawMethods] = match;
+    const depth = indentation.length / 4;
+    pathAtDepth.length = depth;
+    pathAtDepth.push(pathPart ?? '');
+    if (!rawMethods) continue;
+
+    const prefixedPath = pathAtDepth.join('');
+    if (!prefixedPath?.startsWith('/api/v1')) continue;
+    const path = prefixedPath.slice('/api/v1'.length) || '/';
+    if (allMethodPaths.has(path)) continue;
+
+    for (const method of rawMethods?.split(', ') ?? []) {
+      if (isSupportedMethod(method)) labels.add(`${method} ${path}`);
+    }
+  }
+
+  return [...labels].sort();
 }
 
 describe('Authorization matrix (e2e)', () => {
@@ -440,6 +474,31 @@ describe('Authorization matrix (e2e)', () => {
   });
 
   describe('guard matrix - jwt/permission/library/default-password', () => {
+    it('keeps the dashboard scroller inventory in parity with the live application', () => {
+      expect(routeInventory.routes).toHaveLength(routeInventory.totalRoutes);
+      const inventoryLabels = routeInventory.routes
+        .filter((route) => isSupportedMethod(route.httpMethod) && route.path.startsWith('/dashboard/scrollers'))
+        .map(routeLabel)
+        .sort();
+      const liveLabels = liveRouteLabels(ctx.app).filter((label) => label.includes(' /dashboard/scrollers'));
+
+      expect(liveLabels).toEqual(inventoryLabels);
+    });
+
+    it('serves the authenticated random scroller through the batch route', async () => {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/dashboard/scrollers/batch',
+        headers: authHeader(personas.allPermsUser.accessToken),
+        payload: { items: [{ id: 'random', type: 'random', limit: 3 }] },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        items: [{ id: 'random', books: expect.any(Array), failed: false }],
+      });
+    });
+
     it('rejects unauthenticated access to every non-public route', async () => {
       const failures: MatrixFailure[] = [];
       const protectedRoutes = routeInventory.routes.filter((route) => !route.isPublic && isSupportedMethod(route.httpMethod));
@@ -1297,10 +1356,6 @@ describe('Authorization matrix (e2e)', () => {
       expect([403, 404]).toContain(response.statusCode);
     });
   });
-
-  function isSupportedMethod(method: string): method is SupportedHttpMethod {
-    return supportedMethods.has(method as SupportedHttpMethod);
-  }
 
   function routeLabel(route: Pick<RouteInventoryRoute, 'httpMethod' | 'path'>): string {
     return `${route.httpMethod} ${route.path}`;

@@ -3,6 +3,10 @@ import type { ScrollerConfig } from '@bookorbit/types'
 
 const STORAGE_KEY = 'bookorbit:dashboard:config'
 
+function storedConfig(): { scrollers: ScrollerConfig[]; shelfLayout: string } {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as { scrollers: ScrollerConfig[]; shelfLayout: string }
+}
+
 describe('useDashboardConfig', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -28,7 +32,7 @@ describe('useDashboardConfig', () => {
     )
 
     const { useDashboardConfig } = await import('../useDashboardConfig')
-    const { scrollers } = useDashboardConfig()
+    const { scrollers, shelfLayout } = useDashboardConfig()
 
     expect(scrollers.value).toEqual([
       {
@@ -41,6 +45,7 @@ describe('useDashboardConfig', () => {
         smartScopeId: 42,
       },
     ])
+    expect(shelfLayout.value).toBe('wide')
   })
 
   it('clones the default config before applying mutations', async () => {
@@ -84,7 +89,7 @@ describe('useDashboardConfig', () => {
       { id: '3', type: 'smart-scope', label: 'Favorites', enabled: true, order: 2, limit: 20, smartScopeId: 42 },
     ])
 
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')).toEqual(scrollers.value)
+    expect(storedConfig()).toEqual({ scrollers: scrollers.value, shelfLayout: 'wide' })
   })
 
   it('falls back to defaults when stored JSON is malformed', async () => {
@@ -126,7 +131,7 @@ describe('useDashboardConfig', () => {
       { id: '1', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20 },
       { id: '17', type: 'smart-scope', label: 'Smart Scope', enabled: true, order: 2, limit: 20, smartScopeId: 23 },
     ])
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')).toEqual(scrollers.value)
+    expect(storedConfig()).toEqual({ scrollers: scrollers.value, shelfLayout: 'wide' })
 
     reset()
 
@@ -159,6 +164,31 @@ describe('useDashboardConfig', () => {
         limit: 20,
       },
     ])
+  })
+
+  it('persists the two-column shelf layout with the shelf configuration', async () => {
+    const { SHELF_LAYOUT, useDashboardConfig } = await import('../useDashboardConfig')
+    const { scrollers, shelfLayout, saveShelfSettings } = useDashboardConfig()
+
+    saveShelfSettings(scrollers.value, SHELF_LAYOUT.TWO_COLUMNS)
+
+    expect(shelfLayout.value).toBe(SHELF_LAYOUT.TWO_COLUMNS)
+    expect(storedConfig()).toEqual({ scrollers: scrollers.value, shelfLayout: SHELF_LAYOUT.TWO_COLUMNS })
+  })
+
+  it('normalizes an unknown stored shelf layout to wide rows', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        scrollers: [{ id: '1', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20 }],
+        shelfLayout: 'unsupported-layout',
+      }),
+    )
+
+    const { useDashboardConfig } = await import('../useDashboardConfig')
+    const { shelfLayout } = useDashboardConfig()
+
+    expect(shelfLayout.value).toBe('wide')
   })
 
   it('preserves and normalizes continue-listening and want-to-read shelves', async () => {

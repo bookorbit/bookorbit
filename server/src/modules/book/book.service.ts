@@ -19,6 +19,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { extractEpubMetadata } from '../metadata/lib/epub';
@@ -265,6 +266,7 @@ export class BookService {
     @Optional() private readonly fileRenameService: FileRenameService,
     @Optional() private readonly achievementEvents: AchievementEventsService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
+    @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -1139,6 +1141,18 @@ export class BookService {
     return result;
   }
 
+  async executeBookIdsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<number[]> {
+    const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes);
+    return this.bookRepo.findCardIds({
+      where,
+      orderBy,
+      limit: query.pagination.size,
+      offset: query.pagination.page * query.pagination.size,
+      userId,
+    });
+  }
+
   async queryJumpBucketsForLibrary(user: RequestUser, libraryId: number, query: JumpBucketsQuery): Promise<JumpBucketsResponse> {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const timeZone = this.resolveUserTimeZone(user);
@@ -1709,6 +1723,11 @@ export class BookService {
 
       if (dto.seriesMemberships !== undefined) {
         await this.seriesMemberships?.replaceForBook(id, dto.seriesMemberships, tx);
+        // After replaceForBook, because it is what creates any series row the editor named.
+        for (const membership of dto.seriesMemberships ?? []) {
+          if (membership.expectedBookCount === undefined) continue;
+          await this.seriesExpectedCount?.setManual(membership.seriesName, membership.expectedBookCount ?? null, tx);
+        }
       }
       this.throwIfMetadataUpdateFailpoint('afterSeriesMembershipsReplace');
 
@@ -2629,6 +2648,8 @@ export class BookService {
         title: meta?.title ?? undefined,
         author: authorRows[0]?.name ?? undefined,
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+        seriesName: meta?.seriesName ?? undefined,
+        seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: providerIds,
         isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,

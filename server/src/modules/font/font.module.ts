@@ -9,6 +9,6 @@ import { FontValidationService } from './font.validation.service';
 @Module({
   controllers: [FontController],
   providers: [FontService, FontRepository, FontStorageService, FontValidationService],
-  exports: [FontService],
+  exports: [FontService, FontValidationService],
 })
 export class FontModule {}

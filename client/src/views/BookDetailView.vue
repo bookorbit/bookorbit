@@ -82,6 +82,12 @@ function onMetadataSaved(updated: BookDetail) {
   detail.value = updated
 }
 
+// A moved book keeps its id but changes library, so refetch to show the new one.
+// Named apart from the onBookMoved socket subscription above.
+function handleMovedToLibrary() {
+  void fetch(bookId.value)
+}
+
 function onLocksChanged(lockedFields: BookMetadataLockField[]) {
   if (detail.value) detail.value.lockedFields = lockedFields
 }
@@ -95,7 +101,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
   <BookDetailLayout :book-id="bookId">
     <Transition name="content" mode="out-in">
       <div v-if="detail" key="detail">
-        <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" />
+        <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" @moved="handleMovedToLibrary" />
         <EditMetadataTab
           v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
           :book="detail"

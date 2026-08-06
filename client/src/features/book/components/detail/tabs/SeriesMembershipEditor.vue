@@ -16,7 +16,7 @@ const { t } = useI18n()
 const emit = defineEmits<{ 'update:modelValue': [EditableSeriesMembership[]] }>()
 
 const visibleMemberships = computed<EditableSeriesMembership[]>(() =>
-  props.modelValue.length > 0 ? props.modelValue : [{ seriesName: '', seriesIndex: null }],
+  props.modelValue.length > 0 ? props.modelValue : [{ seriesName: '', seriesIndex: null, expectedBookCount: null }],
 )
 
 const rowKeys = ref<string[]>([])
@@ -47,7 +47,7 @@ function getRowKey(index: number) {
 function updateMembership(index: number, patch: Partial<EditableSeriesMembership>) {
   if (props.disabled) return
   if (props.modelValue.length === 0 && index === 0) {
-    emit('update:modelValue', [{ seriesName: '', seriesIndex: null, ...patch }])
+    emit('update:modelValue', [{ seriesName: '', seriesIndex: null, expectedBookCount: null, ...patch }])
     return
   }
   const next = props.modelValue.map((membership, i) => (i === index ? { ...membership, ...patch } : membership))
@@ -63,12 +63,18 @@ function updateSeriesIndex(index: number, event: Event) {
   updateMembership(index, { seriesIndex: raw === '' ? null : Number.parseFloat(raw) })
 }
 
+function updateExpectedBookCount(index: number, event: Event) {
+  const raw = (event.target as HTMLInputElement).value
+  const parsed = Number.parseInt(raw, 10)
+  updateMembership(index, { expectedBookCount: raw === '' || Number.isNaN(parsed) ? null : parsed })
+}
+
 function addMembership() {
   if (props.disabled) return
   if (props.modelValue.length > 0) {
     rowKeys.value = [...rowKeys.value, createRowKey()]
   }
-  emit('update:modelValue', [...props.modelValue, { seriesName: '', seriesIndex: null }])
+  emit('update:modelValue', [...props.modelValue, { seriesName: '', seriesIndex: null, expectedBookCount: null }])
 }
 
 function removeMembership(index: number) {
@@ -101,7 +107,7 @@ function moveMembership(index: number, offset: -1 | 1) {
     <div
       v-for="(membership, index) in visibleMemberships"
       :key="getRowKey(index)"
-      class="grid grid-cols-[2rem_minmax(0,1fr)_5.5rem_auto] items-center gap-2"
+      class="grid grid-cols-[2rem_minmax(0,1fr)_5.5rem_5.5rem_auto] items-center gap-2"
     >
       <button
         v-if="index === 0"
@@ -131,7 +137,20 @@ function moveMembership(index: number, offset: -1 | 1) {
         class="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="disabled"
         placeholder="#"
+        :aria-label="t('book.detail.seriesMembership.seriesIndexLabel')"
         @input="updateSeriesIndex(index, $event)"
+      />
+      <input
+        :value="membership.expectedBookCount ?? ''"
+        type="number"
+        step="1"
+        min="1"
+        class="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="disabled"
+        :placeholder="t('book.detail.seriesMembership.totalPlaceholder')"
+        :aria-label="t('book.detail.seriesMembership.totalLabel')"
+        :title="t('book.detail.seriesMembership.totalHint')"
+        @input="updateExpectedBookCount(index, $event)"
       />
       <div class="flex items-center gap-1">
         <button

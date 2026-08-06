@@ -329,9 +329,9 @@ describe('DetailsTab cover surface', () => {
         seriesName: 'Mistborn Era 2',
         seriesIndex: 4,
         seriesMemberships: [
-          { seriesId: 22, seriesName: 'Cosmere', seriesIndex: null, displayOrder: 2 },
-          { seriesId: 20, seriesName: 'Mistborn Era 2', seriesIndex: 4, displayOrder: 0 },
-          { seriesId: 21, seriesName: 'Mistborn Saga', seriesIndex: 7.5, displayOrder: 1 },
+          { seriesId: 22, seriesName: 'Cosmere', seriesIndex: null, displayOrder: 2, expectedBookCount: null },
+          { seriesId: 20, seriesName: 'Mistborn Era 2', seriesIndex: 4, displayOrder: 0, expectedBookCount: null },
+          { seriesId: 21, seriesName: 'Mistborn Saga', seriesIndex: 7.5, displayOrder: 1, expectedBookCount: null },
         ],
       }),
     )

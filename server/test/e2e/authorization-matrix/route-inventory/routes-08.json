@@ -166,5 +166,29 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-move/book-move.controller.ts",
+    "className": "BookMoveController",
+    "methodName": "preview",
+    "httpMethod": "POST",
+    "path": "/books/move/preview",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-move/book-move.controller.ts",
+    "className": "BookMoveController",
+    "methodName": "move",
+    "httpMethod": "POST",
+    "path": "/books/move",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

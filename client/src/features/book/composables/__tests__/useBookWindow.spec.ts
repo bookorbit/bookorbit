@@ -182,6 +182,18 @@ describe('useBookWindow', () => {
     expect(window.slots.value).toHaveLength(80)
   })
 
+  it('does not refetch when only query property order changes', async () => {
+    mockBlocks(80)
+    const { query } = makeWindow()
+    await flush()
+    fetchMock.mockClear()
+
+    query.value = { sort: [{ dir: 'asc', field: 'title' }] }
+    await flush()
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('exposes the contiguous prefix for list mode', async () => {
     mockBlocks(250)
     const { window } = makeWindow()

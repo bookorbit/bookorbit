@@ -1,5 +1,4 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { inArray } from 'drizzle-orm';
 import { Observable } from 'rxjs';
 
 import type {
@@ -16,7 +15,6 @@ import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pag
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText } from '../../common/utils/metadata-text-normalize.utils';
 import type { RequestUser } from '../../common/types/request-user';
-import { books } from '../../db/schema';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
@@ -125,17 +123,18 @@ export class AuthorsService {
     }
 
     const orderMap = new Map(page.bookIds.map((id, index) => [id, index]));
-    const { rows, authorRows, fileRows, genreRows, progressRows } = await this.bookReadService.findCards({
-      where: inArray(books.id, page.bookIds),
-      orderBy: [],
-      limit: page.bookIds.length,
-      offset: 0,
-      userId: user.id,
-    });
-
-    const items = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows).sort(
-      (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
-    );
+    const cardData = await this.bookReadService.findCardsByBookIds(page.bookIds, user.id);
+    const items = assembleBookCards(
+      cardData.rows,
+      cardData.authorRows,
+      cardData.fileRows,
+      cardData.genreRows,
+      cardData.progressRows,
+      cardData.statusRows,
+      cardData.narratorRows,
+      cardData.tagRows,
+      cardData.seriesMembershipRows,
+    ).sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
     return { items, total: page.total, page: page.page, size: page.size };
   }

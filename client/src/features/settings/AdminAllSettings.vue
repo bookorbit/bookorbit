@@ -7,6 +7,7 @@ import UsersPage from '@/features/admin/UsersPage.vue'
 import OidcSettings from './OidcSettings.vue'
 import AccountActivityPage from '@/features/admin/AccountActivityPage.vue'
 import MagicLinksSettings from './MagicLinksSettings.vue'
+import ServerFontsSettings from './ServerFontsSettings.vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { ADMIN_TAB_INFO, ADMIN_TABS, normalizeAdminTab, type AdminTab as Tab } from './lib/admin-tabs'
 
@@ -54,6 +55,7 @@ const tabWidths: Record<Tab, string> = {
   'account-activity': 'max-w-6xl',
   'magic-links': 'max-w-5xl',
   oidc: 'max-w-3xl',
+  'server-fonts': 'max-w-3xl',
 }
 
 function selectTab(tab: Tab) {
@@ -89,5 +91,6 @@ function selectTab(tab: Tab) {
     <AccountActivityPage v-else-if="activeTab === 'account-activity'" />
     <MagicLinksSettings v-else-if="activeTab === 'magic-links'" :with-header="false" with-embedded-create-action />
     <OidcSettings v-else-if="activeTab === 'oidc'" embedded />
+    <ServerFontsSettings v-else-if="activeTab === 'server-fonts'" embedded />
   </div>
 </template>

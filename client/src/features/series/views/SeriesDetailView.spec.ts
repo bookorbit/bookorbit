@@ -138,7 +138,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
   }
 }
 
-function makeSeriesInfo(): SeriesDetail {
+function makeSeriesInfo(overrides: Partial<SeriesDetail> = {}): SeriesDetail {
   return {
     id: 42,
     name: 'The Series',
@@ -146,6 +146,8 @@ function makeSeriesInfo(): SeriesDetail {
     readCount: 0,
     authors: ['Author'],
     possibleGaps: [],
+    expectedBookCount: null,
+    ...overrides,
   }
 }
 
@@ -303,6 +305,27 @@ describe('SeriesDetailView', () => {
     expect(wrapper.find('[data-testid="virtual-book-grid"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="virtual-book-grid"]')).toHaveLength(1)
     expect(wrapper.get('[data-testid="series-books-section-heading"]').text()).toBe('Books')
+  })
+
+  it('shows the ownership bar only once a provider has supplied a series total', async () => {
+    mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 4, expectedBookCount: 7 }))
+
+    const wrapper = mountView()
+    await nextTick()
+
+    const bar = wrapper.get('[role="progressbar"]')
+    expect(bar.attributes('aria-valuenow')).toBe('4')
+    expect(bar.attributes('aria-valuemax')).toBe('7')
+    expect(wrapper.text()).toContain('4 of 7')
+  })
+
+  it('hides the ownership bar when no provider total is known', async () => {
+    mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 4, expectedBookCount: null }))
+
+    const wrapper = mountView()
+    await nextTick()
+
+    expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
   })
 
   it('shows grouped media sections with labels and counts when enabled', async () => {

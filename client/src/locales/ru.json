@@ -168,8 +168,7 @@
           "blush": "Смешать"
         },
         "accentColor": {
-          "label": "Цвет акцента",
-          "hint": "Controls highlights and interactive elements"
+          "label": "Цвет акцента"
         },
         "cornerRadius": {
           "label": "Corner radius",
@@ -715,7 +714,6 @@
       },
       "groupMappings": {
         "title": "Сопоставления групп",
-        "description": "Map OIDC group claims to BookOrbit permissions. Synced on every login.",
         "noPermission": "Нет разрешения",
         "empty": "Привязки групп не настроены.",
         "addMapping": "Добавить сопоставление",
@@ -757,14 +755,11 @@
         "recommendationsGroup": "Рекомендации",
         "achievementsGroup": "Достижения",
         "updatesGroup": "Обновления",
-        "importFromBooklore": "Import from Booklore",
         "bookloreImportConfigured": "Буккорный импорт настроен",
         "migrationRunning": "Миграция запущена",
         "migrationCompleted": "Миграция завершена",
         "migrationFailed": "Сбой миграции",
-        "importDescription": "One-time import of books, metadata, and reading progress from a previous Booklore installation.",
         "configuredDescription": "Источник: {name}. Переход пока не запущен - продолжайте установку для импорта.",
-        "runningDescription": "Stage: {stage} - started {started}",
         "completedDescription": "От {name} - завершено {date}",
         "migrationErrorGeneric": "Произошла ошибка во время миграции.",
         "stageInitializing": "инициализация",
@@ -851,9 +846,7 @@
         "errorLoadSuggestions": "Не удалось загрузить пользовательское сопоставление предложений",
         "requiredFields": "Требуется имя хоста, пользователя, базы данных и хоста",
         "connectionTestPassedWithWarnings": "Проверка соединения пройдена с предупреждениями",
-        "connectionTestPassedWithCount": "Connection test passed with {count} warning(s). First: {first}",
         "connectionTestPassed": "Проверка соединения пройдена",
-        "connectionOkMissingTables": "Connection ok, but {count} required table(s) are missing",
         "cannotTestMediaPathActiveRun": "Невозможно протестировать путь к медиафайлу, пока запуск активен",
         "mediaRootPathRequiredCover": "Для импортирования необходим корневой путь к файлу.",
         "useAbsolutePath": "Используйте абсолютный путь (например: /books).",
@@ -862,7 +855,6 @@
         "mediaPathValidationFailed": "Ошибка проверки пути к файлу.",
         "connectionFailedBeforeMediaPath": "Проверка соединения не удалась, прежде чем проверка пути к медиафайлу будет завершена.",
         "cannotModifySourceActiveRun": "Невозможно изменить источник, пока запуск активен",
-        "sourceSavedValidatedWarnings": "Source saved and validated with {count} warning(s)",
         "sourceSavedValidated": "Источник сохранен и проверен",
         "errorSaveValidateSource": "Не удалось сохранить или проверить источник",
         "cannotSaveMappingsActiveRun": "Невозможно сохранить сопоставления, пока запуск активен",
@@ -1204,7 +1196,6 @@
         },
         "status": {
           "inQueuePaused": "{count} в очереди - приостановлено",
-          "remaining": "{count} remaining",
           "eligible": "~{count} права"
         },
         "trigger": {
@@ -1213,8 +1204,6 @@
         },
         "lastRun": {
           "justNow": "только что",
-          "minutesAgo": "{count}m ago",
-          "hoursAgo": "{count}h ago",
           "yesterday": "вчера",
           "daysAgo": "{count, plural, one {# день назад} few {# дней назад} many {# дней назад} other {# дней назад}}",
           "label": "Последний запуск: {when}",
@@ -1287,8 +1276,7 @@
           "audnexus": "Метаданные аудиокниги, управляемые сообществом. Установка не требуется.",
           "comicvine": "Метаданные книги комиксов от ComicVine. Требуется бесплатный ключ API с comicvine.gamespot.com.",
           "ranobedb": "Японские светлые метаданные из RanobeDB. Установка не требуется.",
-          "lubimyczytac": "Каталог польских книг (lubimyczytac.pl). Страницы публичных книг не требуются.",
-          "aladin": "Korean book metadata from Aladin (알라딘). A TTB Key from aladin.co.kr is required."
+          "lubimyczytac": "Каталог польских книг (lubimyczytac.pl). Страницы публичных книг не требуются."
         },
         "blocked": {
           "google": "Книги Google требуют ключ API перед включением",
@@ -1337,8 +1325,7 @@
             "hint": "Собирайте и deduplicate жанров из каждого поставщика, назначенного в поле Genres, вместо того, чтобы останавливаться на первом результате."
           },
           "storeProviderIds": {
-            "label": "ID провайдера магазина в книгах",
-            "hint": "When fetching metadata, save the returned provider IDs (ISBN, ASIN, Goodreads ID, etc.) on the book record for more accurate future lookups."
+            "label": "ID провайдера магазина в книгах"
           }
         },
         "library": {
@@ -1681,7 +1668,6 @@
         "changePathSuffix": "файл.",
         "metadata": "Метаданные",
         "autoFetch": "Автозагрузка метаданных от провайдеров",
-        "autoFetchHint": "Automatically fetch metadata from configured providers (Google Books, iTunes, Open Library, etc.) after a file is added to Book Dock.",
         "autoFinalize": "Автозавершение",
         "enableAutoFinalize": "Включить автозавершение",
         "enableAutoFinalizeHint": "Файлы с оценкой достоверности метаданных на или выше порога будут автоматически завершены.",
@@ -1808,9 +1794,6 @@
         "copy": "Копировать",
         "never": "Никогда",
         "justNow": "Только что",
-        "minutesAgo": "{count}m ago",
-        "hoursAgo": "{count}h ago",
-        "daysAgo": "{count}d ago",
         "loadFailed": "Не удалось загрузить",
         "devicePaired": "Устройство успешно соединено",
         "devicePairedHint": "Вы готовы к настройке Kobo. Следуйте инструкциям ниже.",
@@ -2008,9 +1991,6 @@
         "loadFailed": "Не удалось загрузить настройки KOReader",
         "never": "Никогда",
         "justNow": "Только что",
-        "minutesAgo": "{count}m ago",
-        "hoursAgo": "{count}h ago",
-        "daysAgo": "{count}d ago",
         "unknown": "Неизвестен",
         "updateAvailable": "Доступно обновление",
         "upToDate": "Актуально",
@@ -2080,7 +2060,7 @@
         "stockGuideTitle": "Стандартный плагин синхронизации",
         "stockStep1Prefix": "На устройстве KOReader перейдите на",
         "stockStep1Suffix": ".",
-        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
+        "stockStep2": "Установить сервер синхронизации на URL-адрес, показанный выше.",
         "stockStep3": "Введите имя пользователя и пароль, который вы создали, а затем нажмите «Войти».",
         "locationNote": "BookOrbit сохраняет совместимые с EPUB места от веб-читателя. Восстановление должно приземляться ближе к той же позиции, хотя точное размещение линии может варьироваться в зависимости от читателя и EPUB макета.",
         "dangerZone": "Опасная зона",
@@ -2160,7 +2140,6 @@
             "saving": "Сохранение...",
             "confirmLink": "Подтвердите ссылку",
             "unlinkTitle": "Отменить привязку книги KOReader?",
-            "unlinkBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
             "unlinking": "Отсоединение..."
           },
           "dismiss": "Отклонить",
@@ -2168,7 +2147,6 @@
           "dismissing": "Отклонено...",
           "unlinking": "Отсоединение...",
           "unlinkConfirmTitle": "Отменить привязку книги KOReader?",
-          "unlinkConfirmBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
           "dismissConfirmTitle": "Закрыть {title}?",
           "dismissConfirmBody": "Это удалит его из списка несовпадающих книг. Если какое-либо устройство сообщит об этом хэше, он снова появится как новая запись.",
           "dismissAllConfirmTitle": "{count, plural, =0 {Нет несовпадающих книг} one {Распусти все # несовпадающую книгу?} few {Исключи все # несовпадающие книги?} many {Исключи все # несовпадающие книги?} other {Исключи все # несовпадающие книги?}}",
@@ -2360,7 +2338,6 @@
       "subtitle": "Чтение информации, которую пользователь добровольно решил поделиться.",
       "auditNotice": "Доступ к этому профилю записан и виден пользователю.",
       "period": "Отчетный период",
-      "periodDays": "Last {count} days",
       "durationMinutes": "{count, plural, one {# минута} few {# минут} many {# минут} other {# минут}}",
       "durationHours": "{count, plural, one {# час} few {# часов} many {# часов} other {# часов}}",
       "metrics": {
@@ -2660,7 +2637,6 @@
     },
     "hub": {
       "title": "Аннотации",
-      "totalCount": "{count} total",
       "bookCount": "{count, plural, =0 {нет книг} one {# книга} few {# книги} many {# книги} other {# книги}}",
       "noteCount": "{count, plural, =0 {нет заметок} one {# Примечание} few {# заметки} many {# заметки} other {# заметки}}",
       "export": "Экспорт",
@@ -3181,7 +3157,6 @@
         "imageRemoveFailed": "Не удалось удалить изображение автора",
         "mergeSuccess": "Объединенные {count} автора(ы); затрагиваемые книги {books}",
         "mergeFailed": "Не удалось объединить авторов",
-        "deleteSuccess": "Deleted author; affected {books} books",
         "deleteFailed": "Не удалось удалить автора"
       }
     }
@@ -3494,7 +3469,6 @@
       "sort": "Сортировка",
       "refreshingMetadata": "Обновление метаданных {processed} / {total}",
       "failedCount": "{count} не удалось",
-      "remainingCount": "{count} remaining",
       "readOnlyNotice": "Редактирование таблицы отключено на небольших экранах. Переключитесь на список или сетку для более быстрых действий.",
       "fetching": "Извлечение...",
       "updated": "Обновлено",
@@ -3837,12 +3811,6 @@
         "sortAria": "Сортировать файлы",
         "syncHistory": "История синхронизации",
         "metadataWriteBack": "Записать метаданные обратно",
-        "relative": {
-          "seconds": "{value}s ago",
-          "minutes": "{value}m ago",
-          "hours": "{value}h ago",
-          "days": "{value}d ago"
-        },
         "renameFailed": "Не удалось переименовать файл",
         "deleteFailed": "Не удалось удалить файл",
         "addFile": "Добавить файл",
@@ -3956,10 +3924,6 @@
           "summaryAria": "Чтение сводки",
           "notSet": "Не задано",
           "relative": {
-            "seconds": "{count}s ago",
-            "minutes": "{count}m ago",
-            "hours": "{count}h ago",
-            "days": "{count}d ago",
             "months": "{count, plural, =0 {# месяц назад} one {# месяц назад} few {# месяцев назад} many {# месяцев назад} other {# месяцев назад}}",
             "years": "{count, plural, =0 {# год назад} one {# год назад} few {# лет назад} many {# лет назад} other {# лет назад}}"
           },
@@ -4132,9 +4096,6 @@
         "clickToLock": "Нажмите, чтобы заблокировать",
         "clickToUnlock": "Нажмите, чтобы разблокировать"
       },
-      "progress": {
-        "complete": "{percent} complete"
-      },
       "rating": {
         "label": "Рейтинг",
         "remove": "Удалить оценку",
@@ -4157,6 +4118,14 @@
       },
       "text": {
         "openDetails": "Открыть детали"
+      }
+    },
+    "move": {
+      "title": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
+      "folderCount": "{count, plural, one {# folder} few {# folders} many {# folders} other {# folders}}",
+      "confirm": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
+      "review": {
+        "collisions": "{count, plural, one {# name conflict} few {# name conflicts} many {# name conflicts} other {# name conflicts}}"
       }
     }
   },
@@ -4194,7 +4163,6 @@
     },
     "label": {
       "paused": "Пауза",
-      "remaining": "{count} remaining",
       "processing": "Обработка {count}",
       "failed": "{count} не удалось",
       "rateLimited": "Курс {count} ограничен"
@@ -4277,8 +4245,7 @@
     },
     "upload": {
       "nDone": "{count} завершён",
-      "nFailed": "{count} не удалось",
-      "nTotal": "{count} total"
+      "nFailed": "{count} не удалось"
     },
     "fileList": {
       "emptyTitle": "Нет файлов в книжном док-баре",
@@ -4800,8 +4767,7 @@
         "trendSteady": "Стабильный темп",
         "pages": "страницы",
         "hours": "часов",
-        "readCount": "Прочитано {count}",
-        "daysLeft": "{count}d left"
+        "readCount": "Прочитано {count}"
       }
     }
   },
@@ -4857,7 +4823,6 @@
       "toggleSharing": "Переключить обмен",
       "removeSystemBeforeDelete": "Удалить обозначение системы перед удалением",
       "notesHeading": "Примечания поставщика",
-      "notesBody": "The {system} provider (superuser only) is used for password reset emails. The {defaultProvider} provider is used when sending books with no explicit provider selected. Providers marked {shared} are available to all users.",
       "deleteTitle": "Удалить поставщика?",
       "nameHostRequired": "Имя и хост обязательны",
       "created": "Поставщик создан",
@@ -5033,8 +4998,7 @@
         "description": "Приостановить синхронизацию оборудования без отключения."
       },
       "syncOnStatus": {
-        "title": "Синхронизация при смене статуса",
-        "description": "Push updates when you mark a book as reading, read, etc."
+        "title": "Синхронизация при смене статуса"
       },
       "syncOnProgress": {
         "title": "Синхронизация при обновлении",
@@ -5085,7 +5049,6 @@
       },
       "lastSynced": {
         "justNow": "Только что",
-        "minutesAgo": "{count} min ago",
         "hoursAgo": "{count, plural, =0 {# час назад} one {# час назад} few {# часов назад} many {# часов назад} other {# часов назад}}",
         "daysAgo": "{count, plural, =0 {# день назад} one {# день назад} few {# дней назад} many {# дней назад} other {# дней назад}}"
       }
@@ -5125,7 +5088,6 @@
     },
     "review": {
       "title": "Обзор темы импорт с тяжелым обложкой",
-      "subtitle": "{total} Hardcover books, {matched} matched.",
       "closeAriaLabel": "Закрыть обзор импорта",
       "searchPlaceholder": "Поиск по заголовку или автору",
       "importProgress": "Прогресс импорта",
@@ -5661,8 +5623,7 @@
       "unresolvedBooksExplanation": "Эти книги существуют в исходном коде, но не могут быть сопоставлены ни с одной книгой в вашей библиотеке.",
       "mappedUsers": "Сопоставленные пользователи ({count})",
       "mappedUsersExplanation": "Полноценное количество пользователей поступает из кэшированного плана перехода.",
-      "coverFailures": "{count} импорт(ы) обложки не удалось. Подробные строки с ошибками не сохранены.",
-      "userPreviewCounts": "{statuses} statuses, {progress} progress entries, {sessions} reading sessions, {bookmarks} bookmarks, {annotations} annotations, {collections} collection entries"
+      "coverFailures": "{count} импорт(ы) обложки не удалось. Подробные строки с ошибками не сохранены."
     },
     "unresolvedReason": {
       "noTitleAuthorMatch": "Соответствующая книга по названию или автору не найдена",
@@ -5704,9 +5665,7 @@
       "loadSuggestionsFailed": "Не удалось загрузить пользовательское сопоставление предложений",
       "sourceFieldsRequired": "Требуется имя хоста, пользователя, базы данных и хоста",
       "connectionPassedWithWarnings": "Проверка соединения пройдена с предупреждениями",
-      "connectionPassedWithWarningCount": "Connection test passed with {count} warning(s). First: {warning}",
       "connectionPassed": "Проверка соединения пройдена",
-      "connectionMissingTables": "Connection ok, but {count} required table(s) are missing",
       "cannotTestMediaWhileRunning": "Невозможно протестировать путь к медиафайлу, пока запуск активен",
       "mediaPathRequired": "Для импортирования необходим корневой путь к файлу.",
       "mediaPathAbsolute": "Используйте абсолютный путь (например: /books).",
@@ -5715,7 +5674,6 @@
       "mediaPathValidationFailed": "Ошибка проверки пути к файлу.",
       "connectionFailedBeforeMedia": "Проверка соединения не удалась, прежде чем проверка пути к медиафайлу будет завершена.",
       "cannotModifySourceWhileRunning": "Невозможно изменить источник, пока запуск активен",
-      "sourceSavedWithWarnings": "Source saved and validated with {count} warning(s)",
       "sourceSaved": "Источник сохранен и проверен",
       "saveSourceFailed": "Не удалось сохранить или проверить источник",
       "cannotSaveMappingsWhileRunning": "Невозможно сохранить сопоставления, пока запуск активен",
@@ -5863,47 +5821,22 @@
     "settings": {
       "title": "Настройки",
       "ariaLabel": "Настройки чтения",
-      "tabs": {
-        "appearance": "Внешний вид",
-        "text": "Текст",
-        "layout": "Макет"
-      },
-      "appearance": {
-        "mode": "Режим",
+      "mode": {
         "light": "Светлая",
-        "dark": "Тёмная",
-        "colorTheme": "Цветовая схема"
+        "dark": "Тёмная"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Диапазон: 10-32px",
-        "lineHeight": "Высота линии",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Семейство шрифтов",
-        "fontFamilyDescription": "Выберите встроенные или загруженные шрифты для текста тела.",
-        "builtIn": "Встроенный",
-        "yourFonts": "Ваши шрифты"
-      },
-      "layout": {
-        "pageSpreads": "Спреды страниц",
-        "pageSpreadsDescription": "Выберите, как это пары страниц EPUB на основе образа.",
+      "fontBuiltIn": "Встроенный",
+      "fontYours": "Ваши шрифты",
+      "readingFlow": "Чтение потока",
+      "pageSpreads": "Спреды страниц",
+      "pageSpreadsHint": "Выберите, как это пары страниц EPUB на основе образа.",
+      "spread": {
         "bookDefault": "Книга по умолчанию",
-        "singlePage": "Одна страница",
-        "readingFlow": "Чтение потока",
-        "readingFlowDescription": "Переключение между нагруженной и непрерывной прокруткой.",
-        "paginated": "Популярно",
-        "scrolled": "Прокрутка",
-        "textColumns": "Текстовые колонки",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Разрыв столбцов",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Выровнять текст по ширине",
-        "justifyTextDescription": "Включить выравнивание параграфов всей ширины.",
-        "hyphenation": "Перенос",
-        "hyphenationDescription": "Включить автоматическое перенос слов."
-      }
+        "singlePage": "Одна страница"
+      },
+      "columnGap": "Разрыв столбцов",
+      "justifyText": "Выровнять текст по ширине",
+      "hyphenation": "Перенос"
     },
     "search": {
       "placeholder": "Поиск в бронировании (мин. {min} символов)...",
@@ -5992,29 +5925,17 @@
       "cycleFooterMode": "Информация о нижнем колонтитуле"
     },
     "cbz": {
-      "tabs": {
-        "view": "Вид",
-        "reading": "Чтение",
-        "layout": "Макет"
-      },
       "fitMode": "По размеру",
       "background": "Справочная информация",
       "scrollMode": "Режим прокрутки",
       "scrollModeHint": "Используйте \"Без пробелов\" для вебсайтов и вертикальных полос.",
       "readingDirection": "Направление чтения",
       "pageView": "Вид страницы",
-      "autoFallback": "Auto-fallback",
       "spreadAlignmentLabel": "Распространение выравнивания",
-      "spreadAlignmentHint": "Спрэд выравнивание недоступно в режиме авто-резервного возврата.",
       "spreadGap": "Распространяемый разрыв",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Переключить фокус на две страницы",
       "forceTwoPage": "Принудительно две страницы",
-      "off": "Выкл",
-      "on": "На",
       "widePages": "Широкие страницы",
-      "resetBookViewSettings": "Сбросить настройки просмотра книги",
-      "resetConfirm": "Сбросить настройки просмотра этой книги к вашим глобальным настройкам?",
       "firstPage": "Первая страница",
       "lastPage": "Последняя страница",
       "fit": {
@@ -6589,7 +6510,6 @@
         "noEntities": "Объекты не найдены",
         "mergeCount": "Слияние ({count})",
         "deleteCount": "Удалить ({count})",
-        "totalCount": "{count} total",
         "sortLabel": "сортировка: {sortName}",
         "sort": {
           "nameAsc": "Имя А-Я",
@@ -6669,7 +6589,6 @@
       "customize": "Настроить панель инструментов",
       "allShelvesHidden": "Все полки скрыты.",
       "greeting": {
-        "night": "Good night,",
         "morning": "Доброе утро,",
         "afternoon": "Добрый день,",
         "evening": "Добрый вечер,",
@@ -6754,7 +6673,6 @@
         "emptyLibraryHint": "Как только вы добавите книги в эту библиотеку, они появятся здесь."
       },
       "querySelection": {
-        "loadedSelected": "{selected} of {total} loaded books selected.",
         "selectAllMatching": "Выбрать все {total} подходящие книги"
       }
     },

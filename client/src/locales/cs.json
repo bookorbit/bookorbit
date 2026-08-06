@@ -168,8 +168,7 @@
           "blush": "Vyprázdnit"
         },
         "accentColor": {
-          "label": "Barva zvýraznění",
-          "hint": "Controls highlights and interactive elements"
+          "label": "Barva zvýraznění"
         },
         "cornerRadius": {
           "label": "Corner radius",
@@ -644,7 +643,6 @@
       "noActiveHint": "Všechny generované kouzelné odkazy na tuto stránku vypršely nebo byly zrušeny.",
       "copyLinkAria": "Kopírovat odkaz pro {label}",
       "pauseAria": "Pozastavit {label}",
-      "resumeAria": "Resume {label}",
       "revokeAria": "Revoke {label}",
       "lastUsedLabel": "Naposledy použité {date}"
     },
@@ -715,7 +713,6 @@
       },
       "groupMappings": {
         "title": "Skupinové mapování",
-        "description": "Map OIDC group claims to BookOrbit permissions. Synced on every login.",
         "noPermission": "Bez oprávnění",
         "empty": "Nejsou nakonfigurovány žádné mapování skupin.",
         "addMapping": "Přidat mapování",
@@ -757,7 +754,6 @@
         "recommendationsGroup": "Doporučení",
         "achievementsGroup": "Úspěchy",
         "updatesGroup": "Aktualizace",
-        "importFromBooklore": "Import from Booklore",
         "bookloreImportConfigured": "Import Booklore nakonfigurován",
         "migrationRunning": "Probíhá migrace",
         "migrationCompleted": "Migrace dokončena",
@@ -779,7 +775,7 @@
         "running": "Běhání...",
         "backfillAchievements": "Úspěchy nevyplňování",
         "backfillAchievementsHint": "Přehodnotit úspěchy všech uživatelů.",
-        "backfillResult": "Processed {users} users; granted {awards} awards.",
+        "backfillResult": "Zpracovaní uživatelé {users}; uděleno {awards} ocenění.",
         "runBackfill": "Spustit Backfill",
         "checkForUpdates": "Zkontrolovat aktualizace",
         "checkForUpdatesHint": "Automaticky zkontrolovat GitHub pro nové vydání při startu a zobrazit indikátor v postranním panelu, pokud je k dispozici.",
@@ -851,9 +847,7 @@
         "errorLoadSuggestions": "Nepodařilo se načíst návrhy mapování uživatelů",
         "requiredFields": "Hostitel, uživatel, databáze a zdrojové jméno jsou vyžadovány",
         "connectionTestPassedWithWarnings": "Zkouška připojení prošla varováním",
-        "connectionTestPassedWithCount": "Connection test passed with {count} warning(s). First: {first}",
         "connectionTestPassed": "Test připojení prošel",
-        "connectionOkMissingTables": "Connection ok, but {count} required table(s) are missing",
         "cannotTestMediaPathActiveRun": "Nelze otestovat cestu k médiím, když je běh aktivní",
         "mediaRootPathRequiredCover": "Kořenový adresář médií je vyžadován pro import obalu.",
         "useAbsolutePath": "Použijte absolutní cestu (například: /books).",
@@ -862,7 +856,6 @@
         "mediaPathValidationFailed": "Ověření cesty k médiím selhalo.",
         "connectionFailedBeforeMediaPath": "Test připojení se nezdařil před dokončením ověření cesty média.",
         "cannotModifySourceActiveRun": "Nelze změnit zdroj, pokud je aktivní běh",
-        "sourceSavedValidatedWarnings": "Source saved and validated with {count} warning(s)",
         "sourceSavedValidated": "Zdroj uložen a potvrzen",
         "errorSaveValidateSource": "Nepodařilo se uložit nebo ověřit zdroj",
         "cannotSaveMappingsActiveRun": "Mapování nelze uložit, pokud je aktivní běh",
@@ -874,7 +867,6 @@
         "errorSaveMappings": "Nepodařilo se uložit mapování",
         "cannotRunDryRunActiveRun": "Nelze spustit suchý běh, když je aktivní běh",
         "saveMappingsFirst": "Nejprve uložte mapování",
-        "dryRunCompleted": "Dry-run completed: {matched} matched, {unresolved} unresolved",
         "dryRunFailed": "Dry-run selhal",
         "selectSourceForAllGroups": "Vyberte zdrojovou knihu pro všechny {count} duplicitní skupiny",
         "duplicatesResolved": "Vyřešeny duplicitní shody",
@@ -908,7 +900,6 @@
         "strategyPathMapping": "Odpovídá mapované cestě k souboru",
         "strategyTitleAuthor": "Shoduje se podle názvu a autora",
         "strategyUnavailable": "Strategie zápasu není k dispozici",
-        "userPreviewCounts": "{statuses} statuses, {progress} progress entries, {bookmarks} bookmarks, {annotations} annotations, {collections} collection entries",
         "connErrorUnreachable": "Nelze se připojit k databázovému serveru. Zkontrolujte hostitele a port.",
         "connErrorAuth": "Ověření se nezdařilo. Zkontrolujte uživatelské jméno a heslo.",
         "connErrorUnknownDatabase": "Databáze nebyla nalezena. Zkontrolujte název databáze.",
@@ -962,7 +953,6 @@
         "unresolvedSummary": "Nevyřešené shrnutí",
         "resolveDuplicateMatches": "Vyřešit duplicitní cílové shody",
         "resolveDuplicateHint": "Pro každou cílovou knihu zvolte jednu zdrojovou knihu. Doporučená volba je předem vybrána, pokud existuje jedna nejsilnější shoda.",
-        "remainingGroups": "Remaining groups:",
         "ofCount": "z {count}",
         "targetBookNum": "Cílová kniha #{id}",
         "recommended": "Doporučené",
@@ -1028,7 +1018,6 @@
         "unresolvedBooksHint": "Tyto knihy existují ve zdroji, ale nelze je shodovat s žádnou knihou ve vaší knihovně.",
         "mappedUsersHeading": "Mapovaní uživatelé ({count})",
         "mappedUsersHint": "Celkový počet uživatelů pochází z náhledu suchého běhu v mezipaměti s plánem přechodu.",
-        "coverImportsFailed": "{count} cover import(s) failed. Detailed failure rows are not stored.",
         "backToSetup": "Zpět na nastavení"
       },
       "libraries": {
@@ -1134,6 +1123,9 @@
         "account-activity": "Aktivita účtu",
         "magic-links": "Kouzelné odkazy",
         "oidc": "OIDC / SSO"
+      },
+      "serverFonts": {
+        "noFontsYet": "Zatím žádná písma serveru"
       }
     },
     "common": {
@@ -1158,7 +1150,6 @@
       "fields": {
         "title": "Hlava 1 – Celkem",
         "subtitle": "Podtitulek",
-        "description": "Description",
         "cover": "Kryt",
         "authors": "Autoři",
         "publisher": "Vydavatel",
@@ -1213,8 +1204,6 @@
         },
         "lastRun": {
           "justNow": "právě teď",
-          "minutesAgo": "{count}m ago",
-          "hoursAgo": "{count}h ago",
           "yesterday": "včera",
           "daysAgo": "{count, plural, one {Před # dnem} few {před # dny} many {před # dny} other {před # dny}}",
           "label": "Poslední spuštění: {when}",
@@ -1268,7 +1257,6 @@
           "region": "Oblasti",
           "cookie": "Cookie",
           "coverResolution": "Rozlišení titulu",
-          "country": "Country",
           "language": "Jazyk",
           "ttbKey": "TTB klíč"
         },
@@ -1286,16 +1274,13 @@
           "audible": "Pulls audiobook metadata z Audable. Není nutné žádné další nastavení.",
           "audnexus": "audiobook metadata, řízená komunitou. Není vyžadováno žádné nastavení.",
           "comicvine": "Metadata Comic book od ComicVine. Bezplatný API klíč je vyžadován z comicvine.gamespot.com.",
-          "ranobedb": "Japanese light novel metadata from RanobeDB. No setup required.",
-          "lubimyczytac": "Polský katalog knih (lubimyczytac.pl). Stránky s veřejnou knihou. Není nutné nastavit.",
-          "aladin": "Korean book metadata from Aladin (알라딘). A TTB Key from aladin.co.kr is required."
+          "lubimyczytac": "Polský katalog knih (lubimyczytac.pl). Stránky s veřejnou knihou. Není nutné nastavit."
         },
         "blocked": {
           "google": "Google Books vyžaduje API klíč, než může být povoleno",
           "hardcover": "Hardcover vyžaduje klíč API, aby mohl být povolen",
           "hardcoverTest": "Hardcover token musí projít zkouškou, než může být povolen",
-          "comicvine": "Kombinovaná verze vyžaduje API klíč",
-          "aladin": "Aladin requires a TTB Key before it can be enabled"
+          "comicvine": "Kombinovaná verze vyžaduje API klíč"
         }
       },
       "fieldRules": {
@@ -1790,7 +1775,6 @@
         "resetLibraryPattern": "Obnovit {name} na výchozí gesto",
         "tokenTitle": "Název knihy",
         "tokenSubtitle": "Rezervovat titulky",
-        "tokenAuthors": "Author(s), comma-separated",
         "tokenYear": "Rok zveřejnění",
         "tokenSeries": "Název série",
         "tokenSeriesIndex": "Ukazatel série (nulová prošívaná)",
@@ -1808,9 +1792,6 @@
         "copy": "Kopírovat",
         "never": "Nikdy",
         "justNow": "Právě teď",
-        "minutesAgo": "{count}m ago",
-        "hoursAgo": "{count}h ago",
-        "daysAgo": "{count}d ago",
         "loadFailed": "Nepodařilo se načíst",
         "devicePaired": "Zařízení bylo úspěšně spárováno",
         "devicePairedHint": "Jste připraveni nastavit svůj Kobo. Postupujte podle níže uvedených pokynů.",
@@ -2008,9 +1989,6 @@
         "loadFailed": "Nepodařilo se načíst nastavení KOReader",
         "never": "Nikdy",
         "justNow": "Právě teď",
-        "minutesAgo": "{count}m ago",
-        "hoursAgo": "{count}h ago",
-        "daysAgo": "{count}d ago",
         "unknown": "Neznámý",
         "updateAvailable": "K dispozici je aktualizace",
         "upToDate": "Aktuální",
@@ -2068,7 +2046,6 @@
         "failedPositions": "{count, plural, =0 {žádné zvýraznění pozice nepotřebují pozornost.} one {# zvýrazní pozici vyžaduje pozornost.} few {# zvýrazní pozice potřebují pozornost.} many {# zvýrazní pozice potřebují pozornost.} other {# zvýrazní pozice potřebují pozornost.}}",
         "setupGuide": "Průvodce nastavením",
         "setupSteps": "KOReader kroky nastavení",
-        "setupStepsHint": "Use the BookOrbit plugin for catalog browsing, downloads, progress, reading events, and highlights. Use the stock plugin for progress only.",
         "pluginGuideTitle": "Doplněk BookOrbit",
         "pluginStep1": "Stáhněte si přednastavený plugin výše.",
         "pluginStep2Prefix": "Rozbalit a kopírovat",
@@ -2080,7 +2057,7 @@
         "stockGuideTitle": "Synchronizační plugin pro průběh skladu",
         "stockStep1Prefix": "Na vašem zařízení KOReader, přejděte na",
         "stockStep1Suffix": ".",
-        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
+        "stockStep2": "Nastavte vlastní synchronizační server na URL zobrazenou výše.",
         "stockStep3": "Zadejte uživatelské jméno a heslo, které jste vytvořili, a poté klepněte na Přihlášení.",
         "locationNote": "BookOrbit ukládá místa EPUB kompatibilní s KOReaderem z webové čtečky. Obnova by měla být umístěna v blízkosti stejné polohy, ale přesné umístění čáry se může lišit podle čtečky a grafu EPUB.",
         "dangerZone": "Nebezpečná zóna",
@@ -2160,7 +2137,6 @@
             "saving": "Ukládání...",
             "confirmLink": "Potvrdit odkaz",
             "unlinkTitle": "Odpojit knihu KOReader?",
-            "unlinkBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
             "unlinking": "Odpojování..."
           },
           "dismiss": "Odmítnout",
@@ -2168,7 +2144,6 @@
           "dismissing": "Odstraňování...",
           "unlinking": "Odpojování...",
           "unlinkConfirmTitle": "Odpojit knihu KOReader?",
-          "unlinkConfirmBody": "Future syncs for this hash will stop resolving to {title} until it is linked again. Already synced stats will stay on their current BookOrbit book.",
           "dismissConfirmTitle": "Odmítnout {title}?",
           "dismissConfirmBody": "Tím se odstraní z vašeho seznamu neporovnaných knih. Pokud nějaké zařízení tuto hash znovu nahlásí, znovu se objeví jako nový záznam.",
           "dismissAllConfirmTitle": "{count, plural, =0 {žádné neporovnané knihy} one {Odmítnout všechny # neporovnané knihy?} few {Odmítnout všechny # neporovnané knihy?} many {Odmítnout všechny # neporovnané knihy?} other {Odmítnout všechny # neporovnané knihy?}}",
@@ -2784,7 +2759,6 @@
       "impact": "Dopad",
       "user": "Uživatel",
       "action": "Akce",
-      "description": "Description",
       "ip": "IP adresa"
     },
     "categories": {
@@ -3055,7 +3029,6 @@
       "deleteAuthor": "Odstranit autora",
       "showLess": "Zobrazit méně",
       "showMore": "Zobrazit více",
-      "lookingUpMetadata": "Looking up author metadata...",
       "noBiography": "Není k dispozici žádná biografie. Použijte menu pro aktualizaci metadat.",
       "previewFrom": "Náhled z {provider}. Uložte metadata pro jejich zachování.",
       "booksLabel": "Knihy",
@@ -3102,13 +3075,10 @@
       },
       "toast": {
         "refreshed": "Metadata autora obnovena",
-        "refreshedNoImage": "Metadata refreshed, but no author image was found.",
         "refreshFailed": "Aktualizace metadat autora se nezdařila",
-        "bulkRefreshPartial": "Refreshed {updated} author(s), {failed} failed",
         "bulkRefreshSuccess": "Obnovená metadata pro {updated} autor(y)",
         "bulkRefreshFailed": "Nepodařilo se aktualizovat vybrané autory",
-        "deleteSuccess": "{count, plural, =0 {Smazal # autora; ovlivnil to {books} knihy} one {Smazal # autora; ovlivnil to {books} knihy} few {Smazali # autorů; ovlivnili to {books} knihy} many {Smazali # autorů; ovlivnili to {books} knihy} other {Smazali # autorů; ovlivnili to {books} knihy}}",
-        "deleteFailed": "Failed to delete author(s)"
+        "deleteSuccess": "{count, plural, =0 {Smazal # autora; ovlivnil to {books} knihy} one {Smazal # autora; ovlivnil to {books} knihy} few {Smazali # autorů; ovlivnili to {books} knihy} many {Smazali # autorů; ovlivnili to {books} knihy} other {Smazali # autorů; ovlivnili to {books} knihy}}"
       }
     },
     "detail": {
@@ -3121,7 +3091,6 @@
       "edit": {
         "name": "Název",
         "sortName": "Seřadit název",
-        "description": "Description",
         "image": "Obrázek",
         "uploading": "Nahrávám...",
         "replaceImage": "Nahradit obrázek",
@@ -3135,13 +3104,11 @@
         "searchPlaceholder": "Hledat autory pro sloučení do tohoto autora",
         "searching": "Vyhledávání...",
         "bookCount": "{count, plural, =0 {Žádné knihy} one {# kniha} few {# knih} many {# knih} other {# knih}}",
-        "selectedSummary": "Selected {count} author(s), approx. {books} books affected.",
         "merging": "Slučování...",
         "mergeSelected": "Sloučit vybrané",
         "confirmLabel": "Sloučit"
       },
       "mergeDialog": {
-        "title": "Merge {count} author(s) into \"{name}\"?",
         "titleFallback": "Sloučit vybrané autory?",
         "description": "Tímto sloučíte vybrané autory do aktuálního autora a znovu propojte související knihy. Tuto akci nelze vrátit zpět.",
         "descriptionEmpty": "Tuto akci nelze vrátit zpět."
@@ -3170,7 +3137,7 @@
       },
       "toast": {
         "refreshed": "Metadata autora obnovena",
-        "refreshedNoImage": "Metadata refreshed, but no author image was found.",
+        "refreshedNoImage": "Metadata byla aktualizována, ale nebyl nalezen žádný obrázek autora.",
         "refreshFailed": "Aktualizace metadat autora se nezdařila",
         "nameRequired": "Je vyžadováno jméno autora",
         "updated": "Autor byl aktualizován",
@@ -3179,7 +3146,6 @@
         "imageUploadFailed": "Nepodařilo se nahrát obrázek autora",
         "imageRemoved": "Obrázek autora byl odstraněn",
         "imageRemoveFailed": "Nepodařilo se odstranit obrázek autora",
-        "mergeSuccess": "Merged {count} author(s); affected {books} books",
         "mergeFailed": "Sloučení autorů se nezdařilo",
         "deleteSuccess": "Vymazaný autor; ovlivněné knihy {books}",
         "deleteFailed": "Nepodařilo se odstranit autora"
@@ -3191,8 +3157,7 @@
     "unknownFormat": "neznámé",
     "collapsedSeries": {
       "label": "Série",
-      "bookCount": "{count, plural, =0 {Žádné knihy} one {# kniha} few {# knih} many {# knih} other {# knih}}",
-      "readCount": "{count} read"
+      "bookCount": "{count, plural, =0 {Žádné knihy} one {# kniha} few {# knih} many {# knih} other {# knih}}"
     },
     "card": {
       "missing": "Chybějící"
@@ -3297,7 +3262,6 @@
         "communityRating": "Komunitní hodnocení",
         "readProgress": "Průběh čtení",
         "readStatus": "Číst stav",
-        "description": "Description",
         "isbn": "ISBN",
         "metadataScore": "Skóre metadat",
         "cover": "Kryt",
@@ -3353,7 +3317,6 @@
       },
       "scoreRangePlaceholder": "0-100",
       "valuePlaceholder": "hodnota",
-      "maxPlaceholder": "max",
       "to": "do",
       "group": "Skupina",
       "addRule": "Přidat pravidlo",
@@ -3765,7 +3728,6 @@
         "comicTeamsLabel": "Týmy",
         "comicLocationsLabel": "Místa",
         "customMetadata": "Vlastní metadata",
-        "descriptionLabel": "Description",
         "unlockField": "Odemknout {field}",
         "lockField": "Zamknout {field}",
         "diffPanel": {
@@ -3838,10 +3800,7 @@
         "syncHistory": "Historie synchronizace",
         "metadataWriteBack": "Odepsání metadat",
         "relative": {
-          "seconds": "Před {value}s",
-          "minutes": "{value}m ago",
-          "hours": "{value}h ago",
-          "days": "{value}d ago"
+          "seconds": "Před {value}s"
         },
         "renameFailed": "Nepodařilo se přejmenovat soubor",
         "deleteFailed": "Nepodařilo se odstranit soubor",
@@ -3851,8 +3810,7 @@
           "label": "Seřadit:",
           "name": "Název",
           "format": "Formát",
-          "size": "Velikost",
-          "date": "Date"
+          "size": "Velikost"
         },
         "hidePaths": "Skrýt cesty",
         "showPaths": "Zobrazit cesty",
@@ -3943,8 +3901,7 @@
           "aug": "Srp",
           "sep": "Zář",
           "oct": "říjen",
-          "nov": "Lov",
-          "dec": "Dec"
+          "nov": "Lov"
         },
         "heatmap": {
           "minutesUnit": "minuty",
@@ -3957,9 +3914,6 @@
           "notSet": "Nenastaveno",
           "relative": {
             "seconds": "Před {count}s",
-            "minutes": "{count}m ago",
-            "hours": "{count}h ago",
-            "days": "{count}d ago",
             "months": "{count, plural, =0 {Před # měsícem} one {před # měsícem} few {před # měsíci} many {před # měsíci} other {před # měsíci}}",
             "years": "{count, plural, =0 {Před # rokem} one {před # rokem} few {před # lety} many {před # lety} other {před # lety}}"
           },
@@ -3971,7 +3925,6 @@
             "saveFailed": "Nepodařilo se uložit data čtení."
           },
           "eta": {
-            "max": "99h+ to finish",
             "minutes": "~{m}m k dokončení",
             "hours": "~{h}h k dokončení",
             "hoursMinutes": "~{h}h {m}m k dokončení"
@@ -4022,8 +3975,6 @@
           "title": "Relace",
           "sourceWeb": "Webová",
           "sourceManual": "Ruční",
-          "colDate": "Date",
-          "colDateMobile": "Date",
           "colDuration": "Doba trvání",
           "colDurationMobile": "Doba trvání",
           "colProgressChange": "Probíhá změna",
@@ -4158,6 +4109,14 @@
       "text": {
         "openDetails": "Otevřít podrobnosti"
       }
+    },
+    "move": {
+      "title": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
+      "folderCount": "{count, plural, one {# folder} few {# folders} many {# folders} other {# folders}}",
+      "confirm": "{count, plural, one {Move # book} few {Move # books} many {Move # books} other {Move # books}}",
+      "review": {
+        "collisions": "{count, plural, one {# name conflict} few {# name conflicts} many {# name conflicts} other {# name conflicts}}"
+      }
     }
   },
   "bookMetadataFetch": {
@@ -4272,8 +4231,7 @@
       "series": "Série",
       "seriesIndex": "Řada #",
       "genres": "Genres",
-      "genresCommaSeparated": "Žánry (oddělené čárkami)",
-      "description": "Description"
+      "genresCommaSeparated": "Žánry (oddělené čárkami)"
     },
     "upload": {
       "nDone": "{count} hotovo",
@@ -4752,7 +4710,6 @@
         "title": "Zanedbávané Gemy",
         "empty": "Všechny tvé knihy s nejvyšším hodnocením byly přečteny!",
         "rating": "{rating}/5",
-        "daysWaiting": "{count}d waiting",
         "queued": "Ve frontě",
         "addToQueue": "Přidat do fronty",
         "shuffle": "Zamíchat"
@@ -4799,9 +4756,7 @@
         "trendDown": "Populární dolů",
         "trendSteady": "Ustálené tempo",
         "pages": "stránky",
-        "hours": "hodiny",
-        "readCount": "{count} read",
-        "daysLeft": "{count}d left"
+        "hours": "hodiny"
       }
     }
   },
@@ -5085,7 +5040,6 @@
       },
       "lastSynced": {
         "justNow": "Právě teď",
-        "minutesAgo": "{count} min ago",
         "hoursAgo": "{count, plural, =0 {Před # hodinou} one {před # hodinou} few {před # hodinami} many {před # hodinami} other {před # hodinami}}",
         "daysAgo": "{count, plural, =0 {Před # dnem} one {Před # dnem} few {před # dny} many {před # dny} other {před # dny}}"
       }
@@ -5133,7 +5087,6 @@
       "blank": "prázdný",
       "noRows": "Aktuální filtry neodpovídají žádné řádky.",
       "selectRowAriaLabel": "Vybrat {title}",
-      "selectionSummary": "{count} selected: {ready} ready, {reviewed} reviewed.",
       "selectedProgress": "{count, plural, =0 {žádné aktualizace postupu} one {# Průběh aktualizace} few {# Průběžné aktualizace} many {# Průběžné aktualizace} other {# Průběžné aktualizace}}",
       "selectReady": "Vybrat připravený",
       "selectPage": "Vybrat stránku",
@@ -5579,7 +5532,6 @@
     "duplicates": {
       "title": "Vyřešit duplicitní cílové shody",
       "explanation": "Pro každou cílovou knihu zvolte jednu zdrojovou knihu. Doporučená volba je předem vybrána, pokud existuje jedna nejsilnější shoda.",
-      "remainingGroups": "Remaining groups:",
       "ofCount": "z {total}",
       "targetBookId": "Cílová kniha #{id}",
       "recommended": "Doporučené",
@@ -5660,9 +5612,7 @@
       "unresolvedBooks": "Nevyřešené knihy ({count})",
       "unresolvedBooksExplanation": "Tyto knihy existují ve zdroji, ale nelze je shodovat s žádnou knihou ve vaší knihovně.",
       "mappedUsers": "Mapovaní uživatelé ({count})",
-      "mappedUsersExplanation": "Celkový počet uživatelů pochází z náhledu suchého běhu v mezipaměti s plánem přechodu.",
-      "coverFailures": "{count} cover import(s) failed. Detailed failure rows are not stored.",
-      "userPreviewCounts": "{statuses} statuses, {progress} progress entries, {sessions} reading sessions, {bookmarks} bookmarks, {annotations} annotations, {collections} collection entries"
+      "mappedUsersExplanation": "Celkový počet uživatelů pochází z náhledu suchého běhu v mezipaměti s plánem přechodu."
     },
     "unresolvedReason": {
       "noTitleAuthorMatch": "Nebyla nalezena žádná odpovídající kniha podle názvu nebo autora",
@@ -5704,9 +5654,7 @@
       "loadSuggestionsFailed": "Nepodařilo se načíst návrhy mapování uživatelů",
       "sourceFieldsRequired": "Hostitel, uživatel, databáze a zdrojové jméno jsou vyžadovány",
       "connectionPassedWithWarnings": "Zkouška připojení prošla varováním",
-      "connectionPassedWithWarningCount": "Connection test passed with {count} warning(s). First: {warning}",
       "connectionPassed": "Test připojení prošel",
-      "connectionMissingTables": "Connection ok, but {count} required table(s) are missing",
       "cannotTestMediaWhileRunning": "Nelze otestovat cestu k médiím, když je běh aktivní",
       "mediaPathRequired": "Kořenový adresář médií je vyžadován pro import obalu.",
       "mediaPathAbsolute": "Použijte absolutní cestu (například: /books).",
@@ -5715,7 +5663,6 @@
       "mediaPathValidationFailed": "Ověření cesty k médiím selhalo.",
       "connectionFailedBeforeMedia": "Test připojení se nezdařil před dokončením ověření cesty média.",
       "cannotModifySourceWhileRunning": "Nelze změnit zdroj, pokud je aktivní běh",
-      "sourceSavedWithWarnings": "Source saved and validated with {count} warning(s)",
       "sourceSaved": "Zdroj uložen a potvrzen",
       "saveSourceFailed": "Nepodařilo se uložit nebo ověřit zdroj",
       "cannotSaveMappingsWhileRunning": "Mapování nelze uložit, pokud je aktivní běh",
@@ -5727,7 +5674,6 @@
       "saveMappingsFailed": "Nepodařilo se uložit mapování",
       "cannotDryRunWhileRunning": "Nelze spustit suchý běh, když je aktivní běh",
       "saveMappingsFirst": "Nejprve uložte mapování",
-      "dryRunCompleted": "Dry-run completed: {matched} matched, {unresolved} unresolved",
       "dryRunFailed": "Dry-run selhal",
       "selectSourceForDuplicates": "Vyberte zdrojovou knihu pro všechny {count} duplicitní skupiny",
       "duplicatesResolved": "Vyřešeny duplicitní shody",
@@ -5863,47 +5809,22 @@
     "settings": {
       "title": "Nastavení",
       "ariaLabel": "Nastavení čtečky",
-      "tabs": {
-        "appearance": "Vzhled",
-        "text": "Text",
-        "layout": "Rozložení"
-      },
-      "appearance": {
-        "mode": "Režim",
+      "mode": {
         "light": "Světlý",
-        "dark": "Tmavý",
-        "colorTheme": "Barevný motiv"
+        "dark": "Tmavý"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Rozsah: 10-32px",
-        "lineHeight": "Výška čáry",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Rodina písma",
-        "fontFamilyDescription": "Vyberte vestavěná nebo nahraná písma pro text těla.",
-        "builtIn": "Vestavěné",
-        "yourFonts": "Vaše písma"
-      },
-      "layout": {
-        "pageSpreads": "Rozložení stránky",
-        "pageSpreadsDescription": "Vyberte si, jak tyto EPUB stránky založené na obrázcích.",
+      "fontBuiltIn": "Vestavěné",
+      "fontYours": "Vaše písma",
+      "readingFlow": "Měření průtoku",
+      "pageSpreads": "Rozložení stránky",
+      "pageSpreadsHint": "Vyberte si, jak tyto EPUB stránky založené na obrázcích.",
+      "spread": {
         "bookDefault": "Výchozí rezervace",
-        "singlePage": "Jedna stránka",
-        "readingFlow": "Měření průtoku",
-        "readingFlowDescription": "Přepínání mezi stránkováním a spojitým rolováním.",
-        "paginated": "Stránkováno",
-        "scrolled": "Posunout",
-        "textColumns": "Sloupce textu",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Mezera sloupce",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Zarovnat text",
-        "justifyTextDescription": "Povolit zarovnání odstavce na celou šířku.",
-        "hyphenation": "Hyfenace",
-        "hyphenationDescription": "Povolit automatickou pomlčku slova."
-      }
+        "singlePage": "Jedna stránka"
+      },
+      "columnGap": "Mezera sloupce",
+      "justifyText": "Zarovnat text",
+      "hyphenation": "Hyfenace"
     },
     "search": {
       "placeholder": "Hledat v knize (min {min} znaků)...",
@@ -5992,29 +5913,17 @@
       "cycleFooterMode": "Cykovat informační režim zápatí"
     },
     "cbz": {
-      "tabs": {
-        "view": "Zobrazit",
-        "reading": "Čtení",
-        "layout": "Rozložení"
-      },
       "fitMode": "Přizpůsobit režim",
       "background": "Pozadí",
       "scrollMode": "Režim rolování",
       "scrollModeHint": "Pro webové hračky a vertikální proužky použijte \"Žádné mezery\".",
       "readingDirection": "Směr čtení",
       "pageView": "Zobrazení stránky",
-      "autoFallback": "Auto-fallback",
       "spreadAlignmentLabel": "Zarovnání rozpětí",
-      "spreadAlignmentHint": "Zarovnání šíře není v režimu automatického záložního nastavení dostupné.",
       "spreadGap": "Rozšíření mezery",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Přepínání dvoustránkového režimu ostření",
       "forceTwoPage": "Vynutit dvoustránku",
-      "off": "Vypnuto",
-      "on": "Zapnuto",
       "widePages": "Široké stránky",
-      "resetBookViewSettings": "Obnovit nastavení zobrazení knihy",
-      "resetConfirm": "Obnovit nastavení zobrazení pro tuto knihu na vaše globální nastavení?",
       "firstPage": "První stránka",
       "lastPage": "Poslední stránka",
       "fit": {
@@ -6356,8 +6265,7 @@
         "notEnoughData": "Pro tento graf je třeba alespoň číst {count}."
       },
       "readingHeatmap": {
-        "title": "Čtení topné mapy",
-        "notEnoughData": "Need activity on at least {count} days for this chart."
+        "title": "Čtení topné mapy"
       },
       "readingPace": {
         "title": "Čtení tempa",

@@ -1133,7 +1133,15 @@
         "users": "Uporabniki",
         "account-activity": "Dejavnost računov",
         "magic-links": "Čarobne povezave",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Strežniške pisave"
+      },
+      "serverFonts": {
+        "title": "Strežniške pisave",
+        "subtitle": "Naložite pisave, ki jih lahko vsak uporabnik izbere v bralniku e-knjig, ne da bi moral naložiti svoje.",
+        "listLabel": "Strežniške pisave",
+        "noFontsYet": "Še ni strežniških pisav",
+        "noFontsHint": "Pisave, ki jih dodate tukaj, se prikažejo v bralniku vsakega uporabnika."
       }
     },
     "common": {
@@ -1668,7 +1676,12 @@
         "deleteFamilyFailed": "Brisanje družine pisav ni uspelo",
         "demoCannotManage": "Demo-omejeni račun ne more upravljati pisav",
         "fileAdded": "\"{name}\" dodano",
-        "uploadFailed": "Nalaganje ni uspelo"
+        "uploadFailed": "Nalaganje ni uspelo",
+        "serverFontsTitle": "Strežniške pisave (v skupni rabi s strani skrbnika)",
+        "serverFontsHint": "Te pisave vam je poslal skrbnik strežnika. Eno izklopite, da je ne boste videli v bralniku.",
+        "serverFontsShown": "{count} od {total} prikazanih",
+        "serverFontsAllHidden": "Vse strežniške pisave so skrite. Vaš bralnik bo ponudil samo vgrajene in vaše lastne pisave.",
+        "serverFontVisibilityFailed": "Vidnosti pisave strežnika ni bilo mogoče posodobiti"
       },
       "bookDock": {
         "title": "Odložišče knjig",
@@ -2080,7 +2093,7 @@
         "stockGuideTitle": "Vgrajeni vtičnik za sinhronizacijo napredka",
         "stockStep1Prefix": "Na vaši napravi KOReader pojdite na",
         "stockStep1Suffix": ".",
-        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
+        "stockStep2": "Nastavite strežnik za sinhronizacijo po meri na zgoraj prikazani URL.",
         "stockStep3": "Vnesite uporabniško ime in geslo, ki ste ju ustvarili, nato tapnite Prijava.",
         "locationNote": "BookOrbit shrani lokacije EPUB, združljive s KOReader, iz spletnega bralnika. Obnovitev naj bi pristala blizu enakega položaja, čeprav se natančna postavitev vrstice lahko razlikuje glede na bralnik in postavitev EPUB.",
         "dangerZone": "Nevarno območje",
@@ -2873,6 +2886,7 @@
       "BookBulkUpdateTags": "Posodobi oznake knjig",
       "BookBulkSetMetadataLock": "Nastavitev zaklepanja metapodatkov",
       "BookBulkEditMetadata": "Urejanje metapodatkov knjige",
+      "BookBulkMoveLibrary": "Prestavi knjige v drugo knjižnico",
       "BookReadingStateReset": "Ponastavi stanje branja",
       "BookWriteAndRename": "Zapiši metapodatke in preimenuj datoteko",
       "CollectionCreate": "Ustvari zbirko",
@@ -3331,8 +3345,12 @@
         "isFinished": "je zaključeno",
         "isLocked": "je zaklenjeno",
         "isUnlocked": "je odklenjeno",
-        "isUpNext": "je naslednje"
+        "isUpNext": "je naslednje",
+        "isTrue": "je da",
+        "isFalse": "je ne"
       },
+      "customFieldsGroup": "Polja po meri",
+      "customFieldFallback": "Polje po meri",
       "anyProvider": "Kateri koli ponudnik",
       "communityRatingProvider": "Ponudnik ocen skupnosti",
       "loadingLibraries": "Nalaganje knjižnic ...",
@@ -4077,7 +4095,11 @@
         "seriesPlaceholder": "Serija",
         "moveUp": "Premakni navzgor",
         "moveDown": "Premakni navzdol",
-        "removeSeries": "Odstrani serijo"
+        "removeSeries": "Odstrani serijo",
+        "seriesIndexLabel": "Vrstni red v seriji",
+        "totalLabel": "Knjige v seriji",
+        "totalPlaceholder": "od",
+        "totalHint": "Skupno število knjig v tej seriji. Deljeno z vsemi, ki imajo to serijo."
       }
     },
     "table": {
@@ -4157,6 +4179,69 @@
       },
       "text": {
         "openDetails": "Odpri podrobnosti"
+      }
+    },
+    "move": {
+      "title": "{count, plural, one {Premakni # knjigo} two {Premakni # knjigi} few {Premakni # knjige} other {Premakni # knjig}}",
+      "subtitle": "Datoteke se premaknejo na disku v ciljno knjižnico. To lahko spremeni, kdo lahko vidi te knjige.",
+      "searchPlaceholder": "Iskanje po knjižnicah",
+      "currentLibrary": "Trenutno",
+      "folderCount": "{count, plural, one {# mapa} two {# mapi} few {# mape} other {# map}}",
+      "continue": "Nadaljuj",
+      "back": "Nazaj",
+      "confirm": "{count, plural, one {Premakni # knjigo} two {Premakni # knjigi} few {Premakni # knjige} other {Premakni # knjig}}",
+      "action": "Premakni v knjižnico",
+      "review": {
+        "ready": "{count} pripravljeno",
+        "collisions": "{count, plural, one {# spor pri imenu} two {# spora pri imenu} few {# spori pri imenu} other {# sporov pri imenu}}",
+        "ineligible": "{count} se ne more premakniti",
+        "alreadyThere": "{count} je že tam",
+        "collisionsHeading": "Konflikt imen",
+        "ineligibleHeading": "Se ne more premakniti",
+        "moreCollisions": "in še {count} več"
+      },
+      "policy": {
+        "suggested": "Uporabi predlagano",
+        "keep_both": "Obdrži oboje",
+        "merge": "Združi",
+        "skip": "Preskoči"
+      },
+      "collision": {
+        "folder_path": "To ime mape že uporablja knjiga",
+        "file_path": "Datoteka že uporablja to pot",
+        "hash_duplicate": "Identičen izvod je že v tej knjižnici"
+      },
+      "ineligible": {
+        "book_not_present": "Datoteke za to knjigo manjkajo",
+        "no_content_file": "Ta knjiga nima berljive datoteke",
+        "multi_file_target_per_file": "Cilj shrani eno datoteko na knjigo, ta knjiga pa ima {detail} datotek",
+        "no_source_access": "Knjižnice, v kateri je ta knjiga, ne morete urejati",
+        "pattern_unresolved": "Ciljna knjižnica nima uporabnega vzorca poimenovanja",
+        "path_too_long": "Ciljna pot bi bila predolga",
+        "path_outside_target_root": "Ciljna pot bi bila zunaj mape knjižnice"
+      },
+      "warning": {
+        "accessLoss": "{user} ne bo več videl {count} teh knjig",
+        "koboImpact": "{count} knjig bo zapustilo Kobo uporabnika {user} ob naslednji sinhronizaciji",
+        "layout": {
+          "wrap_into_folder": "{count} knjig bo vsaka shranjena v svoji mapi",
+          "dissolve_folder": "{count} map s knjigami bo raztopljenih v posamezne datoteke"
+        },
+        "crossDevice": "Datoteke se premaknejo na drug pogon, kjer se kopirajo, preverijo in nato odstranijo."
+      },
+      "progress": {
+        "label": "Prestavitev knjig v {library}",
+        "failed": "{count} neuspešno"
+      },
+      "done": {
+        "summary": "Premaknjenih {count} knjig v {library}",
+        "merged": "{count} združeno s kopijami, ki so že tam",
+        "skipped": "{count} preskočeno",
+        "failed": "{count} neuspešno"
+      },
+      "toast": {
+        "success": "Premaknjenih {count} knjig v {library}",
+        "partial": "Premaknjenih {moved} knjig, {failed} ni uspelo"
       }
     }
   },
@@ -4690,6 +4775,14 @@
         "upNextInSeries": "Naslednje v seriji",
         "random": "Odkrij nekaj novega",
         "smartScope": "Pametni obseg"
+      },
+      "shelfLayout": {
+        "title": "Razporeditev polic",
+        "description": "Izberite, kako so police razporejene na večjih zaslonih.",
+        "wide": "Široke vrstice",
+        "wideDescription": "Prikaži eno polico na vrsto.",
+        "twoColumns": "Dva stolpca",
+        "twoColumnsDescription": "Prikažite dve polici na vrsto."
       },
       "reorderHintWidget": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje gradnika.",
       "reorderHintShelf": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje police.",
@@ -5863,46 +5956,66 @@
     "settings": {
       "title": "Nastavitve",
       "ariaLabel": "Nastavitve bralnika",
-      "tabs": {
-        "appearance": "Videz",
-        "text": "Besedilo",
-        "layout": "Postavitev"
-      },
-      "appearance": {
-        "mode": "Način",
+      "reset": "Ponastavi na privzeto",
+      "modeLabel": "Barvni način",
+      "mode": {
         "light": "Svetlo",
-        "dark": "Temno",
-        "colorTheme": "Barvna tema"
+        "dark": "Temno"
       },
-      "text": {
-        "fontSize": "Velikost pisave",
-        "fontSizeRange": "Obseg: 10-32px",
-        "lineHeight": "Višina vrstice",
-        "lineHeightRange": "Obseg: 0.8-3.0",
-        "fontFamily": "Družina pisav",
-        "fontFamilyDescription": "Izberite vgrajene ali naložene pisave za besedilo.",
-        "builtIn": "Vgrajeno",
-        "yourFonts": "Vaše pisave"
+      "textSize": "Velikost besedila",
+      "textSizeSmaller": "Manjše besedilo",
+      "textSizeLarger": "Večje besedilo",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Barva strani",
+      "font": "Pisava",
+      "fontBuiltIn": "Vgrajeno",
+      "fontServer": "Strežniške pisave",
+      "fontYours": "Vaše pisave",
+      "lineSpacing": "Razmik med vrsticami",
+      "pageWidth": "Širina strani",
+      "pageWidthNarrow": "Ozko",
+      "pageWidthMedium": "Srednje",
+      "pageWidthWide": "Široko",
+      "pageWidthFull": "Polno",
+      "readingFlow": "Potek branja",
+      "flow": {
+        "paginated": "Strani",
+        "scrolled": "Pomikanje"
       },
-      "layout": {
-        "pageSpreads": "Razpon strani",
-        "pageSpreadsDescription": "Izberite, kako ta na slikah temelječ EPUB združuje strani.",
+      "pageSpreads": "Razpored strani",
+      "pageSpreadsHint": "Izberite, kako ta slikovna datoteka EPUB združuje strani.",
+      "spread": {
         "bookDefault": "Privzeto za knjigo",
-        "singlePage": "Ena stran",
-        "readingFlow": "Potek branja",
-        "readingFlowDescription": "Preklapljajte med branjem po straneh in neprekinjenim drsenjem.",
-        "paginated": "Po straneh",
-        "scrolled": "Drsenje",
-        "textColumns": "Stolpci besedila",
-        "textColumnsRange": "Obseg: 1-10",
-        "columnGap": "Razmik med stolpci",
-        "columnGapRange": "Obseg: 0-50%",
-        "maxWidth": "Največja širina",
-        "maxWidthRange": "Obseg: 400-1600",
-        "justifyText": "Poravnaj besedilo",
-        "justifyTextDescription": "Omogoči poravnavo odstavkov na polno širino.",
-        "hyphenation": "Deljenje besed",
-        "hyphenationDescription": "Omogoči samodejno deljenje besed."
+        "singlePage": "Ena stran"
+      },
+      "advanced": "Napredna postavitev",
+      "columns": "Stolpci",
+      "columnsFewer": "Manj stolpcev",
+      "columnsMore": "Več stolpcev",
+      "columnGap": "Razmik med stolpci",
+      "justifyText": "Poravnaj besedilo",
+      "hyphenation": "Deljenje besed",
+      "themes": {
+        "default": "Privzeto",
+        "gray": "Siva",
+        "sepia": "Sepija",
+        "crimson": "Škrlatna",
+        "meadow": "Travnik",
+        "rosewood": "Palisandr",
+        "azure": "Azur",
+        "dawnlight": "Zora",
+        "ember": "Žerjavica",
+        "aurora": "Avrora",
+        "ocean": "Ocean",
+        "mist": "Meglica",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Privzeto za knjigo",
+        "serif": "Serif",
+        "sansSerif": "Sans-serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -5992,29 +6105,17 @@
       "cycleFooterMode": "Preklopi način nožne vrstice"
     },
     "cbz": {
-      "tabs": {
-        "view": "Pogled",
-        "reading": "Branje",
-        "layout": "Postavitev"
-      },
       "fitMode": "Način prilagajanja",
       "background": "Ozadje",
       "scrollMode": "Način drsenja",
       "scrollModeHint": "Uporabite \"Brez vrzeli\" za webtoone in navpične trakove.",
       "readingDirection": "Smer branja",
       "pageView": "Pogled strani",
-      "autoFallback": "Samodejni nadomestni način",
       "spreadAlignmentLabel": "Poravnava razpona",
-      "spreadAlignmentHint": "Poravnava razpona ni na voljo v samodejnem nadomestnem načinu.",
       "spreadGap": "Razmik",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Preklop na dvostransko pogled",
       "forceTwoPage": "Vsili dve strani",
-      "off": "Izklopljeno",
-      "on": "Vklopljeno",
       "widePages": "Široke strani",
-      "resetBookViewSettings": "Ponastavi nastavitve pogleda knjige",
-      "resetConfirm": "Ali želite ponastaviti nastavitve pogleda za to knjigo na globalne privzete vrednosti?",
       "firstPage": "Prva stran",
       "lastPage": "Zadnja stran",
       "fit": {
@@ -6084,6 +6185,10 @@
   "series": {
     "completion": {
       "readOfTotal": "prebranih {read} od {total} ({percentage} %)"
+    },
+    "ownership": {
+      "label": "V knjižnici",
+      "ownedOfExpected": "{owned} od {expected} v knjižnici"
     },
     "gaps": {
       "label": "Možne vrzeli:"
@@ -6889,7 +6994,8 @@
       "users": "Uporabniki",
       "account-activity": "Dejavnost računa",
       "magic-links": "Čarobne povezave",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Strežniške pisave"
     },
     "system": {
       "file-naming": "Poimenovanje datotek",

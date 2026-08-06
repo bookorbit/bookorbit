@@ -51,8 +51,8 @@ describe('mapIssueToCandidate', () => {
       expect.objectContaining({
         provider: MetadataProviderKey.COMICVINE,
         providerId: '777',
-        title: 'Series Name #12.5 - The Origin',
-        subtitle: 'The Origin',
+        title: 'The Origin',
+        displayTitle: 'Series Name #12.5 - The Origin',
         authors: ['Writer A'],
         description: 'Fallback synopsis',
         publishedYear: 2024,
@@ -79,6 +79,75 @@ describe('mapIssueToCandidate', () => {
     );
   });
 
+  it('never sets subtitle - comics have no ComicInfo.xml subtitle concept distinct from title', () => {
+    const withName = mapIssueToCandidate(makeIssue({ name: 'The Origin' }));
+    expect(withName.subtitle).toBeUndefined();
+
+    const withoutName = mapIssueToCandidate(makeIssue({ name: null }));
+    expect(withoutName.subtitle).toBeUndefined();
+  });
+
+  describe('series total books', () => {
+    it('takes the issue count from the volume the caller searched', () => {
+      const candidate = mapIssueToCandidate(makeIssue(), { volumeIssueCount: 50 });
+      expect(candidate.seriesTotalBooks).toBe(50);
+    });
+
+    it('stays undefined when no volume record was available, as on a general issue search', () => {
+      expect(mapIssueToCandidate(makeIssue()).seriesTotalBooks).toBeUndefined();
+      expect(mapIssueToCandidate(makeIssue(), {}).seriesTotalBooks).toBeUndefined();
+    });
+
+    it('rejects an out-of-range issue count', () => {
+      expect(mapIssueToCandidate(makeIssue(), { volumeIssueCount: 0 }).seriesTotalBooks).toBeUndefined();
+      expect(mapIssueToCandidate(makeIssue(), { volumeIssueCount: 10_001 }).seriesTotalBooks).toBeUndefined();
+    });
+  });
+
+  describe('title', () => {
+    it('uses the issue name verbatim, not a series/issue-number concatenation', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: 'The Origin', volume: { id: 10, name: 'Series Name' }, issue_number: '12.5' }));
+      expect(candidate.title).toBe('The Origin');
+    });
+
+    it('stays unset when the issue has no name, leaving any existing title alone', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: null, volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.title).toBeUndefined();
+    });
+
+    it('stays unset when the issue name is an empty string', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '', volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.title).toBeUndefined();
+    });
+
+    it('stays unset when the issue name is only whitespace', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '   ', volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.title).toBeUndefined();
+    });
+
+    it('trims surrounding whitespace from the issue name', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '  The Origin  ' }));
+      expect(candidate.title).toBe('The Origin');
+    });
+  });
+
+  describe('displayTitle', () => {
+    it('concatenates series, issue number, and name when a name is present', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: 'The Origin', volume: { id: 10, name: 'Series Name' }, issue_number: '12.5' }));
+      expect(candidate.displayTitle).toBe('Series Name #12.5 - The Origin');
+    });
+
+    it('omits the name suffix when the issue has no name', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: null, volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.displayTitle).toBe('Series Name #7');
+    });
+
+    it('omits the name suffix when the issue name is an empty string', () => {
+      const candidate = mapIssueToCandidate(makeIssue({ name: '', volume: { id: 10, name: 'Series Name' }, issue_number: '7' }));
+      expect(candidate.displayTitle).toBe('Series Name #7');
+    });
+  });
+
   it('uses store_date fallback and treats malformed years as unknown', () => {
     const fromStoreDate = mapIssueToCandidate(
       makeIssue({
@@ -96,7 +165,7 @@ describe('mapIssueToCandidate', () => {
         store_date: null,
       }),
     );
-    expect(malformedYear.title).toBe('Series Name #7');
+    expect(malformedYear.displayTitle).toBe('Series Name #7');
     expect(malformedYear.publishedYear).toBeUndefined();
   });
 

@@ -181,6 +181,18 @@ describe('BookRepository', () => {
     });
   });
 
+  it('findCardIds applies card query pagination without running enrichment queries', async () => {
+    const chain = makeSelectChain('offset', [{ id: 9 }, { id: 3 }]);
+    const db = { select: vi.fn().mockReturnValue(chain) };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.findCardIds({ where: undefined, orderBy: [], limit: 20, offset: 40, userId: 7 })).resolves.toEqual([9, 3]);
+
+    expect(db.select).toHaveBeenCalledOnce();
+    expect(chain.limit).toHaveBeenCalledWith(20);
+    expect(chain.offset).toHaveBeenCalledWith(40);
+  });
+
   it('findById returns null when no matching book exists', async () => {
     const db = {
       select: vi.fn().mockReturnValue(makeSelectChain('limit', [])),

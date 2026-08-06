@@ -1,6 +1,7 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { normalizeSeriesTotalBooks } from '../../../../common/utils/series-total-books.utils';
 import { HardcoverBookWithEditions, HardcoverCachedContributor, HardcoverEdition, HardcoverSearchDocument } from './hardcover.types';
 
 function parseYear(releaseYear: number | undefined | null, releaseDate: string | undefined): number | undefined {
@@ -48,6 +49,28 @@ function resolveEditionPublishedDate(edition: HardcoverEdition, book: HardcoverB
   return parseDate(edition.release_year, edition.release_date) ?? parseDate(book.release_year, book.release_date);
 }
 
+// Hardcover's subtitle field is legacy and unmaintained; librarians embed the
+// subtitle in the title separated by a colon. Mirror Hardcover's own display
+// rule (confirmed by their developers): split on the first colon once the
+// title exceeds 60 characters. Short colon titles like "2001: A Space Odyssey"
+// stay untouched. An API-provided subtitle is kept verbatim: it blocks the
+// split unless it merely duplicates the embedded part, in which case the
+// title is trimmed so the subtitle does not appear twice.
+const MAX_UNSPLIT_TITLE_LENGTH = 60;
+
+function splitEmbeddedSubtitle(title: string, subtitle: string | undefined): { title: string; subtitle: string | undefined } {
+  if (title.length <= MAX_UNSPLIT_TITLE_LENGTH) return { title, subtitle };
+  const colonIndex = title.indexOf(':');
+  if (colonIndex === -1) return { title, subtitle };
+  const baseTitle = title.slice(0, colonIndex).trim();
+  const embeddedSubtitle = title.slice(colonIndex + 1).trim();
+  if (!baseTitle || !embeddedSubtitle) return { title, subtitle };
+  const providedSubtitle = subtitle?.trim();
+  if (!providedSubtitle) return { title: baseTitle, subtitle: embeddedSubtitle };
+  if (embeddedSubtitle.toLowerCase() === providedSubtitle.toLowerCase()) return { title: baseTitle, subtitle };
+  return { title, subtitle };
+}
+
 function normalizeCommunityRating(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5 ? value : undefined;
 }
@@ -60,12 +83,13 @@ export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandida
   const { isbn10, isbn13 } = pickIsbn(doc.isbns);
   const communityRating = normalizeCommunityRating(doc.rating);
   const communityRatingCount = normalizeCommunityRatingCount(doc.ratings_count);
+  const { title, subtitle } = splitEmbeddedSubtitle(doc.title, doc.subtitle);
 
   return {
     provider: MetadataProviderKey.HARDCOVER,
     providerId: doc.slug,
-    title: doc.title,
-    subtitle: doc.subtitle,
+    title,
+    subtitle,
     description: doc.description,
     authors: doc.author_names ?? [],
     pageCount: doc.pages,
@@ -93,13 +117,14 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
   const authors = editionAuthors.length > 0 ? editionAuthors : extractAuthorsFromContributors(book.cached_contributors);
   const communityRating = normalizeCommunityRating(book.rating);
   const communityRatingCount = normalizeCommunityRatingCount(book.ratings_count);
+  const { title, subtitle } = splitEmbeddedSubtitle(edition.title ?? book.title, edition.subtitle ?? book.subtitle);
 
   return {
     provider: MetadataProviderKey.HARDCOVER,
     providerId: book.slug,
     hardcoverEditionId: String(edition.id),
-    title: edition.title ?? book.title,
-    subtitle: edition.subtitle ?? book.subtitle,
+    title,
+    subtitle,
     description: book.description,
     authors,
     publisher: edition.publisher?.name,
@@ -111,6 +136,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     isbn13: edition.isbn_13,
     seriesName: book.featured_book_series?.series?.name,
     seriesIndex: book.featured_book_series?.position ?? undefined,
+    seriesTotalBooks: normalizeSeriesTotalBooks(book.featured_book_series?.series?.books_count),
     coverUrl: edition.image?.url ?? book.image?.url,
     sourceUrl: `https://hardcover.app/books/${book.slug}`,
     ...(communityRating !== undefined ? { communityRating } : {}),

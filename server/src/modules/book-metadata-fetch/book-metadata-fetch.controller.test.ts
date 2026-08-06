@@ -109,7 +109,7 @@ describe('BookMetadataFetchController', () => {
   });
 
   it('returns status summary merged with paused state and session snapshot', async () => {
-    queueRepo.getStatusSummary.mockResolvedValue({ queued: 3, processing: 1, failed: 2 });
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 3, processing: 1, failed: 2, latestFailureAt: '2026-01-01T00:00:00.000Z' });
     configService.isPaused.mockResolvedValue(true);
     session.getSnapshot.mockReturnValue({ sessionTotal: 7, sessionDone: 3, currentItemName: 'Book' });
 
@@ -117,6 +117,7 @@ describe('BookMetadataFetchController', () => {
       queued: 3,
       processing: 1,
       failed: 2,
+      latestFailureAt: '2026-01-01T00:00:00.000Z',
       paused: true,
       sessionTotal: 7,
       sessionDone: 3,

@@ -1,4 +1,4 @@
-import type { MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
+import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
 
 export { getProviderColor, providerBadgeStyle, providerActivePillStyle } from '@/lib/provider-colors'
 
@@ -6,6 +6,10 @@ const COVER_PROXY_PATH = '/api/v1/books/cover/proxy'
 
 export function getProviderLabel(provider: MetadataProviderKey, providers: readonly MetadataProviderInfo[]): string {
   return providers.find((p) => p.key === provider)?.label ?? provider
+}
+
+export function resolveCandidateDisplayTitle(candidate: Pick<MetadataCandidate, 'title' | 'displayTitle'>): string | undefined {
+  return candidate.displayTitle ?? candidate.title
 }
 
 function currentOrigin(): string | null {

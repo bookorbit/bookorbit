@@ -168,8 +168,7 @@
           "blush": "Blush"
         },
         "accentColor": {
-          "label": "Accent farve",
-          "hint": "Controls highlights and interactive elements"
+          "label": "Accent farve"
         },
         "cornerRadius": {
           "label": "Corner radius",
@@ -715,7 +714,6 @@
       },
       "groupMappings": {
         "title": "Grupper Tilknytninger",
-        "description": "Map OIDC group claims to BookOrbit permissions. Synced on every login.",
         "noPermission": "Ingen tilladelse",
         "empty": "Ingen gruppe tilknytninger konfigureret.",
         "addMapping": "Tilføj kortlægning",
@@ -757,7 +755,6 @@
         "recommendationsGroup": "Anbefalinger",
         "achievementsGroup": "Bedrifter",
         "updatesGroup": "Opdateringer",
-        "importFromBooklore": "Import from Booklore",
         "bookloreImportConfigured": "Booklore import konfigureret",
         "migrationRunning": "Migration kører",
         "migrationCompleted": "Migration fuldført",
@@ -853,7 +850,6 @@
         "connectionTestPassedWithWarnings": "Forbindelsestest bestået med advarsler",
         "connectionTestPassedWithCount": "Forbindelsestest bestået med {count} advarsel(s). Først: {first}",
         "connectionTestPassed": "Forbindelsestesten bestået",
-        "connectionOkMissingTables": "Connection ok, but {count} required table(s) are missing",
         "cannotTestMediaPathActiveRun": "Kan ikke teste medie sti, mens en kørsel er aktiv",
         "mediaRootPathRequiredCover": "Medie Root-sti er påkrævet til dækimport.",
         "useAbsolutePath": "Brug en absolut sti (for eksempel: /books).",
@@ -1028,7 +1024,6 @@
         "unresolvedBooksHint": "Disse bøger findes i kilden, men kunne ikke matches til nogen bog i dit bibliotek.",
         "mappedUsersHeading": "Tilknyttede brugere ({count})",
         "mappedUsersHint": "Per-bruger totaler kommer fra tør-run preview cached med migreringsplanen.",
-        "coverImportsFailed": "{count} cover import(s) failed. Detailed failure rows are not stored.",
         "backToSetup": "Tilbage til opsætning"
       },
       "libraries": {
@@ -1280,7 +1275,6 @@
           "amazon": "Session cookie anbefales. Indsæt kun cookie værdi (ingen \"Cookie:\").",
           "goodreads": "Det største læsefællesskab på nettet. Ingen opsætning er påkrævet.",
           "hardcover": "Et moderne alternativ til Goodreads. Token fra hardcover.app/account/api. \"Bearer\" præfiks er valgfri.",
-          "openLibrary": "The Internet Archive's free book catalog. No setup required.",
           "itunes": "Apples digitale bogkatalog. Vælg om der skal hentes dæksler af høj eller standard opløsning.",
           "kobo": "Scrapes Kobos offentlige bogsider. Land og sprog skal matche Kobo URL-stier. Bot beskyttelse kan blokere forespørgsler.",
           "audible": "Træk audiobook metadata fra Audible. Ingen yderligere opsætning er påkrævet.",
@@ -1953,8 +1947,7 @@
           "loadMore": "Indlæs mere aktivitet"
         },
         "howBooksSynced": {
-          "title": "Hvordan bøger synkroniseres",
-          "body": "To send books to your Kobo device, you must enable {syncToKobo} on the collections containing those books. Open any collection from the sidebar, click the Edit icon, and toggle {syncToKobo}. Books that are not part of an enabled collection will not sync."
+          "title": "Hvordan bøger synkroniseres"
         },
         "nextSteps": {
           "title": "Næste Trin",
@@ -2080,7 +2073,6 @@
         "stockGuideTitle": "Plugin til lagerfremdriftssynkronisering",
         "stockStep1Prefix": "Gå til din KOReader enhed",
         "stockStep1Suffix": ".",
-        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
         "stockStep3": "Indtast det brugernavn og den adgangskode, du har oprettet, og tryk derefter på Login.",
         "locationNote": "BookOrbit gemmer KOReader-kompatible EPUB-placeringer fra weblæseren. Gendan skal lande tæt på samme position, selvom nøjagtige linje placering kan variere af læser og EPUB layout.",
         "dangerZone": "Fare Zone",
@@ -2296,7 +2288,6 @@
     "accountActivity": {
       "title": "Konto Aktivitet",
       "subtitle": "Gennemgå kontoautentificeringsaktivitet uden at afsløre læsehistorik.",
-      "privacyNotice": "This page reports sign-ins and authentication refreshes only. It does not use reading history, book progress, or library activity.",
       "privacyLabel": "Om kontoaktivitet privatliv",
       "never": "Aldrig",
       "openInsightsFor": "Åbn delte læseindsigter for {name}",
@@ -3680,8 +3671,7 @@
         "koboRemovedByDeviceTooltip": "Kobo rapporterede at denne bog blev fjernet.",
         "koboNotSynced": "Ikke synkroniseret",
         "koboNotSyncedTooltip": "I kø til næste Kobo synkronisering.",
-        "filesNotFound": "Filer ikke fundet",
-        "filesNotFoundDescription": "The file(s) for this book can no longer be found on disk. Metadata is still available. Run a library scan to confirm, or remove the record."
+        "filesNotFound": "Filer ikke fundet"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {ingen felter} one {et felt} other {# felter}}",
@@ -3935,19 +3925,13 @@
         "months": {
           "jan": "Jan",
           "feb": "Feb",
-          "mar": "Mar",
           "apr": "April",
           "may": "Maj",
           "jun": "Juni",
           "jul": "Juli",
-          "aug": "Aug",
-          "sep": "Sep",
-          "oct": "Okt",
-          "nov": "Nov",
-          "dec": "Dec"
+          "oct": "Okt"
         },
         "heatmap": {
-          "minutesUnit": "min",
           "title": "Aktivitet",
           "empty": "Ingen læsning aktivitet i dette vindue.",
           "emptyHint": "Sessioner, der registreres her, vil bygge din konsistensvisning."
@@ -3998,7 +3982,6 @@
         "journey": {
           "tooltipProgress": "Fremskridt",
           "tooltipReading": "Læser",
-          "minutesUnit": "min",
           "title": "Rejse med fremskridt",
           "empty": "Ingen fremdriftsdata i dette vindue.",
           "emptyHint": "Fremskridt vises efter en session registrerer en læseposition."
@@ -5661,7 +5644,6 @@
       "unresolvedBooksExplanation": "Disse bøger findes i kilden, men kunne ikke matches til nogen bog i dit bibliotek.",
       "mappedUsers": "Tilknyttede brugere ({count})",
       "mappedUsersExplanation": "Per-bruger totaler kommer fra tør-run preview cached med migreringsplanen.",
-      "coverFailures": "{count} cover import(s) failed. Detailed failure rows are not stored.",
       "userPreviewCounts": "{statuses} statusser, {progress} fremdriftsindgange, {sessions} læsessioner, {bookmarks} bogmærker, {annotations} annotationer, {collections} indsamlingsposter"
     },
     "unresolvedReason": {
@@ -5706,7 +5688,6 @@
       "connectionPassedWithWarnings": "Forbindelsestest bestået med advarsler",
       "connectionPassedWithWarningCount": "Forbindelsestest bestået med {count} advarsel(s). Først: {warning}",
       "connectionPassed": "Forbindelsestesten bestået",
-      "connectionMissingTables": "Connection ok, but {count} required table(s) are missing",
       "cannotTestMediaWhileRunning": "Kan ikke teste medie sti, mens en kørsel er aktiv",
       "mediaPathRequired": "Medie Root-sti er påkrævet til dækimport.",
       "mediaPathAbsolute": "Brug en absolut sti (for eksempel: /books).",
@@ -5863,47 +5844,21 @@
     "settings": {
       "title": "Indstillinger",
       "ariaLabel": "Læser indstillinger",
-      "tabs": {
-        "appearance": "Udseende",
-        "text": "Tekst",
-        "layout": "Layout"
-      },
-      "appearance": {
-        "mode": "Tilstand",
+      "mode": {
         "light": "Lys",
-        "dark": "Mørk",
-        "colorTheme": "Farve tema"
+        "dark": "Mørk"
       },
-      "text": {
-        "fontSize": "Font size",
-        "fontSizeRange": "Interval: 10-32px",
-        "lineHeight": "Linje højde",
-        "lineHeightRange": "Range: 0.8-3.0",
-        "fontFamily": "Skrifttype familie",
-        "fontFamilyDescription": "Vælg indbyggede eller uploadede skrifttyper til brødtekst.",
-        "builtIn": "Indbygget",
-        "yourFonts": "Dine skrifttyper"
-      },
-      "layout": {
-        "pageSpreads": "Sidespreads",
-        "pageSpreadsDescription": "Vælg hvordan dette billede-baserede EPUB par sider.",
+      "fontBuiltIn": "Indbygget",
+      "fontYours": "Dine skrifttyper",
+      "readingFlow": "Læser flow",
+      "pageSpreads": "Sidespreads",
+      "pageSpreadsHint": "Vælg hvordan dette billede-baserede EPUB par sider.",
+      "spread": {
         "bookDefault": "Bogs standard",
-        "singlePage": "Enkelt side",
-        "readingFlow": "Læser flow",
-        "readingFlowDescription": "Skift mellem sidekædet og kontinuerlig rulning.",
-        "paginated": "Pagineret",
-        "scrolled": "Rullet",
-        "textColumns": "Tekst kolonner",
-        "textColumnsRange": "Range: 1-10",
-        "columnGap": "Kolonne mellemrum",
-        "columnGapRange": "Range: 0-50%",
-        "maxWidth": "Max width",
-        "maxWidthRange": "Range: 400-1600",
-        "justifyText": "Justér tekst",
-        "justifyTextDescription": "Aktivér justering af afsnit i fuld bredde.",
-        "hyphenation": "Hyphenation",
-        "hyphenationDescription": "Aktiver automatisk ordskift bindeling."
-      }
+        "singlePage": "Enkelt side"
+      },
+      "columnGap": "Kolonne mellemrum",
+      "justifyText": "Justér tekst"
     },
     "search": {
       "placeholder": "Søg i bog (min {min} tegn)...",
@@ -5992,29 +5947,17 @@
       "cycleFooterMode": "Cyklus footer info tilstand"
     },
     "cbz": {
-      "tabs": {
-        "view": "Vis",
-        "reading": "Læser",
-        "layout": "Layout"
-      },
       "fitMode": "Tilpas tilstand",
       "background": "Baggrund",
       "scrollMode": "Rul tilstand",
       "scrollModeHint": "Brug \"Ingen huller\" til webtoons og lodrette strimler.",
       "readingDirection": "Læser retning",
       "pageView": "Side visning",
-      "autoFallback": "Auto-fallback",
       "spreadAlignmentLabel": "Spred justering",
-      "spreadAlignmentHint": "Spredning justering er utilgængelig i auto-fallback-tilstand.",
       "spreadGap": "Spred mellemrum",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Fokusér to-sidet skift",
       "forceTwoPage": "Gennemtving to-sidet",
-      "off": "Fra",
-      "on": "Til",
       "widePages": "Brede sider",
-      "resetBookViewSettings": "Nulstil indstillinger for bogvisning",
-      "resetConfirm": "Nulstil visningsindstillingerne for denne bog til dine globale standarder?",
       "firstPage": "Første side",
       "lastPage": "Sidste side",
       "fit": {
@@ -6625,7 +6568,6 @@
       },
       "bulkDeleteModal": {
         "title": "Masse Slet",
-        "confirm": "{count, plural, =0 {Are you sure you want to delete # selected entity?} one {Are you sure you want to delete # selected entity?} other {Are you sure you want to delete # selected entities?}}",
         "deleteButton": "Slet {count}"
       },
       "mergeModal": {

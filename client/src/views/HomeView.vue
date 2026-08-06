@@ -30,6 +30,8 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import ViewHeader from '@/components/ViewHeader.vue'
 import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
+import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
+import { useMoveToLibraryTarget } from '@/features/book/composables/useMoveToLibraryTarget'
 import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
@@ -421,6 +423,19 @@ const {
 } = useBookTableShell({
   books,
   querySelection,
+  onMoveToLibrary: (bookId) => openMoveForBook(bookId),
+})
+
+const {
+  open: moveToLibraryOpen,
+  payload: movePayload,
+  count: moveCount,
+  openForSelection: openMoveForSelection,
+  openForBook: openMoveForBook,
+  setOpen: setMoveOpen,
+} = useMoveToLibraryTarget({
+  getSelectionPayload: () => getSelectionPayload(),
+  selectedCount: computed(() => (querySelection.value ? querySelection.value.total : selectedCount.value)),
 })
 
 const { onBookMissing, onBookRestored, onBookMoved, onBookTransferred } = useBookEvents()
@@ -520,6 +535,12 @@ const {
   submitting: bulkEditSubmitting,
   selectedCount: bulkEditCount,
 } = useBulkEditMetadata(selectedIds, books, querySelection)
+
+// Moved books leave this view through the book:transferred socket event, so the
+// sheet only has to drop the now-stale selection.
+function handleBooksMoved() {
+  exitSelectionMode()
+}
 
 function handleEditSelected() {
   const count = querySelection.value ? querySelection.value.total : selectedIds.value.size
@@ -918,6 +939,7 @@ defineOptions({ name: 'HomeView' })
             :rail-gutter-kind="bucketKind"
             @range="handleRange"
             @first-visible-index="handleFirstVisibleIndex"
+            :allow-move-to-library="true"
             @action="handleBookAction"
             @select="handleSelect"
             @update:book="handleTableBookUpdate"
@@ -931,6 +953,7 @@ defineOptions({ name: 'HomeView' })
               :book="book"
               :selection-mode="selectionMode"
               :selected="isSelected(book.id)"
+              :allow-move-to-library="true"
               @action="handleBookAction(book, $event)"
               @select="handleSelect(book.id, $event)"
             />
@@ -953,6 +976,7 @@ defineOptions({ name: 'HomeView' })
             :filter-active="activeFilterCount > 0"
             :initialized="booksInitialized"
             @update:sort="localSortModel = $event"
+            :allow-move-to-library="true"
             @action="handleBookAction"
             @select="handleSelect"
             @update:book="handleTableBookUpdate"
@@ -1025,6 +1049,7 @@ defineOptions({ name: 'HomeView' })
       @download="handleDownloadFiles"
       @export-metadata="openMetadataExport(querySelection ? 'all-matching' : 'selected')"
       @add-to-collection="addToCollectionOpen = true"
+      @move-to-library="openMoveForSelection"
       @edit="handleEditSelected"
       @edit-individually="handleEditIndividually"
       @refresh-metadata="handleBulkRefreshMetadata"
@@ -1056,6 +1081,15 @@ defineOptions({ name: 'HomeView' })
       :selected-count="querySelection ? querySelection.total : selectedCount"
       @update:open="addToCollectionOpen = $event"
       @done="exitSelectionMode"
+    />
+
+    <MoveToLibrarySheet
+      :open="moveToLibraryOpen"
+      :selection-payload="movePayload"
+      :selected-count="moveCount"
+      :current-library-id="libraryId"
+      @update:open="setMoveOpen"
+      @moved="handleBooksMoved"
     />
 
     <BulkEditMetadataDialog

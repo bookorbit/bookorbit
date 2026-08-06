@@ -1,6 +1,7 @@
 import { ComicMetadataFields, MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { normalizeSeriesTotalBooks } from '../../../../common/utils/series-total-books.utils';
 import { ComicVineIssue, ComicVinePersonCredit } from './comicvine.types';
 
 function parseYear(dateStr: string | null | undefined): number | undefined {
@@ -34,13 +35,22 @@ function buildComicMetadata(issue: ComicVineIssue): ComicMetadataFields {
   };
 }
 
-function buildTitle(issue: ComicVineIssue): string {
+function buildTitle(issue: ComicVineIssue): string | undefined {
+  return issue.name?.trim() || undefined;
+}
+
+function buildDisplayTitle(issue: ComicVineIssue): string {
   const parts = [issue.volume.name, `#${issue.issue_number}`];
   if (issue.name) parts.push(`- ${issue.name}`);
   return parts.join(' ');
 }
 
-export function mapIssueToCandidate(issue: ComicVineIssue): MetadataCandidate {
+/**
+ * The issue payload only carries its volume's id and name, so the issue count has to come from
+ * the volume record the caller already searched. Options object rather than a positional count so
+ * that `.map(mapIssueToCandidate)` cannot silently pass the array index as the total.
+ */
+export function mapIssueToCandidate(issue: ComicVineIssue, options?: { volumeIssueCount?: number }): MetadataCandidate {
   const writers = extractByRole(issue.person_credits ?? [], 'writer');
   const rawPublishedDate = issue.cover_date ?? issue.store_date;
   const publishedDate = parsePublishedDateKey(rawPublishedDate ?? undefined);
@@ -49,13 +59,14 @@ export function mapIssueToCandidate(issue: ComicVineIssue): MetadataCandidate {
     provider: MetadataProviderKey.COMICVINE,
     providerId: String(issue.id),
     title: buildTitle(issue),
-    subtitle: issue.name ?? undefined,
+    displayTitle: buildDisplayTitle(issue),
     authors: writers,
     description: issue.description ?? issue.deck ?? undefined,
     publishedDate,
     publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : parseYear(rawPublishedDate),
     seriesName: issue.volume.name,
     seriesIndex: parseSeriesIndex(issue.issue_number),
+    seriesTotalBooks: normalizeSeriesTotalBooks(options?.volumeIssueCount),
     coverUrl: issue.image?.original_url,
     sourceUrl: issue.site_detail_url ?? undefined,
     comicMetadata: buildComicMetadata(issue),

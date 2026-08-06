@@ -1,5 +1,5 @@
 import type { Rule, RuleField, RuleOperator, SortField } from '@bookorbit/types'
-import { parseCustomSortFieldId } from '@bookorbit/types'
+import { parseCustomRuleFieldId, parseCustomSortFieldId } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
 import { PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
@@ -17,7 +17,10 @@ export function sortFieldLabel(field: SortField): string {
 }
 
 export function fieldLabel(field: RuleField): string {
-  return t(`book.filter.fields.${field}`)
+  const customFieldId = parseCustomRuleFieldId(field)
+  if (customFieldId === null) return t(`book.filter.fields.${field}`)
+  // Custom field labels are user-authored, so they are shown as-is rather than translated.
+  return activeCustomFieldLabel(customFieldId) ?? t('book.filter.customFieldFallback')
 }
 
 export function operatorLabel(operator: RuleOperator): string {
@@ -35,6 +38,8 @@ const NO_VALUE_OPS: RuleOperator[] = [
   'isLocked',
   'isUnlocked',
   'isUpNext',
+  'isTrue',
+  'isFalse',
 ]
 
 function communityRatingProviderLabel(rule: Rule): string {

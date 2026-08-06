@@ -75,6 +75,6 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
     },
     FormatWriterRegistry,
   ],
-  exports: [FileWriteService, FileWriteRepository, FileRenameService, FileRenameRepository, BulkRenameRepository],
+  exports: [FileWriteService, FileWriteRepository, FileRenameService, FileRenameRepository, BulkRenameRepository, FileLockService],
 })
 export class FileWriteModule {}

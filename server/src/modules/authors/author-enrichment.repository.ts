@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AuthorEnrichmentConditions, AuthorEnrichmentFailedItem, AuthorEnrichmentStatus } from '@bookorbit/types';
 import type { SQL } from 'drizzle-orm';
-import { and, asc, count, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, lte, max, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -185,6 +185,7 @@ export class AuthorEnrichmentRepository {
       .select({
         status: authorEnrichmentQueue.status,
         cnt: count(),
+        latestUpdatedAt: max(authorEnrichmentQueue.updatedAt),
       })
       .from(authorEnrichmentQueue)
       .groupBy(authorEnrichmentQueue.status);
@@ -194,6 +195,7 @@ export class AuthorEnrichmentRepository {
       processing: 0,
       rateLimited: 0,
       failed: 0,
+      latestFailureAt: null,
       done: 0,
       total: 0,
     };
@@ -203,7 +205,10 @@ export class AuthorEnrichmentRepository {
       if (row.status === 'queued') summary.queued = value;
       else if (row.status === 'processing') summary.processing = value;
       else if (row.status === 'rate_limited') summary.rateLimited = value;
-      else if (row.status === 'failed') summary.failed = value;
+      else if (row.status === 'failed') {
+        summary.failed = value;
+        summary.latestFailureAt = row.latestUpdatedAt?.toISOString() ?? null;
+      }
     }
 
     summary.total = summary.queued + summary.processing + summary.rateLimited + summary.failed;

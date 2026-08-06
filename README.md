@@ -59,7 +59,7 @@ Try the live instance before you install. No account required.
 ### Platform & Delivery
 
 - **Multi-User & SSO**: Granular per-user permissions and isolated reading data, with native support for Authentik, Keycloak, and Authelia via OIDC.
-- **Multilingual Interface**: English, German, Spanish, French, Italian, Dutch, Polish, Brazilian Portuguese, and Slovenian, translated by the community on [Crowdin](https://crowdin.com/project/bookorbit).
+- **Multilingual Interface**: Community translations are managed on [Crowdin](https://crowdin.com/project/bookorbit). See the [localization guide](docs/LOCALIZATION.md) for current language support and contributor instructions.
 - **Content Delivery**: OPDS support for compatible apps, Send-to-Kindle via email, and browser drag-and-drop uploads.
 - **Automated Ingestion**: Configure a Book Dock drop folder for hands-free importing.
 
@@ -124,6 +124,8 @@ For local development, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). To contri
 ## Translations
 
 Help translate BookOrbit into your language on [Crowdin](https://crowdin.com/project/bookorbit).
+
+When adding user-facing text in code, add the Vue I18n key only to `client/src/locales/en.json`. Do not edit non-English catalogs in a feature pull request; untranslated keys fall back to English until Crowdin provides a translation. See [docs/LOCALIZATION.md](docs/LOCALIZATION.md) for the complete workflow.
 
 [![Translation progress](https://raw.githubusercontent.com/bookorbit/bookorbit/generated-charts/translation-progress.svg)](https://crowdin.com/project/bookorbit)
 

@@ -190,6 +190,25 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           pnpm-version: ${{ env.PNPM_VERSION }}
 
+      - name: Enforce localization change policy
+        shell: bash
+        env:
+          IS_CROWDIN: ${{ steps.crowdin.outputs.is_crowdin }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          validator="$RUNNER_TEMP/validate-locale-pr.mjs"
+          if git cat-file -e "$PR_BASE_SHA:scripts/validate-locale-pr.mjs" 2>/dev/null; then
+            git show "$PR_BASE_SHA:scripts/validate-locale-pr.mjs" > "$validator"
+          else
+            git show "$PR_HEAD_SHA:scripts/validate-locale-pr.mjs" > "$validator"
+          fi
+          node "$validator" "$PR_BASE_SHA" "$PR_HEAD_SHA" "$IS_CROWDIN"
+
+      - name: Test PR policy scripts
+        run: node --test scripts/validate-locale-pr.test.mjs
+
       - name: Lint PR title
         shell: bash
         env:
@@ -259,6 +278,7 @@ jobs:
               - 'pnpm-workspace.yaml'
               - '.github/actions/setup-node-pnpm/action.yml'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/crowdin-translations.yml'
 
       - name: Print change scope
         shell: bash

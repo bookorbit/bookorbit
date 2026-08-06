@@ -1133,7 +1133,15 @@
         "users": "Utilisateurs",
         "account-activity": "Activité du compte",
         "magic-links": "Liens magiques",
-        "oidc": "OIDC / SSO"
+        "oidc": "OIDC / SSO",
+        "server-fonts": "Polices du serveur"
+      },
+      "serverFonts": {
+        "title": "Polices du serveur",
+        "subtitle": "Téléversez des polices directement disponibles pour tous les utilisateurs dans le lecteur d'eBook.",
+        "listLabel": "Polices du serveur",
+        "noFontsYet": "Aucune police disponible sur le serveur pour le moment",
+        "noFontsHint": "Les polices que vous ajoutez ici sont disponibles dans le lecteur de tous les utilisateurs."
       }
     },
     "common": {
@@ -1668,7 +1676,12 @@
         "deleteFamilyFailed": "Échec de la suppression de la famille de polices",
         "demoCannotManage": "Le compte restreint à la démo ne peut pas gérer les polices",
         "fileAdded": "\"{name}\" ajouté",
-        "uploadFailed": "Échec du téléchargement"
+        "uploadFailed": "Échec du téléchargement",
+        "serverFontsTitle": "Polices du serveur (partagées par l'admin)",
+        "serverFontsHint": "Ces polices proviennent de l'admin du serveur. Désactivez-en une pour qu'elle ne soit plus disponible dans votre lecteur.",
+        "serverFontsShown": "{count} sur {total} disponibles",
+        "serverFontsAllHidden": "Toutes les polices du serveur sont désactivées. Votre lecteur ne proposera que les polices intégrées et vos propres polices.",
+        "serverFontVisibilityFailed": "Échec de mise à jour des polices disponibles sur le serveur"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -2080,7 +2093,7 @@
         "stockGuideTitle": "Plugin de synchronisation de la progression des stocks",
         "stockStep1Prefix": "Sur votre appareil KOReader, accédez à",
         "stockStep1Suffix": ".",
-        "stockStep2InlineUrl": "Set the custom sync server to the following URL:",
+        "stockStep2": "Définissez le serveur de synchronisation personnalisé sur URL indiqué ci-dessus.",
         "stockStep3": "Saisissez le nom d'utilisateur et le mot de passe que vous avez créés, puis appuyez sur Connexion.",
         "locationNote": "BookOrbit enregistre les emplacements EPUB compatibles KOReader à partir du lecteur Web. La restauration doit atterrir à proximité de la même position, bien que l'emplacement exact de la ligne puisse varier selon le lecteur et la disposition EPUB.",
         "dangerZone": "Zone dangereuse",
@@ -2873,6 +2886,7 @@
       "BookBulkUpdateTags": "Mettre à jour les balises du livre",
       "BookBulkSetMetadataLock": "Définir des verrous de métadonnées",
       "BookBulkEditMetadata": "Modifier les métadonnées du livre",
+      "BookBulkMoveLibrary": "Déplacer les livres vers une autre bibliothèque",
       "BookReadingStateReset": "Réinitialiser l'état de lecture",
       "BookWriteAndRename": "Écrire les métadonnées et renommer le fichier",
       "CollectionCreate": "Créer une collection",
@@ -3331,8 +3345,12 @@
         "isFinished": "est terminé",
         "isLocked": "est verrouillé",
         "isUnlocked": "n'est pas verrouillé",
-        "isUpNext": "est à la suite"
+        "isUpNext": "est à la suite",
+        "isTrue": "est Vrai",
+        "isFalse": "est Faux"
       },
+      "customFieldsGroup": "Champs personnalisés",
+      "customFieldFallback": "Champ personalisé",
       "anyProvider": "N'importe quel fournisseur",
       "communityRatingProvider": "Fournisseur de notation communautaire",
       "loadingLibraries": "Chargement des bibliothèques...",
@@ -4077,7 +4095,11 @@
         "seriesPlaceholder": "Série",
         "moveUp": "Monter",
         "moveDown": "Descendre",
-        "removeSeries": "Supprimer la série"
+        "removeSeries": "Supprimer la série",
+        "seriesIndexLabel": "Position dans les séries",
+        "totalLabel": "Livres dans la série",
+        "totalPlaceholder": "sur",
+        "totalHint": "Nombre de tomes dans cette série. Partagé avec tous ceux qui ont cette série."
       }
     },
     "table": {
@@ -4157,6 +4179,69 @@
       },
       "text": {
         "openDetails": "Ouvrir les détails"
+      }
+    },
+    "move": {
+      "title": "{count, plural, one {Déplacez # livre} many {Déplacez # livres} other {Déplacez # livres}}",
+      "subtitle": "Les fichiers sont déplacés sur le disque vers la bibliothèque choisie. Cela peut changer la visibilité de ces livres pour les utilisateurs.",
+      "searchPlaceholder": "Rechercher dans les bibliothèques",
+      "currentLibrary": "Actuelle",
+      "folderCount": "{count, plural, one {# folder} many {# folders} other {# folders}}",
+      "continue": "Continuer",
+      "back": "Précédent",
+      "confirm": "{count, plural, one {Déplacer # book} many {Déplacer # books} other {Déplacer # books}}",
+      "action": "Déplacer vers la bibliothèque",
+      "review": {
+        "ready": "{count} prêt",
+        "collisions": "{count, plural, one {# conflit de nom} many {# conflits de nom} other {# conflits de nom}}",
+        "ineligible": "{count} ne peut pas être déplacé",
+        "alreadyThere": "{count} déjà présent",
+        "collisionsHeading": "Conflit de noms",
+        "ineligibleHeading": "Ne peut pas être déplacé",
+        "moreCollisions": "et {count} autres"
+      },
+      "policy": {
+        "suggested": "Utiliser la suggestion",
+        "keep_both": "Garder les deux",
+        "merge": "Fusionner",
+        "skip": "Passer"
+      },
+      "collision": {
+        "folder_path": "Un livre utilise déjà ce nom de dossier",
+        "file_path": "Un fichier utilise déjà ce chemin",
+        "hash_duplicate": "Une copie identique existe déjà dans cette bibliothèque"
+      },
+      "ineligible": {
+        "book_not_present": "Les fichiers de ce livre sont manquants",
+        "no_content_file": "Ce livre n'a aucun fichier lisible",
+        "multi_file_target_per_file": "La destination stocke un fichier par livre, et ce livre a {detail} fichiers",
+        "no_source_access": "Vous ne pouvez pas modifier la bibliothèque dans laquelle se trouve ce livre",
+        "pattern_unresolved": "La bibliothèque de destination n'a pas de motif de nommage utilisable",
+        "path_too_long": "Le chemin de destination est trop long",
+        "path_outside_target_root": "Le chemin de destination est en hors du dossier de la bibliothèque"
+      },
+      "warning": {
+        "accessLoss": "{user} ne verra plus {count} de ces livres",
+        "koboImpact": "{count} livres seront supprimés de la Kobo de {user} lors de la prochaine synchronisation",
+        "layout": {
+          "wrap_into_folder": "{count} livres seront placés dans leur propre dossier",
+          "dissolve_folder": "{count} dossiers de livres seront changés en fichiers uniques"
+        },
+        "crossDevice": "Les fichiers sont déplacés vers un autre lecteur : ils sont copiés, vérifiés, puis supprimés."
+      },
+      "progress": {
+        "label": "Déplacement des livres vers {library}",
+        "failed": "{count} en échec"
+      },
+      "done": {
+        "summary": "{count} livres déplacés vers {library}",
+        "merged": "{count} fusionnés avec des copies existantes",
+        "skipped": "{count} ignorés",
+        "failed": "{count} en échec"
+      },
+      "toast": {
+        "success": "{count} livres déplacés vers {library}",
+        "partial": "{moved} livres déplacés, {failed} en échec"
       }
     }
   },
@@ -4690,6 +4775,14 @@
         "upNextInSeries": "Suite de la série",
         "random": "Découvrez quelque chose de nouveau",
         "smartScope": "Collection Intelligente"
+      },
+      "shelfLayout": {
+        "title": "Disposition de l'étagère",
+        "description": "Choisissez comment les étagères sont disposées sur des écrans plus grands.",
+        "wide": "Large rangées",
+        "wideDescription": "Afficher une étagère par ligne.",
+        "twoColumns": "Deux colonnes",
+        "twoColumnsDescription": "Afficher une étagère par ligne."
       },
       "reorderHintWidget": "Faites glisser pour réorganiser. Basculez pour afficher ou masquer un widget.",
       "reorderHintShelf": "Faites glisser pour réorganiser. Basculez pour afficher ou masquer une étagère.",
@@ -5863,46 +5956,66 @@
     "settings": {
       "title": "Paramètres",
       "ariaLabel": "Paramètres du lecteur",
-      "tabs": {
-        "appearance": "Apparence",
-        "text": "Texte",
-        "layout": "Disposition"
+      "reset": "Rétablir les valeurs par défaut",
+      "modeLabel": "Style de couleur",
+      "mode": {
+        "light": "Clair",
+        "dark": "Sombre"
       },
-      "appearance": {
-        "mode": "Mode",
-        "light": "Lumière",
-        "dark": "Sombre",
-        "colorTheme": "Thème de couleur"
+      "textSize": "Taille du texte",
+      "textSizeSmaller": "Texte plus petits",
+      "textSizeLarger": "Texte plus grand",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Couleur de la page",
+      "font": "Police",
+      "fontBuiltIn": "Intégrée",
+      "fontServer": "Polices du serveur",
+      "fontYours": "Vos polices",
+      "lineSpacing": "Interligne",
+      "pageWidth": "Largeur de page",
+      "pageWidthNarrow": "Étroite",
+      "pageWidthMedium": "Moyenne",
+      "pageWidthWide": "Large",
+      "pageWidthFull": "Pleine",
+      "readingFlow": "Mode de lecture",
+      "flow": {
+        "paginated": "Pages",
+        "scrolled": "Défilement"
       },
-      "text": {
-        "fontSize": "Taille de la police",
-        "fontSizeRange": "Plage : 10-32 px",
-        "lineHeight": "Hauteur de ligne",
-        "lineHeightRange": "Plage : 0,8-3,0",
-        "fontFamily": "Famille de polices",
-        "fontFamilyDescription": "Choisissez des polices intégrées ou téléchargées pour le corps du texte.",
-        "builtIn": "Intégré",
-        "yourFonts": "Vos polices"
+      "pageSpreads": "Double-pages",
+      "pageSpreadsHint": "Choisissez comment cet EPUB d'images affiche les pages.",
+      "spread": {
+        "bookDefault": "Par défaut",
+        "singlePage": "Page unique"
       },
-      "layout": {
-        "pageSpreads": "Pages doubles",
-        "pageSpreadsDescription": "Choisissez comment ce EPUB basé sur des images associe les pages.",
-        "bookDefault": "Livre par défaut",
-        "singlePage": "Page unique",
-        "readingFlow": "Flux de lecture",
-        "readingFlowDescription": "Basculez entre le défilement paginé et continu.",
-        "paginated": "Paginé",
-        "scrolled": "Défilé",
-        "textColumns": "Colonnes de texte",
-        "textColumnsRange": "Plage : 1-10",
-        "columnGap": "Écart de colonne",
-        "columnGapRange": "Plage : 0-50 %",
-        "maxWidth": "Largeur maximale",
-        "maxWidthRange": "Plage : 400-1600",
-        "justifyText": "Justifier le texte",
-        "justifyTextDescription": "Activer l’alignement des paragraphes sur toute la largeur.",
-        "hyphenation": "Césure",
-        "hyphenationDescription": "Activez la césure automatique des mots."
+      "advanced": "Mise en page Avancée",
+      "columns": "Colonnes",
+      "columnsFewer": "Moins de colonnes",
+      "columnsMore": "Plus de colonnes",
+      "columnGap": "Espace de colonne",
+      "justifyText": "Justifier le texte",
+      "hyphenation": "Césure",
+      "themes": {
+        "default": "Par défaut",
+        "gray": "Gris",
+        "sepia": "Sépia",
+        "crimson": "Cramoisi",
+        "meadow": "Prairie",
+        "rosewood": "Rose-rouge",
+        "azure": "Azur",
+        "dawnlight": "Aube",
+        "ember": "Ambre",
+        "aurora": "Aurore",
+        "ocean": "Océan",
+        "mist": "Brume",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "bookDefault": "Police du livre par défaut",
+        "serif": "Serif",
+        "sansSerif": "Sans Serif",
+        "monospace": "Monospace"
       }
     },
     "search": {
@@ -5992,29 +6105,17 @@
       "cycleFooterMode": "Mode d'information du pied de page du cycle"
     },
     "cbz": {
-      "tabs": {
-        "view": "Voir",
-        "reading": "Lecture",
-        "layout": "Disposition"
-      },
       "fitMode": "Mode d'ajustement",
       "background": "Contexte",
       "scrollMode": "Mode défilement",
       "scrollModeHint": "Utilisez \"Pas d'espaces\" pour les webtoons et les bandes verticales.",
       "readingDirection": "Sens de lecture",
       "pageView": "Affichage des pages",
-      "autoFallback": "Repli automatique",
       "spreadAlignmentLabel": "Alignement de la propagation",
-      "spreadAlignmentHint": "L’alignement de la propagation n’est pas disponible en mode de repli automatique.",
       "spreadGap": "Écart de propagation",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Focus sur la bascule de deux pages",
       "forceTwoPage": "Forcer deux pages",
-      "off": "Désactivé",
-      "on": "Sur",
       "widePages": "Pages larges",
-      "resetBookViewSettings": "Réinitialiser les paramètres d'affichage du livre",
-      "resetConfirm": "Réinitialiser les paramètres d'affichage de ce livre à vos valeurs par défaut globales ?",
       "firstPage": "Première page",
       "lastPage": "Dernière page",
       "fit": {
@@ -6084,6 +6185,10 @@
   "series": {
     "completion": {
       "readOfTotal": "{read} sur {total} lu ({percentage}%)"
+    },
+    "ownership": {
+      "label": "Dans la bibliothèque",
+      "ownedOfExpected": "{owned} de {expected} dans la bibliothèque"
     },
     "gaps": {
       "label": "Lacunes possibles :"
@@ -6889,7 +6994,8 @@
       "users": "Utilisateurs",
       "account-activity": "Activité du compte",
       "magic-links": "Liens magiques",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Polices du serveur"
     },
     "system": {
       "file-naming": "Nom du fichier",

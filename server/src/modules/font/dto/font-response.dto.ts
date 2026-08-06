@@ -1,7 +1,13 @@
 import type { UserFont } from '@bookorbit/types';
-import type { UserFontRow } from '../../../db/schema';
+import type { ServerFontRow, UserFontRow } from '../../../db/schema';
 
-export function toFontResponse(row: UserFontRow): UserFont {
+/** The columns user and server font rows have in common, which is all the wire shape needs. */
+export type FontRowLike = Pick<
+  UserFontRow & ServerFontRow,
+  'id' | 'familyName' | 'originalFileName' | 'format' | 'weight' | 'style' | 'fileSize' | 'createdAt'
+>;
+
+export function toFontResponse(row: FontRowLike): UserFont {
   return {
     id: row.id,
     familyName: row.familyName,

@@ -43,6 +43,19 @@ async function parseResult<T>(res: Response): Promise<StatisticsResult<T>> {
   return res.json() as Promise<StatisticsResult<T>>
 }
 
+// Only endpoints with known concurrent chart consumers opt into request coalescing.
+const inFlightRequests = new Map<string, Promise<unknown>>()
+
+function coalesceRequest<T>(key: string, request: () => Promise<T>): Promise<T> {
+  const existing = inFlightRequests.get(key) as Promise<T> | undefined
+  if (existing) return existing
+  const pending = request().finally(() => {
+    if (inFlightRequests.get(key) === pending) inFlightRequests.delete(key)
+  })
+  inFlightRequests.set(key, pending)
+  return pending
+}
+
 function buildParams(filters: StatisticsFilterConfig, extra?: Record<string, string>): string {
   const params = new URLSearchParams()
   filters.libraryIds.forEach((id) => params.append('libraryIds', String(id)))
@@ -145,9 +158,12 @@ export async function fetchUserReadingSourceDistribution(filters: StatisticsFilt
 }
 
 export async function fetchUserPeakReadingHours(filters: StatisticsFilterConfig): Promise<UserPeakHourStat[]> {
-  const res = await api(`/api/v1/user-statistics/peak-hours${buildParams(filters, { days: '365' })}`)
-  if (!res.ok) throw new Error(`User peak hours request failed: ${res.status}`)
-  return res.json() as Promise<UserPeakHourStat[]>
+  const url = `/api/v1/user-statistics/peak-hours${buildParams(filters, { days: '365' })}`
+  return coalesceRequest(url, async () => {
+    const res = await api(url)
+    if (!res.ok) throw new Error(`User peak hours request failed: ${res.status}`)
+    return res.json() as Promise<UserPeakHourStat[]>
+  })
 }
 
 export async function fetchUserFavoriteReadingDays(filters: StatisticsFilterConfig): Promise<UserFavoriteDayStat[]> {
@@ -157,9 +173,12 @@ export async function fetchUserFavoriteReadingDays(filters: StatisticsFilterConf
 }
 
 export async function fetchUserCompletionTimeline(filters: StatisticsFilterConfig): Promise<UserCompletionTimelinePoint[]> {
-  const res = await api(`/api/v1/user-statistics/completion-timeline${buildParams(filters, { days: '1825' })}`)
-  if (!res.ok) throw new Error(`User completion timeline request failed: ${res.status}`)
-  return res.json() as Promise<UserCompletionTimelinePoint[]>
+  const url = `/api/v1/user-statistics/completion-timeline${buildParams(filters, { days: '1825' })}`
+  return coalesceRequest(url, async () => {
+    const res = await api(url)
+    if (!res.ok) throw new Error(`User completion timeline request failed: ${res.status}`)
+    return res.json() as Promise<UserCompletionTimelinePoint[]>
+  })
 }
 
 export async function fetchUserGoalTrajectory(filters: StatisticsFilterConfig, goalBooks = 12): Promise<UserGoalTrajectory> {
