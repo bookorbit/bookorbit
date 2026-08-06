@@ -137,6 +137,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     bulkSetRating: vi.fn(),
     bulkUpdateMetadataFields: vi.fn(),
     updateMetadataFields: vi.fn(),
+    updateAddedAt: vi.fn(),
     replaceCommunityRatings: vi.fn(),
     withTransaction: vi.fn(),
     deleteByIds: vi.fn(),
@@ -1505,6 +1506,34 @@ describe('BookService', () => {
         write: { status: 'success', fieldsWritten: ['title'], durationMs: 12 },
         libraryAutoWriteEnabled: true,
       });
+    });
+
+    it('updateAddedAt stores the selected date in the user timezone and returns updated detail', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser({ settings: { timezone: 'America/New_York' } });
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5, addedAt: '2020-06-15T04:00:00.000Z' } as never);
+
+      await expect(service.updateAddedAt(5, { addedAt: '2020-06-15' }, user)).resolves.toEqual({
+        id: 5,
+        addedAt: '2020-06-15T04:00:00.000Z',
+      });
+
+      expect(bookRepo.updateAddedAt).toHaveBeenCalledWith(5, new Date('2020-06-15T04:00:00.000Z'));
+      expect(service.getDetail).toHaveBeenCalledWith(5, user);
+    });
+
+    it('updateAddedAt rejects invalid and future dates before persistence', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-05-20T12:00:00.000Z'));
+
+      await expect(service.updateAddedAt(5, { addedAt: '2026-02-30' }, makeUser())).rejects.toThrow('addedAt must be a valid date');
+      await expect(service.updateAddedAt(5, { addedAt: '2026-05-21' }, makeUser())).rejects.toThrow('addedAt cannot be in the future');
+      expect(bookRepo.updateAddedAt).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
     });
 
     it('updateMetadata replaces community rating rows', async () => {

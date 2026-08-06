@@ -1962,6 +1962,10 @@ export class BookRepository {
     await executor.update(books).set(bookUpdate).where(eq(books.id, bookId));
   }
 
+  async updateAddedAt(bookId: number, addedAt: Date): Promise<void> {
+    await this.db.update(books).set({ addedAt, updatedAt: new Date() }).where(eq(books.id, bookId));
+  }
+
   async replaceCommunityRatings(
     bookId: number,
     ratings: Array<{ provider: string; rating: number; ratingCount: number | null }>,

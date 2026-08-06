@@ -40,6 +40,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { api } from '@/lib/api'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
@@ -98,6 +99,7 @@ const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{ saved: [BookDetail]; moved: [] }>()
 const { t } = useI18n()
 const router = useRouter()
+const { user } = useAuth()
 
 const addToCollectionOpen = ref(false)
 const moveToLibraryOpen = ref(false)
@@ -600,11 +602,28 @@ async function savePersonalNote() {
 const { setStatus, updateStatus } = useBookStatus()
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
+const userTimeZone = computed(() => {
+  const value = user.value?.settings?.timezone?.trim()
+  if (!value) return 'UTC'
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+    return value
+  } catch {
+    return 'UTC'
+  }
+})
 
 function dateToDateKey(value: Date): string {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: userTimeZone.value,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value)
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+  if (!year || !month || !day) return ''
   return `${year}-${month}-${day}`
 }
 
@@ -620,6 +639,14 @@ function toDateInputValue(value: string | null | undefined): string {
   return dateToDateKey(parsed)
 }
 
+const addedDate = computed(() => toDateInputValue(props.book.addedAt))
+const draftAddedDate = ref('')
+const editingAddedDate = ref(false)
+const savingAddedDate = ref(false)
+const addedDateError = ref<string | null>(null)
+const addedDateInput = ref<HTMLInputElement | null>(null)
+const addedDateEditButton = ref<HTMLButtonElement | null>(null)
+
 const localReadStatus = ref<ReadStatus | null>(props.book.readStatus?.status ?? null)
 const savedReadingDates = ref<{ startedAt: string; finishedAt: string }>({
   startedAt: toDateInputValue(props.book.readStatus?.startedAt),
@@ -633,6 +660,62 @@ const savingReadingDates = ref(false)
 const readingDatesError = ref<string | null>(null)
 const activeReadingDateField = ref<'startedAt' | 'finishedAt' | null>(null)
 const todayDateInput = computed(() => dateToDateKey(new Date()))
+
+function validateAddedDate(value: string): string | null {
+  if (!value) return t('book.detail.details.dateAddedRequiredError')
+  if (value > todayDateInput.value) return t('book.detail.details.dateAddedFutureError')
+  return null
+}
+
+const canSaveAddedDate = computed(() => draftAddedDate.value !== addedDate.value && !savingAddedDate.value)
+
+function startEditingAddedDate() {
+  if (savingAddedDate.value || isEditingAnyReadingDate.value) return
+  draftAddedDate.value = addedDate.value
+  addedDateError.value = null
+  editingAddedDate.value = true
+  void nextTick(() => addedDateInput.value?.focus())
+}
+
+function finishAddedDateEdit() {
+  editingAddedDate.value = false
+  void nextTick(() => addedDateEditButton.value?.focus())
+}
+
+async function saveAddedDate() {
+  if (!editingAddedDate.value || savingAddedDate.value) return
+  const validationError = validateAddedDate(draftAddedDate.value)
+  addedDateError.value = validationError
+  if (validationError) return
+
+  savingAddedDate.value = true
+  try {
+    const res = await api(`/api/v1/books/${props.book.id}/added-at`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addedAt: draftAddedDate.value }),
+    })
+    if (!res.ok) throw new Error()
+    const updated = (await res.json()) as BookDetail
+    addedDateError.value = null
+    emit('saved', updated)
+    finishAddedDateEdit()
+  } catch {
+    addedDateError.value = t('book.detail.details.saveAddedDateError')
+  } finally {
+    savingAddedDate.value = false
+  }
+}
+
+function cancelAddedDateEdit() {
+  if (!editingAddedDate.value || savingAddedDate.value) return
+  addedDateError.value = null
+  finishAddedDateEdit()
+}
+
+function clearAddedDateError() {
+  addedDateError.value = null
+}
 
 function normalizeReadStatusDates(readStatus: UserBookStatus | null | undefined) {
   return {
@@ -650,6 +733,7 @@ function validateReadingDates(values: { startedAt: string; finishedAt: string })
 }
 
 const isEditingAnyReadingDate = computed(() => activeReadingDateField.value !== null)
+const isEditingAnyDate = computed(() => editingAddedDate.value || isEditingAnyReadingDate.value)
 
 function formatDisplayDate(dateKey: string): string {
   if (!dateKey) return '-'
@@ -1035,6 +1119,17 @@ function formatDateTime(iso: string): string {
   return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+function formatAddedDateTime(iso: string): string {
+  return formatLocaleDate(new Date(iso), {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: userTimeZone.value,
+  })
+}
+
 function formatPercent(value: number): string {
   const clamped = Math.max(0, Math.min(100, value))
   if (clamped > 0 && clamped < 1) return '<1%'
@@ -1043,7 +1138,7 @@ function formatPercent(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric', timeZone: userTimeZone.value })
 }
 
 function formatBadgeStyle(fmt: string) {
@@ -2475,15 +2570,60 @@ watch(
         </div>
         <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.added') }}</dt>
-          <template v-if="book.addedAt">
+          <template v-if="editingAddedDate">
+            <dd class="mt-1">
+              <div class="flex items-center gap-1.5">
+                <input
+                  ref="addedDateInput"
+                  v-model="draftAddedDate"
+                  type="date"
+                  required
+                  :max="todayDateInput"
+                  :aria-label="t('book.detail.details.added')"
+                  :aria-invalid="addedDateError ? 'true' : undefined"
+                  :aria-describedby="addedDateError ? 'added-date-error' : undefined"
+                  class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground"
+                  @input="clearAddedDateError"
+                />
+                <button
+                  class="h-6 rounded bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  :disabled="!canSaveAddedDate"
+                  @click="saveAddedDate"
+                >
+                  {{ savingAddedDate ? t('book.detail.details.saving') : t('common.save') }}
+                </button>
+                <button
+                  class="inline-flex h-6 w-6 items-center justify-center rounded border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                  :title="t('book.detail.details.cancelDateAddedEdit')"
+                  :aria-label="t('book.detail.details.cancelDateAddedEdit')"
+                  :disabled="savingAddedDate"
+                  @click="cancelAddedDateEdit"
+                >
+                  <X class="size-3" />
+                </button>
+              </div>
+              <p v-if="addedDateError" id="added-date-error" role="alert" class="mt-1 text-[10px] text-destructive">{{ addedDateError }}</p>
+            </dd>
+          </template>
+          <dd v-else class="mt-0.5 flex items-center gap-1.5">
             <Tooltip>
               <TooltipTrigger as-child>
-                <dd class="text-sm text-foreground mt-0.5 truncate cursor-default">{{ formatDate(book.addedAt) }}</dd>
+                <span class="text-sm text-foreground truncate cursor-default">{{ formatDate(book.addedAt) }}</span>
               </TooltipTrigger>
-              <TooltipContent>{{ formatDateTime(book.addedAt) }}</TooltipContent>
+              <TooltipContent>{{ formatAddedDateTime(book.addedAt) }}</TooltipContent>
             </Tooltip>
-          </template>
-          <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
+            <button
+              v-if="canEditMetadata"
+              ref="addedDateEditButton"
+              class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              :title="t('book.detail.details.editDateAdded')"
+              :aria-label="t('book.detail.details.editDateAdded')"
+              :disabled="isEditingAnyDate || savingAddedDate || savingReadingDates"
+              @click="startEditingAddedDate"
+            >
+              <Pencil class="size-3" />
+            </button>
+          </dd>
         </div>
         <HardcoverBookSyncGridItem :book-id="book.id" />
         <StorygraphBookSyncGridItem :book-id="book.id" />
@@ -2523,7 +2663,7 @@ watch(
             <button
               class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               :title="t('book.detail.details.editDateStarted')"
-              :disabled="isEditingAnyReadingDate || savingReadingDates"
+              :disabled="isEditingAnyDate || savingReadingDates"
               @click="startEditingReadingDate('startedAt')"
             >
               <Pencil class="size-3" />
@@ -2566,7 +2706,7 @@ watch(
             <button
               class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               :title="t('book.detail.details.editDateFinished')"
-              :disabled="isEditingAnyReadingDate || savingReadingDates"
+              :disabled="isEditingAnyDate || savingReadingDates"
               @click="startEditingReadingDate('finishedAt')"
             >
               <Pencil class="size-3" />

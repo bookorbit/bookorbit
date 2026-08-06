@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useMediaQuery } from '@vueuse/core'
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Maximize, Minimize, Settings } from '@lucide/vue'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Maximize, Minimize, Minus, Plus, Settings } from '@lucide/vue'
 import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
@@ -20,6 +20,9 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import CbzSettingsPanel from './components/CbzSettingsPanel.vue'
 
 const TWO_PAGE_BREAKPOINT = 900
+const MIN_ZOOM_SCALE = 0.5
+const MAX_ZOOM_SCALE = 3
+const ZOOM_STEP = 0.25
 
 const { t } = useI18n()
 
@@ -48,13 +51,16 @@ const bookSettings = useReaderSettings(props.fileId, 'cbz')
 const currentPage = ref(0)
 const showSettings = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
+const paginatedViewport = ref<HTMLElement | null>(null)
 const viewportWidth = ref(0)
 const viewportHeight = ref(0)
 const currentImageLoaded = ref(false)
 const pendingImageLoads = ref(0)
 const loadedImageCount = ref(0)
 const pageRatios = ref<number[]>([])
+const pageDimensions = ref<Array<{ width: number; height: number } | undefined>>([])
 const stripImagesReady = ref(false)
+const zoomScale = ref(1)
 
 watch(showSettings, setVisibilityLock)
 
@@ -159,6 +165,26 @@ const pageLabel = computed(() => {
 })
 
 const fullscreenLabel = computed(() => (isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen'))
+const zoomPercent = computed(() => Math.round(zoomScale.value * 100))
+const canZoomOut = computed(() => zoomScale.value > MIN_ZOOM_SCALE)
+const canZoomIn = computed(() => zoomScale.value < MAX_ZOOM_SCALE)
+
+const paginatedStageStyle = computed(() => {
+  const stageScale = Math.max(1, zoomScale.value)
+  return {
+    width: `${stageScale * 100}%`,
+    height: `${stageScale * 100}%`,
+  }
+})
+
+const paginatedContentStyle = computed(() => {
+  const stageScale = Math.max(1, zoomScale.value)
+  return {
+    width: `${100 / stageScale}%`,
+    height: `${100 / stageScale}%`,
+    transform: `scale(${zoomScale.value})`,
+  }
+})
 
 const progressPageIndex = computed(() => {
   const spread = currentSpread.value
@@ -179,9 +205,9 @@ const sliderFillPercent = computed(() => {
 
 const stripFrameClass = computed(() => {
   if (fitMode.value === 'fit-height' || fitMode.value === 'fit-page') {
-    return 'w-full h-[100dvh] flex items-center justify-center overflow-hidden'
+    return 'flex items-center justify-center overflow-hidden'
   }
-  return 'w-full flex justify-center'
+  return 'flex justify-center'
 })
 
 const stripGap = computed(() => (scrollMode.value === 'long-strip' ? 0 : 8))
@@ -194,16 +220,17 @@ const stripVirtualizer = useVirtualizer(
     const fit = fitMode.value
     const height = Math.max(1, viewportHeight.value)
     const width = stripViewportWidth.value
+    const scale = zoomScale.value
     const ratios = pageRatios.value
 
     return {
       count: mode === 'paginated' ? 0 : pageCount.value,
       getScrollElement: () => scrollContainer.value,
       estimateSize: (index: number) => {
-        if (fit === 'fit-page' || fit === 'fit-height') return height
+        if (fit === 'fit-page' || fit === 'fit-height') return height * scale
         const ratio = ratios[index]
-        if (fit === 'fit-width' && ratio && ratio > 0) return width / ratio
-        return height
+        if (fit === 'fit-width' && ratio && ratio > 0) return (width * scale) / ratio
+        return height * scale
       },
       gap: stripGap.value,
       paddingStart: stripPadding.value,
@@ -235,6 +262,27 @@ const stripImageClass = computed(() => {
   }
 })
 
+function stripFrameStyle(pageStart: number) {
+  const scaledWidth = stripViewportWidth.value * zoomScale.value
+  const frameHeight = fitMode.value === 'fit-height' || fitMode.value === 'fit-page' ? viewportHeight.value * zoomScale.value : undefined
+  return {
+    width: `${scaledWidth}px`,
+    height: frameHeight === undefined ? undefined : `${frameHeight}px`,
+    insetInlineStart: `${Math.max(0, (viewportWidth.value - scaledWidth) / 2)}px`,
+    transform: `translateY(${pageStart}px)`,
+  }
+}
+
+function stripImageStyle(pageIndex: number) {
+  if (fitMode.value !== 'actual') return undefined
+  const dimensions = pageDimensions.value[pageIndex]
+  if (!dimensions) return undefined
+  return {
+    width: `${dimensions.width * zoomScale.value}px`,
+    height: `${dimensions.height * zoomScale.value}px`,
+  }
+}
+
 const canGoPrev = computed(() => {
   if (pageCount.value <= 0) return false
   if (isTwoPageEffective.value) return spreadLayout.value.prevAnchor(currentPage.value) !== currentPage.value
@@ -265,6 +313,9 @@ function setPageRatio(pageIndex: number, width: number, height: number) {
   const next = [...pageRatios.value]
   next[pageIndex] = ratio
   pageRatios.value = next
+  const nextDimensions = [...pageDimensions.value]
+  nextDimensions[pageIndex] = { width, height }
+  pageDimensions.value = nextDimensions
 }
 
 function preload(n: number) {
@@ -381,8 +432,59 @@ function onTouchEnd(e: TouchEvent) {
   else prevPage()
 }
 
-// ── Wheel (paginated mode only) ────────────────────────────────────────────────
+// ── Zoom / wheel navigation ────────────────────────────────────────────────────
+interface ZoomFocalPoint {
+  clientX: number
+  clientY: number
+}
+
+function setZoomScale(nextScale: number, focalPoint?: ZoomFocalPoint) {
+  const clampedScale = Math.min(MAX_ZOOM_SCALE, Math.max(MIN_ZOOM_SCALE, nextScale))
+  const previousScale = zoomScale.value
+  if (clampedScale === previousScale) return
+
+  const viewport = scrollMode.value === 'paginated' ? paginatedViewport.value : scrollContainer.value
+  if (!viewport) {
+    zoomScale.value = clampedScale
+    return
+  }
+
+  const bounds = viewport.getBoundingClientRect()
+  const anchorX = focalPoint ? Math.min(viewport.clientWidth, Math.max(0, focalPoint.clientX - bounds.left)) : viewport.clientWidth / 2
+  const anchorY = focalPoint ? Math.min(viewport.clientHeight, Math.max(0, focalPoint.clientY - bounds.top)) : viewport.clientHeight / 2
+  const previousHorizontalInset = previousScale < 1 ? (viewport.clientWidth * (1 - previousScale)) / 2 : 0
+  const previousVerticalInset = scrollMode.value === 'paginated' && previousScale < 1 ? (viewport.clientHeight * (1 - previousScale)) / 2 : 0
+  const contentX = (viewport.scrollLeft + anchorX - previousHorizontalInset) / previousScale
+  const contentY = (viewport.scrollTop + anchorY - previousVerticalInset) / previousScale
+
+  zoomScale.value = clampedScale
+  void nextTick(() => {
+    const nextHorizontalInset = clampedScale < 1 ? (viewport.clientWidth * (1 - clampedScale)) / 2 : 0
+    const nextVerticalInset = scrollMode.value === 'paginated' && clampedScale < 1 ? (viewport.clientHeight * (1 - clampedScale)) / 2 : 0
+    viewport.scrollLeft = Math.max(0, nextHorizontalInset + contentX * clampedScale - anchorX)
+    viewport.scrollTop = Math.max(0, nextVerticalInset + contentY * clampedScale - anchorY)
+  })
+}
+
+function zoomIn() {
+  setZoomScale(zoomScale.value + ZOOM_STEP)
+}
+
+function zoomOut() {
+  setZoomScale(zoomScale.value - ZOOM_STEP)
+}
+
 function onWheel(e: WheelEvent) {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+    const focalPoint = { clientX: e.clientX, clientY: e.clientY }
+    if (e.deltaY < 0) setZoomScale(zoomScale.value + ZOOM_STEP, focalPoint)
+    else if (e.deltaY > 0) setZoomScale(zoomScale.value - ZOOM_STEP, focalPoint)
+    return
+  }
+
+  if (scrollMode.value !== 'paginated') return
+  if (zoomScale.value > 1) return
   e.preventDefault()
   if (e.deltaY > 0) nextPage()
   else if (e.deltaY < 0) prevPage()
@@ -422,6 +524,19 @@ function onKeyDown(e: KeyboardEvent) {
       break
     case 'Escape':
       showSettings.value = false
+      break
+    case '+':
+    case '=':
+      e.preventDefault()
+      zoomIn()
+      break
+    case '-':
+      e.preventDefault()
+      zoomOut()
+      break
+    case '0':
+      e.preventDefault()
+      setZoomScale(1)
       break
   }
 }
@@ -618,6 +733,25 @@ onUnmounted(() => {
             {{ t('reader.peek.startReading') }}
           </button>
         </div>
+        <div class="hidden items-center md:flex" :aria-label="t('reader.cbz.zoomControls')" role="group">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button class="viewer-btn" :disabled="!canZoomOut" :aria-label="t('reader.cbz.zoomOut')" @click="zoomOut">
+                <Minus :size="15" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('reader.cbz.zoomOut') }}</TooltipContent>
+          </Tooltip>
+          <span class="min-w-12 text-center text-xs tabular-nums text-muted-foreground" aria-live="polite">{{ zoomPercent }}%</span>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button class="viewer-btn" :disabled="!canZoomIn" :aria-label="t('reader.cbz.zoomIn')" @click="zoomIn">
+                <Plus :size="15" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('reader.cbz.zoomIn') }}</TooltipContent>
+          </Tooltip>
+        </div>
         <Tooltip>
           <TooltipTrigger as-child>
             <button class="viewer-btn" :aria-label="fullscreenLabel" @click="toggleFullscreen">
@@ -691,61 +825,65 @@ onUnmounted(() => {
     <!-- ── Paginated view ──────────────────────────────────────────────────── -->
     <div
       v-if="scrollMode === 'paginated'"
-      class="absolute inset-0 flex items-center justify-center overflow-hidden"
+      ref="paginatedViewport"
+      data-testid="cbz-paginated-viewport"
+      class="absolute inset-0 overflow-auto"
       @click="handleImageClick"
       @touchstart.passive="onTouchStart"
       @touchend.passive="onTouchEnd"
-      @wheel.prevent="onWheel"
+      @wheel="onWheel"
     >
       <div v-if="!currentImageLoaded && !error" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
         <div class="w-8 h-8 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
       </div>
 
-      <div
-        data-testid="cbz-paginated-pages"
-        class="flex h-full w-full items-center justify-center px-1"
-        :style="renderSpread ? spreadContainerStyle : undefined"
-      >
-        <template v-if="renderSpread">
-          <div data-spread-side="left" class="flex h-full min-w-0 flex-1 items-center justify-end">
-            <img
-              v-if="renderLeftPage !== null"
-              :src="pageUrl(renderLeftPage)"
-              :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
-              :style="{ maxWidth: '100%', maxHeight: '100%' }"
-              alt=""
-              draggable="false"
-              @load="onPaginatedImageLoad(renderLeftPage, $event)"
-            />
-            <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
-          </div>
-          <div data-spread-side="right" class="flex h-full min-w-0 flex-1 items-center justify-start">
-            <img
-              v-if="renderRightPage !== null"
-              :src="pageUrl(renderRightPage)"
-              :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
-              :style="{ maxWidth: '100%', maxHeight: '100%' }"
-              alt=""
-              draggable="false"
-              @load="onPaginatedImageLoad(renderRightPage, $event)"
-            />
-            <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
-          </div>
-        </template>
+      <div class="flex min-h-full min-w-full items-center justify-center" :style="paginatedStageStyle">
+        <div
+          data-testid="cbz-paginated-pages"
+          class="flex shrink-0 items-center justify-center px-1 origin-center"
+          :style="[paginatedContentStyle, renderSpread ? spreadContainerStyle : undefined]"
+        >
+          <template v-if="renderSpread">
+            <div data-spread-side="left" class="flex h-full min-w-0 flex-1 items-center justify-end">
+              <img
+                v-if="renderLeftPage !== null"
+                :src="pageUrl(renderLeftPage)"
+                :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
+                :style="{ maxWidth: '100%', maxHeight: '100%' }"
+                alt=""
+                draggable="false"
+                @load="onPaginatedImageLoad(renderLeftPage, $event)"
+              />
+              <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
+            </div>
+            <div data-spread-side="right" class="flex h-full min-w-0 flex-1 items-center justify-start">
+              <img
+                v-if="renderRightPage !== null"
+                :src="pageUrl(renderRightPage)"
+                :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
+                :style="{ maxWidth: '100%', maxHeight: '100%' }"
+                alt=""
+                draggable="false"
+                @load="onPaginatedImageLoad(renderRightPage, $event)"
+              />
+              <div v-else aria-hidden="true" class="h-[92%] w-[92%] rounded-sm border border-border/60 bg-background/30" />
+            </div>
+          </template>
 
-        <img
-          v-else-if="renderSinglePage !== null"
-          :src="pageUrl(renderSinglePage)"
-          :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
-          alt=""
-          draggable="false"
-          @load="onPaginatedImageLoad(renderSinglePage, $event)"
-        />
+          <img
+            v-else-if="renderSinglePage !== null"
+            :src="pageUrl(renderSinglePage)"
+            :class="[imgFitClass, 'pointer-events-none transition-opacity duration-150', currentImageLoaded ? 'opacity-100' : 'opacity-0']"
+            alt=""
+            draggable="false"
+            @load="onPaginatedImageLoad(renderSinglePage, $event)"
+          />
+        </div>
       </div>
     </div>
 
     <!-- ── Infinite / long-strip view ─────────────────────────────────────── -->
-    <div v-else ref="scrollContainer" class="absolute inset-0 overflow-y-auto overflow-x-hidden" @scroll.passive="onStripScroll">
+    <div v-else ref="scrollContainer" class="absolute inset-0 overflow-auto" @scroll.passive="onStripScroll" @wheel="onWheel">
       <div class="relative w-full" :style="{ height: `${virtualStripSize}px` }">
         <div
           v-for="page in renderedStripPages"
@@ -755,11 +893,12 @@ onUnmounted(() => {
           :data-page="page.index"
           class="absolute start-0 top-0"
           :class="[stripFrameClass, scrollMode === 'long-strip' ? '' : 'px-2']"
-          :style="{ transform: `translateY(${page.start}px)` }"
+          :style="stripFrameStyle(page.start)"
         >
           <img
             :src="pageUrl(page.index)"
             :class="stripImageClass"
+            :style="stripImageStyle(page.index)"
             alt=""
             decoding="async"
             draggable="false"

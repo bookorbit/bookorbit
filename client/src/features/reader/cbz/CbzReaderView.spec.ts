@@ -217,4 +217,52 @@ describe('CbzReaderView', () => {
 
     wrapper.unmount()
   })
+
+  it('zooms with desktop controls and Ctrl-wheel without turning the page', async () => {
+    mocks.savedMode = 'paginated'
+    mocks.pageCount = 6
+    mocks.savedPageNumber = 2
+
+    const wrapper = shallowMount(CbzReaderView, {
+      props: { bookId: 11, fileId: 22 },
+      global: {
+        stubs: {
+          Tooltip: { template: '<div><slot /></div>' },
+          TooltipTrigger: { template: '<div><slot /></div>' },
+          TooltipContent: { template: '<div><slot /></div>' },
+        },
+      },
+    })
+
+    await flushPromises()
+    await nextTick()
+
+    const pages = wrapper.get('[data-testid="cbz-paginated-pages"]')
+    const viewport = wrapper.get('[data-testid="cbz-paginated-viewport"]').element as HTMLElement
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 1_000 },
+      clientHeight: { configurable: true, value: 800 },
+    })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 1_000, height: 800 } as DOMRect)
+    expect(pages.attributes('style')).toContain('scale(1)')
+
+    await wrapper.get('button[aria-label="reader.cbz.zoomIn"]').trigger('click')
+    await nextTick()
+    expect(pages.attributes('style')).toContain('scale(1.25)')
+    expect(viewport.scrollLeft).toBe(125)
+    expect(viewport.scrollTop).toBe(100)
+
+    const slider = wrapper.get('input[type="range"]')
+    expect(slider.attributes('value')).toBe('1')
+
+    viewport.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, clientX: 500, clientY: 400, deltaY: 100 }))
+    await nextTick()
+
+    expect(pages.attributes('style')).toContain('scale(1)')
+    expect(viewport.scrollLeft).toBe(0)
+    expect(viewport.scrollTop).toBe(0)
+    expect(slider.attributes('value')).toBe('1')
+
+    wrapper.unmount()
+  })
 })

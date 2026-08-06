@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(),
   push: vi.fn<(to: unknown) => void>(),
   hasPermission: vi.fn<(...args: unknown[]) => boolean>(),
+  user: { value: { settings: { timezone: 'UTC' } } },
 }))
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -25,6 +26,10 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: mocks.hasPermission }),
+}))
+
+vi.mock('@/features/auth/composables/useAuth', () => ({
+  useAuth: () => ({ user: mocks.user }),
 }))
 
 function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
@@ -146,6 +151,7 @@ describe('DetailsTab cover surface', () => {
     mocks.push.mockReset()
     mocks.hasPermission.mockReset()
     mocks.hasPermission.mockReturnValue(true)
+    mocks.user.value.settings.timezone = 'UTC'
 
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)
@@ -499,5 +505,58 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     expect(wrapper.findAll('button').some((button) => button.text().includes('Reset reading state'))).toBe(false)
+  })
+
+  it('edits and saves the added date inline', async () => {
+    const updated = makeBook({ addedAt: '2020-06-15T00:00:00.000Z', updatedAt: '2026-08-05T12:00:00.000Z' })
+    mocks.api.mockImplementation(async (input) => {
+      const url = String(input)
+      if (url.endsWith('/added-at')) return response(updated)
+      if (url.includes('/metadata-score/weights')) return response({})
+      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/collections/membership')) return response([])
+      if (url.includes('/kobo-state')) return response({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] })
+      if (url.includes('/koreader/books/')) return response(null)
+      if (url.includes('/progress')) return response([])
+      return response({})
+    })
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    await wrapper.get('button[aria-label="Edit date added"]').trigger('click')
+    const input = wrapper.get('input[aria-label="Added"]')
+    await input.setValue('2020-06-15')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/books/12/added-at', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addedAt: '2020-06-15' }),
+    })
+    expect(wrapper.emitted('saved')).toEqual([[updated]])
+  })
+
+  it('keeps the added calendar date in the configured account timezone', async () => {
+    mocks.user.value.settings.timezone = 'Europe/Rome'
+    const wrapper = mountDetails(makeBook({ addedAt: '2022-07-12T22:00:00.000Z' }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Jul 13, 2022')
+
+    await wrapper.get('button[aria-label="Edit date added"]').trigger('click')
+
+    expect((wrapper.get('input[aria-label="Added"]').element as HTMLInputElement).value).toBe('2022-07-13')
+  })
+
+  it('hides added date editing when the user cannot edit metadata', async () => {
+    mocks.hasPermission.mockReturnValue(false)
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    expect(wrapper.find('button[aria-label="Edit date added"]').exists()).toBe(false)
   })
 })

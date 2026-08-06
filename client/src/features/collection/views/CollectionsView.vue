@@ -26,19 +26,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <CreateCollectionDialog :open="createOpen" @close="closeCreate" />
-  <EntityIndexView
-    :title="t('titles.collections')"
-    title-icon="FolderOpen"
-    fallback-icon="FolderOpen"
-    :items="collections"
-    route-name="collection"
-    :loading="loading"
-    :search-placeholder="t('components.sidebar.filterCollectionsPlaceholder')"
-    :empty-title="t('components.sidebar.noCollections')"
-    :empty-hint="t('components.entityIndex.collectionsEmptyHint')"
-    can-add
-    :add-label="t('components.sidebar.newCollection')"
-    @add="openCreate"
-  />
+  <div class="h-full">
+    <CreateCollectionDialog :open="createOpen" @close="closeCreate" />
+    <EntityIndexView
+      :title="t('titles.collections')"
+      title-icon="FolderOpen"
+      fallback-icon="FolderOpen"
+      :items="collections"
+      route-name="collection"
+      :loading="loading"
+      :search-placeholder="t('components.sidebar.filterCollectionsPlaceholder')"
+      :empty-title="t('components.sidebar.noCollections')"
+      :empty-hint="t('components.entityIndex.collectionsEmptyHint')"
+      can-add
+      :add-label="t('components.sidebar.newCollection')"
+      @add="openCreate"
+    />
+  </div>
 </template>

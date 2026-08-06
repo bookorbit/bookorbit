@@ -58,6 +58,20 @@ describe('BookRepository', () => {
     expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('updates a book added date and modification timestamp together', async () => {
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn().mockReturnValue({ where });
+    const db = { update: vi.fn().mockReturnValue({ set }) };
+    const repo = new BookRepository(db as never);
+    const addedAt = new Date('2020-06-15T00:00:00.000Z');
+
+    await repo.updateAddedAt(9, addedAt);
+
+    expect(db.update).toHaveBeenCalledWith(books);
+    expect(set).toHaveBeenCalledWith({ addedAt, updatedAt: expect.any(Date) });
+    expect(where).toHaveBeenCalledOnce();
+  });
+
   it('loads book titles for deletion audit details', async () => {
     const rows = [
       { id: 3, title: 'Dune' },

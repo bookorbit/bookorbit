@@ -26,19 +26,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <CreateSmartScopeDialog :open="createOpen" @close="closeCreate" />
-  <EntityIndexView
-    :title="t('titles.smartScopes')"
-    title-icon="Aperture"
-    fallback-icon="Aperture"
-    :items="smartScopes"
-    route-name="smartScope"
-    :loading="loading"
-    :search-placeholder="t('components.sidebar.filterSmartScopesPlaceholder')"
-    :empty-title="t('components.sidebar.noSmartScopes')"
-    :empty-hint="t('components.entityIndex.smartScopesEmptyHint')"
-    can-add
-    :add-label="t('components.sidebar.newSmartScope')"
-    @add="openCreate"
-  />
+  <div class="h-full">
+    <CreateSmartScopeDialog :open="createOpen" @close="closeCreate" />
+    <EntityIndexView
+      :title="t('titles.smartScopes')"
+      title-icon="Aperture"
+      fallback-icon="Aperture"
+      :items="smartScopes"
+      route-name="smartScope"
+      :loading="loading"
+      :search-placeholder="t('components.sidebar.filterSmartScopesPlaceholder')"
+      :empty-title="t('components.sidebar.noSmartScopes')"
+      :empty-hint="t('components.entityIndex.smartScopesEmptyHint')"
+      can-add
+      :add-label="t('components.sidebar.newSmartScope')"
+      @add="openCreate"
+    />
+  </div>
 </template>
