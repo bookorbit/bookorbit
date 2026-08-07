@@ -7,6 +7,7 @@ import * as schema from '../../db/schema';
 import {
   authors,
   bookAuthors,
+  bookFileHashHistory,
   bookFiles,
   bookGenres,
   bookMetadata,
@@ -235,6 +236,10 @@ export class ScannerRepository {
       .where(eq(bookFiles.id, id))
       .returning();
     return file;
+  }
+
+  async recordFileHashHistory(bookFileId: number, fileHash: string, reason: 'rescan' | 'external_change' | 'file_write') {
+    await this.db.insert(bookFileHashHistory).values({ bookFileId, fileHash, reason }).onConflictDoNothing();
   }
 
   async findBookFileByAbsolutePath(absolutePath: string, libraryId?: number) {
