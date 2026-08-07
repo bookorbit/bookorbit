@@ -121,6 +121,7 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     upsertDirScanState: vi.fn().mockResolvedValue(undefined),
     deleteStaleDirScanState: vi.fn().mockResolvedValue(undefined),
     clearDirScanState: vi.fn().mockResolvedValue(undefined),
+    recordFileHashHistory: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
