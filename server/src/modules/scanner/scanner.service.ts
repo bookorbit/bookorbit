@@ -51,6 +51,7 @@ interface FileByInoEntry {
   absolutePath: string;
   sizeBytes: number | null;
   mtime: Date | null;
+  fileHash: string | null;
 }
 
 interface ScanLookupMaps {
@@ -272,7 +273,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const fileByIno = new Map<bigint, FileByInoEntry>(
       knownFiles
         .filter((f) => f.ino !== 0n)
-        .map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath, sizeBytes: f.sizeBytes, mtime: f.mtime }]),
+        .map((f) => [f.ino, { id: f.id, bookId: f.bookId, absolutePath: f.absolutePath, sizeBytes: f.sizeBytes, mtime: f.mtime, fileHash: f.fileHash }]),
     );
 
     const fileIdsByBookId = new Map<number, Set<number>>();
@@ -2039,7 +2040,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByPath: Map<string, FileByPathEntry>,
     fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
-  ): Promise<ProcessedFileResult & { fileId: number }> {
+  ): Promise<ProcessedFileResult> {
     const sizeUnchanged = fileStat.sizeBytes === byPath.sizeBytes;
     const mtimeUnchanged = fileStat.mtime.getTime() === byPath.mtime?.getTime();
     const inoUnchanged = fileStat.ino === byPath.ino;
@@ -2052,13 +2053,36 @@ export class ScannerService implements OnApplicationBootstrap {
 
     await waitForStability(fileStat.absolutePath, fileStat.mtime.getTime());
 
+    let finalHash = byPath.fileHash;
     if (!sizeUnchanged || !mtimeUnchanged || !inoUnchanged || reassigned) {
+      if (!sizeUnchanged || !mtimeUnchanged || !inoUnchanged) {
+        try {
+          const newHash = await computeFileHash(fileStat.absolutePath);
+          if (newHash !== finalHash) {
+            if (finalHash) {
+              await this.scannerRepo.recordHashHistory(byPath.id, finalHash, 'external_change');
+            }
+            finalHash = newHash;
+          }
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code === 'ENOENT' || code === 'EACCES') {
+            this.logger.debug(
+              `[scanner.process_file] [end] bookId=${bookId} path="${sanitizeLogValue(fileStat.absolutePath)}" action=skip_inaccessible - file no longer accessible`,
+            );
+            return { isNew: false, reassigned: false, changed: false, fileId: null };
+          }
+          throw err;
+        }
+      }
+
       await this.scannerRepo.updateBookFile(byPath.id, {
         ...(reassigned && { bookId }),
         libraryFolderId,
         ino: fileStat.ino,
         sizeBytes: fileStat.sizeBytes,
         mtime: fileStat.mtime,
+        ...(finalHash !== byPath.fileHash && { fileHash: finalHash }),
         format,
         role,
         sortOrder,
@@ -2079,7 +2103,7 @@ export class ScannerService implements OnApplicationBootstrap {
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
-      fileHash: byPath.fileHash,
+      fileHash: finalHash,
       sortOrder,
     });
     if (fileStat.ino !== 0n) {
@@ -2089,6 +2113,7 @@ export class ScannerService implements OnApplicationBootstrap {
         absolutePath: fileStat.absolutePath,
         sizeBytes: fileStat.sizeBytes,
         mtime: fileStat.mtime,
+        fileHash: finalHash,
       });
     }
     return { isNew: false, reassigned, changed: !sizeUnchanged || !mtimeUnchanged, fileId: byPath.id };
@@ -2104,7 +2129,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByPath: Map<string, FileByPathEntry>,
     fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
-  ): Promise<(ProcessedFileResult & { fileId: number }) | null> {
+  ): Promise<ProcessedFileResult | null> {
     const byIno = fileByIno.get(fileStat.ino);
     if (!byIno) return null;
 
@@ -2112,6 +2137,27 @@ export class ScannerService implements OnApplicationBootstrap {
     if (await this.pathExists(oldAbsolutePath)) return null;
     const sizeUnchanged = fileStat.sizeBytes === byIno.sizeBytes;
     const mtimeUnchanged = fileStat.mtime.getTime() === byIno.mtime?.getTime();
+    
+    let finalHash = byIno.fileHash;
+    if (!sizeUnchanged || !mtimeUnchanged) {
+      try {
+        const newHash = await computeFileHash(fileStat.absolutePath);
+        if (newHash !== finalHash) {
+          if (finalHash) {
+            await this.scannerRepo.recordHashHistory(byIno.id, finalHash, 'external_change');
+          }
+          finalHash = newHash;
+        }
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT' || code === 'EACCES') {
+          this.logger.debug(`[scanner.process_file] [end] bookId=${bookId} path="${sanitizeLogValue(fileStat.absolutePath)}" action=skip_inaccessible - file no longer accessible`);
+          return { isNew: false, reassigned: false, changed: false, fileId: null };
+        }
+        throw err;
+      }
+    }
+
     await this.scannerRepo.updateBookFile(byIno.id, {
       bookId,
       libraryFolderId,
@@ -2119,6 +2165,7 @@ export class ScannerService implements OnApplicationBootstrap {
       relPath: fileStat.relPath,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
+      ...(finalHash !== byIno.fileHash && { fileHash: finalHash }),
       format,
       role,
       sortOrder,
@@ -2134,10 +2181,10 @@ export class ScannerService implements OnApplicationBootstrap {
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
-      fileHash: oldPathEntry?.fileHash ?? null,
+      fileHash: finalHash,
       sortOrder,
     });
-    fileByIno.set(fileStat.ino, { id: byIno.id, bookId, absolutePath: fileStat.absolutePath, sizeBytes: fileStat.sizeBytes, mtime: fileStat.mtime });
+    fileByIno.set(fileStat.ino, { id: byIno.id, bookId, absolutePath: fileStat.absolutePath, sizeBytes: fileStat.sizeBytes, mtime: fileStat.mtime, fileHash: finalHash });
     return { isNew: false, reassigned: byIno.bookId !== bookId, changed: !sizeUnchanged || !mtimeUnchanged, fileId: byIno.id };
   }
 
@@ -2151,7 +2198,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByPath: Map<string, FileByPathEntry>,
     fileByIno: Map<bigint, FileByInoEntry>,
     counts: ScanCounts,
-  ): Promise<(ProcessedFileResult & { fileId: number }) | null> {
+  ): Promise<ProcessedFileResult | null> {
     let globalByIno = await this.scannerRepo.findBookFileWithContextByIno(fileStat.ino);
     if (
       !globalByIno ||
@@ -2173,6 +2220,27 @@ export class ScannerService implements OnApplicationBootstrap {
     const oldAbsolutePath = globalByIno.file.absolutePath;
     const sizeUnchanged = fileStat.sizeBytes === globalByIno.file.sizeBytes;
     const mtimeUnchanged = fileStat.mtime.getTime() === globalByIno.file.mtime?.getTime();
+    
+    let finalHash = globalByIno.file.fileHash;
+    if (!sizeUnchanged || !mtimeUnchanged) {
+      try {
+        const newHash = await computeFileHash(fileStat.absolutePath);
+        if (newHash !== finalHash) {
+          if (finalHash) {
+            await this.scannerRepo.recordHashHistory(globalByIno.file.id, finalHash, 'external_change');
+          }
+          finalHash = newHash;
+        }
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT' || code === 'EACCES') {
+          this.logger.debug(`[scanner.process_file] [end] bookId=${bookId} path="${sanitizeLogValue(fileStat.absolutePath)}" action=skip_inaccessible - file no longer accessible`);
+          return { isNew: false, reassigned: false, changed: false, fileId: null };
+        }
+        throw err;
+      }
+    }
+
     await this.scannerRepo.updateBookFile(globalByIno.file.id, {
       bookId,
       libraryFolderId,
@@ -2181,6 +2249,7 @@ export class ScannerService implements OnApplicationBootstrap {
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
+      ...(finalHash !== globalByIno.file.fileHash && { fileHash: finalHash }),
       format,
       role,
       sortOrder,
@@ -2200,7 +2269,7 @@ export class ScannerService implements OnApplicationBootstrap {
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
-      fileHash: globalByIno.file.fileHash,
+      fileHash: finalHash,
       sortOrder,
     });
     fileByIno.set(fileStat.ino, {
@@ -2209,6 +2278,7 @@ export class ScannerService implements OnApplicationBootstrap {
       absolutePath: fileStat.absolutePath,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
+      fileHash: finalHash,
     });
     return {
       isNew: false,
@@ -2285,6 +2355,7 @@ export class ScannerService implements OnApplicationBootstrap {
             absolutePath: fileStat.absolutePath,
             sizeBytes: fileStat.sizeBytes,
             mtime: fileStat.mtime,
+            fileHash,
           });
         }
         return { isNew: false, reassigned: byHash.bookId !== bookId, changed: false, fileId: byHash.id };
@@ -2345,6 +2416,7 @@ export class ScannerService implements OnApplicationBootstrap {
             absolutePath: fileStat.absolutePath,
             sizeBytes: fileStat.sizeBytes,
             mtime: fileStat.mtime,
+            fileHash,
           });
         }
         return { isNew: false, reassigned: globalByHash.file.bookId !== bookId, changed: false, fileId: globalByHash.file.id };
@@ -2408,6 +2480,7 @@ export class ScannerService implements OnApplicationBootstrap {
         absolutePath: fileStat.absolutePath,
         sizeBytes: fileStat.sizeBytes,
         mtime: fileStat.mtime,
+        fileHash,
       });
     }
     return { isNew: true, reassigned: false, changed: true, fileId: created.id };

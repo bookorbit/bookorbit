@@ -95,6 +95,7 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     updateBookFile: vi.fn().mockResolvedValue(makeBookFile()),
     findBookFileByAbsolutePath: vi.fn().mockResolvedValue(null),
     findBookFileByHash: vi.fn().mockResolvedValue(null),
+    recordHashHistory: vi.fn().mockResolvedValue(undefined),
     findBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
     findMissingBookFileWithContextByIno: vi.fn().mockResolvedValue(null),
     findBookFileWithContextByHash: vi.fn().mockResolvedValue(null),

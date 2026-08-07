@@ -13,6 +13,7 @@ import {
   books,
   genres,
   koreaderDeviceProgress,
+  bookFileHashHistory,
   libraries,
   libraryFolders,
   scanJobs,
@@ -235,6 +236,10 @@ export class ScannerRepository {
       .where(eq(bookFiles.id, id))
       .returning();
     return file;
+  }
+
+  async recordHashHistory(bookFileId: number, fileHash: string, reason: string): Promise<void> {
+    await this.db.insert(bookFileHashHistory).values({ bookFileId, fileHash, reason }).onConflictDoNothing();
   }
 
   async findBookFileByAbsolutePath(absolutePath: string, libraryId?: number) {
