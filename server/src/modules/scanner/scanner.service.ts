@@ -2070,7 +2070,7 @@ export class ScannerService implements OnApplicationBootstrap {
             this.logger.debug(
               `[scanner.process_file] [end] bookId=${bookId} path="${sanitizeLogValue(fileStat.absolutePath)}" action=skip_inaccessible - file no longer accessible`,
             );
-            return { isNew: false, reassigned: false, changed: false, fileId: null };
+            return { isNew: false, reassigned: false, changed: false, fileId: code === 'ENOENT' ? null : byPath.id };
           }
           throw err;
         }
@@ -2152,7 +2152,7 @@ export class ScannerService implements OnApplicationBootstrap {
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'ENOENT' || code === 'EACCES') {
           this.logger.debug(`[scanner.process_file] [end] bookId=${bookId} path="${sanitizeLogValue(fileStat.absolutePath)}" action=skip_inaccessible - file no longer accessible`);
-          return { isNew: false, reassigned: false, changed: false, fileId: null };
+          return { isNew: false, reassigned: false, changed: false, fileId: code === 'ENOENT' ? null : byIno.id };
         }
         throw err;
       }
@@ -2235,7 +2235,7 @@ export class ScannerService implements OnApplicationBootstrap {
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'ENOENT' || code === 'EACCES') {
           this.logger.debug(`[scanner.process_file] [end] bookId=${bookId} path="${sanitizeLogValue(fileStat.absolutePath)}" action=skip_inaccessible - file no longer accessible`);
-          return { isNew: false, reassigned: false, changed: false, fileId: null };
+          return { isNew: false, reassigned: false, changed: false, fileId: code === 'ENOENT' ? null : globalByIno.file.id };
         }
         throw err;
       }

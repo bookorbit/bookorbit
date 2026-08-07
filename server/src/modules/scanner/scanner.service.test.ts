@@ -869,13 +869,14 @@ describe('zero-byte primary files', () => {
 // ── File identity resolution ──────────────────────────────────────────────────
 
 describe('file identity resolution', () => {
-  it('updates the book file record when path matches but mtime changed', async () => {
+  it('updates the book file record and recomputes hash when path matches but mtime changed', async () => {
     const oldMtime = new Date('2023-01-01');
     const newMtime = new Date('2024-06-01');
     const fileStat = makeFileStat({ mtime: newMtime });
+    mockFingerprint.mockResolvedValueOnce('new-hash-mtime');
 
     const repo = makeRepo({
-      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ absolutePath: fileStat.absolutePath, mtime: oldMtime })]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ absolutePath: fileStat.absolutePath, mtime: oldMtime, fileHash: 'old-hash' })]),
       findBooksByLibraryFolder: vi
         .fn()
         .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
@@ -892,8 +893,65 @@ describe('file identity resolution', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(repo.updateBookFile).toHaveBeenCalledWith(1, expect.objectContaining({ mtime: newMtime }));
+    expect(repo.recordHashHistory).toHaveBeenCalledWith(1, 'old-hash', 'external_change');
+    expect(repo.updateBookFile).toHaveBeenCalledWith(1, expect.objectContaining({ mtime: newMtime, fileHash: 'new-hash-mtime' }));
     expect(repo.createBookFile).not.toHaveBeenCalled();
+  });
+
+  it('updates the book file record and recomputes hash when path matches but sizeBytes changed', async () => {
+    const oldSize = 1000;
+    const newSize = 2000;
+    const fileStat = makeFileStat({ sizeBytes: newSize });
+    mockFingerprint.mockResolvedValueOnce('new-hash-size');
+
+    const repo = makeRepo({
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ absolutePath: fileStat.absolutePath, sizeBytes: oldSize, fileHash: 'old-hash' })]),
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [fileStat])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.recordHashHistory).toHaveBeenCalledWith(1, 'old-hash', 'external_change');
+    expect(repo.updateBookFile).toHaveBeenCalledWith(1, expect.objectContaining({ sizeBytes: newSize, fileHash: 'new-hash-size' }));
+  });
+
+  it('updates the book file record and recomputes hash when path matches but ino changed', async () => {
+    const oldIno = 1000n;
+    const newIno = 2000n;
+    const fileStat = makeFileStat({ ino: newIno });
+    mockFingerprint.mockResolvedValueOnce('new-hash-ino');
+
+    const repo = makeRepo({
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([makeBookFile({ absolutePath: fileStat.absolutePath, ino: oldIno, fileHash: 'old-hash' })]),
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [fileStat])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.recordHashHistory).toHaveBeenCalledWith(1, 'old-hash', 'external_change');
+    expect(repo.updateBookFile).toHaveBeenCalledWith(1, expect.objectContaining({ ino: newIno, fileHash: 'new-hash-ino' }));
   });
 
   it('does not update when path matches and file is unchanged', async () => {
