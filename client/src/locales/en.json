@@ -257,6 +257,22 @@
           "label": "Show spine on comics",
           "hint": "Apply the spine and gloss effect to comic covers (cbz, cbr, cb7)"
         },
+        "detailCoverTint": {
+          "title": "Book details cover tint",
+          "hint": "Fades colour sampled from the cover behind the artwork and title on the book details page",
+          "off": {
+            "label": "Off",
+            "hint": "Plain card background"
+          },
+          "single": {
+            "label": "One colour",
+            "hint": "The cover's dominant colour only"
+          },
+          "duotone": {
+            "label": "Two colours",
+            "hint": "Adds the cover's accent colour when it has a distinct one"
+          }
+        },
         "shadow": {
           "title": "Cover shadow strength",
           "hint": "Controls depth under covers across grid, list, table, and dashboard thumbnails",

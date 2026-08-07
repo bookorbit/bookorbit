@@ -55,6 +55,32 @@
   box-shadow: none;
 }
 
+/* Colour pulled from the book's own cover, strongest behind the artwork and
+   title and gone before the body copy. Alphas are tuned per theme: the same
+   hue needs more presence over a dark card than over a light one.
+
+   The two tones glow from opposite top corners and overlap in the middle, which
+   reads as one soft field rather than two stripes. A cover with no distinct
+   second tone leaves the -2 variables inheriting the first, so the pair
+   collapses back into a single wash. */
+.book-detail-cover-tint {
+  --cover-tint-near: 0.24;
+  --cover-tint-mid: 0.16;
+  --cover-tint-far: 0.05;
+  --cover-tint-hue-2: var(--cover-tint-hue);
+  --cover-tint-saturation-2: var(--cover-tint-saturation);
+  background-image:
+    radial-gradient(78% 46% at 12% 0%, hsl(var(--cover-tint-hue) var(--cover-tint-saturation) 50% / var(--cover-tint-near)) 0%, transparent 72%),
+    radial-gradient(78% 46% at 88% 0%, hsl(var(--cover-tint-hue-2) var(--cover-tint-saturation-2) 50% / var(--cover-tint-mid)) 0%, transparent 72%),
+    linear-gradient(to bottom, hsl(var(--cover-tint-hue) var(--cover-tint-saturation) 50% / var(--cover-tint-far)) 0%, transparent 55%);
+}
+
+.dark .book-detail-cover-tint {
+  --cover-tint-near: 0.34;
+  --cover-tint-mid: 0.24;
+  --cover-tint-far: 0.08;
+}
+
 .book-cover-artwork-frame {
   position: absolute;
   border-radius: inherit;

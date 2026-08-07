@@ -6,6 +6,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import {
   useDisplaySettings,
   type BookCoverDisplayMode,
+  type BookDetailCoverTint,
   type BookShadowStrength,
   type BookSpineOverlay,
   type CardOverlayKey,
@@ -13,7 +14,7 @@ import {
 
 const { t } = useI18n()
 
-const { cardOverlays, bookSpineOverlay, showSpineOnComics, bookShadowStrength, bookCoverDisplayMode } = useDisplaySettings()
+const { cardOverlays, bookSpineOverlay, showSpineOnComics, bookShadowStrength, bookCoverDisplayMode, bookDetailCoverTint } = useDisplaySettings()
 
 const overlayOptions = computed<{ key: CardOverlayKey; label: string; hint: string }[]>(() => [
   {
@@ -69,6 +70,24 @@ const bookCoverDisplayOptions = computed<{ id: BookCoverDisplayMode; label: stri
   },
 ])
 
+const bookDetailCoverTintOptions = computed<{ id: BookDetailCoverTint; label: string; hint: string }[]>(() => [
+  {
+    id: 'off',
+    label: t('settings.appearance.bookCovers.detailCoverTint.off.label'),
+    hint: t('settings.appearance.bookCovers.detailCoverTint.off.hint'),
+  },
+  {
+    id: 'single',
+    label: t('settings.appearance.bookCovers.detailCoverTint.single.label'),
+    hint: t('settings.appearance.bookCovers.detailCoverTint.single.hint'),
+  },
+  {
+    id: 'duotone',
+    label: t('settings.appearance.bookCovers.detailCoverTint.duotone.label'),
+    hint: t('settings.appearance.bookCovers.detailCoverTint.duotone.hint'),
+  },
+])
+
 function toggleOverlay(key: CardOverlayKey) {
   const idx = cardOverlays.value.indexOf(key)
   if (idx === -1) cardOverlays.value = [...cardOverlays.value, key]
@@ -85,6 +104,10 @@ function setBookShadowStrength(mode: BookShadowStrength) {
 
 function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
   bookCoverDisplayMode.value = mode
+}
+
+function setBookDetailCoverTint(mode: BookDetailCoverTint) {
+  bookDetailCoverTint.value = mode
 }
 </script>
 
@@ -147,6 +170,28 @@ function setBookCoverDisplayMode(mode: BookCoverDisplayMode) {
           </p>
         </div>
         <ToggleSwitch v-model="showSpineOnComics" />
+      </div>
+      <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div>
+          <p class="settings-label">{{ t('settings.appearance.bookCovers.detailCoverTint.title') }}</p>
+          <p class="settings-hint">{{ t('settings.appearance.bookCovers.detailCoverTint.hint') }}</p>
+        </div>
+        <div class="mt-3 grid gap-2 sm:grid-cols-3">
+          <button
+            v-for="opt in bookDetailCoverTintOptions"
+            :key="opt.id"
+            class="rounded-md border px-3 py-2 text-left transition-colors"
+            :class="
+              bookDetailCoverTint === opt.id
+                ? 'border-primary bg-primary/8 text-primary'
+                : 'border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground'
+            "
+            @click="setBookDetailCoverTint(opt.id)"
+          >
+            <p class="text-xs font-semibold">{{ opt.label }}</p>
+            <p class="mt-0.5 text-[11px] leading-snug opacity-80">{{ opt.hint }}</p>
+          </button>
+        </div>
       </div>
       <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <div>

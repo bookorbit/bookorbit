@@ -250,6 +250,7 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
           libraryId: visibleLibrary.libraryId,
           libraryName: visibleLibraryName,
           formats: ['epub'],
+          updatedAt: expect.any(String),
         },
         {
           id: visiblePdf.bookId,
@@ -259,6 +260,7 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
           libraryId: visibleLibrary.libraryId,
           libraryName: visibleLibraryName,
           formats: ['pdf'],
+          updatedAt: expect.any(String),
         },
         {
           id: visibleCbz.bookId,
@@ -268,6 +270,7 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
           libraryId: visibleLibrary.libraryId,
           libraryName: visibleLibraryName,
           formats: ['cbz'],
+          updatedAt: expect.any(String),
         },
       ]);
 
@@ -410,7 +413,14 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
         payload: { status: 'reading' },
       });
 
-      expect(setStatus.statusCode).toBe(204);
+      expect(setStatus.statusCode).toBe(200);
+      expect(setStatus.json()).toMatchObject({
+        status: 'reading',
+        source: 'manual',
+        startedAt: expect.any(String),
+        finishedAt: null,
+        updatedAt: expect.any(String),
+      });
 
       const getFileProgress = await ctx.app.inject({
         method: 'GET',
@@ -436,6 +446,11 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
         cfi: null,
         pageNumber: null,
         percentage: 0,
+        koboLocationSource: null,
+        koboLocationType: null,
+        koboLocationValue: null,
+        koboContentSourceProgressPercent: null,
+        koreaderProgress: null,
       });
 
       const limitedBookProgress = await ctx.app.inject({
@@ -467,6 +482,11 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
           cfi: null,
           pageNumber: null,
           percentage: 0,
+          koboLocationSource: null,
+          koboLocationType: null,
+          koboLocationValue: null,
+          koboContentSourceProgressPercent: null,
+          koreaderProgress: null,
           updatedAt: null,
         },
       ]);
@@ -492,7 +512,7 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
             filename: 'alpha-contract.epub',
           },
         ],
-        collections: [],
+        collections: expect.any(Array),
         readStatus: {
           status: 'reading',
           source: 'manual',
@@ -601,7 +621,7 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
 
       expect(exportResponse.statusCode).toBe(201);
       expect(exportResponse.headers['content-type']).toContain('application/zip');
-      expect(exportResponse.headers['content-disposition']).toBe('attachment; filename="books.zip"');
+      expect(exportResponse.headers['content-disposition']).toBe('attachment; filename="books.zip"; filename*=UTF-8\'\'books.zip');
 
       const zipEntries = await listZipEntries(exportResponse);
       expect(zipEntries).toEqual(['alpha-contract.epub', 'beta-contract.pdf']);

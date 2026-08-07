@@ -15,7 +15,7 @@ vi.mock('vue-router', async (importOriginal) => {
   return { ...actual, useRouter: () => ({ push: mocks.push, back: mocks.back }) }
 })
 
-vi.mock('@/lib/api', () => ({ api: mocks.api }))
+vi.mock('@/lib/api', () => ({ api: mocks.api, setOnAuthFailure: vi.fn<(callback: () => void) => void>() }))
 vi.mock('@/features/auth/composables/usePermissions', () => ({ usePermissions: () => ({ hasPermission: mocks.hasPermission }) }))
 
 vi.mock('@/features/book/composables/useDeleteBook', () => ({

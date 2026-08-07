@@ -15,6 +15,9 @@ import { normalizeBookDetailTab } from '@/features/book/lib/book-detail-tabs'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { useCoverTint } from '@/features/book/composables/useCoverTint'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const ReadingLogTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/ReadingLogTab.vue'))
@@ -48,6 +51,22 @@ const pageTitle = computed(() => {
   return t('views.bookDetail.pageTitle.book', { base })
 })
 usePageTitle(pageTitle)
+
+// Only the details tab shows the artwork the tint is derived from; behind forms
+// and tables the same colour reads as noise.
+const { coverUrl } = useCoverVersions()
+const { bookDetailCoverTint } = useDisplaySettings()
+const tintSource = computed(() => {
+  const book = detail.value
+  if (bookDetailCoverTint.value === 'off' || tab.value !== 'details' || !book || book.coverSource === null) return null
+  return coverUrl(book.id, 'cover', book.updatedAt ?? book.addedAt)
+})
+const { tint } = useCoverTint(tintSource)
+const coverTint = computed(() => {
+  if (!tint.value) return null
+  if (bookDetailCoverTint.value === 'single') return { ...tint.value, secondary: null }
+  return tint.value
+})
 
 const { subscribeLibrary } = useScanProgress()
 watch(
@@ -98,7 +117,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
 </script>
 
 <template>
-  <BookDetailLayout :book-id="bookId">
+  <BookDetailLayout :book-id="bookId" :cover-tint="coverTint">
     <Transition name="content" mode="out-in">
       <div v-if="detail" key="detail">
         <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" @moved="handleMovedToLibrary" />
