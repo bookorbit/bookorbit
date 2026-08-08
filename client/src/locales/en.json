@@ -5297,6 +5297,41 @@
       "column": {
         "progress": "Progress"
       }
+    },
+    "linkedBooks": {
+      "title": "Linked books",
+      "description": "Shows books you're currently reading. Once a book is matched to Hardcover, pick a different edition (physical, ebook, audiobook) here to change what your reading progress syncs against.",
+      "loading": "Loading books...",
+      "loadError": "Failed to load books.",
+      "retry": "Retry",
+      "empty": "No books currently being read.",
+      "untitled": "Untitled",
+      "unknownAuthor": "Unknown author",
+      "matchMethod": {
+        "isbn": "ISBN",
+        "title": "Title",
+        "cached": "Cached",
+        "manual": "Manual",
+        "metadata_id": "Metadata match"
+      },
+      "status": {
+        "error": "Error: {error}",
+        "linked": "Linked",
+        "linkedWithMethod": "Linked ({method})",
+        "notLinked": "Not linked yet"
+      },
+      "unmatchedHint": "This book hasn't been matched to Hardcover yet. It will be matched automatically the next time it syncs.",
+      "editionsLoadError": "Failed to load editions.",
+      "viewEditions": "View editions",
+      "noEditionsFound": "No editions found.",
+      "pages": "{count, plural, one {# page} other {# pages}}",
+      "isbn": "ISBN {isbn}",
+      "current": "Current",
+      "useThis": "Use this",
+      "toast": {
+        "switched": "Switched to {format}",
+        "switchFailed": "Failed to switch edition"
+      }
     }
   },
   "library": {
