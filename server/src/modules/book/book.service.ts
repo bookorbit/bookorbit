@@ -1354,6 +1354,7 @@ export class BookService {
     const tokens: Record<string, string> = { originalFilename: stem, extension };
 
     if (!meta) return tokens;
+    if (meta.libraryName) tokens['library'] = meta.libraryName;
     if (meta.title) tokens['title'] = meta.title;
     if (meta.subtitle) tokens['subtitle'] = meta.subtitle;
     if (meta.publisher) tokens['publisher'] = meta.publisher;

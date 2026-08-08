@@ -33,6 +33,7 @@ const TOKEN_DESCRIPTIONS = computed<Record<PatternToken, string>>(() => ({
   publisher: t('settings.reader.fileNaming.tokenPublisher'),
   isbn: t('settings.reader.fileNaming.tokenIsbn'),
   language: t('settings.reader.fileNaming.tokenLanguage'),
+  library: t('settings.reader.fileNaming.tokenLibrary'),
   originalFilename: t('settings.reader.fileNaming.tokenOriginalFilename'),
   extension: t('settings.reader.fileNaming.tokenExtension'),
 }))

@@ -82,4 +82,13 @@ describe('useKoreaderFileNamingDrafts', () => {
     })
     expect(state.normalizedDeviceDraft('device-1').pattern).toBe('')
   })
+
+  it('previews the library token so a device pattern can be split per library', () => {
+    const devices = ref([device()])
+    const accountPattern = ref('{library}/<{series}/>{title}')
+    const state = useKoreaderFileNamingDrafts(devices, accountPattern)
+
+    expect(state.defaultPreview.value).toBe('Books/Sprawl/Neuromancer.epub')
+    expect(state.deviceStandalonePreview('device-1')).toBe('Books/Neuromancer.epub')
+  })
 })

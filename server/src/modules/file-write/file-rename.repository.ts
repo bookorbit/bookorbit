@@ -17,6 +17,7 @@ export interface BookRenameData {
     role: string;
   };
   libraryId: number;
+  libraryName: string;
   libraryFolderId: number;
   libraryFolderPath: string;
   organizationMode: string;
@@ -57,6 +58,7 @@ export class FileRenameRepository {
         libraryFolderId: bookFiles.libraryFolderId,
         libraryFolderPath: libraryFolders.path,
         libraryId: books.libraryId,
+        libraryName: libraries.name,
         organizationMode: libraries.organizationMode,
         fileRenameEnabled: libraries.fileRenameEnabled,
         fileNamingPattern: libraries.fileNamingPattern,
@@ -95,6 +97,7 @@ export class FileRenameRepository {
         role: row.role,
       },
       libraryId: row.libraryId,
+      libraryName: row.libraryName,
       libraryFolderId: row.libraryFolderId,
       libraryFolderPath: row.libraryFolderPath,
       organizationMode: row.organizationMode,

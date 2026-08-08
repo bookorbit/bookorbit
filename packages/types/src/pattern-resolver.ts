@@ -15,6 +15,7 @@ export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   language: "English",
   publisher: "Ace Books",
   isbn: "9780441569595",
+  library: "Books",
   originalFilename: "neuromancer",
   extension: "epub",
 };
@@ -29,6 +30,7 @@ export const PATTERN_TOKENS = [
   { token: "publisher", description: "Publisher" },
   { token: "isbn", description: "ISBN-13" },
   { token: "language", description: "Language" },
+  { token: "library", description: "Library name" },
   { token: "originalFilename", description: "Original filename (without extension)" },
   { token: "extension", description: "File extension (without dot)" },
 ] as const;

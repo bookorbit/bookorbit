@@ -66,6 +66,16 @@ describe('file-rename.utils', () => {
       expect(tokens['authors']).toBe('Author A, Author B');
     });
 
+    it('includes the library token when a library name is given', () => {
+      const tokens = buildTokens(fullMetadata, ['Frank Herbert'], 'dune', 'epub', 'Science Fiction');
+      expect(tokens['library']).toBe('Science Fiction');
+    });
+
+    it('omits the library token when no library name is given', () => {
+      expect(buildTokens(fullMetadata, ['Frank Herbert'], 'dune', 'epub')['library']).toBeUndefined();
+      expect(buildTokens(fullMetadata, ['Frank Herbert'], 'dune', 'epub', '')['library']).toBeUndefined();
+    });
+
     it('omits tokens for null metadata fields', () => {
       const emptyMetadata = {
         title: null,

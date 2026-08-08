@@ -302,6 +302,12 @@ describe('KOReader device pattern', () => {
     expect(resolveUploadPath(pattern, FULL, 'epub')).toBe('Series/Sprawl/1.00 - Neuromancer.epub');
     expect(resolveUploadPath(pattern, { ...FULL, series: '', seriesIndex: '' }, 'epub')).toBe('Standalone/William Gibson - Neuromancer.epub');
   });
+
+  it('keeps each library in its own subtree when the pattern starts with the library token', () => {
+    const pattern = '{library:upper}/<Series/{series}/|{authors:first}/>{title}';
+    expect(resolveUploadPath(pattern, FULL, 'epub')).toBe('BOOKS/Series/Sprawl/Neuromancer.epub');
+    expect(resolveUploadPath(pattern, { ...FULL, library: 'Comics', series: '' }, 'cbz')).toBe('COMICS/William Gibson/Neuromancer.cbz');
+  });
 });
 
 describe('resolveUploadPath', () => {
@@ -347,6 +353,22 @@ describe('resolveUploadPath', () => {
   describe('originalFilename token', () => {
     it('uses the originalFilename token in path position', () => {
       expect(resolveUploadPath('{authors}/{originalFilename}', FULL, 'epub')).toBe('William Gibson/neuromancer.epub');
+    });
+  });
+
+  describe('library token', () => {
+    it('uses the library token in path position', () => {
+      expect(resolveUploadPath('{library}/{title}', FULL, 'epub')).toBe('Books/Neuromancer.epub');
+    });
+
+    it('drops an optional library segment when the book has no library name', () => {
+      expect(resolveUploadPath('<{library}/>{title}', { ...FULL, library: '' }, 'epub')).toBe('Neuromancer.epub');
+    });
+
+    it('sanitizes a library name containing path separators', () => {
+      expect(resolveUploadPath('{library}/{title}', { ...FULL, library: 'Comics/Manga' }, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+        'Comics_Manga/Neuromancer.epub',
+      );
     });
   });
 

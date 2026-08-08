@@ -13,9 +13,16 @@ export interface RenameMetadata {
   seriesIndex: number | null;
 }
 
-export function buildTokens(metadata: RenameMetadata, authors: string[], originalStem: string, format: string): Record<string, string> {
+export function buildTokens(
+  metadata: RenameMetadata,
+  authors: string[],
+  originalStem: string,
+  format: string,
+  libraryName?: string | null,
+): Record<string, string> {
   const tokens: Record<string, string> = { originalFilename: originalStem, extension: format };
 
+  if (libraryName) tokens['library'] = libraryName;
   if (metadata.title) tokens['title'] = metadata.title;
   if (metadata.subtitle) tokens['subtitle'] = metadata.subtitle;
   if (metadata.publisher) tokens['publisher'] = metadata.publisher;

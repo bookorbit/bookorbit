@@ -96,6 +96,7 @@ type CollapsedRawRow = {
 };
 type PatternMetadataRow = {
   bookId: number;
+  libraryName: string;
   title: string | null;
   subtitle: string | null;
   publisher: string | null;
@@ -1734,6 +1735,7 @@ export class BookRepository {
       this.db
         .select({
           bookId: books.id,
+          libraryName: libraries.name,
           title: bookMetadata.title,
           subtitle: bookMetadata.subtitle,
           publisher: bookMetadata.publisher,
@@ -1746,6 +1748,7 @@ export class BookRepository {
           isbn13: bookMetadata.isbn13,
         })
         .from(books)
+        .innerJoin(libraries, eq(libraries.id, books.libraryId))
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(inArray(books.id, bookIds)),
       this.db

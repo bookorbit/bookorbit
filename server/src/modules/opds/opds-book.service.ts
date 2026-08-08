@@ -119,6 +119,7 @@ export interface OpdsManifestFileRow {
 
 export interface OpdsManifestBookRow {
   id: number;
+  libraryName: string;
   title: string;
   subtitle: string | null;
   authors: string[];
@@ -305,6 +306,7 @@ export class OpdsBookService {
         .select({
           id: books.id,
           folderPath: books.folderPath,
+          libraryName: libraries.name,
           title: bookMetadata.title,
           subtitle: bookMetadata.subtitle,
           seriesName: bookMetadata.seriesName,
@@ -316,6 +318,7 @@ export class OpdsBookService {
           isbn13: bookMetadata.isbn13,
         })
         .from(books)
+        .innerJoin(libraries, eq(libraries.id, books.libraryId))
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(inArray(books.id, bookIds)),
       this.db
@@ -366,6 +369,7 @@ export class OpdsBookService {
     return metaRows
       .map((row) => ({
         id: row.id,
+        libraryName: row.libraryName,
         title: row.title ?? row.folderPath.split('/').pop() ?? 'Untitled',
         subtitle: row.subtitle,
         authors: authorsByBook.get(row.id) ?? [],

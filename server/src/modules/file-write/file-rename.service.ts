@@ -109,7 +109,7 @@ export class FileRenameService implements OnModuleDestroy {
 
     const format = (data.file.format ?? extname(data.file.absolutePath).slice(1)).toLowerCase();
     const originalStem = basename(data.file.absolutePath, extname(data.file.absolutePath));
-    const tokens = buildTokens(data.metadata, data.authors, originalStem, format);
+    const tokens = buildTokens(data.metadata, data.authors, originalStem, format, data.libraryName);
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
     const resolvedRelPath = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
@@ -134,7 +134,7 @@ export class FileRenameService implements OnModuleDestroy {
         const fileExt = extname(file.absolutePath);
         const fileFormat = (file.format ?? fileExt.slice(1)).toLowerCase();
         const fileOriginalStem = basename(file.absolutePath, fileExt);
-        const fileTokens = buildTokens(data.metadata, data.authors, fileOriginalStem, fileFormat);
+        const fileTokens = buildTokens(data.metadata, data.authors, fileOriginalStem, fileFormat, data.libraryName);
         const fileResolvedRelPath = resolveUploadPath(pattern, fileTokens, fileFormat, { sanitizeForCrossPlatform });
 
         let targetAbs: string;

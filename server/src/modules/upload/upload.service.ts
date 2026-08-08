@@ -325,7 +325,7 @@ export class UploadService {
   }
 
   private async resolveDestination(
-    library: { fileNamingPattern?: string | null; organizationMode?: string | null },
+    library: { name?: string | null; fileNamingPattern?: string | null; organizationMode?: string | null },
     libraryFolderPath: string,
     tempPath: string,
     filename: string,
@@ -340,7 +340,7 @@ export class UploadService {
 
     if (pattern) {
       const stem = basename(filename, extname(filename));
-      const tokens = await this.buildPatternTokens(tempPath, format, stem);
+      const tokens = await this.buildPatternTokens(tempPath, format, stem, library.name);
       if (library.organizationMode === 'book_per_file') {
         const resolvedFilename = resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform });
         if (resolvedFilename) {
@@ -379,8 +379,9 @@ export class UploadService {
     return { absolutePath, bookFolderPath, relPath };
   }
 
-  private async buildPatternTokens(tempPath: string, format: string, stem: string): Promise<Record<string, string>> {
+  private async buildPatternTokens(tempPath: string, format: string, stem: string, libraryName?: string | null): Promise<Record<string, string>> {
     const base: Record<string, string> = { originalFilename: stem, extension: format };
+    if (libraryName) base['library'] = libraryName;
     const event = 'upload.pattern_tokens';
     const startedAt = Date.now();
 

@@ -1826,6 +1826,7 @@
         "tokenPublisher": "Publisher",
         "tokenIsbn": "ISBN-13",
         "tokenLanguage": "Language",
+        "tokenLibrary": "Library name",
         "tokenOriginalFilename": "Original filename (without extension)",
         "tokenExtension": "File extension (without dot)",
         "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",

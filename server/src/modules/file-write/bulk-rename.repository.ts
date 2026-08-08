@@ -15,6 +15,7 @@ export interface BulkRenameBookData {
   relPath: string | null;
   format: string | null;
   libraryFolderPath: string;
+  libraryName: string;
   organizationMode: string;
   fileNamingPattern: string | null;
   bookFolderPath: string;
@@ -43,6 +44,7 @@ export class BulkRenameRepository {
         relPath: bookFiles.relPath,
         format: bookFiles.format,
         libraryFolderPath: libraryFolders.path,
+        libraryName: libraries.name,
         organizationMode: libraries.organizationMode,
         fileNamingPattern: libraries.fileNamingPattern,
         bookFolderPath: books.folderPath,
@@ -92,6 +94,7 @@ export class BulkRenameRepository {
       relPath: row.relPath,
       format: row.format,
       libraryFolderPath: row.libraryFolderPath,
+      libraryName: row.libraryName,
       organizationMode: row.organizationMode,
       fileNamingPattern: row.fileNamingPattern,
       bookFolderPath: row.bookFolderPath,

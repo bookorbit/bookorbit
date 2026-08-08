@@ -262,7 +262,7 @@ export class BulkRenameService {
     try {
       const format = (book.format ?? extname(book.absolutePath).slice(1)).toLowerCase();
       const originalStem = basename(book.absolutePath, extname(book.absolutePath));
-      const tokens = buildTokens(book.metadata, book.authors, originalStem, format);
+      const tokens = buildTokens(book.metadata, book.authors, originalStem, format, book.libraryName);
       const resolvedRelPath = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
       if (!resolvedRelPath) {

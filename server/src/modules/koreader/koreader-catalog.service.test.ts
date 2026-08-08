@@ -950,6 +950,7 @@ describe('KoreaderCatalogService', () => {
     function makeManifestRow(overrides: Record<string, unknown> = {}) {
       return {
         id: 10,
+        libraryName: 'Main',
         title: 'Dune',
         subtitle: null,
         authors: ['Frank Herbert'],
@@ -1106,6 +1107,36 @@ describe('KoreaderCatalogService', () => {
       const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
 
       expect(result.items[0]!.files[0]!.devicePath).toBe('Dune/1 - Dune.epub');
+    });
+
+    it('resolves the library token so each library keeps its own subtree on the device', async () => {
+      const { service, opdsBookService } = makeService({
+        fileNamingPattern: '{library:upper}/<{series}/>{title}',
+        seriesFileNamingPattern: '',
+        standaloneFileNamingPattern: '',
+      });
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({
+        rows: [makeManifestRow(), makeManifestRow({ id: 11, libraryName: 'Comics', title: 'Sandman', seriesName: 'Sandman' })],
+        hasNext: false,
+      });
+
+      const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
+
+      expect(result.items[0]!.files[0]!.devicePath).toBe('MAIN/Dune/Dune.epub');
+      expect(result.items[1]!.files[0]!.devicePath).toBe('COMICS/Sandman/Sandman.epub');
+    });
+
+    it('drops the library segment when the pattern makes it optional and the name is missing', async () => {
+      const { service, opdsBookService } = makeService({
+        fileNamingPattern: '<{library}/>{title}',
+        seriesFileNamingPattern: '',
+        standaloneFileNamingPattern: '',
+      });
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ libraryName: '' })], hasNext: false });
+
+      const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
+
+      expect(result.items[0]!.files[0]!.devicePath).toBe('Dune.epub');
     });
   });
 });

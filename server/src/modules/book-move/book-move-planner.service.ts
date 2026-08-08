@@ -213,7 +213,7 @@ export class BookMovePlannerService {
 
   private resolvePathForFile(file: MoveBookFile, book: MoveBookData, input: PlanInput, format: string): string | null {
     const originalStem = basename(file.absolutePath, extname(file.absolutePath));
-    const tokens = buildTokens(book.metadata, book.authors, originalStem, format);
+    const tokens = buildTokens(book.metadata, book.authors, originalStem, format, input.target.libraryName);
     return resolveUploadPath(input.pattern!, tokens, format, { sanitizeForCrossPlatform: input.sanitizeForCrossPlatform });
   }
 
