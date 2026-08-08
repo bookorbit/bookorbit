@@ -151,12 +151,20 @@ describe('HardcoverProvider', () => {
     });
 
     it('returns all candidates from an ISBN search when the pinned edition is not among them', async () => {
-      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([mockBook]);
+      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([
+        {
+          ...mockBook,
+          editions: [
+            { id: 1001, isbn_13: '9780756404079', reading_format_id: 1 },
+            { id: 1002, isbn_13: '9780756404079', reading_format_id: 2 },
+          ],
+        },
+      ]);
 
       const results = await provider.search({ isbn: '9780756404079', hardcoverEditionId: '999999' });
 
-      expect(results).toHaveLength(1);
-      expect(results[0].hardcoverEditionId).toBe('1001');
+      expect(results).toHaveLength(2);
+      expect(results.map((result) => result.hardcoverEditionId)).toEqual(expect.arrayContaining(['1001', '1002']));
     });
 
     it('falls through to title search when ISBN returns no results', async () => {
@@ -350,14 +358,20 @@ describe('HardcoverProvider', () => {
     });
 
     it('falls back to ISBN match when the pinned edition id is no longer present', async () => {
-      vi.spyOn(client, 'lookupBySlug').mockResolvedValue(mockBook);
+      vi.spyOn(client, 'lookupBySlug').mockResolvedValue({
+        ...mockBook,
+        editions: [
+          { id: 1001, isbn_13: 'OTHER-ISBN', reading_format_id: 1 },
+          { id: 1002, isbn_13: '9780756404079', reading_format_id: 1 },
+        ],
+      });
 
       const result = await provider.lookupById('the-name-of-the-wind', undefined, {
         isbn: '9780756404079',
         hardcoverEditionId: '999999',
       });
 
-      expect(result?.hardcoverEditionId).toBe('1001');
+      expect(result?.hardcoverEditionId).toBe('1002');
     });
   });
 });
