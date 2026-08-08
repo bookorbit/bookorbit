@@ -29,7 +29,11 @@ export class HardcoverProvider implements IdentifiableProvider {
     if (params.isbn) {
       const books = signal ? await this.client.searchByIsbn(params.isbn, apiKey, signal) : await this.client.searchByIsbn(params.isbn, apiKey);
       if (books.length > 0) {
-        return books.flatMap(mapBookWithEditions);
+        const candidates = books.flatMap(mapBookWithEditions);
+        const pinned = params.hardcoverEditionId
+          ? candidates.find((candidate) => candidate.hardcoverEditionId === params.hardcoverEditionId)
+          : undefined;
+        return pinned ? [pinned] : candidates;
       }
     }
 

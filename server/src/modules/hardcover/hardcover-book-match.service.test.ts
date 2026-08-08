@@ -312,9 +312,9 @@ describe('HardcoverBookMatchService', () => {
       expect(await makeService().listEditions(1, 'tok', 999)).toEqual([]);
     });
 
-    it('returns an empty array when the query fails', async () => {
+    it('throws instead of masking an upstream failure as an empty catalog', async () => {
       mockClient.query.mockRejectedValue(new Error('boom'));
-      expect(await makeService().listEditions(1, 'tok', 100)).toEqual([]);
+      await expect(makeService().listEditions(1, 'tok', 100)).rejects.toThrow('Failed to load Hardcover editions');
     });
   });
 });

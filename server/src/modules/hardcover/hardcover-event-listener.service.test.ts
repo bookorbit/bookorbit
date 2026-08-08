@@ -105,4 +105,31 @@ describe('HardcoverEventListener', () => {
 
     expect(mockRepo.updateEditionIfLinked).not.toHaveBeenCalled();
   });
+
+  it('ignores a partial numeric prefix like "200abc"', async () => {
+    const { events } = makeListener();
+
+    events.emit(ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, { userId: 1, bookId: 10, hardcoverEditionId: '200abc' });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mockRepo.updateEditionIfLinked).not.toHaveBeenCalled();
+  });
+
+  it('ignores exponent notation', async () => {
+    const { events } = makeListener();
+
+    events.emit(ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, { userId: 1, bookId: 10, hardcoverEditionId: '2e3' });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mockRepo.updateEditionIfLinked).not.toHaveBeenCalled();
+  });
+
+  it('ignores an unsafe integer value', async () => {
+    const { events } = makeListener();
+
+    events.emit(ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, { userId: 1, bookId: 10, hardcoverEditionId: '99999999999999999999' });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mockRepo.updateEditionIfLinked).not.toHaveBeenCalled();
+  });
 });

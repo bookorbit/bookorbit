@@ -9,7 +9,7 @@ import type {
   UpdateHardcoverBookSyncPayload,
 } from '@bookorbit/types';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { distinctUntilChanged, filter, map, merge, Observable, of, Subject } from 'rxjs';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -316,6 +316,14 @@ export class HardcoverSyncService {
   async setEdition(userId: number, bookId: number, editionId: number): Promise<{ success: boolean }> {
     const state = await this.repo.findBookState(userId, bookId);
     if (!state?.hardcoverBookId) return { success: false };
+
+    const token = await this.settingsService.getTokenForUser(userId);
+    if (!token) return { success: false };
+
+    const editions = await this.matchService.listEditions(userId, token, state.hardcoverBookId);
+    if (!editions.some((edition) => edition.id === editionId)) {
+      throw new BadRequestException(`Edition ${editionId} does not belong to the matched Hardcover book`);
+    }
 
     await this.repo.upsertBookState({
       userId,

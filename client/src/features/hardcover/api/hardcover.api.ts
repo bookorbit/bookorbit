@@ -142,7 +142,7 @@ export async function fetchHardcoverLinkedBooks(): Promise<HardcoverLinkedBook[]
 
 export async function fetchHardcoverEditions(bookId: number): Promise<HardcoverEdition[]> {
   const res = await api(`${BASE}/books/${bookId}/editions`)
-  if (!res.ok) return []
+  if (!res.ok) throw new Error('Failed to fetch Hardcover editions')
   return res.json()
 }
 

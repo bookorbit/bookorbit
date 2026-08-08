@@ -724,9 +724,27 @@ describe('HardcoverSyncService', () => {
       expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
     });
 
-    it('sets the edition, forces a resync, and back-fills the shared metadata field', async () => {
+    it('fails when there is no token to validate the edition against', async () => {
       mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
       mockSettingsService.getTokenForUser.mockResolvedValue(null);
+
+      expect(await makeService().setEdition(1, 1, 200)).toEqual({ success: false });
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
+    });
+
+    it('rejects an edition id that does not belong to the matched hardcover book', async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockMatchService.listEditions.mockResolvedValue([{ id: 999, format: 'Physical Book' }]);
+
+      await expect(makeService().setEdition(1, 1, 200)).rejects.toThrow('Edition 200 does not belong to the matched Hardcover book');
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
+    });
+
+    it('sets the edition, forces a resync, and back-fills the shared metadata field', async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockMatchService.listEditions.mockResolvedValue([{ id: 200, format: 'Physical Book' }]);
 
       const result = await makeService().setEdition(1, 1, 200);
 
@@ -747,7 +765,8 @@ describe('HardcoverSyncService', () => {
 
     it('does not let a back-fill failure fail the edition pick', async () => {
       mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
-      mockSettingsService.getTokenForUser.mockResolvedValue(null);
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockMatchService.listEditions.mockResolvedValue([{ id: 200, format: 'Physical Book' }]);
       mockBookService.setHardcoverEditionIdIfEmpty.mockRejectedValue(new Error('boom'));
 
       await expect(makeService().setEdition(1, 1, 200)).resolves.toEqual({ success: true });

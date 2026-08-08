@@ -133,6 +133,32 @@ describe('HardcoverProvider', () => {
       expect(results[1].pageCount).toBeUndefined();
     });
 
+    it('returns only the pinned edition from an ISBN search when hardcoverEditionId is provided', async () => {
+      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([
+        {
+          ...mockBook,
+          editions: [
+            { id: 1001, isbn_13: '9780756404079', reading_format_id: 1 },
+            { id: 1002, isbn_13: '9780756404079', reading_format_id: 2 },
+          ],
+        },
+      ]);
+
+      const results = await provider.search({ isbn: '9780756404079', hardcoverEditionId: '1002' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].hardcoverEditionId).toBe('1002');
+    });
+
+    it('returns all candidates from an ISBN search when the pinned edition is not among them', async () => {
+      vi.spyOn(client, 'searchByIsbn').mockResolvedValue([mockBook]);
+
+      const results = await provider.search({ isbn: '9780756404079', hardcoverEditionId: '999999' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].hardcoverEditionId).toBe('1001');
+    });
+
     it('falls through to title search when ISBN returns no results', async () => {
       vi.spyOn(client, 'searchByIsbn').mockResolvedValue([]);
       vi.spyOn(client, 'searchBooks').mockResolvedValue([mockDocument]);

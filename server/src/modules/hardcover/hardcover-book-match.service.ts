@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import type { HardcoverEdition as HardcoverEditionSummary } from '@bookorbit/types';
 
 import { parsePublishedDateKey } from '../../common/utils/published-date.utils';
@@ -360,19 +360,24 @@ export class HardcoverBookMatchService {
     }
   }
 
+  // A failed upstream lookup must not be reported as "no editions" - the caller (and the user)
+  // needs to be able to tell an empty catalog apart from a provider outage and retry.
   async listEditions(userId: number, token: string, hardcoverBookId: number): Promise<HardcoverEditionSummary[]> {
+    const startedAt = Date.now();
+    let data: BooksDisplayQueryResult;
     try {
-      const data = await this.client.query<BooksDisplayQueryResult>(userId, token, FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY, { id: hardcoverBookId });
-      const hardcoverBook = data.books?.[0];
-      if (!hardcoverBook?.editions) return [];
-      return hardcoverBook.editions.map(mapEditionForDisplay);
+      data = await this.client.query<BooksDisplayQueryResult>(userId, token, FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY, { id: hardcoverBookId });
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
-        `[hardcover.list_editions] [fail] userId=${userId} hardcoverBookId=${hardcoverBookId} error="${error}" - edition list lookup failed`,
+        `[hardcover.list_editions] [fail] userId=${userId} hardcoverBookId=${hardcoverBookId} durationMs=${Date.now() - startedAt} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - edition list lookup failed`,
       );
-      return [];
+      throw new InternalServerErrorException('Failed to load Hardcover editions');
     }
+
+    const hardcoverBook = data.books?.[0];
+    if (!hardcoverBook?.editions) return [];
+    return hardcoverBook.editions.map(mapEditionForDisplay);
   }
 
   private async resolveCachedMatch(

@@ -213,9 +213,9 @@ describe('hardcover.api', () => {
     )
   })
 
-  it('returns an empty array when fetching editions fails', async () => {
+  it('throws instead of masking a failed edition fetch as an empty list', async () => {
     mockApi.mockResolvedValueOnce(jsonResponse({}, false))
-    await expect(fetchHardcoverEditions(12)).resolves.toEqual([])
+    await expect(fetchHardcoverEditions(12)).rejects.toThrow('Failed to fetch Hardcover editions')
   })
 
   it('throws when fetching linked books or setting an edition fails', async () => {

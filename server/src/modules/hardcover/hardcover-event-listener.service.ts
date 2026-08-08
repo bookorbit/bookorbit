@@ -68,15 +68,17 @@ export class HardcoverEventListener implements OnModuleInit {
   }
 
   private async handleHardcoverEditionChanged(payload: BookHardcoverEditionChangedPayload): Promise<void> {
-    const editionId = parseInt(payload.hardcoverEditionId, 10);
-    if (Number.isNaN(editionId)) return;
+    if (!/^\d+$/.test(payload.hardcoverEditionId)) return;
+    const editionId = Number(payload.hardcoverEditionId);
+    if (!Number.isSafeInteger(editionId)) return;
 
+    const startedAt = Date.now();
     try {
       await this.repo.updateEditionIfLinked(payload.userId, payload.bookId, editionId);
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
-        `[hardcover.propagate_edition] [fail] userId=${payload.userId} bookId=${payload.bookId} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - propagating metadata edition id to sync state failed`,
+        `[hardcover.propagate_edition] [fail] userId=${payload.userId} bookId=${payload.bookId} durationMs=${Date.now() - startedAt} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - propagating metadata edition id to sync state failed`,
       );
     }
   }

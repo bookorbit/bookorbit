@@ -184,4 +184,25 @@ describe('HardcoverLinkedBooks', () => {
 
     expect(toastError).toHaveBeenCalledWith('Failed to switch edition')
   })
+
+  it('shows a retryable error instead of an unhandled rejection when loading editions fails', async () => {
+    const wrapper = mountList()
+    await flushPromises()
+
+    mocks.fetchHardcoverEditions.mockRejectedValueOnce(new Error('provider down'))
+
+    await wrapper.find('button').trigger('click')
+    const viewEditions = wrapper.findAll('button').find((b) => b.text().includes('View editions'))
+    await viewEditions!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed to load editions.')
+
+    mocks.fetchHardcoverEditions.mockResolvedValueOnce([{ id: 201, format: 'Audiobook' }])
+    const retry = wrapper.findAll('button').find((b) => b.text() === 'Retry')
+    await retry!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Audiobook')
+  })
 })

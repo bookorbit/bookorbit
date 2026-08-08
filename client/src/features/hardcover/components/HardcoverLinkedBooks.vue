@@ -11,6 +11,7 @@ const loadError = ref(false)
 const expandedBookId = ref<number | null>(null)
 const editionsByBookId = reactive<Record<number, HardcoverEdition[]>>({})
 const loadingEditions = reactive<Record<number, boolean>>({})
+const editionsLoadError = reactive<Record<number, boolean>>({})
 const settingEdition = reactive<Record<number, boolean>>({})
 
 onMounted(async () => {
@@ -61,8 +62,11 @@ function statusLabel(book: HardcoverLinkedBook): string {
 async function loadEditions(book: HardcoverLinkedBook) {
   if (editionsByBookId[book.bookId]) return
   loadingEditions[book.bookId] = true
+  editionsLoadError[book.bookId] = false
   try {
     editionsByBookId[book.bookId] = await fetchHardcoverEditions(book.bookId)
+  } catch {
+    editionsLoadError[book.bookId] = true
   } finally {
     loadingEditions[book.bookId] = false
   }
@@ -139,8 +143,14 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
           </p>
 
           <div v-else>
+            <div v-if="editionsLoadError[book.bookId]" class="flex items-center gap-2 text-xs text-destructive">
+              <AlertCircle class="size-3.5 shrink-0" />
+              Failed to load editions.
+              <button type="button" class="underline underline-offset-2" @click="loadEditions(book)">Retry</button>
+            </div>
+
             <button
-              v-if="!editionsByBookId[book.bookId]"
+              v-else-if="!editionsByBookId[book.bookId]"
               type="button"
               :disabled="loadingEditions[book.bookId]"
               class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
