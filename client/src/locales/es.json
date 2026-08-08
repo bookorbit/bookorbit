@@ -254,6 +254,22 @@
           "label": "Mostrar lomo en cómics",
           "hint": "Aplicar el efecto de lomo y brillo a las portadas de cómics (cbz, cbr, cb7)"
         },
+        "detailCoverTint": {
+          "title": "Color de la portada en la ficha del libro",
+          "hint": "Difumina el color extraído de la portada detrás de la imagen y del título en la página de detalles del libro.",
+          "off": {
+            "label": "Desactivado",
+            "hint": "Fondo liso de la tarjeta"
+          },
+          "single": {
+            "label": "Un color",
+            "hint": "Solo el color predominante de la portada."
+          },
+          "duotone": {
+            "label": "Dos colores",
+            "hint": "Añade el color de acento de la portada cuando tiene uno bien definido."
+          }
+        },
         "shadow": {
           "title": "Intensidad de la sombra de portada",
           "hint": "Controla la profundidad bajo las portadas en las miniaturas de cuadrícula, lista, tabla y panel",
@@ -2026,6 +2042,8 @@
         "daysAgo": "Hace {count}d",
         "unknown": "Desconocido",
         "updateAvailable": "Actualización disponible",
+        "manualUpdateRequired": "Actualización manual necesaria",
+        "manualUpdateExplanation": "Esta versión de plugin no puede instalar sus propias actualizaciones. Descarga el plugin y copia bookorbit.koplugin a koreader/plugins/ en este dispositivo.",
         "upToDate": "actualizado",
         "versionUnknown": "Versión desconocida",
         "latestPlugin": "Complemento más reciente: v{version}",
@@ -2094,6 +2112,7 @@
         "stockStep1Prefix": "En su dispositivo KOReader, vaya a",
         "stockStep1Suffix": ".",
         "stockStep2": "Configure el servidor de sincronización personalizado en el URL que se muestra arriba.",
+        "stockStep2InlineUrl": "Configure el servidor de sincronización personalizado en la siguiente URL:",
         "stockStep3": "Ingrese el nombre de usuario y la contraseña que creó, luego toque Iniciar sesión.",
         "locationNote": "BookOrbit guarda ubicaciones EPUB compatibles con KOReader del lector web. La restauración debe aterrizar cerca de la misma posición, aunque la ubicación exacta de la línea puede variar según el lector y el diseño de EPUB.",
         "dangerZone": "Zona de peligro",
@@ -3678,6 +3697,8 @@
         "fileSize": "Tamaño de archivo",
         "library": "Biblioteca",
         "added": "Añadido",
+        "cancelDateAddedEdit": "Cancelar fecha de edición añadida",
+        "editDateAdded": "Editar fecha añadida",
         "dateStarted": "Fecha de inicio",
         "saving": "Guardando...",
         "cancelDateStartedEdit": "Cancelar fecha de inicio editar",
@@ -3689,9 +3710,12 @@
         "synopsis": "Sinopsis",
         "noDescription": "No hay descripción disponible.",
         "dateStartedFutureError": "La fecha de inicio no puede ser futura.",
+        "dateAddedRequiredError": "Se requiere la fecha añadida.",
+        "dateAddedFutureError": "La fecha añadida no puede ser futura.",
         "dateFinishedFutureError": "La fecha de finalización no puede ser futura.",
         "dateFinishedBeforeStartedError": "La fecha de finalización debe ser igual o posterior a la fecha de inicio.",
         "saveReadingDatesError": "No se pudieron guardar las fechas de lectura.",
+        "saveAddedDateError": "Error al guardar la fecha añadida.",
         "koboPendingDelete": "Pendiente de eliminar del dispositivo",
         "koboPendingDeleteTooltip": "Kobo lo eliminará en la próxima sincronización.",
         "koboRemovedByDevice": "Eliminado por dispositivo",
@@ -4734,6 +4758,10 @@
       "untitled": "Sin título",
       "cover": "Portada",
       "bookCover": "portada del libro"
+    },
+    "libraryLoad": {
+      "errorTitle": "No se pueden cargar tus bibliotecas",
+      "errorDescription": "BookOrbit no ha podido recuperar tus bibliotecas. Los datos de tu biblioteca no se han eliminado."
     },
     "scroller": {
       "failedToLoad": "No se pudo cargar.",
@@ -6111,6 +6139,9 @@
       "scrollModeHint": "Utilice \"Sin espacios\" para webtoons y tiras verticales.",
       "readingDirection": "dirección de lectura",
       "pageView": "Vista de página",
+      "twoPagePagedOnly": "Dos páginas se muestran sólo en modo paginado.",
+      "spreadSection": "Distribución de dos páginas",
+      "spreadFallbackHint": "Esta pantalla es demasiado estrecha para dos páginas, por lo que se muestran páginas individuales.",
       "spreadAlignmentLabel": "Alineación extendida",
       "spreadGap": "Brecha de propagación",
       "spreadGapValue": "{value}px",
@@ -6118,6 +6149,9 @@
       "widePages": "Páginas anchas",
       "firstPage": "Primera página",
       "lastPage": "Última página",
+      "zoomControls": "Controles de zoom",
+      "zoomOut": "Alejar",
+      "zoomIn": "Acercar",
       "fit": {
         "page": "Ajuste de página",
         "width": "Ancho de página",
