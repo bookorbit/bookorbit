@@ -10,6 +10,8 @@ export interface MetadataSearchParams {
   seriesName?: string;
   seriesIndex?: number;
   existingProviderIds?: Partial<Record<MetadataProviderKey, string>>;
+  // Pins a Hardcover refresh to a previously chosen edition instead of re-deriving one by ISBN.
+  hardcoverEditionId?: string;
   isAudiobook?: boolean;
   // Hint for providers to cap deep candidate exploration in non-interactive flows
   // (e.g. auto-fill/background refresh where there is no manual candidate picking).

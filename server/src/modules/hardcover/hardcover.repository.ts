@@ -118,6 +118,17 @@ export class HardcoverRepository {
     return row!;
   }
 
+  // Only updates an existing link (never creates one) - used to propagate a metadata-side edition
+  // pick into a user's sync target without turning an unrelated metadata edit into a new sync link.
+  async updateEditionIfLinked(userId: number, bookId: number, hardcoverEditionId: number): Promise<boolean> {
+    const [row] = await this.db
+      .update(schema.hardcoverBookState)
+      .set({ hardcoverEditionId, updatedAt: new Date() })
+      .where(and(eq(schema.hardcoverBookState.userId, userId), eq(schema.hardcoverBookState.bookId, bookId)))
+      .returning({ id: schema.hardcoverBookState.id });
+    return row != null;
+  }
+
   async setBookSyncOverride(userId: number, bookId: number, syncOverride: 'included' | 'excluded' | null): Promise<HardcoverBookState> {
     const syncExcluded = syncOverride === 'excluded';
     const [row] = await this.db
@@ -153,11 +164,15 @@ export class HardcoverRepository {
     return row ?? null;
   }
 
+  async findCurrentReadingBooks(userId: number): Promise<BookSyncData[]> {
+    return this.findBookSyncDataForUser(userId, undefined, false, ['reading', 'rereading']);
+  }
+
   private async findSyncableBooksForUser(userId: number, bookId?: number): Promise<BookSyncData[]> {
     return this.findBookSyncDataForUser(userId, bookId, false);
   }
 
-  private async findBookSyncDataForUser(userId: number, bookId?: number, includeUnread = true): Promise<BookSyncData[]> {
+  private async findBookSyncDataForUser(userId: number, bookId?: number, includeUnread = true, statuses?: ReadStatus[]): Promise<BookSyncData[]> {
     const bookFilter = bookId !== undefined ? eq(schema.books.id, bookId) : undefined;
 
     const maxProgressSq = this.db
@@ -219,7 +234,8 @@ export class HardcoverRepository {
       .leftJoin(attemptsSq, eq(attemptsSq.bookId, schema.books.id))
       .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId));
 
-    const rows = includeUnread ? await query.where(bookFilter) : await query.where(and(bookFilter, ne(schema.userBookStatus.status, 'unread')));
+    const statusFilter = statuses ? inArray(schema.userBookStatus.status, statuses) : ne(schema.userBookStatus.status, 'unread');
+    const rows = includeUnread ? await query.where(bookFilter) : await query.where(and(bookFilter, statusFilter));
 
     return rows as BookSyncData[];
   }

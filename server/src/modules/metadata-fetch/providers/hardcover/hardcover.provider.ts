@@ -57,6 +57,12 @@ export class HardcoverProvider implements IdentifiableProvider {
     if (!book) return null;
 
     const candidates = mapBookWithEditions(book);
+
+    if (params?.hardcoverEditionId) {
+      const pinned = candidates.find((candidate) => candidate.hardcoverEditionId === params.hardcoverEditionId);
+      if (pinned) return pinned;
+    }
+
     const requestedIsbn = normalizeMetadataIsbn(params?.isbn);
     if (requestedIsbn) {
       return candidates.find((candidate) => candidateHasNormalizedIsbn(candidate, requestedIsbn)) ?? null;

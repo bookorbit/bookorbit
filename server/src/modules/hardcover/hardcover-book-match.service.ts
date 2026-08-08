@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { HardcoverEdition as HardcoverEditionSummary } from '@bookorbit/types';
 
+import { parsePublishedDateKey } from '../../common/utils/published-date.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { BookSyncData } from './hardcover.repository';
 import { HardcoverClientService } from './hardcover-client.service';
@@ -107,6 +109,76 @@ interface BooksQueryResult {
     id: number;
     editions?: HardcoverEdition[];
   }>;
+}
+
+// Hardcover reading_format_id: 1 = physical, 2 = audiobook, 4 = ebook.
+const AUDIOBOOK_READING_FORMAT_ID = 2;
+const EBOOK_READING_FORMAT_ID = 4;
+
+const EDITION_DISPLAY_FIELDS = `
+      id
+      title
+      pages
+      isbn_10
+      isbn_13
+      publisher { name }
+      language { code2 }
+      release_date
+      release_year
+      reading_format_id
+      audio_seconds
+      image { url }`;
+
+const FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY = `
+query FindBookEditionsForDisplay($id: Int!) {
+  books(where: { id: { _eq: $id } }, limit: 1) {
+    id
+    editions(limit: ${EDITION_SELECTION_LIMIT}) {${EDITION_DISPLAY_FIELDS}
+    }
+  }
+}`;
+
+interface HardcoverEditionDisplayRow {
+  id: number;
+  title?: string | null;
+  pages?: number | null;
+  isbn_10?: string | null;
+  isbn_13?: string | null;
+  publisher?: { name?: string | null } | null;
+  language?: { code2?: string | null } | null;
+  release_date?: string | null;
+  release_year?: number | null;
+  reading_format_id?: number | null;
+  audio_seconds?: number | null;
+  image?: { url?: string | null } | null;
+}
+
+interface BooksDisplayQueryResult {
+  books: Array<{
+    id: number;
+    editions?: HardcoverEditionDisplayRow[];
+  }>;
+}
+
+function editionFormatLabel(edition: HardcoverEditionDisplayRow): string {
+  if (edition.reading_format_id === AUDIOBOOK_READING_FORMAT_ID || (edition.audio_seconds ?? 0) > 0) return 'Audiobook';
+  if (edition.reading_format_id === EBOOK_READING_FORMAT_ID) return 'E-Book';
+  return 'Physical Book';
+}
+
+function mapEditionForDisplay(edition: HardcoverEditionDisplayRow): HardcoverEditionSummary {
+  return {
+    id: edition.id,
+    title: edition.title ?? null,
+    format: editionFormatLabel(edition),
+    pages: typeof edition.pages === 'number' && edition.pages > 0 ? edition.pages : null,
+    isbn10: edition.isbn_10 ?? null,
+    isbn13: edition.isbn_13 ?? null,
+    publisher: edition.publisher?.name ?? null,
+    language: edition.language?.code2 ?? null,
+    publishedDate: parsePublishedDateKey(edition.release_date) ?? null,
+    coverUrl: edition.image?.url ?? null,
+  };
 }
 
 interface SearchBooksResult {
@@ -285,6 +357,21 @@ export class HardcoverBookMatchService {
         `[hardcover.book_match] [fail] userId=${userId} bookId=${book.bookId} method=title_author error="${error}" - title lookup failed`,
       );
       return null;
+    }
+  }
+
+  async listEditions(userId: number, token: string, hardcoverBookId: number): Promise<HardcoverEditionSummary[]> {
+    try {
+      const data = await this.client.query<BooksDisplayQueryResult>(userId, token, FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY, { id: hardcoverBookId });
+      const hardcoverBook = data.books?.[0];
+      if (!hardcoverBook?.editions) return [];
+      return hardcoverBook.editions.map(mapEditionForDisplay);
+    } catch (err) {
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[hardcover.list_editions] [fail] userId=${userId} hardcoverBookId=${hardcoverBookId} error="${error}" - edition list lookup failed`,
+      );
+      return [];
     }
   }
 

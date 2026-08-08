@@ -1,6 +1,8 @@
 import type {
   HardcoverActiveSyncStatus,
   HardcoverBookSyncState,
+  HardcoverEdition,
+  HardcoverLinkedBook,
   HardcoverSettings,
   HardcoverSyncPendingSummary,
   ReadStatus,
@@ -11,6 +13,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { distinctUntilChanged, filter, map, merge, Observable, of, Subject } from 'rxjs';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { BookService } from '../book/book.service';
 import { HARDCOVER_STATUS } from './hardcover.constants';
 import { HardcoverBookMatchService } from './hardcover-book-match.service';
 import { HardcoverClientService } from './hardcover-client.service';
@@ -121,6 +124,7 @@ export class HardcoverSyncService {
     private readonly client: HardcoverClientService,
     private readonly matchService: HardcoverBookMatchService,
     private readonly settingsService: HardcoverSettingsService,
+    private readonly bookService: BookService,
   ) {}
 
   async syncBook(userId: number, bookId: number): Promise<HardcoverSyncBookResult> {
@@ -275,6 +279,63 @@ export class HardcoverSyncService {
     }
 
     return this.toBookSyncState(bookId, book, settings, state);
+  }
+
+  async listLinkedBooks(userId: number): Promise<HardcoverLinkedBook[]> {
+    const books = await this.repo.findCurrentReadingBooks(userId);
+    const states = await this.repo.findBookStatesByBookIds(
+      userId,
+      books.map((book) => book.bookId),
+    );
+    const stateByBookId = new Map(states.map((state) => [state.bookId, state]));
+
+    return books.map((book) => {
+      const state = stateByBookId.get(book.bookId);
+      return {
+        bookId: book.bookId,
+        title: book.title,
+        authorName: book.authorName,
+        hardcoverBookId: state?.hardcoverBookId ?? null,
+        hardcoverEditionId: state?.hardcoverEditionId ?? null,
+        matchMethod: state?.matchMethod ?? null,
+        matchError: state?.matchError ?? null,
+      };
+    });
+  }
+
+  async getEditions(userId: number, bookId: number): Promise<HardcoverEdition[]> {
+    const token = await this.settingsService.getTokenForUser(userId);
+    if (!token) return [];
+
+    const state = await this.repo.findBookState(userId, bookId);
+    if (!state?.hardcoverBookId) return [];
+
+    return this.matchService.listEditions(userId, token, state.hardcoverBookId);
+  }
+
+  async setEdition(userId: number, bookId: number, editionId: number): Promise<{ success: boolean }> {
+    const state = await this.repo.findBookState(userId, bookId);
+    if (!state?.hardcoverBookId) return { success: false };
+
+    await this.repo.upsertBookState({
+      userId,
+      bookId,
+      hardcoverBookId: state.hardcoverBookId,
+      hardcoverEditionId: editionId,
+      matchMethod: 'manual',
+      matchError: null,
+      lastSyncedAt: null,
+    });
+
+    await this.syncBook(userId, bookId);
+
+    await this.bookService.setHardcoverEditionIdIfEmpty(bookId, String(editionId)).catch((err) => {
+      this.logger.warn(
+        `[hardcover.set_edition] [fail] userId=${userId} bookId=${bookId} errorClass=${err?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - back-fill of shared metadata edition id failed`,
+      );
+    });
+
+    return { success: true };
   }
 
   private async runSyncAll(userId: number, token: string, books: BookSyncData[], runId: number, settings: HardcoverSettings): Promise<void> {

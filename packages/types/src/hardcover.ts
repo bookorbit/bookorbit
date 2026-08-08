@@ -135,3 +135,34 @@ export interface HardcoverImportApplyResult extends HardcoverImportSummary {
   progressApplied: number;
   failed: number;
 }
+
+export interface HardcoverEdition {
+  id: number;
+  title: string | null;
+  format: string;
+  pages: number | null;
+  isbn10: string | null;
+  isbn13: string | null;
+  publisher: string | null;
+  language: string | null;
+  publishedDate: string | null;
+  coverUrl: string | null;
+}
+
+export interface HardcoverLinkedBook {
+  bookId: number;
+  title: string | null;
+  authorName: string | null;
+  hardcoverBookId: number | null;
+  hardcoverEditionId: number | null;
+  matchMethod: string | null;
+  matchError: string | null;
+}
+
+export interface SetHardcoverEditionPayload {
+  editionId: number;
+}
+
+export interface SetHardcoverEditionResult {
+  success: boolean;
+}

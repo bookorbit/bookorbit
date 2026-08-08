@@ -245,4 +245,76 @@ describe('HardcoverBookMatchService', () => {
 
     expect(result).toEqual({ hardcoverBookId: 123, hardcoverEditionId: 801, editionPages: 405, matchMethod: 'title' });
   });
+
+  describe('listEditions', () => {
+    it('maps editions for display, deriving a format label and published date', async () => {
+      mockClient.query.mockResolvedValue({
+        books: [
+          {
+            id: 100,
+            editions: [
+              {
+                id: 200,
+                title: 'Test Book',
+                pages: 320,
+                isbn_10: '0756404079',
+                isbn_13: '9780756404079',
+                publisher: { name: 'DAW Books' },
+                language: { code2: 'en' },
+                release_date: '2007-03-27',
+                release_year: 2007,
+                reading_format_id: 1,
+                image: { url: 'https://assets.hardcover.app/cover.jpg' },
+              },
+              {
+                id: 201,
+                pages: null,
+                reading_format_id: 2,
+                audio_seconds: 50000,
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await makeService().listEditions(1, 'tok', 100);
+
+      expect(result).toEqual([
+        {
+          id: 200,
+          title: 'Test Book',
+          format: 'Physical Book',
+          pages: 320,
+          isbn10: '0756404079',
+          isbn13: '9780756404079',
+          publisher: 'DAW Books',
+          language: 'en',
+          publishedDate: '2007-03-27',
+          coverUrl: 'https://assets.hardcover.app/cover.jpg',
+        },
+        {
+          id: 201,
+          title: null,
+          format: 'Audiobook',
+          pages: null,
+          isbn10: null,
+          isbn13: null,
+          publisher: null,
+          language: null,
+          publishedDate: null,
+          coverUrl: null,
+        },
+      ]);
+    });
+
+    it('returns an empty array when the book is not found', async () => {
+      mockClient.query.mockResolvedValue({ books: [] });
+      expect(await makeService().listEditions(1, 'tok', 999)).toEqual([]);
+    });
+
+    it('returns an empty array when the query fails', async () => {
+      mockClient.query.mockRejectedValue(new Error('boom'));
+      expect(await makeService().listEditions(1, 'tok', 100)).toEqual([]);
+    });
+  });
 });

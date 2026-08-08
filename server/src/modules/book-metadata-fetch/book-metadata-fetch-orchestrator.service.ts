@@ -224,6 +224,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         seriesName: meta?.seriesName ?? undefined,
         seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: this.collectProviderIds(meta ?? {}),
+        hardcoverEditionId: meta?.hardcoverEditionId ?? undefined,
         isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,
       };
