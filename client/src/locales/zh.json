@@ -494,8 +494,8 @@
       },
       "readingPreferences": {
         "title": "阅读首选项",
-        "timezoneHint": "时区用于时间敏感的成就，如早期鸟类和全夜。",
-        "timezone": "Timezone",
+        "timezoneHint": "时区用于处理对时间敏感的成就，例如“早鸟”和“通宵达人”。",
+        "timezone": "时区",
         "save": "保存首选项",
         "enableAchievements": "启用成就",
         "enableAchievementsHint": "跟踪成就进度，显示与成就相关的接口。在通知中单独管理成就通知。",
@@ -1016,7 +1016,7 @@
         "readingProgressEntries": "读取进度条目",
         "audiobookProgressEntries": "音频簿进度条目",
         "bookmarksLabel": "书签",
-        "annotationsLabel": "说明",
+        "annotationsLabel": "批注",
         "collectionEntries": "收藏条目",
         "loadFullReportHint": "单击“负载完整报告”以在导出的报告中包含干燥的比赛摘要。",
         "completedNoIssues": "迁移已完成，没有未解决的书籍或故障。",
@@ -1685,7 +1685,7 @@
         "serverFontVisibilityFailed": "服务端字体显示状态更新失败"
       },
       "bookDock": {
-        "title": "预约停靠栏",
+        "title": "Book Dock",
         "subtitle": "配置文件进入书签时的处理方式。",
         "dropFolder": "丢弃文件夹",
         "containerPath": "容器路径",
@@ -2276,7 +2276,7 @@
     "system": {
       "tabs": {
         "file-naming": "文件名称",
-        "book-dock": "预约停靠栏",
+        "book-dock": "Book Dock",
         "maintenance": "维护费",
         "audit-log": "审核日志"
       }
@@ -4267,7 +4267,7 @@
       "allMatchesShown": "{count, plural, =0 {显示所有1场比赛} one {显示所有1场比赛} other {显示所有#场比赛}}",
       "bookCount": "{count, plural, =0 {没有书籍} one {# 书} other {# 书}}",
       "fileCount": "{count, plural, =0 {没有文件} one {# 文件} other {# 文件}}",
-      "bookDock": "预约停靠栏",
+      "bookDock": "Book Dock",
       "statistics": "统计",
       "achievements": "1. 成就",
       "annotations": "说明",
@@ -5529,7 +5529,7 @@
           "description": "从另一个库工具导入完成或失败。"
         },
         "bookDock": {
-          "label": "预约停靠栏",
+          "label": "Book Dock",
           "description": "当存入码头的文件准备好审查或最后定稿。"
         },
         "koboSync": {
@@ -6291,7 +6291,7 @@
       "title": "书"
     },
     "bookDock": {
-      "title": "预约停靠栏",
+      "title": "Book Dock",
       "newFilesDetected": "检测到新文件",
       "reconnecting": "重新连接",
       "rescanFailed": "重新扫描失败",
@@ -6406,7 +6406,7 @@
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader 同步",
-    "bookDock": "预约停靠栏",
+    "bookDock": "Book Dock",
     "whatsNew": "新功能",
     "annotations": "说明",
     "achievements": "成就",
@@ -6471,7 +6471,7 @@
     },
     "system": {
       "file-naming": "文件名称",
-      "book-dock": "预约停靠栏",
+      "book-dock": "Book Dock",
       "maintenance": "维护费",
       "audit-log": "审核日志"
     },

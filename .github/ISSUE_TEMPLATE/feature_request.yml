@@ -36,10 +36,25 @@ body:
     validations:
       required: true
 
+  - type: markdown
+    attributes:
+      value: |
+        ### Before implementing this request
+
+        If you want to implement this request, comment on the issue with your proposed approach after
+        submitting it. Wait for a maintainer to approve the approach and assign the issue to you before
+        writing code or opening a pull request, including a draft.
+
+        If nobody responds within seven days, leave one polite follow-up and @mention the maintainers
+        or contributors already involved in the issue. People may have missed the original notification,
+        so a reminder is welcome. No response does not count as approval.
+
   - type: checkboxes
     id: checklist
     attributes:
       label: Before submitting
       options:
         - label: I've searched existing issues and this hasn't been requested yet.
+          required: true
+        - label: If I implement this, I will wait for maintainer approval and assignment before writing code or opening a pull request.
           required: true

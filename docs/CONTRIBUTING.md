@@ -44,7 +44,8 @@ This is the end-to-end journey from idea to merged PR. Each phase builds on the 
 
 ### Phase 1: Find or Create an Issue
 
-> **Issue first, PR second.** Every pull request must link to an approved issue. PRs without one will be closed.
+> **Issue first, PR second.** Every pull request must link to an approved issue assigned to the
+> contributor. PRs without prior approval and assignment will be closed without review.
 
 - Browse [open issues](../../issues) for something you want to tackle.
 - If you have a new idea, open one using the [bug report](../../issues/new?template=bug_report.yml) or [feature request](../../issues/new?template=feature_request.yml) template.
@@ -52,12 +53,22 @@ This is the end-to-end journey from idea to merged PR. Each phase builds on the 
 
 ### Phase 2: Get Maintainer Approval
 
-Wait for explicit approval before writing code. Approval looks like:
+Before writing code, comment on the issue to say that you want to implement it and briefly describe
+your proposed approach. Then wait for both:
 
-- A :+1: reaction on your issue.
-- A comment such as "go ahead", "approved", or "approved to proceed".
+- A maintainer comment explicitly approving the implementation.
+- A maintainer assigning the issue to you.
 
-This step prevents wasted effort on changes that conflict with the project direction. Small bug fixes with clear reproduction are usually approved quickly.
+Do not start implementation or open a pull request, including a draft, until both have happened. A
+reaction or lack of a response does not count as approval.
+
+If nobody responds within seven days, leave one polite follow-up comment and @mention the maintainers
+or contributors already involved in the issue. People have responsibilities outside the project and
+may simply have missed the original notification, so a reminder is welcome. Continue waiting for an
+explicit reply before starting implementation or opening a pull request.
+
+This step prevents wasted effort on changes that conflict with the project direction. Small bug fixes
+with clear reproduction are usually approved quickly.
 
 ### Phase 3: Fork and Clone
 
@@ -183,7 +194,9 @@ git push origin BO-123-your-feature-name
 
 When creating the PR:
 
-- **Fill out the PR template.** It asks for a summary, the commands you ran with their real output, what you did while manually testing, visual evidence for UI changes, and an authorship note covering any AI assistance.
+- **Fill out the PR template.** It asks for the linked approval, a summary, the commands you ran with
+  their real output, what you did while manually testing, end-to-end evidence, and an authorship note
+  covering any AI assistance.
 - **Use a Conventional Commit-style PR title** (for example: `fix(reader): correct page count for multi-volume PDFs`).
 - **Link your issue** with a GitHub closing keyword in the description (`close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`) and an issue reference (`#123` or `owner/repo#123`).
   Example:
@@ -196,8 +209,10 @@ When creating the PR:
   Fixes: #123
   ```
 
-- **Open as a draft** if you want early direction feedback before the code is complete.
-- **Attach visual evidence for UI changes.** Include screenshots for every UI change and a short screen recording when behavior or interaction changes. Ready-for-review PRs missing applicable visual evidence will be closed without review and may be resubmitted once complete.
+- **Open as a draft** if the implementation is incomplete after the linked issue has been approved and
+  assigned. Use the issue for direction before approval.
+- **Attach end-to-end evidence.** Upload a recording showing the changed behavior through the real
+  client. Ready-for-review PRs without the required evidence will not be reviewed.
 - **Disclose AI usage** if applicable. See [AI_POLICY.md](AI_POLICY.md) for the format and expectations.
 
 ### Phase 11: Respond to Review

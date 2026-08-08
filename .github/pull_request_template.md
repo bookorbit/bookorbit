@@ -1,10 +1,13 @@
 > [!IMPORTANT]
-> Ready-for-review PRs must satisfy every applicable section below. Incomplete submissions are closed
-> without detailed review, and you are welcome to resubmit once complete. Open a draft PR if the work
+> Before writing code or opening a PR, including a draft, discuss your approach in the linked issue
+> and wait for a maintainer to approve it and assign the issue to you. PRs opened without prior
+> approval and assignment will be closed without review. After approval, open a draft PR if the work
 > is not finished.
 
 Closes #
 
+- **Maintainer approval:** (link to the approval comment)
+- **Assigned contributor:** @
 - **Type:** bug fix | feature | refactor | docs | chore
 - **UI changed:** yes | no
 - **How I ran this:** `pnpm dev` | Docker | I did not run it
@@ -35,12 +38,33 @@ summarize it.
 
 ## Evidence
 
-UI changes require screenshots. Changes to behavior or interaction also require a short recording of
-the complete workflow. Screenshots must show the surrounding browser window rather than a cropped
-element, and recordings must start from a page load. For backend changes, paste the log lines your
-change emits.
+Upload a recording that proves the changed behavior works in the real client. Show the starting state,
+the user action, and the final result. If the workflow crosses multiple clients, show the result in
+each affected client.
 
-<!-- Drag files in here, or write "No UI changes." -->
+Ready-for-review PRs without the required evidence will not be reviewed. Keep the PR in draft until
+the evidence has been uploaded.
+
+Examples:
+
+- **Web:** Start from a page load, perform the affected workflow, and show the saved result after
+  refreshing the page.
+- **KOReader:** Perform the affected workflow inside KOReader and show the result there. For sync
+  changes, also show the corresponding result in BookOrbit.
+- **Kobo:** Perform the affected workflow on the device, run the sync, and show the resulting state on
+  the device and in BookOrbit where applicable.
+- **Scanner, import, or metadata:** Add or modify a real book, run the operation through its normal
+  BookOrbit control, and show the resulting book state in the BookOrbit UI.
+- **Server code used by a client:** Trigger the behavior from that client and show the result in the
+  client. Calling the endpoint directly is not end-to-end evidence.
+
+"No UI changes," written testing claims, automated test output, logs, API requests, database queries,
+and direct service calls are not evidence. They may support the recording but cannot replace it.
+
+Evidence must match the final commit. If the workflow cannot be demonstrated in its real client or
+device, keep the PR in draft and state what remains untested.
+
+<!-- Upload the recording here. -->
 
 ## Authorship and review
 
@@ -58,6 +82,7 @@ AI assistance is welcome on this project; unreviewed AI output is not. See the
 <summary><b>Contributor checklist</b></summary>
 
 - [ ] One focused change, linked above to an issue a maintainer approved
+- [ ] I discussed my approach and was assigned the issue before writing code or opening this PR
 - [ ] I read every line of the final diff
 - [ ] `pnpm verify` passes against the final diff
 - [ ] Tests added or updated per the [testing expectations](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md#phase-7-write-and-run-tests)
