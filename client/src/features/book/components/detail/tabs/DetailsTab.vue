@@ -317,13 +317,23 @@ function startEditingManualProgress(isMobile = false) {
   if (!primaryFile.value) return
   const prog = fileProgressById.value[primaryFile.value.id]
 
+  // Anula o valor temporariamente para contornar o gatilho de conversão do watch
+  manualProgress.value = null
+
   if (props.book.pageCount && props.book.pageCount > 0) {
     progressMode.value = 'page'
-    manualProgress.value = prog?.pageNumber ?? (prog ? Math.round((prog.percentage / 100) * props.book.pageCount) : 0)
   } else {
     progressMode.value = 'percentage'
-    manualProgress.value = prog ? Math.round(prog.percentage) : 0
   }
+
+  // Preenche o valor apenas após o descarte seguro do watch na fila de microtasks
+  nextTick(() => {
+    if (progressMode.value === 'page' && props.book.pageCount) {
+      manualProgress.value = prog?.pageNumber ?? (prog ? Math.round((prog.percentage / 100) * props.book.pageCount) : 0)
+    } else {
+      manualProgress.value = prog ? Math.round(prog.percentage) : 0
+    }
+  })
 
   const past = new Date()
   past.setMinutes(past.getMinutes() - 30)
