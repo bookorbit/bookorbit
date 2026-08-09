@@ -191,14 +191,20 @@ describe('hardcover.api', () => {
 
   it('fetches linked books and editions, and sets an edition', async () => {
     mockApi
-      .mockResolvedValueOnce(jsonResponse([{ bookId: 12, title: 'Book', authorName: 'Author', hardcoverBookId: 100, hardcoverEditionId: null }]))
-      .mockResolvedValueOnce(jsonResponse([{ id: 200, format: 'Physical Book' }]))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          books: [{ bookId: 12, title: 'Book', authorName: 'Author', hardcoverBookId: 100, hardcoverEditionId: null }],
+          truncated: false,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ editions: [{ id: 200, format: 'Physical Book' }], truncated: true }))
       .mockResolvedValueOnce(jsonResponse({ success: true }))
 
-    await expect(fetchHardcoverLinkedBooks()).resolves.toEqual([
-      { bookId: 12, title: 'Book', authorName: 'Author', hardcoverBookId: 100, hardcoverEditionId: null },
-    ])
-    await expect(fetchHardcoverEditions(12)).resolves.toEqual([{ id: 200, format: 'Physical Book' }])
+    await expect(fetchHardcoverLinkedBooks()).resolves.toEqual({
+      books: [{ bookId: 12, title: 'Book', authorName: 'Author', hardcoverBookId: 100, hardcoverEditionId: null }],
+      truncated: false,
+    })
+    await expect(fetchHardcoverEditions(12)).resolves.toEqual({ editions: [{ id: 200, format: 'Physical Book' }], truncated: true })
     await expect(setHardcoverEdition(12, 200)).resolves.toEqual({ success: true })
 
     expect(mockApi).toHaveBeenNthCalledWith(1, '/api/v1/hardcover/books')

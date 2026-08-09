@@ -1,11 +1,12 @@
 import type {
   HardcoverActiveSyncStatus,
   HardcoverBookSyncState,
-  HardcoverEdition,
-  HardcoverLinkedBook,
+  HardcoverEditionsResult,
+  HardcoverLinkedBooksResult,
   HardcoverSettings,
   HardcoverSyncPendingSummary,
   ReadStatus,
+  SetHardcoverEditionResult,
   UpdateHardcoverBookSyncPayload,
 } from '@bookorbit/types';
 
@@ -24,6 +25,8 @@ import {
   resolveHardcoverBookSyncDecision,
   resolveHardcoverBookSyncOverrideForToggle,
 } from './hardcover-sync-policy';
+
+const LINKED_BOOKS_LIMIT = 200;
 
 const STATUS_MAP: Partial<Record<ReadStatus, number>> = {
   want_to_read: HARDCOVER_STATUS.WANT_TO_READ,
@@ -281,54 +284,50 @@ export class HardcoverSyncService {
     return this.toBookSyncState(bookId, book, settings, state);
   }
 
-  async listLinkedBooks(userId: number): Promise<HardcoverLinkedBook[]> {
-    const books = await this.repo.findCurrentReadingBooks(userId);
+  async listLinkedBooks(userId: number): Promise<HardcoverLinkedBooksResult> {
+    // One over the cap, so a full page can be told apart from a truncated one.
+    const rows = await this.repo.findCurrentReadingBooks(userId, LINKED_BOOKS_LIMIT + 1);
+    const books = rows.slice(0, LINKED_BOOKS_LIMIT);
     const states = await this.repo.findBookStatesByBookIds(
       userId,
       books.map((book) => book.bookId),
     );
     const stateByBookId = new Map(states.map((state) => [state.bookId, state]));
 
-    return books.map((book) => {
-      const state = stateByBookId.get(book.bookId);
-      return {
-        bookId: book.bookId,
-        title: book.title,
-        authorName: book.authorName,
-        hardcoverBookId: state?.hardcoverBookId ?? null,
-        hardcoverEditionId: state?.hardcoverEditionId ?? null,
-        matchMethod: state?.matchMethod ?? null,
-        matchError: state?.matchError ?? null,
-      };
-    });
+    return {
+      books: books.map((book) => {
+        const state = stateByBookId.get(book.bookId);
+        return {
+          bookId: book.bookId,
+          title: book.title,
+          authorName: book.authorName,
+          hardcoverBookId: state?.hardcoverBookId ?? null,
+          hardcoverEditionId: state?.hardcoverEditionId ?? null,
+          matchMethod: state?.matchMethod ?? null,
+          matchError: state?.matchError ?? null,
+        };
+      }),
+      truncated: rows.length > LINKED_BOOKS_LIMIT,
+    };
   }
 
-  async getEditions(userId: number, bookId: number): Promise<HardcoverEdition[]> {
-    const token = await this.settingsService.getTokenForUser(userId);
-    if (!token) return [];
-
-    const state = await this.repo.findBookState(userId, bookId);
-    if (!state?.hardcoverBookId) return [];
-
-    return this.matchService.listEditions(userId, token, state.hardcoverBookId);
+  async getEditions(userId: number, bookId: number): Promise<HardcoverEditionsResult> {
+    const { token, hardcoverBookId } = await this.requireMatchedBook(userId, bookId);
+    return this.matchService.listEditions(userId, token, hardcoverBookId);
   }
 
-  async setEdition(userId: number, bookId: number, editionId: number): Promise<{ success: boolean }> {
-    const state = await this.repo.findBookState(userId, bookId);
-    if (!state?.hardcoverBookId) return { success: false };
+  async setEdition(userId: number, bookId: number, editionId: number): Promise<SetHardcoverEditionResult> {
+    const { token, hardcoverBookId } = await this.requireMatchedBook(userId, bookId);
 
-    const token = await this.settingsService.getTokenForUser(userId);
-    if (!token) return { success: false };
-
-    const editions = await this.matchService.listEditions(userId, token, state.hardcoverBookId);
-    if (!editions.some((edition) => edition.id === editionId)) {
+    const edition = await this.matchService.findEditionForBook(userId, token, hardcoverBookId, editionId);
+    if (!edition) {
       throw new BadRequestException(`Edition ${editionId} does not belong to the matched Hardcover book`);
     }
 
     await this.repo.upsertBookState({
       userId,
       bookId,
-      hardcoverBookId: state.hardcoverBookId,
+      hardcoverBookId,
       hardcoverEditionId: editionId,
       matchMethod: 'manual',
       matchError: null,
@@ -344,6 +343,18 @@ export class HardcoverSyncService {
     });
 
     return { success: true };
+  }
+
+  // Both edition routes need the same two preconditions, and neither can be reported as an empty
+  // catalogue: "not connected" and "not matched yet" are distinct states the user can act on.
+  private async requireMatchedBook(userId: number, bookId: number): Promise<{ token: string; hardcoverBookId: number }> {
+    const token = await this.settingsService.getTokenForUser(userId);
+    if (!token) throw new BadRequestException('Hardcover is not connected for this user');
+
+    const state = await this.repo.findBookState(userId, bookId);
+    if (!state?.hardcoverBookId) throw new BadRequestException(`Book ${bookId} is not matched to a Hardcover book yet`);
+
+    return { token, hardcoverBookId: state.hardcoverBookId };
   }
 
   private async runSyncAll(userId: number, token: string, books: BookSyncData[], runId: number, settings: HardcoverSettings): Promise<void> {

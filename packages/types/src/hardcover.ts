@@ -159,10 +159,23 @@ export interface HardcoverLinkedBook {
   matchError: string | null;
 }
 
+// Both list results are capped server-side; `truncated` lets the UI say so instead of
+// presenting a partial list as the whole thing.
+export interface HardcoverLinkedBooksResult {
+  books: HardcoverLinkedBook[];
+  truncated: boolean;
+}
+
+export interface HardcoverEditionsResult {
+  editions: HardcoverEdition[];
+  truncated: boolean;
+}
+
 export interface SetHardcoverEditionPayload {
   editionId: number;
 }
 
+// Every failure path throws, so a resolved response always means the edition was applied.
 export interface SetHardcoverEditionResult {
   success: boolean;
 }

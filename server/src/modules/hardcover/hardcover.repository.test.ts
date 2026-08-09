@@ -210,17 +210,34 @@ describe('HardcoverRepository', () => {
     expect(selectArgs.some((cols) => cols && 'bookId' in cols && 'status' in cols)).toBe(true);
   });
 
-  it('findCurrentReadingBooks filters to reading/rereading statuses', async () => {
+  it('findCurrentReadingBooks filters to reading/rereading statuses and bounds the result', async () => {
     const { repo, db } = makeRepository();
     const chain: Record<string, unknown> = {};
-    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as']) {
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as', 'orderBy', 'limit']) {
       chain[method] = vi.fn().mockReturnValue(chain);
     }
     chain.then = (resolve: (rows: unknown[]) => void) => resolve([{ bookId: 42 }]);
     db.select.mockImplementation(() => chain);
 
-    await expect(repo.findCurrentReadingBooks(7)).resolves.toEqual([{ bookId: 42 }]);
+    await expect(repo.findCurrentReadingBooks(7, 200)).resolves.toEqual([{ bookId: 42 }]);
     expect(chain.where).toHaveBeenCalled();
+    expect(chain.orderBy).toHaveBeenCalled();
+    expect(chain.limit).toHaveBeenCalledWith(200);
+  });
+
+  it('leaves the unbounded sync query without an order or limit', async () => {
+    const { repo, db } = makeRepository();
+    const chain: Record<string, unknown> = {};
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as', 'orderBy', 'limit']) {
+      chain[method] = vi.fn().mockReturnValue(chain);
+    }
+    chain.then = (resolve: (rows: unknown[]) => void) => resolve([{ bookId: 42 }]);
+    db.select.mockImplementation(() => chain);
+
+    await repo.findSyncableBooks(7);
+
+    expect(chain.orderBy).not.toHaveBeenCalled();
+    expect(chain.limit).not.toHaveBeenCalled();
   });
 
   it('updateEditionIfLinked updates an existing link and returns true', async () => {

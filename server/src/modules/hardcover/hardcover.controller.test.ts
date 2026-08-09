@@ -181,16 +181,16 @@ describe('HardcoverController', () => {
   });
 
   it('listLinkedBooks delegates to service', async () => {
-    mockSyncService.listLinkedBooks.mockResolvedValue([{ bookId: 1, title: 'Book One' }]);
+    mockSyncService.listLinkedBooks.mockResolvedValue({ books: [{ bookId: 1, title: 'Book One' }], truncated: false });
     const result = await makeController().listLinkedBooks(mockUser as any);
-    expect(result).toEqual([{ bookId: 1, title: 'Book One' }]);
+    expect(result).toEqual({ books: [{ bookId: 1, title: 'Book One' }], truncated: false });
     expect(mockSyncService.listLinkedBooks).toHaveBeenCalledWith(1);
   });
 
   it('listEditions delegates to service after verifying book access', async () => {
-    mockSyncService.getEditions.mockResolvedValue([{ id: 200, format: 'Physical Book' }]);
+    mockSyncService.getEditions.mockResolvedValue({ editions: [{ id: 200, format: 'Physical Book' }], truncated: false });
     const result = await makeController().listEditions(mockUser as any, 42);
-    expect(result).toEqual([{ id: 200, format: 'Physical Book' }]);
+    expect(result).toEqual({ editions: [{ id: 200, format: 'Physical Book' }], truncated: false });
     expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
     expect(mockSyncService.getEditions).toHaveBeenCalledWith(1, 42);
   });

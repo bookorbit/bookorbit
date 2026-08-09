@@ -6,13 +6,15 @@ import { toast } from 'vue-sonner'
 import type { HardcoverEdition, HardcoverLinkedBook } from '@bookorbit/types'
 import { fetchHardcoverEditions, fetchHardcoverLinkedBooks, setHardcoverEdition } from '../api/hardcover.api'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const books = ref<HardcoverLinkedBook[]>([])
+const booksTruncated = ref(false)
 const loading = ref(true)
 const loadError = ref(false)
 const expandedBookId = ref<number | null>(null)
 const editionsByBookId = reactive<Record<number, HardcoverEdition[]>>({})
+const editionsTruncated = reactive<Record<number, boolean>>({})
 const loadingEditions = reactive<Record<number, boolean>>({})
 const editionsLoadError = reactive<Record<number, boolean>>({})
 const settingEdition = reactive<Record<number, boolean>>({})
@@ -27,8 +29,11 @@ async function loadBooks(): Promise<void> {
   loading.value = true
   loadError.value = false
   try {
-    const rows = await fetchHardcoverLinkedBooks()
-    if (requestId === loadRequestId) books.value = rows
+    const result = await fetchHardcoverLinkedBooks()
+    if (requestId === loadRequestId) {
+      books.value = result.books
+      booksTruncated.value = result.truncated
+    }
   } catch {
     if (requestId === loadRequestId) loadError.value = true
   } finally {
@@ -44,10 +49,13 @@ function toggleExpanded(bookId: number) {
   expandedBookId.value = expandedBookId.value === bookId ? null : bookId
 }
 
+function panelId(bookId: number): string {
+  return `hardcover-linked-book-${bookId}`
+}
+
 function matchMethodLabel(method: string): string {
   const key = `hardcover.linkedBooks.matchMethod.${method}`
-  const translated = t(key)
-  return translated === key ? method : translated
+  return te(key) ? t(key) : method
 }
 
 function statusLabel(book: HardcoverLinkedBook): string {
@@ -61,11 +69,13 @@ function statusLabel(book: HardcoverLinkedBook): string {
 }
 
 async function loadEditions(book: HardcoverLinkedBook) {
-  if (editionsByBookId[book.bookId]) return
+  if (editionsByBookId[book.bookId] || loadingEditions[book.bookId]) return
   loadingEditions[book.bookId] = true
   editionsLoadError[book.bookId] = false
   try {
-    editionsByBookId[book.bookId] = await fetchHardcoverEditions(book.bookId)
+    const result = await fetchHardcoverEditions(book.bookId)
+    editionsByBookId[book.bookId] = result.editions
+    editionsTruncated[book.bookId] = result.truncated
   } catch {
     editionsLoadError[book.bookId] = true
   } finally {
@@ -73,17 +83,14 @@ async function loadEditions(book: HardcoverLinkedBook) {
   }
 }
 
+// The list is deliberately kept mounted: reloading the books refreshes which row reads as
+// "Current", so collapsing the panel would only cost the user their place.
 async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdition) {
   settingEdition[book.bookId] = true
   try {
-    const { success } = await setHardcoverEdition(book.bookId, edition.id)
-    if (success) {
-      toast.success(t('hardcover.linkedBooks.toast.switched', { format: edition.format }))
-      delete editionsByBookId[book.bookId]
-      await loadBooks()
-    } else {
-      toast.error(t('hardcover.linkedBooks.toast.switchFailed'))
-    }
+    await setHardcoverEdition(book.bookId, edition.id)
+    toast.success(t('hardcover.linkedBooks.toast.switched', { format: edition.format }))
+    await loadBooks()
   } catch {
     toast.error(t('hardcover.linkedBooks.toast.switchFailed'))
   } finally {
@@ -101,12 +108,12 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
       </p>
     </div>
 
-    <div v-if="loading" class="flex items-center gap-2 text-xs text-muted-foreground py-4">
+    <div v-if="loading" role="status" class="flex items-center gap-2 text-xs text-muted-foreground py-4">
       <Loader2 class="size-3.5 animate-spin" />
       {{ t('hardcover.linkedBooks.loading') }}
     </div>
 
-    <div v-else-if="loadError" class="flex items-center gap-2 text-xs text-destructive py-2">
+    <div v-else-if="loadError" role="alert" class="flex items-center gap-2 text-xs text-destructive py-2">
       <AlertCircle class="size-3.5 shrink-0" />
       {{ t('hardcover.linkedBooks.loadError') }}
       <button type="button" class="underline underline-offset-2" @click="handleRetryLoadBooks">{{ t('hardcover.linkedBooks.retry') }}</button>
@@ -115,8 +122,17 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
     <div v-else-if="books.length === 0" class="text-xs text-muted-foreground py-2">{{ t('hardcover.linkedBooks.empty') }}</div>
 
     <div v-else class="divide-y divide-border/60">
+      <p v-if="booksTruncated" class="text-[11px] text-muted-foreground pb-2">
+        {{ t('hardcover.linkedBooks.booksTruncated', { count: books.length }) }}
+      </p>
       <div v-for="book in books" :key="book.bookId" class="py-2.5">
-        <button type="button" class="flex w-full items-center justify-between gap-2 text-left" @click="toggleExpanded(book.bookId)">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between gap-2 text-left"
+          :aria-expanded="expandedBookId === book.bookId"
+          :aria-controls="panelId(book.bookId)"
+          @click="toggleExpanded(book.bookId)"
+        >
           <div class="min-w-0">
             <p class="text-sm truncate">{{ book.title ?? t('hardcover.linkedBooks.untitled') }}</p>
             <p class="text-xs text-muted-foreground truncate">{{ book.authorName ?? t('hardcover.linkedBooks.unknownAuthor') }}</p>
@@ -124,7 +140,7 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
           <div class="flex items-center gap-2 shrink-0">
             <span
               class="flex items-center gap-1 text-xs"
-              :class="book.matchError ? 'text-destructive' : book.hardcoverBookId ? 'text-green-600' : 'text-muted-foreground'"
+              :class="book.matchError ? 'text-destructive' : book.hardcoverBookId ? 'text-success' : 'text-muted-foreground'"
             >
               <AlertCircle v-if="book.matchError" class="size-3.5" />
               <CheckCircle2 v-else-if="book.hardcoverBookId" class="size-3.5" />
@@ -136,17 +152,24 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
           </div>
         </button>
 
-        <div v-if="expandedBookId === book.bookId" class="mt-3 space-y-3 pl-1">
+        <div v-if="expandedBookId === book.bookId" :id="panelId(book.bookId)" class="mt-3 space-y-3 pl-1">
           <p v-if="!book.hardcoverBookId" class="flex items-start gap-1.5 text-[11px] text-muted-foreground leading-relaxed">
             <HelpCircle class="size-3.5 shrink-0 mt-0.5" />
             {{ t('hardcover.linkedBooks.unmatchedHint') }}
           </p>
 
           <div v-else>
-            <div v-if="editionsLoadError[book.bookId]" class="flex items-center gap-2 text-xs text-destructive">
+            <div v-if="editionsLoadError[book.bookId]" role="alert" class="flex items-center gap-2 text-xs text-destructive">
               <AlertCircle class="size-3.5 shrink-0" />
               {{ t('hardcover.linkedBooks.editionsLoadError') }}
-              <button type="button" class="underline underline-offset-2" @click="loadEditions(book)">{{ t('hardcover.linkedBooks.retry') }}</button>
+              <button
+                type="button"
+                :disabled="loadingEditions[book.bookId]"
+                class="underline underline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                @click="loadEditions(book)"
+              >
+                {{ t('hardcover.linkedBooks.retry') }}
+              </button>
             </div>
 
             <button
@@ -163,6 +186,9 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
             <div v-else class="space-y-1.5">
               <p v-if="editionsByBookId[book.bookId]!.length === 0" class="text-xs text-muted-foreground">
                 {{ t('hardcover.linkedBooks.noEditionsFound') }}
+              </p>
+              <p v-if="editionsTruncated[book.bookId]" class="text-[11px] text-muted-foreground">
+                {{ t('hardcover.linkedBooks.editionsTruncated', { count: editionsByBookId[book.bookId]!.length }) }}
               </p>
               <div
                 v-for="edition in editionsByBookId[book.bookId]"

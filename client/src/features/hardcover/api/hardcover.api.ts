@@ -4,10 +4,10 @@ import type {
   HardcoverActiveSyncStatus,
   HardcoverBookSyncState,
   HardcoverBookSyncNowResult,
-  HardcoverEdition,
+  HardcoverEditionsResult,
   HardcoverImportApplyResult,
   HardcoverImportPreview,
-  HardcoverLinkedBook,
+  HardcoverLinkedBooksResult,
   HardcoverSyncPendingSummary,
   HardcoverSettings,
   HardcoverTokenValidationResult,
@@ -134,13 +134,13 @@ export async function startHardcoverBookSync(bookId: number): Promise<HardcoverB
   return res.json()
 }
 
-export async function fetchHardcoverLinkedBooks(): Promise<HardcoverLinkedBook[]> {
+export async function fetchHardcoverLinkedBooks(): Promise<HardcoverLinkedBooksResult> {
   const res = await api(`${BASE}/books`)
   if (!res.ok) throw new Error('Failed to fetch Hardcover linked books')
   return res.json()
 }
 
-export async function fetchHardcoverEditions(bookId: number): Promise<HardcoverEdition[]> {
+export async function fetchHardcoverEditions(bookId: number): Promise<HardcoverEditionsResult> {
   const res = await api(`${BASE}/books/${bookId}/editions`)
   if (!res.ok) throw new Error('Failed to fetch Hardcover editions')
   return res.json()

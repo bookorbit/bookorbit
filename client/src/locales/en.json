@@ -5324,6 +5324,8 @@
       "editionsLoadError": "Failed to load editions.",
       "viewEditions": "View editions",
       "noEditionsFound": "No editions found.",
+      "booksTruncated": "Showing the first {count} books you're reading.",
+      "editionsTruncated": "Showing the first {count} editions.",
       "pages": "{count, plural, one {# page} other {# pages}}",
       "isbn": "ISBN {isbn}",
       "current": "Current",

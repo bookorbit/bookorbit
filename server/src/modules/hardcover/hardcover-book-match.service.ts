@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
-import type { HardcoverEdition as HardcoverEditionSummary } from '@bookorbit/types';
+import type { HardcoverEdition as HardcoverEditionSummary, HardcoverEditionsResult } from '@bookorbit/types';
 
 import { parsePublishedDateKey } from '../../common/utils/published-date.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -115,6 +115,8 @@ interface BooksQueryResult {
 const AUDIOBOOK_READING_FORMAT_ID = 2;
 const EBOOK_READING_FORMAT_ID = 4;
 
+export const EDITION_DISPLAY_LIMIT = 50;
+
 const EDITION_DISPLAY_FIELDS = `
       id
       title
@@ -124,16 +126,29 @@ const EDITION_DISPLAY_FIELDS = `
       publisher { name }
       language { code2 }
       release_date
-      release_year
       reading_format_id
       audio_seconds
       image { url }`;
 
+// Ordered so the capped window is deterministic: without order_by, two calls can return a
+// different slice of the same catalogue and a legitimate pick would fail validation.
+// One over the cap, so the caller can tell a full page apart from a truncated one.
 const FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY = `
 query FindBookEditionsForDisplay($id: Int!) {
   books(where: { id: { _eq: $id } }, limit: 1) {
     id
-    editions(limit: ${EDITION_SELECTION_LIMIT}) {${EDITION_DISPLAY_FIELDS}
+    editions(limit: ${EDITION_DISPLAY_LIMIT + 1}, order_by: { id: asc }) {${EDITION_DISPLAY_FIELDS}
+    }
+  }
+}`;
+
+// Validates a single edition by asking for it scoped to the book, instead of re-listing the
+// capped window and checking membership - an edition past the cap is still a valid pick.
+const FIND_BOOK_EDITION_BY_ID_QUERY = `
+query FindBookEditionById($id: Int!, $editionId: Int!) {
+  books(where: { id: { _eq: $id } }, limit: 1) {
+    id
+    editions(where: { id: { _eq: $editionId } }, limit: 1) {${EDITION_DISPLAY_FIELDS}
     }
   }
 }`;
@@ -147,7 +162,6 @@ interface HardcoverEditionDisplayRow {
   publisher?: { name?: string | null } | null;
   language?: { code2?: string | null } | null;
   release_date?: string | null;
-  release_year?: number | null;
   reading_format_id?: number | null;
   audio_seconds?: number | null;
   image?: { url?: string | null } | null;
@@ -362,22 +376,50 @@ export class HardcoverBookMatchService {
 
   // A failed upstream lookup must not be reported as "no editions" - the caller (and the user)
   // needs to be able to tell an empty catalog apart from a provider outage and retry.
-  async listEditions(userId: number, token: string, hardcoverBookId: number): Promise<HardcoverEditionSummary[]> {
+  async listEditions(userId: number, token: string, hardcoverBookId: number): Promise<HardcoverEditionsResult> {
+    const data = await this.queryEditions(userId, token, hardcoverBookId, 'list_editions', FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY, {
+      id: hardcoverBookId,
+    });
+
+    const rows = data.books?.[0]?.editions ?? [];
+    return {
+      editions: rows.slice(0, EDITION_DISPLAY_LIMIT).map(mapEditionForDisplay),
+      truncated: rows.length > EDITION_DISPLAY_LIMIT,
+    };
+  }
+
+  // Resolves one edition scoped to the book it must belong to. Null means Hardcover knows of no
+  // such edition on that book, which is exactly the "not yours to pick" case the caller rejects.
+  async findEditionForBook(userId: number, token: string, hardcoverBookId: number, editionId: number): Promise<HardcoverEditionSummary | null> {
+    const data = await this.queryEditions(userId, token, hardcoverBookId, 'find_edition', FIND_BOOK_EDITION_BY_ID_QUERY, {
+      id: hardcoverBookId,
+      editionId,
+    });
+
+    const edition = data.books?.[0]?.editions?.[0];
+    return edition ? mapEditionForDisplay(edition) : null;
+  }
+
+  // A failed upstream lookup must not be reported as "no editions" - the caller (and the user)
+  // needs to be able to tell an empty catalog apart from a provider outage and retry.
+  private async queryEditions(
+    userId: number,
+    token: string,
+    hardcoverBookId: number,
+    event: string,
+    query: string,
+    variables: Record<string, unknown>,
+  ): Promise<BooksDisplayQueryResult> {
     const startedAt = Date.now();
-    let data: BooksDisplayQueryResult;
     try {
-      data = await this.client.query<BooksDisplayQueryResult>(userId, token, FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY, { id: hardcoverBookId });
+      return await this.client.query<BooksDisplayQueryResult>(userId, token, query, variables);
     } catch (err) {
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
-        `[hardcover.list_editions] [fail] userId=${userId} hardcoverBookId=${hardcoverBookId} durationMs=${Date.now() - startedAt} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - edition list lookup failed`,
+        `[hardcover.${event}] [fail] userId=${userId} hardcoverBookId=${hardcoverBookId} durationMs=${Date.now() - startedAt} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - edition lookup failed`,
       );
       throw new InternalServerErrorException('Failed to load Hardcover editions');
     }
-
-    const hardcoverBook = data.books?.[0];
-    if (!hardcoverBook?.editions) return [];
-    return hardcoverBook.editions.map(mapEditionForDisplay);
   }
 
   private async resolveCachedMatch(
