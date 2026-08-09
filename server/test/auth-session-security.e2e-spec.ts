@@ -241,7 +241,7 @@ describe('Auth session security (e2e)', () => {
       });
 
       expect(statusAfter.statusCode).toBe(200);
-      expect(statusAfter.json()).toEqual({ needsSetup: false });
+      expect(statusAfter.json()).toEqual({ needsSetup: false, allowRegistration: false });
     });
 
     it('rejects setup when already completed', async () => {

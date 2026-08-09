@@ -93,6 +93,7 @@ function makeService(dbOverrides?: Record<string, unknown>) {
   const appSettings = {
     getOidcConfig: vi.fn().mockResolvedValue({ enabled: false }),
     getDefaultLibraryAccessLibraryIds: vi.fn().mockResolvedValue([]),
+    getValue: vi.fn().mockResolvedValue(null),
   };
   const oidcSessionRepo = {
     findActiveByUserId: vi.fn().mockResolvedValue(null),
@@ -154,14 +155,33 @@ describe('AuthService', () => {
       const { service, db } = makeService();
       ((db as unknown as Record<string, unknown>).$count as vi.Mock).mockResolvedValue(0);
 
-      await expect(service.setupStatus()).resolves.toEqual({ needsSetup: true });
+      await expect(service.setupStatus()).resolves.toEqual({ needsSetup: true, allowRegistration: false });
     });
 
     it('returns needsSetup=false when at least one user exists', async () => {
       const { service, db } = makeService();
       ((db as unknown as Record<string, unknown>).$count as vi.Mock).mockResolvedValue(1);
 
-      await expect(service.setupStatus()).resolves.toEqual({ needsSetup: false });
+      await expect(service.setupStatus()).resolves.toEqual({ needsSetup: false, allowRegistration: false });
+    });
+
+    it('reports allowRegistration=true when the setting is enabled', async () => {
+      const { service, db, appSettings } = makeService();
+      ((db as unknown as Record<string, unknown>).$count as vi.Mock).mockResolvedValue(1);
+      appSettings.getValue.mockResolvedValue('true');
+
+      await expect(service.setupStatus()).resolves.toEqual({ needsSetup: false, allowRegistration: true });
+      expect(appSettings.getValue).toHaveBeenCalledWith('allow_registration');
+    });
+
+    it('treats an unset or non-boolean registration setting as closed', async () => {
+      const { service, db, appSettings } = makeService();
+      ((db as unknown as Record<string, unknown>).$count as vi.Mock).mockResolvedValue(1);
+
+      for (const value of [null, '', 'TRUE', 'yes', '1']) {
+        appSettings.getValue.mockResolvedValue(value);
+        await expect(service.setupStatus()).resolves.toEqual({ needsSetup: false, allowRegistration: false });
+      }
     });
   });
 
@@ -229,17 +249,37 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('throws ForbiddenException when registration is closed', async () => {
-      const { service, db } = makeService();
-      (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'false' });
+      const { service, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('false');
 
       await expect(service.register({ username: 'u', name: 'U', password: 'P@ssw0rd!', email: 'u@example.com' } as never)).rejects.toThrow(
         ForbiddenException,
       );
     });
 
+    it('throws ForbiddenException when the registration setting is missing', async () => {
+      const { service, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue(null);
+
+      await expect(service.register({ username: 'u', name: 'U', password: 'P@ssw0rd!', email: 'u@example.com' } as never)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('does not create a user when registration is closed', async () => {
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('false');
+
+      await expect(service.register({ username: 'u', name: 'U', password: 'P@ssw0rd!', email: 'u@example.com' } as never)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect((db as unknown as { transaction: vi.Mock }).transaction).not.toHaveBeenCalled();
+      expect((db as unknown as { insert: vi.Mock }).insert).not.toHaveBeenCalled();
+    });
+
     it('throws ConflictException when username already exists', async () => {
-      const { service, db } = makeService();
-      (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
       (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce({ id: 99, username: 'existing' });
 
       await expect(
@@ -248,8 +288,8 @@ describe('AuthService', () => {
     });
 
     it('throws ConflictException when email already in use', async () => {
-      const { service, db } = makeService();
-      (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
       (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id: 88, email: 'existing@example.com' });
@@ -260,8 +300,8 @@ describe('AuthService', () => {
     });
 
     it('registers user successfully', async () => {
-      const { service, db } = makeService();
-      (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
       (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce(null);
       ((db as unknown as Record<string, unknown>).returning as vi.Mock).mockResolvedValueOnce([{ id: 1, username: 'jdoe', name: 'John Doe' }]);
 
@@ -269,9 +309,75 @@ describe('AuthService', () => {
       expect(result).toEqual({ id: 1, username: 'jdoe', name: 'John Doe' });
     });
 
+    it('reports a conflict when a concurrent signup wins the unique index race', async () => {
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue(null);
+      const pgError = Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' });
+      ((db as unknown as Record<string, unknown>).transaction as vi.Mock).mockRejectedValue(pgError);
+
+      await expect(
+        service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: 'jdoe@example.com' } as never),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('detects a unique violation wrapped as an error cause', async () => {
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue(null);
+      ((db as unknown as Record<string, unknown>).transaction as vi.Mock).mockRejectedValue(new Error('insert failed', { cause: { code: '23505' } }));
+
+      await expect(
+        service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: 'jdoe@example.com' } as never),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('does not mask unrelated database failures as conflicts', async () => {
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue(null);
+      ((db as unknown as Record<string, unknown>).transaction as vi.Mock).mockRejectedValue(
+        Object.assign(new Error('connection terminated'), { code: '08006' }),
+      );
+
+      await expect(
+        service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: 'jdoe@example.com' } as never),
+      ).rejects.toThrow('connection terminated');
+    });
+
+    it('never grants superuser or explicit permissions to a self-registered account', async () => {
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce(null);
+      ((db as unknown as Record<string, unknown>).returning as vi.Mock).mockResolvedValueOnce([{ id: 1, username: 'jdoe', name: 'John Doe' }]);
+
+      await service.register({ username: 'jdoe', name: 'John Doe', password: 'P@ssw0rd!', email: 'jdoe@example.com' } as never);
+
+      const insertedUser = ((db as unknown as { values: vi.Mock }).values.mock.calls[0] as [Record<string, unknown>])[0];
+      expect(insertedUser).not.toHaveProperty('isSuperuser');
+      expect(insertedUser).not.toHaveProperty('active');
+      expect(insertedUser).not.toHaveProperty('provisioningMethod');
+      expect(insertedUser.passwordHash).toBe('mock-hash:P@ssw0rd!');
+    });
+
+    it('neutralises newlines in the logged username', async () => {
+      const { service, db, appSettings } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce(null);
+      const forged = 'evil\n[auth.login] [end] userId=1 - forged';
+      ((db as unknown as Record<string, unknown>).returning as vi.Mock).mockResolvedValueOnce([{ id: 1, username: forged, name: 'Evil' }]);
+      const logSpy = vi.spyOn((service as unknown as { logger: { log: (msg: string) => void } }).logger, 'log');
+
+      await service.register({ username: forged, name: 'Evil', password: 'P@ssw0rd!', email: 'evil@example.com' } as never);
+
+      const logged = logSpy.mock.calls.at(-1)?.[0] as string;
+      expect(logged).not.toContain('\n');
+      expect(logged).toContain('evil [auth.login]');
+    });
+
     it('grants configured default library access to self-registered users', async () => {
       const { service, db, appSettings } = makeService();
-      (db.query as never as Record<string, Record<string, vi.Mock>>).appSettings.findFirst.mockResolvedValue({ value: 'true' });
+      appSettings.getValue.mockResolvedValue('true');
       (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValueOnce(null);
       appSettings.getDefaultLibraryAccessLibraryIds.mockResolvedValue([2, 4]);
       ((db as unknown as Record<string, unknown>).returning as vi.Mock).mockResolvedValueOnce([{ id: 1, username: 'jdoe', name: 'John Doe' }]);

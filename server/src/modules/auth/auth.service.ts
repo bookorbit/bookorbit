@@ -26,6 +26,7 @@ import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
 import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveUserAvatarUrl } from '../../common/utils/user-avatar-url';
 import { SystemMailService } from '../email/system-mail.service';
 import { UserService } from '../user/user.service';
@@ -67,6 +68,16 @@ function maskEmail(email: string): string {
   return `${email[0]}***@${email.slice(at + 1)}`;
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const directCode = (error as { code?: unknown }).code;
+  if (directCode === '23505') return true;
+
+  if (!(error instanceof Error)) return false;
+  return (error.cause as { code?: unknown } | undefined)?.code === '23505';
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -84,16 +95,28 @@ export class AuthService {
     @Inject(DB) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
+  private async isRegistrationOpen(): Promise<boolean> {
+    return (await this.appSettings.getValue(APP_SETTING_KEYS.ALLOW_REGISTRATION)) === 'true';
+  }
+
   async register(dto: RegisterDto) {
-    const setting = await this.db.query.appSettings.findFirst({
-      where: eq(schema.appSettings.key, APP_SETTING_KEYS.ALLOW_REGISTRATION),
-    });
-    if (setting?.value !== 'true') {
+    if (!(await this.isRegistrationOpen())) {
       throw new ForbiddenException('Registration is not open');
     }
 
     const defaultLibraryIds = await this.appSettings.getDefaultLibraryAccessLibraryIds();
     const passwordHash = await hash(dto.password, 12);
+    try {
+      return await this.registerInTransaction(dto, passwordHash, defaultLibraryIds);
+    } catch (error) {
+      // Two concurrent signups for the same identifier pass the pre-checks and collide on the
+      // lower(username)/lower(email) unique indexes; report the loser as a conflict, not a 500.
+      if (isUniqueViolation(error)) throw new ConflictException('Registration failed');
+      throw error;
+    }
+  }
+
+  private registerInTransaction(dto: RegisterDto, passwordHash: string, defaultLibraryIds: number[]) {
     return this.db.transaction(async (tx) => {
       const existingUsername = await tx.query.users.findFirst({
         where: eq(sql`lower(${schema.users.username})`, dto.username.toLowerCase()),
@@ -125,7 +148,7 @@ export class AuthService {
           .onConflictDoNothing();
       }
 
-      this.logger.log(`[auth.register] [end] userId=${user.id} username=${user.username} - registration completed`);
+      this.logger.log(`[auth.register] [end] userId=${user.id} username="${sanitizeLogValue(user.username)}" - registration completed`);
 
       this.auditEvents.emit(AUDIT_EVENT, {
         userId: user.id,
@@ -138,9 +161,9 @@ export class AuthService {
     });
   }
 
-  async setupStatus(): Promise<{ needsSetup: boolean }> {
-    const count = await this.db.$count(schema.users);
-    return { needsSetup: count === 0 };
+  async setupStatus(): Promise<{ needsSetup: boolean; allowRegistration: boolean }> {
+    const [count, allowRegistration] = await Promise.all([this.db.$count(schema.users), this.isRegistrationOpen()]);
+    return { needsSetup: count === 0, allowRegistration };
   }
 
   async setup(dto: SetupDto, setupToken: string | undefined, reply: FastifyReply) {

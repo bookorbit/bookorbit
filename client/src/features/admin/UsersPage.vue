@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useUsers, type UserRow } from './composables/useUsers'
+import { useSelfRegistration } from './composables/useSelfRegistration'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'
 import StatusPill from './components/StatusPill.vue'
@@ -14,6 +15,7 @@ import type { StatusPillTone } from './lib/status-pill-styles'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
 const { t } = useI18n()
 const { isSuperuser, hasPermission } = usePermissions()
@@ -49,6 +51,15 @@ const savingDefaultLibraryAccess = ref(false)
 const defaultLibraryAccessError = ref<string | null>(null)
 
 const canManageUserDefaults = computed(() => hasPermission(Permission.ManageUsers))
+const canManageAppSettings = computed(() => hasPermission(Permission.ManageAppSettings))
+
+const {
+  allowRegistration,
+  saving: savingSelfRegistration,
+  error: selfRegistrationError,
+  load: loadSelfRegistration,
+  setAllowRegistration,
+} = useSelfRegistration()
 
 const hasActiveFilters = computed(() => search.value.length > 0 || state.value.length > 0 || sortBy.value !== 'username' || sortDir.value !== 'asc')
 
@@ -61,7 +72,10 @@ const sortSelection = computed<string>({
   },
 })
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  if (canManageAppSettings.value) await loadSelfRegistration()
+})
 
 function applyFilters() {
   page.value = 1
@@ -180,6 +194,11 @@ async function onSaved(newResetUrl?: string) {
   drawerOpen.value = false
   if (newResetUrl) resetUrl.value = newResetUrl
   await load()
+}
+
+async function toggleSelfRegistration() {
+  if (savingSelfRegistration.value) return
+  await setAllowRegistration(!allowRegistration.value)
 }
 
 async function saveDefaultLibraryAccess() {
@@ -473,6 +492,40 @@ async function saveDefaultLibraryAccess() {
         </div>
       </nav>
     </template>
+
+    <section v-if="!loading && !error && canManageAppSettings" aria-labelledby="self-registration-heading" class="space-y-3 pt-6">
+      <div>
+        <h3 id="self-registration-heading" class="settings-group-label mb-1">
+          {{ t('adminFeature.usersPage.selfRegistration.title') }}
+        </h3>
+        <p class="text-sm text-muted-foreground">{{ t('adminFeature.usersPage.selfRegistration.subtitle') }}</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-4 shadow-xs">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="min-w-0">
+            <p class="settings-label">{{ t('adminFeature.usersPage.selfRegistration.label') }}</p>
+            <p class="settings-hint">{{ t('adminFeature.usersPage.selfRegistration.hint') }}</p>
+          </div>
+          <ToggleSwitch
+            :model-value="allowRegistration"
+            :disabled="savingSelfRegistration"
+            :aria-label="t('adminFeature.usersPage.selfRegistration.label')"
+            class="self-start md:self-auto"
+            @update:model-value="toggleSelfRegistration"
+          />
+        </div>
+        <p v-if="allowRegistration" class="mt-3 text-sm text-muted-foreground">
+          {{ t('adminFeature.usersPage.selfRegistration.enabledNotice') }}
+        </p>
+        <p v-if="selfRegistrationError" role="alert" class="mt-3 text-sm text-destructive">
+          {{
+            selfRegistrationError === 'save'
+              ? t('adminFeature.usersPage.selfRegistration.saveError')
+              : t('adminFeature.usersPage.selfRegistration.loadError')
+          }}
+        </p>
+      </div>
+    </section>
 
     <section v-if="!loading && !error && canManageUserDefaults" aria-labelledby="default-library-access-heading" class="space-y-3 pt-6">
       <div>

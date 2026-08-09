@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import { LoginErrorCode, type OidcProviderPublic } from '@bookorbit/types'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import { LoginError, useAuth } from './composables/useAuth'
-import { useOidc } from './composables/useOidc'
-import { useSetupStatus } from './composables/useSetupStatus'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { RegisterError, useAuth } from './composables/useAuth'
+import { checkIdentityText } from './lib/identity-text'
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
@@ -25,6 +22,10 @@ function radiusPreview(id: string): string {
     pill: '999px',
   }
   return map[id] ?? '4px'
+}
+
+function handleToggleTheme() {
+  themeStore.toggleTheme()
 }
 
 function openRadius() {
@@ -51,63 +52,59 @@ function closeAll() {
   backgroundOpen.value = false
 }
 
-const { login } = useAuth()
-const { getPublicProviders, initiateLogin } = useOidc()
-const { allowRegistration, setupStatusError } = useSetupStatus()
-
-const route = useRoute()
-const justRegistered = computed(() => route.query.registered === '1')
+const { register } = useAuth()
 
 const username = ref('')
+const name = ref('')
+const email = ref('')
 const password = ref('')
-const error = ref<string | null>(null)
+const confirmPassword = ref('')
+
 const loading = ref(false)
-const oidcProviders = ref<OidcProviderPublic[]>([])
-const oidcLoadingSlug = ref<string | null>(null)
+const error = ref<string | null>(null)
 
-function resolveLoginError(err: unknown): string {
-  if (!(err instanceof Error)) return t('auth.login.errors.invalidCredentials')
-
-  if (err instanceof LoginError && err.errorCode === LoginErrorCode.ACCOUNT_LOCKED) {
-    const minutes = Math.max(1, Math.ceil((err.retryAfterSeconds ?? 0) / 60))
-    return t('auth.login.errors.accountLocked', { minutes })
+function resolveRegisterError(err: unknown): string {
+  if (err instanceof RegisterError) {
+    if (err.status === 403) return t('auth.register.errors.closed')
+    if (err.status === 409) return t('auth.register.errors.taken')
+    if (err.status === 429) return t('auth.register.errors.tooManyAttempts')
+    if (err.status === 400) return t('auth.register.errors.invalid')
   }
-
-  const normalizedMessage = err.message.trim().toLowerCase()
-  if (normalizedMessage.includes('too many requests')) {
-    return t('auth.login.errors.tooManyAttempts')
-  }
-  if (normalizedMessage.includes('invalid credentials')) {
-    return t('auth.login.errors.invalidCredentials')
-  }
-
-  return err.message || t('auth.login.errors.invalidCredentials')
+  return t('auth.register.errors.failed')
 }
-
-onMounted(async () => {
-  oidcProviders.value = await getPublicProviders()
-})
 
 async function handleSubmit() {
   error.value = null
+
+  const usernameProblem = checkIdentityText(username.value)
+  if (usernameProblem) {
+    error.value = t(`auth.register.errors.username.${usernameProblem}`)
+    return
+  }
+
+  const nameProblem = checkIdentityText(name.value)
+  if (nameProblem) {
+    error.value = t(`auth.register.errors.name.${nameProblem}`)
+    return
+  }
+
+  if (password.value !== confirmPassword.value) {
+    error.value = t('auth.errors.passwordsDoNotMatch')
+    return
+  }
+
   loading.value = true
   try {
-    await login(username.value, password.value)
+    await register({
+      username: username.value,
+      name: name.value,
+      email: email.value,
+      password: password.value,
+    })
   } catch (err) {
-    error.value = resolveLoginError(err)
+    error.value = resolveRegisterError(err)
   } finally {
     loading.value = false
-  }
-}
-
-async function handleOidcLogin(provider: OidcProviderPublic) {
-  error.value = null
-  oidcLoadingSlug.value = provider.slug
-  try {
-    await initiateLogin(provider)
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : t('auth.oidc.loginFailed')
-    oidcLoadingSlug.value = null
   }
 }
 </script>
@@ -115,11 +112,11 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
 <template>
   <div class="login-bg min-h-screen flex items-center justify-center px-4 overflow-hidden">
     <!-- Compact theme picker -->
-    <div class="fixed top-5 right-5 z-20 flex items-center gap-1.5">
+    <div class="fixed bottom-5 right-5 z-20 flex items-center gap-1.5">
       <!-- Dark / light toggle -->
       <Tooltip>
         <TooltipTrigger as-child>
-          <button class="theme-btn" @click="themeStore.toggleTheme()">
+          <button class="theme-btn" @click="handleToggleTheme">
             <Sun v-if="themeStore.resolvedTheme === 'dark'" :size="14" />
             <Moon v-else :size="14" />
           </button>
@@ -132,7 +129,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
       <!-- Radius picker -->
       <div class="relative">
         <Transition name="popover">
-          <div v-if="radiusOpen" class="accent-popover absolute top-full right-0 mt-2 p-2.5 rounded-lg">
+          <div v-if="radiusOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg">
             <div class="flex items-center gap-1.5">
               <Tooltip v-for="opt in RADIUS_OPTIONS" :key="opt.id">
                 <TooltipTrigger as-child>
@@ -155,7 +152,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         </Transition>
         <Tooltip>
           <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openRadius()">
+            <button class="theme-btn" @click="openRadius">
               <span class="w-3.5 h-3.5 border-2 border-current block" :style="{ borderRadius: radiusPreview(themeStore.radius) }" />
             </button>
           </TooltipTrigger>
@@ -166,7 +163,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
       <!-- Background picker -->
       <div class="relative">
         <Transition name="popover">
-          <div v-if="backgroundOpen" class="accent-popover absolute top-full right-0 mt-2 p-2.5 rounded-lg w-64 max-h-72 overflow-y-auto">
+          <div v-if="backgroundOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-2.5 rounded-lg w-64 max-h-72 overflow-y-auto">
             <div class="grid grid-cols-5 gap-1.5">
               <Tooltip v-for="opt in BACKGROUND_OPTIONS" :key="opt.id">
                 <TooltipTrigger as-child>
@@ -187,7 +184,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         </Transition>
         <Tooltip>
           <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openBackground()">
+            <button class="theme-btn" @click="openBackground">
               <Wallpaper :size="14" />
             </button>
           </TooltipTrigger>
@@ -197,9 +194,8 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
 
       <!-- Accent picker -->
       <div class="relative">
-        <!-- Colour popover -->
         <Transition name="popover">
-          <div v-if="accentOpen" class="accent-popover absolute top-full right-0 mt-2 p-3 rounded-lg space-y-2 w-96 max-w-[calc(100vw-2rem)]">
+          <div v-if="accentOpen" class="accent-popover absolute bottom-full right-0 mb-2 p-3 rounded-lg space-y-2 w-96 max-w-[calc(100vw-2rem)]">
             <div class="overflow-x-auto no-scrollbar px-1 py-0.5">
               <div class="space-y-2 w-max">
                 <div v-for="(row, rowIndex) in ACCENT_ROWS" :key="rowIndex" class="flex items-center gap-1.5">
@@ -229,7 +225,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         <!-- Swatch button showing current accent -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <button class="theme-btn" @click="openAccent()">
+            <button class="theme-btn" @click="openAccent">
               <span class="w-3.5 h-3.5 rounded-full block" :class="currentAccent?.swatchClass" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
@@ -239,85 +235,96 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
     </div>
 
     <!-- Click-outside backdrop -->
-    <div v-if="accentOpen || radiusOpen || backgroundOpen" class="fixed inset-0 z-10" @click="closeAll()" />
+    <div v-if="accentOpen || radiusOpen || backgroundOpen" class="fixed inset-0 z-10" @click="closeAll" />
 
-    <div class="login-card relative z-10 w-full max-w-sm rounded-2xl p-8">
-      <div class="text-center mb-8 animate-fade-up">
-        <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
-        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.login.subtitle') }}</p>
+    <div class="login-card relative z-10 w-full max-w-md rounded-2xl p-8">
+      <div class="mb-6">
+        <h1 class="text-xl font-semibold text-foreground">{{ t('auth.register.title') }}</h1>
+        <p class="text-sm text-muted-foreground mt-1">{{ t('auth.register.subtitle') }}</p>
       </div>
 
-      <div v-if="justRegistered" role="status" class="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2.5 text-sm text-foreground">
-        {{ t('auth.login.registeredNotice') }}
-      </div>
-
-      <form @submit.prevent="handleSubmit" class="space-y-4">
-        <div class="space-y-1.5 animate-fade-up" style="animation-delay: 80ms">
-          <label for="username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
+      <form class="space-y-4" @submit.prevent="handleSubmit">
+        <div class="space-y-1.5">
+          <label for="register-username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
           <input
-            id="username"
+            id="register-username"
             v-model="username"
             type="text"
             autocomplete="username"
             required
+            minlength="3"
+            maxlength="100"
             class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
           />
         </div>
 
-        <div class="space-y-1.5 animate-fade-up" style="animation-delay: 160ms">
-          <label for="password" class="text-sm font-medium text-foreground">{{ t('auth.fields.password') }}</label>
+        <div class="space-y-1.5">
+          <label for="register-name" class="text-sm font-medium text-foreground">{{ t('auth.fields.fullName') }}</label>
           <input
-            id="password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
+            id="register-name"
+            v-model="name"
+            type="text"
+            autocomplete="name"
+            required
+            maxlength="255"
+            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="register-email" class="text-sm font-medium text-foreground">{{ t('auth.fields.email') }}</label>
+          <input
+            id="register-email"
+            v-model="email"
+            type="email"
+            autocomplete="email"
             required
             class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
           />
         </div>
 
-        <div v-if="error" role="alert" class="text-sm text-destructive animate-shake">{{ error }}</div>
-        <div v-if="setupStatusError" class="text-sm text-destructive animate-shake">{{ setupStatusError }}</div>
+        <div class="space-y-1.5">
+          <label for="register-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.password') }}</label>
+          <input
+            id="register-password"
+            v-model="password"
+            type="password"
+            autocomplete="new-password"
+            required
+            minlength="8"
+            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
+          />
+          <p class="text-xs text-muted-foreground">{{ t('auth.fields.passwordHint') }}</p>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="register-confirm-password" class="text-sm font-medium text-foreground">{{ t('auth.fields.confirmPassword') }}</label>
+          <input
+            id="register-confirm-password"
+            v-model="confirmPassword"
+            type="password"
+            autocomplete="new-password"
+            required
+            class="w-full rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
+          />
+        </div>
+
+        <div v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</div>
 
         <button
           type="submit"
           :disabled="loading"
-          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors animate-fade-up"
-          style="animation-delay: 240ms"
+          class="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {{ loading ? t('auth.login.signingIn') : t('auth.login.signIn') }}
+          {{ loading ? t('auth.register.creatingAccount') : t('auth.register.createAccount') }}
         </button>
       </form>
 
-      <template v-if="oidcProviders.length > 0">
-        <div class="flex items-center gap-3 my-6">
-          <div class="flex-1 h-px bg-border" />
-          <span class="text-sm text-muted-foreground">{{ t('auth.login.orDivider') }}</span>
-          <div class="flex-1 h-px bg-border" />
-        </div>
-
-        <div class="space-y-3">
-          <button
-            v-for="provider in oidcProviders"
-            :key="provider.slug"
-            type="button"
-            :disabled="oidcLoadingSlug !== null"
-            class="flex w-full items-center justify-center gap-2 rounded-md border border-input bg-background/60 px-4 py-2 text-[14px] font-medium text-foreground hover:bg-muted/60 disabled:opacity-50 transition-colors backdrop-blur-sm"
-            @click="handleOidcLogin(provider)"
-          >
-            <img v-if="provider.iconUrl" :src="provider.iconUrl" alt="" class="h-4 w-4 shrink-0 object-contain" />
-            {{ oidcLoadingSlug === provider.slug ? t('auth.oidc.redirecting') : t('auth.oidc.signInWith', { provider: provider.displayName }) }}
-          </button>
-        </div>
-      </template>
-
       <p class="mt-6 text-center text-sm text-muted-foreground">
-        <RouterLink to="/forgot-password" class="text-primary hover:underline">{{ t('auth.login.forgotPassword') }}</RouterLink>
-      </p>
-
-      <p v-if="allowRegistration" class="mt-2 text-center text-sm text-muted-foreground">
-        {{ t('auth.login.noAccount') }}
-        <RouterLink to="/register" class="text-primary hover:underline">{{ t('auth.login.signUp') }}</RouterLink>
+        {{ t('auth.register.haveAccount') }}
+        <RouterLink to="/login" class="text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+          {{ t('auth.register.signIn') }}
+        </RouterLink>
       </p>
     </div>
   </div>

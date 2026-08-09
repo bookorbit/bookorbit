@@ -2559,6 +2559,15 @@
         "resetPassword": "Failed to create a password reset link",
         "unlock": "Failed to unlock the account"
       },
+      "selfRegistration": {
+        "title": "Self-Registration",
+        "subtitle": "Control whether visitors can create their own accounts.",
+        "label": "Allow self-registration",
+        "hint": "When enabled, the sign-in page shows a link to create an account.",
+        "enabledNotice": "New accounts start with the default library access below and no other permissions. Grant permissions before they can use protected features.",
+        "loadError": "Failed to load the self-registration setting",
+        "saveError": "Failed to update the self-registration setting"
+      },
       "defaultLibraryAccess": {
         "title": "Default Library Access",
         "subtitle": "Viewer access granted to self-registered and OIDC-provisioned users.",
@@ -2995,6 +3004,9 @@
       "signingIn": "Signing in...",
       "orDivider": "or",
       "forgotPassword": "Forgot password?",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up",
+      "registeredNotice": "Account created. Sign in to continue. An administrator needs to grant permissions before you can access the library.",
       "errors": {
         "invalidCredentials": "Invalid username or password",
         "tooManyAttempts": "Too many login attempts. Please wait a minute and try again.",
@@ -3037,6 +3049,29 @@
       "errors": {
         "invalidLink": "Invalid reset link. Please request a new one.",
         "invalidOrExpired": "Invalid or expired reset link. Please request a new one."
+      }
+    },
+    "register": {
+      "title": "Create your account",
+      "subtitle": "Sign up to get started.",
+      "createAccount": "Create account",
+      "creatingAccount": "Creating account...",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "errors": {
+        "closed": "Self-registration is not open on this server.",
+        "taken": "That username or email is already in use.",
+        "invalid": "Check the details you entered and try again.",
+        "tooManyAttempts": "Too many attempts. Please wait a minute and try again.",
+        "failed": "Failed to create account",
+        "username": {
+          "unsafeCharacters": "Your username cannot contain hidden or text-direction characters.",
+          "untrimmed": "Your username cannot start or end with a space."
+        },
+        "name": {
+          "unsafeCharacters": "Your name cannot contain hidden or text-direction characters.",
+          "untrimmed": "Your name cannot start or end with a space."
+        }
       }
     },
     "setup": {
@@ -7052,6 +7087,7 @@
     "notFound": "Not Found",
     "signIn": "Sign In",
     "initialSetup": "Initial Setup",
+    "register": "Create Account",
     "forgotPassword": "Forgot Password",
     "resetPassword": "Reset Password",
     "completingSignIn": "Completing Sign In",
