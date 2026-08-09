@@ -84,6 +84,7 @@ function handleBrightnessInput(event: Event) {
                   <TooltipTrigger as-child>
                     <button
                       class="w-7 h-7 md:w-5 md:h-5 rounded-full transition-all hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card shrink-0"
+                      :class="opt.swatchClass"
                       :aria-label="t(opt.labelKey)"
                       :style="{
                         backgroundColor: opt.color,
