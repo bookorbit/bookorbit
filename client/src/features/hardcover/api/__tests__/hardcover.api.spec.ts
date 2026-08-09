@@ -14,10 +14,13 @@ import {
   cancelHardcoverSync,
   disconnectHardcover,
   fetchHardcoverBookSyncState,
+  fetchHardcoverEditions,
+  fetchHardcoverLinkedBooks,
   fetchHardcoverSettings,
   fetchHardcoverSyncPendingSummary,
   fetchHardcoverSyncStatus,
   previewHardcoverImport,
+  setHardcoverEdition,
   startHardcoverBookSync,
   startHardcoverSync,
   streamHardcoverSyncStatus,
@@ -184,6 +187,48 @@ describe('hardcover.api', () => {
     })
 
     expect(mockApi).toHaveBeenCalledWith('/api/v1/hardcover/books/12/sync', { method: 'POST' })
+  })
+
+  it('fetches linked books and editions, and sets an edition', async () => {
+    mockApi
+      .mockResolvedValueOnce(
+        jsonResponse({
+          books: [{ bookId: 12, title: 'Book', authorName: 'Author', hardcoverBookId: 100, hardcoverEditionId: null }],
+          truncated: false,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ editions: [{ id: 200, format: 'Physical Book' }], truncated: true }))
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+
+    await expect(fetchHardcoverLinkedBooks()).resolves.toEqual({
+      books: [{ bookId: 12, title: 'Book', authorName: 'Author', hardcoverBookId: 100, hardcoverEditionId: null }],
+      truncated: false,
+    })
+    await expect(fetchHardcoverEditions(12)).resolves.toEqual({ editions: [{ id: 200, format: 'Physical Book' }], truncated: true })
+    await expect(setHardcoverEdition(12, 200)).resolves.toEqual({ success: true })
+
+    expect(mockApi).toHaveBeenNthCalledWith(1, '/api/v1/hardcover/books')
+    expect(mockApi).toHaveBeenNthCalledWith(2, '/api/v1/hardcover/books/12/editions')
+    expect(mockApi).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/hardcover/books/12/edition',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ editionId: 200 }),
+      }),
+    )
+  })
+
+  it('throws instead of masking a failed edition fetch as an empty list', async () => {
+    mockApi.mockResolvedValueOnce(jsonResponse({}, false))
+    await expect(fetchHardcoverEditions(12)).rejects.toThrow('Failed to fetch Hardcover editions')
+  })
+
+  it('throws when fetching linked books or setting an edition fails', async () => {
+    mockApi.mockResolvedValueOnce(jsonResponse({}, false)).mockResolvedValueOnce(jsonResponse({}, false))
+
+    await expect(fetchHardcoverLinkedBooks()).rejects.toThrow('Failed to fetch Hardcover linked books')
+    await expect(setHardcoverEdition(12, 200)).rejects.toThrow('Failed to set Hardcover edition')
   })
 
   it('previews and applies Hardcover import payloads', async () => {

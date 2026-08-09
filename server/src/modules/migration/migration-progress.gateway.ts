@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
@@ -10,6 +10,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from '../auth/auth.service';
 import { MigrationRepository } from './migration.repository';
 import { sanitizeRunForApi } from './core/api-sanitizers';
+import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 
 @WebSocketGateway({ namespace: '/migration', cors: { credentials: true } })
 export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -38,10 +39,10 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
   async handleConnection(client: Socket): Promise<void> {
     try {
       const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new Error('No token provided');
+      if (!token) throw new UnauthorizedException('No token provided');
       const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
       const user = await this.authService.validateUser(payload.sub, payload.ver);
-      if (!user) throw new Error('User not found or token revoked');
+      if (!user) throw new UnauthorizedException('User not found or token revoked');
       this.assertCanViewMigrationProgress(user);
       (client.data as Record<string, unknown>).user = user;
       this.logger.debug(`[migration.ws_connection] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
@@ -49,7 +50,7 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
       this.logger.warn(
         `[migration.ws_connection] [fail] socketId=${client.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - websocket rejected`,
       );
-      client.disconnect();
+      rejectSocketConnection(client, err);
     }
   }
 
@@ -105,6 +106,6 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
   private assertCanViewMigrationProgress(user: RequestUser): void {
     if (user.isSuperuser) return;
     if (user.permissions.includes(Permission.ManageAppSettings)) return;
-    throw new Error('Missing permission: manage_app_settings');
+    throw new ForbiddenException('Missing permission: manage_app_settings');
   }
 }

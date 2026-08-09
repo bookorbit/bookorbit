@@ -1,3 +1,7 @@
+export enum LoginErrorCode {
+  ACCOUNT_LOCKED = "account_locked",
+}
+
 export enum OidcErrorCode {
   STATE_EXPIRED = "oidc_state_expired",
   TOKEN_EXCHANGE_FAILED = "oidc_token_exchange_failed",

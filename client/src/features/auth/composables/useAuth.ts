@@ -94,6 +94,16 @@ async function hydratePreferences(options: { refreshUser?: boolean } = {}): Prom
   initLocaleSync()
 }
 
+export class LoginError extends Error {
+  constructor(
+    public readonly errorCode: string | undefined,
+    public readonly retryAfterSeconds: number | undefined,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
 export function useAuth() {
   async function init(): Promise<void> {
     isLoading.value = true
@@ -122,7 +132,7 @@ export function useAuth() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(err.message ?? 'Invalid credentials')
+      throw new LoginError(err.errorCode, err.retryAfterSeconds, err.message ?? 'Invalid credentials')
     }
 
     const data: AuthResponse = await res.json()

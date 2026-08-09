@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 export interface UserRow extends AuthUser {
   id: number
   hasContentFilters?: boolean
+  lockedUntil?: string | null
 }
 
 export type UserLibrary = Pick<Library, 'id' | 'name'>

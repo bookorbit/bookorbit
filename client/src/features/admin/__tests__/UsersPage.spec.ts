@@ -151,6 +151,35 @@ describe('UsersPage', () => {
     expect(wrapper.find('button[aria-label="Delete Ada Lovelace"]').exists()).toBe(true)
   })
 
+  it('offers the unlock action only while the account is actually locked', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+    expect(wrapper.find('button[aria-label="Unlock Ada Lovelace"]').exists()).toBe(false)
+
+    stubApi({ users: [{ ...USER, lockedUntil: new Date(Date.now() - 60_000).toISOString() }] })
+    const expired = mount(UsersPage)
+    await flushPromises()
+    expect(expired.find('button[aria-label="Unlock Ada Lovelace"]').exists()).toBe(false)
+
+    stubApi({ users: [{ ...USER, lockedUntil: new Date(Date.now() + 60_000).toISOString() }] })
+    const locked = mount(UsersPage)
+    await flushPromises()
+    expect(locked.find('button[aria-label="Unlock Ada Lovelace"]').exists()).toBe(true)
+    expect(locked.text()).toContain('Locked')
+  })
+
+  it('clears the lockout through the unlock endpoint and reloads', async () => {
+    stubApi({ users: [{ ...USER, lockedUntil: new Date(Date.now() + 60_000).toISOString() }] })
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    await wrapper.find('button[aria-label="Unlock Ada Lovelace"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/users/4/unlock', { method: 'POST' })
+    expect(listUrls().length).toBeGreaterThan(1)
+  })
+
   it('shows a filtered empty state that differs from the unfiltered one', async () => {
     stubApi({ users: [], total: 0 })
     const wrapper = mount(UsersPage)

@@ -4,11 +4,14 @@ import type {
   HardcoverActiveSyncStatus,
   HardcoverBookSyncState,
   HardcoverBookSyncNowResult,
+  HardcoverEditionsResult,
   HardcoverImportApplyResult,
   HardcoverImportPreview,
+  HardcoverLinkedBooksResult,
   HardcoverSyncPendingSummary,
   HardcoverSettings,
   HardcoverTokenValidationResult,
+  SetHardcoverEditionResult,
   UpdateHardcoverBookSyncPayload,
   UpsertHardcoverSettingsPayload,
 } from '@bookorbit/types'
@@ -128,6 +131,28 @@ export async function startHardcoverBookSync(bookId: number): Promise<HardcoverB
     const body = await res.json().catch(() => ({}))
     throw new Error((body as { message?: string }).message ?? 'Failed to sync Hardcover book')
   }
+  return res.json()
+}
+
+export async function fetchHardcoverLinkedBooks(): Promise<HardcoverLinkedBooksResult> {
+  const res = await api(`${BASE}/books`)
+  if (!res.ok) throw new Error('Failed to fetch Hardcover linked books')
+  return res.json()
+}
+
+export async function fetchHardcoverEditions(bookId: number): Promise<HardcoverEditionsResult> {
+  const res = await api(`${BASE}/books/${bookId}/editions`)
+  if (!res.ok) throw new Error('Failed to fetch Hardcover editions')
+  return res.json()
+}
+
+export async function setHardcoverEdition(bookId: number, editionId: number): Promise<SetHardcoverEditionResult> {
+  const res = await api(`${BASE}/books/${bookId}/edition`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ editionId }),
+  })
+  if (!res.ok) throw new Error('Failed to set Hardcover edition')
   return res.json()
 }
 

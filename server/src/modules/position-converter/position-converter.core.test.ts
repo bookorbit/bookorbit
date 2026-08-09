@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { chapterIndexFromSpineStep, parseCfi } from './cfi.utils';
-import { cfiRangeToXPointer, parseChapterDocument, xpointerRangeToCfi } from './position-converter.core';
+import { cfiRangeToXPointer, collapsedRangeToCfi, parseChapterDocument, xpointerRangeToCfi } from './position-converter.core';
 import { parseXPointer } from './xpointer.utils';
 
 const SIMPLE_CHAPTER = `<?xml version="1.0" encoding="utf-8"?>
@@ -95,6 +95,27 @@ describe('parseCfi', () => {
     expect(chapterIndexFromSpineStep(12)).toBe(5);
     expect(chapterIndexFromSpineStep(null)).toBeNull();
     expect(chapterIndexFromSpineStep(3)).toBeNull();
+  });
+});
+
+describe('parseChapterDocument', () => {
+  const chapter = (body: string) => `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title></head><body>${body}</body></html>`;
+
+  it('indexes named entities as the characters a renderer would show', () => {
+    const doc = parseChapterDocument(chapter('<p>a&nbsp;b pa&shy;sakyti c&mdash;d</p>'));
+    expect(doc.index.collapsed).toBe('a b pa­sakyti c—d');
+  });
+
+  it('keeps escaped entity text literal instead of resolving it twice', () => {
+    const doc = parseChapterDocument(chapter('<p>write &amp;nbsp; for a space</p>'));
+    expect(doc.index.collapsed).toBe('write &nbsp; for a space');
+  });
+
+  it('builds cfi offsets against resolved characters', () => {
+    const doc = parseChapterDocument(chapter('<p>a&nbsp;bc</p>'));
+    // The nbsp occupies one UTF-16 unit, so "bc" starts at offset 2, not 7.
+    expect(collapsedRangeToCfi(doc, 0, 2, 4)).toBe('epubcfi(/6/2!/4/2,/1:2,/1:4)');
   });
 });
 

@@ -109,61 +109,9 @@ export class KoboAnnotationMaterializerService {
         if (!koboSpan?.pos0) continue;
         if (!this.needsCanonical(formats?.cfi) && !this.needsCanonical(formats?.xpointer)) continue;
 
-        const location = (koboSpan.extras as { koboLocation?: unknown } | null)?.koboLocation;
-        const outcome = await this.koboSpanConverter.koboSpanToCanonical({
-          bookFileId: file.id,
-          ctx,
-          location,
-          text: annotation.text || null,
-        });
-
-        // The device's own position belongs to the current rendition by definition;
-        // stamping the hash keeps the materializer from re-synthesizing the verbatim
-        // location the device uploaded.
-        if (outcome.renditionHash) {
-          await this.annotationSync.upsertGeneratedPosition({
-            annotationId: annotation.id,
-            userId,
-            bookFileId: file.id,
-            format: 'kobo_span',
-            pos0: koboSpan.pos0,
-            pos1: koboSpan.pos1,
-            status: koboSpan.status as 'exact' | 'repaired' | 'failed' | 'pending',
-            converterVersion: this.koboSpanConverter.version,
-            extras: { ...(koboSpan.extras ?? {}), chapterIndex: outcome.chapterIndex, renditionHash: outcome.renditionHash },
-          });
-        }
-
-        if (outcome.status === 'failed' || !outcome.cfi || !outcome.xpointerPos0) {
-          failed += 1;
-          await this.storeFailure(userId, annotation.id, file.id, 'cfi', outcome.chapterIndex ?? null, outcome.reason ?? 'conversion_failed');
-          await this.storeFailure(userId, annotation.id, file.id, 'xpointer', outcome.chapterIndex ?? null, outcome.reason ?? 'conversion_failed');
-          continue;
-        }
-
-        converted += 1;
-        await this.annotationSync.upsertGeneratedPosition({
-          annotationId: annotation.id,
-          userId,
-          bookFileId: file.id,
-          format: 'cfi',
-          pos0: outcome.cfi,
-          pos1: null,
-          status: outcome.status,
-          converterVersion: this.positionConverter.version,
-          extras: { chapterIndex: outcome.chapterIndex },
-        });
-        await this.annotationSync.upsertGeneratedPosition({
-          annotationId: annotation.id,
-          userId,
-          bookFileId: file.id,
-          format: 'xpointer',
-          pos0: outcome.xpointerPos0,
-          pos1: outcome.xpointerPos1 ?? null,
-          status: outcome.status,
-          converterVersion: this.positionConverter.version,
-          extras: { chapterIndex: outcome.chapterIndex },
-        });
+        const outcome = await this.convertFromKoboSpan(userId, annotation, koboSpan, file, ctx);
+        if (outcome.converted) converted += 1;
+        else failed += 1;
       }
 
       if (converted > 0 || failed > 0) {
@@ -177,6 +125,75 @@ export class KoboAnnotationMaterializerService {
         `[${CONVERT_EVENT}] [fail] userId=${userId} bookId=${bookId} durationMs=${Date.now() - startedAtMs} errorClass=${errorClass} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - incoming kobo position conversion failed`,
       );
     }
+  }
+
+  /**
+   * Converts one stored kobo_span position to cfi + xpointer, recording a failure on
+   * both canonical formats when it cannot resolve. Shared by device sync and by hub
+   * position retry, which is the only way an already-failed conversion is redone.
+   */
+  async convertFromKoboSpan(
+    userId: number,
+    annotation: { id: number; text: string | null },
+    koboSpan: AnnotationPosition,
+    file: KepubReaderFile,
+    ctx: KepubContext,
+  ): Promise<{ converted: boolean; reason?: string }> {
+    const location = (koboSpan.extras as { koboLocation?: unknown } | null)?.koboLocation;
+    const outcome = await this.koboSpanConverter.koboSpanToCanonical({
+      bookFileId: file.id,
+      ctx,
+      location,
+      text: annotation.text || null,
+    });
+
+    // The device's own position belongs to the current rendition by definition;
+    // stamping the hash keeps the materializer from re-synthesizing the verbatim
+    // location the device uploaded.
+    if (outcome.renditionHash && koboSpan.pos0) {
+      await this.annotationSync.upsertGeneratedPosition({
+        annotationId: annotation.id,
+        userId,
+        bookFileId: file.id,
+        format: 'kobo_span',
+        pos0: koboSpan.pos0,
+        pos1: koboSpan.pos1,
+        status: koboSpan.status as 'exact' | 'repaired' | 'failed' | 'pending',
+        converterVersion: this.koboSpanConverter.version,
+        extras: { ...(koboSpan.extras ?? {}), chapterIndex: outcome.chapterIndex, renditionHash: outcome.renditionHash },
+      });
+    }
+
+    if (outcome.status === 'failed' || !outcome.cfi || !outcome.xpointerPos0) {
+      const reason = outcome.reason ?? 'conversion_failed';
+      await this.storeFailure(userId, annotation.id, file.id, 'cfi', outcome.chapterIndex ?? null, reason);
+      await this.storeFailure(userId, annotation.id, file.id, 'xpointer', outcome.chapterIndex ?? null, reason);
+      return { converted: false, reason };
+    }
+
+    await this.annotationSync.upsertGeneratedPosition({
+      annotationId: annotation.id,
+      userId,
+      bookFileId: file.id,
+      format: 'cfi',
+      pos0: outcome.cfi,
+      pos1: null,
+      status: outcome.status,
+      converterVersion: this.positionConverter.version,
+      extras: { chapterIndex: outcome.chapterIndex },
+    });
+    await this.annotationSync.upsertGeneratedPosition({
+      annotationId: annotation.id,
+      userId,
+      bookFileId: file.id,
+      format: 'xpointer',
+      pos0: outcome.xpointerPos0,
+      pos1: outcome.xpointerPos1 ?? null,
+      status: outcome.status,
+      converterVersion: this.positionConverter.version,
+      extras: { chapterIndex: outcome.chapterIndex },
+    });
+    return { converted: true };
   }
 
   private async materializeOne(

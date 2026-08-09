@@ -64,6 +64,7 @@ export class UserRepository {
         active: schema.users.active,
         isSuperuser: schema.users.isSuperuser,
         isDefaultPassword: schema.users.isDefaultPassword,
+        lockedUntil: schema.users.lockedUntil,
         provisioningMethod: schema.users.provisioningMethod,
         createdAt: schema.users.createdAt,
         permissionName: schema.userPermissions.permissionName,
@@ -81,6 +82,7 @@ export class UserRepository {
       active: boolean;
       isSuperuser: boolean;
       isDefaultPassword: boolean;
+      lockedUntil: Date | null;
       provisioningMethod: string;
       createdAt: Date;
       permissions: Permission[];
@@ -98,6 +100,7 @@ export class UserRepository {
           active: row.active,
           isSuperuser: row.isSuperuser,
           isDefaultPassword: row.isDefaultPassword,
+          lockedUntil: row.lockedUntil,
           provisioningMethod: row.provisioningMethod,
           createdAt: row.createdAt,
           permissions: [],
@@ -313,6 +316,10 @@ export class UserRepository {
     });
 
     return rawToken;
+  }
+
+  async clearLockout(userId: number): Promise<void> {
+    await this.db.update(schema.users).set({ failedLoginAttempts: 0, lockedUntil: null }).where(eq(schema.users.id, userId));
   }
 
   async findByOidcSubject(subject: string, issuer: string) {

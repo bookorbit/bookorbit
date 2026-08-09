@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { SQL, and, asc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -1960,6 +1960,17 @@ export class BookRepository {
     }
 
     await executor.update(books).set(bookUpdate).where(eq(books.id, bookId));
+  }
+
+  // Only fills a missing shared edition id - never overwrites a value already set by someone
+  // else (via metadata edit/refresh) so a per-user sync pick can't silently change shared metadata.
+  async setHardcoverEditionIdIfEmpty(bookId: number, hardcoverEditionId: string): Promise<boolean> {
+    const [row] = await this.db
+      .update(bookMetadata)
+      .set({ hardcoverEditionId, updatedAt: new Date() })
+      .where(and(eq(bookMetadata.bookId, bookId), isNull(bookMetadata.hardcoverEditionId)))
+      .returning({ bookId: bookMetadata.bookId });
+    return row != null;
   }
 
   async updateAddedAt(bookId: number, addedAt: Date): Promise<void> {

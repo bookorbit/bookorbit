@@ -82,7 +82,11 @@ import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookNoteService } from '../user-book-note/user-book-note.service';
 import { UserBookStatusService, type AutoReadingActivity } from '../user-book-status/user-book-status.service';
-import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
+import {
+  ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED,
+  ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED,
+  AchievementEventsService,
+} from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
@@ -487,6 +491,10 @@ export class BookService {
       const passes = await this.checkBookPassesContentFilters(bookId, user.contentFilters);
       if (!passes) throw new NotFoundException(`Book ${bookId} not found`);
     }
+  }
+
+  setHardcoverEditionIdIfEmpty(bookId: number, hardcoverEditionId: string): Promise<boolean> {
+    return this.bookRepo.setHardcoverEditionIdIfEmpty(bookId, hardcoverEditionId);
   }
 
   async verifyFileAccess(fileId: number, user: RequestUser): Promise<NonNullable<Awaited<ReturnType<BookRepository['findFileById']>>>> {
@@ -1801,6 +1809,15 @@ export class BookService {
       });
     }
 
+    // Clearing is intentionally not propagated, so it can't disrupt an unrelated active sync.
+    if (dto.hardcoverEditionId != null) {
+      this.achievementEvents?.emit(ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, {
+        userId: user.id,
+        bookId: id,
+        hardcoverEditionId: dto.hardcoverEditionId,
+      });
+    }
+
     if (hasMetadataUpdate) {
       this.embedder?.embedBook(id).catch((err: Error) => this.logger.warn(`Embedding failed for book ${id}: ${err.message}`));
       const hasRenameRelevantField =
@@ -2671,6 +2688,7 @@ export class BookService {
         seriesName: meta?.seriesName ?? undefined,
         seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: providerIds,
+        hardcoverEditionId: meta?.hardcoverEditionId ?? undefined,
         isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,
       };

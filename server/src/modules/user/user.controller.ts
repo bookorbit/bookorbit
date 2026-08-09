@@ -294,6 +294,18 @@ export class UserController {
     return this.userService.adminResetPassword(id, requestingUser);
   }
 
+  @Post(':id/unlock')
+  @RequirePermission(Permission.ManageUsers)
+  @Auditable({
+    action: AuditAction.UserUnlock,
+    resource: AuditResource.User,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Cleared login lockout for user #${req.params['id']}`,
+  })
+  unlockUser(@Param('id', ParseIntPipe) id: number, @CurrentUser() requestingUser: RequestUser) {
+    return this.userService.unlockUser(id, requestingUser);
+  }
+
   @Get('me/content-filters')
   getMyContentFilters(@CurrentUser() user: RequestUser) {
     return this.userService.getContentFilters(user.id, user);

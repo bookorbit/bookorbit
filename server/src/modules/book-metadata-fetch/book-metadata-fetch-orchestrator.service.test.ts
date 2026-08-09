@@ -599,6 +599,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
           goodreadsId: 'goodreads-1',
           amazonId: 'amazon-1',
           hardcoverId: 'hardcover-1',
+          hardcoverEditionId: 'hardcover-edition-1',
           openLibraryId: 'open-library-1',
           itunesId: 'itunes-1',
           audibleId: 'audible-1',
@@ -624,6 +625,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
         author: undefined,
         isbn: 'isbn-10',
         isAudiobook: true,
+        hardcoverEditionId: 'hardcover-edition-1',
         existingProviderIds: {
           [MetadataProviderKey.GOOGLE]: 'google-1',
           [MetadataProviderKey.GOODREADS]: 'goodreads-1',

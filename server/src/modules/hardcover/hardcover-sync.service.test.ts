@@ -12,6 +12,7 @@ const mockRepo = {
   findSyncableBooks: vi.fn(),
   findSyncableBook: vi.fn(),
   findBookSyncData: vi.fn(),
+  findCurrentReadingBooks: vi.fn(),
   findReadingAttempts: vi.fn(),
   linkReadingAttempt: vi.fn(),
 };
@@ -22,6 +23,8 @@ const mockClient = {
 
 const mockMatchService = {
   matchBook: vi.fn(),
+  listEditions: vi.fn(),
+  findEditionForBook: vi.fn(),
 };
 
 const mockSettingsService = {
@@ -29,8 +32,12 @@ const mockSettingsService = {
   getSettings: vi.fn(),
 };
 
+const mockBookService = {
+  setHardcoverEditionIdIfEmpty: vi.fn(),
+};
+
 function makeService() {
-  return new HardcoverSyncService(mockRepo as any, mockClient as any, mockMatchService as any, mockSettingsService as any);
+  return new HardcoverSyncService(mockRepo as any, mockClient as any, mockMatchService as any, mockSettingsService as any, mockBookService as any);
 }
 
 const defaultSettings = {
@@ -67,12 +74,14 @@ describe('HardcoverSyncService', () => {
     mockRepo.findSyncableBooks.mockResolvedValue([]);
     mockRepo.findSyncableBook.mockResolvedValue(null);
     mockRepo.findBookSyncData.mockResolvedValue(null);
+    mockRepo.findCurrentReadingBooks.mockResolvedValue([]);
     mockRepo.findReadingAttempts.mockResolvedValue([]);
     mockRepo.linkReadingAttempt.mockResolvedValue(undefined);
     mockRepo.upsertBookState.mockResolvedValue({});
     mockRepo.setBookSyncOverride.mockResolvedValue({});
     mockRepo.updateLastSyncedAt.mockResolvedValue(undefined);
     mockSettingsService.getSettings.mockResolvedValue(defaultSettings);
+    mockBookService.setHardcoverEditionIdIfEmpty.mockResolvedValue(false);
   });
 
   describe('syncBook', () => {
@@ -638,6 +647,164 @@ describe('HardcoverSyncService', () => {
       await svc.syncAll(1);
       svc.cancelSync(1);
       expect(svc.getSyncStatus(1)).toBeNull();
+    });
+  });
+
+  describe('listLinkedBooks', () => {
+    it('maps currently-reading books with their link state', async () => {
+      mockRepo.findCurrentReadingBooks.mockResolvedValue([readingBook]);
+      mockRepo.findBookStatesByBookIds.mockResolvedValue([
+        { bookId: 1, hardcoverBookId: 100, hardcoverEditionId: 200, matchMethod: 'isbn', matchError: null },
+      ]);
+
+      const result = await makeService().listLinkedBooks(1);
+
+      expect(result).toEqual({
+        truncated: false,
+        books: [
+          {
+            bookId: 1,
+            title: 'Book One',
+            authorName: 'Author One',
+            hardcoverBookId: 100,
+            hardcoverEditionId: 200,
+            matchMethod: 'isbn',
+            matchError: null,
+          },
+        ],
+      });
+    });
+
+    it('reports unlinked books without a matching state row', async () => {
+      mockRepo.findCurrentReadingBooks.mockResolvedValue([readingBook]);
+      mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
+
+      const result = await makeService().listLinkedBooks(1);
+
+      expect(result.books).toEqual([
+        {
+          bookId: 1,
+          title: 'Book One',
+          authorName: 'Author One',
+          hardcoverBookId: null,
+          hardcoverEditionId: null,
+          matchMethod: null,
+          matchError: null,
+        },
+      ]);
+    });
+
+    it('asks for one row past the cap so truncation can be detected', async () => {
+      mockRepo.findCurrentReadingBooks.mockResolvedValue([readingBook]);
+      mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
+
+      await makeService().listLinkedBooks(1);
+
+      expect(mockRepo.findCurrentReadingBooks).toHaveBeenCalledWith(1, 201);
+    });
+
+    it('caps the list and reports truncation instead of dropping books silently', async () => {
+      const rows = Array.from({ length: 201 }, (_, index) => ({ ...readingBook, bookId: index + 1 }));
+      mockRepo.findCurrentReadingBooks.mockResolvedValue(rows);
+      mockRepo.findBookStatesByBookIds.mockResolvedValue([]);
+
+      const result = await makeService().listLinkedBooks(1);
+
+      expect(result.books).toHaveLength(200);
+      expect(result.truncated).toBe(true);
+    });
+  });
+
+  describe('getEditions', () => {
+    it('throws instead of reporting a disconnected account as an empty catalog', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue(null);
+      await expect(makeService().getEditions(1, 1)).rejects.toThrow('Hardcover is not connected for this user');
+      expect(mockMatchService.listEditions).not.toHaveBeenCalled();
+    });
+
+    it('throws instead of reporting an unmatched book as an empty catalog', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: null });
+      await expect(makeService().getEditions(1, 1)).rejects.toThrow('Book 1 is not matched to a Hardcover book yet');
+      expect(mockMatchService.listEditions).not.toHaveBeenCalled();
+    });
+
+    it('lists editions for the matched hardcover book', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
+      mockMatchService.listEditions.mockResolvedValue({ editions: [{ id: 200, format: 'Physical Book' }], truncated: false });
+
+      const result = await makeService().getEditions(1, 1);
+
+      expect(mockMatchService.listEditions).toHaveBeenCalledWith(1, 'tok', 100);
+      expect(result).toEqual({ editions: [{ id: 200, format: 'Physical Book' }], truncated: false });
+    });
+  });
+
+  describe('setEdition', () => {
+    it('throws when the book has no matched hardcoverBookId', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookState.mockResolvedValue(null);
+
+      await expect(makeService().setEdition(1, 1, 200)).rejects.toThrow('Book 1 is not matched to a Hardcover book yet');
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
+    });
+
+    it('throws when there is no token to validate the edition against', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue(null);
+
+      await expect(makeService().setEdition(1, 1, 200)).rejects.toThrow('Hardcover is not connected for this user');
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
+    });
+
+    it('rejects an edition id that does not belong to the matched hardcover book', async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockMatchService.findEditionForBook.mockResolvedValue(null);
+
+      await expect(makeService().setEdition(1, 1, 200)).rejects.toThrow('Edition 200 does not belong to the matched Hardcover book');
+      expect(mockRepo.upsertBookState).not.toHaveBeenCalled();
+    });
+
+    it('validates against the book rather than the capped display window', async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockMatchService.findEditionForBook.mockResolvedValue({ id: 9999, format: 'Physical Book' });
+
+      await expect(makeService().setEdition(1, 1, 9999)).resolves.toEqual({ success: true });
+      expect(mockMatchService.findEditionForBook).toHaveBeenCalledWith(1, 'tok', 100, 9999);
+      expect(mockMatchService.listEditions).not.toHaveBeenCalled();
+    });
+
+    it('sets the edition, forces a resync, and back-fills the shared metadata field', async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockMatchService.findEditionForBook.mockResolvedValue({ id: 200, format: 'Physical Book' });
+
+      const result = await makeService().setEdition(1, 1, 200);
+
+      expect(result).toEqual({ success: true });
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 1,
+          bookId: 1,
+          hardcoverBookId: 100,
+          hardcoverEditionId: 200,
+          matchMethod: 'manual',
+          matchError: null,
+          lastSyncedAt: null,
+        }),
+      );
+      expect(mockBookService.setHardcoverEditionIdIfEmpty).toHaveBeenCalledWith(1, '200');
+    });
+
+    it('does not let a back-fill failure fail the edition pick', async () => {
+      mockRepo.findBookState.mockResolvedValue({ hardcoverBookId: 100 });
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockMatchService.findEditionForBook.mockResolvedValue({ id: 200, format: 'Physical Book' });
+      mockBookService.setHardcoverEditionIdIfEmpty.mockRejectedValue(new Error('boom'));
+
+      await expect(makeService().setEdition(1, 1, 200)).resolves.toEqual({ success: true });
     });
   });
 });
