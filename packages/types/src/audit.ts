@@ -28,6 +28,7 @@ export enum AuditAction {
   UserSuperuserEnable = "user.superuser.enable",
   UserSuperuserDisable = "user.superuser.disable",
   UserContentFiltersSet = "user.content_filters.set",
+  UserUnlock = "user.unlock",
   ReadingInsightsSharingUpdate = "reading_insights.sharing.update",
   ReadingInsightsProfileView = "reading_insights.profile.view",
 

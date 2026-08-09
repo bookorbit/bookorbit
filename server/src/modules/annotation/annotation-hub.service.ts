@@ -15,6 +15,7 @@ import { AnnotationConversionService } from './annotation-conversion.service';
 import { AnnotationExportService, type AnnotationExportFormat, type AnnotationExportResult } from './annotation-export.service';
 import { AnnotationSyncRepository } from './annotation-sync.repository';
 import { AnnotationRepository, type HubAnnotationRow, type HubFilters, type HubSort } from './annotation.repository';
+import { DevicePositionRebuilderRegistry } from './device-position-rebuilder';
 import type { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto } from './dto/annotation-hub.dto';
 
 const BULK_EVENT = 'annotation.bulk';
@@ -34,6 +35,7 @@ export class AnnotationHubService {
     private readonly exportService: AnnotationExportService,
     private readonly syncRepo: AnnotationSyncRepository,
     private readonly conversionService: AnnotationConversionService,
+    private readonly rebuilderRegistry: DevicePositionRebuilderRegistry,
   ) {}
 
   async list(userId: number, query: AnnotationHubQueryDto): Promise<AnnotationHubResponse> {
@@ -164,20 +166,27 @@ export class AnnotationHubService {
   }
 
   /**
-   * Resets a position to pending so converters recompute it. cfi recomputes
-   * immediately; device formats recompute on that device type's next sync.
+   * Resets a position to pending so converters recompute it. A canonical format is
+   * rebuilt from the device position first, since the cfi backfill can only derive
+   * cfi from an xpointer and has nothing to work from when that failed too. Formats
+   * with no usable source recompute on that device type's next sync.
    */
   async retryPosition(userId: number, annotationId: number, format: AnnotationPositionFormat): Promise<AnnotationSyncDetail> {
     const annotation = await this.syncRepo.findAnnotationById(annotationId, userId);
     if (!annotation) throw new NotFoundException(`Annotation ${annotationId} not found`);
 
     await this.syncRepo.updatePosition(annotationId, format, { status: 'pending', converterVersion: null });
+
+    let rebuilt = false;
     let converted = 0;
-    if (format === 'cfi') {
-      converted = await this.conversionService.ensureCfiPositionsForBook(userId, annotation.bookId);
+    if (format === 'cfi' || format === 'xpointer') {
+      const target = { id: annotationId, bookId: annotation.bookId, text: annotation.text };
+      rebuilt = (await this.rebuilderRegistry.get()?.rebuildCanonicalPositions(userId, target))?.rebuilt ?? false;
+      if (!rebuilt && format === 'cfi') converted = await this.conversionService.ensureCfiPositionsForBook(userId, annotation.bookId);
     }
+
     this.logger.log(
-      `[${RETRY_EVENT}] [end] userId=${userId} annotationId=${annotationId} format=${format} converted=${converted} - position retry applied`,
+      `[${RETRY_EVENT}] [end] userId=${userId} annotationId=${annotationId} format=${format} rebuilt=${rebuilt} converted=${converted} - position retry applied`,
     );
     return this.syncDetail(userId, annotationId);
   }

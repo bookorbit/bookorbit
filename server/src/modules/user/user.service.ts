@@ -329,6 +329,16 @@ export class UserService {
     return { resetUrl: `${appUrl}/reset-password?token=${rawToken}` };
   }
 
+  async unlockUser(targetUserId: number, requestingUser: RequestUser) {
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
+    if (target.isSuperuser && !requestingUser.isSuperuser) {
+      throw new ForbiddenException('Only administrators can unlock administrator accounts');
+    }
+    await this.userRepo.clearLockout(targetUserId);
+    return { unlocked: true };
+  }
+
   private uniquePermissions(permissionNames: Permission[]): Permission[] {
     return Array.from(new Set(permissionNames));
   }

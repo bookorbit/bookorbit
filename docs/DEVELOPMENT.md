@@ -30,7 +30,7 @@ graph LR
 | ------------ | ------------------------------- | ----------------- |
 | Frontend     | Vue 3, Tailwind CSS v4, Vite    | `client/`         |
 | Backend      | NestJS 11, Fastify, Drizzle ORM | `server/`         |
-| Database     | PostgreSQL 16, pgvector         | Docker container  |
+| Database     | PostgreSQL 18, pgvector         | Docker container  |
 | Shared types | TypeScript                      | `packages/types/` |
 | Real-time    | Socket.IO                       | Server + Client   |
 
@@ -128,7 +128,7 @@ This installs dependencies for all three workspaces (server, client, packages/ty
 docker compose -f docker-compose.dev.yml up -d --wait
 ```
 
-This starts a PostgreSQL 16 container (with the `pgvector` extension) on port 5432. The `--wait` flag blocks until the database is healthy. Data is persisted in a named Docker volume across restarts.
+This starts a PostgreSQL 18 container (with the `pgvector` extension) on port 5432. The `--wait` flag blocks until the database is healthy. Data is persisted in a named Docker volume across restarts.
 
 > **Already have PostgreSQL running?** You can point `DATABASE_URL` in `server/.env` at your existing instance, but you will still need the `uuid-ossp`, `pg_trgm`, `unaccent`, and `vector` extensions installed. Using Docker is the easiest path.
 

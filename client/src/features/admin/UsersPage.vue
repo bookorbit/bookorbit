@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { KeyRound, MoreVertical, Pencil, Save, Search, ShieldAlert, ShieldCheck, Trash2, UserPlus } from '@lucide/vue'
+import { KeyRound, LockOpen, MoreVertical, Pencil, Save, Search, ShieldAlert, ShieldCheck, Trash2, UserPlus } from '@lucide/vue'
 import { Permission, type AuthUser, type DefaultLibraryAccessConfig } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
@@ -121,6 +121,20 @@ function resetPasswordHint(user: UserRow): string {
   if (user.provisioningMethod === 'oidc') return t('adminFeature.usersPage.resetPasswordOidcHint')
   if (user.provisioningMethod === 'shared') return t('adminFeature.usersPage.resetPasswordSharedHint')
   return t('adminFeature.usersPage.resetPassword')
+}
+
+function isLocked(user: UserRow): boolean {
+  return Boolean(user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now())
+}
+
+async function handleUnlock(userId: number) {
+  actionError.value = null
+  const res = await api(`/api/v1/users/${userId}/unlock`, { method: 'POST' })
+  if (!res.ok) {
+    actionError.value = t('adminFeature.usersPage.errors.unlock')
+    return
+  }
+  await load()
 }
 
 async function handleResetPassword(userId: number) {
@@ -303,9 +317,14 @@ async function saveDefaultLibraryAccess() {
                 </div>
               </td>
               <td class="px-3 py-2">
-                <StatusPill :tone="user.active ? 'success' : 'danger'">
-                  {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
-                </StatusPill>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <StatusPill :tone="user.active ? 'success' : 'danger'">
+                    {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
+                  </StatusPill>
+                  <StatusPill v-if="isLocked(user)" tone="warning">
+                    {{ t('adminFeature.usersPage.lockedBadge') }}
+                  </StatusPill>
+                </div>
               </td>
               <td class="px-3 py-2">
                 <div class="flex items-center justify-end gap-1">
@@ -322,6 +341,19 @@ async function saveDefaultLibraryAccess() {
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>{{ t('common.edit') }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip v-if="isLocked(user)">
+                      <TooltipTrigger as-child>
+                        <button
+                          type="button"
+                          class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          :aria-label="t('adminFeature.usersPage.unlockAria', { name: user.name })"
+                          @click="handleUnlock(user.id)"
+                        >
+                          <LockOpen :size="14" aria-hidden="true" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ t('adminFeature.usersPage.unlockHint') }}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>
@@ -383,6 +415,9 @@ async function saveDefaultLibraryAccess() {
               <ShieldAlert :size="11" aria-hidden="true" />
               {{ t('adminFeature.usersPage.filteredBadge') }}
             </StatusPill>
+            <StatusPill v-if="isLocked(user)" tone="warning">
+              {{ t('adminFeature.usersPage.lockedBadge') }}
+            </StatusPill>
           </div>
           <div v-if="canManage(user)" class="mt-3 flex items-center gap-2 border-t border-border pt-3">
             <button
@@ -403,6 +438,9 @@ async function saveDefaultLibraryAccess() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-56">
+                <DropdownMenuItem v-if="isLocked(user)" @click="handleUnlock(user.id)">
+                  {{ t('adminFeature.usersPage.unlockAccount') }}
+                </DropdownMenuItem>
                 <DropdownMenuItem :disabled="!isPasswordResettable(user)" @click="handleResetPassword(user.id)">
                   {{ t('adminFeature.usersPage.resetPassword') }}
                 </DropdownMenuItem>

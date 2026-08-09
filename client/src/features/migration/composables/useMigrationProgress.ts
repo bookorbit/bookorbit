@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { io, Socket } from 'socket.io-client'
+import { Socket } from 'socket.io-client'
 import type { MigrationProgressEvent } from '@bookorbit/types'
-import { getAccessToken } from '@/lib/api'
+import { createAuthenticatedSocket } from '@/lib/socket'
 
 let socket: Socket | null = null
 const progressMap = ref<Map<number, MigrationProgressEvent>>(new Map())
@@ -9,11 +9,7 @@ const subscribedRuns = new Set<number>()
 
 function getSocket(): Socket {
   if (!socket) {
-    socket = io('/migration', {
-      auth: (cb: (data: object) => void) => cb({ token: getAccessToken() }),
-      transports: ['websocket'],
-      autoConnect: true,
-    })
+    socket = createAuthenticatedSocket('/migration', { autoConnect: true })
 
     socket.on('migration:progress', (event: MigrationProgressEvent) => {
       progressMap.value.set(event.runId, event)

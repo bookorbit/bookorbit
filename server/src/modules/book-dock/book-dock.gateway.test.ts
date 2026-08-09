@@ -14,6 +14,7 @@ describe('BookDockGateway', () => {
       id: 'socket-1',
       handshake: { auth: {} },
       data: {},
+      emit: vi.fn(),
       disconnect: vi.fn(),
     } as any;
 
@@ -30,6 +31,7 @@ describe('BookDockGateway', () => {
       id: 'socket-2',
       handshake: { auth: { token: 'jwt' } },
       data: {},
+      emit: vi.fn(),
       disconnect: vi.fn(),
     } as any;
 
@@ -48,6 +50,7 @@ describe('BookDockGateway', () => {
       id: 'socket-3',
       handshake: { auth: { token: 'jwt' } },
       data: {},
+      emit: vi.fn(),
       disconnect: vi.fn(),
     } as any;
 

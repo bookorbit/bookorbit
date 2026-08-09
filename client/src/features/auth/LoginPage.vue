@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { OidcProviderPublic } from '@bookorbit/types'
+import { LoginErrorCode, type OidcProviderPublic } from '@bookorbit/types'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import { useAuth } from './composables/useAuth'
+import { LoginError, useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
 import { useSetupStatus } from './composables/useSetupStatus'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -63,6 +63,11 @@ const oidcLoadingSlug = ref<string | null>(null)
 
 function resolveLoginError(err: unknown): string {
   if (!(err instanceof Error)) return t('auth.login.errors.invalidCredentials')
+
+  if (err instanceof LoginError && err.errorCode === LoginErrorCode.ACCOUNT_LOCKED) {
+    const minutes = Math.max(1, Math.ceil((err.retryAfterSeconds ?? 0) / 60))
+    return t('auth.login.errors.accountLocked', { minutes })
+  }
 
   const normalizedMessage = err.message.trim().toLowerCase()
   if (normalizedMessage.includes('too many requests')) {
@@ -262,7 +267,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
           />
         </div>
 
-        <div v-if="error" class="text-sm text-destructive animate-shake">{{ error }}</div>
+        <div v-if="error" role="alert" class="text-sm text-destructive animate-shake">{{ error }}</div>
         <div v-if="setupStatusError" class="text-sm text-destructive animate-shake">{{ setupStatusError }}</div>
 
         <button

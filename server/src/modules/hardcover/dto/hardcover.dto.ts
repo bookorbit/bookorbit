@@ -1,6 +1,6 @@
 import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
-import type { ApplyHardcoverImportPayload, UpdateHardcoverBookSyncPayload } from '@bookorbit/types';
+import type { ApplyHardcoverImportPayload, SetHardcoverEditionPayload, UpdateHardcoverBookSyncPayload } from '@bookorbit/types';
 
 export class UpsertHardcoverSettingsDto {
   @IsOptional()
@@ -44,6 +44,12 @@ export class ValidateHardcoverTokenDto {
 export class UpdateHardcoverBookSyncDto implements UpdateHardcoverBookSyncPayload {
   @IsBoolean()
   syncEnabled!: boolean;
+}
+
+export class SetHardcoverEditionDto implements SetHardcoverEditionPayload {
+  @IsInt()
+  @Min(1)
+  editionId!: number;
 }
 
 export class ApplyHardcoverImportDto implements ApplyHardcoverImportPayload {

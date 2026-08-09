@@ -1,6 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { api, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
+import { api, getValidToken, onAuthRecovered, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
+
+/** A token shaped like a real JWT, so the client can read `exp` out of it. Never verified here. */
+function signedToken(expiresInSeconds: number): string {
+  const payload = btoa(JSON.stringify({ sub: 1, ver: 1, exp: Math.floor(Date.now() / 1000) + expiresInSeconds }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `header.${payload}.signature`
+}
+
+function urlOf(input: RequestInfo | URL): string {
+  return typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+}
 
 describe('api wrapper', () => {
   const originalFetch = globalThis.fetch
@@ -84,5 +97,166 @@ describe('api wrapper', () => {
     setOnAuthFailure(onFail)
     await expect(api('/api/v1/books/1')).rejects.toThrow('Session expired')
     expect(onFail).toHaveBeenCalledTimes(1)
+  })
+
+  describe('expiry awareness', () => {
+    it('renews an expired token before the request, so the server never sees it', async () => {
+      const calls: { url: string; auth: string | null }[] = []
+      const fetchMock = vi.fn<typeof fetch>((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = urlOf(input)
+        calls.push({ url, auth: new Headers(init?.headers).get('Authorization') })
+        if (url.endsWith('/api/v1/auth/refresh')) {
+          return Promise.resolve(new Response(JSON.stringify({ accessToken: signedToken(900) }), { status: 200 }))
+        }
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+      })
+      globalThis.fetch = fetchMock as never
+      setAccessToken(signedToken(-60))
+
+      const res = await api('/api/v1/dashboard/widgets/reading-streak')
+
+      expect(res.status).toBe(200)
+      // Refresh first, then the request. No 401 round trip, so no widget ever sees a failure.
+      expect(calls.map((c) => c.url)).toEqual(['/api/v1/auth/refresh', '/api/v1/dashboard/widgets/reading-streak'])
+      expect(calls[1]!.auth).not.toBe(`Bearer ${calls[0]!.auth}`)
+    })
+
+    it('renews a token that is valid but about to expire', async () => {
+      const urls: string[] = []
+      const fetchMock = vi.fn<typeof fetch>((input: RequestInfo | URL) => {
+        urls.push(urlOf(input))
+        if (urlOf(input).endsWith('/api/v1/auth/refresh')) {
+          return Promise.resolve(new Response(JSON.stringify({ accessToken: signedToken(900) }), { status: 200 }))
+        }
+        return Promise.resolve(new Response('', { status: 200 }))
+      })
+      globalThis.fetch = fetchMock as never
+      // Inside the 30s skew: still valid, not worth sending.
+      setAccessToken(signedToken(5))
+
+      await api('/api/v1/books/1')
+
+      expect(urls).toEqual(['/api/v1/auth/refresh', '/api/v1/books/1'])
+    })
+
+    it('leaves a token with plenty of life alone', async () => {
+      const urls: string[] = []
+      const fetchMock = vi.fn<typeof fetch>((input: RequestInfo | URL) => {
+        urls.push(urlOf(input))
+        return Promise.resolve(new Response('', { status: 200 }))
+      })
+      globalThis.fetch = fetchMock as never
+      setAccessToken(signedToken(900))
+
+      await api('/api/v1/books/1')
+
+      expect(urls).toEqual(['/api/v1/books/1'])
+    })
+
+    it('treats an undecodable token as unknown expiry and lets the 401 path decide', async () => {
+      const urls: string[] = []
+      let refreshed = false
+      const fetchMock = vi.fn<typeof fetch>((input: RequestInfo | URL) => {
+        const url = urlOf(input)
+        urls.push(url)
+        if (url.endsWith('/api/v1/auth/refresh')) {
+          refreshed = true
+          return Promise.resolve(new Response(JSON.stringify({ accessToken: signedToken(900) }), { status: 200 }))
+        }
+        return Promise.resolve(new Response('', { status: refreshed ? 200 : 401 }))
+      })
+      globalThis.fetch = fetchMock as never
+      setAccessToken('not-a-jwt')
+
+      await api('/api/v1/books/1')
+
+      expect(urls).toEqual(['/api/v1/books/1', '/api/v1/auth/refresh', '/api/v1/books/1'])
+    })
+
+    it('getValidToken renews a stale token for websocket handshakes and uploads', async () => {
+      const fresh = signedToken(900)
+      globalThis.fetch = vi.fn<typeof fetch>((input: RequestInfo | URL) => {
+        if (urlOf(input).endsWith('/api/v1/auth/refresh')) {
+          return Promise.resolve(new Response(JSON.stringify({ accessToken: fresh }), { status: 200 }))
+        }
+        return Promise.resolve(new Response('', { status: 200 }))
+      }) as never
+      setAccessToken(signedToken(-60))
+
+      await expect(getValidToken()).resolves.toBe(fresh)
+    })
+
+    it('getValidToken reports no token rather than refreshing when nobody is signed in', async () => {
+      const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(new Response('', { status: 200 })))
+      globalThis.fetch = fetchMock as never
+      setAccessToken(null)
+
+      await expect(getValidToken()).resolves.toBeNull()
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('backs off after a failed proactive refresh instead of retrying on every call', async () => {
+      const stale = signedToken(-60)
+      const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(new Response('', { status: 401 })))
+      globalThis.fetch = fetchMock as never
+      setAccessToken(stale)
+
+      // The refresh fails, so the caller is handed the stale token to try anyway.
+      await expect(getValidToken()).resolves.toBe(stale)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+
+      await expect(getValidToken()).resolves.toBe(stale)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('auth recovery signal', () => {
+    it('fires once a rejected request is followed by a successful refresh', async () => {
+      let refreshed = false
+      globalThis.fetch = vi.fn<typeof fetch>((input: RequestInfo | URL) => {
+        if (urlOf(input).endsWith('/api/v1/auth/refresh')) {
+          refreshed = true
+          return Promise.resolve(new Response(JSON.stringify({ accessToken: signedToken(900) }), { status: 200 }))
+        }
+        return Promise.resolve(new Response('', { status: refreshed ? 200 : 401 }))
+      }) as never
+
+      const recovered = vi.fn<() => void>()
+      const stop = onAuthRecovered(recovered)
+      await api('/api/v1/books/1')
+      stop()
+
+      expect(recovered).toHaveBeenCalledTimes(1)
+    })
+
+    it('stays quiet for a routine refresh, so healthy views do not reload', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(() =>
+        Promise.resolve(new Response(JSON.stringify({ accessToken: signedToken(900) }), { status: 200 })),
+      ) as never
+
+      const recovered = vi.fn<() => void>()
+      const stop = onAuthRecovered(recovered)
+      await refreshAccessToken()
+      stop()
+
+      expect(recovered).not.toHaveBeenCalled()
+    })
+
+    it('stops notifying a listener that has unsubscribed', async () => {
+      let refreshed = false
+      globalThis.fetch = vi.fn<typeof fetch>((input: RequestInfo | URL) => {
+        if (urlOf(input).endsWith('/api/v1/auth/refresh')) {
+          refreshed = true
+          return Promise.resolve(new Response(JSON.stringify({ accessToken: signedToken(900) }), { status: 200 }))
+        }
+        return Promise.resolve(new Response('', { status: refreshed ? 200 : 401 }))
+      }) as never
+
+      const recovered = vi.fn<() => void>()
+      onAuthRecovered(recovered)()
+      await api('/api/v1/books/1')
+
+      expect(recovered).not.toHaveBeenCalled()
+    })
   })
 })

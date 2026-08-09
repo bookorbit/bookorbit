@@ -398,6 +398,14 @@ describe('UserRepository', () => {
     expect(updateWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 12 }));
   });
 
+  it('clearLockout resets the attempt counter and the lock timestamp', async () => {
+    await repo.clearLockout(12);
+
+    expect(db.update).toHaveBeenCalledWith(schema.users);
+    expect(updateSet).toHaveBeenCalledWith({ failedLoginAttempts: 0, lockedUntil: null });
+    expect(updateWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 12 }));
+  });
+
   it('setPermissions replaces permission rows in one transaction', async () => {
     const txDeleteWhere = vi.fn().mockResolvedValue(undefined);
     const txDelete = vi.fn().mockReturnValue({ where: txDeleteWhere });

@@ -19,7 +19,7 @@ import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { AuditAction } from '@bookorbit/types';
+import { AuditAction, LoginErrorCode } from '@bookorbit/types';
 
 import { APP_SETTING_KEYS } from '../../common/constants/app-settings.constants';
 import { DB } from '../../db/db.module';
@@ -203,25 +203,16 @@ export class AuthService {
     const user = await this.userService.findByUsername(dto.username);
     const now = new Date();
 
-    if (user?.lockedUntil && user.lockedUntil > now) {
-      this.logger.warn(
-        `[auth.login] [fail] userId=${user.id} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="account locked" - login failed`,
-      );
-      this.auditEvents.emit(AUDIT_EVENT, {
-        userId: user.id,
-        actorUsername: user.username,
-        action: AuditAction.AuthLoginFailed,
-        description: `Failed login attempt for username '${dto.username}'`,
-        ip,
-        meta: { attemptedUsername: dto.username, lockout: true, lockedUntil: user.lockedUntil.toISOString() },
-      });
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    const isLockedOut = Boolean(user?.lockedUntil && user.lockedUntil > now);
 
+    // The lockout is reported only to someone who supplied the correct password, so an attacker
+    // probing usernames still gets the generic failure and learns nothing about which accounts exist.
     const passwordHash = user?.passwordHash ?? DUMMY_HASH;
     const isPasswordValid = await compare(dto.password, passwordHash);
     if (!user || !user.active || !isPasswordValid) {
-      const lockedUntil = user && user.active ? await this.recordFailedLoginAttempt(user.id, user.failedLoginAttempts ?? 0, now) : null;
+      const newlyLockedUntil =
+        user && user.active && !isLockedOut ? await this.recordFailedLoginAttempt(user.id, user.failedLoginAttempts ?? 0, now) : null;
+      const lockedUntil = newlyLockedUntil ?? (isLockedOut ? (user?.lockedUntil ?? null) : null);
       this.logger.warn(
         `[auth.login] [fail]${user ? ` userId=${user.id}` : ''} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="${lockedUntil ? 'account locked' : 'invalid credentials'}" - login failed`,
       );
@@ -236,6 +227,26 @@ export class AuthService {
           : { attemptedUsername: dto.username },
       });
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (isLockedOut && user.lockedUntil) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 1000));
+      this.logger.warn(
+        `[auth.login] [fail] userId=${user.id} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="account locked" - login failed`,
+      );
+      this.auditEvents.emit(AUDIT_EVENT, {
+        userId: user.id,
+        actorUsername: user.username,
+        action: AuditAction.AuthLoginFailed,
+        description: `Failed login attempt for username '${dto.username}'`,
+        ip,
+        meta: { attemptedUsername: dto.username, lockout: true, lockedUntil: user.lockedUntil.toISOString() },
+      });
+      throw new UnauthorizedException({
+        message: 'Account temporarily locked after too many failed sign-in attempts',
+        errorCode: LoginErrorCode.ACCOUNT_LOCKED,
+        retryAfterSeconds,
+      });
     }
 
     if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
@@ -564,7 +575,13 @@ export class AuthService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.users)
-        .set({ passwordHash, isDefaultPassword: false, tokenVersion: sql`${schema.users.tokenVersion} + 1` })
+        .set({
+          passwordHash,
+          isDefaultPassword: false,
+          tokenVersion: sql`${schema.users.tokenVersion} + 1`,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        })
         .where(eq(schema.users.id, row.userId));
 
       await tx.update(schema.passwordResetTokens).set({ usedAt: new Date() }).where(eq(schema.passwordResetTokens.id, row.id));
@@ -606,7 +623,13 @@ export class AuthService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.users)
-        .set({ passwordHash, isDefaultPassword: false, tokenVersion: sql`${schema.users.tokenVersion} + 1` })
+        .set({
+          passwordHash,
+          isDefaultPassword: false,
+          tokenVersion: sql`${schema.users.tokenVersion} + 1`,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        })
         .where(eq(schema.users.id, userId));
 
       await tx

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import fastifyCookie from '@fastify/cookie';
 import Fastify from 'fastify';
+import { LoginErrorCode } from '@bookorbit/types';
 
 vi.mock('bcryptjs', () => ({
   hash: vi.fn((value: string) => Promise.resolve(`mock-hash:${value}`)),
@@ -328,6 +329,46 @@ describe('AuthService', () => {
       });
 
       await expect(service.login({ username: 'jdoe', password: 'pass' }, makeReply())).rejects.toThrow(UnauthorizedException);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('reports the lockout with a retry time when the password is correct', async () => {
+      const { service, userService } = makeService();
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        passwordHash: 'mock-hash:pass',
+        tokenVersion: 1,
+        failedLoginAttempts: 0,
+        lockedUntil: new Date(Date.now() + 5 * 60_000),
+      });
+
+      const error = await service.login({ username: 'jdoe', password: 'pass' }, makeReply()).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      const response = (error as UnauthorizedException).getResponse() as { errorCode: string; retryAfterSeconds: number };
+      expect(response.errorCode).toBe(LoginErrorCode.ACCOUNT_LOCKED);
+      expect(response.retryAfterSeconds).toBeGreaterThan(4 * 60);
+      expect(response.retryAfterSeconds).toBeLessThanOrEqual(5 * 60);
+    });
+
+    it('hides the lockout behind the generic failure when the password is wrong', async () => {
+      const { service, db, userService } = makeService();
+      userService.findByUsername.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        passwordHash: 'mock-hash:correct',
+        tokenVersion: 1,
+        failedLoginAttempts: 0,
+        lockedUntil: new Date(Date.now() + 5 * 60_000),
+      });
+
+      const error = await service.login({ username: 'jdoe', password: 'wrong' }, makeReply()).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UnauthorizedException);
+      expect((error as UnauthorizedException).getResponse()).not.toHaveProperty('errorCode');
       expect(db.update).not.toHaveBeenCalled();
     });
 
@@ -1169,6 +1210,21 @@ describe('AuthService', () => {
         UnauthorizedException,
       );
     });
+
+    it('clears an active lockout on success', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        provisioningMethod: 'local',
+        passwordHash: 'mock-hash:old',
+      });
+
+      await service.changePassword(1, { currentPassword: 'old', newPassword: 'New@1234' }, makeReply());
+
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith(
+        expect.objectContaining({ failedLoginAttempts: 0, lockedUntil: null }),
+      );
+    });
   });
 
   describe('getSessions', () => {
@@ -1293,6 +1349,28 @@ describe('AuthService', () => {
 
       await expect(service.resetPassword({ token: 'valid', newPassword: 'NewPassword1!' })).resolves.toBeUndefined();
       expect(db.transaction).toHaveBeenCalled();
+    });
+
+    it('clears an active lockout so the new password works immediately', async () => {
+      const { service, db } = makeService();
+      (db.query as never as Record<string, Record<string, vi.Mock>>).passwordResetTokens.findFirst.mockResolvedValue({
+        id: 5,
+        userId: 1,
+        expiresAt: new Date(Date.now() + 10_000),
+        usedAt: null,
+      });
+      (db.query as never as Record<string, Record<string, vi.Mock>>).users.findFirst.mockResolvedValue({
+        id: 1,
+        username: 'jdoe',
+        active: true,
+        provisioningMethod: 'local',
+      });
+
+      await service.resetPassword({ token: 'valid', newPassword: 'NewPassword1!' });
+
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith(
+        expect.objectContaining({ failedLoginAttempts: 0, lockedUntil: null }),
+      );
     });
   });
 

@@ -103,6 +103,7 @@ describe('handleConnection', () => {
       data: {},
       disconnect,
       join,
+      emit: vi.fn(),
     } as any;
 
     await gateway.handleConnection(client);
@@ -120,11 +121,13 @@ describe('handleConnection', () => {
       throw new Error('bad token');
     });
     const disconnect = vi.fn();
+    const emit = vi.fn();
     const client = {
       id: 'sock-2',
       handshake: { auth: {} },
       data: {},
       disconnect,
+      emit,
     } as any;
 
     await gateway.handleConnection(client);

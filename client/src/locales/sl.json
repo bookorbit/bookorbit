@@ -254,6 +254,22 @@
           "label": "Prikaži hrbet na stripih",
           "hint": "Uporabi učinek hrbta in sijaja na naslovnicah stripov (cbz, cbr, cb7)"
         },
+        "detailCoverTint": {
+          "title": "Barva platnice podrobnosti knjige",
+          "hint": "Barva bledenja, vzorčena z naslovnice za umetniškim delom in naslovom na strani s podrobnostmi o knjigi",
+          "off": {
+            "label": "Izklopljeno",
+            "hint": "Ozadje navadne kartice"
+          },
+          "single": {
+            "label": "Ena barva",
+            "hint": "Samo prevladujoča barva naslovnice"
+          },
+          "duotone": {
+            "label": "Dve barvi",
+            "hint": "Doda poudarjeno barvo naslovnice, če ima izrazito barvo"
+          }
+        },
         "shadow": {
           "title": "Jakost sence naslovnice",
           "hint": "Nadzoruje globino pod naslovnicami v mreži, seznamu, tabeli in sličicah nadzorne plošče",
@@ -587,7 +603,7 @@
       "noSharedAccountsHint": "Za ustvarjanje čarobnih povezav najprej ustvarite skupni račun na {usersPage}.",
       "activeLinks": "Aktivne povezave",
       "inactiveLinks": "Neaktivne povezave",
-      "paused": "Ustavljeno",
+      "paused": "Zaustavljeno",
       "deletedUser": "Izbrisan uporabnik",
       "expiredPrefix": "Poteklo ",
       "never": "Ni zabeležene dejavnosti",
@@ -599,7 +615,7 @@
       "usesCount": "{count, plural, =0 {brez uporab} one {ena uporaba} two {# uporab} few {# uporab} other {# uporab}}",
       "copied": "Kopirano!",
       "copyLink": "Kopiraj povezavo",
-      "pause": "Ustavi",
+      "pause": "Premor",
       "resume": "Nadaljuj",
       "revoke": "Prekliči",
       "revoking": "Preklicevanje ...",
@@ -2026,6 +2042,8 @@
         "daysAgo": "pred {count} dnevi",
         "unknown": "Neznano",
         "updateAvailable": "Na voljo je posodobitev",
+        "manualUpdateRequired": "Potrebna je ročna posodobitev",
+        "manualUpdateExplanation": "Ta različica vtičnika ne more namestiti lastnih posodobitev. Prenesite vtičnik in kopirajte datoteko bookorbit.koplugin v datoteko koreader/plugins/ v tej napravi.",
         "upToDate": "Posodobljeno",
         "versionUnknown": "Različica neznana",
         "latestPlugin": "Najnovejši vtičnik: v{version}",
@@ -2094,6 +2112,7 @@
         "stockStep1Prefix": "Na vaši napravi KOReader pojdite na",
         "stockStep1Suffix": ".",
         "stockStep2": "Nastavite strežnik za sinhronizacijo po meri na zgoraj prikazani URL.",
+        "stockStep2InlineUrl": "Nastavite strežnik za sinhronizacijo po meri na naslednji URL:",
         "stockStep3": "Vnesite uporabniško ime in geslo, ki ste ju ustvarili, nato tapnite Prijava.",
         "locationNote": "BookOrbit shrani lokacije EPUB, združljive s KOReader, iz spletnega bralnika. Obnovitev naj bi pristala blizu enakega položaja, čeprav se natančna postavitev vrstice lahko razlikuje glede na bralnik in postavitev EPUB.",
         "dangerZone": "Nevarno območje",
@@ -3678,6 +3697,8 @@
         "fileSize": "Velikost datoteke",
         "library": "Knjižnica",
         "added": "Dodano",
+        "cancelDateAddedEdit": "Prekliči datum dodajanja urejanja",
+        "editDateAdded": "Uredi datum dodajanja",
         "dateStarted": "Datum začetka",
         "saving": "Shranjevanje...",
         "cancelDateStartedEdit": "Prekliči urejanje datuma začetka",
@@ -3689,9 +3710,12 @@
         "synopsis": "Vsebina",
         "noDescription": "Opis ni na voljo.",
         "dateStartedFutureError": "Datum začetka ne more biti v prihodnosti.",
+        "dateAddedRequiredError": "Datum dodajanja je obvezen.",
+        "dateAddedFutureError": "Datum dodajanja ne sme biti v prihodnosti.",
         "dateFinishedFutureError": "Datum zaključka ne more biti v prihodnosti.",
         "dateFinishedBeforeStartedError": "Datum zaključka mora biti enak ali za datumom začetka.",
         "saveReadingDatesError": "Shranjevanje bralnih datumov ni uspelo.",
+        "saveAddedDateError": "Shranjevanje datuma dodajanja ni uspelo.",
         "koboPendingDelete": "Čaka na izbris iz naprave",
         "koboPendingDeleteTooltip": "Kobo jo bo odstranil ob naslednji sinhronizaciji.",
         "koboRemovedByDevice": "Odstranjeno z naprave",
@@ -4734,6 +4758,10 @@
       "untitled": "Brez naslova",
       "cover": "Naslovnica",
       "bookCover": "Naslovnica knjige"
+    },
+    "libraryLoad": {
+      "errorTitle": "Vaših knjižnic ni mogoče naložiti",
+      "errorDescription": "BookOrbit ni mogel pridobiti vaših knjižnic. Vsebina v vaši knjižnici ni bila odstranjena."
     },
     "scroller": {
       "failedToLoad": "Nalaganje ni uspelo.",
@@ -6111,6 +6139,9 @@
       "scrollModeHint": "Uporabite \"Brez vrzeli\" za webtoone in navpične trakove.",
       "readingDirection": "Smer branja",
       "pageView": "Pogled strani",
+      "twoPagePagedOnly": "Dve strani sta prikazani samo v načinu po strani.",
+      "spreadSection": "Dvostranska razporeditev",
+      "spreadFallbackHint": "Ta zaslon je preozek za dve strani, zato so prikazane posamezne strani.",
       "spreadAlignmentLabel": "Poravnava razpona",
       "spreadGap": "Razmik",
       "spreadGapValue": "{value}px",
@@ -6118,6 +6149,9 @@
       "widePages": "Široke strani",
       "firstPage": "Prva stran",
       "lastPage": "Zadnja stran",
+      "zoomControls": "Kontrolniki za povečavo",
+      "zoomOut": "Pomanjšaj",
+      "zoomIn": "Povečaj",
       "fit": {
         "page": "Prilagoditev strani",
         "width": "Širina strani",

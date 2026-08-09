@@ -39,6 +39,7 @@ export class LibraryRepository {
         displayOrder: libraries.displayOrder,
         coverAspectRatio: libraries.coverAspectRatio,
         scanMode: libraries.scanMode,
+        fileRenameEnabled: libraries.fileRenameEnabled,
         createdAt: libraries.createdAt,
         updatedAt: libraries.updatedAt,
         bookCount: sql<number>`count(${books.id})::int`,

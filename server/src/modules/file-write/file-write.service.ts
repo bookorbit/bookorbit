@@ -473,7 +473,7 @@ export class FileWriteService implements OnModuleDestroy {
     for (let attempt = 1; attempt <= FILE_STATE_REFRESH_ATTEMPTS; attempt++) {
       try {
         const stats = await stat(file.absolutePath, { bigint: true });
-        await this.fileWriteRepo.updateFileStat(file.id, {
+        await this.fileWriteRepo.updateFileStateAfterMetadataWrite(bookId, file.id, file.fileHash ?? null, {
           ...(newHash ? { fileHash: newHash } : {}),
           mtime: stats.mtime,
           sizeBytes: Number(stats.size),

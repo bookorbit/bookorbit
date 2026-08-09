@@ -9,6 +9,7 @@ import { AuthService } from '../auth/auth.service';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
+import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 
 export const BOOK_METADATA_FETCH_STATUS_EVENT = 'book-metadata-fetch:status';
 
@@ -42,7 +43,7 @@ export class BookMetadataFetchGateway implements OnGatewayConnection, OnGatewayD
       client.emit(BOOK_METADATA_FETCH_STATUS_EVENT, { ...summary, paused, ...this.session.getSnapshot() } satisfies BookMetadataFetchStatusEvent);
     } catch (err) {
       this.logger.warn(`WS rejected: ${(err as Error).message} socket=${client.id}`);
-      client.disconnect();
+      rejectSocketConnection(client, err);
     }
   }
 

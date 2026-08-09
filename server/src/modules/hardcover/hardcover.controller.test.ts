@@ -19,6 +19,9 @@ const mockSyncService = {
   getBookSyncState: vi.fn(),
   updateBookSyncState: vi.fn(),
   syncBook: vi.fn(),
+  listLinkedBooks: vi.fn(),
+  getEditions: vi.fn(),
+  setEdition: vi.fn(),
 };
 
 const mockImportService = {
@@ -175,6 +178,29 @@ describe('HardcoverController', () => {
     expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
     expect(mockSyncService.syncBook).toHaveBeenCalledWith(1, 42);
     expect(mockSyncService.getBookSyncState).toHaveBeenCalledWith(1, 42);
+  });
+
+  it('listLinkedBooks delegates to service', async () => {
+    mockSyncService.listLinkedBooks.mockResolvedValue({ books: [{ bookId: 1, title: 'Book One' }], truncated: false });
+    const result = await makeController().listLinkedBooks(mockUser as any);
+    expect(result).toEqual({ books: [{ bookId: 1, title: 'Book One' }], truncated: false });
+    expect(mockSyncService.listLinkedBooks).toHaveBeenCalledWith(1);
+  });
+
+  it('listEditions delegates to service after verifying book access', async () => {
+    mockSyncService.getEditions.mockResolvedValue({ editions: [{ id: 200, format: 'Physical Book' }], truncated: false });
+    const result = await makeController().listEditions(mockUser as any, 42);
+    expect(result).toEqual({ editions: [{ id: 200, format: 'Physical Book' }], truncated: false });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
+    expect(mockSyncService.getEditions).toHaveBeenCalledWith(1, 42);
+  });
+
+  it('setEdition delegates to service after verifying book access', async () => {
+    mockSyncService.setEdition.mockResolvedValue({ success: true });
+    const result = await makeController().setEdition(mockUser as any, 42, { editionId: 200 });
+    expect(result).toEqual({ success: true });
+    expect(mockBookService.verifyBookAccess).toHaveBeenCalledWith(42, mockUser);
+    expect(mockSyncService.setEdition).toHaveBeenCalledWith(1, 42, 200);
   });
 
   it('previewImport delegates to service', async () => {
