@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { readFile, readdir } from 'fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -6,6 +6,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { Client } from 'pg';
 
 import * as schema from '../src/db/schema';
+import { waitForCondition } from './e2e/app-harness';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -61,6 +62,13 @@ function changedReadingStates(entries: unknown[]): Record<string, unknown>[] {
   return entries.flatMap((entry) => {
     const value = entry as { ChangedReadingState?: { ReadingState: Record<string, unknown> } };
     return value.ChangedReadingState ? [value.ChangedReadingState.ReadingState] : [];
+  });
+}
+
+function changedProductMetadata(entries: unknown[]): Array<{ BookEntitlement: { Id: string }; BookMetadata: { Title: string | null } }> {
+  return entries.flatMap((entry) => {
+    const value = entry as { ChangedProductMetadata?: { BookEntitlement: { Id: string }; BookMetadata: { Title: string | null } } };
+    return value.ChangedProductMetadata ? [value.ChangedProductMetadata] : [];
   });
 }
 
@@ -735,6 +743,113 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
       const delivered = changedReadingStates(await drainEntries(deviceB));
       const state = delivered.find((readingState) => readingState.EntitlementId === targetEntitlementId);
       expect(state).toEqual(expect.objectContaining({ StatusInfo: expect.objectContaining({ Status: 'Finished' }) }));
+    });
+  });
+
+  describe('metadata edits that rewrite the book file', () => {
+    let writeBookId!: number;
+    let writePrimaryFileId!: number;
+    let writeEntitlementId!: string;
+    let writeDevice!: KoboDevice;
+
+    async function primaryFileHash(): Promise<string | null> {
+      const [row] = await ctx.db
+        .select({ fileHash: schema.bookFiles.fileHash })
+        .from(schema.books)
+        .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+        .where(eq(schema.books.id, writeBookId));
+      if (!row) throw new Error(`Book ${writeBookId} has no primary file`);
+      return row.fileHash;
+    }
+
+    async function snapshotFileHash(deviceId: number): Promise<string | null> {
+      const [row] = await ctx.db
+        .select({ fileHash: schema.koboSnapshotBooks.fileHash })
+        .from(schema.koboSnapshotBooks)
+        .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
+        .where(and(eq(schema.koboLibrarySnapshots.deviceId, deviceId), eq(schema.koboSnapshotBooks.bookId, writeBookId)));
+      if (!row) throw new Error(`Device ${deviceId} has no snapshot row for book ${writeBookId}`);
+      return row.fileHash;
+    }
+
+    beforeAll(async () => {
+      const writeLibrary = await createLibraryWithFolder(ctx, { name: `kobo-file-write-${randomUUID()}` });
+      await ctx.db.update(schema.libraries).set({ fileWriteEnabled: true }).where(eq(schema.libraries.id, writeLibrary.libraryId));
+
+      const path = await createEpubFixture(writeLibrary.folderPath, `kobo-file-write-${randomUUID()}.epub`, {
+        title: 'Kobo File Write Seed',
+        uid: `urn:uuid:${randomUUID()}`,
+      });
+      await triggerAndWaitForLibraryScan(ctx, writeLibrary.libraryId);
+      writeBookId = (await locateBookByAbsolutePath(ctx, path)).bookId;
+
+      const [book] = await ctx.db.select({ primaryFileId: schema.books.primaryFileId }).from(schema.books).where(eq(schema.books.id, writeBookId));
+      if (!book?.primaryFileId) throw new Error(`Book ${writeBookId} has no primary file`);
+      writePrimaryFileId = book.primaryFileId;
+
+      const addBooksResponse = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/collections/${collectionId}/books`,
+        headers: authHeader(ctx.adminToken),
+        payload: { bookIds: [writeBookId] },
+      });
+      expect([200, 201]).toContain(addBooksResponse.statusCode);
+
+      writeDevice = await createDevice('Kobo File Write');
+      await drainEntries(writeDevice);
+
+      const [identity] = await ctx.db
+        .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.bookId, writeBookId)));
+      if (!identity) throw new Error(`Book ${writeBookId} has no Kobo entitlement identity`);
+      writeEntitlementId = identity.entitlementId;
+    }, 180_000);
+
+    it('delivers changed metadata without re-issuing the entitlement after the file is rewritten', async () => {
+      const hashBeforeEdit = await primaryFileHash();
+      expect(hashBeforeEdit).toEqual(expect.any(String));
+      expect(await snapshotFileHash(writeDevice.id)).toBe(hashBeforeEdit);
+
+      const patchResponse = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${writeBookId}/metadata`,
+        headers: authHeader(ctx.adminToken),
+        payload: { title: 'Kobo File Write Updated', description: 'Rewritten by the metadata write' },
+      });
+      expect(patchResponse.statusCode).toBe(200);
+
+      await waitForCondition(async () => {
+        if ((await primaryFileHash()) === hashBeforeEdit) throw new Error('the metadata write has not rewritten the EPUB yet');
+      }, 60_000);
+
+      const hashAfterEdit = await primaryFileHash();
+      expect(hashAfterEdit).not.toBe(hashBeforeEdit);
+      // Read before syncing: reconcile writes the current hash onto the row either way, so after a
+      // sync this no longer distinguishes an acknowledged rewrite from a re-delivered one.
+      const acknowledgedHash = await snapshotFileHash(writeDevice.id);
+
+      const delivered = await drainEntries(writeDevice);
+      const changed = changedProductMetadata(delivered).filter((entry) => entry.BookEntitlement.Id === writeEntitlementId);
+
+      expect(newEntitlementIds(delivered)).not.toContain(writeEntitlementId);
+      expect(changed).toHaveLength(1);
+      expect(changed[0]!.BookMetadata.Title).toBe('Kobo File Write Updated');
+      expect(acknowledgedHash).toBe(hashAfterEdit);
+    });
+
+    it('re-issues the entitlement when the file changes outside a metadata write', async () => {
+      await drainEntries(writeDevice);
+
+      // A scanner-detected content change moves the hash without the file-write acknowledgement,
+      // so the device genuinely holds stale bytes and has to download the book again.
+      await ctx.db
+        .update(schema.bookFiles)
+        .set({ fileHash: createHash('sha256').update(randomUUID()).digest('hex') })
+        .where(eq(schema.bookFiles.id, writePrimaryFileId));
+
+      const delivered = await drainEntries(writeDevice);
+      expect(newEntitlementIds(delivered)).toContain(writeEntitlementId);
     });
   });
 });

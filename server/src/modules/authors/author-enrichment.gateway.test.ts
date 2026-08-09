@@ -1,6 +1,7 @@
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 import { AUTHOR_ENRICHMENT_STATUS_EVENT } from './author-enrichment.gateway';
 import { Permission } from '@bookorbit/types';
+import { WS_UNAUTHORIZED_EVENT } from '../../common/utils/ws-auth.utils';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
@@ -111,7 +112,8 @@ describe('AuthorEnrichmentGateway', () => {
     await gateway.handleConnection(client);
 
     expect(client.disconnect).toHaveBeenCalledTimes(1);
-    expect(client.emit).not.toHaveBeenCalled();
+    // Told to re-authenticate, but given no status snapshot.
+    expect(client.emit).toHaveBeenCalledExactlyOnceWith(WS_UNAUTHORIZED_EVENT, { reason: 'invalid_token' });
   });
 
   it('handleConnection emits snapshot when user has required permission', async () => {

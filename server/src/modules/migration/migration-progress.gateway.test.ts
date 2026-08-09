@@ -48,6 +48,7 @@ function makeClient() {
     id: 'socket-1',
     handshake: { auth: { token: 'token-1' } },
     data: {},
+    emit: vi.fn(),
     disconnect: vi.fn(),
     join: vi.fn(),
     emit: vi.fn(),

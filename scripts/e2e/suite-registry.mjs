@@ -583,6 +583,7 @@ export const E2E_SUITES = Object.freeze({
     changedPaths: [
       "server/src/modules/kobo/**",
       "server/src/modules/book/**",
+      "server/src/modules/file-write/**",
       "server/test/kobo-multi-device-sync.e2e-spec.ts",
       "server/test/e2e/reader-state-isolation/**",
       "packages/types/src/book.ts",
