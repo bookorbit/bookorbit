@@ -43,6 +43,7 @@ export type MergeStrategy = "fillMissing" | "overwrite" | "overwriteIfProvided";
 export type GenreMergeMode = "firstProvider" | "merge";
 export const MERGE_STRATEGIES: MergeStrategy[] = ["fillMissing", "overwrite", "overwriteIfProvided"];
 export const GENRE_MERGE_MODES: GenreMergeMode[] = ["firstProvider", "merge"];
+export const MAX_METADATA_GENRE_COUNT = 50;
 
 export interface FieldPreference {
   enabled: boolean;
@@ -56,6 +57,7 @@ export interface MetadataFetchOptions {
   genres: {
     mode: GenreMergeMode;
     blocklist: string[];
+    maxCount: number | null;
   };
   saveProviderIds: boolean;
 }

@@ -62,6 +62,7 @@ function withBlocklist(prefs: MetadataFetchPreferences, blocklist: string[]): Me
       genres: {
         mode: prefs.options?.genres.mode ?? 'merge',
         blocklist,
+        maxCount: prefs.options?.genres.maxCount ?? null,
       },
       saveProviderIds: prefs.options?.saveProviderIds ?? true,
     },

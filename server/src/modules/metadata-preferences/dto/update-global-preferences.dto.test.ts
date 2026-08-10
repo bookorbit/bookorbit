@@ -105,6 +105,7 @@ describe('UpdateGlobalPreferencesDto', () => {
         genres: {
           mode: 'merge',
           blocklist: ['Audiobook', 'Adult'],
+          maxCount: 3,
         },
         saveProviderIds: true,
       },
@@ -133,6 +134,52 @@ describe('UpdateGlobalPreferencesDto', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('accepts unlimited genre results when the maximum is null or omitted', async () => {
+    const baseInput = {
+      fields: {
+        title: {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'fillMissing',
+        },
+      },
+      options: {
+        genres: {
+          mode: 'merge',
+          maxCount: null,
+        },
+        saveProviderIds: true,
+      },
+    };
+
+    await expect(validateInput(baseInput)).resolves.toMatchObject({ errors: [] });
+    delete (baseInput.options.genres as { maxCount?: number | null }).maxCount;
+    const { dto, errors } = await validateInput(baseInput);
+
+    expect(errors).toHaveLength(0);
+    expect(dto.options?.genres.maxCount).toBeNull();
+  });
+
+  it('rejects genre limits outside the supported integer range', async () => {
+    const inputFor = (maxCount: number) => ({
+      fields: {
+        title: {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'fillMissing',
+        },
+      },
+      options: {
+        genres: { mode: 'merge', maxCount },
+        saveProviderIds: true,
+      },
+    });
+
+    expect((await validateInput(inputFor(0))).errors).not.toHaveLength(0);
+    expect((await validateInput(inputFor(2.5))).errors).not.toHaveLength(0);
+    expect((await validateInput(inputFor(51))).errors).not.toHaveLength(0);
+  });
+
   it('rejects invalid advanced options', async () => {
     const { errors } = await validateInput({
       fields: {
@@ -146,6 +193,7 @@ describe('UpdateGlobalPreferencesDto', () => {
         genres: {
           mode: 'invalid',
           blocklist: ['ok', 42],
+          maxCount: 0,
         },
         saveProviderIds: 'yes',
       },

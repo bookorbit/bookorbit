@@ -1364,6 +1364,12 @@
             "label": "Combine genres from all selected providers",
             "hint": "Collect and deduplicate genres from every provider assigned to the Genres field, rather than stopping at the first result."
           },
+          "maxGenres": {
+            "label": "Maximum genres per book",
+            "hint": "Applied after exclusions and duplicate removal. Leave empty for unlimited. This affects future metadata fetches.",
+            "unlimited": "Unlimited",
+            "error": "Enter a whole number from 1 to {max}, or leave the field empty."
+          },
           "storeProviderIds": {
             "label": "Store provider IDs on books",
             "hint": "When fetching metadata, save the returned provider IDs (ISBN, ASIN, Goodreads ID, etc.) on the book record for more accurate future lookups."
