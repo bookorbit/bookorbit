@@ -1,13 +1,14 @@
 > [!IMPORTANT]
-> Ready-for-review PRs must satisfy every applicable section below. Incomplete submissions are closed
-> without detailed review, and you are welcome to resubmit once complete. Open a draft PR if the work
+> Before writing code or opening a PR, including a draft, discuss your approach in the linked issue
+> and wait for a maintainer to approve it and assign the issue to you. PRs opened without prior
+> approval and assignment will be closed without review. After approval, open a draft PR if the work
 > is not finished.
 
 Closes #
 
-- **Type:** bug fix | feature | refactor | docs | chore
+- **Maintainer approval:** (link to the approval comment)
+- **Assigned contributor:** @
 - **UI changed:** yes | no
-- **How I ran this:** `pnpm dev` | Docker | I did not run it
 - **Evidence captured at commit:** (run `git rev-parse --short HEAD`)
 
 ## What changed
@@ -35,12 +36,13 @@ summarize it.
 
 ## Evidence
 
-UI changes require screenshots. Changes to behavior or interaction also require a short recording of
-the complete workflow. Screenshots must show the surrounding browser window rather than a cropped
-element, and recordings must start from a page load. For backend changes, paste the log lines your
-change emits.
+Upload a video of yourself using the change in the app. Show what it looked like before, what you
+did, and what happened.
 
-<!-- Drag files in here, or write "No UI changes." -->
+Record it yourself. Videos made by a model, or by a coding agent driving the app, do not count, and
+the PR will be closed without review.
+
+<!-- Video here. -->
 
 ## Authorship and review
 
@@ -58,7 +60,7 @@ AI assistance is welcome on this project; unreviewed AI output is not. See the
 <summary><b>Contributor checklist</b></summary>
 
 - [ ] One focused change, linked above to an issue a maintainer approved
-- [ ] I read every line of the final diff
+- [ ] I discussed my approach and was assigned the issue before writing code or opening this PR
 - [ ] `pnpm verify` passes against the final diff
 - [ ] Tests added or updated per the [testing expectations](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md#phase-7-write-and-run-tests)
 - [ ] User-facing text uses Vue I18n keys added only to `client/src/locales/en.json`; non-English catalogs are unchanged, and accessibility was checked

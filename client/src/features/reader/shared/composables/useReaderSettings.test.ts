@@ -72,6 +72,15 @@ describe('useReaderSettings - load() with valid localStorage epub delta', () => 
     expect(s.effective.value).toMatchObject({ ...READER_GROUP_DEFAULTS.epub, fontSize: 24 })
   })
 
+  it('preserves the minimum EPUB font size', async () => {
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ fontSize: 6 }))
+
+    const s = useReaderSettings(BOOK_FILE_ID, 'epub')
+    await s.load()
+
+    expect(s.bookDelta.value).toEqual({ fontSize: 6 })
+  })
+
   it('filters invalid EPUB spread settings from localStorage deltas', async () => {
     const raw = { fontSize: 20, fixedLayoutSpread: 'two-page' }
     localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify(raw))
@@ -85,6 +94,16 @@ describe('useReaderSettings - load() with valid localStorage epub delta', () => 
 })
 
 describe('useReaderSettings - load() with invalid localStorage value', () => {
+  it('removes an EPUB font size below the supported minimum', async () => {
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ fontSize: 5 }))
+
+    const s = useReaderSettings(BOOK_FILE_ID, 'epub')
+    await s.load()
+
+    expect(s.bookDelta.value).toBeNull()
+    expect(localStorage.getItem(`reader:book:${BOOK_FILE_ID}`)).toBeNull()
+  })
+
   it('removes localStorage key and leaves bookDelta null when value is not an object', async () => {
     localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify('not-an-object'))
 

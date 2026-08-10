@@ -132,24 +132,32 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({
-      subtitle: expected.goodreads.subtitle,
-      description: expected.goodreads.description,
-      publisher: expected.goodreads.publisher,
-      language: expected.goodreads.language,
-      pageCount: expected.goodreads.pageCount,
-      goodreadsId: expected.goodreads.providerId,
-      openLibraryId: expected.openLibrary.providerId,
-      coverUrl: expected.goodreads.coverUrl,
-      audioMetadata: {
-        narrators: expected.goodreads.narrators,
-        durationSeconds: expected.goodreads.durationSeconds,
-        abridged: expected.goodreads.abridged,
-        chapters: expected.goodreads.chapters,
+      metadata: {
+        subtitle: expected.goodreads.subtitle,
+        description: expected.goodreads.description,
+        publisher: expected.goodreads.publisher,
+        language: expected.goodreads.language,
+        pageCount: expected.goodreads.pageCount,
+        goodreadsId: expected.goodreads.providerId,
+        openLibraryId: expected.openLibrary.providerId,
+        coverUrl: expected.goodreads.coverUrl,
+        audioMetadata: {
+          narrators: expected.goodreads.narrators,
+          durationSeconds: expected.goodreads.durationSeconds,
+          abridged: expected.goodreads.abridged,
+          chapters: expected.goodreads.chapters,
+        },
+        comicMetadata: {
+          issueNumber: expected.goodreads.comicMetadata?.issueNumber,
+          volumeName: expected.goodreads.comicMetadata?.volumeName,
+          storyArcs: expected.goodreads.comicMetadata?.storyArcs,
+        },
       },
-      comicMetadata: {
-        issueNumber: expected.goodreads.comicMetadata?.issueNumber,
-        volumeName: expected.goodreads.comicMetadata?.volumeName,
-        storyArcs: expected.goodreads.comicMetadata?.storyArcs,
+      diagnostics: {
+        reason: null,
+        activeProviders: ['goodreads', 'openLibrary'],
+        candidateProviders: ['goodreads', 'openLibrary'],
+        candidateCount: 2,
       },
     });
 

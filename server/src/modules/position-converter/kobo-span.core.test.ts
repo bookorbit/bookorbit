@@ -62,6 +62,33 @@ const IMG_EPUB = `<?xml version="1.0" encoding="utf-8"?>
 </body>
 </html>`;
 
+// Named HTML entities are legal in EPUB2 XHTML through its DTD. kepubify resolves
+// them when it converts, so the epub side has to resolve them too or the two text
+// indexes never align. The fixtures below mirror real kepubify input and output:
+// it re-emits nbsp numerically and writes the other characters literally.
+const NBSP = '\u00a0';
+const SHY = '\u00ad';
+const THINSP = '\u2009';
+
+const ENTITY_EPUB = `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>T</title></head>
+<body><p>Rumata piktai dėbtelėjo. &#8212;&nbsp;Malonėk pa&shy;sakyti tiksliau.&thinsp;Gerai?</p></body>
+</html>`;
+
+const ENTITY_KEPUB = `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>T</title></head>
+<body><div id="book-columns"><div id="book-inner"><p><span class="koboSpan" id="kobo.1.1">Rumata piktai dėbtelėjo. </span><span class="koboSpan" id="kobo.1.2">&#8212;&#160;Malonėk pa${SHY}sakyti tiksliau.${THINSP}Gerai?</span></p></div></div></body>
+</html>`;
+
+/** What the device reports: the rendered characters, invisible ones included. */
+const ENTITY_SPAN_TEXT = `\u2014${NBSP}Malonėk pa${SHY}sakyti tiksliau.${THINSP}Gerai?`;
+
+/** What the collapsed index holds: whitespace collapses, the soft hyphen survives. */
+const ENTITY_SPAN_COLLAPSED = `\u2014 Malonėk pa${SHY}sakyti tiksliau. Gerai?`;
+
 function docs(epubXhtml: string, kepubXhtml: string) {
   const epubDoc = parseChapterDocument(epubXhtml);
   const kepubDoc = parseChapterDocument(kepubXhtml);
@@ -233,6 +260,46 @@ describe('koboSpanRangeToCanonical', () => {
       'absent words entirely',
     );
     expect(result).toEqual({ status: 'failed', reason: 'span_not_found' });
+  });
+
+  it('aligns a chapter whose epub side uses named html entities', () => {
+    const { epubDoc, kepubDoc } = docs(ENTITY_EPUB, ENTITY_KEPUB);
+    expect(epubDoc.index.collapsed).toBe(kepubDoc.index.collapsed);
+    expect(epubDoc.index.collapsed).toContain(`dėbtelėjo. ${ENTITY_SPAN_COLLAPSED}`);
+  });
+
+  it('converts a kobo highlight in a chapter that uses named html entities', () => {
+    const { epubDoc, kepubDoc, spanIndex } = docs(ENTITY_EPUB, ENTITY_KEPUB);
+    const result = koboSpanRangeToCanonical(
+      epubDoc,
+      kepubDoc,
+      spanIndex,
+      6,
+      { startId: 'kobo.1.2', startChar: 0, endId: 'kobo.1.2', endChar: ENTITY_SPAN_TEXT.length },
+      ENTITY_SPAN_TEXT,
+    );
+    expect(result.status).toBe('exact');
+    if (result.status === 'failed') return;
+    expect(result.aligned).toBe(true);
+    expect(epubDoc.index.extractCollapsed(result.startCp, result.endCp)).toBe(ENTITY_SPAN_COLLAPSED);
+    expect(result.cfi).toContain('epubcfi(');
+    expect(result.xpointerPos0).toContain('DocFragment[7]');
+  });
+
+  it('converts a highlight that starts inside an entity-bearing run', () => {
+    const { epubDoc, kepubDoc, spanIndex } = docs(ENTITY_EPUB, ENTITY_KEPUB);
+    const startChar = ENTITY_SPAN_TEXT.indexOf('Malonėk');
+    const result = koboSpanRangeToCanonical(
+      epubDoc,
+      kepubDoc,
+      spanIndex,
+      6,
+      { startId: 'kobo.1.2', startChar, endId: 'kobo.1.2', endChar: ENTITY_SPAN_TEXT.length },
+      ENTITY_SPAN_TEXT.slice(startChar),
+    );
+    expect(result.status).toBe('exact');
+    if (result.status === 'failed') return;
+    expect(epubDoc.index.extractCollapsed(result.startCp, result.endCp)).toBe(ENTITY_SPAN_COLLAPSED.slice(startChar));
   });
 
   it('fails with text_not_found when spans resolve but the text is absent', () => {

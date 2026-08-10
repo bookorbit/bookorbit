@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
@@ -10,6 +10,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { UserService } from '../user/user.service';
 import { NotificationRepository } from './notification.repository';
+import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 
 @WebSocketGateway({ namespace: '/notifications', cors: { credentials: true } })
 export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -39,12 +40,12 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
     const event = 'notification.socket';
     try {
       const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new Error('No token provided');
+      if (!token) throw new UnauthorizedException('No token provided');
 
       const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
       const user = await this.userService.findByIdWithPermissions(payload.sub);
-      if (!user || !user.active) throw new Error('User not found or inactive');
-      if (user.tokenVersion !== payload.ver) throw new Error('Token revoked');
+      if (!user || !user.active) throw new UnauthorizedException('User not found or inactive');
+      if (user.tokenVersion !== payload.ver) throw new UnauthorizedException('Token revoked');
 
       this.assertHasAccess(user);
 
@@ -57,7 +58,7 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
       const errorClass = err instanceof Error ? err.name : 'Error';
       const message = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(`[${event}] [fail] socketId=${client.id} errorClass=${errorClass} error="${message}" - websocket rejected`);
-      client.disconnect();
+      rejectSocketConnection(client, err);
     }
   }
 
@@ -91,10 +92,10 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
 
   private assertHasAccess(user: RequestUser): void {
     if (user.permissions.includes(Permission.DemoRestricted)) {
-      throw new Error('Demo-restricted account cannot access notifications');
+      throw new ForbiddenException('Demo-restricted account cannot access notifications');
     }
     if (user.isSuperuser) return;
     if (user.permissions.includes(Permission.NotificationAccess)) return;
-    throw new Error('Missing permission: notification_access');
+    throw new ForbiddenException('Missing permission: notification_access');
   }
 }

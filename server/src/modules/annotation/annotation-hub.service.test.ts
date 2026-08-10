@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
 import { AnnotationHubService } from './annotation-hub.service';
+import { DevicePositionRebuilderRegistry } from './device-position-rebuilder';
 
 function makeHubRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -30,7 +31,7 @@ function makeHubRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeService() {
+function makeService(rebuilderRegistered = false) {
   const annotationRepo = {
     findHubPaginated: vi.fn().mockResolvedValue({ items: [makeHubRow()], total: 1 }),
     getHubStats: vi.fn().mockResolvedValue({ books: 1, withNotes: 1, web: 1, koreader: 0, kobo: 0 }),
@@ -46,7 +47,7 @@ function makeService() {
   };
   const exportService = { export: vi.fn().mockResolvedValue({ contentType: 'text/markdown', filename: 'x.md', content: '#' }) };
   const syncRepo = {
-    findAnnotationById: vi.fn().mockResolvedValue({ id: 1, bookId: 5, origin: 'web', version: 3, deletedAt: null }),
+    findAnnotationById: vi.fn().mockResolvedValue({ id: 1, bookId: 5, origin: 'web', version: 3, deletedAt: null, text: 'selected text' }),
     findPositionsByAnnotationIds: vi
       .fn()
       .mockResolvedValue([
@@ -61,8 +62,17 @@ function makeService() {
     updatePosition: vi.fn().mockResolvedValue(undefined),
   };
   const conversionService = { ensureCfiPositionsForBook: vi.fn().mockResolvedValue(1) };
-  const service = new AnnotationHubService(annotationRepo as never, exportService as never, syncRepo as never, conversionService as never);
-  return { service, annotationRepo, exportService, syncRepo, conversionService };
+  const rebuilder = { rebuildCanonicalPositions: vi.fn().mockResolvedValue({ rebuilt: true }) };
+  const rebuilderRegistry = new DevicePositionRebuilderRegistry();
+  if (rebuilderRegistered) rebuilderRegistry.register(rebuilder);
+  const service = new AnnotationHubService(
+    annotationRepo as never,
+    exportService as never,
+    syncRepo as never,
+    conversionService as never,
+    rebuilderRegistry,
+  );
+  return { service, annotationRepo, exportService, syncRepo, conversionService, rebuilder, rebuilderRegistry };
 }
 
 describe('AnnotationHubService', () => {
@@ -354,11 +364,47 @@ describe('AnnotationHubService', () => {
       expect(conversionService.ensureCfiPositionsForBook).toHaveBeenCalledWith(10, 5);
     });
 
-    it('does not run cfi conversion for device formats', async () => {
+    it('does not run the cfi backfill for an xpointer retry', async () => {
       const { service, conversionService } = makeService();
 
       await service.retryPosition(10, 1, 'xpointer');
 
+      expect(conversionService.ensureCfiPositionsForBook).not.toHaveBeenCalled();
+    });
+
+    it('rebuilds from the device position instead of the cfi backfill when one is available', async () => {
+      const { service, rebuilder, conversionService } = makeService(true);
+
+      await service.retryPosition(10, 1, 'cfi');
+
+      expect(rebuilder.rebuildCanonicalPositions).toHaveBeenCalledWith(10, { id: 1, bookId: 5, text: 'selected text' });
+      expect(conversionService.ensureCfiPositionsForBook).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the cfi backfill when the device rebuild has no source position', async () => {
+      const { service, rebuilder, conversionService } = makeService(true);
+      rebuilder.rebuildCanonicalPositions.mockResolvedValueOnce({ rebuilt: false, reason: 'no_kobo_span_position' });
+
+      await service.retryPosition(10, 1, 'cfi');
+
+      expect(conversionService.ensureCfiPositionsForBook).toHaveBeenCalledWith(10, 5);
+    });
+
+    it('rebuilds an xpointer position, which the cfi backfill can never produce', async () => {
+      const { service, rebuilder, syncRepo } = makeService(true);
+
+      await service.retryPosition(10, 1, 'xpointer');
+
+      expect(syncRepo.updatePosition).toHaveBeenCalledWith(1, 'xpointer', { status: 'pending', converterVersion: null });
+      expect(rebuilder.rebuildCanonicalPositions).toHaveBeenCalledWith(10, { id: 1, bookId: 5, text: 'selected text' });
+    });
+
+    it('leaves a device-native format to its own next sync', async () => {
+      const { service, rebuilder, conversionService } = makeService(true);
+
+      await service.retryPosition(10, 1, 'kobo_span');
+
+      expect(rebuilder.rebuildCanonicalPositions).not.toHaveBeenCalled();
       expect(conversionService.ensureCfiPositionsForBook).not.toHaveBeenCalled();
     });
 

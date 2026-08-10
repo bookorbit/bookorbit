@@ -1,8 +1,8 @@
 import { ref } from 'vue'
-import { io, Socket } from 'socket.io-client'
+import { Socket } from 'socket.io-client'
 import { toast } from 'vue-sonner'
 import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@bookorbit/types'
-import { getAccessToken } from '@/lib/api'
+import { createAuthenticatedSocket } from '@/lib/socket'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
 let socket: Socket | null = null
@@ -12,12 +12,7 @@ const subscribedLibraries = new Set<number>()
 
 function getSocket(): Socket {
   if (!socket) {
-    // Use a callback so getAccessToken() is called at (re)connect time, not just once at creation.
-    socket = io('/scan', {
-      auth: (cb: (data: object) => void) => cb({ token: getAccessToken() }),
-      transports: ['websocket'],
-      autoConnect: true,
-    })
+    socket = createAuthenticatedSocket('/scan', { autoConnect: true })
 
     socket.on('scan:progress', (event: ScanProgressEvent) => {
       progressMap.value.set(event.libraryId, event)

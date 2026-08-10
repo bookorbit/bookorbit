@@ -293,7 +293,7 @@ defineExpose({ scrollToIndex })
       </div>
     </div>
 
-    <div v-else-if="!virtualized" class="grid w-full max-w-full items-start" :style="staticGridStyle" data-testid="book-grid-static">
+    <div v-else-if="!virtualized" class="grid w-full max-w-full items-end" :style="staticGridStyle" data-testid="book-grid-static">
       <div v-for="book in staticBooks" :key="book.id" class="min-w-0" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
         <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
         <BookCoverCard
@@ -367,7 +367,9 @@ defineExpose({ scrollToIndex })
 }
 
 .book-grid-cell {
-  height: calc(var(--book-grid-height) + var(--book-grid-label-height, 0px));
+  display: grid;
+  align-items: end;
+  height: calc(var(--book-grid-height) + var(--book-grid-label-height, 0px) + var(--book-grid-gap));
   box-sizing: border-box;
   padding-left: 0;
   padding-right: var(--book-grid-gap);

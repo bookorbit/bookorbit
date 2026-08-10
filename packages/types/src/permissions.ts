@@ -4,6 +4,7 @@ export enum Permission {
   LibraryUpload = "library_upload",
   LibraryEditMetadata = "library_edit_metadata",
   LibraryDeleteBooks = "library_delete_books",
+  BookDockAccess = "book_dock_access",
   DemoRestricted = "demo_restricted",
 
   // Devices & Access
@@ -13,7 +14,6 @@ export enum Permission {
   ReadwiseSync = "readwise_sync",
   StorygraphSync = "storygraph_sync",
   OpdsAccess = "opds_access",
-  BookDockAccess = "book_dock_access",
 
   // Email
   EmailSend = "email_send",
@@ -24,6 +24,7 @@ export enum Permission {
   ManageMetadataConfig = "manage_metadata_config",
   ManageIcons = "manage_icons",
   ManageAppSettings = "manage_app_settings",
+  ManageBookDock = "manage_book_dock",
   ManageUsers = "manage_users",
   ViewUserActivity = "view_user_activity",
   ViewAuditLog = "view_audit_log",
@@ -37,6 +38,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.LibraryUpload]: "Upload books",
   [Permission.LibraryEditMetadata]: "Edit metadata",
   [Permission.LibraryDeleteBooks]: "Delete books",
+  [Permission.BookDockAccess]: "Book Dock",
   [Permission.DemoRestricted]: "Demo restricted",
   [Permission.KoboSync]: "Kobo sync",
   [Permission.KoreaderSync]: "KOReader sync",
@@ -44,13 +46,13 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.ReadwiseSync]: "Readwise sync",
   [Permission.StorygraphSync]: "StoryGraph sync",
   [Permission.OpdsAccess]: "OPDS access",
-  [Permission.BookDockAccess]: "Book Dock",
   [Permission.EmailSend]: "Send by email",
   [Permission.ManageEmail]: "Manage email",
   [Permission.ManageLibraries]: "Manage libraries",
   [Permission.ManageMetadataConfig]: "Metadata config",
   [Permission.ManageIcons]: "Manage icons",
   [Permission.ManageAppSettings]: "App settings",
+  [Permission.ManageBookDock]: "Manage Book Dock",
   [Permission.ManageUsers]: "Manage users",
   [Permission.ViewUserActivity]: "View user activity",
   [Permission.ViewAuditLog]: "View audit log",

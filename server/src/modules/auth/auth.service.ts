@@ -19,13 +19,14 @@ import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { AuditAction } from '@bookorbit/types';
+import { AuditAction, LoginErrorCode } from '@bookorbit/types';
 
 import { APP_SETTING_KEYS } from '../../common/constants/app-settings.constants';
 import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
 import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveUserAvatarUrl } from '../../common/utils/user-avatar-url';
 import { SystemMailService } from '../email/system-mail.service';
 import { UserService } from '../user/user.service';
@@ -67,6 +68,16 @@ function maskEmail(email: string): string {
   return `${email[0]}***@${email.slice(at + 1)}`;
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const directCode = (error as { code?: unknown }).code;
+  if (directCode === '23505') return true;
+
+  if (!(error instanceof Error)) return false;
+  return (error.cause as { code?: unknown } | undefined)?.code === '23505';
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -84,16 +95,28 @@ export class AuthService {
     @Inject(DB) private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
+  private async isRegistrationOpen(): Promise<boolean> {
+    return (await this.appSettings.getValue(APP_SETTING_KEYS.ALLOW_REGISTRATION)) === 'true';
+  }
+
   async register(dto: RegisterDto) {
-    const setting = await this.db.query.appSettings.findFirst({
-      where: eq(schema.appSettings.key, APP_SETTING_KEYS.ALLOW_REGISTRATION),
-    });
-    if (setting?.value !== 'true') {
+    if (!(await this.isRegistrationOpen())) {
       throw new ForbiddenException('Registration is not open');
     }
 
     const defaultLibraryIds = await this.appSettings.getDefaultLibraryAccessLibraryIds();
     const passwordHash = await hash(dto.password, 12);
+    try {
+      return await this.registerInTransaction(dto, passwordHash, defaultLibraryIds);
+    } catch (error) {
+      // Two concurrent signups for the same identifier pass the pre-checks and collide on the
+      // lower(username)/lower(email) unique indexes; report the loser as a conflict, not a 500.
+      if (isUniqueViolation(error)) throw new ConflictException('Registration failed');
+      throw error;
+    }
+  }
+
+  private registerInTransaction(dto: RegisterDto, passwordHash: string, defaultLibraryIds: number[]) {
     return this.db.transaction(async (tx) => {
       const existingUsername = await tx.query.users.findFirst({
         where: eq(sql`lower(${schema.users.username})`, dto.username.toLowerCase()),
@@ -125,7 +148,7 @@ export class AuthService {
           .onConflictDoNothing();
       }
 
-      this.logger.log(`[auth.register] [end] userId=${user.id} username=${user.username} - registration completed`);
+      this.logger.log(`[auth.register] [end] userId=${user.id} username="${sanitizeLogValue(user.username)}" - registration completed`);
 
       this.auditEvents.emit(AUDIT_EVENT, {
         userId: user.id,
@@ -138,9 +161,9 @@ export class AuthService {
     });
   }
 
-  async setupStatus(): Promise<{ needsSetup: boolean }> {
-    const count = await this.db.$count(schema.users);
-    return { needsSetup: count === 0 };
+  async setupStatus(): Promise<{ needsSetup: boolean; allowRegistration: boolean }> {
+    const [count, allowRegistration] = await Promise.all([this.db.$count(schema.users), this.isRegistrationOpen()]);
+    return { needsSetup: count === 0, allowRegistration };
   }
 
   async setup(dto: SetupDto, setupToken: string | undefined, reply: FastifyReply) {
@@ -203,25 +226,16 @@ export class AuthService {
     const user = await this.userService.findByUsername(dto.username);
     const now = new Date();
 
-    if (user?.lockedUntil && user.lockedUntil > now) {
-      this.logger.warn(
-        `[auth.login] [fail] userId=${user.id} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="account locked" - login failed`,
-      );
-      this.auditEvents.emit(AUDIT_EVENT, {
-        userId: user.id,
-        actorUsername: user.username,
-        action: AuditAction.AuthLoginFailed,
-        description: `Failed login attempt for username '${dto.username}'`,
-        ip,
-        meta: { attemptedUsername: dto.username, lockout: true, lockedUntil: user.lockedUntil.toISOString() },
-      });
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    const isLockedOut = Boolean(user?.lockedUntil && user.lockedUntil > now);
 
+    // The lockout is reported only to someone who supplied the correct password, so an attacker
+    // probing usernames still gets the generic failure and learns nothing about which accounts exist.
     const passwordHash = user?.passwordHash ?? DUMMY_HASH;
     const isPasswordValid = await compare(dto.password, passwordHash);
     if (!user || !user.active || !isPasswordValid) {
-      const lockedUntil = user && user.active ? await this.recordFailedLoginAttempt(user.id, user.failedLoginAttempts ?? 0, now) : null;
+      const newlyLockedUntil =
+        user && user.active && !isLockedOut ? await this.recordFailedLoginAttempt(user.id, user.failedLoginAttempts ?? 0, now) : null;
+      const lockedUntil = newlyLockedUntil ?? (isLockedOut ? (user?.lockedUntil ?? null) : null);
       this.logger.warn(
         `[auth.login] [fail]${user ? ` userId=${user.id}` : ''} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="${lockedUntil ? 'account locked' : 'invalid credentials'}" - login failed`,
       );
@@ -236,6 +250,26 @@ export class AuthService {
           : { attemptedUsername: dto.username },
       });
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (isLockedOut && user.lockedUntil) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 1000));
+      this.logger.warn(
+        `[auth.login] [fail] userId=${user.id} username=${dto.username} ip=${ip ?? 'unknown'} errorClass=UnauthorizedException error="account locked" - login failed`,
+      );
+      this.auditEvents.emit(AUDIT_EVENT, {
+        userId: user.id,
+        actorUsername: user.username,
+        action: AuditAction.AuthLoginFailed,
+        description: `Failed login attempt for username '${dto.username}'`,
+        ip,
+        meta: { attemptedUsername: dto.username, lockout: true, lockedUntil: user.lockedUntil.toISOString() },
+      });
+      throw new UnauthorizedException({
+        message: 'Account temporarily locked after too many failed sign-in attempts',
+        errorCode: LoginErrorCode.ACCOUNT_LOCKED,
+        retryAfterSeconds,
+      });
     }
 
     if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
@@ -564,7 +598,13 @@ export class AuthService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.users)
-        .set({ passwordHash, isDefaultPassword: false, tokenVersion: sql`${schema.users.tokenVersion} + 1` })
+        .set({
+          passwordHash,
+          isDefaultPassword: false,
+          tokenVersion: sql`${schema.users.tokenVersion} + 1`,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        })
         .where(eq(schema.users.id, row.userId));
 
       await tx.update(schema.passwordResetTokens).set({ usedAt: new Date() }).where(eq(schema.passwordResetTokens.id, row.id));
@@ -606,7 +646,13 @@ export class AuthService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(schema.users)
-        .set({ passwordHash, isDefaultPassword: false, tokenVersion: sql`${schema.users.tokenVersion} + 1` })
+        .set({
+          passwordHash,
+          isDefaultPassword: false,
+          tokenVersion: sql`${schema.users.tokenVersion} + 1`,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        })
         .where(eq(schema.users.id, userId));
 
       await tx

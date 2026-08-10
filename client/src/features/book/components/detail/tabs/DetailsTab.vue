@@ -141,58 +141,14 @@ const coverFailed = ref(false)
 const coverImageRatio = ref<number | null>(null)
 const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
-const genresExpanded = ref(false)
 const genreMeasureContainer = ref<HTMLElement | null>(null)
 const genreHiddenCount = ref(0)
 const visibleGenreCount = ref(0)
 const safeDescription = useSafeHtml(() => props.book.description)
 const filledCustomMetadata = computed(() => (props.book.customMetadata ?? []).filter((field) => field.value !== null && field.value !== ''))
-const displayedGenres = computed(() => {
-  if (genresExpanded.value || genreHiddenCount.value === 0) return props.book.genres
-  const count = visibleGenreCount.value > 0 ? visibleGenreCount.value : props.book.genres.length
-  return props.book.genres.slice(0, count)
-})
-const MORE_BUTTON_RESERVED_WIDTH = 72
-
-function getUniqueRowTops(values: number[]): number[] {
-  const rows: number[] = []
-  for (const value of values) {
-    if (!rows.some((rowTop) => Math.abs(rowTop - value) <= 1)) rows.push(value)
-  }
-  return rows.sort((a, b) => a - b)
-}
-
-function getRowTop(metrics: Array<{ top: number; right: number }>): number | null {
-  const tops = getUniqueRowTops(metrics.map((metric) => metric.top))
-  return tops.length > 0 ? tops[0]! : null
-}
-
-function getRowRight(metrics: Array<{ top: number; right: number }>, rowTop: number): number {
-  const rowItems = metrics.filter((metric) => Math.abs(metric.top - rowTop) <= 1)
-  return rowItems.length ? Math.max(...rowItems.map((metric) => metric.right)) : 0
-}
-
-function ensureMoreButtonFitsSecondRow(
-  metrics: Array<{ top: number; right: number }>,
-  secondRowTop: number,
-  containerWidth: number,
-  initialVisibleCount: number,
-) {
-  let visibleCount = initialVisibleCount
-  let hiddenCount = metrics.length - visibleCount
-
-  while (hiddenCount > 0 && visibleCount > 0) {
-    const visibleMetrics = metrics.slice(0, visibleCount)
-    const currentSecondRowTop = getRowTop(visibleMetrics.filter((metric) => metric.top >= secondRowTop - 1))
-    const rowTop = currentSecondRowTop ?? secondRowTop
-    const remainingWidth = containerWidth - getRowRight(visibleMetrics, rowTop)
-    if (remainingWidth >= MORE_BUTTON_RESERVED_WIDTH) break
-    visibleCount -= 1
-    hiddenCount += 1
-  }
-
-  return { visibleCount, hiddenCount }
-}
+const displayedGenres = computed(() => props.book.genres.slice(0, visibleGenreCount.value))
+const hiddenGenres = computed(() => props.book.genres.slice(visibleGenreCount.value))
+const GENRE_GAP_PX = 6
 
 function resetGenreFoldState() {
   visibleGenreCount.value = props.book.genres.length
@@ -207,34 +163,32 @@ function measureGenreOverflow() {
   }
 
   const pills = Array.from(container.querySelectorAll<HTMLElement>('[data-genre-pill="true"]'))
-  if (pills.length === 0) {
-    resetGenreFoldState()
-    return
-  }
-
-  const containerRect = container.getBoundingClientRect()
+  const moreButton = container.querySelector<HTMLElement>('[data-genre-more-measure="true"]')
   const containerWidth = container.clientWidth
-  const pillMetrics = pills.map((pill) => {
-    const rect = pill.getBoundingClientRect()
-    return {
-      top: rect.top - containerRect.top,
-      right: rect.right - containerRect.left,
-    }
-  })
-
-  const rowTops = getUniqueRowTops(pillMetrics.map((metric) => metric.top))
-  if (rowTops.length <= 2) {
+  if (pills.length === 0 || !moreButton || containerWidth <= 0) {
     resetGenreFoldState()
     return
   }
 
-  const secondRowTop = rowTops[1]!
-  let visibleCount = pillMetrics.findIndex((metric) => metric.top > secondRowTop + 1)
-  if (visibleCount === -1) visibleCount = pillMetrics.length
+  const pillWidths = pills.map((pill) => pill.getBoundingClientRect().width)
+  const allPillsWidth = pillWidths.reduce((total, width) => total + width, 0) + GENRE_GAP_PX * Math.max(0, pills.length - 1)
+  if (allPillsWidth <= containerWidth) {
+    resetGenreFoldState()
+    return
+  }
 
-  const fitted = ensureMoreButtonFitsSecondRow(pillMetrics, secondRowTop, containerWidth, visibleCount)
-  visibleGenreCount.value = fitted.visibleCount
-  genreHiddenCount.value = fitted.hiddenCount
+  const moreButtonWidth = moreButton.getBoundingClientRect().width
+  let usedWidth = 0
+  let visibleCount = 0
+  for (const pillWidth of pillWidths) {
+    const nextPillWidth = usedWidth + (visibleCount > 0 ? GENRE_GAP_PX : 0) + pillWidth
+    if (nextPillWidth + GENRE_GAP_PX + moreButtonWidth > containerWidth) break
+    usedWidth = nextPillWidth
+    visibleCount += 1
+  }
+
+  visibleGenreCount.value = visibleCount
+  genreHiddenCount.value = pills.length - visibleCount
 }
 
 let genreResizeObserver: ResizeObserver | null = null
@@ -259,7 +213,6 @@ function formatCustomMetadataValue(field: CustomMetadataBookValue): string {
 watch(
   () => `${props.book.id}:${props.book.genres.join('|')}`,
   () => {
-    genresExpanded.value = false
     resetGenreFoldState()
     scheduleGenreOverflowMeasure()
   },
@@ -2060,36 +2013,60 @@ watch(
       <!-- Genres + Tags -->
       <div v-if="book.genres.length || book.tags.length" class="mt-4 space-y-1.5">
         <div v-if="book.genres.length" class="relative">
-          <div class="flex flex-wrap items-center gap-1.5">
+          <div data-test="genre-row" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
             <span
               v-for="(genre, index) in displayedGenres"
               :key="`${genre}-${index}`"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary"
+              data-test="visible-genre"
+              class="shrink-0 rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary"
             >
               {{ genre }}
             </span>
-            <button
-              v-if="genreHiddenCount > 0"
-              type="button"
-              class="text-xs font-medium text-foreground hover:text-foreground transition-colors whitespace-nowrap"
-              @click="genresExpanded = !genresExpanded"
-            >
-              {{ genresExpanded ? t('book.detail.details.showLess') : t('book.detail.details.moreCount', { count: genreHiddenCount }) }}
-            </button>
+            <Popover v-if="genreHiddenCount > 0">
+              <PopoverTrigger as-child>
+                <button
+                  type="button"
+                  data-test="genre-overflow-trigger"
+                  class="shrink-0 whitespace-nowrap rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  :aria-label="t('book.detail.details.moreCount', { count: genreHiddenCount })"
+                >
+                  +{{ genreHiddenCount }}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" class="w-80 max-w-[calc(100vw-2rem)] p-3">
+                <div data-test="hidden-genres" class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="(genre, index) in hiddenGenres"
+                    :key="`hidden-${genre}-${index}`"
+                    class="rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary"
+                  >
+                    {{ genre }}
+                  </span>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div
             ref="genreMeasureContainer"
             aria-hidden="true"
-            class="pointer-events-none absolute left-0 top-0 -z-10 invisible flex w-full flex-wrap gap-1.5"
+            class="pointer-events-none invisible absolute left-0 top-0 -z-10 flex w-full items-center gap-1.5 whitespace-nowrap"
           >
             <span
               v-for="(genre, index) in book.genres"
               :key="`measure-${genre}-${index}`"
               data-genre-pill="true"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary"
+              class="shrink-0 rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary"
             >
               {{ genre }}
             </span>
+            <button
+              type="button"
+              tabindex="-1"
+              data-genre-more-measure="true"
+              class="shrink-0 whitespace-nowrap rounded-full border border-border px-2.5 py-0.5 text-xs font-medium"
+            >
+              +{{ book.genres.length }}
+            </button>
           </div>
         </div>
 

@@ -75,7 +75,7 @@ describe('ReaderSettingsPanel', () => {
   })
 
   it('disables the text size steppers at the ends of the range', () => {
-    const atMin = mountPanel({ state: makeState({ fontSize: 10 }) })
+    const atMin = mountPanel({ state: makeState({ fontSize: 6 }) })
     expect(buttonByAriaLabel(atMin, 'Smaller text').attributes('disabled')).toBeDefined()
     expect(buttonByAriaLabel(atMin, 'Larger text').attributes('disabled')).toBeUndefined()
 

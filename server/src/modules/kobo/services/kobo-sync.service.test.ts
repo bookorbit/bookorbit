@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { sql } from 'drizzle-orm';
 import * as schema from '../../../db/schema';
 import { KoboSyncService } from './kobo-sync.service';
@@ -123,8 +124,10 @@ function makeBook(id: number, format = 'epub') {
     authors: ['Author One'],
     description: 'Description',
     publisher: 'Publisher',
+    publishedDate: null,
     publishedYear: 2022,
     language: 'en',
+    isbn: '9780306406157',
     seriesName: 'Series',
     seriesIndex: 2,
     fileFormat: format,
@@ -271,6 +274,8 @@ describe('KoboSyncService', () => {
 
     expect(fetchSpy).toHaveBeenCalledWith(3, [12], true, expect.any(Map));
     expect(metadata.Title).toBe('Book 12');
+    expect(metadata.Language).toBe('en');
+    expect(metadata.ISBN).toBe('9780306406157');
     expect(metadata.DownloadUrls).toEqual([
       {
         Format: 'PDF',
@@ -280,6 +285,14 @@ describe('KoboSyncService', () => {
         DrmType: 'None',
       },
     ]);
+  });
+
+  it('omits ISBN from Kobo metadata when the book has no valid ISBN', () => {
+    const service = makeService(makeDb());
+
+    const metadata = (service as any).buildBookMetadata({ ...makeBook(12), isbn: null }, 'tok', 'https://base');
+
+    expect(metadata).not.toHaveProperty('ISBN');
   });
 
   it('removeBookFromSync handles missing snapshot/row and delete-vs-mark paths', async () => {
@@ -955,60 +968,44 @@ describe('KoboSyncService', () => {
     });
   });
 
-  it('buildMetadataHash is deterministic and changes when metadata inputs change', () => {
+  it('buildMetadataHash covers normalized language, ISBN, identity, cover, and serializer changes', () => {
     const service = makeService(makeDb());
+    const params = {
+      title: 'Dune',
+      authors: ['Frank Herbert'],
+      seriesName: 'Dune',
+      seriesIndex: 1,
+      metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      entitlementId: 'entitlement-1',
+      coverImageId: 'cover-1',
+      language: 'en',
+      isbn: '9780306406157',
+    };
 
-    const hashA = (service as any).buildMetadataHash({
-      title: 'Dune',
-      authors: ['Frank Herbert'],
-      seriesName: 'Dune',
-      seriesIndex: 1,
-      metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      entitlementId: 'entitlement-1',
-      coverImageId: 'cover-1',
-    });
-    const hashB = (service as any).buildMetadataHash({
-      title: 'Dune',
-      authors: ['Frank Herbert'],
-      seriesName: 'Dune',
-      seriesIndex: 1,
-      metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      entitlementId: 'entitlement-1',
-      coverImageId: 'cover-1',
-    });
-    const hashC = (service as any).buildMetadataHash({
-      title: 'Dune Messiah',
-      authors: ['Frank Herbert'],
-      seriesName: 'Dune',
-      seriesIndex: 2,
-      metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      entitlementId: 'entitlement-1',
-      coverImageId: 'cover-1',
-    });
-    const hashE = (service as any).buildMetadataHash({
-      title: 'Dune',
-      authors: ['Frank Herbert'],
-      seriesName: 'Dune',
-      seriesIndex: 1,
-      metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      entitlementId: 'entitlement-2',
-      coverImageId: 'cover-1',
-    });
-    const hashF = (service as any).buildMetadataHash({
-      title: 'Dune',
-      authors: ['Frank Herbert'],
-      seriesName: 'Dune',
-      seriesIndex: 1,
-      metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      entitlementId: 'entitlement-1',
-      coverImageId: 'cover-2',
-    });
+    const hash = (service as any).buildMetadataHash(params);
+    const legacyHash = createHash('sha256')
+      .update(
+        [
+          params.title,
+          params.authors.join(','),
+          params.seriesName,
+          String(params.seriesIndex),
+          String(params.metadataUpdatedAt),
+          params.entitlementId,
+          params.coverImageId,
+        ].join('|'),
+      )
+      .digest('hex')
+      .slice(0, 16);
 
-    expect(hashA).toBe(hashB);
-    expect(hashA).not.toBe(hashC);
-    expect(hashA).not.toBe(hashE);
-    expect(hashA).not.toBe(hashF);
-    expect(hashA).toHaveLength(16);
+    expect((service as any).buildMetadataHash({ ...params })).toBe(hash);
+    expect((service as any).buildMetadataHash({ ...params, title: 'Dune Messiah' })).not.toBe(hash);
+    expect((service as any).buildMetadataHash({ ...params, entitlementId: 'entitlement-2' })).not.toBe(hash);
+    expect((service as any).buildMetadataHash({ ...params, coverImageId: 'cover-2' })).not.toBe(hash);
+    expect((service as any).buildMetadataHash({ ...params, language: 'de' })).not.toBe(hash);
+    expect((service as any).buildMetadataHash({ ...params, isbn: '9780441172719' })).not.toBe(hash);
+    expect(hash).not.toBe(legacyHash);
+    expect(hash).toHaveLength(16);
   });
 
   it('maps settings and file metadata into the actual Kobo delivery format', () => {
@@ -1064,6 +1061,9 @@ describe('KoboSyncService', () => {
           {
             bookId: 5,
             title: 'Dune',
+            isbn10: '0306406152',
+            isbn13: '9780306406157',
+            language: 'English',
             seriesName: 'Saga',
             seriesIndex: 2,
             metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -1080,7 +1080,9 @@ describe('KoboSyncService', () => {
             description: 'Desc',
             publisher: 'Pub',
             publishedYear: 1965,
-            language: 'en',
+            language: 'English',
+            isbn10: '0306406152',
+            isbn13: '9780306406157',
             seriesName: 'Saga',
             seriesIndex: 2,
             fileFormat: 'epub',
@@ -1091,7 +1093,10 @@ describe('KoboSyncService', () => {
             updatedAt: new Date('2026-01-02T00:00:00.000Z'),
           },
         ],
-        [{ bookId: 5, name: 'Author A' }],
+        [
+          { bookId: 5, name: 'Author A' },
+          { bookId: 5, name: 'Author B' },
+        ],
         [{ bookId: 5, name: 'Collection A' }],
       ],
     });
@@ -1113,10 +1118,13 @@ describe('KoboSyncService', () => {
     expect(books.get(5)).toEqual(
       expect.objectContaining({
         title: 'Dune',
-        authors: ['Author A'],
+        authors: ['Author A', 'Author B'],
         collectionNames: ['Collection A'],
+        language: 'en',
+        isbn: '9780306406157',
         metadataHash: expect.any(String),
       }),
     );
+    expect(books.get(5)?.metadataHash).toBe(snapshotRows[0].metadataHash);
   });
 });

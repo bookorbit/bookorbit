@@ -774,14 +774,18 @@ describe('Book Dock ingest + finalize (e2e)', () => {
 
   it('enforces Book Dock permission and library access for finalize', async () => {
     const noPermissionUser = await createUserAndLogin(context);
-    const withPermissionUser = await createUserAndLogin(context, {
+    const accessOnlyUser = await createUserAndLogin(context, {
       permissions: [Permission.BookDockAccess],
+    });
+    const withPermissionUser = await createUserAndLogin(context, {
+      permissions: [Permission.BookDockAccess, Permission.LibraryUpload],
     });
     const destination = await createLibraryWithFolder(context);
     const bookDockRow = await createBookDockRow(context, {
       fileName: 'permission-check.fb2',
       selectedMetadata: { title: 'Permission Check' },
       status: 'ready',
+      uploadedBy: withPermissionUser.userId,
     });
 
     const forbiddenSummary = await context.app.inject({
@@ -797,6 +801,19 @@ describe('Book Dock ingest + finalize (e2e)', () => {
       headers: authHeader(withPermissionUser.accessToken),
     });
     expect(allowedSummary.statusCode).toBe(200);
+
+    const missingUploadPermission = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/finalize',
+      headers: authHeader(accessOnlyUser.accessToken),
+      payload: {
+        fileIds: [bookDockRow.id],
+        defaultLibraryId: destination.libraryId,
+        defaultFolderId: destination.libraryFolderId,
+      },
+    });
+    expect(missingUploadPermission.statusCode).toBe(403);
+    expect(missingUploadPermission.json()).toMatchObject({ message: `Missing permission: ${Permission.LibraryUpload}` });
 
     const noAccessFinalize = await context.app.inject({
       method: 'POST',

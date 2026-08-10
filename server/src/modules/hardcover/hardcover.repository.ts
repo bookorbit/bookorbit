@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Permission } from '@bookorbit/types';
 import type { ContentFilterRules, ReadStatus } from '@bookorbit/types';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
@@ -118,6 +118,17 @@ export class HardcoverRepository {
     return row!;
   }
 
+  // Only updates an existing link (never creates one) - used to propagate a metadata-side edition
+  // pick into a user's sync target without turning an unrelated metadata edit into a new sync link.
+  async updateEditionIfLinked(userId: number, bookId: number, hardcoverEditionId: number): Promise<boolean> {
+    const [row] = await this.db
+      .update(schema.hardcoverBookState)
+      .set({ hardcoverEditionId, updatedAt: new Date() })
+      .where(and(eq(schema.hardcoverBookState.userId, userId), eq(schema.hardcoverBookState.bookId, bookId)))
+      .returning({ id: schema.hardcoverBookState.id });
+    return row != null;
+  }
+
   async setBookSyncOverride(userId: number, bookId: number, syncOverride: 'included' | 'excluded' | null): Promise<HardcoverBookState> {
     const syncExcluded = syncOverride === 'excluded';
     const [row] = await this.db
@@ -153,11 +164,22 @@ export class HardcoverRepository {
     return row ?? null;
   }
 
+  // Bounded and ordered: this backs a settings list, not a sync run, and a library can hold far
+  // more in-progress books than anyone wants rendered at once.
+  async findCurrentReadingBooks(userId: number, limit: number): Promise<BookSyncData[]> {
+    return this.findBookSyncDataForUser(userId, undefined, false, { statuses: ['reading', 'rereading'], limit });
+  }
+
   private async findSyncableBooksForUser(userId: number, bookId?: number): Promise<BookSyncData[]> {
     return this.findBookSyncDataForUser(userId, bookId, false);
   }
 
-  private async findBookSyncDataForUser(userId: number, bookId?: number, includeUnread = true): Promise<BookSyncData[]> {
+  private async findBookSyncDataForUser(
+    userId: number,
+    bookId?: number,
+    includeUnread = true,
+    options: { statuses?: ReadStatus[]; limit?: number } = {},
+  ): Promise<BookSyncData[]> {
     const bookFilter = bookId !== undefined ? eq(schema.books.id, bookId) : undefined;
 
     const maxProgressSq = this.db
@@ -219,7 +241,14 @@ export class HardcoverRepository {
       .leftJoin(attemptsSq, eq(attemptsSq.bookId, schema.books.id))
       .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId));
 
-    const rows = includeUnread ? await query.where(bookFilter) : await query.where(and(bookFilter, ne(schema.userBookStatus.status, 'unread')));
+    const statusFilter = options.statuses ? inArray(schema.userBookStatus.status, options.statuses) : ne(schema.userBookStatus.status, 'unread');
+    const filtered = includeUnread ? query.where(bookFilter) : query.where(and(bookFilter, statusFilter));
+
+    // Sync callers stay unordered and unbounded; only the bounded list needs a stable window.
+    const rows =
+      options.limit === undefined
+        ? await filtered
+        : await filtered.orderBy(asc(schema.bookMetadata.title), asc(schema.books.id)).limit(options.limit);
 
     return rows as BookSyncData[];
   }

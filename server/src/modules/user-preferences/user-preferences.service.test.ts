@@ -70,6 +70,7 @@ const validDisplayPreferences: DisplayPreferences = {
   showSpineOnComics: false,
   bookShadowStrength: 'strong',
   bookCoverDisplayMode: 'natural-bottom',
+  bookDetailCoverTint: 'duotone',
   seriesCardCoverMode: 'stack',
   gridCardPrimaryLabel: 'hidden',
   gridCardSecondaryLabel: 'hidden',

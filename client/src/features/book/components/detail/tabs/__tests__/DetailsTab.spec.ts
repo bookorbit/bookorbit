@@ -275,6 +275,35 @@ describe('DetailsTab cover surface', () => {
     expect(wrapper.text()).toContain('Author One, Author Two')
   })
 
+  it('keeps genres on one line and moves genres that do not fit into the overflow popover', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        genres: ['Fantasy', 'Adventure', 'Romance', 'Mystery'],
+      }),
+    )
+    await flushPromises()
+
+    const measureButton = wrapper.get<HTMLElement>('[data-genre-more-measure="true"]')
+    const measureContainer = measureButton.element.parentElement as HTMLElement
+    Object.defineProperty(measureContainer, 'clientWidth', { configurable: true, value: 300 })
+
+    for (const pill of wrapper.findAll<HTMLElement>('[data-genre-pill="true"]')) {
+      vi.spyOn(pill.element, 'getBoundingClientRect').mockReturnValue({ width: 80 } as DOMRect)
+    }
+    vi.spyOn(measureButton.element, 'getBoundingClientRect').mockReturnValue({ width: 40 } as DOMRect)
+
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+
+    const row = wrapper.get('[data-test="genre-row"]')
+    expect(row.classes()).toContain('whitespace-nowrap')
+    expect(row.classes()).not.toContain('flex-wrap')
+    expect(wrapper.findAll('[data-test="visible-genre"]').map((pill) => pill.text())).toEqual(['Fantasy', 'Adventure', 'Romance'])
+    expect(wrapper.get('[data-test="genre-overflow-trigger"]').text()).toBe('+1')
+    expect(wrapper.get('[data-test="genre-overflow-trigger"]').attributes('aria-label')).toBe('+1 more')
+    expect(wrapper.get('[data-test="hidden-genres"]').text()).toContain('Mystery')
+  })
+
   it('summarizes pending Kobo sync state for each affected device', async () => {
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)

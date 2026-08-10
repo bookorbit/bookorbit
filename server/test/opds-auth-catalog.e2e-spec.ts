@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
 import { ConfigService } from '@nestjs/config';
 
+import { normalizeMetadataTextKey } from '../src/common/utils/metadata-text-normalize.utils';
 import { createCoverToken } from '../src/modules/opds/opds-auth.guard';
 import * as schema from '../src/db/schema';
 import { createEpubFixture, createFb2Fixture, writeFixtureFile } from './e2e/opds/opds-fixture-builder';
@@ -627,7 +628,9 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       );
       expect(mobiDownloadResponse.statusCode).toBe(200);
       expect(mobiDownloadResponse.headers['content-type']).toContain('application/x-mobipocket-ebook');
-      expect(mobiDownloadResponse.headers['content-disposition']).toMatch(/\.mobi"$/);
+      expect(mobiDownloadResponse.headers['content-disposition']).toBe(
+        'attachment; filename="visible-alpha.mobi"; filename*=UTF-8\'\'visible-alpha.mobi',
+      );
     });
 
     it('exposes and downloads raw FB2 acquisition files', async () => {
@@ -645,7 +648,7 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(downloadResponse.statusCode).toBe(200);
       expect(downloadResponse.headers['content-type']).toContain('application/x-fictionbook+xml');
       expect(downloadResponse.headers['content-disposition']).toContain('attachment;');
-      expect(downloadResponse.headers['content-disposition']).toMatch(/\.fb2"$/);
+      expect(downloadResponse.headers['content-disposition']).toBe('attachment; filename="visible-raw.fb2"; filename*=UTF-8\'\'visible-raw.fb2');
       expect(downloadResponse.body).toBe(rawFb2FixtureContent);
     });
   });
@@ -679,13 +682,34 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
   }
 
   async function seedBookMetadata(bookId: number, title: string, seriesName: string, seriesIndex: number, isbn13?: string): Promise<void> {
-    const values = { bookId, title, seriesName, seriesIndex, ...(isbn13 !== undefined ? { isbn13 } : {}) };
-    const set = { title, seriesName, seriesIndex, ...(isbn13 !== undefined ? { isbn13 } : {}) };
+    const normalizedName = normalizeMetadataTextKey(seriesName);
+    if (!normalizedName) throw new Error(`Series normalization failed for ${seriesName}`);
+
+    const [series] = await ctx.db
+      .insert(schema.bookSeries)
+      .values({ name: seriesName, normalizedName })
+      .onConflictDoUpdate({
+        target: schema.bookSeries.normalizedName,
+        set: { name: seriesName, updatedAt: new Date() },
+      })
+      .returning({ id: schema.bookSeries.id });
+    if (!series) throw new Error(`Series upsert failed for ${seriesName}`);
+
+    const values = { bookId, title, seriesId: series.id, seriesName, seriesIndex, ...(isbn13 !== undefined ? { isbn13 } : {}) };
+    const set = { title, seriesId: series.id, seriesName, seriesIndex, ...(isbn13 !== undefined ? { isbn13 } : {}) };
 
     await ctx.db.insert(schema.bookMetadata).values(values).onConflictDoUpdate({
       target: schema.bookMetadata.bookId,
       set,
     });
+
+    await ctx.db
+      .insert(schema.bookSeriesMemberships)
+      .values({ bookId, seriesId: series.id, seriesIndex, displayOrder: 0 })
+      .onConflictDoUpdate({
+        target: [schema.bookSeriesMemberships.bookId, schema.bookSeriesMemberships.seriesId],
+        set: { seriesIndex, displayOrder: 0, updatedAt: new Date() },
+      });
   }
 
   async function linkBookAuthor(bookId: number, authorName: string): Promise<void> {

@@ -10,6 +10,7 @@ import ContentFilterChipInput from '@/components/ui/ContentFilterChipInput.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import Badge from '@/components/ui/badge/Badge.vue'
 import { useTagSearchWithIds, useGenreSearchWithIds } from './composables/useContentFilterSearch'
+import { PERMISSION_GROUPS, presetPermissions, type PermissionPreset } from './lib/permission-presets'
 
 interface Library {
   id: number
@@ -33,55 +34,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-
-const PERMISSION_GROUPS: { id: string; label: string; permissions: Permission[] }[] = [
-  {
-    id: 'content',
-    label: 'Content',
-    permissions: [Permission.LibraryDownload, Permission.LibraryUpload, Permission.LibraryEditMetadata, Permission.LibraryDeleteBooks],
-  },
-  {
-    id: 'devicesAccess',
-    label: 'Devices & Access',
-    permissions: [
-      Permission.KoboSync,
-      Permission.KoreaderSync,
-      Permission.HardcoverSync,
-      Permission.ReadwiseSync,
-      Permission.StorygraphSync,
-      Permission.OpdsAccess,
-      Permission.BookDockAccess,
-    ],
-  },
-  {
-    id: 'email',
-    label: 'Email',
-    permissions: [Permission.EmailSend, Permission.ManageEmail],
-  },
-  {
-    id: 'administration',
-    label: 'Administration',
-    permissions: [
-      Permission.ManageLibraries,
-      Permission.ManageMetadataConfig,
-      Permission.ManageIcons,
-      Permission.ManageAppSettings,
-      Permission.ManageUsers,
-      Permission.ViewUserActivity,
-      Permission.ViewAuditLog,
-    ],
-  },
-  {
-    id: 'notifications',
-    label: 'Notifications',
-    permissions: [Permission.NotificationAccess],
-  },
-  {
-    id: 'restrictions',
-    label: 'Restrictions',
-    permissions: [Permission.DemoRestricted],
-  },
-]
 
 const permissionGroups = computed(() =>
   PERMISSION_GROUPS.map((group) => ({ ...group, label: t(`adminFeature.userForm.permissionGroups.${group.id}`) })),
@@ -134,24 +86,8 @@ const hasRestrictions = computed(() => {
   )
 })
 
-function applyPreset(preset: 'standard' | 'admin' | 'clear') {
-  if (preset === 'clear') {
-    selectedPermissionNames.value.clear()
-  } else if (preset === 'admin') {
-    const all = PERMISSION_GROUPS.flatMap((g) => g.permissions)
-    selectedPermissionNames.value = new Set(all)
-  } else if (preset === 'standard') {
-    selectedPermissionNames.value = new Set([
-      Permission.LibraryDownload,
-      Permission.KoboSync,
-      Permission.KoreaderSync,
-      Permission.HardcoverSync,
-      Permission.ReadwiseSync,
-      Permission.StorygraphSync,
-      Permission.OpdsAccess,
-      Permission.BookDockAccess,
-    ])
-  }
+function applyPreset(preset: PermissionPreset) {
+  selectedPermissionNames.value = new Set(presetPermissions(preset))
 }
 
 watch(

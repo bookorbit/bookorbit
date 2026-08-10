@@ -22,6 +22,7 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     showSpineOnComics: false,
     bookShadowStrength: 'strong',
     bookCoverDisplayMode: 'blurred-fit',
+    bookDetailCoverTint: 'duotone',
     cardInfoMode: 'hover-overlay',
     seriesCardCoverMode: 'stack',
     gridCardPrimaryLabel: 'hidden',

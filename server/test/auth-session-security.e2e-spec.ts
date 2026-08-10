@@ -241,7 +241,7 @@ describe('Auth session security (e2e)', () => {
       });
 
       expect(statusAfter.statusCode).toBe(200);
-      expect(statusAfter.json()).toEqual({ needsSetup: false });
+      expect(statusAfter.json()).toEqual({ needsSetup: false, allowRegistration: false });
     });
 
     it('rejects setup when already completed', async () => {
@@ -292,6 +292,68 @@ describe('Auth session security (e2e)', () => {
 
       expect(invalidLoginResponse.statusCode).toBe(401);
       expect(getSetCookieLines(invalidLoginResponse.headers)).toHaveLength(0);
+    });
+  });
+
+  describe('login lockout', () => {
+    async function attemptLogin(username: string, password: string) {
+      return context.app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password } });
+    }
+
+    async function lockAccount(credentials: LocalUserCredentials) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const response = await attemptLogin(credentials.username, 'DefinitelyWrong123');
+        expect(response.statusCode).toBe(401);
+      }
+      const locked = await context.db.query.users.findFirst({ where: eq(schema.users.id, credentials.userId) });
+      expect(locked?.lockedUntil).toBeInstanceOf(Date);
+    }
+
+    it('tells the owner of a correct password that the account is locked, with a retry window', async () => {
+      const credentials = await createLocalUser(context.db, { password: 'LockoutPass123' });
+      await lockAccount(credentials);
+
+      const response = await attemptLogin(credentials.username, credentials.password);
+
+      expect(response.statusCode).toBe(401);
+      const body = response.json() as { errorCode?: string; retryAfterSeconds?: number };
+      expect(body.errorCode).toBe('account_locked');
+      expect(body.retryAfterSeconds).toBeGreaterThan(0);
+      expect(body.retryAfterSeconds).toBeLessThanOrEqual(15 * 60);
+      expect(getSetCookieLines(response.headers)).toHaveLength(0);
+    });
+
+    it('does not reveal the lockout to someone who does not know the password', async () => {
+      const credentials = await createLocalUser(context.db, { password: 'LockoutPass123' });
+      await lockAccount(credentials);
+
+      const response = await attemptLogin(credentials.username, 'StillWrong123');
+
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).not.toHaveProperty('errorCode');
+      expect(response.json()).not.toHaveProperty('retryAfterSeconds');
+    });
+
+    it('lets a completed password reset unlock the account immediately', async () => {
+      const credentials = await createLocalUser(context.db, { password: 'LockoutPass123' });
+      await lockAccount(credentials);
+
+      const rawToken = randomUUID();
+      await context.db.insert(schema.passwordResetTokens).values({
+        userId: credentials.userId,
+        tokenHash: sha256(rawToken),
+        expiresAt: new Date(Date.now() + 15 * 60_000),
+      });
+
+      const resetResponse = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/reset-password',
+        payload: { token: rawToken, newPassword: 'UnlockedPass123' },
+      });
+      expect(resetResponse.statusCode).toBe(204);
+
+      const afterReset = await attemptLogin(credentials.username, 'UnlockedPass123');
+      expect(afterReset.statusCode).toBe(200);
     });
   });
 

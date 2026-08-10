@@ -6,6 +6,8 @@ import {
   CBX_SPREAD_GAP_MAX,
   CBX_SPREAD_GAP_MIN,
   CBX_READER_DEFAULTS,
+  EPUB_FONT_SIZE_MAX,
+  EPUB_FONT_SIZE_MIN,
   EPUB_READER_DEFAULTS,
   PDF_READER_DEFAULTS,
   type CbxReaderSettings,
@@ -69,7 +71,7 @@ function sanitizeEpubPartialSettings(settings: unknown): Partial<EpubReaderSetti
   if ((typeof settings.fontFamily === 'string' && settings.fontFamily.length > 0) || settings.fontFamily === null) {
     out.fontFamily = settings.fontFamily
   }
-  if (isNumberInRange(settings.fontSize, 10, 32)) {
+  if (isNumberInRange(settings.fontSize, EPUB_FONT_SIZE_MIN, EPUB_FONT_SIZE_MAX)) {
     out.fontSize = settings.fontSize
   }
   if (isNumberInRange(settings.lineHeight, 0.8, 3)) {

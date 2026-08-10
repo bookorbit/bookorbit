@@ -6,12 +6,14 @@ import { Logger } from '@nestjs/common';
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
   readdir: vi.fn(),
+  realpath: vi.fn(),
 }));
 
-import { stat, readdir } from 'fs/promises';
+import { stat, readdir, realpath } from 'fs/promises';
 
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
+const mockRealpath = realpath as MockedFunction<typeof realpath>;
 
 const mockRepo: Mocked<
   Pick<
@@ -672,6 +674,29 @@ describe('handleCreate — move detection', () => {
 
     expect(mockRepo.updateBookFolderPath).not.toHaveBeenCalled();
     expect(result).toEqual({ type: 'book-moved', libraryId: 2, bookIds: [30] });
+  });
+
+  it('updates the tracked path for a case-only rename on a case-insensitive filesystem', async () => {
+    const oldPath = '/books/Author/Book.epub';
+    const newPath = '/books/Author/book.epub';
+    const fileStat = makeFileStat({ ino: 4001n, size: 70000 });
+    mockStat.mockResolvedValue(fileStat);
+    mockRealpath.mockResolvedValue(newPath);
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue(null);
+    mockRepo.findMissingBookByFolderPath.mockResolvedValue(null);
+    mockRepo.findBookFileWithContextByIno.mockResolvedValue({
+      file: { id: 51, bookId: 31, absolutePath: oldPath },
+      libraryId: 2,
+      folderPath: '/books/Author',
+      libraryFolderPath: '/books',
+      bookStatus: 'present',
+    } as any);
+
+    const result = await makeService().handleCreate(newPath);
+
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(51, expect.objectContaining({ absolutePath: newPath, relPath: 'Author/book.epub' }));
+    expect(mockRepo.markBooksAsPresent).toHaveBeenCalledWith([31]);
+    expect(result).toEqual({ type: 'book-moved', libraryId: 2, bookIds: [31] });
   });
 
   it('handles root-level file rename (folderPath equals old absolutePath)', async () => {

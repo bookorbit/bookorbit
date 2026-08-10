@@ -26,7 +26,7 @@ import {
   X,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BookCard, KoreaderDeviceInfo, KoreaderManualHashLink, KoreaderUnmatchedBook } from '@bookorbit/types'
+import type { BookCard, KoreaderDeviceInfo, KoreaderDeviceSweepInfo, KoreaderManualHashLink, KoreaderUnmatchedBook } from '@bookorbit/types'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -269,15 +269,17 @@ function linkedBookAuthors(link: KoreaderManualHashLink): string {
   return link.bookAuthors.length > 0 ? link.bookAuthors.join(', ') : t('settings.reader.koreader.hashLinks.unknownAuthor')
 }
 
-function pluginUpdateText(updateAvailable: boolean | null): string {
-  if (updateAvailable === true) return t('settings.reader.koreader.updateAvailable')
-  if (updateAvailable === false) return t('settings.reader.koreader.upToDate')
+function pluginUpdateText(sweep: KoreaderDeviceSweepInfo): string {
+  if (sweep.requiresManualUpdate) return t('settings.reader.koreader.manualUpdateRequired')
+  if (sweep.updateAvailable === true) return t('settings.reader.koreader.updateAvailable')
+  if (sweep.updateAvailable === false) return t('settings.reader.koreader.upToDate')
   return t('settings.reader.koreader.versionUnknown')
 }
 
-function pluginUpdateClass(updateAvailable: boolean | null): string {
-  if (updateAvailable === true) return 'border-primary/40 bg-primary/10 text-primary'
-  if (updateAvailable === false) return 'border-border bg-muted text-muted-foreground'
+function pluginUpdateClass(sweep: KoreaderDeviceSweepInfo): string {
+  if (sweep.requiresManualUpdate) return 'border-destructive/40 bg-destructive/10 text-destructive'
+  if (sweep.updateAvailable === true) return 'border-primary/40 bg-primary/10 text-primary'
+  if (sweep.updateAvailable === false) return 'border-border bg-muted text-muted-foreground'
   return 'border-border bg-background text-muted-foreground'
 }
 
@@ -777,7 +779,7 @@ async function handleDownloadPlugin() {
                     {{ t('settings.reader.koreader.updateAvailable') }}
                   </span>
                 </div>
-                <p class="settings-hint">
+                <p class="settings-hint mt-2">
                   {{ t('settings.reader.koreader.preconfiguredPluginHintPrefix') }}
                   <span class="font-mono text-foreground">koreader/plugins/</span>
                   {{ t('settings.reader.koreader.preconfiguredPluginHintSuffix') }}
@@ -851,15 +853,18 @@ async function handleDownloadPlugin() {
                       {{ sweep.deviceModel }}
                       <span v-if="sweep.pluginVersion" class="font-normal text-muted-foreground"> v{{ sweep.pluginVersion }}</span>
                     </p>
-                    <span class="rounded-md border px-2 py-0.5 text-[11px] font-medium" :class="pluginUpdateClass(sweep.updateAvailable)">
-                      {{ pluginUpdateText(sweep.updateAvailable) }}
+                    <span class="rounded-md border px-2 py-0.5 text-[11px] font-medium" :class="pluginUpdateClass(sweep)">
+                      {{ pluginUpdateText(sweep) }}
                     </span>
                   </div>
                   <p class="settings-hint mt-1">
                     {{ t('settings.reader.koreader.lastFullSync', { time: formatLastSync(sweep.lastSweepAt) }) }}
-                    <span v-if="sweep.updateAvailable === true && sweep.latestPluginVersion">
+                    <span v-if="sweep.updateAvailable === true && sweep.latestPluginVersion && !sweep.requiresManualUpdate">
                       {{ t('settings.reader.koreader.latestPluginSuffix', { version: sweep.latestPluginVersion }) }}</span
                     >
+                  </p>
+                  <p v-if="sweep.requiresManualUpdate" class="settings-hint mt-1">
+                    {{ t('settings.reader.koreader.manualUpdateExplanation') }}
                   </p>
                 </div>
               </div>

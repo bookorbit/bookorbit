@@ -31,6 +31,11 @@ export interface KoreaderDeviceSweepInfo {
   pluginVersion: string | null;
   latestPluginVersion: string | null;
   updateAvailable: boolean | null;
+  /**
+   * The device runs a plugin too old to install its own updates, so the server
+   * withholds the update offer and the user must install the zip by hand.
+   */
+  requiresManualUpdate: boolean;
   lastSweepAt: string;
   lastSweepBooksMatched: number;
   lastSweepPageStats: number;

@@ -513,6 +513,25 @@ export const E2E_SUITES = Object.freeze({
       ...SHARED_DB_AND_HELPER_PATHS,
     ],
   },
+  "koreader-progress-position": {
+    id: "koreader-progress-position",
+    name: "KOReader Progress Position Routing",
+    timeout: 45,
+    lane: "full",
+    description: "KOReader progress position routing into cfi or pageNumber per book format",
+    vitestTarget: "test/koreader-progress-position.e2e-spec.ts",
+    junitOutput: `${TEST_RESULTS_DIR}/koreader-progress-position-e2e-junit.xml`,
+    prepareDedicatedDatabase: true,
+    useDedicatedDatabase: true,
+    changedPaths: [
+      "server/src/modules/koreader/**",
+      "server/src/modules/book/book.service.ts",
+      "server/src/db/schema/reader.ts",
+      "server/test/koreader-progress-position.e2e-spec.ts",
+      "server/test/e2e/reader-state-isolation/**",
+      ...SHARED_DB_AND_HELPER_PATHS,
+    ],
+  },
   "koreader-file-naming": {
     id: "koreader-file-naming",
     name: "KOReader File Naming",
@@ -583,6 +602,7 @@ export const E2E_SUITES = Object.freeze({
     changedPaths: [
       "server/src/modules/kobo/**",
       "server/src/modules/book/**",
+      "server/src/modules/file-write/**",
       "server/test/kobo-multi-device-sync.e2e-spec.ts",
       "server/test/e2e/reader-state-isolation/**",
       "packages/types/src/book.ts",

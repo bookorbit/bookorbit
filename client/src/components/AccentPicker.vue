@@ -14,6 +14,7 @@ const { t } = useI18n()
         <TooltipTrigger as-child>
           <button
             class="w-3.5 h-3.5 rounded-full transition-transform hover:scale-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card shrink-0"
+            :class="opt.swatchClass"
             :aria-label="t(opt.labelKey)"
             :style="{
               backgroundColor: opt.color,

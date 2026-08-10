@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Upload, RotateCw, Trash2, PenLine, FileText, Search, X, Wand2, RefreshCw, FolderPlus, Loader2, Pause, Play } from '@lucide/vue'
-import type { BookDockFileStatus } from '@bookorbit/types'
+import { Permission, type BookDockFileStatus } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { SUPPORTED_FORMATS_ACCEPT, useBookDockUpload } from '../composables/useBookDockUpload'
@@ -37,7 +37,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { files: uploadFiles, isUploading, addFiles, clearCompleted } = useBookDockUpload()
-const { isDemoRestrictedAccount } = usePermissions()
+const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const fileInput = ref<HTMLInputElement | null>(null)
 const rescanning = ref(false)
 const processingStateChanging = ref(false)
@@ -50,6 +50,8 @@ const uploadDone = computed(() => uploadFiles.value.filter((f) => f.status === '
 const uploadError = computed(() => uploadFiles.value.filter((f) => f.status === 'error').length)
 const uploadProgress = computed(() => (uploadTotal.value > 0 ? Math.round((uploadDone.value / uploadTotal.value) * 100) : 0))
 const canBulkEdit = computed(() => !isDemoRestrictedAccount.value)
+const canFinalize = computed(() => hasPermission(Permission.LibraryUpload))
+const canManageBookDock = computed(() => hasPermission(Permission.ManageBookDock))
 
 let popoverTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -216,6 +218,7 @@ function emitBulkDiscard() {
       <input ref="fileInput" type="file" :accept="SUPPORTED_FORMATS_ACCEPT" multiple class="hidden" @change="onFilesSelected" />
 
       <button
+        v-if="canManageBookDock"
         data-testid="book-dock-processing-toggle"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95 disabled:opacity-60 disabled:active:scale-100"
         :disabled="processingStateChanging"
@@ -228,6 +231,7 @@ function emitBulkDiscard() {
       </button>
 
       <button
+        v-if="canManageBookDock"
         data-testid="book-dock-rescan"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95"
         :disabled="rescanning || props.paused"
@@ -278,6 +282,7 @@ function emitBulkDiscard() {
       <span class="text-xs font-medium text-foreground">{{ props.selectionCount }} selected</span>
       <div class="flex-1" />
       <button
+        v-if="canFinalize"
         data-testid="book-dock-finalize"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all active:scale-95"
         @click="emitFinalize"
@@ -286,6 +291,7 @@ function emitBulkDiscard() {
         {{ t('bookDock.finalize') }}
       </button>
       <button
+        v-if="canFinalize"
         data-testid="book-dock-set-destination"
         class="flex items-center gap-1.5 h-7 px-3 rounded-lg text-xs font-medium bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition-all active:scale-95"
         @click="emitSetDestination"

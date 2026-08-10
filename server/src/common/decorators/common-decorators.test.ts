@@ -27,6 +27,9 @@ describe('common decorators', () => {
       @RequirePermission(Permission.ManageUsers)
       withPermission() {}
 
+      @RequirePermission(Permission.BookDockAccess, Permission.LibraryUpload)
+      withPermissions() {}
+
       @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
       withoutPermission() {}
 
@@ -40,6 +43,10 @@ describe('common decorators', () => {
     expect(Reflect.getMetadata(IS_PUBLIC_KEY, DecoratedController.prototype.open)).toBe(true);
     expect(Reflect.getMetadata(ALLOW_DEFAULT_PASSWORD_KEY, DecoratedController.prototype.allowDefaultPassword)).toBe(true);
     expect(Reflect.getMetadata(PERMISSION_KEY, DecoratedController.prototype.withPermission)).toBe(Permission.ManageUsers);
+    expect(Reflect.getMetadata(PERMISSION_KEY, DecoratedController.prototype.withPermissions)).toEqual([
+      Permission.BookDockAccess,
+      Permission.LibraryUpload,
+    ]);
     expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, DecoratedController.prototype.withoutPermission)).toEqual({
       permission: Permission.DemoRestricted,
       message: 'Demo-restricted account cannot perform bulk edits',

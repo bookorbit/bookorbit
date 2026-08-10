@@ -317,7 +317,7 @@ E2E suites are selected by `scripts/e2e/select-matrix.mjs`:
 - **Pull request / push to main / manual `CI` dispatch:** E2E is skipped in `.github/workflows/ci.yml`.
 
 Each selected suite runs as its own GitHub Actions job via the reusable
-`.github/workflows/e2e-runner.yml` workflow, which spins up a PostgreSQL 16 + pgvector service
+`.github/workflows/e2e-runner.yml` workflow, which spins up a PostgreSQL 18 + pgvector service
 container and calls `pnpm run e2e:run -- <suite-id>`.
 
 **Manual full run:** Trigger `.github/workflows/e2e.yml` from the Actions tab. It accepts an

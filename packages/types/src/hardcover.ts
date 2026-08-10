@@ -135,3 +135,47 @@ export interface HardcoverImportApplyResult extends HardcoverImportSummary {
   progressApplied: number;
   failed: number;
 }
+
+export interface HardcoverEdition {
+  id: number;
+  title: string | null;
+  format: string;
+  pages: number | null;
+  isbn10: string | null;
+  isbn13: string | null;
+  publisher: string | null;
+  language: string | null;
+  publishedDate: string | null;
+  coverUrl: string | null;
+}
+
+export interface HardcoverLinkedBook {
+  bookId: number;
+  title: string | null;
+  authorName: string | null;
+  hardcoverBookId: number | null;
+  hardcoverEditionId: number | null;
+  matchMethod: string | null;
+  matchError: string | null;
+}
+
+// Both list results are capped server-side; `truncated` lets the UI say so instead of
+// presenting a partial list as the whole thing.
+export interface HardcoverLinkedBooksResult {
+  books: HardcoverLinkedBook[];
+  truncated: boolean;
+}
+
+export interface HardcoverEditionsResult {
+  editions: HardcoverEdition[];
+  truncated: boolean;
+}
+
+export interface SetHardcoverEditionPayload {
+  editionId: number;
+}
+
+// Every failure path throws, so a resolved response always means the edition was applied.
+export interface SetHardcoverEditionResult {
+  success: boolean;
+}

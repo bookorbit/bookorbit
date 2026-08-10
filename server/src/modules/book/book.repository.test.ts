@@ -72,6 +72,29 @@ describe('BookRepository', () => {
     expect(where).toHaveBeenCalledOnce();
   });
 
+  it('setHardcoverEditionIdIfEmpty only fills a missing shared edition id', async () => {
+    const returning = vi.fn().mockResolvedValue([{ bookId: 5 }]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const set = vi.fn().mockReturnValue({ where });
+    const db = { update: vi.fn().mockReturnValue({ set }) };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.setHardcoverEditionIdIfEmpty(5, '200')).resolves.toBe(true);
+
+    expect(db.update).toHaveBeenCalledWith(bookMetadata);
+    expect(set).toHaveBeenCalledWith({ hardcoverEditionId: '200', updatedAt: expect.any(Date) });
+  });
+
+  it('setHardcoverEditionIdIfEmpty returns false when the shared edition id is already set', async () => {
+    const returning = vi.fn().mockResolvedValue([]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const set = vi.fn().mockReturnValue({ where });
+    const db = { update: vi.fn().mockReturnValue({ set }) };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.setHardcoverEditionIdIfEmpty(5, '200')).resolves.toBe(false);
+  });
+
   it('loads book titles for deletion audit details', async () => {
     const rows = [
       { id: 3, title: 'Dune' },

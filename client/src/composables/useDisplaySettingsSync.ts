@@ -119,6 +119,7 @@ export function initDisplaySettingsSync(): void {
         settings.showSpineOnComics.value,
         settings.bookShadowStrength.value,
         settings.bookCoverDisplayMode.value,
+        settings.bookDetailCoverTint.value,
         settings.seriesCardCoverMode.value,
         settings.gridCardPrimaryLabel.value,
         settings.gridCardSecondaryLabel.value,

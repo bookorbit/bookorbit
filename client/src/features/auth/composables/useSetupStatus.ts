@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 const needsSetup = ref<boolean | null>(null)
+const allowRegistration = ref(false)
 const setupStatusError = ref<string | null>(null)
 let inFlight: Promise<boolean> | null = null
 
@@ -13,9 +14,10 @@ export function useSetupStatus() {
       try {
         const res = await fetch('/api/v1/auth/setup-status', { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to load setup status')
-        const data = (await res.json()) as { needsSetup?: boolean }
+        const data = (await res.json()) as { needsSetup?: boolean; allowRegistration?: boolean }
         setupStatusError.value = null
         needsSetup.value = data.needsSetup === true
+        allowRegistration.value = data.allowRegistration === true
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load setup status'
         setupStatusError.value = message
@@ -34,5 +36,5 @@ export function useSetupStatus() {
     setupStatusError.value = null
   }
 
-  return { needsSetup, setupStatusError, fetchSetupStatus, markSetupComplete }
+  return { needsSetup, allowRegistration, setupStatusError, fetchSetupStatus, markSetupComplete }
 }

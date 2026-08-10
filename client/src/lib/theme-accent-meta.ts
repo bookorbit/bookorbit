@@ -8,6 +8,7 @@ export interface AccentOption {
   label: string
   labelKey: string
   color: string
+  swatchClass?: string
 }
 
 export interface AccentPair {
@@ -20,10 +21,19 @@ interface AccentMetaDefinition {
   tone: AccentTone
   hue: number
   primary: AccentPrimaryDef
+  previewColor?: string
+  swatchClass?: string
 }
 
 const ACCENT_META_BY_ID: Record<Accent, AccentMetaDefinition> = {
-  white: { label: 'White', tone: 'vivid', hue: 0, primary: [0.2, 0, 0.985, 0] },
+  white: {
+    label: 'White',
+    tone: 'vivid',
+    hue: 0,
+    primary: [0.2, 0, 0.985, 0],
+    previewColor: 'oklch(0.985 0 0)',
+    swatchClass: 'ring-1 ring-border',
+  },
   grey: { label: 'Grey', tone: 'pastel', hue: 0, primary: [0.55, 0, 0.75, 0] },
   scarlet: { label: 'Scarlet', tone: 'vivid', hue: 2, primary: [0.58, 0.25, 0.74, 0.2] },
   rosewater: { label: 'Rosewater', tone: 'pastel', hue: 2, primary: [0.7, 0.125, 0.8, 0.11] },
@@ -102,6 +112,7 @@ export function isPastelAccent(accent: string | null | undefined): boolean {
 }
 
 function getAccentPreviewColor(definition: AccentMetaDefinition): string {
+  if (definition.previewColor) return definition.previewColor
   const [lightL, lightC, darkL, darkC] = definition.primary
   return `light-dark(oklch(${lightL} ${lightC} ${definition.hue}), oklch(${darkL} ${darkC} ${definition.hue}))`
 }
@@ -113,6 +124,7 @@ const ALL_ACCENT_OPTIONS: readonly AccentOption[] = ACCENT_IDS.map((id) => {
     label: definition.label,
     labelKey: `settings.appearance.theme.accents.${id}`,
     color: getAccentPreviewColor(definition),
+    swatchClass: definition.swatchClass,
   }
 })
 
