@@ -56,6 +56,7 @@ interface CacheEntry {
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
+  removeNSPrefix: true,
   textNodeName: '#text',
 });
 
@@ -203,13 +204,13 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
   const opfEntry = findInZip(zip.files, opfPath);
   if (!opfEntry) throw new Error(`OPF not found: ${opfPath}`);
   const opfDoc = xmlParser.parse(await readEntryBounded(opfEntry, MAX_XML_ENTRY_BYTES)) as Record<string, unknown>;
-  const pkg = (opfDoc['package'] ?? opfDoc['opf:package'] ?? opfDoc) as Record<string, unknown>;
-  const manifestEl = (pkg['manifest'] ?? pkg['opf:manifest']) as Record<string, unknown> | undefined;
-  const spineEl = (pkg['spine'] ?? pkg['opf:spine']) as Record<string, unknown> | undefined;
-  const metadataEl = (pkg['metadata'] ?? pkg['opf:metadata']) as Record<string, unknown> | undefined;
+  const pkg = (opfDoc['package'] ?? opfDoc) as Record<string, unknown>;
+  const manifestEl = pkg['manifest'] as Record<string, unknown> | undefined;
+  const spineEl = pkg['spine'] as Record<string, unknown> | undefined;
+  const metadataEl = pkg['metadata'] as Record<string, unknown> | undefined;
 
   const manifestById = new Map<string, EpubManifestItem>();
-  const manifest: EpubManifestItem[] = toArray((manifestEl?.item ?? manifestEl?.['opf:item']) as any).map((item: any) => {
+  const manifest: EpubManifestItem[] = toArray(manifestEl?.item as any).map((item: any) => {
     const id = item['@_id'];
     const relHref = item['@_href'];
     const mediaType = item['@_media-type'] ?? 'application/octet-stream';
@@ -222,7 +223,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
     return manifestItem;
   });
 
-  const spine: EpubSpineItem[] = toArray((spineEl?.itemref ?? spineEl?.['opf:itemref']) as any).reduce<EpubSpineItem[]>((acc, itemref: any) => {
+  const spine: EpubSpineItem[] = toArray(spineEl?.itemref as any).reduce<EpubSpineItem[]>((acc, itemref: any) => {
     const idref = itemref['@_idref'];
     const m = manifestById.get(idref);
     if (m) acc.push({ idref, href: m.href, mediaType: m.mediaType, linear: itemref['@_linear'] !== 'no' });
@@ -231,12 +232,12 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
 
   const metadata: Record<string, unknown> = {};
   if (metadataEl) {
-    const title = getText(metadataEl['dc:title']);
-    const creator = getText(toArray(metadataEl['dc:creator'])[0]);
-    const language = getText(metadataEl['dc:language']);
-    const publisher = getText(metadataEl['dc:publisher']);
-    const description = getText(metadataEl['dc:description']);
-    const identifier = getText(toArray(metadataEl['dc:identifier'])[0]);
+    const title = getText(metadataEl['title']);
+    const creator = getText(toArray(metadataEl['creator'])[0]);
+    const language = getText(metadataEl['language']);
+    const publisher = getText(metadataEl['publisher']);
+    const description = getText(metadataEl['description']);
+    const identifier = getText(toArray(metadataEl['identifier'])[0]);
     if (title) metadata.title = title;
     if (creator) metadata.creator = creator;
     if (language) metadata.language = language;
@@ -247,7 +248,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
 
   let coverPath: string | null = manifest.find((m) => m.properties?.includes('cover-image'))?.href ?? null;
   if (!coverPath && metadataEl) {
-    const coverMeta = toArray((metadataEl['meta'] ?? metadataEl['opf:meta']) as any).find((m: any) => m['@_name'] === 'cover');
+    const coverMeta = toArray(metadataEl['meta'] as any).find((m: any) => m['@_name'] === 'cover');
     if (coverMeta) coverPath = manifestById.get((coverMeta as any)['@_content'])?.href ?? null;
   }
 
@@ -264,7 +265,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
         const body = html['body'] as Record<string, unknown> | undefined;
         const navs = toArray(body?.nav as any);
         const tocNav = (navs.find((n: any) => {
-          const type = n['@_epub:type'] ?? n['@_type'];
+          const type = n['@_type'];
           return typeof type === 'string' && type.split(/\s+/).includes('toc');
         }) ?? navs[0]) as Record<string, unknown> | undefined;
         if (tocNav) {
