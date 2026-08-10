@@ -29,8 +29,19 @@ describe('permission-presets', () => {
       Permission.ReadwiseSync,
       Permission.StorygraphSync,
       Permission.OpdsAccess,
-      Permission.BookDockAccess,
     ])
+    expect(presetPermissions('standard')).not.toContain(Permission.BookDockAccess)
+    expect(presetPermissions('standard')).not.toContain(Permission.ManageBookDock)
+  })
+
+  it('separates personal Book Dock access from global Book Dock administration', () => {
+    const content = PERMISSION_GROUPS.find((group) => group.id === 'content')
+    const administration = PERMISSION_GROUPS.find((group) => group.id === 'administration')
+
+    expect(content?.permissions).toContain(Permission.BookDockAccess)
+    expect(content?.permissions).not.toContain(Permission.ManageBookDock)
+    expect(administration?.permissions).toContain(Permission.ManageBookDock)
+    expect(administration?.permissions).not.toContain(Permission.BookDockAccess)
   })
 
   it('selects nothing for the clear preset', () => {

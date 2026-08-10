@@ -3,6 +3,7 @@ import { Readable } from 'stream';
 import { Permission } from '@bookorbit/types';
 
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
+import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 import { BookDockController } from './book-dock.controller';
 
 vi.mock('fs', () => ({
@@ -26,6 +27,7 @@ function makeController() {
     getSummary: vi.fn(),
     getStatistics: vi.fn(),
     getFile: vi.fn(),
+    getCoverPath: vi.fn(),
     updateFile: vi.fn(),
     discardFile: vi.fn(),
     bulkDiscard: vi.fn(),
@@ -40,7 +42,6 @@ function makeController() {
   const ingestService = { ingestUpload: vi.fn() };
   const finalizeService = { previewNames: vi.fn(), previewFinalize: vi.fn(), discardDuplicateCandidates: vi.fn(), finalize: vi.fn() };
   const watcherService = { rescan: vi.fn() };
-  const repo = { findById: vi.fn() };
   const appSettings = { getMaxUploadSizeMb: vi.fn().mockResolvedValue(500) };
 
   const controller = new BookDockController(
@@ -48,14 +49,13 @@ function makeController() {
     ingestService as never,
     finalizeService as never,
     watcherService as never,
-    repo as never,
     appSettings as never,
   );
 
-  return { controller, service, ingestService, finalizeService, watcherService, repo, appSettings };
+  return { controller, service, ingestService, finalizeService, watcherService, appSettings };
 }
 
-const MOCK_USER = { id: 1, isSuperuser: false } as any;
+const MOCK_USER = { id: 1, isSuperuser: false, permissions: [Permission.BookDockAccess] } as any;
 
 describe('BookDockController', () => {
   beforeEach(() => {
@@ -76,33 +76,34 @@ describe('BookDockController', () => {
       order: 'desc',
       search: undefined,
       userId: MOCK_USER.id,
-      isSuperuser: MOCK_USER.isSuperuser,
+      canManageAll: false,
     });
   });
 
   it('getCover throws when file has no cover path or cover file does not exist', async () => {
-    const { controller, repo } = makeController();
+    const { controller, service } = makeController();
     const reply = { header: vi.fn(), send: vi.fn() } as any;
 
-    repo.findById.mockResolvedValueOnce({ id: 1, coverPath: null });
-    await expect(controller.getCover(1, reply)).rejects.toBeInstanceOf(NotFoundException);
+    service.getCoverPath.mockRejectedValueOnce(new NotFoundException('No cover available'));
+    await expect(controller.getCover(MOCK_USER, 1, reply)).rejects.toBeInstanceOf(NotFoundException);
 
-    repo.findById.mockResolvedValueOnce({ id: 1, coverPath: '/covers/1.jpg' });
+    service.getCoverPath.mockResolvedValueOnce('/covers/1.jpg');
     vi.mocked(access).mockRejectedValueOnce(new Error('ENOENT'));
-    await expect(controller.getCover(1, reply)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.getCover(MOCK_USER, 1, reply)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('getCover streams cover bytes with proper headers', async () => {
-    const { controller, repo } = makeController();
-    repo.findById.mockResolvedValue({ id: 1, coverPath: '/covers/1.jpg' });
+    const { controller, service } = makeController();
+    service.getCoverPath.mockResolvedValue('/covers/1.jpg');
     vi.mocked(access).mockResolvedValue(undefined as never);
     const reply = {
       header: vi.fn().mockReturnThis(),
       send: vi.fn(),
     } as any;
 
-    await controller.getCover(1, reply);
+    await controller.getCover(MOCK_USER, 1, reply);
 
+    expect(service.getCoverPath).toHaveBeenCalledWith(1, MOCK_USER.id, false);
     expect(createReadStream).toHaveBeenCalledWith('/covers/1.jpg');
     expect(reply.header).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
     expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'private, max-age=3600');
@@ -131,7 +132,7 @@ describe('BookDockController', () => {
 
     await expect(controller.upload(MOCK_USER, req)).resolves.toEqual({ id: 44, fileName: 'book.epub' });
     expect(ingestService.ingestUpload).toHaveBeenCalledWith('book.epub', expect.any(Readable), MOCK_USER.id);
-    expect(service.getFile).toHaveBeenCalledWith(44);
+    expect(service.getFile).toHaveBeenCalledWith(44, MOCK_USER.id, false);
   });
 
   it('bulk and finalize endpoints delegate payload fields as expected', async () => {
@@ -174,18 +175,18 @@ describe('BookDockController', () => {
       overrides: [],
     } as any);
     await controller.finalize(
-      { id: 99, isSuperuser: true } as any,
+      { id: 99, isSuperuser: true, permissions: [] } as any,
       { fileIds: [1], defaultLibraryId: 2, defaultFolderId: 3, selectAll: false, excludedIds: [], overrides: [] } as any,
     );
     await controller.rescan();
     await controller.pause();
     await controller.resume();
 
-    expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, MOCK_USER.isSuperuser);
-    expect(finalizeService.previewNames).toHaveBeenCalledWith([10], false, [], 2, MOCK_USER.id, MOCK_USER.isSuperuser, undefined, undefined);
-    expect(finalizeService.previewFinalize).toHaveBeenCalledWith(1, false, [10], false, [], 2, 3, [], undefined, undefined);
-    expect(finalizeService.discardDuplicateCandidates).toHaveBeenCalledWith(1, false, [10], false, [], 2, 3, [], undefined, undefined);
-    expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, [1], false, [], 2, 3, [], undefined, undefined);
+    expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, false);
+    expect(finalizeService.previewNames).toHaveBeenCalledWith([10], false, [], 2, MOCK_USER.id, false, undefined, undefined);
+    expect(finalizeService.previewFinalize).toHaveBeenCalledWith(1, false, false, [10], false, [], 2, 3, [], undefined, undefined);
+    expect(finalizeService.discardDuplicateCandidates).toHaveBeenCalledWith(1, false, false, [10], false, [], 2, 3, [], undefined, undefined);
+    expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, true, [1], false, [], 2, 3, [], undefined, undefined);
     expect(watcherService.rescan).toHaveBeenCalled();
     expect(service.pauseProcessing).toHaveBeenCalledTimes(1);
     expect(service.resumeProcessing).toHaveBeenCalledTimes(1);
@@ -197,5 +198,29 @@ describe('BookDockController', () => {
       message: 'Demo-restricted account cannot perform bulk edits',
     });
     expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, BookDockController.prototype.finalize)).toBeUndefined();
+  });
+
+  it('requires upload permission for finalization and management permission for global controls', () => {
+    const finalizationPermissions = [Permission.BookDockAccess, Permission.LibraryUpload];
+
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.previewFinalize)).toEqual(finalizationPermissions);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.discardFinalizeDuplicates)).toEqual(finalizationPermissions);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.finalize)).toEqual(finalizationPermissions);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.pause)).toBe(Permission.ManageBookDock);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.resume)).toBe(Permission.ManageBookDock);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.rescan)).toBe(Permission.ManageBookDock);
+  });
+
+  it('grants global scope only to superusers and Book Dock managers', async () => {
+    const { controller, service } = makeController();
+    service.getSummary.mockResolvedValue({});
+
+    await controller.getSummary(MOCK_USER);
+    await controller.getSummary({ ...MOCK_USER, permissions: [Permission.BookDockAccess, Permission.ManageBookDock] });
+    await controller.getSummary({ ...MOCK_USER, isSuperuser: true, permissions: [] });
+
+    expect(service.getSummary).toHaveBeenNthCalledWith(1, MOCK_USER.id, false);
+    expect(service.getSummary).toHaveBeenNthCalledWith(2, MOCK_USER.id, true);
+    expect(service.getSummary).toHaveBeenNthCalledWith(3, MOCK_USER.id, true);
   });
 });

@@ -10,7 +10,13 @@ export interface PermissionGroup {
 export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     id: 'content',
-    permissions: [Permission.LibraryDownload, Permission.LibraryUpload, Permission.LibraryEditMetadata, Permission.LibraryDeleteBooks],
+    permissions: [
+      Permission.LibraryDownload,
+      Permission.LibraryUpload,
+      Permission.LibraryEditMetadata,
+      Permission.LibraryDeleteBooks,
+      Permission.BookDockAccess,
+    ],
   },
   {
     id: 'devicesAccess',
@@ -21,7 +27,6 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       Permission.ReadwiseSync,
       Permission.StorygraphSync,
       Permission.OpdsAccess,
-      Permission.BookDockAccess,
     ],
   },
   {
@@ -35,6 +40,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       Permission.ManageMetadataConfig,
       Permission.ManageIcons,
       Permission.ManageAppSettings,
+      Permission.ManageBookDock,
       Permission.ManageUsers,
       Permission.ViewUserActivity,
       Permission.ViewAuditLog,
@@ -59,7 +65,6 @@ const STANDARD_PRESET: Permission[] = [
   Permission.ReadwiseSync,
   Permission.StorygraphSync,
   Permission.OpdsAccess,
-  Permission.BookDockAccess,
 ]
 
 export type PermissionPreset = 'standard' | 'admin' | 'clear'

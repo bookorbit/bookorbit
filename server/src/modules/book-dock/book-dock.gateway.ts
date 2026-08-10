@@ -3,7 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import type { BookDockSummary } from '@bookorbit/types';
 import { AuthService } from '../auth/auth.service';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 
@@ -36,7 +35,7 @@ export class BookDockGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.logger.debug(`WS disconnected: socket=${client.id}`);
   }
 
-  emitSummary(summary: BookDockSummary): void {
-    this.server?.emit('book-dock:summary', summary);
+  emitChanged(): void {
+    this.server?.emit('book-dock:changed');
   }
 }

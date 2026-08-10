@@ -207,7 +207,7 @@ describe('Authorization matrix (e2e)', () => {
       koboActive: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboDisabled: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboRevoked: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
-      bookDockUser: await createUserAndLogin(ctx, { permissions: [Permission.BookDockAccess] }),
+      bookDockUser: await createUserAndLogin(ctx, { permissions: [Permission.BookDockAccess, Permission.LibraryUpload] }),
       uploadUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryUpload] }),
       ownerUser: await createUserAndLogin(ctx),
       otherUser: await createUserAndLogin(ctx),
@@ -628,6 +628,11 @@ describe('Authorization matrix (e2e)', () => {
         [Permission.ManageAppSettings]: {
           method: 'GET',
           path: '/app-settings',
+          token: 'allPerms',
+        },
+        [Permission.ManageBookDock]: {
+          method: 'POST',
+          path: '/book-dock/rescan',
           token: 'allPerms',
         },
         [Permission.ManageUsers]: {
@@ -1201,18 +1206,41 @@ describe('Authorization matrix (e2e)', () => {
   });
 
   describe('service authz - library scoped data and mixed batch semantics', () => {
+    it("prevents Book Dock users from reading or mutating another user's entries", async () => {
+      const foreignRow = await createBookDockRow(ctx, {
+        fileName: `authz-foreign-book-dock-${randomUUID()}.fb2`,
+        uploadedBy: personas.otherUser.userId,
+      });
+
+      for (const request of [
+        { method: 'GET' as const, payload: undefined },
+        { method: 'PATCH' as const, payload: { selectedMetadata: { title: 'Unauthorized edit' } } },
+        { method: 'DELETE' as const, payload: undefined },
+      ]) {
+        const response = await ctx.app.inject({
+          method: request.method,
+          url: `/api/v1/book-dock/files/${foreignRow.id}`,
+          headers: authHeader(personas.bookDockUser.accessToken),
+          payload: request.payload,
+        });
+        expectError(response, 403, 'You do not have access to this Book Dock file');
+      }
+    });
+
     it('returns mixed-result finalize envelope for Book Dock authorization failures', async () => {
       const accessibleRow = await createBookDockRow(ctx, {
         fileName: `authz-finalize-ok-${randomUUID()}.fb2`,
         targetLibraryId: libraryA.libraryId,
         targetFolderId: libraryA.libraryFolderId,
         status: 'ready',
+        uploadedBy: personas.bookDockUser.userId,
       });
       const inaccessibleRow = await createBookDockRow(ctx, {
         fileName: `authz-finalize-denied-${randomUUID()}.fb2`,
         targetLibraryId: libraryB.libraryId,
         targetFolderId: libraryB.libraryFolderId,
         status: 'ready',
+        uploadedBy: personas.bookDockUser.userId,
       });
 
       const response = await ctx.app.inject({

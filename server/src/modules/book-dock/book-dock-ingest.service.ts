@@ -168,7 +168,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
         afterId,
         status: 'pending',
         userId: 0,
-        isSuperuser: true,
+        canManageAll: true,
       });
       if (rows.length === 0) break;
 
@@ -203,10 +203,10 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
 
     const coversDir = join(this.bookDockPath, 'covers');
     await this.repo.update(fileId, { status: 'extracting' });
-    await this.emitSummary();
+    this.emitChange();
     await this.metadataService.extractAndSave(fileId, row.absolutePath, format, coversDir);
     await this.autoFetchMetadataAsync(fileId);
-    await this.emitSummary();
+    this.emitChange();
     this.events.emit(BOOK_DOCK_FILE_INGESTED, fileId);
   }
 
@@ -234,7 +234,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     if (!params.title && !params.isbn) return;
 
     await this.repo.update(fileId, { status: 'fetching' });
-    await this.emitSummary();
+    this.emitChange();
     try {
       const { resolved, sources, providerIds = {} } = await this.metadataFetchPipeline.runWithSources(params, {});
       const fetched = normalizeBookDockMetadata(resolved) ?? {};
@@ -274,10 +274,8 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     return join(dir, uniqueName);
   }
 
-  private async emitSummary(): Promise<void> {
-    const summary = await this.repo.countsByStatus();
-    const paused = await this.processingState.isPaused();
-    this.gateway.emitSummary({ ...summary, paused });
+  private emitChange(): void {
+    this.gateway.emitChanged();
   }
 }
 

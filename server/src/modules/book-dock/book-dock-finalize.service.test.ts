@@ -68,7 +68,7 @@ function makeService() {
     on: vi.fn(),
   };
   const gateway = {
-    emitSummary: vi.fn(),
+    emitChanged: vi.fn(),
   };
   const processingState = {
     isPaused: vi.fn().mockResolvedValue(false),
@@ -187,7 +187,7 @@ describe('BookDockFinalizeService', () => {
         success: true,
         bookId: 42,
       } as never);
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
       await service.triggerAutoFinalize(row.id);
 
@@ -221,7 +221,7 @@ describe('BookDockFinalizeService', () => {
         success: true,
         bookId: 42,
       } as never);
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
       await service.triggerAutoFinalize(row.id);
 
@@ -255,7 +255,7 @@ describe('BookDockFinalizeService', () => {
         success: true,
         bookId: 42,
       } as never);
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
       await service.triggerAutoFinalize(row.id);
 
@@ -288,7 +288,7 @@ describe('BookDockFinalizeService', () => {
         success: true,
         bookId: 42,
       } as never);
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
       await service.triggerAutoFinalize(row.id);
 
@@ -318,7 +318,7 @@ describe('BookDockFinalizeService', () => {
         success: true,
         bookId: 42,
       } as never);
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
       await service.triggerAutoFinalize(row.id);
 
@@ -374,7 +374,7 @@ describe('BookDockFinalizeService', () => {
         afterId: undefined,
         status: 'ready',
         userId: 0,
-        isSuperuser: true,
+        canManageAll: true,
       });
       expect(enqueueSpy).toHaveBeenCalledWith(1);
       expect(enqueueSpy).not.toHaveBeenCalledWith(2);
@@ -408,9 +408,9 @@ describe('BookDockFinalizeService', () => {
         success: true,
         bookId: 101,
       } as never);
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
-      const result = await service.finalize(7, true, [1, 2], false, [], 5, 9);
+      const result = await service.finalize(7, true, true, [1, 2], false, [], 5, 9);
 
       expect(result.total).toBe(2);
       expect(result.succeeded).toBe(1);
@@ -443,9 +443,9 @@ describe('BookDockFinalizeService', () => {
             bookId: analysis.fileId + 9,
           }) as never,
       );
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
-      const result = await service.finalize(7, true, [], true, [], 5, 9, [], 'ready', 'foo');
+      const result = await service.finalize(7, true, true, [], true, [], 5, 9, [], 'ready', 'foo');
 
       expect(repo.findSelectionBatch).toHaveBeenCalledTimes(2);
       expect(result.total).toBe(2);
@@ -830,9 +830,9 @@ describe('BookDockFinalizeService', () => {
         success: true,
         bookId: 99,
       } as never);
-      vi.spyOn(service as never, 'emitSummary').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
-      await service.finalize(1, true, [4], false, [], 5, 9, [{ fileId: 4, targetFileName: '1_alt' }]);
+      await service.finalize(1, true, true, [4], false, [], 5, 9, [{ fileId: 4, targetFileName: '1_alt' }]);
 
       const overrideMapPassed = prepareSpy.mock.calls[0]?.[3] as Map<number, unknown>;
       expect(overrideMapPassed.get(4)).toMatchObject({ fileId: 4, targetFileName: '1_alt' });
@@ -930,7 +930,7 @@ describe('BookDockFinalizeService', () => {
         return Promise.resolve(undefined) as never;
       });
 
-      const preview = await service.previewFinalize(1, true, [1, 2, 3], false, [], undefined, undefined);
+      const preview = await service.previewFinalize(1, true, true, [1, 2, 3], false, [], undefined, undefined);
 
       expect(preview).toMatchObject({
         total: 3,
@@ -981,7 +981,7 @@ describe('BookDockFinalizeService', () => {
         return Promise.resolve(undefined) as never;
       });
 
-      const result = await service.discardDuplicateCandidates(1, true, [1, 2, 3], false, [], undefined, undefined);
+      const result = await service.discardDuplicateCandidates(1, true, true, [1, 2, 3], false, [], undefined, undefined);
 
       expect(result).toEqual({ total: 3, discarded: 1, skipped: 2, discardedFileIds: [1] });
       expect(mockUnlink).toHaveBeenCalledWith('/dock/duplicate.epub');

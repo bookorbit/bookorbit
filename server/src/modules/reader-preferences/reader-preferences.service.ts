@@ -1,5 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CBX_SPREAD_GAP_MAX, CBX_SPREAD_GAP_MIN, READER_GROUP_DEFAULTS, getFormatGroup, type ReaderFormatGroup } from '@bookorbit/types';
+import {
+  CBX_SPREAD_GAP_MAX,
+  CBX_SPREAD_GAP_MIN,
+  EPUB_FONT_SIZE_MAX,
+  EPUB_FONT_SIZE_MIN,
+  READER_GROUP_DEFAULTS,
+  getFormatGroup,
+  type ReaderFormatGroup,
+} from '@bookorbit/types';
 import { z } from 'zod';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -14,7 +22,7 @@ const EPUB_SETTINGS_SCHEMA = z
     themeName: z.string().min(1),
     isDark: z.boolean(),
     fontFamily: z.string().min(1).nullable(),
-    fontSize: z.number().min(10).max(32),
+    fontSize: z.number().min(EPUB_FONT_SIZE_MIN).max(EPUB_FONT_SIZE_MAX),
     lineHeight: z.number().min(0.8).max(3),
     maxColumnCount: z.number().int().min(1).max(10),
     gap: z.number().min(0).max(0.5),

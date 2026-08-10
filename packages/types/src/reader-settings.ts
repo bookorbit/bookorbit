@@ -1,5 +1,7 @@
 export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio" | "physical";
 
+export const EPUB_FONT_SIZE_MIN = 6;
+export const EPUB_FONT_SIZE_MAX = 32;
 export const CBX_SPREAD_GAP_MIN = 0;
 export const CBX_SPREAD_GAP_MAX = 64;
 
@@ -55,7 +57,7 @@ export interface EpubReaderSettings {
   themeName: string; // matches one of the reader's built-in theme names
   isDark: boolean;
   fontFamily: string | null; // null = use the book's embedded font
-  fontSize: number; // 10-32
+  fontSize: number; // EPUB_FONT_SIZE_MIN-EPUB_FONT_SIZE_MAX
   lineHeight: number; // 0.8-3.0
   maxColumnCount: number; // 1-10
   gap: number; // 0-0.5 (column gap as fraction)
