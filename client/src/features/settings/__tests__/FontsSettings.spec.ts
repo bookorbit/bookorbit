@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { computed } from 'vue'
 import FontsSettings from '../FontsSettings.vue'
-import type { UserFont } from '@bookorbit/types'
-import { ref, computed } from 'vue'
+import { makeCustomFontsMock, makeFontStore, mockFont } from './font-store-fixture'
 
 // --- Mocks ---
 
@@ -22,58 +22,19 @@ vi.mock('../SettingsPageHeader.vue', () => ({
   default: { template: '<div />' },
 }))
 
-const mockFont = (id: number, familyName: string, weight = 400, style: 'normal' | 'italic' = 'normal'): UserFont => ({
-  id,
-  familyName,
-  originalFileName: `${familyName}-${weight}.ttf`,
-  format: 'ttf',
-  weight,
-  style,
-  fileSize: 50000,
-  createdAt: '2026-01-01T00:00:00.000Z',
-})
-
 const literataFonts = [mockFont(1, 'Literata', 400), mockFont(2, 'Literata', 700)]
 const georgiaPro = mockFont(3, 'Georgia Pro')
-
-function makeComposable(initialFonts: UserFont[] = []) {
-  const fonts = ref<UserFont[]>(initialFonts)
-  const loading = ref(false)
-  const uploading = ref(false)
-
-  const families = computed(() => {
-    const map = new Map<string, UserFont[]>()
-    for (const f of fonts.value) {
-      const arr = map.get(f.familyName) ?? []
-      arr.push(f)
-      map.set(f.familyName, arr)
-    }
-    return Array.from(map.entries()).map(([name, variants]) => ({
-      name,
-      cssFamilyName: `__userfont_${name.toLowerCase().replace(/\s+/g, '_')}`,
-      variants,
-    }))
-  })
-
-  return {
-    fonts,
-    families,
-    loading,
-    uploading,
-    fetchFonts: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    uploadFont: vi.fn<(file: File) => Promise<unknown>>(),
-    updateFont: vi.fn<(id: number, data: object) => Promise<UserFont | null>>(),
-    deleteFont: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
-    generateFontFaceCSS: vi.fn<() => string>().mockReturnValue(''),
-    isFontFamilySelected: vi.fn<() => boolean>().mockReturnValue(false),
-    getCssFamilyForDisplay: vi.fn<() => string | null>().mockReturnValue(null),
-    ACCEPTED_EXTENSIONS: '.ttf,.otf,.woff,.woff2',
-  }
-}
 
 import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { toast } from 'vue-sonner'
+
+/** Builds the user-scope store and installs it as the composable's scopeStore('user'). */
+function makeComposable(initialFonts: Parameters<typeof makeFontStore>[1] = []) {
+  const store = makeFontStore('user', initialFonts)
+  vi.mocked(useCustomFonts).mockReturnValue(makeCustomFontsMock({ user: store }) as never)
+  return store
+}
 
 function makePermissions(isDemo = false) {
   return { isDemoRestrictedAccount: computed(() => isDemo) }
@@ -87,7 +48,7 @@ describe('FontsSettings', () => {
 
   describe('empty state', () => {
     it('shows empty state message when no fonts are loaded', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable() as never)
+      makeComposable()
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -95,7 +56,7 @@ describe('FontsSettings', () => {
     })
 
     it('shows quota counter as 0 / 50', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable() as never)
+      makeComposable()
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -105,7 +66,7 @@ describe('FontsSettings', () => {
 
   describe('with fonts', () => {
     it('renders font family names', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable([...literataFonts, georgiaPro]) as never)
+      makeComposable([...literataFonts, georgiaPro])
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -114,7 +75,7 @@ describe('FontsSettings', () => {
     })
 
     it('shows correct quota count', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable([...literataFonts, georgiaPro]) as never)
+      makeComposable([...literataFonts, georgiaPro])
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -122,7 +83,7 @@ describe('FontsSettings', () => {
     })
 
     it('shows file count per family', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable([...literataFonts, georgiaPro]) as never)
+      makeComposable([...literataFonts, georgiaPro])
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -140,7 +101,6 @@ describe('FontsSettings', () => {
         suggestedWeight: 400,
         suggestedStyle: 'normal',
       })
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -158,7 +118,6 @@ describe('FontsSettings', () => {
     it('shows error toast when upload fails', async () => {
       const composable = makeComposable()
       composable.uploadFont.mockRejectedValue(new Error('File too large'))
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -174,7 +133,6 @@ describe('FontsSettings', () => {
     it('dismisses an error when X is clicked', async () => {
       const composable = makeComposable()
       composable.uploadFont.mockRejectedValue(new Error('Oops'))
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -196,7 +154,6 @@ describe('FontsSettings', () => {
     it('removes font family (optimistic) and completes silently', async () => {
       const composable = makeComposable([...literataFonts, georgiaPro])
       composable.deleteFont.mockResolvedValue(true)
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -215,7 +172,6 @@ describe('FontsSettings', () => {
     it('refetches and shows error toast when family delete fails', async () => {
       const composable = makeComposable([georgiaPro])
       composable.deleteFont.mockResolvedValue(false)
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -231,7 +187,6 @@ describe('FontsSettings', () => {
     it('removes variant (optimistic) and completes silently', async () => {
       const composable = makeComposable([...literataFonts])
       composable.deleteFont.mockResolvedValue(true)
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -252,7 +207,6 @@ describe('FontsSettings', () => {
     it('restores variant and shows error toast when variant delete fails', async () => {
       const composable = makeComposable([...literataFonts])
       composable.deleteFont.mockResolvedValue(false)
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -274,7 +228,6 @@ describe('FontsSettings', () => {
     it('shows input when pencil is clicked and saves on Enter', async () => {
       const composable = makeComposable([georgiaPro])
       composable.updateFont.mockResolvedValue({ ...georgiaPro, familyName: 'New Name' })
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -296,7 +249,6 @@ describe('FontsSettings', () => {
 
     it('cancels edit on Escape', async () => {
       const composable = makeComposable([georgiaPro])
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -316,7 +268,6 @@ describe('FontsSettings', () => {
     it('shows error and refetches if rename partially fails', async () => {
       const composable = makeComposable([...literataFonts])
       composable.updateFont.mockResolvedValueOnce({ ...literataFonts[0]!, familyName: 'New' }).mockResolvedValueOnce(null)
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -336,8 +287,7 @@ describe('FontsSettings', () => {
 
   describe('variant expand', () => {
     it('shows variant rows when family header is clicked', async () => {
-      const composable = makeComposable([...literataFonts])
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
+      makeComposable([...literataFonts])
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -360,7 +310,7 @@ describe('FontsSettings', () => {
     })
 
     it('shows "Not available for demo accounts" text in upload zone', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable() as never)
+      makeComposable()
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -368,7 +318,7 @@ describe('FontsSettings', () => {
     })
 
     it('disables the file input', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable() as never)
+      makeComposable()
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -378,7 +328,6 @@ describe('FontsSettings', () => {
 
     it('does not call uploadFont when file is dropped', async () => {
       const composable = makeComposable()
-      vi.mocked(useCustomFonts).mockReturnValue(composable as never)
 
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
@@ -393,7 +342,7 @@ describe('FontsSettings', () => {
     })
 
     it('hides Rename family and Delete family buttons', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable([georgiaPro]) as never)
+      makeComposable([georgiaPro])
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -405,7 +354,7 @@ describe('FontsSettings', () => {
     })
 
     it('hides Edit weight/style and Delete variant buttons when variants are expanded', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable([...literataFonts]) as never)
+      makeComposable([...literataFonts])
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -421,7 +370,7 @@ describe('FontsSettings', () => {
     })
 
     it('still shows font families (read access is allowed)', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable([georgiaPro]) as never)
+      makeComposable([georgiaPro])
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 
@@ -429,7 +378,7 @@ describe('FontsSettings', () => {
     })
 
     it('still shows quota counter', async () => {
-      vi.mocked(useCustomFonts).mockReturnValue(makeComposable([georgiaPro]) as never)
+      makeComposable([georgiaPro])
       const wrapper = mount(FontsSettings, { attachTo: document.body })
       await flushPromises()
 

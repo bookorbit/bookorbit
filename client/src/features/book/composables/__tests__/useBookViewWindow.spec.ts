@@ -87,10 +87,11 @@ async function flush() {
   await nextTick()
 }
 
-function setup(options: { scope?: number | null; viewMode?: string; collapse?: boolean; q?: string; railEnabled?: boolean } = {}) {
+function setup(options: { scope?: number | null; viewMode?: string; collapse?: boolean; q?: string; railEnabled?: boolean; enabled?: boolean } = {}) {
   const scopeId = ref<number | null>(options.scope === undefined ? 1 : options.scope)
   const viewMode = ref(options.viewMode ?? 'table')
   const railEnabled = ref(options.railEnabled ?? true)
+  const enabled = ref(options.enabled ?? true)
   const collapseEnabled = ref(options.collapse ?? false)
   const q = ref(options.q ?? '')
   const win = useBookViewWindow({
@@ -101,8 +102,9 @@ function setup(options: { scope?: number | null; viewMode?: string; collapse?: b
     railEnabled,
     collapseEnabled,
     q,
+    enabled,
   })
-  return { win, scopeId, viewMode, railEnabled, collapseEnabled, q }
+  return { win, scopeId, viewMode, railEnabled, enabled, collapseEnabled, q }
 }
 
 function listRequests(): number[] {
@@ -160,6 +162,25 @@ describe('useBookViewWindow', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
     expect(win.total.value).toBe(0)
+  })
+
+  it('waits until enabled and sends only the prepared sort', async () => {
+    mockApi(250)
+    const { win, enabled } = setup({ enabled: false })
+    await flush()
+
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    win.sort.value = [{ field: 'author', dir: 'desc' }]
+    enabled.value = true
+    await flush()
+
+    const listCalls = fetchMock.mock.calls.filter(([url]) => !url.includes('jump-buckets'))
+    expect(listCalls).toHaveLength(1)
+    expect(JSON.parse(String(listCalls[0]?.[1]?.body))).toMatchObject({
+      sort: [{ field: 'author', dir: 'desc' }],
+      pagination: { page: 0 },
+    })
   })
 
   it('loadMorePrefix resolves only after the next contiguous chunk has loaded', async () => {

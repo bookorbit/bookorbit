@@ -33,9 +33,18 @@ vi.mock('../../common/utils/accent-insensitive-search.utils', () => ({
 import { BadRequestException } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
-import { EMPTY_CONTENT_FILTER_RULES, FIELD_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
+import {
+  CUSTOM_FIELD_TYPE_OPERATORS,
+  EMPTY_CONTENT_FILTER_RULES,
+  FIELD_OPERATORS,
+  customRuleField,
+  type CustomMetadataFieldType,
+  type RuleField,
+  type RuleOperator,
+} from '@bookorbit/types';
 
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { bookCustomMetadataValues, books } from '../../db/schema';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
 
@@ -80,8 +89,28 @@ function collectSqlText(node: unknown, acc: string[] = []): string[] {
     const arr = n[key];
     if (Array.isArray(arr)) arr.forEach((child) => collectSqlText(child, acc));
   }
-  for (const key of ['value', 'left', 'right'] as const) {
+  for (const key of ['value', 'left', 'right', 'whereClause', 'subquery'] as const) {
     if (n[key]) collectSqlText(n[key], acc);
+  }
+  return acc;
+}
+
+/**
+ * Names of the database columns a mocked clause tree compares against, in visit order.
+ * Column objects are leaves here: descending into one would reach its table and from there
+ * every sibling column, which would make any column look referenced.
+ */
+function collectColumnNames(node: unknown, acc: string[] = []): string[] {
+  if (!node || typeof node !== 'object') return acc;
+  const n = node as Record<string, unknown>;
+  if (typeof n.columnType === 'string' && typeof n.name === 'string') {
+    acc.push(n.name);
+    return acc;
+  }
+  for (const key of ['values', 'clauses', 'value', 'left', 'right', 'whereClause', 'subquery'] as const) {
+    const child = n[key];
+    if (Array.isArray(child)) child.forEach((item) => collectColumnNames(item, acc));
+    else if (child) collectColumnNames(child, acc);
   }
   return acc;
 }
@@ -121,6 +150,8 @@ function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unkn
     case 'isLocked':
     case 'isUnlocked':
     case 'isUpNext':
+    case 'isTrue':
+    case 'isFalse':
       return {};
     case 'contains':
     case 'notContains':
@@ -150,6 +181,22 @@ function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unkn
       const _exhaustive: never = operator;
       return _exhaustive;
     }
+  }
+}
+
+/** The value a client sends for a custom field of the given type, which is what picks the value column. */
+function buildValueForCustomType(operator: RuleOperator, type: CustomMetadataFieldType): { value?: unknown; valueTo?: unknown } {
+  switch (type) {
+    case 'number':
+      return operator === 'between' ? { value: 10, valueTo: 20 } : { value: 10 };
+    case 'date':
+      if (operator === 'between') return { value: '2024-01-01', valueTo: '2024-12-31' };
+      return operator === 'withinLast' ? { value: 7 } : { value: '2024-01-01' };
+    case 'boolean':
+      return {};
+    case 'text':
+    case 'url':
+      return { value: 'test' };
   }
 }
 
@@ -600,6 +647,26 @@ describe('field coverage smoke tests', () => {
         expect(() => {
           where = builder.buildWhere(wrapRule(rule) as never, USER_CTX);
         }, `field '${field}' operator '${operator}' should not throw`).not.toThrow();
+        expectPostgresSafeDateArithmetic(where);
+      }
+    },
+  );
+
+  it.each(Object.entries(CUSTOM_FIELD_TYPE_OPERATORS) as [CustomMetadataFieldType, RuleOperator[]][])(
+    'custom %s field: every operator the type offers resolves without throwing',
+    (type, operators) => {
+      const { builder } = makeBuilder();
+      const field = customRuleField(4);
+      for (const operator of operators) {
+        const { value, valueTo } = buildValueForCustomType(operator, type);
+        const rule: Record<string, unknown> = { type: 'rule', field, operator };
+        if (value !== undefined) rule.value = value;
+        if (valueTo !== undefined) rule.valueTo = valueTo;
+
+        let where: unknown;
+        expect(() => {
+          where = builder.buildWhere(wrapRule(rule) as never, USER_CTX);
+        }, `custom ${type} field operator '${operator}' should not throw`).not.toThrow();
         expectPostgresSafeDateArithmetic(where);
       }
     },
@@ -1132,6 +1199,170 @@ describe('publishedDateRuleToSql', () => {
       type: 'or',
       clauses: [{ type: 'isNotNull' }, { type: 'isNotNull' }],
     });
+  });
+});
+
+describe('customFieldRuleToSql', () => {
+  const CUSTOM_FIELD = customRuleField(7);
+
+  function buildCustomRule(rule: Record<string, unknown>) {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: CUSTOM_FIELD, ...rule }) as never, USER_CTX) as any;
+    return getRuleSql(where);
+  }
+
+  /** The value predicate an EXISTS carries, after the book id and field id scope clauses. */
+  function valuePredicate(existsClause: any) {
+    return existsClause.values[0].whereClause.clauses[2];
+  }
+
+  it('scopes every custom field rule to the book and the field id', () => {
+    const clause = buildCustomRule({ operator: 'contains', value: 'signed' });
+
+    const scope = clause.values[0].whereClause;
+    expect(scope).toMatchObject({ type: 'and' });
+    expect(scope.clauses[0]).toMatchObject({ type: 'eq', left: bookCustomMetadataValues.bookId, right: books.id });
+    expect(scope.clauses[1]).toMatchObject({ type: 'eq', left: bookCustomMetadataValues.fieldId, right: 7 });
+  });
+
+  it.each([
+    ['contains', 'signed', 'value_text'],
+    ['startsWith', 'signed', 'value_text'],
+    ['endsWith', 'signed', 'value_text'],
+    ['eq', 'signed', 'value_text'],
+    ['eq', 12, 'value_number'],
+    ['gt', 12, 'value_number'],
+    ['gte', 12, 'value_number'],
+    ['lt', 12, 'value_number'],
+    ['lte', 12, 'value_number'],
+    ['before', '2024-01-01', 'value_date'],
+    ['after', '2024-01-01', 'value_date'],
+    ['withinLast', 30, 'value_date'],
+  ] as const)('reads %s with a %s value from %s', (operator, value, column) => {
+    const clause = buildCustomRule({ operator, value });
+
+    expect(collectColumnNames(clause)).toContain(column);
+  });
+
+  it.each([
+    ['numeric bounds', 12, 20, 'value_number'],
+    ['date bounds', '2024-01-01', '2024-12-31', 'value_date'],
+  ] as const)('routes between with %s to %s', (_label, value, valueTo, column) => {
+    const clause = buildCustomRule({ operator: 'between', value, valueTo });
+
+    expect(collectColumnNames(clause)).toContain(column);
+  });
+
+  it.each([
+    ['isTrue', true],
+    ['isFalse', false],
+  ] as const)('matches %s against the boolean column', (operator, expected) => {
+    const clause = buildCustomRule({ operator });
+
+    expect(valuePredicate(clause)).toMatchObject({
+      type: 'eq',
+      left: bookCustomMetadataValues.valueBoolean,
+      right: expected,
+    });
+  });
+
+  it('answers isNotEmpty from all four value columns so it works whatever the field type is', () => {
+    const clause = buildCustomRule({ operator: 'isNotEmpty' });
+
+    const presence = valuePredicate(clause);
+    expect(presence).toMatchObject({ type: 'or' });
+    expect(collectColumnNames(presence)).toEqual(['value_text', 'value_number', 'value_date', 'value_boolean']);
+  });
+
+  it('negates the whole EXISTS for isEmpty so books with no value for the field match', () => {
+    const clause = buildCustomRule({ operator: 'isEmpty' });
+
+    expect(clause).toMatchObject({ type: 'not' });
+    expect(collectColumnNames(valuePredicate(clause.value))).toEqual(['value_text', 'value_number', 'value_date', 'value_boolean']);
+  });
+
+  it.each([
+    ['notContains', 'signed'],
+    ['notEq', 'signed'],
+    ['notEq', 12],
+  ] as const)('negates the whole EXISTS for %s so books with no value for the field match', (operator, value) => {
+    const clause = buildCustomRule({ operator, value });
+
+    expect(clause).toMatchObject({ type: 'not' });
+    expect(clause.value).toMatchObject({ type: 'sql' });
+  });
+
+  it('compares notContains against the positive pattern inside the negated EXISTS', () => {
+    const clause = buildCustomRule({ operator: 'notContains', value: 'signed' });
+
+    expect(valuePredicate(clause.value)).toMatchObject({
+      type: 'accentInsensitiveIlike',
+      left: bookCustomMetadataValues.valueText,
+      pattern: '%signed%',
+    });
+  });
+
+  it('escapes LIKE metacharacters in custom field text values', () => {
+    const clause = buildCustomRule({ operator: 'contains', value: '100%_x' });
+
+    expect(valuePredicate(clause)).toMatchObject({ pattern: '%100\\%\\_x%' });
+  });
+
+  it('keeps date arithmetic Postgres-safe for withinLast', () => {
+    const clause = buildCustomRule({ operator: 'withinLast', value: 30 });
+
+    expectPostgresSafeDateArithmetic(clause);
+    expect(collectSqlText(clause).join(' ')).toContain('timezone(');
+  });
+
+  it('rejects list values that no custom field operator accepts', () => {
+    expect(() => buildCustomRule({ operator: 'includesAny', value: ['a'] })).toThrow(BadRequestException);
+  });
+
+  it('rejects a numeric operator without a numeric value', () => {
+    expect(() => buildCustomRule({ operator: 'gt', value: 'not a number' })).toThrow(BadRequestException);
+  });
+
+  it('rejects a date operator without a parseable date', () => {
+    expect(() => buildCustomRule({ operator: 'before', value: 'not a date' })).toThrow(BadRequestException);
+  });
+
+  it('builds independent predicates for two different custom fields in one group', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      {
+        type: 'group',
+        join: 'AND',
+        rules: [
+          { type: 'rule', field: customRuleField(7), operator: 'eq', value: 'signed' },
+          { type: 'rule', field: customRuleField(9), operator: 'gt', value: 3 },
+        ],
+      } as never,
+      USER_CTX,
+    ) as any;
+
+    const [first, second] = where.clauses[1].clauses;
+    expect(first.values[0].whereClause.clauses[1]).toMatchObject({ right: 7 });
+    expect(second.values[0].whereClause.clauses[1]).toMatchObject({ right: 9 });
+    expect(collectColumnNames(valuePredicate(first))).toEqual(['value_text']);
+    expect(collectColumnNames(valuePredicate(second))).toEqual(['value_number']);
+  });
+
+  it('does not require an authenticated user', () => {
+    const { builder } = makeBuilder();
+
+    expect(() =>
+      builder.buildWhere(wrapRule({ type: 'rule', field: CUSTOM_FIELD, operator: 'contains', value: 'signed' }) as never, BASE_CTX),
+    ).not.toThrow();
+  });
+
+  it('treats a field reference with trailing SQL as an unknown field rather than a custom one', () => {
+    const { builder } = makeBuilder();
+
+    expect(() =>
+      builder.buildWhere(wrapRule({ type: 'rule', field: 'custom:7; DROP TABLE books', operator: 'contains', value: 'x' }) as never, USER_CTX),
+    ).toThrow(BadRequestException);
   });
 });
 

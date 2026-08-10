@@ -61,6 +61,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { SeriesModule } from './modules/series/series.module';
 import { EntityManagerModule } from './modules/entity-manager/entity-manager.module';
 import { FontModule } from './modules/font/font.module';
+import { ServerFontModule } from './modules/server-font/server-font.module';
 import { KoreaderModule } from './modules/koreader/koreader.module';
 import { AppInfoModule } from './modules/app-info/app-info.module';
 import { ReleaseNotesModule } from './modules/release-notes/release-notes.module';
@@ -73,6 +74,7 @@ import { CustomIconModule } from './modules/custom-icon/custom-icon.module';
 import { AccountActivityModule } from './modules/account-activity/account-activity.module';
 import { SharedReadingInsightsModule } from './modules/shared-reading-insights/shared-reading-insights.module';
 import { BookDuplicatesModule } from './modules/book-duplicates/book-duplicates.module';
+import { BookMoveModule } from './modules/book-move/book-move.module';
 
 @Module({
   imports: [
@@ -142,6 +144,7 @@ import { BookDuplicatesModule } from './modules/book-duplicates/book-duplicates.
     SeriesModule,
     EntityManagerModule,
     FontModule,
+    ServerFontModule,
     KoreaderModule,
     AppInfoModule,
     ReleaseNotesModule,
@@ -152,6 +155,7 @@ import { BookDuplicatesModule } from './modules/book-duplicates/book-duplicates.
     AccountActivityModule,
     SharedReadingInsightsModule,
     BookDuplicatesModule,
+    BookMoveModule,
     BrowseCountsModule,
   ],
   providers: [

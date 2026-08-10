@@ -3,6 +3,18 @@ const RIGHT_ZONE = 0.7
 const DOUBLE_CLICK_MS = 300
 const ANNOTATION_CLICK_SUPPRESSION_MS = DOUBLE_CLICK_MS + 100
 const SWIPE_THRESHOLD = 50
+const TAP_MOVEMENT_THRESHOLD = 10
+
+interface FoliateInputView {
+  prev?: () => void
+  next?: () => void
+  goLeft?: () => void
+  goRight?: () => void
+  getBoundingClientRect?: () => DOMRect
+  renderer?: {
+    getAttribute?: (name: string) => string | null
+  }
+}
 
 export function useFoliateInput(
   getView: () => unknown,
@@ -18,19 +30,19 @@ export function useFoliateInput(
   let suppressClickNavigationUntil = 0
   let touchStartX = 0
   let touchStartY = 0
+  let touchStartScreenX = 0
+  let touchStartScreenY = 0
   let touchStartTime = 0
   let lastTouchTime = 0
   let isTextSelectionInProgress = false
   let longHoldTimeout: ReturnType<typeof setTimeout> | null = null
 
   function getViewEl() {
-    return getView() as {
-      prev?: () => void
-      next?: () => void
-      goLeft?: () => void
-      goRight?: () => void
-      getBoundingClientRect?: () => DOMRect
-    } | null
+    return getView() as FoliateInputView | null
+  }
+
+  function isScrolledFlow() {
+    return getViewEl()?.renderer?.getAttribute?.('flow') === 'scrolled'
   }
 
   function navigateLeft() {
@@ -68,6 +80,8 @@ export function useFoliateInput(
     const touch = e.touches[0]!
     touchStartX = touch.clientX
     touchStartY = touch.clientY
+    touchStartScreenX = touch.screenX
+    touchStartScreenY = touch.screenY
     touchStartTime = Date.now()
     isTextSelectionInProgress = false
     longHoldTimeout = setTimeout(() => {
@@ -108,6 +122,10 @@ export function useFoliateInput(
       const deltaY = Math.abs(touch.clientY - touchStartY)
 
       if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaX) > deltaY) {
+        // Scrolled flow scrolls the iframe along with its container, so the content stays
+        // under the finger and deltaY collapses to roughly zero. Any sideways drift while
+        // scrolling would then read as a swipe and turn the page.
+        if (isScrolledFlow()) return
         if (isNavigating) return
         isNavigating = true
         if (deltaX < 0) navigateRight()
@@ -116,7 +134,12 @@ export function useFoliateInput(
         return
       }
 
-      if (touchDuration < 500 && Math.abs(deltaX) < 10 && deltaY < 10) {
+      // Client coordinates move with the scrolling container, so only screen coordinates
+      // separate a stationary tap from a flick that scrolled the page under the finger.
+      const screenDeltaX = Math.abs(touch.screenX - touchStartScreenX)
+      const screenDeltaY = Math.abs(touch.screenY - touchStartScreenY)
+
+      if (touchDuration < 500 && screenDeltaX < TAP_MOVEMENT_THRESHOLD && screenDeltaY < TAP_MOVEMENT_THRESHOLD) {
         const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null
         if (!iframe) return
         const iframeRect = iframe.getBoundingClientRect()

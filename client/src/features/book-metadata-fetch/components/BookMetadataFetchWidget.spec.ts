@@ -10,6 +10,7 @@ const subscribeBooks = vi.fn<() => void>()
 const subscribeAuthors = vi.fn<() => void>()
 const toastSuccess = vi.fn<(message: string) => void>()
 const toastWarning = vi.fn<(message: string) => void>()
+const authUser = ref({ id: 1 })
 
 vi.mock('../composables/useBookMetadataFetchStatus', () => ({
   useBookMetadataFetchStatus: () => ({ status: bookStatus, subscribe: subscribeBooks }),
@@ -21,6 +22,10 @@ vi.mock('@/features/settings/composables/useAuthorEnrichmentStatus', () => ({
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ isSuperuser: ref(true), hasPermission: () => true }),
+}))
+
+vi.mock('@/features/auth/composables/useAuth', () => ({
+  useAuth: () => ({ user: authUser }),
 }))
 
 vi.mock('vue-sonner', () => ({
@@ -36,6 +41,7 @@ function idleBookStatus(overrides: Partial<BookMetadataFetchStatusEvent> = {}): 
     queued: 0,
     processing: 0,
     failed: 0,
+    latestFailureAt: null,
     paused: false,
     sessionTotal: 0,
     sessionDone: 0,
@@ -50,6 +56,7 @@ function idleAuthorStatus(overrides: Partial<AuthorEnrichmentStatusEvent> = {}):
     processing: 0,
     rateLimited: 0,
     failed: 0,
+    latestFailureAt: null,
     done: 0,
     total: 0,
     paused: false,
@@ -65,6 +72,8 @@ describe('BookMetadataFetchWidget', () => {
   beforeEach(() => {
     activateI18nLocale('en')
     vi.clearAllMocks()
+    localStorage.clear()
+    authUser.value = { id: 1 }
     bookStatus.value = idleBookStatus()
     authorStatus.value = idleAuthorStatus()
   })
@@ -92,7 +101,7 @@ describe('BookMetadataFetchWidget', () => {
   })
 
   it('shows terminal failures as finished and dismisses them without deleting the failure report', async () => {
-    authorStatus.value = idleAuthorStatus({ failed: 152, total: 152 })
+    authorStatus.value = idleAuthorStatus({ failed: 152, latestFailureAt: '2026-08-05T10:00:00.000Z', total: 152 })
     const wrapper = shallowMount(BookMetadataFetchWidget)
 
     expect(wrapper.text()).toContain('Author enrichment finished')
@@ -102,6 +111,28 @@ describe('BookMetadataFetchWidget', () => {
 
     expect(wrapper.find('.fixed').exists()).toBe(false)
     expect(authorStatus.value.failed).toBe(152)
+  })
+
+  it('keeps a dismissed terminal failure card hidden after the widget remounts', async () => {
+    authorStatus.value = idleAuthorStatus({ failed: 2, latestFailureAt: '2026-08-05T10:00:00.000Z', total: 2 })
+    const wrapper = shallowMount(BookMetadataFetchWidget)
+
+    await wrapper.get('button[aria-label="Dismiss author enrichment status"]').trigger('click')
+    wrapper.unmount()
+
+    const remounted = shallowMount(BookMetadataFetchWidget)
+    expect(remounted.find('.fixed').exists()).toBe(false)
+  })
+
+  it('shows a new terminal failure set after an older one was dismissed', async () => {
+    authorStatus.value = idleAuthorStatus({ failed: 2, latestFailureAt: '2026-08-05T10:00:00.000Z', total: 2 })
+    const wrapper = shallowMount(BookMetadataFetchWidget)
+
+    await wrapper.get('button[aria-label="Dismiss author enrichment status"]').trigger('click')
+    authorStatus.value = idleAuthorStatus({ failed: 2, latestFailureAt: '2026-08-05T11:00:00.000Z', total: 2 })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Author enrichment finished')
   })
 
   it('keeps a dismissed card hidden for the current run and restores it for later work', async () => {
@@ -168,7 +199,7 @@ describe('BookMetadataFetchWidget', () => {
   })
 
   it('also makes retained book metadata failures dismissible', async () => {
-    bookStatus.value = idleBookStatus({ failed: 3 })
+    bookStatus.value = idleBookStatus({ failed: 3, latestFailureAt: '2026-08-05T10:00:00.000Z' })
     const wrapper = shallowMount(BookMetadataFetchWidget)
 
     expect(wrapper.text()).toContain('Metadata fetch finished')
@@ -176,5 +207,38 @@ describe('BookMetadataFetchWidget', () => {
 
     expect(wrapper.find('.fixed').exists()).toBe(false)
     expect(bookStatus.value.failed).toBe(3)
+  })
+
+  it('keeps a dismissed book metadata failure card hidden after the widget remounts', async () => {
+    bookStatus.value = idleBookStatus({ failed: 3, latestFailureAt: '2026-08-05T10:00:00.000Z' })
+    const wrapper = shallowMount(BookMetadataFetchWidget)
+
+    await wrapper.get('button[aria-label="Dismiss metadata fetch status"]').trigger('click')
+    wrapper.unmount()
+
+    const remounted = shallowMount(BookMetadataFetchWidget)
+    expect(remounted.find('.fixed').exists()).toBe(false)
+  })
+
+  it('shows a new book metadata failure set after an older one was dismissed', async () => {
+    bookStatus.value = idleBookStatus({ failed: 3, latestFailureAt: '2026-08-05T10:00:00.000Z' })
+    const wrapper = shallowMount(BookMetadataFetchWidget)
+
+    await wrapper.get('button[aria-label="Dismiss metadata fetch status"]').trigger('click')
+    bookStatus.value = idleBookStatus({ failed: 3, latestFailureAt: '2026-08-05T11:00:00.000Z' })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Metadata fetch finished')
+  })
+
+  it('does not let a dismissed author card hide retained book metadata failures', async () => {
+    authorStatus.value = idleAuthorStatus({ failed: 3, latestFailureAt: '2026-08-05T10:00:00.000Z', total: 3 })
+    const wrapper = shallowMount(BookMetadataFetchWidget)
+
+    await wrapper.get('button[aria-label="Dismiss author enrichment status"]').trigger('click')
+    bookStatus.value = idleBookStatus({ failed: 3, latestFailureAt: '2026-08-05T10:00:00.000Z' })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Metadata fetch finished')
   })
 })

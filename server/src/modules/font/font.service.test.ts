@@ -5,7 +5,7 @@ import type { FontStorageService } from './font.storage.service';
 import type { FontValidationService } from './font.validation.service';
 import type { RequestUser } from '../../common/types/request-user';
 import type { UserFontRow } from '../../db/schema';
-import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { EMPTY_CONTENT_FILTER_RULES, MAX_FONT_FILE_SIZE } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   return {
@@ -144,9 +144,20 @@ describe('FontService', () => {
 
     it('rejects files exceeding size limit', async () => {
       const user = makeUser();
-      const buffer = Buffer.alloc(11 * 1024 * 1024);
+      const buffer = Buffer.alloc(MAX_FONT_FILE_SIZE + 1);
 
       await expect(service.upload(user, buffer, 'big.ttf')).rejects.toThrow(BadRequestException);
+    });
+
+    it('accepts a font at exactly the size limit', async () => {
+      const user = makeUser();
+      const buffer = makeTTFBuffer();
+      // Reporting the limit as the length avoids allocating 50 MB just to probe the boundary.
+      Object.defineProperty(buffer, 'length', { value: MAX_FONT_FILE_SIZE });
+      repo.create.mockResolvedValue(makeFontRow());
+
+      await expect(service.upload(user, buffer, 'exactly-at-limit.ttf')).resolves.toBeDefined();
+      expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ fileSize: MAX_FONT_FILE_SIZE }));
     });
 
     it('rejects unsupported file extensions', async () => {

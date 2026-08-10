@@ -1,9 +1,10 @@
-import { Controller, DefaultValuePipe, Get, Param, ParseEnumPipe, ParseIntPipe, Query } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Get, HttpCode, HttpStatus, Param, ParseEnumPipe, ParseIntPipe, Post, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { DashboardService } from './dashboard.service';
 import { DashboardWidgetService } from './dashboard-widget.service';
+import { DashboardScrollerBatchDto } from './dto/dashboard-scroller-batch.dto';
 import { ScrollerType } from './dto/scroller-type.enum';
 
 @Controller('dashboard')
@@ -21,6 +22,12 @@ export class DashboardController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.dashboardService.getScroller(type, user, limit, smartScopeId);
+  }
+
+  @Post('scrollers/batch')
+  @HttpCode(HttpStatus.OK)
+  getScrollers(@CurrentUser() user: RequestUser, @Body() dto: DashboardScrollerBatchDto) {
+    return this.dashboardService.getScrollers(dto, user);
   }
 
   @Get('widgets/reading-goal')

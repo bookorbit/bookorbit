@@ -75,7 +75,10 @@ function buildMultipartBody(fileName: string, content: Buffer, contentType: stri
   return { body: Buffer.concat([preamble, content, closing]), boundary };
 }
 
-const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+lmL8AAAAASUVORK5CYII=', 'base64');
+const onePixelPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWM4YWT0HwAFHgIsBxDy5AAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
   let ctx!: UsersAdminLifecycleE2EContext;

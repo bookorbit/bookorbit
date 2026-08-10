@@ -29,7 +29,11 @@ export class HardcoverProvider implements IdentifiableProvider {
     if (params.isbn) {
       const books = signal ? await this.client.searchByIsbn(params.isbn, apiKey, signal) : await this.client.searchByIsbn(params.isbn, apiKey);
       if (books.length > 0) {
-        return books.flatMap(mapBookWithEditions);
+        const candidates = books.flatMap(mapBookWithEditions);
+        const pinned = params.hardcoverEditionId
+          ? candidates.find((candidate) => candidate.hardcoverEditionId === params.hardcoverEditionId)
+          : undefined;
+        return pinned ? [pinned] : candidates;
       }
     }
 
@@ -57,6 +61,12 @@ export class HardcoverProvider implements IdentifiableProvider {
     if (!book) return null;
 
     const candidates = mapBookWithEditions(book);
+
+    if (params?.hardcoverEditionId) {
+      const pinned = candidates.find((candidate) => candidate.hardcoverEditionId === params.hardcoverEditionId);
+      if (pinned) return pinned;
+    }
+
     const requestedIsbn = normalizeMetadataIsbn(params?.isbn);
     if (requestedIsbn) {
       return candidates.find((candidate) => candidateHasNormalizedIsbn(candidate, requestedIsbn)) ?? null;

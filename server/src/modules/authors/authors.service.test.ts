@@ -1,17 +1,39 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
-vi.mock('../book/utils/assemble-book-cards', () => ({
-  assembleBookCards: vi.fn(),
-}));
-
-import { assembleBookCards } from '../book/utils/assemble-book-cards';
-
 import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorsService } from './authors.service';
 
 function reqUser(id = 7, superuser = false) {
   return { id, isSuperuser: superuser, permissions: [], contentFilters: undefined } as any;
+}
+
+function makeBookRow(id: number, title: string) {
+  return {
+    id,
+    status: 'ready',
+    coverAspectRatio: '2/3',
+    primaryFileId: null,
+    folderPath: `/books/${id}`,
+    addedAt: new Date('2026-08-01T00:00:00.000Z'),
+    title,
+    seriesId: null,
+    seriesName: null,
+    seriesIndex: null,
+    publishedDate: null,
+    publishedYear: null,
+    language: null,
+    rating: null,
+    metadataScore: null,
+    coverSource: null,
+    lockedFields: null,
+    subtitle: null,
+    publisher: null,
+    pageCount: null,
+    isbn13: null,
+    hardcoverId: null,
+    hardcoverEditionId: null,
+  };
 }
 
 describe('AuthorsService', () => {
@@ -31,8 +53,8 @@ describe('AuthorsService', () => {
     countAuthors: vi.fn(),
   };
 
-  const bookRepo = {
-    findCards: vi.fn(),
+  const bookReadService = {
+    findCardsByBookIds: vi.fn(),
   };
 
   const libraryService = {
@@ -80,7 +102,7 @@ describe('AuthorsService', () => {
     vi.resetAllMocks();
     service = new AuthorsService(
       authorsRepo as any,
-      bookRepo as any,
+      bookReadService as any,
       libraryService as any,
       appSettings as any,
       authorMetadataFetchService as any,
@@ -97,7 +119,6 @@ describe('AuthorsService', () => {
     enrichmentOrchestrator.backfillLinkedAuthors.mockResolvedValue(8);
     appSettings.getAuthorsAutoEnrichmentWriteMode.mockResolvedValue('missing_only');
     metadataScoreService.calculateAndSaveMany.mockResolvedValue(undefined);
-    vi.mocked(assembleBookCards).mockReturnValue([]);
   });
 
   it('countAll counts authors across the accessible libraries', async () => {
@@ -354,7 +375,7 @@ describe('AuthorsService', () => {
     const result = await service.findBooks(reqUser(), 10, {});
 
     expect(result).toEqual({ items: [], total: 0, page: 0, size: 50 });
-    expect(bookRepo.findCards).not.toHaveBeenCalled();
+    expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
   });
 
   it('findBooks passes sort, order, size, and libraryId to findBookIdsPage', async () => {
@@ -377,19 +398,94 @@ describe('AuthorsService', () => {
   });
 
   it('findBooks assembles and returns books in bookIds page order', async () => {
-    const book1 = { id: 1, title: 'A' } as any;
-    const book3 = { id: 3, title: 'C' } as any;
-    const book2 = { id: 2, title: 'B' } as any;
-
     authorsRepo.findById.mockResolvedValue({ id: 5, name: 'Author', bookCount: 3 });
     authorsRepo.findBookIdsPage.mockResolvedValue({ bookIds: [3, 1, 2], total: 3, page: 0, size: 50 });
-    bookRepo.findCards.mockResolvedValue({ rows: [], authorRows: [], fileRows: [], genreRows: [], progressRows: [] });
-    vi.mocked(assembleBookCards).mockReturnValue([book1, book2, book3]);
+    bookReadService.findCardsByBookIds.mockResolvedValue({
+      rows: [makeBookRow(1, 'A'), makeBookRow(2, 'B'), makeBookRow(3, 'C')],
+      authorRows: [],
+      fileRows: [],
+      genreRows: [],
+      progressRows: [],
+      statusRows: [],
+      narratorRows: [],
+      tagRows: [],
+      seriesMembershipRows: [],
+      total: 3,
+    });
 
     const result = await service.findBooks(reqUser(), 5, {});
 
+    expect(bookReadService.findCardsByBookIds).toHaveBeenCalledWith([3, 1, 2], 7);
     expect(result.total).toBe(3);
     expect(result.items.map((b) => b.id)).toEqual([3, 1, 2]);
+  });
+
+  it('findBooks preserves per-user status and all card enrichments', async () => {
+    const updatedAt = new Date('2026-08-05T12:00:00.000Z');
+    const startedAt = new Date('2026-08-01T08:30:00.000Z');
+    const expectedFinishedAt = new Date('2026-08-04T18:45:00.000Z');
+
+    authorsRepo.findById.mockResolvedValue({ id: 5, name: 'Author', bookCount: 1 });
+    authorsRepo.findBookIdsPage.mockResolvedValue({ bookIds: [11], total: 1, page: 0, size: 50 });
+    bookReadService.findCardsByBookIds.mockResolvedValue({
+      rows: [{ ...makeBookRow(11, 'Enriched Book'), primaryFileId: 101 }],
+      authorRows: [{ bookId: 11, name: 'Author' }],
+      fileRows: [{ bookId: 11, id: 101, format: 'epub', role: 'content', sizeBytes: 2048 }],
+      genreRows: [{ bookId: 11, name: 'Fantasy' }],
+      progressRows: [{ bookFileId: 101, percentage: 100 }],
+      statusRows: [
+        {
+          bookId: 11,
+          status: 'read',
+          source: 'manual',
+          startedAt,
+          finishedAt: expectedFinishedAt,
+          updatedAt,
+        },
+      ],
+      narratorRows: [{ bookId: 11, name: 'Narrator' }],
+      tagRows: [{ bookId: 11, name: 'Favorite' }],
+      seriesMembershipRows: [
+        {
+          bookId: 11,
+          seriesId: 4,
+          seriesName: 'Saga',
+          seriesIndex: 2,
+          displayOrder: 0,
+          expectedBookCount: 3,
+        },
+      ],
+      total: 1,
+    });
+
+    const result = await service.findBooks(reqUser(), 5, {});
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      id: 11,
+      authors: ['Author'],
+      files: [{ id: 101, format: 'epub', role: 'primary', sizeBytes: 2048 }],
+      genres: ['Fantasy'],
+      readingProgress: 100,
+      readStatus: {
+        status: 'read',
+        source: 'manual',
+        startedAt: startedAt.toISOString(),
+        finishedAt: expectedFinishedAt.toISOString(),
+        updatedAt: updatedAt.toISOString(),
+      },
+      narrators: ['Narrator'],
+      tags: ['Favorite'],
+      seriesMemberships: [
+        {
+          seriesId: 4,
+          seriesName: 'Saga',
+          seriesIndex: 2,
+          displayOrder: 0,
+          expectedBookCount: 3,
+        },
+      ],
+    });
   });
 
   it('findBooks uses defaults when dto fields are omitted', async () => {

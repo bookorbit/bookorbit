@@ -10,7 +10,7 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile } from '../metadata/lib/pdf-parser';
-import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
+import { ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { BulkEditFieldsDto } from './dto/bulk-edit-metadata.dto';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -137,6 +137,8 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     bulkSetRating: vi.fn(),
     bulkUpdateMetadataFields: vi.fn(),
     updateMetadataFields: vi.fn(),
+    setHardcoverEditionIdIfEmpty: vi.fn(),
+    updateAddedAt: vi.fn(),
     replaceCommunityRatings: vi.fn(),
     withTransaction: vi.fn(),
     deleteByIds: vi.fn(),
@@ -1233,6 +1235,25 @@ describe('BookService', () => {
       );
     });
 
+    it('refreshMetadata pins the search to a previously chosen Hardcover edition', async () => {
+      const { service, bookRepo, pipeline } = makeService();
+      const user = makeUser();
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: { id: 1, libraryId: 7 },
+          book_metadata: { title: 'Old', isbn13: '9780756404741', isbn10: null, hardcoverEditionId: '8941973' },
+        },
+        authorRows: [{ id: 1, name: 'Patrick Rothfuss', sortName: null }],
+        genreRows: [],
+        communityRatingRows: [],
+      });
+      pipeline.runWithSources.mockResolvedValue({ resolved: {}, sources: {}, providerIds: {} });
+
+      await service.refreshMetadata(1, true, user);
+
+      expect(pipeline.runWithSources).toHaveBeenCalledWith(expect.objectContaining({ hardcoverEditionId: '8941973' }), expect.any(Object), 7);
+    });
+
     it('refreshMetadata persists provider-specific community rating rows', async () => {
       const { service, bookRepo, pipeline } = makeService();
       const user = makeUser();
@@ -1505,6 +1526,34 @@ describe('BookService', () => {
         write: { status: 'success', fieldsWritten: ['title'], durationMs: 12 },
         libraryAutoWriteEnabled: true,
       });
+    });
+
+    it('updateAddedAt stores the selected date in the user timezone and returns updated detail', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser({ settings: { timezone: 'America/New_York' } });
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5, addedAt: '2020-06-15T04:00:00.000Z' } as never);
+
+      await expect(service.updateAddedAt(5, { addedAt: '2020-06-15' }, user)).resolves.toEqual({
+        id: 5,
+        addedAt: '2020-06-15T04:00:00.000Z',
+      });
+
+      expect(bookRepo.updateAddedAt).toHaveBeenCalledWith(5, new Date('2020-06-15T04:00:00.000Z'));
+      expect(service.getDetail).toHaveBeenCalledWith(5, user);
+    });
+
+    it('updateAddedAt rejects invalid and future dates before persistence', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-05-20T12:00:00.000Z'));
+
+      await expect(service.updateAddedAt(5, { addedAt: '2026-02-30' }, makeUser())).rejects.toThrow('addedAt must be a valid date');
+      await expect(service.updateAddedAt(5, { addedAt: '2026-05-21' }, makeUser())).rejects.toThrow('addedAt cannot be in the future');
+      expect(bookRepo.updateAddedAt).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
     });
 
     it('updateMetadata replaces community rating rows', async () => {
@@ -1879,6 +1928,40 @@ describe('BookService', () => {
         bookIds: [5],
         rating: 4,
       });
+    });
+
+    it('updateMetadata emits hardcover edition changed event when hardcoverEditionId is set', async () => {
+      const { service, achievementEvents } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { hardcoverEditionId: '200' }, user);
+
+      expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, {
+        userId: user.id,
+        bookId: 5,
+        hardcoverEditionId: '200',
+      });
+    });
+
+    it('updateMetadata does not emit hardcover edition changed event when hardcoverEditionId is cleared', async () => {
+      const { service, achievementEvents } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { hardcoverEditionId: null }, user);
+
+      expect(achievementEvents.emit).not.toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, expect.anything());
+    });
+
+    it('setHardcoverEditionIdIfEmpty delegates to the repository', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.setHardcoverEditionIdIfEmpty.mockResolvedValue(true);
+
+      await expect(service.setHardcoverEditionIdIfEmpty(5, '200')).resolves.toBe(true);
+      expect(bookRepo.setHardcoverEditionIdIfEmpty).toHaveBeenCalledWith(5, '200');
     });
 
     it('updateMetadata replaces genres array only', async () => {

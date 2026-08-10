@@ -24,9 +24,16 @@ function mountComposable(): ReturnType<typeof useDashboardLabels> {
 
 type CatalogNames = { widgetNames: Record<string, string>; shelfNames: Record<string, string> }
 
+// Production falls back to English for any key a target catalog has not translated,
+// so the expected label is the Portuguese one where it exists and English otherwise.
+// Reading pt directly would assert `undefined` against rendered English the first
+// time Portuguese lags behind a new dashboard key.
 const CATALOGS: Record<'en' | 'pt', CatalogNames> = {
   en: en.dashboard.settings,
-  pt: pt.dashboard.settings,
+  pt: {
+    widgetNames: { ...en.dashboard.settings.widgetNames, ...pt.dashboard.settings.widgetNames },
+    shelfNames: { ...en.dashboard.settings.shelfNames, ...pt.dashboard.settings.shelfNames },
+  },
 }
 
 // Mirrors the kebab-case type to camel-case message key mapping the composable owns.
@@ -45,6 +52,13 @@ const WIDGET_KEY_BY_TYPE: Record<WidgetType, string> = {
   'year-projection': 'yearProjection',
   'long-wait': 'longWait',
 }
+
+// A widget whose Portuguese name genuinely differs from English. Assertions that a
+// translated label is not the English one only hold for such a widget: a name that
+// falls back to English renders the English string for a legitimate reason.
+const PT_TRANSLATED_WIDGET = (Object.keys(WIDGET_KEY_BY_TYPE) as WidgetType[]).find(
+  (type) => CATALOGS.pt.widgetNames[WIDGET_KEY_BY_TYPE[type]] !== CATALOGS.en.widgetNames[WIDGET_KEY_BY_TYPE[type]],
+)
 
 const SHELF_KEY_BY_TYPE: Record<ScrollerType, string> = {
   'recently-added': 'recentlyAdded',
@@ -107,19 +121,23 @@ describe('useDashboardLabels', () => {
         const key = WIDGET_KEY_BY_TYPE[type]
         expect(widgetName(type), `widget name for ${type}`).toBe(CATALOGS.pt.widgetNames[key])
       }
-      expect(widgetName('reading-streak')).not.toBe(CATALOGS.en.widgetNames.readingStreak)
-      expect(widgetName('currently-reading')).not.toBe(CATALOGS.en.widgetNames.currentlyReading)
+      expect(PT_TRANSLATED_WIDGET, 'Portuguese should translate at least one widget name').toBeDefined()
+      const translatedKey = WIDGET_KEY_BY_TYPE[PT_TRANSLATED_WIDGET!]
+      expect(widgetName(PT_TRANSLATED_WIDGET!)).not.toBe(CATALOGS.en.widgetNames[translatedKey])
     })
 
     it('re-resolves when the locale changes back', async () => {
       const { widgetName } = mountComposable()
 
+      expect(PT_TRANSLATED_WIDGET, 'Portuguese should translate at least one widget name').toBeDefined()
+      const type = PT_TRANSLATED_WIDGET!
+
       await setI18nLocale('pt')
-      const translated = widgetName('reading-streak')
+      const translated = widgetName(type)
       await setI18nLocale('en')
 
-      expect(translated).not.toBe(widgetName('reading-streak'))
-      expect(widgetName('reading-streak')).toBe(CATALOGS.en.widgetNames.readingStreak)
+      expect(translated).not.toBe(widgetName(type))
+      expect(widgetName(type)).toBe(CATALOGS.en.widgetNames[WIDGET_KEY_BY_TYPE[type]])
     })
   })
 

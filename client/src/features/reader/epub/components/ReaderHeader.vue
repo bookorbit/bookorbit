@@ -14,7 +14,9 @@ import {
   Search,
   Settings,
 } from '@lucide/vue'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useMediaQuery } from '@vueuse/core'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useFullscreen } from '../../shared/composables/useFullscreen'
 
@@ -42,8 +44,16 @@ const emit = defineEmits<{
 
 const { isFullscreen } = useFullscreen()
 
+// The settings surface is one panel in two containers: an anchored popover where there
+// is room beside the text, a bottom sheet where the thumb is and the page must stay visible.
+const isCompact = useMediaQuery('(max-width: 639px)')
+
 function onSettingsOpenChange(open: boolean) {
   emit('update:settingsOpen', open)
+}
+
+function openSettings() {
+  emit('update:settingsOpen', true)
 }
 
 function getFooterModeIcon(mode: 0 | 1 | 2) {
@@ -159,8 +169,33 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
         <TooltipContent>{{ isFullscreen ? t('reader.header.exitFullscreen') : t('reader.header.enterFullscreen') }}</TooltipContent>
       </Tooltip>
 
-      <DropdownMenu :open="props.settingsOpen" @update:open="onSettingsOpenChange">
-        <DropdownMenuTrigger as-child>
+      <template v-if="isCompact">
+        <button
+          class="viewer-btn"
+          :class="props.settingsOpen ? '!bg-muted !text-foreground' : ''"
+          :title="t('reader.settings.title')"
+          :aria-label="t('reader.settings.ariaLabel')"
+          @click="openSettings"
+        >
+          <Settings :size="18" />
+        </button>
+        <Sheet :open="props.settingsOpen" @update:open="onSettingsOpenChange">
+          <SheetContent
+            side="bottom"
+            hide-close
+            class="max-h-[85vh] gap-0 rounded-t-2xl border-border bg-card p-0"
+            :aria-label="t('reader.settings.ariaLabel')"
+          >
+            <div class="flex shrink-0 justify-center pt-2.5 pb-1">
+              <div class="h-1 w-9 rounded-full bg-border" />
+            </div>
+            <slot name="settingsPanel" />
+          </SheetContent>
+        </Sheet>
+      </template>
+
+      <Popover v-else :open="props.settingsOpen" @update:open="onSettingsOpenChange">
+        <PopoverTrigger as-child>
           <button
             class="viewer-btn"
             :class="props.settingsOpen ? '!bg-muted !text-foreground' : ''"
@@ -169,16 +204,16 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
           >
             <Settings :size="18" />
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
+        </PopoverTrigger>
+        <PopoverContent
           align="end"
           side="bottom"
           :side-offset="10"
-          class="w-[22rem] max-w-[calc(100vw-1rem)] max-h-[min(80vh,38rem)] rounded-lg border-border bg-card p-0 shadow-2xl overflow-hidden"
+          class="flex max-h-[min(80vh,40rem)] w-[21rem] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border-border bg-card p-0 shadow-2xl"
         >
           <slot name="settingsPanel" />
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </PopoverContent>
+      </Popover>
     </div>
   </header>
 </template>

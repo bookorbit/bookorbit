@@ -60,6 +60,15 @@ describe('KoreaderCatalogController', () => {
     expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply);
   });
 
+  it('forwards an unread reset rather than treating it as a missing status', async () => {
+    const { controller, catalogService } = makeController();
+    const user = { id: 7 } as never;
+    catalogService.setReadStatus.mockResolvedValueOnce({ readStatus: 'unread' });
+
+    await expect(controller.setReadStatus(user, 10, { status: 'unread' } as never)).resolves.toEqual({ readStatus: 'unread' });
+    expect(catalogService.setReadStatus).toHaveBeenCalledWith(user, 10, 'unread');
+  });
+
   it('passes a named dashboard section through and omits smartScopeId unless it is set', async () => {
     const { controller, catalogService } = makeController();
     const user = { id: 7 } as never;

@@ -18,6 +18,7 @@ import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboKepubContextService } from './services/kobo-kepub-context.service';
+import { KoboPositionRebuildService } from './services/kobo-position-rebuild.service';
 import { KoboProgressBridgeService } from './services/kobo-progress-bridge.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
@@ -55,6 +56,7 @@ describe('KoboModule', () => {
       KoboKepubContextService,
       KoboProgressBridgeService,
       KoboAnnotationMaterializerService,
+      KoboPositionRebuildService,
       KoboAnnotationExchangeService,
       KoboReadingStateService,
       KoboSyncHistoryService,

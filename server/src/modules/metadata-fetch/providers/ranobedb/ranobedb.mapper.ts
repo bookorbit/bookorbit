@@ -1,6 +1,7 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 
 import { parseCompactPublishedDate, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { normalizeSeriesTotalBooks } from '../../../../common/utils/series-total-books.utils';
 import { RanobeDbBook, RanobeDbRelease } from './ranobedb.types';
 
 const IMAGE_BASE_URL = 'https://images.ranobedb.org';
@@ -127,6 +128,7 @@ export function mapRanobeDbBook(book: RanobeDbBook): MetadataCandidate | null {
     isbn13: selectedRelease?.isbn13 ?? undefined,
     seriesName: book.series?.title,
     seriesIndex: resolveSeriesIndex(book),
+    seriesTotalBooks: normalizeSeriesTotalBooks(book.series?.books.length),
     description: book.description?.trim() || book.description_ja?.trim() || undefined,
     genres: resolveGenres(book),
     coverUrl: book.image ? `${IMAGE_BASE_URL}/${book.image.filename}` : undefined,

@@ -18,6 +18,7 @@ import {
   Send,
   Star,
   StickyNote,
+  FolderInput,
   Trash2,
   TriangleAlert,
   X,
@@ -39,12 +40,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { api } from '@/lib/api'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import { useMetadataLocks } from '@/features/book/composables/useMetadataLocks'
 import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/composables/usePersonalNote'
 import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
+import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import ResetReadingStateDialog from '@/features/book/components/ResetReadingStateDialog.vue'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
@@ -93,11 +96,13 @@ type SeriesDisplayLink = {
 }
 
 const props = defineProps<{ book: BookDetail }>()
-const emit = defineEmits<{ saved: [BookDetail] }>()
+const emit = defineEmits<{ saved: [BookDetail]; moved: [] }>()
 const { t } = useI18n()
 const router = useRouter()
+const { user } = useAuth()
 
 const addToCollectionOpen = ref(false)
+const moveToLibraryOpen = ref(false)
 const scoreBreakdownOpen = ref(false)
 const mobileScoreBreakdownOpen = ref(false)
 const moreMenuOpen = ref(false)
@@ -125,7 +130,10 @@ const {
   cancelDelete,
   confirmDelete,
 } = useDeleteBook(() => {
-  router.back()
+  // Not router.back(): the previous entry may be this same book, or absent
+  // entirely when the page was deep-linked or reloaded, which left the user
+  // looking at a book that no longer exists.
+  void router.push({ name: 'dashboard' })
 })
 
 const coverLoaded = ref(false)
@@ -133,58 +141,14 @@ const coverFailed = ref(false)
 const coverImageRatio = ref<number | null>(null)
 const coverLightboxOpen = ref(false)
 const descriptionExpanded = ref(false)
-const genresExpanded = ref(false)
 const genreMeasureContainer = ref<HTMLElement | null>(null)
 const genreHiddenCount = ref(0)
 const visibleGenreCount = ref(0)
 const safeDescription = useSafeHtml(() => props.book.description)
 const filledCustomMetadata = computed(() => (props.book.customMetadata ?? []).filter((field) => field.value !== null && field.value !== ''))
-const displayedGenres = computed(() => {
-  if (genresExpanded.value || genreHiddenCount.value === 0) return props.book.genres
-  const count = visibleGenreCount.value > 0 ? visibleGenreCount.value : props.book.genres.length
-  return props.book.genres.slice(0, count)
-})
-const MORE_BUTTON_RESERVED_WIDTH = 72
-
-function getUniqueRowTops(values: number[]): number[] {
-  const rows: number[] = []
-  for (const value of values) {
-    if (!rows.some((rowTop) => Math.abs(rowTop - value) <= 1)) rows.push(value)
-  }
-  return rows.sort((a, b) => a - b)
-}
-
-function getRowTop(metrics: Array<{ top: number; right: number }>): number | null {
-  const tops = getUniqueRowTops(metrics.map((metric) => metric.top))
-  return tops.length > 0 ? tops[0]! : null
-}
-
-function getRowRight(metrics: Array<{ top: number; right: number }>, rowTop: number): number {
-  const rowItems = metrics.filter((metric) => Math.abs(metric.top - rowTop) <= 1)
-  return rowItems.length ? Math.max(...rowItems.map((metric) => metric.right)) : 0
-}
-
-function ensureMoreButtonFitsSecondRow(
-  metrics: Array<{ top: number; right: number }>,
-  secondRowTop: number,
-  containerWidth: number,
-  initialVisibleCount: number,
-) {
-  let visibleCount = initialVisibleCount
-  let hiddenCount = metrics.length - visibleCount
-
-  while (hiddenCount > 0 && visibleCount > 0) {
-    const visibleMetrics = metrics.slice(0, visibleCount)
-    const currentSecondRowTop = getRowTop(visibleMetrics.filter((metric) => metric.top >= secondRowTop - 1))
-    const rowTop = currentSecondRowTop ?? secondRowTop
-    const remainingWidth = containerWidth - getRowRight(visibleMetrics, rowTop)
-    if (remainingWidth >= MORE_BUTTON_RESERVED_WIDTH) break
-    visibleCount -= 1
-    hiddenCount += 1
-  }
-
-  return { visibleCount, hiddenCount }
-}
+const displayedGenres = computed(() => props.book.genres.slice(0, visibleGenreCount.value))
+const hiddenGenres = computed(() => props.book.genres.slice(visibleGenreCount.value))
+const GENRE_GAP_PX = 6
 
 function resetGenreFoldState() {
   visibleGenreCount.value = props.book.genres.length
@@ -199,34 +163,32 @@ function measureGenreOverflow() {
   }
 
   const pills = Array.from(container.querySelectorAll<HTMLElement>('[data-genre-pill="true"]'))
-  if (pills.length === 0) {
-    resetGenreFoldState()
-    return
-  }
-
-  const containerRect = container.getBoundingClientRect()
+  const moreButton = container.querySelector<HTMLElement>('[data-genre-more-measure="true"]')
   const containerWidth = container.clientWidth
-  const pillMetrics = pills.map((pill) => {
-    const rect = pill.getBoundingClientRect()
-    return {
-      top: rect.top - containerRect.top,
-      right: rect.right - containerRect.left,
-    }
-  })
-
-  const rowTops = getUniqueRowTops(pillMetrics.map((metric) => metric.top))
-  if (rowTops.length <= 2) {
+  if (pills.length === 0 || !moreButton || containerWidth <= 0) {
     resetGenreFoldState()
     return
   }
 
-  const secondRowTop = rowTops[1]!
-  let visibleCount = pillMetrics.findIndex((metric) => metric.top > secondRowTop + 1)
-  if (visibleCount === -1) visibleCount = pillMetrics.length
+  const pillWidths = pills.map((pill) => pill.getBoundingClientRect().width)
+  const allPillsWidth = pillWidths.reduce((total, width) => total + width, 0) + GENRE_GAP_PX * Math.max(0, pills.length - 1)
+  if (allPillsWidth <= containerWidth) {
+    resetGenreFoldState()
+    return
+  }
 
-  const fitted = ensureMoreButtonFitsSecondRow(pillMetrics, secondRowTop, containerWidth, visibleCount)
-  visibleGenreCount.value = fitted.visibleCount
-  genreHiddenCount.value = fitted.hiddenCount
+  const moreButtonWidth = moreButton.getBoundingClientRect().width
+  let usedWidth = 0
+  let visibleCount = 0
+  for (const pillWidth of pillWidths) {
+    const nextPillWidth = usedWidth + (visibleCount > 0 ? GENRE_GAP_PX : 0) + pillWidth
+    if (nextPillWidth + GENRE_GAP_PX + moreButtonWidth > containerWidth) break
+    usedWidth = nextPillWidth
+    visibleCount += 1
+  }
+
+  visibleGenreCount.value = visibleCount
+  genreHiddenCount.value = pills.length - visibleCount
 }
 
 let genreResizeObserver: ResizeObserver | null = null
@@ -251,7 +213,6 @@ function formatCustomMetadataValue(field: CustomMetadataBookValue): string {
 watch(
   () => `${props.book.id}:${props.book.genres.join('|')}`,
   () => {
-    genresExpanded.value = false
     resetGenreFoldState()
     scheduleGenreOverflowMeasure()
   },
@@ -445,11 +406,28 @@ async function savePersonalNote() {
 const { setStatus, updateStatus } = useBookStatus()
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
+const userTimeZone = computed(() => {
+  const value = user.value?.settings?.timezone?.trim()
+  if (!value) return 'UTC'
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+    return value
+  } catch {
+    return 'UTC'
+  }
+})
 
 function dateToDateKey(value: Date): string {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: userTimeZone.value,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value)
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+  if (!year || !month || !day) return ''
   return `${year}-${month}-${day}`
 }
 
@@ -460,6 +438,14 @@ function toDateInputValue(value: string | null | undefined): string {
   if (Number.isNaN(parsed.getTime())) return ''
   return dateToDateKey(parsed)
 }
+
+const addedDate = computed(() => toDateInputValue(props.book.addedAt))
+const draftAddedDate = ref('')
+const editingAddedDate = ref(false)
+const savingAddedDate = ref(false)
+const addedDateError = ref<string | null>(null)
+const addedDateInput = ref<HTMLInputElement | null>(null)
+const addedDateEditButton = ref<HTMLButtonElement | null>(null)
 
 const localReadStatus = ref<ReadStatus | null>(props.book.readStatus?.status ?? null)
 const savedReadingDates = ref<{ startedAt: string; finishedAt: string }>({
@@ -474,6 +460,62 @@ const savingReadingDates = ref(false)
 const readingDatesError = ref<string | null>(null)
 const activeReadingDateField = ref<'startedAt' | 'finishedAt' | null>(null)
 const todayDateInput = computed(() => dateToDateKey(new Date()))
+
+function validateAddedDate(value: string): string | null {
+  if (!value) return t('book.detail.details.dateAddedRequiredError')
+  if (value > todayDateInput.value) return t('book.detail.details.dateAddedFutureError')
+  return null
+}
+
+const canSaveAddedDate = computed(() => draftAddedDate.value !== addedDate.value && !savingAddedDate.value)
+
+function startEditingAddedDate() {
+  if (savingAddedDate.value || isEditingAnyReadingDate.value) return
+  draftAddedDate.value = addedDate.value
+  addedDateError.value = null
+  editingAddedDate.value = true
+  void nextTick(() => addedDateInput.value?.focus())
+}
+
+function finishAddedDateEdit() {
+  editingAddedDate.value = false
+  void nextTick(() => addedDateEditButton.value?.focus())
+}
+
+async function saveAddedDate() {
+  if (!editingAddedDate.value || savingAddedDate.value) return
+  const validationError = validateAddedDate(draftAddedDate.value)
+  addedDateError.value = validationError
+  if (validationError) return
+
+  savingAddedDate.value = true
+  try {
+    const res = await api(`/api/v1/books/${props.book.id}/added-at`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addedAt: draftAddedDate.value }),
+    })
+    if (!res.ok) throw new Error()
+    const updated = (await res.json()) as BookDetail
+    addedDateError.value = null
+    emit('saved', updated)
+    finishAddedDateEdit()
+  } catch {
+    addedDateError.value = t('book.detail.details.saveAddedDateError')
+  } finally {
+    savingAddedDate.value = false
+  }
+}
+
+function cancelAddedDateEdit() {
+  if (!editingAddedDate.value || savingAddedDate.value) return
+  addedDateError.value = null
+  finishAddedDateEdit()
+}
+
+function clearAddedDateError() {
+  addedDateError.value = null
+}
 
 function normalizeReadStatusDates(readStatus: UserBookStatus | null | undefined) {
   return {
@@ -491,6 +533,7 @@ function validateReadingDates(values: { startedAt: string; finishedAt: string })
 }
 
 const isEditingAnyReadingDate = computed(() => activeReadingDateField.value !== null)
+const isEditingAnyDate = computed(() => editingAddedDate.value || isEditingAnyReadingDate.value)
 
 function formatDisplayDate(dateKey: string): string {
   if (!dateKey) return '-'
@@ -876,6 +919,17 @@ function formatDateTime(iso: string): string {
   return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+function formatAddedDateTime(iso: string): string {
+  return formatLocaleDate(new Date(iso), {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: userTimeZone.value,
+  })
+}
+
 function formatPercent(value: number): string {
   const clamped = Math.max(0, Math.min(100, value))
   if (clamped > 0 && clamped < 1) return '<1%'
@@ -884,7 +938,7 @@ function formatPercent(value: number): string {
 }
 
 function formatDate(iso: string): string {
-  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric' })
+  return formatLocaleDate(new Date(iso), { year: 'numeric', month: 'short', day: 'numeric', timeZone: userTimeZone.value })
 }
 
 function formatBadgeStyle(fmt: string) {
@@ -907,6 +961,22 @@ function providerLinkStyle(provider: string) {
 function handleEditMetadataFromScore() {
   scoreBreakdownOpen.value = false
   router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
+}
+
+function handleMoveFromMenu() {
+  moreMenuOpen.value = false
+  mobileMoreMenuOpen.value = false
+  moveToLibraryOpen.value = true
+}
+
+function handleMoveOpenChange(open: boolean) {
+  moveToLibraryOpen.value = open
+}
+
+// The book still exists after a move, it just lives elsewhere, so refresh the
+// detail rather than navigating away.
+function handleBookMoved() {
+  emit('moved')
 }
 
 function handleDeleteFromMenu() {
@@ -1396,7 +1466,7 @@ watch(
       >
         <PopoverTrigger as-child>
           <button
-            class="flex items-center justify-center h-9 w-9 rounded-md border border-destructive/30 bg-background text-destructive hover:bg-destructive/10 transition-colors"
+            class="flex items-center justify-center h-9 w-9 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
           >
             <MoreVertical class="size-3.5" />
           </button>
@@ -1404,11 +1474,19 @@ watch(
         <PopoverContent class="w-44 p-1" align="end">
           <button
             v-if="canEditMetadata"
-            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
             @click="handleOpenResetReadingState"
           >
             <RotateCcw class="size-3.5" />
             Reset reading state
+          </button>
+          <button
+            v-if="hasPermission('library_edit_metadata')"
+            class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+            @click="handleMoveFromMenu"
+          >
+            <FolderInput class="size-3.5" />
+            {{ t('book.move.action') }}
           </button>
           <button
             v-if="hasPermission('library_delete_books')"
@@ -1559,7 +1637,7 @@ watch(
             <Popover v-if="canEditMetadata || hasPermission('library_delete_books')" :open="moreMenuOpen" @update:open="(v) => (moreMenuOpen = v)">
               <PopoverTrigger as-child>
                 <button
-                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-destructive/30 bg-background text-destructive hover:bg-destructive/10 transition-colors"
+                  class="flex flex-1 items-center justify-center h-9 rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
                 >
                   <MoreVertical class="size-3.5" />
                 </button>
@@ -1567,11 +1645,19 @@ watch(
               <PopoverContent class="w-44 p-1" align="end">
                 <button
                   v-if="canEditMetadata"
-                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm text-foreground hover:bg-muted transition-colors"
                   @click="handleOpenResetReadingState"
                 >
                   <RotateCcw class="size-3.5" />
                   Reset reading state
+                </button>
+                <button
+                  v-if="hasPermission('library_edit_metadata')"
+                  class="flex w-full items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                  @click="handleMoveFromMenu"
+                >
+                  <FolderInput class="size-3.5" />
+                  {{ t('book.move.action') }}
                 </button>
                 <button
                   v-if="hasPermission('library_delete_books')"
@@ -1927,36 +2013,60 @@ watch(
       <!-- Genres + Tags -->
       <div v-if="book.genres.length || book.tags.length" class="mt-4 space-y-1.5">
         <div v-if="book.genres.length" class="relative">
-          <div class="flex flex-wrap items-center gap-1.5">
+          <div data-test="genre-row" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
             <span
               v-for="(genre, index) in displayedGenres"
               :key="`${genre}-${index}`"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary"
+              data-test="visible-genre"
+              class="shrink-0 rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary"
             >
               {{ genre }}
             </span>
-            <button
-              v-if="genreHiddenCount > 0"
-              type="button"
-              class="text-xs font-medium text-foreground hover:text-foreground transition-colors whitespace-nowrap"
-              @click="genresExpanded = !genresExpanded"
-            >
-              {{ genresExpanded ? t('book.detail.details.showLess') : t('book.detail.details.moreCount', { count: genreHiddenCount }) }}
-            </button>
+            <Popover v-if="genreHiddenCount > 0">
+              <PopoverTrigger as-child>
+                <button
+                  type="button"
+                  data-test="genre-overflow-trigger"
+                  class="shrink-0 whitespace-nowrap rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  :aria-label="t('book.detail.details.moreCount', { count: genreHiddenCount })"
+                >
+                  +{{ genreHiddenCount }}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" class="w-80 max-w-[calc(100vw-2rem)] p-3">
+                <div data-test="hidden-genres" class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="(genre, index) in hiddenGenres"
+                    :key="`hidden-${genre}-${index}`"
+                    class="rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary"
+                  >
+                    {{ genre }}
+                  </span>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div
             ref="genreMeasureContainer"
             aria-hidden="true"
-            class="pointer-events-none absolute left-0 top-0 -z-10 invisible flex w-full flex-wrap gap-1.5"
+            class="pointer-events-none invisible absolute left-0 top-0 -z-10 flex w-full items-center gap-1.5 whitespace-nowrap"
           >
             <span
               v-for="(genre, index) in book.genres"
               :key="`measure-${genre}-${index}`"
               data-genre-pill="true"
-              class="text-xs px-2.5 py-0.5 rounded-full border border-primary/40 text-primary"
+              class="shrink-0 rounded-full border border-primary/40 px-2.5 py-0.5 text-xs text-primary"
             >
               {{ genre }}
             </span>
+            <button
+              type="button"
+              tabindex="-1"
+              data-genre-more-measure="true"
+              class="shrink-0 whitespace-nowrap rounded-full border border-border px-2.5 py-0.5 text-xs font-medium"
+            >
+              +{{ book.genres.length }}
+            </button>
           </div>
         </div>
 
@@ -2025,15 +2135,60 @@ watch(
         </div>
         <div class="min-w-0">
           <dt class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.detail.details.added') }}</dt>
-          <template v-if="book.addedAt">
+          <template v-if="editingAddedDate">
+            <dd class="mt-1">
+              <div class="flex items-center gap-1.5">
+                <input
+                  ref="addedDateInput"
+                  v-model="draftAddedDate"
+                  type="date"
+                  required
+                  :max="todayDateInput"
+                  :aria-label="t('book.detail.details.added')"
+                  :aria-invalid="addedDateError ? 'true' : undefined"
+                  :aria-describedby="addedDateError ? 'added-date-error' : undefined"
+                  class="w-full rounded border border-input bg-background px-2 py-1 text-xs text-foreground"
+                  @input="clearAddedDateError"
+                />
+                <button
+                  class="h-6 rounded bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  :disabled="!canSaveAddedDate"
+                  @click="saveAddedDate"
+                >
+                  {{ savingAddedDate ? t('book.detail.details.saving') : t('common.save') }}
+                </button>
+                <button
+                  class="inline-flex h-6 w-6 items-center justify-center rounded border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                  :title="t('book.detail.details.cancelDateAddedEdit')"
+                  :aria-label="t('book.detail.details.cancelDateAddedEdit')"
+                  :disabled="savingAddedDate"
+                  @click="cancelAddedDateEdit"
+                >
+                  <X class="size-3" />
+                </button>
+              </div>
+              <p v-if="addedDateError" id="added-date-error" role="alert" class="mt-1 text-[10px] text-destructive">{{ addedDateError }}</p>
+            </dd>
+          </template>
+          <dd v-else class="mt-0.5 flex items-center gap-1.5">
             <Tooltip>
               <TooltipTrigger as-child>
-                <dd class="text-sm text-foreground mt-0.5 truncate cursor-default">{{ formatDate(book.addedAt) }}</dd>
+                <span class="text-sm text-foreground truncate cursor-default">{{ formatDate(book.addedAt) }}</span>
               </TooltipTrigger>
-              <TooltipContent>{{ formatDateTime(book.addedAt) }}</TooltipContent>
+              <TooltipContent>{{ formatAddedDateTime(book.addedAt) }}</TooltipContent>
             </Tooltip>
-          </template>
-          <dd v-else class="text-sm text-foreground mt-0.5">-</dd>
+            <button
+              v-if="canEditMetadata"
+              ref="addedDateEditButton"
+              class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              :title="t('book.detail.details.editDateAdded')"
+              :aria-label="t('book.detail.details.editDateAdded')"
+              :disabled="isEditingAnyDate || savingAddedDate || savingReadingDates"
+              @click="startEditingAddedDate"
+            >
+              <Pencil class="size-3" />
+            </button>
+          </dd>
         </div>
         <HardcoverBookSyncGridItem :book-id="book.id" />
         <StorygraphBookSyncGridItem :book-id="book.id" />
@@ -2073,7 +2228,7 @@ watch(
             <button
               class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               :title="t('book.detail.details.editDateStarted')"
-              :disabled="isEditingAnyReadingDate || savingReadingDates"
+              :disabled="isEditingAnyDate || savingReadingDates"
               @click="startEditingReadingDate('startedAt')"
             >
               <Pencil class="size-3" />
@@ -2116,7 +2271,7 @@ watch(
             <button
               class="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               :title="t('book.detail.details.editDateFinished')"
-              :disabled="isEditingAnyReadingDate || savingReadingDates"
+              :disabled="isEditingAnyDate || savingReadingDates"
               @click="startEditingReadingDate('finishedAt')"
             >
               <Pencil class="size-3" />
@@ -2238,6 +2393,15 @@ watch(
   />
 
   <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+
+  <MoveToLibrarySheet
+    :open="moveToLibraryOpen"
+    :selection-payload="{ bookIds: [book.id] }"
+    :selected-count="1"
+    :current-library-id="book.libraryId"
+    @update:open="handleMoveOpenChange"
+    @moved="handleBookMoved"
+  />
 
   <ResetReadingStateDialog
     :open="resetReadingStateDialogOpen"

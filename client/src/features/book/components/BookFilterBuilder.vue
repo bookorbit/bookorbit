@@ -3,15 +3,24 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Plus, Trash2, X } from '@lucide/vue'
 import {
   COMMUNITY_RATING_PROVIDER_KEYS,
+  CUSTOM_FIELD_OPERATORS,
+  CUSTOM_FIELD_TYPE_OPERATORS,
   FIELD_OPERATORS,
   RULE_FIELDS,
+  customRuleField,
+  isCustomRuleField,
+  parseCustomRuleFieldId,
   type CommunityRatingProvider,
+  type CustomMetadataFieldType,
+  type CustomRuleField,
   type GroupRule,
   type Rule,
   type RuleField,
   type RuleOperator,
+  type StaticRuleField,
 } from '@bookorbit/types'
 import { READ_STATUSES } from '@bookorbit/types'
+import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
 import { fieldLabel, operatorLabel } from '@/features/book/lib/filter-labels'
 import { providerIconPathSafe } from '@/features/book/lib/provider-icons'
 import { PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
@@ -47,6 +56,8 @@ const NO_VALUE_OPERATORS: RuleOperator[] = [
   'isLocked',
   'isUnlocked',
   'isUpNext',
+  'isTrue',
+  'isFalse',
 ]
 const BETWEEN_OPERATORS: RuleOperator[] = ['between']
 const COLLECTION_OPERATORS: RuleOperator[] = ['includesAny', 'includesAll', 'excludesAll']
@@ -96,6 +107,36 @@ const libraryOptions = computed(() => libraries.value.map((library) => library.n
 onMounted(() => {
   void fetchLibraries()
 })
+
+const { fields: customFields } = useActiveCustomFields()
+
+const activeCustomFields = computed(() =>
+  customFields.value.filter((f) => !f.archivedAt).sort((a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label)),
+)
+
+const customFieldTypes = computed(() => new Map(activeCustomFields.value.map((f) => [f.id, f.type])))
+
+function customFieldType(field: RuleField): CustomMetadataFieldType | null {
+  const fieldId = parseCustomRuleFieldId(field)
+  return fieldId === null ? null : (customFieldTypes.value.get(fieldId) ?? null)
+}
+
+// A custom field's type decides which operators make sense for it. A rule pointing at a field
+// that is no longer active keeps every custom operator selectable so the saved one still shows.
+function operatorsForField(field: RuleField): RuleOperator[] {
+  const type = customFieldType(field)
+  if (type) return CUSTOM_FIELD_TYPE_OPERATORS[type]
+  if (isCustomRuleField(field)) return CUSTOM_FIELD_OPERATORS
+  return FIELD_OPERATORS[field as StaticRuleField]
+}
+
+function isNumericField(field: RuleField): boolean {
+  return NUMERIC_FIELDS.includes(field) || customFieldType(field) === 'number'
+}
+
+function isDateField(field: RuleField): boolean {
+  return DATE_FIELDS.includes(field) || customFieldType(field) === 'date'
+}
 
 type WithinLastUnit = 'days' | 'weeks' | 'months'
 
@@ -149,8 +190,8 @@ function toLocalNodes(group: GroupRule | undefined): LocalNode[] {
 function parseValue(field: RuleField, operator: RuleOperator, raw: string, chips: string[], unit: WithinLastUnit): Rule['value'] {
   if (NO_VALUE_OPERATORS.includes(operator)) return undefined
   if (COLLECTION_OPERATORS.includes(operator)) return chips
-  if (NUMERIC_FIELDS.includes(field)) return raw === '' ? undefined : Number(raw)
-  if (DATE_FIELDS.includes(field) && operator === 'withinLast') {
+  if (isNumericField(field)) return raw === '' ? undefined : Number(raw)
+  if (isDateField(field) && operator === 'withinLast') {
     if (raw === '') return undefined
     const n = Number(raw)
     const multiplier = unit === 'weeks' ? 7 : unit === 'months' ? 30 : 1
@@ -161,6 +202,13 @@ function parseValue(field: RuleField, operator: RuleOperator, raw: string, chips
 
 const nodes = ref<LocalNode[]>(toLocalNodes(props.modelValue))
 const join = ref<'AND' | 'OR'>(props.modelValue?.join ?? 'AND')
+
+// Active fields, plus any custom field an existing rule already points at so a scope built on a
+// since-archived field still shows its own selection instead of an empty dropdown.
+const customFieldOptions = computed<CustomRuleField[]>(() => {
+  const selected = nodes.value.flatMap((node) => (node.kind === 'rule' && isCustomRuleField(node.rule.field) ? [node.rule.field] : []))
+  return [...new Set([...activeCustomFields.value.map((f) => customRuleField(f.id)), ...selected])]
+})
 let selfEmitting = false
 
 watch(
@@ -199,7 +247,7 @@ function emitUpdate() {
         value: parseValue(n.rule.field, n.rule.operator, n.rule.value, n.rule.valueChips, n.rule.valueUnit),
         valueTo:
           BETWEEN_OPERATORS.includes(n.rule.operator) && n.rule.valueTo !== ''
-            ? NUMERIC_FIELDS.includes(n.rule.field)
+            ? isNumericField(n.rule.field)
               ? Number(n.rule.valueTo)
               : n.rule.valueTo
             : undefined,
@@ -242,7 +290,7 @@ function removeNode(index: number) {
 function onFieldChange(index: number) {
   const node = nodes.value[index]
   if (node?.kind !== 'rule') return
-  const validOps = FIELD_OPERATORS[node.rule.field]
+  const validOps = operatorsForField(node.rule.field)
   if (!validOps.includes(node.rule.operator)) {
     node.rule.operator = validOps[0]!
   }
@@ -332,8 +380,8 @@ function removeStatusChip(index: number, status: string) {
 
 function valueInputType(field: RuleField, operator: RuleOperator): string {
   if (NO_VALUE_OPERATORS.includes(operator)) return 'none'
-  if (DATE_FIELDS.includes(field)) return operator === 'withinLast' ? 'number' : 'date'
-  if (NUMERIC_FIELDS.includes(field)) return 'number'
+  if (isDateField(field)) return operator === 'withinLast' ? 'number' : 'date'
+  if (isNumericField(field)) return 'number'
   return 'text'
 }
 
@@ -395,6 +443,9 @@ function showValueToInput(operator: RuleOperator): boolean {
           class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary shrink-0"
         >
           <option v-for="field in RULE_FIELDS" :key="field" :value="field">{{ fieldLabel(field) }}</option>
+          <optgroup v-if="customFieldOptions.length > 0" :label="t('book.filter.customFieldsGroup')">
+            <option v-for="field in customFieldOptions" :key="field" :value="field">{{ fieldLabel(field) }}</option>
+          </optgroup>
         </select>
 
         <select
@@ -402,7 +453,7 @@ function showValueToInput(operator: RuleOperator): boolean {
           @change="onOperatorChange(index)"
           class="h-9 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary shrink-0"
         >
-          <option v-for="op in FIELD_OPERATORS[node.rule.field]" :key="op" :value="op">{{ operatorLabel(op) }}</option>
+          <option v-for="op in operatorsForField(node.rule.field)" :key="op" :value="op">{{ operatorLabel(op) }}</option>
         </select>
 
         <div

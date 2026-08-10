@@ -1,6 +1,7 @@
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 import { AUTHOR_ENRICHMENT_STATUS_EVENT } from './author-enrichment.gateway';
 import { Permission } from '@bookorbit/types';
+import { WS_UNAUTHORIZED_EVENT } from '../../common/utils/ws-auth.utils';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
@@ -33,8 +34,14 @@ describe('AuthorEnrichmentGateway', () => {
       processing: 1,
       rateLimited: 0,
       failed: 0,
+      latestFailureAt: null,
       done: 10,
       total: 13,
+      paused: false,
+      sessionTotal: 13,
+      sessionDone: 10,
+      sessionFailed: 0,
+      currentItemName: null,
     });
 
     expect(emit).toHaveBeenCalledWith('author-enrichment:status', {
@@ -42,8 +49,14 @@ describe('AuthorEnrichmentGateway', () => {
       processing: 1,
       rateLimited: 0,
       failed: 0,
+      latestFailureAt: null,
       done: 10,
       total: 13,
+      paused: false,
+      sessionTotal: 13,
+      sessionDone: 10,
+      sessionFailed: 0,
+      currentItemName: null,
     });
   });
 
@@ -57,8 +70,14 @@ describe('AuthorEnrichmentGateway', () => {
         processing: 0,
         rateLimited: 0,
         failed: 0,
+        latestFailureAt: null,
         done: 0,
         total: 0,
+        paused: false,
+        sessionTotal: 0,
+        sessionDone: 0,
+        sessionFailed: 0,
+        currentItemName: null,
       }),
     ).not.toThrow();
   });
@@ -93,7 +112,8 @@ describe('AuthorEnrichmentGateway', () => {
     await gateway.handleConnection(client);
 
     expect(client.disconnect).toHaveBeenCalledTimes(1);
-    expect(client.emit).not.toHaveBeenCalled();
+    // Told to re-authenticate, but given no status snapshot.
+    expect(client.emit).toHaveBeenCalledExactlyOnceWith(WS_UNAUTHORIZED_EVENT, { reason: 'invalid_token' });
   });
 
   it('handleConnection emits snapshot when user has required permission', async () => {
@@ -101,7 +121,7 @@ describe('AuthorEnrichmentGateway', () => {
     const user = { id: 11, isSuperuser: false, permissions: [Permission.ManageMetadataConfig] };
     jwtService.verify.mockReturnValue({ sub: 11, ver: 2 });
     authService.validateUser.mockResolvedValue(user);
-    queueRepo.getStatusSummary.mockResolvedValue({ queued: 3, processing: 1, rateLimited: 0, failed: 0, done: 2, total: 6 });
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 3, processing: 1, rateLimited: 0, failed: 0, latestFailureAt: null, done: 2, total: 6 });
     enrichmentConfig.isPaused.mockResolvedValue(true);
     session.getSnapshot.mockReturnValue({ sessionTotal: 6, sessionDone: 2, sessionFailed: 1, currentItemName: 'Alice' });
     const client = {
@@ -119,6 +139,7 @@ describe('AuthorEnrichmentGateway', () => {
       processing: 1,
       rateLimited: 0,
       failed: 0,
+      latestFailureAt: null,
       done: 2,
       total: 6,
       paused: true,

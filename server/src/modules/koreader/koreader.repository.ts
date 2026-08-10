@@ -7,7 +7,8 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
-type ResolvedBookFileByHash = { id: number; bookId: number; libraryId: number };
+type ResolvedBookFileByHash = { id: number; bookId: number; libraryId: number; format: string | null };
+type ResolvedBookFileByHashes = { bookFileId: number; bookId: number; libraryId: number; format: string | null };
 type KoreaderUnmatchedSource = 'current_file' | 'file' | 'statistics';
 type KoreaderUnmatchedCandidate = {
   hash: string;
@@ -22,6 +23,18 @@ type KoreaderHashLinkMetadata = {
   authors?: string | null;
   lastOpen?: number | null;
 };
+
+export interface ReadingProgressUpsert {
+  bookFileId: number;
+  userId: number;
+  percentage: number;
+  /** Reflowable position converted from the device xpointer; null for paged formats or a failed conversion. */
+  cfi?: string | null;
+  /** The device position string verbatim, so the next pull hands KOReader back what it sent. */
+  xpointer?: string | null;
+  /** 1-based page for paged formats; null for reflowable and audio. */
+  pageNumber?: number | null;
+}
 
 export interface DeviceProgressUpsert {
   bookFileId: number;
@@ -71,7 +84,7 @@ export class KoreaderRepository {
     const libraryFilter = accessibleLibraryIds ? inArray(schema.books.libraryId, accessibleLibraryIds) : undefined;
 
     const [byFileHash] = await this.db
-      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId })
+      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId, format: schema.bookFiles.format })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
       .where(and(eq(schema.bookFiles.fileHash, hash), libraryFilter))
@@ -80,7 +93,7 @@ export class KoreaderRepository {
     if (byFileHash) return byFileHash;
 
     const [byFileHashHistory] = await this.db
-      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId })
+      .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId, format: schema.bookFiles.format })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
@@ -91,7 +104,7 @@ export class KoreaderRepository {
 
     if (userId !== undefined) {
       const [byManualLink] = await this.db
-        .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId })
+        .select({ id: schema.bookFiles.id, bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId, format: schema.bookFiles.format })
         .from(schema.koreaderBookHashLinks)
         .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.koreaderBookHashLinks.bookFileId))
         .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
@@ -108,8 +121,8 @@ export class KoreaderRepository {
     hashes: string[],
     accessibleLibraryIds: number[] | null,
     userId?: number,
-  ): Promise<Map<string, { bookFileId: number; bookId: number; libraryId: number }>> {
-    const result = new Map<string, { bookFileId: number; bookId: number; libraryId: number }>();
+  ): Promise<Map<string, ResolvedBookFileByHashes>> {
+    const result = new Map<string, ResolvedBookFileByHashes>();
     if (hashes.length === 0) return result;
     if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return result;
 
@@ -121,6 +134,7 @@ export class KoreaderRepository {
         bookFileId: schema.bookFiles.id,
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
+        format: schema.bookFiles.format,
       })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
@@ -128,7 +142,7 @@ export class KoreaderRepository {
 
     for (const row of direct) {
       if (row.hash && !result.has(row.hash)) {
-        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId });
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, format: row.format });
       }
     }
 
@@ -141,6 +155,7 @@ export class KoreaderRepository {
         bookFileId: schema.bookFiles.id,
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
+        format: schema.bookFiles.format,
       })
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
@@ -149,7 +164,7 @@ export class KoreaderRepository {
 
     for (const row of history) {
       if (!result.has(row.hash)) {
-        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId });
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, format: row.format });
       }
     }
 
@@ -162,6 +177,7 @@ export class KoreaderRepository {
         bookFileId: schema.bookFiles.id,
         bookId: schema.bookFiles.bookId,
         libraryId: schema.books.libraryId,
+        format: schema.bookFiles.format,
       })
       .from(schema.koreaderBookHashLinks)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.koreaderBookHashLinks.bookFileId))
@@ -170,7 +186,7 @@ export class KoreaderRepository {
 
     for (const row of manualLinks) {
       if (!result.has(row.hash)) {
-        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId });
+        result.set(row.hash, { bookFileId: row.bookFileId, bookId: row.bookId, libraryId: row.libraryId, format: row.format });
       }
     }
 
@@ -533,24 +549,27 @@ export class KoreaderRepository {
     return row ?? null;
   }
 
-  async upsertReadingProgress(bookFileId: number, userId: number, percentage: number, cfi: string | null = null, xpointer: string | null = null) {
+  async upsertReadingProgress(entry: ReadingProgressUpsert) {
+    const { bookFileId, userId, percentage, cfi = null, xpointer = null, pageNumber = null } = entry;
+
     await this.db
       .insert(schema.readingProgress)
-      .values({ bookFileId, userId, percentage, cfi, koreaderProgress: xpointer })
+      .values({ bookFileId, userId, percentage, cfi, pageNumber, koreaderProgress: xpointer })
       .onConflictDoUpdate({
         target: [schema.readingProgress.bookFileId, schema.readingProgress.userId],
         // Deliberately do NOT update updatedAt here. reading_progress.updatedAt must only
         // change when the web reader writes it, so getProgress can use it as an accurate
         // "last web-reader sync time" for comparison against koreader_device_progress.updatedAt.
-        // The cfi stored here is the server-side conversion of KOReader's XPointer (null when
-        // conversion fails) so the web reader resumes at the same paragraph; stale web locator
-        // fields are never kept, or clients may resume at an older location. Kobo location
-        // fields clear because the position no longer matches the device's bookmark; the Kobo
-        // pull path recomputes a precise Location from the cfi.
+        // Exactly one of cfi and pageNumber carries the position, chosen by the book file's
+        // format: cfi is the server-side conversion of KOReader's XPointer for reflowable
+        // documents, pageNumber the page KOReader reports for paged ones. Both are written on
+        // every sync so stale web locator fields are never kept, or clients may resume at an
+        // older location. Kobo location fields clear because the position no longer matches the
+        // device's bookmark; the Kobo pull path recomputes a precise Location from the cfi.
         set: {
           percentage,
           cfi,
-          pageNumber: null,
+          pageNumber,
           koreaderProgress: xpointer,
           koboLocationSource: null,
           koboLocationType: null,

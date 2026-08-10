@@ -5,6 +5,18 @@ import { SCROLLER_TYPES, type ScrollerConfig, type ScrollerType } from '@bookorb
 const STORAGE_KEY = 'bookorbit:dashboard:config'
 const MAX_SCROLLERS = 8
 
+export const SHELF_LAYOUT = {
+  WIDE: 'wide',
+  TWO_COLUMNS: 'two-columns',
+} as const
+
+export type DashboardShelfLayout = (typeof SHELF_LAYOUT)[keyof typeof SHELF_LAYOUT]
+
+interface StoredDashboardConfig {
+  scrollers: ScrollerConfig[]
+  shelfLayout: DashboardShelfLayout
+}
+
 export const DEFAULT_SCROLLERS: ScrollerConfig[] = [
   { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20 },
   { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 2, limit: 20 },
@@ -38,6 +50,10 @@ function parseStoredScrollers(value: unknown): unknown[] | null {
 
   const { scrollers } = value as { scrollers?: unknown }
   return Array.isArray(scrollers) ? scrollers : null
+}
+
+function normalizeShelfLayout(value: unknown): DashboardShelfLayout {
+  return value === SHELF_LAYOUT.TWO_COLUMNS ? SHELF_LAYOUT.TWO_COLUMNS : SHELF_LAYOUT.WIDE
 }
 
 function normalizeBoolean(value: unknown, fallback: boolean): boolean {
@@ -105,12 +121,20 @@ function normalizeScrollers(value: unknown): ScrollerConfig[] {
   return normalized.length > 0 ? normalized : cloneDefaultScrollers()
 }
 
-function loadConfig(): ScrollerConfig[] {
+function loadConfig(): StoredDashboardConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? normalizeScrollers(JSON.parse(raw)) : cloneDefaultScrollers()
+    if (!raw) return { scrollers: cloneDefaultScrollers(), shelfLayout: SHELF_LAYOUT.WIDE }
+
+    const parsed: unknown = JSON.parse(raw)
+    const shelfLayout =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? normalizeShelfLayout((parsed as { shelfLayout?: unknown }).shelfLayout)
+        : SHELF_LAYOUT.WIDE
+
+    return { scrollers: normalizeScrollers(parsed), shelfLayout }
   } catch {
-    return cloneDefaultScrollers()
+    return { scrollers: cloneDefaultScrollers(), shelfLayout: SHELF_LAYOUT.WIDE }
   }
 }
 
@@ -131,17 +155,32 @@ function areScrollersEqual(left: ScrollerConfig[], right: ScrollerConfig[]): boo
   })
 }
 
-// Module-level singleton — all callers share the same reactive ref
-const scrollers = ref<ScrollerConfig[]>(loadConfig())
+// Module-level singletons - all callers share the same reactive state
+const initialConfig = loadConfig()
+const scrollers = ref<ScrollerConfig[]>(initialConfig.scrollers)
+const shelfLayout = ref<DashboardShelfLayout>(initialConfig.shelfLayout)
 
 export function useDashboardConfig() {
   function save() {
     scrollers.value = normalizeScrollers(scrollers.value)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(scrollers.value))
+    shelfLayout.value = normalizeShelfLayout(shelfLayout.value)
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        scrollers: scrollers.value,
+        shelfLayout: shelfLayout.value,
+      } satisfies StoredDashboardConfig),
+    )
   }
 
   function saveScrollers(newScrollers: ScrollerConfig[]) {
     scrollers.value = normalizeScrollers(newScrollers)
+    save()
+  }
+
+  function saveShelfSettings(newScrollers: ScrollerConfig[], newShelfLayout: DashboardShelfLayout) {
+    scrollers.value = normalizeScrollers(newScrollers)
+    shelfLayout.value = normalizeShelfLayout(newShelfLayout)
     save()
   }
 
@@ -177,8 +216,9 @@ export function useDashboardConfig() {
 
   function reset() {
     scrollers.value = cloneDefaultScrollers()
+    shelfLayout.value = SHELF_LAYOUT.WIDE
     localStorage.removeItem(STORAGE_KEY)
   }
 
-  return { scrollers, saveScrollers, addScroller, pruneDeletedSmartScopeScrollers, reset, MAX_SCROLLERS }
+  return { scrollers, shelfLayout, saveScrollers, saveShelfSettings, addScroller, pruneDeletedSmartScopeScrollers, reset, MAX_SCROLLERS }
 }

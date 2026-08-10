@@ -7,6 +7,13 @@ import { setI18nLocale } from '@/i18n'
 import en from '@/locales/en.json'
 import pt from '@/locales/pt.json'
 
+// Production falls back to English for any key a target catalog has not translated,
+// so these are the labels Portuguese actually renders. Reading pt directly would
+// assert `undefined` against rendered English the first time Portuguese lags
+// behind a new dashboard key.
+const PT_WIDGET_NAMES = { ...en.dashboard.settings.widgetNames, ...pt.dashboard.settings.widgetNames }
+const PT_SHELF_NAMES = { ...en.dashboard.settings.shelfNames, ...pt.dashboard.settings.shelfNames }
+
 type UseSmartScopesMock = () => {
   smartScopes: Ref<unknown[]>
   fetchSmartScopes: () => void
@@ -106,6 +113,22 @@ describe('DashboardSettingsSheet', () => {
     expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(en.dashboard.settings.shelfNames).sort())
   })
 
+  it('offers wide-row and two-column shelf layouts', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    const wideButton = wrapper.findAll('button').find((button) => button.text().includes(en.dashboard.settings.shelfLayout.wide))
+    const twoColumnButton = wrapper.findAll('button').find((button) => button.text().includes(en.dashboard.settings.shelfLayout.twoColumns))
+
+    expect(wideButton?.attributes('aria-pressed')).toBe('true')
+    expect(twoColumnButton?.attributes('aria-pressed')).toBe('false')
+
+    await twoColumnButton?.trigger('click')
+
+    expect(wideButton?.attributes('aria-pressed')).toBe('false')
+    expect(twoColumnButton?.attributes('aria-pressed')).toBe('true')
+  })
+
   it('translates the shelf selector when the locale changes', async () => {
     const wrapper = await openSheet()
     await openShelvesTab(wrapper)
@@ -113,7 +136,7 @@ describe('DashboardSettingsSheet', () => {
     await setI18nLocale('pt')
     await nextTick()
 
-    expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(pt.dashboard.settings.shelfNames).sort())
+    expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(PT_SHELF_NAMES).sort())
   })
 
   it('renders every widget name from the catalog rather than a hardcoded map', async () => {
@@ -146,20 +169,27 @@ describe('DashboardSettingsSheet', () => {
     const labels = widgetRowLabels(wrapper)
 
     expect(labels).toEqual([
-      pt.dashboard.settings.widgetNames.readingStreak,
-      pt.dashboard.settings.widgetNames.currentlyReading,
-      pt.dashboard.settings.widgetNames.readingGoal,
-      pt.dashboard.settings.widgetNames.readingDna,
-      pt.dashboard.settings.widgetNames.monthlyChallenge,
-      pt.dashboard.settings.widgetNames.highlightOfTheDay,
-      pt.dashboard.settings.widgetNames.neglectedGems,
-      pt.dashboard.settings.widgetNames.readingRhythm,
-      pt.dashboard.settings.widgetNames.diversityScore,
-      pt.dashboard.settings.widgetNames.libraryOverview,
-      pt.dashboard.settings.widgetNames.yearProjection,
-      pt.dashboard.settings.widgetNames.longWait,
+      PT_WIDGET_NAMES.readingStreak,
+      PT_WIDGET_NAMES.currentlyReading,
+      PT_WIDGET_NAMES.readingGoal,
+      PT_WIDGET_NAMES.readingDna,
+      PT_WIDGET_NAMES.monthlyChallenge,
+      PT_WIDGET_NAMES.highlightOfTheDay,
+      PT_WIDGET_NAMES.neglectedGems,
+      PT_WIDGET_NAMES.readingRhythm,
+      PT_WIDGET_NAMES.diversityScore,
+      PT_WIDGET_NAMES.libraryOverview,
+      PT_WIDGET_NAMES.yearProjection,
+      PT_WIDGET_NAMES.longWait,
     ])
-    expect(labels).not.toContain(en.dashboard.settings.widgetNames.readingStreak)
-    expect(labels).not.toContain(en.dashboard.settings.widgetNames.currentlyReading)
+
+    // Only meaningful for names Portuguese actually translates. A name that falls
+    // back to English renders the English label legitimately, so asserting its
+    // absence would fail for a reason that is not a bug.
+    const englishNamesPortugueseReplaces = (['readingStreak', 'currentlyReading'] as const)
+      .filter((key) => PT_WIDGET_NAMES[key] !== en.dashboard.settings.widgetNames[key])
+      .map((key) => en.dashboard.settings.widgetNames[key])
+
+    expect(labels.filter((label) => englishNamesPortugueseReplaces.includes(label))).toEqual([])
   })
 })

@@ -86,7 +86,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { Logger } from '@nestjs/common';
 
 import { authors, bookAuthors, bookGenres, bookMetadata, books, bookTags, genres, tags } from '../../db/schema';
-import { extractCbzMetadata } from './lib/cbz-metadata';
+import { extractCbzMetadata, type ParsedCbzMetadata } from './lib/cbz-metadata';
 import { generateThumbnail, imageExt } from './lib/cover';
 import { extractCbzCover } from './lib/cover-cbz';
 import { extractEpubCover } from './lib/cover-epub';
@@ -216,6 +216,7 @@ describe('MetadataService', () => {
         filterAutomatedBookUpdate: ReturnType<typeof vi.fn>;
       };
       embedder?: { embedBook: ReturnType<typeof vi.fn> } | null;
+      seriesExpectedCount?: { record: ReturnType<typeof vi.fn> };
     },
   ) {
     return new MetadataService(
@@ -231,6 +232,9 @@ describe('MetadataService', () => {
       }) as never,
       (overrides?.embedder ?? embedder) as never,
       metadataEvents as never,
+      undefined,
+      undefined,
+      overrides?.seriesExpectedCount as never,
     );
   }
 
@@ -637,6 +641,7 @@ describe('MetadataService', () => {
       subtitle: null,
       seriesName: 'Amazing Series',
       seriesIndex: 1,
+      seriesTotalBooks: null,
       description: null,
       publisher: null,
       publishedDate: null,
@@ -671,6 +676,78 @@ describe('MetadataService', () => {
         comicvineId: '140529',
       }),
     );
+  });
+
+  describe('extractAndSave(cbz) series length from ComicInfo Count', () => {
+    function comicMetadata(overrides: Partial<ParsedCbzMetadata> = {}): ParsedCbzMetadata {
+      return {
+        title: 'Amazing Series',
+        subtitle: null,
+        seriesName: 'Amazing Series',
+        seriesIndex: 1,
+        seriesTotalBooks: null,
+        description: null,
+        publisher: null,
+        publishedDate: null,
+        publishedYear: null,
+        language: null,
+        pageCount: null,
+        rating: null,
+        isbn10: null,
+        isbn13: null,
+        authors: [],
+        genres: [],
+        tags: [],
+        googleBooksId: null,
+        goodreadsId: null,
+        amazonId: null,
+        hardcoverId: null,
+        hardcoverEditionId: null,
+        openLibraryId: null,
+        ranobedbId: null,
+        koboId: null,
+        comicvineId: null,
+        lubimyczytacId: null,
+        aladinId: null,
+        itunesId: null,
+        comicMetadata: null,
+        ...overrides,
+      };
+    }
+
+    async function scanWith(metadata: ParsedCbzMetadata) {
+      const { db } = makeDb();
+      const seriesExpectedCount = { record: vi.fn().mockResolvedValue(1) };
+      const service = makeService(db, undefined, { seriesExpectedCount });
+      vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+      vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+      mockExtractCbzMetadata.mockResolvedValue(metadata);
+
+      await service.extractAndSave(24, '/tmp/book.cbz', 'cbz');
+      return seriesExpectedCount;
+    }
+
+    it('records the series length the file declared', async () => {
+      const seriesExpectedCount = await scanWith(comicMetadata({ seriesTotalBooks: 12 }));
+
+      expect(seriesExpectedCount.record).toHaveBeenCalledWith('Amazing Series', 12);
+    });
+
+    it('passes the absent length through so no series is annotated', async () => {
+      const seriesExpectedCount = await scanWith(comicMetadata({ seriesTotalBooks: null }));
+
+      expect(seriesExpectedCount.record).toHaveBeenCalledWith('Amazing Series', null);
+    });
+
+    it('scans without error when the expected-count service is not provided', async () => {
+      const { db } = makeDb();
+      const service = makeService(db);
+      vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+      vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+      mockExtractCbzMetadata.mockResolvedValue(comicMetadata({ seriesTotalBooks: 12 }));
+
+      await expect(service.extractAndSave(25, '/tmp/book.cbz', 'cbz')).resolves.toBeUndefined();
+    });
   });
 
   it('extractAndSave(mobi) ignores malformed publishedDate values from providers', async () => {

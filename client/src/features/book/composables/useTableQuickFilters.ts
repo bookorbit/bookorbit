@@ -1,6 +1,6 @@
-import type { Rule, RuleField, TableViewType } from '@bookorbit/types'
+import type { Rule, StaticRuleField, TableViewType } from '@bookorbit/types'
 
-type QuickFilterField = Exclude<RuleField, 'communityRating'>
+type QuickFilterField = Exclude<StaticRuleField, 'communityRating'>
 
 const TEXT_FIELD_MAP: Partial<Record<string, QuickFilterField>> = {
   title: 'title',

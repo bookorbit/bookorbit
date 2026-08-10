@@ -94,6 +94,25 @@ async function hydratePreferences(options: { refreshUser?: boolean } = {}): Prom
   initLocaleSync()
 }
 
+export class RegisterError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+export class LoginError extends Error {
+  constructor(
+    public readonly errorCode: string | undefined,
+    public readonly retryAfterSeconds: number | undefined,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
 export function useAuth() {
   async function init(): Promise<void> {
     isLoading.value = true
@@ -122,7 +141,7 @@ export function useAuth() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(err.message ?? 'Invalid credentials')
+      throw new LoginError(err.errorCode, err.retryAfterSeconds, err.message ?? 'Invalid credentials')
     }
 
     const data: AuthResponse = await res.json()
@@ -172,6 +191,22 @@ export function useAuth() {
     router.push('/')
   }
 
+  async function register(payload: { username: string; name: string; email: string; password: string }): Promise<void> {
+    const res = await fetch('/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new RegisterError(res.status, err.message ?? 'Failed to create account')
+    }
+
+    router.push({ path: '/login', query: { registered: '1' } })
+  }
+
   async function logout(): Promise<void> {
     try {
       const res = await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' })
@@ -210,5 +245,5 @@ export function useAuth() {
     router.push('/')
   }
 
-  return { user, isLoading, init, login, loginWithMagicLink, logout, me, setup }
+  return { user, isLoading, init, login, loginWithMagicLink, logout, me, register, setup }
 }

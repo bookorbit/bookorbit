@@ -36,7 +36,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Dune', bookCount: 6, readCount: 2, authors: ['Frank Herbert'], possibleGaps: [3] },
+      seriesInfo: { id: 42, name: 'Dune', bookCount: 6, readCount: 2, authors: ['Frank Herbert'], possibleGaps: [3], expectedBookCount: null },
     })
 
     const { seriesInfo, items, total, load } = useSeriesDetail(seriesId)
@@ -106,7 +106,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Stale', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Stale', bookCount: 1, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
     await pendingLoad
 
@@ -122,14 +122,14 @@ describe('useSeriesDetail', () => {
         total: 2,
         page: 0,
         size: 50,
-        seriesInfo: { id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [] },
+        seriesInfo: { id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
       })
       .mockResolvedValueOnce({
         items: [{ id: 2 } as BookCard],
         total: 2,
         page: 1,
         size: 50,
-        seriesInfo: { id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [] },
+        seriesInfo: { id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
       })
 
     const { items, load } = useSeriesDetail(seriesId)
@@ -153,7 +153,7 @@ describe('useSeriesDetail', () => {
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Found', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Found', bookCount: 0, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
 
     await load(true)
@@ -167,7 +167,7 @@ describe('useSeriesDetail', () => {
       total: 5,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [], expectedBookCount: null },
     })
 
     const { seriesInfo, total, load } = useSeriesDetail(seriesId)
@@ -192,7 +192,7 @@ describe('useSeriesDetail', () => {
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
     await pendingLoad
   })
@@ -204,7 +204,7 @@ describe('useSeriesDetail', () => {
       total: 5,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Test', bookCount: 5, readCount: 2, authors: ['Author'], possibleGaps: [], expectedBookCount: null },
     })
 
     const { seriesInfo, total, load } = useSeriesDetail(seriesId)
@@ -229,7 +229,7 @@ describe('useSeriesDetail', () => {
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'New', bookCount: 0, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
     await pendingLoad
   })
@@ -241,7 +241,7 @@ describe('useSeriesDetail', () => {
       total: 0,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Test', bookCount: 0, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Test', bookCount: 0, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
 
     const { sort, order, libraryId, load } = useSeriesDetail(seriesId)
@@ -288,7 +288,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Fresh', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Fresh', bookCount: 1, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
     await resetLoad
 
@@ -297,7 +297,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'Stale', bookCount: 999, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'Stale', bookCount: 999, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
     await firstLoad
 
@@ -333,7 +333,7 @@ describe('useSeriesDetail', () => {
       total: 1,
       page: 0,
       size: 50,
-      seriesInfo: { id: 42, name: 'OK', bookCount: 1, readCount: 0, authors: [], possibleGaps: [] },
+      seriesInfo: { id: 42, name: 'OK', bookCount: 1, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null },
     })
     await resetLoad
     await firstLoad

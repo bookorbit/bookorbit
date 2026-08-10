@@ -19,6 +19,7 @@ import {
   resolveCfiParts,
   spineCfiForChapterIndex,
 } from './cfi.utils';
+import { decodeNamedEntities } from './xhtml-entities';
 import { buildXPointer, parseXPointer, resolveXPointerElement } from './xpointer.utils';
 
 export const CONVERTER_VERSION = 1;
@@ -46,7 +47,7 @@ export interface ConversionFailure {
 export type ConversionResult = ConversionSuccess | ConversionFailure;
 
 export function parseChapterDocument(xhtml: string): ChapterDocument {
-  const $ = cheerio.load(xhtml, { xml: true });
+  const $ = cheerio.load(decodeNamedEntities(xhtml), { xml: true });
   const root = $.root()[0] as unknown as CfiNode;
   return { root, index: new ChapterTextIndex(root) };
 }

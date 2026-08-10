@@ -71,6 +71,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       processing: 0,
       rateLimited: 0,
       failed: 0,
+      latestFailureAt: null,
       done: 0,
       total: 0,
     });
@@ -331,8 +332,24 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     session.incrementDone();
     session.incrementDone(true);
     queueRepo.getStatusSummary
-      .mockResolvedValueOnce({ queued: 0, processing: 0, rateLimited: 0, failed: 152, done: 0, total: 152 })
-      .mockResolvedValueOnce({ queued: 0, processing: 0, rateLimited: 0, failed: 152, done: 0, total: 152 });
+      .mockResolvedValueOnce({
+        queued: 0,
+        processing: 0,
+        rateLimited: 0,
+        failed: 152,
+        latestFailureAt: '2026-01-01T00:00:00.000Z',
+        done: 0,
+        total: 152,
+      })
+      .mockResolvedValueOnce({
+        queued: 0,
+        processing: 0,
+        rateLimited: 0,
+        failed: 152,
+        latestFailureAt: '2026-01-01T00:00:00.000Z',
+        done: 0,
+        total: 152,
+      });
 
     await (service as any).checkAndResetSession();
 
@@ -354,7 +371,15 @@ describe('AuthorEnrichmentOrchestratorService', () => {
 
   it('does not reset an active session or emit repeatedly for an empty session', async () => {
     session.addToTotal(1);
-    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 1, processing: 0, rateLimited: 0, failed: 0, done: 0, total: 1 });
+    queueRepo.getStatusSummary.mockResolvedValueOnce({
+      queued: 1,
+      processing: 0,
+      rateLimited: 0,
+      failed: 0,
+      latestFailureAt: null,
+      done: 0,
+      total: 1,
+    });
 
     await (service as any).checkAndResetSession();
 
@@ -363,14 +388,30 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     expect(gateway.emitStatus).not.toHaveBeenCalled();
 
     session.reset();
-    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, rateLimited: 0, failed: 0, done: 0, total: 0 });
+    queueRepo.getStatusSummary.mockResolvedValueOnce({
+      queued: 0,
+      processing: 0,
+      rateLimited: 0,
+      failed: 0,
+      latestFailureAt: null,
+      done: 0,
+      total: 0,
+    });
     await (service as any).checkAndResetSession();
     expect(gateway.emitStatus).not.toHaveBeenCalled();
   });
 
   it('does not let a stale drained summary reset newly scheduled session work', async () => {
     session.addToTotal(1);
-    let resolveSummary!: (summary: { queued: number; processing: number; rateLimited: number; failed: number; done: number; total: number }) => void;
+    let resolveSummary!: (summary: {
+      queued: number;
+      processing: number;
+      rateLimited: number;
+      failed: number;
+      latestFailureAt: string | null;
+      done: number;
+      total: number;
+    }) => void;
     queueRepo.getStatusSummary.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveSummary = resolve;
@@ -379,7 +420,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
 
     const resetPromise = (service as any).checkAndResetSession();
     session.addToTotal(1);
-    resolveSummary({ queued: 0, processing: 0, rateLimited: 0, failed: 0, done: 0, total: 0 });
+    resolveSummary({ queued: 0, processing: 0, rateLimited: 0, failed: 0, latestFailureAt: null, done: 0, total: 0 });
     await resetPromise;
 
     expect(session.getSnapshot()).toMatchObject({ sessionTotal: 2, sessionDone: 0, sessionFailed: 0 });

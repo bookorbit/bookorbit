@@ -12,6 +12,7 @@ import { BookQueryBuilder } from '../../book/book-query-builder.service';
 import { SmartScopeService } from '../../smart-scope/smart-scope.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
+import { normalizeKoboLanguage, selectKoboIsbn } from './kobo-metadata.utils';
 import { KoboReadingStateService } from './kobo-reading-state.service';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -20,6 +21,7 @@ const SYNC_PAGE_SIZE = 5;
 const SNAPSHOT_RECONCILE_BATCH_SIZE = 5000;
 const SNAPSHOT_CREATE_BATCH_SIZE = 5000;
 const TOKEN_PREFIX = 'PX.';
+const METADATA_SERIALIZER_VERSION = 2;
 
 type EligibleSnapshotRow = {
   bookId: number;
@@ -75,7 +77,8 @@ export interface KoboBookEntry {
   publisher: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
-  language: string | null;
+  language: string;
+  isbn: string | null;
   seriesName: string | null;
   seriesIndex: number | null;
   fileFormat: string;
@@ -800,7 +803,8 @@ export class KoboSyncService {
       Description: book.description,
       Publisher: publisher,
       PublicationDate: publicationDate,
-      Language: book.language ?? 'en',
+      Language: book.language,
+      ...(book.isbn ? { ISBN: book.isbn } : {}),
       Genre: '00000000-0000-0000-0000-000000000001',
       CoverImageId: book.koboCoverImageId,
       Contributors: book.authors,
@@ -841,8 +845,11 @@ export class KoboSyncService {
     metadataUpdatedAt: Date | null;
     entitlementId: string;
     coverImageId: string;
+    language: string;
+    isbn: string | null;
   }): string {
     const metaStr = [
+      METADATA_SERIALIZER_VERSION,
       params.title ?? '',
       params.authors.join(','),
       params.seriesName ?? '',
@@ -850,6 +857,8 @@ export class KoboSyncService {
       String(params.metadataUpdatedAt ?? ''),
       params.entitlementId,
       params.coverImageId,
+      params.language,
+      params.isbn ?? '',
     ].join('|');
     return createHash('sha256').update(metaStr).digest('hex').slice(0, 16);
   }
@@ -962,6 +971,9 @@ export class KoboSyncService {
       .select({
         bookId: schema.books.id,
         title: schema.bookMetadata.title,
+        isbn10: schema.bookMetadata.isbn10,
+        isbn13: schema.bookMetadata.isbn13,
+        language: schema.bookMetadata.language,
         seriesName: schema.bookMetadata.seriesName,
         seriesIndex: schema.bookMetadata.seriesIndex,
         metadataUpdatedAt: schema.bookMetadata.updatedAt,
@@ -979,6 +991,9 @@ export class KoboSyncService {
       .groupBy(
         schema.books.id,
         schema.bookMetadata.title,
+        schema.bookMetadata.isbn10,
+        schema.bookMetadata.isbn13,
+        schema.bookMetadata.language,
         schema.bookMetadata.seriesName,
         schema.bookMetadata.seriesIndex,
         schema.bookMetadata.updatedAt,
@@ -1011,6 +1026,8 @@ export class KoboSyncService {
           metadataUpdatedAt: row.metadataUpdatedAt,
           entitlementId: identity?.entitlementId ?? String(row.bookId),
           coverImageId,
+          language: normalizeKoboLanguage(row.language),
+          isbn: selectKoboIsbn(row.isbn13, row.isbn10),
         }),
         needsLegacyNumericRemoval: identity?.needsLegacyNumericRemoval ?? false,
       };
@@ -1039,6 +1056,8 @@ export class KoboSyncService {
         publishedDate: schema.bookMetadata.publishedDate,
         publishedYear: schema.bookMetadata.publishedYear,
         language: schema.bookMetadata.language,
+        isbn10: schema.bookMetadata.isbn10,
+        isbn13: schema.bookMetadata.isbn13,
         seriesName: schema.bookMetadata.seriesName,
         seriesIndex: schema.bookMetadata.seriesIndex,
         fileFormat: schema.bookFiles.format,
@@ -1099,6 +1118,8 @@ export class KoboSyncService {
       const identity = identitiesById.get(row.bookId);
       if (!identity) continue;
       const coverImageId = this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.metadataUpdatedAt);
+      const language = normalizeKoboLanguage(row.language);
+      const isbn = selectKoboIsbn(row.isbn13, row.isbn10);
       byId.set(row.bookId, {
         bookId: row.bookId,
         koboEntitlementId: identity.entitlementId,
@@ -1109,7 +1130,8 @@ export class KoboSyncService {
         publisher: row.publisher,
         publishedDate: row.publishedDate,
         publishedYear: row.publishedYear,
-        language: row.language,
+        language,
+        isbn,
         seriesName: row.seriesName,
         seriesIndex: row.seriesIndex,
         fileFormat: row.fileFormat ?? 'epub',
@@ -1124,6 +1146,8 @@ export class KoboSyncService {
           metadataUpdatedAt: row.metadataUpdatedAt,
           entitlementId: identity.entitlementId,
           coverImageId,
+          language,
+          isbn,
         }),
         metadataUpdatedAt: row.metadataUpdatedAt,
         collectionNames: collectionsByBook.get(row.bookId) ?? [],

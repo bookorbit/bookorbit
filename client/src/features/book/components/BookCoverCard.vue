@@ -10,6 +10,7 @@ import {
   Check,
   Download,
   Eye,
+  FolderInput,
   FolderPlus,
   Image,
   Lock,
@@ -63,9 +64,11 @@ const props = defineProps<{
   selected?: boolean
   showLabel?: boolean
   coverAspectRatio?: CoverAspectRatio
+  /** Opt-in: only views that host the destination sheet should offer this. */
+  allowMoveToLibrary?: boolean
 }>()
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 const emit = defineEmits<{
   action: [type: BookActionType]
   select: [event: MouseEvent]
@@ -671,6 +674,10 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                   <DropdownMenuItem @click="emit('action', 'add-to-collection')">
                     <FolderPlus class="size-4 mr-2" />
                     {{ t('book.actions.addToCollection') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem v-if="allowMoveToLibrary && hasPermission('library_edit_metadata')" @click="emit('action', 'move-to-library')">
+                    <FolderInput class="size-4 mr-2" />
+                    {{ t('book.move.action') }}
                   </DropdownMenuItem>
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>

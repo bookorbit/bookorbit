@@ -45,6 +45,18 @@ export class UserPreferencesController {
     await this.userPreferencesService.upsertLocalePreferences(user.id, dto.settings);
   }
 
+  @Get('server-fonts')
+  async getServerFontPreferences(@CurrentUser() user: RequestUser) {
+    const settings = await this.userPreferencesService.getServerFontPreferences(user.id);
+    return { settings };
+  }
+
+  @Put('server-fonts')
+  @HttpCode(204)
+  async upsertServerFontPreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
+    await this.userPreferencesService.upsertServerFontPreferences(user.id, dto.settings);
+  }
+
   @Get('whats-new')
   async getWhatsNewPreferences(@CurrentUser() user: RequestUser) {
     const settings = await this.userPreferencesService.getWhatsNewPreferences(user.id);

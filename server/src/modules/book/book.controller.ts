@@ -45,6 +45,7 @@ import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
+import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
 import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
@@ -526,6 +527,18 @@ export class BookController {
     const sync = shouldSyncFileWrite(syncFileWrite);
     const result = await this.bookService.updateMetadata(id, dto, user, { postSaveMode: sync ? 'sync' : 'schedule' });
     return sync ? result : result.book;
+  }
+
+  @Patch(':id/added-at')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookMetadataUpdate,
+    resource: AuditResource.Book,
+    getResourceId: (req) => parseInt(req.params['id'] as string, 10),
+    description: (req) => `Updated added date for book #${req.params['id']}`,
+  })
+  updateAddedAt(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookAddedAtDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.updateAddedAt(id, dto, user);
   }
 
   @Patch(':id/metadata-and-locks')

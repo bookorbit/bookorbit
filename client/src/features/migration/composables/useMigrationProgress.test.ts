@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
-  getAccessToken: vi.fn<() => string | null>().mockReturnValue('test-token'),
+  getValidToken: vi.fn<() => Promise<string | null>>().mockResolvedValue('test-token'),
+  refreshAccessToken: vi.fn<() => Promise<string>>().mockResolvedValue('test-token'),
 }))
 
 type SocketEventHandler = (...args: unknown[]) => void

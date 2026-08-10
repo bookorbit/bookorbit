@@ -8,6 +8,7 @@ import { Permission } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
+import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 import { BookController } from './book.controller';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
@@ -151,6 +152,7 @@ function makeController() {
     clearFileProgress: vi.fn(),
     saveAudioProgress: vi.fn(),
     updatePersonalNote: vi.fn(),
+    updateAddedAt: vi.fn(),
     updateMetadata: vi.fn(),
     updateMetadataAndLocks: vi.fn(),
     updateMetadataLocks: vi.fn(),
@@ -810,6 +812,7 @@ describe('BookController', () => {
     bookService.getDetail.mockResolvedValue({ id: 7, title: 'Detail' });
 
     await controller.updateMetadata(7, { title: 'New' } as never, user);
+    await controller.updateAddedAt(7, { addedAt: '2020-06-15' }, user);
     await controller.updateMetadataAndLocks(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] } as never, user);
     await controller.bulkSetMetadata({ bookIds: [7, 8], field: 'language', value: 'fr' } as never, user);
     await controller.updateMetadataLocks(7, { lockedFields: ['title'] } as never, user);
@@ -821,6 +824,7 @@ describe('BookController', () => {
     await controller.getDetail(7, user);
 
     expect(bookService.updateMetadata).toHaveBeenCalledWith(7, { title: 'New' }, user, { postSaveMode: 'schedule' });
+    expect(bookService.updateAddedAt).toHaveBeenCalledWith(7, { addedAt: '2020-06-15' }, user);
     expect(bookService.updateMetadataAndLocks).toHaveBeenCalledWith(7, { metadata: { goodreadsId: '123' }, lockedFields: ['goodreadsId'] }, user, {
       postSaveMode: 'schedule',
     });
@@ -913,6 +917,10 @@ describe('BookController', () => {
       getResourceId: (req: { params: Record<string, string> }) => number;
       description: (req: { params: Record<string, string> }) => string;
     };
+    const updateAddedAtAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.updateAddedAt) as {
+      getResourceId: (req: { params: Record<string, string> }) => number;
+      description: (req: { params: Record<string, string> }) => string;
+    };
     const updateMetadataAndLocksAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.updateMetadataAndLocks) as {
       getResourceId: (req: { params: Record<string, string> }) => number;
       description: (req: { params: Record<string, string> }) => string;
@@ -938,6 +946,9 @@ describe('BookController', () => {
     expect(bulkSetMetadataAudit.description({ body: { bookIds: [1, 2], field: 'language' } })).toBe('Bulk set language for 2 books');
     expect(updateMetadataAudit.getResourceId({ params: { id: '44' } })).toBe(44);
     expect(updateMetadataAudit.description({ params: { id: '44' } })).toBe('Updated metadata for book #44');
+    expect(updateAddedAtAudit.getResourceId({ params: { id: '44' } })).toBe(44);
+    expect(updateAddedAtAudit.description({ params: { id: '44' } })).toBe('Updated added date for book #44');
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookController.prototype.updateAddedAt)).toBe(Permission.LibraryEditMetadata);
     expect(updateMetadataAndLocksAudit.getResourceId({ params: { id: '44' } })).toBe(44);
     expect(updateMetadataAndLocksAudit.description({ params: { id: '44' } })).toBe('Updated metadata and locks for book #44');
     expect(updateLocksAudit.getResourceId({ params: { id: '44' } })).toBe(44);

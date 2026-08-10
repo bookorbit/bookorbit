@@ -3,21 +3,25 @@ import { z } from 'zod';
 
 import {
   COMMUNITY_RATING_PROVIDER_KEYS,
+  CUSTOM_FIELD_OPERATORS,
   FIELD_OPERATORS,
-  RULE_FIELDS,
   RULE_OPERATORS,
+  isCustomRuleField,
+  isRuleField,
   type CommunityRatingProvider,
   type GroupRule,
   type Rule,
-  type RuleField,
   type RuleOperator,
+  type StaticRuleField,
 } from '@bookorbit/types';
 import { isDateKey } from '../../../common/utils/timezone.utils';
 
 const COMMUNITY_RATING_PROVIDER_VALUES = ['any', ...COMMUNITY_RATING_PROVIDER_KEYS] as const;
 
-const DATE_VALUE_FIELDS = new Set<RuleField>(['addedAt', 'startedAt', 'finishedAt', 'publishedDate']);
+const DATE_VALUE_FIELDS = new Set<StaticRuleField>(['addedAt', 'startedAt', 'finishedAt', 'publishedDate']);
 const DATE_VALUE_OPERATORS = new Set<RuleOperator>(['before', 'after', 'between']);
+const CUSTOM_NUMERIC_OPERATORS = new Set<RuleOperator>(['gt', 'gte', 'lt', 'lte']);
+const CUSTOM_DATE_OPERATORS = new Set<RuleOperator>(['before', 'after']);
 const ISO_DATE_TIME_RE = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function isValidRuleDateValue(value: unknown): boolean {
@@ -38,23 +42,65 @@ function isValidRuleDateValue(value: unknown): boolean {
   return hour <= 23 && minute <= 59 && second <= 59 && !Number.isNaN(new Date(normalized).getTime());
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+type UnvalidatedRule = { field: string; operator: string; value?: unknown; valueTo?: unknown };
+
+/**
+ * A custom field rule carries no field type, so the value's own shape is what tells the query
+ * builder which typed column to read. Reject the shapes that would otherwise silently read a
+ * column the rule did not mean, rather than leaving them to return no rows.
+ */
+function checkCustomFieldValue(rule: UnvalidatedRule, ctx: z.RefinementCtx): void {
+  const { operator, value, valueTo } = rule;
+  if (Array.isArray(value)) {
+    ctx.addIssue({ code: 'custom', message: 'Custom metadata field rules do not accept list values', path: ['value'] });
+    return;
+  }
+  if (CUSTOM_NUMERIC_OPERATORS.has(operator as RuleOperator) && !isFiniteNumber(value)) {
+    ctx.addIssue({ code: 'custom', message: `Operator '${operator}' requires a numeric value`, path: ['value'] });
+    return;
+  }
+  if (CUSTOM_DATE_OPERATORS.has(operator as RuleOperator) && !isValidRuleDateValue(value)) {
+    ctx.addIssue({ code: 'custom', message: `Operator '${operator}' requires a valid date value`, path: ['value'] });
+    return;
+  }
+  if (operator === 'between') {
+    // `value` picks the column the query builder reads, so `valueTo` has to suit that same column.
+    const rangeIsValid = isFiniteNumber(value) ? isFiniteNumber(valueTo) : isValidRuleDateValue(value) && isValidRuleDateValue(valueTo);
+    if (!rangeIsValid) {
+      ctx.addIssue({ code: 'custom', message: "Operator 'between' requires two numbers or two dates", path: ['value'] });
+    }
+  }
+}
+
 const ruleSchema: z.ZodType<Rule> = z
   .object({
     type: z.literal('rule'),
-    field: z.enum(RULE_FIELDS as unknown as [string, ...string[]]),
+    field: z.string().refine(isRuleField, { message: 'Unknown filter field' }),
     operator: z.enum(RULE_OPERATORS as unknown as [string, ...string[]]),
     value: z.union([z.string(), z.number(), z.array(z.string().min(1)).min(1).max(20), z.array(z.number()).min(1).max(20)]).optional(),
     valueTo: z.union([z.string(), z.number()]).optional(),
     provider: z.enum(COMMUNITY_RATING_PROVIDER_VALUES as unknown as [CommunityRatingProvider, ...CommunityRatingProvider[]]).optional(),
   })
   .superRefine((rule, ctx) => {
-    if (!FIELD_OPERATORS[rule.field as keyof typeof FIELD_OPERATORS]?.includes(rule.operator as never)) {
+    const custom = isCustomRuleField(rule.field);
+    // Narrowing a custom rule to its field's own operators would need a database lookup, so it is
+    // checked against every operator a custom field can take; the query builder degrades the rest.
+    const allowedOperators = custom ? CUSTOM_FIELD_OPERATORS : FIELD_OPERATORS[rule.field as StaticRuleField];
+    if (!allowedOperators?.includes(rule.operator as RuleOperator)) {
       ctx.addIssue({ code: 'custom', message: 'Operator is not valid for this field', path: ['operator'] });
     }
     if (rule.provider !== undefined && rule.field !== 'communityRating') {
       ctx.addIssue({ code: 'custom', message: 'Provider is only valid for community rating rules', path: ['provider'] });
     }
-    if (DATE_VALUE_FIELDS.has(rule.field as RuleField) && DATE_VALUE_OPERATORS.has(rule.operator as RuleOperator)) {
+    if (custom) {
+      checkCustomFieldValue(rule, ctx);
+      return;
+    }
+    if (DATE_VALUE_FIELDS.has(rule.field as StaticRuleField) && DATE_VALUE_OPERATORS.has(rule.operator as RuleOperator)) {
       if (!isValidRuleDateValue(rule.value)) {
         ctx.addIssue({ code: 'custom', message: `Operator '${rule.operator}' requires a valid date value`, path: ['value'] });
       }

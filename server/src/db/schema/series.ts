@@ -9,6 +9,9 @@ export const bookSeries = pgTable(
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 500 }).notNull(),
     normalizedName: varchar('normalized_name', { length: 500 }).notNull(),
+    expectedBookCount: integer('expected_book_count'),
+    expectedBookCountSource: varchar('expected_book_count_source', { length: 50 }),
+    expectedBookCountUpdatedAt: timestamp('expected_book_count_updated_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
@@ -20,6 +23,12 @@ export const bookSeries = pgTable(
     index('book_series_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
     index('book_series_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
     index('book_series_name_lower_idx').on(sql`lower(${t.name})`),
+    // Ceiling mirrors MAX_SERIES_TOTAL_BOOKS; a provider cannot persist a total that would
+    // make the series gap finder enumerate an unbounded range.
+    check(
+      'book_series_expected_book_count_range_chk',
+      sql`${t.expectedBookCount} IS NULL OR (${t.expectedBookCount} >= 1 AND ${t.expectedBookCount} <= 10000)`,
+    ),
   ],
 );
 

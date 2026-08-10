@@ -65,7 +65,7 @@ const props = withDefaults(
   { sortable: true, initialized: true },
 )
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 const emit = defineEmits<{
   'update:sort': [value: SortSpec[]]
   action: [book: BookCard, type: BookActionType]

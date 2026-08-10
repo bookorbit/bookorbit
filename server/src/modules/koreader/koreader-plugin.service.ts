@@ -224,7 +224,7 @@ export class KoreaderPluginService {
         }
 
         entries.push({
-          bookFile: { id: match.bookFileId, bookId: match.bookId, libraryId: match.libraryId },
+          bookFile: { id: match.bookFileId, bookId: match.bookId, libraryId: match.libraryId, format: match.format },
           percentage: item.percentage,
           progress: item.progress,
           timestamp: item.timestamp,

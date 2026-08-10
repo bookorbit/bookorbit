@@ -107,7 +107,9 @@ const bookSortOptions = computed(() => [
   { value: 'publishedYear', label: t('author.detail.books.sort.publishedYear') },
 ])
 
-type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'delete'
+// 'move-to-library' is part of the shared card contract; this view does not
+// opt in, so it never fires here.
+type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'move-to-library' | 'delete'
 
 const {
   pendingId: deleteBookId,

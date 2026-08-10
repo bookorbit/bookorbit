@@ -37,19 +37,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <LibraryCreatorModal v-if="createOpen" @close="closeCreate" @saved="onLibrarySaved" />
-  <EntityIndexView
-    :title="t('titles.libraries')"
-    title-icon="BookCopy"
-    fallback-icon="BookCopy"
-    :items="libraries"
-    route-name="library"
-    :loading="loading"
-    :search-placeholder="t('components.sidebar.filterLibrariesPlaceholder')"
-    :empty-title="t('components.sidebar.noLibraries')"
-    :empty-hint="t('components.entityIndex.librariesEmptyHint')"
-    :can-add="canManageLibraries"
-    :add-label="t('components.sidebar.newLibrary')"
-    @add="openCreate"
-  />
+  <div class="h-full">
+    <LibraryCreatorModal v-if="createOpen" @close="closeCreate" @saved="onLibrarySaved" />
+    <EntityIndexView
+      :title="t('titles.libraries')"
+      title-icon="BookCopy"
+      fallback-icon="BookCopy"
+      :items="libraries"
+      route-name="library"
+      :loading="loading"
+      :search-placeholder="t('components.sidebar.filterLibrariesPlaceholder')"
+      :empty-title="t('components.sidebar.noLibraries')"
+      :empty-hint="t('components.entityIndex.librariesEmptyHint')"
+      :can-add="canManageLibraries"
+      :add-label="t('components.sidebar.newLibrary')"
+      @add="openCreate"
+    />
+  </div>
 </template>

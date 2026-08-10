@@ -37,7 +37,7 @@ function makeService(bookDockPath = '/data/book-dock') {
     countsByStatus: vi.fn().mockResolvedValue({ pending: 1, ready: 2, error: 0, total: 3 }),
   };
   const gateway = {
-    emitSummary: vi.fn(),
+    emitChanged: vi.fn(),
   };
   const processingState = {
     isPaused: vi.fn().mockResolvedValue(false),
@@ -67,7 +67,7 @@ describe('BookDockWatcherService', () => {
   it('rescan walks files and emits summary', async () => {
     const { service } = makeService();
     const walkSpy = vi.spyOn(service as any, 'walkAndIngest').mockResolvedValue(undefined);
-    const emitSpy = vi.spyOn(service as any, 'emitSummary').mockResolvedValue(undefined);
+    const emitSpy = vi.spyOn(service as any, 'emitChange').mockReturnValue(undefined);
 
     await service.rescan();
 
@@ -78,7 +78,7 @@ describe('BookDockWatcherService', () => {
   it('rescan uses a custom configured Book Dock path', async () => {
     const { service } = makeService('/books/bookdrop');
     const walkSpy = vi.spyOn(service as any, 'walkAndIngest').mockResolvedValue(undefined);
-    const emitSpy = vi.spyOn(service as any, 'emitSummary').mockResolvedValue(undefined);
+    const emitSpy = vi.spyOn(service as any, 'emitChange').mockReturnValue(undefined);
 
     await service.rescan();
 
@@ -116,7 +116,7 @@ describe('BookDockWatcherService', () => {
 
     expect(waitForStability).toHaveBeenCalledWith('/data/book-dock/book.epub');
     expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/book.epub');
-    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3, paused: false });
+    expect(gateway.emitChanged).toHaveBeenCalledTimes(1);
   });
 
   it('rescan skips discovery while paused and emits current summary', async () => {
@@ -128,7 +128,7 @@ describe('BookDockWatcherService', () => {
 
     expect(walkSpy).not.toHaveBeenCalled();
     expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
-    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3, paused: true });
+    expect(gateway.emitChanged).toHaveBeenCalledTimes(1);
   });
 
   it('process(delete) removes db row and cover files before emitting summary', async () => {
@@ -140,7 +140,7 @@ describe('BookDockWatcherService', () => {
     expect(unlink).toHaveBeenCalledWith('/data/book-dock/covers/12.jpg');
     expect(unlink).toHaveBeenCalledWith('/data/book-dock/covers/12_thumb.jpg');
     expect(repo.deleteById).toHaveBeenCalledWith(12);
-    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 1, ready: 2, error: 0, total: 3, paused: false });
+    expect(gateway.emitChanged).toHaveBeenCalledTimes(1);
   });
 
   it('process(create) skips stability and ingest while paused', async () => {

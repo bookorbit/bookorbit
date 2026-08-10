@@ -188,6 +188,7 @@ async function handleSubmit() {
                     <TooltipTrigger as-child>
                       <button
                         class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card shrink-0"
+                        :class="opt.swatchClass"
                         :aria-label="t(opt.labelKey)"
                         :style="{
                           backgroundColor: opt.color,
@@ -208,7 +209,7 @@ async function handleSubmit() {
         <Tooltip>
           <TooltipTrigger as-child>
             <button class="theme-btn" @click="openAccent()">
-              <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
+              <span class="w-3.5 h-3.5 rounded-full block" :class="currentAccent?.swatchClass" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
           <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>

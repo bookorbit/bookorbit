@@ -164,8 +164,11 @@ describe('BookCoverArtwork', () => {
     await triggerMainImageLoad(wrapper, 600, 900)
 
     expect(wrapper.find('[data-testid="placeholder"]').exists()).toBe(false)
-    const skeleton = wrapper.find('.animate-pulse')
+    const skeleton = wrapper.find('[data-testid="cover-skeleton"]')
     expect(skeleton.classes()).toContain('opacity-0')
+    // The shimmer is an infinite animation, so leaving it on a loaded cover keeps the
+    // refresh driver ticking for the life of the page. See issue #626.
+    expect(skeleton.classes()).not.toContain('animate-pulse')
   })
 
   it('does not render the fitted spine layer when spine is disabled', async () => {
@@ -242,7 +245,7 @@ describe('BookCoverArtwork', () => {
 
       expect(image.classes()).toContain('opacity-100')
       expect(image.classes()).not.toContain('transition-opacity')
-      expect(second.find('.animate-pulse').classes()).toContain('opacity-0')
+      expect(second.find('[data-testid="cover-skeleton"]').classes()).toContain('opacity-0')
     })
 
     it('restores instantly when src changes to an already-loaded cover', async () => {
@@ -255,7 +258,7 @@ describe('BookCoverArtwork', () => {
       await wrapper.setProps({ src: '/warm.jpg' })
       const image = wrapper.find('img[alt="Dune cover"]')
       expect(image.classes()).toContain('opacity-100')
-      expect(wrapper.find('.animate-pulse').classes()).toContain('opacity-0')
+      expect(wrapper.find('[data-testid="cover-skeleton"]').classes()).toContain('opacity-0')
     })
 
     it('still shows the skeleton when src changes to an unseen cover', async () => {

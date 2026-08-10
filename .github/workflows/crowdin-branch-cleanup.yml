@@ -1,0 +1,30 @@
+name: Crowdin Branch Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  delete-service-branch:
+    # The controlled export workflow reuses this branch for its translation PR.
+    # Removing it after close guarantees that the next export starts from current main.
+    if: github.event.pull_request.head.ref == 'l10n_main' && github.event.pull_request.head.repo.full_name == github.repository
+    name: Delete l10n_main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete the Crowdin service branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: l10n_main
+        run: |
+          if gh api "repos/$REPO/git/refs/heads/$BRANCH" >/dev/null 2>&1; then
+            gh api -X DELETE "repos/$REPO/git/refs/heads/$BRANCH"
+            echo "Deleted $BRANCH; the translation workflow will recreate it from main when needed."
+          else
+            echo "$BRANCH is already absent; nothing to delete."
+          fi

@@ -421,6 +421,34 @@
       "when": 1785272589212,
       "tag": "0059_add_smart_scope_kobo_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1785645905307,
+      "tag": "0060_add_book_move_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1785695009216,
+      "tag": "0061_add_server_fonts",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1785712608966,
+      "tag": "0062_add_series_expected_book_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1785964221973,
+      "tag": "0063_add_dashboard_random_lookup_index",
+      "breakpoints": true
     }
   ]
 }

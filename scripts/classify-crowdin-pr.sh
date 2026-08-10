@@ -19,14 +19,21 @@ if [[ "$HEAD_REPO" != "$BASE_REPO" || "$HEAD_BRANCH" != "l10n_main" ]]; then
 fi
 
 allowed_paths=(
+  "client/src/locales/cs.json"
+  "client/src/locales/da.json"
   "client/src/locales/de.json"
   "client/src/locales/es.json"
+  "client/src/locales/fi.json"
   "client/src/locales/fr.json"
   "client/src/locales/it.json"
   "client/src/locales/nl.json"
   "client/src/locales/pl.json"
   "client/src/locales/pt.json"
+  "client/src/locales/ru.json"
   "client/src/locales/sl.json"
+  "client/src/locales/sv.json"
+  "client/src/locales/uk.json"
+  "client/src/locales/zh.json"
 )
 
 is_allowed_path() {

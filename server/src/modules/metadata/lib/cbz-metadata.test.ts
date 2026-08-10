@@ -128,6 +128,32 @@ describe('extractCbzMetadata', () => {
       expect(r?.seriesIndex).toBe(5);
     });
 
+    it('extracts the series length from Count', async () => {
+      const xml = `<ComicInfo><Series>Amazing Series</Series><Number>5</Number><Count>12</Count></ComicInfo>`;
+      mockZipFile(buildZipWithComicInfo(xml));
+
+      const r = await extractCbzMetadata('/book.cbz');
+      expect(r?.seriesTotalBooks).toBe(12);
+    });
+
+    it('leaves the series length unset when Count is absent', async () => {
+      const xml = `<ComicInfo><Series>Amazing Series</Series><Number>5</Number></ComicInfo>`;
+      mockZipFile(buildZipWithComicInfo(xml));
+
+      const r = await extractCbzMetadata('/book.cbz');
+      expect(r?.seriesTotalBooks).toBeNull();
+    });
+
+    it('rejects a Count that is empty, unparseable or out of range', async () => {
+      for (const count of ['', 'lots', '0', '-3', '4.5', '10001']) {
+        const xml = `<ComicInfo><Series>S</Series><Count>${count}</Count></ComicInfo>`;
+        mockZipFile(buildZipWithComicInfo(xml));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.seriesTotalBooks, `Count=${count}`).toBeNull();
+      }
+    });
+
     it('extracts authors from Writer field', async () => {
       const xml = `<ComicInfo><Writer>Alan Moore</Writer></ComicInfo>`;
       mockZipFile(buildZipWithComicInfo(xml));
@@ -345,6 +371,28 @@ describe('extractCbzMetadata', () => {
       expect(r?.seriesIndex).toBe(3);
       expect(r?.publishedYear).toBe(2001);
       expect(r?.publisher).toBe('Image');
+    });
+
+    it('extracts the series length from numberOfIssues', async () => {
+      const comment = JSON.stringify({
+        'ComicBookInfo/1.0': { series: 'JSON Series', issue: 3, numberOfIssues: 24, credits: [], tags: [] },
+      });
+      mockZipFile(buildZipCommentOnly(comment));
+
+      const r = await extractCbzMetadata('/book.cbz');
+      expect(r?.seriesTotalBooks).toBe(24);
+    });
+
+    it('leaves the series length unset when numberOfIssues is absent or unusable', async () => {
+      for (const value of [undefined, null, 0, -1, 'many']) {
+        const comment = JSON.stringify({
+          'ComicBookInfo/1.0': { series: 'JSON Series', numberOfIssues: value, credits: [], tags: [] },
+        });
+        mockZipFile(buildZipCommentOnly(comment));
+
+        const r = await extractCbzMetadata('/book.cbz');
+        expect(r?.seriesTotalBooks, `numberOfIssues=${String(value)}`).toBeNull();
+      }
     });
 
     it('extracts Writer credits as authors', async () => {

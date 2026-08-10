@@ -210,6 +210,59 @@ describe('HardcoverRepository', () => {
     expect(selectArgs.some((cols) => cols && 'bookId' in cols && 'status' in cols)).toBe(true);
   });
 
+  it('findCurrentReadingBooks filters to reading/rereading statuses and bounds the result', async () => {
+    const { repo, db } = makeRepository();
+    const chain: Record<string, unknown> = {};
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as', 'orderBy', 'limit']) {
+      chain[method] = vi.fn().mockReturnValue(chain);
+    }
+    chain.then = (resolve: (rows: unknown[]) => void) => resolve([{ bookId: 42 }]);
+    db.select.mockImplementation(() => chain);
+
+    await expect(repo.findCurrentReadingBooks(7, 200)).resolves.toEqual([{ bookId: 42 }]);
+    expect(chain.where).toHaveBeenCalled();
+    expect(chain.orderBy).toHaveBeenCalled();
+    expect(chain.limit).toHaveBeenCalledWith(200);
+  });
+
+  it('leaves the unbounded sync query without an order or limit', async () => {
+    const { repo, db } = makeRepository();
+    const chain: Record<string, unknown> = {};
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as', 'orderBy', 'limit']) {
+      chain[method] = vi.fn().mockReturnValue(chain);
+    }
+    chain.then = (resolve: (rows: unknown[]) => void) => resolve([{ bookId: 42 }]);
+    db.select.mockImplementation(() => chain);
+
+    await repo.findSyncableBooks(7);
+
+    expect(chain.orderBy).not.toHaveBeenCalled();
+    expect(chain.limit).not.toHaveBeenCalled();
+  });
+
+  it('updateEditionIfLinked updates an existing link and returns true', async () => {
+    const { repo, db } = makeRepository();
+    const returning = vi.fn().mockResolvedValue([{ id: 2 }]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const set = vi.fn().mockReturnValue({ where });
+    db.update.mockReset();
+    db.update.mockReturnValue({ set });
+
+    await expect(repo.updateEditionIfLinked(7, 42, 555)).resolves.toBe(true);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ hardcoverEditionId: 555 }));
+  });
+
+  it('updateEditionIfLinked returns false when the user has no link for that book', async () => {
+    const { repo, db } = makeRepository();
+    const returning = vi.fn().mockResolvedValue([]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const set = vi.fn().mockReturnValue({ where });
+    db.update.mockReset();
+    db.update.mockReturnValue({ set });
+
+    await expect(repo.updateEditionIfLinked(7, 42, 555)).resolves.toBe(false);
+  });
+
   it('findBookIdByFileId returns null when no file row exists', async () => {
     const { repo, bookIdLimit } = makeRepository();
     bookIdLimit.mockResolvedValueOnce([]);

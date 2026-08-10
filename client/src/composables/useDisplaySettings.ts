@@ -2,6 +2,7 @@ import { ref, watch } from 'vue'
 import {
   AUTHOR_COVER_SHAPES,
   BOOK_COVER_DISPLAY_MODES,
+  BOOK_DETAIL_COVER_TINTS,
   BOOK_SHADOW_STRENGTHS,
   BOOK_SPINE_OVERLAYS,
   BOOK_THUMBNAIL_CLICK_ACTION,
@@ -14,6 +15,7 @@ import {
   TABLE_DENSITIES,
   type AuthorCoverShape,
   type BookCoverDisplayMode,
+  type BookDetailCoverTint,
   type BookShadowStrength,
   type BookSpineOverlay,
   type BookThumbnailClickAction,
@@ -31,6 +33,7 @@ import { storage } from '@/services/storage'
 export type {
   AuthorCoverShape,
   BookCoverDisplayMode,
+  BookDetailCoverTint,
   BookShadowStrength,
   BookSpineOverlay,
   BookThumbnailClickAction,
@@ -50,6 +53,7 @@ const DEFAULT_GRID_GAP = 28
 const DEFAULT_BOOK_SPINE_OVERLAY: BookSpineOverlay = 'off'
 const DEFAULT_BOOK_SHADOW_STRENGTH: BookShadowStrength = 'default'
 const DEFAULT_BOOK_COVER_DISPLAY_MODE: BookCoverDisplayMode = 'blurred-fit'
+const DEFAULT_BOOK_DETAIL_COVER_TINT: BookDetailCoverTint = 'single'
 const DEFAULT_SERIES_CARD_COVER_MODE: SeriesCardCoverMode = 'stack'
 const DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION: BookThumbnailClickAction = 'reader'
 const DEFAULT_CARD_OVERLAYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status', 'series-position']
@@ -70,6 +74,12 @@ function normalizeBookCoverDisplayMode(value: unknown): BookCoverDisplayMode {
   return typeof value === 'string' && BOOK_COVER_DISPLAY_MODES.includes(value as BookCoverDisplayMode)
     ? (value as BookCoverDisplayMode)
     : DEFAULT_BOOK_COVER_DISPLAY_MODE
+}
+
+function normalizeBookDetailCoverTint(value: unknown): BookDetailCoverTint {
+  return typeof value === 'string' && BOOK_DETAIL_COVER_TINTS.includes(value as BookDetailCoverTint)
+    ? (value as BookDetailCoverTint)
+    : DEFAULT_BOOK_DETAIL_COVER_TINT
 }
 
 function normalizeSeriesCardCoverMode(value: unknown): SeriesCardCoverMode {
@@ -152,6 +162,7 @@ const bookShadowStrength = ref<BookShadowStrength>(normalizeBookShadowStrength(s
 const bookCoverDisplayMode = ref<BookCoverDisplayMode>(
   normalizeBookCoverDisplayMode(storage.get('bookCoverDisplayMode', DEFAULT_BOOK_COVER_DISPLAY_MODE)),
 )
+const bookDetailCoverTint = ref<BookDetailCoverTint>(normalizeBookDetailCoverTint(storage.get('bookDetailCoverTint', DEFAULT_BOOK_DETAIL_COVER_TINT)))
 const seriesCardCoverMode = ref<SeriesCardCoverMode>(normalizeSeriesCardCoverMode(storage.get('seriesCardCoverMode', DEFAULT_SERIES_CARD_COVER_MODE)))
 const gridCardPrimaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardPrimaryLabel', 'hidden')))
 const gridCardSecondaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardSecondaryLabel', 'hidden')))
@@ -178,6 +189,7 @@ watch(bookSpineOverlay, (value) => storage.set('bookSpineOverlay', normalizeBook
 watch(showSpineOnComics, (v) => storage.set('showSpineOnComics', v))
 watch(bookShadowStrength, (value) => storage.set('bookShadowStrength', normalizeBookShadowStrength(value)))
 watch(bookCoverDisplayMode, (value) => storage.set('bookCoverDisplayMode', normalizeBookCoverDisplayMode(value)))
+watch(bookDetailCoverTint, (value) => storage.set('bookDetailCoverTint', normalizeBookDetailCoverTint(value)))
 watch(seriesCardCoverMode, (value) => storage.set('seriesCardCoverMode', normalizeSeriesCardCoverMode(value)))
 watch(gridCardPrimaryLabel, (value) => storage.set('gridCardPrimaryLabel', normalizeGridCardLabelField(value)))
 watch(gridCardSecondaryLabel, (value) => storage.set('gridCardSecondaryLabel', normalizeGridCardLabelField(value)))
@@ -204,6 +216,7 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     showSpineOnComics: showSpineOnComics.value === true,
     bookShadowStrength: normalizeBookShadowStrength(bookShadowStrength.value),
     bookCoverDisplayMode: normalizeBookCoverDisplayMode(bookCoverDisplayMode.value),
+    bookDetailCoverTint: normalizeBookDetailCoverTint(bookDetailCoverTint.value),
     seriesCardCoverMode: normalizeSeriesCardCoverMode(seriesCardCoverMode.value),
     gridCardPrimaryLabel: normalizeGridCardLabelField(gridCardPrimaryLabel.value),
     gridCardSecondaryLabel: normalizeGridCardLabelField(gridCardSecondaryLabel.value),
@@ -239,6 +252,9 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
     out.bookShadowStrength = obj.bookShadowStrength as BookShadowStrength
   if (BOOK_COVER_DISPLAY_MODES.includes(obj.bookCoverDisplayMode as BookCoverDisplayMode)) {
     out.bookCoverDisplayMode = obj.bookCoverDisplayMode as BookCoverDisplayMode
+  }
+  if (BOOK_DETAIL_COVER_TINTS.includes(obj.bookDetailCoverTint as BookDetailCoverTint)) {
+    out.bookDetailCoverTint = obj.bookDetailCoverTint as BookDetailCoverTint
   }
   if (SERIES_CARD_COVER_MODES.includes(obj.seriesCardCoverMode as SeriesCardCoverMode)) {
     out.seriesCardCoverMode = obj.seriesCardCoverMode as SeriesCardCoverMode
@@ -279,6 +295,7 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.showSpineOnComics !== undefined) showSpineOnComics.value = prefs.showSpineOnComics
   if (prefs.bookShadowStrength !== undefined) bookShadowStrength.value = prefs.bookShadowStrength
   if (prefs.bookCoverDisplayMode !== undefined) bookCoverDisplayMode.value = prefs.bookCoverDisplayMode
+  if (prefs.bookDetailCoverTint !== undefined) bookDetailCoverTint.value = prefs.bookDetailCoverTint
   if (prefs.seriesCardCoverMode !== undefined) seriesCardCoverMode.value = prefs.seriesCardCoverMode
   if (prefs.gridCardPrimaryLabel !== undefined) gridCardPrimaryLabel.value = prefs.gridCardPrimaryLabel
   if (prefs.gridCardSecondaryLabel !== undefined) gridCardSecondaryLabel.value = prefs.gridCardSecondaryLabel
@@ -306,6 +323,7 @@ export function useDisplaySettings() {
     showSpineOnComics,
     bookShadowStrength,
     bookCoverDisplayMode,
+    bookDetailCoverTint,
     seriesCardCoverMode,
     gridCardPrimaryLabel,
     gridCardSecondaryLabel,

@@ -27,6 +27,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const rawObject = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : undefined;
     const message = typeof raw === 'string' ? raw : ((rawObject?.message as string) ?? (exc?.message as string) ?? 'An error occurred');
     const errorCode = typeof rawObject?.errorCode === 'string' ? rawObject.errorCode : undefined;
+    const retryAfterSeconds = typeof rawObject?.retryAfterSeconds === 'number' ? rawObject.retryAfterSeconds : undefined;
 
     if (status >= (HttpStatus.INTERNAL_SERVER_ERROR as number)) {
       this.logger.error(exception);
@@ -43,6 +44,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       requestId: request.id,
       ...(errorCode ? { errorCode } : {}),
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
     });
   }
 }

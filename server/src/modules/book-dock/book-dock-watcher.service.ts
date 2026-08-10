@@ -51,11 +51,11 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
 
   async rescan(): Promise<void> {
     if (await this.processingState.isPaused()) {
-      await this.emitSummary();
+      this.emitChange();
       return;
     }
     await this.walkAndIngest(this.bookDockPath);
-    await this.emitSummary();
+    this.emitChange();
   }
 
   private async startWatcher(): Promise<void> {
@@ -110,7 +110,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
       await waitForStability(path);
       if (await this.processingState.isPaused()) return;
       const id = await this.ingestService.ingestFromWatchedFolder(path);
-      if (id !== null) await this.emitSummary();
+      if (id !== null) this.emitChange();
     } else {
       const row = await this.repo.findByAbsolutePath(path);
       if (row) {
@@ -120,7 +120,7 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
         }
         await this.repo.deleteById(row.id);
       }
-      await this.emitSummary();
+      this.emitChange();
     }
   }
 
@@ -146,10 +146,8 @@ export class BookDockWatcherService implements OnApplicationBootstrap, OnModuleD
     }
   }
 
-  private async emitSummary(): Promise<void> {
-    const summary = await this.repo.countsByStatus();
-    const paused = await this.processingState.isPaused();
-    this.gateway.emitSummary({ ...summary, paused });
+  private emitChange(): void {
+    this.gateway.emitChanged();
   }
 }
 

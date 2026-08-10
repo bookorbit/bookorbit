@@ -11,7 +11,14 @@ import type {
   ProviderIds,
 } from '@bookorbit/types'
 import { useMetadataDiff, type DiffFieldKey, type MetadataPatch } from '../../../composables/useMetadataDiff'
-import { getProviderColor, getProviderLabel, hideOnError, providerActivePillStyle, toDisplayCoverUrl } from '../../../lib/metadata-fetch'
+import {
+  getProviderColor,
+  getProviderLabel,
+  hideOnError,
+  providerActivePillStyle,
+  resolveCandidateDisplayTitle,
+  toDisplayCoverUrl,
+} from '../../../lib/metadata-fetch'
 import MetadataDiffRow from './MetadataDiffRow.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 
@@ -291,7 +298,7 @@ onBeforeUnmount(() => {
               <span v-else class="block w-full h-full bg-muted-foreground/10" />
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block text-xs font-medium text-foreground line-clamp-1">{{ candidate.title }}</span>
+              <span class="block text-xs font-medium text-foreground line-clamp-1">{{ resolveCandidateDisplayTitle(candidate) }}</span>
               <span class="block text-[10px] text-muted-foreground line-clamp-1">
                 {{ candidate.publishedDate ?? candidate.publishedYear ?? 'Date unknown' }} - {{ index + 1 }} of {{ resultsForActiveProvider.length }}
               </span>

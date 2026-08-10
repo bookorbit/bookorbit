@@ -10,7 +10,6 @@ import {
   type HardcoverImportSummary,
 } from '@bookorbit/types';
 import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
-import { distance } from 'fastest-levenshtein';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -19,13 +18,11 @@ import { UserBookStatusService } from '../user-book-status/user-book-status.serv
 import { ReadingAttemptService } from '../user-book-status/reading-attempt.service';
 import { HARDCOVER_STATUS } from './hardcover.constants';
 import { HardcoverClientService } from './hardcover-client.service';
+import { HardcoverImportFuzzyIndex } from './hardcover-import-fuzzy-index';
 import { type HardcoverImportLocalBook, HardcoverRepository } from './hardcover.repository';
 import { HardcoverSettingsService } from './hardcover-settings.service';
 
 const IMPORT_PAGE_SIZE = 100;
-const TITLE_AUTHOR_ACCEPT_SCORE = 86;
-const TITLE_AUTHOR_TIE_MARGIN = 5;
-
 const IMPORTABLE_STATUS_MAP: Record<number, { status: HardcoverImportedReadStatus; label: string }> = {
   [HARDCOVER_STATUS.WANT_TO_READ]: { status: 'want_to_read', label: 'Want to Read' },
   [HARDCOVER_STATUS.CURRENTLY_READING]: { status: 'reading', label: 'Currently Reading' },
@@ -117,10 +114,10 @@ interface HardcoverUserBook {
 }
 
 interface LocalIndexes {
-  books: HardcoverImportLocalBook[];
   byHardcoverId: Map<number, HardcoverImportLocalBook[]>;
   byHardcoverSlug: Map<string, HardcoverImportLocalBook[]>;
   byIsbn: Map<string, HardcoverImportLocalBook[]>;
+  fuzzy: HardcoverImportFuzzyIndex;
 }
 
 interface MatchResult {
@@ -264,7 +261,8 @@ export class HardcoverImportService {
     );
     const indexes = this.buildIndexes(localBooks, states);
 
-    const rows = hardcoverBooks.map((book) => this.buildPreviewRow(book, indexes));
+    const rows: HardcoverImportPreviewRow[] = [];
+    for (const book of hardcoverBooks) rows.push(await this.buildPreviewRow(book, indexes));
     return {
       summary: summarize(rows),
       rows,
@@ -301,10 +299,10 @@ export class HardcoverImportService {
 
   private buildIndexes(books: HardcoverImportLocalBook[], states: Array<Awaited<ReturnType<HardcoverRepository['findBookState']>>>): LocalIndexes {
     const indexes: LocalIndexes = {
-      books,
       byHardcoverId: new Map(),
       byHardcoverSlug: new Map(),
       byIsbn: new Map(),
+      fuzzy: new HardcoverImportFuzzyIndex(books),
     };
     const booksById = new Map(books.map((book) => [book.bookId, book]));
 
@@ -333,7 +331,7 @@ export class HardcoverImportService {
     return indexes;
   }
 
-  private buildPreviewRow(hardcoverBook: HardcoverUserBook, indexes: LocalIndexes): HardcoverImportPreviewRow {
+  private async buildPreviewRow(hardcoverBook: HardcoverUserBook, indexes: LocalIndexes): Promise<HardcoverImportPreviewRow> {
     const statusMapping = IMPORTABLE_STATUS_MAP[hardcoverBook.status_id] ?? null;
     const hardcoverAuthors = extractHardcoverAuthors(hardcoverBook.book?.cached_contributors);
     const latestRead = hardcoverBook.user_book_reads?.find(hasReadSignal) ?? null;
@@ -363,7 +361,7 @@ export class HardcoverImportService {
       return this.toPreviewRow(base, null, null, null, 'skipped', 'Hardcover status is not imported');
     }
 
-    const match = this.findLocalMatch(hardcoverBook, hardcoverAuthors, indexes);
+    const match = await this.findLocalMatch(hardcoverBook, hardcoverAuthors, indexes);
     if ('outcome' in match) {
       return this.toPreviewRow(base, null, null, null, match.outcome, match.reason);
     }
@@ -420,7 +418,11 @@ export class HardcoverImportService {
     };
   }
 
-  private findLocalMatch(hardcoverBook: HardcoverUserBook, hardcoverAuthors: string[], indexes: LocalIndexes): MatchResult | MatchFailure {
+  private async findLocalMatch(
+    hardcoverBook: HardcoverUserBook,
+    hardcoverAuthors: string[],
+    indexes: LocalIndexes,
+  ): Promise<MatchResult | MatchFailure> {
     const byHardcoverId = uniqueCandidate(indexes.byHardcoverId.get(hardcoverBook.book_id));
     if (byHardcoverId === 'ambiguous') return { outcome: 'skipped', reason: 'Multiple BookOrbit books match this Hardcover ID' };
     if (byHardcoverId) return { book: byHardcoverId, method: 'hardcover_id', confidence: 100 };
@@ -441,31 +443,10 @@ export class HardcoverImportService {
       if (byIsbn) return { book: byIsbn, method: 'isbn', confidence: 100 };
     }
 
-    const titleMatch = this.findTitleAuthorMatch(hardcoverBook.book?.title ?? null, hardcoverAuthors, indexes.books);
-    if (titleMatch) return titleMatch;
+    const titleMatch = await indexes.fuzzy.findMatch(hardcoverBook.book?.title ?? null, hardcoverAuthors);
+    if (titleMatch) return { ...titleMatch, method: 'title_author' };
 
     return { outcome: 'unmatched', reason: 'No matching BookOrbit book found' };
-  }
-
-  private findTitleAuthorMatch(title: string | null, authors: string[], localBooks: HardcoverImportLocalBook[]): MatchResult | null {
-    if (!title?.trim() || authors.length === 0) return null;
-
-    const scored = localBooks
-      .filter((book) => book.title?.trim() && book.authors.length > 0)
-      .map((book) => {
-        const titleScore = scoreTitle(title, book.title!);
-        const authorScore = scoreAuthors(authors, book.authors);
-        const confidence = Math.round((titleScore * 0.7 + authorScore * 0.3) * 100);
-        return { book, titleScore, authorScore, confidence };
-      })
-      .filter((row) => row.titleScore >= 0.8 && row.authorScore >= 0.75 && row.confidence >= TITLE_AUTHOR_ACCEPT_SCORE)
-      .sort((a, b) => b.confidence - a.confidence);
-
-    const best = scored[0];
-    if (!best) return null;
-    const second = scored[1];
-    if (second && best.confidence - second.confidence <= TITLE_AUTHOR_TIE_MARGIN) return null;
-    return { book: best.book, method: 'title_author', confidence: best.confidence };
   }
 
   private async applyProgressIfRequested(
@@ -659,84 +640,6 @@ function extractHardcoverAuthors(value: unknown): string[] {
     }
   }
   return authors.filter((author) => author.length > 0);
-}
-
-function scoreTitle(a: string, b: string): number {
-  const left = normalizeTitle(a);
-  const right = normalizeTitle(b);
-  if (!left || !right) return 0;
-  if (left === right) return 1;
-  if (left.startsWith(right) || right.startsWith(left)) return 0.94;
-  if (left.includes(right) || right.includes(left)) return 0.9;
-
-  const tokenScore = tokenOverlap(left, right);
-  const editScore = normalizedLevenshtein(left, right);
-  return Math.max(tokenScore, editScore >= 0.7 ? editScore : 0);
-}
-
-function scoreAuthors(hardcoverAuthors: string[], localAuthors: string[]): number {
-  let best = 0;
-  for (const hardcoverAuthor of hardcoverAuthors) {
-    for (const localAuthor of localAuthors) {
-      best = Math.max(best, scoreAuthor(hardcoverAuthor, localAuthor));
-    }
-  }
-  return best;
-}
-
-function scoreAuthor(a: string, b: string): number {
-  const left = normalizeName(a);
-  const right = normalizeName(b);
-  if (!left || !right) return 0;
-  if (left === right) return 1;
-  const leftTokens = tokenize(left);
-  const rightTokens = tokenize(right);
-  if (haveEqualTokenSet(leftTokens, rightTokens)) return 0.98;
-  const overlap = tokenOverlap(left, right);
-  const edit = normalizedLevenshtein(left, right);
-  return Math.max(overlap, edit >= 0.76 ? edit : 0);
-}
-
-function normalizeTitle(value: string): string {
-  const stripped = value.split(/:\s+| - /)[0] ?? value;
-  return normalizeName(stripped);
-}
-
-function normalizeName(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function tokenize(value: string): string[] {
-  return value.split(' ').filter((token) => token.length > 1);
-}
-
-function tokenOverlap(a: string, b: string): number {
-  const left = new Set(tokenize(a));
-  const right = new Set(tokenize(b));
-  if (left.size === 0 || right.size === 0) return 0;
-  let overlap = 0;
-  for (const token of left) {
-    if (right.has(token)) overlap++;
-  }
-  return overlap / Math.max(left.size, right.size);
-}
-
-function normalizedLevenshtein(a: string, b: string): number {
-  const maxLen = Math.max(a.length, b.length);
-  return maxLen === 0 ? 1 : 1 - distance(a, b) / maxLen;
-}
-
-function haveEqualTokenSet(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const left = [...a].sort();
-  const right = [...b].sort();
-  return left.every((token, index) => token === right[index]);
 }
 
 function roundProgressPercent(value: number | null | undefined): number | null {

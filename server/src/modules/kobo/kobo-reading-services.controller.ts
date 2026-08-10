@@ -7,7 +7,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { KoboDevice } from './decorators/kobo-device.decorator';
 import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
-import { KoboAnnotationExchangeService } from './services/kobo-annotation-exchange.service';
+import { KoboAnnotationExchangeService, KoboContentNotFoundException } from './services/kobo-annotation-exchange.service';
 import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
 
 @Controller(['kobo/:deviceToken', ''])
@@ -43,15 +43,17 @@ export class KoboReadingServicesController {
         }),
       });
     } catch (error: unknown) {
-      await this.historyService.recordFailure(
-        {
-          userId: user.id,
-          deviceId: device.deviceId,
-          event: 'annotations_pull',
-          durationMs: Date.now() - startedAt,
-        },
-        error,
-      );
+      if (!(error instanceof KoboContentNotFoundException)) {
+        await this.historyService.recordFailure(
+          {
+            userId: user.id,
+            deviceId: device.deviceId,
+            event: 'annotations_pull',
+            durationMs: Date.now() - startedAt,
+          },
+          error,
+        );
+      }
       throw error;
     }
     reply.header('ETag', result.etag);
@@ -97,15 +99,17 @@ export class KoboReadingServicesController {
         }),
       });
     } catch (error: unknown) {
-      await this.historyService.recordFailure(
-        {
-          userId: user.id,
-          deviceId: device.deviceId,
-          event: 'annotations_push',
-          durationMs: Date.now() - startedAt,
-        },
-        error,
-      );
+      if (!(error instanceof KoboContentNotFoundException)) {
+        await this.historyService.recordFailure(
+          {
+            userId: user.id,
+            deviceId: device.deviceId,
+            event: 'annotations_push',
+            durationMs: Date.now() - startedAt,
+          },
+          error,
+        );
+      }
       throw error;
     }
   }

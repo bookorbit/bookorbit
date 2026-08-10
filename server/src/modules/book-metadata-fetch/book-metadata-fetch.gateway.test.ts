@@ -64,7 +64,7 @@ describe('BookMetadataFetchGateway', () => {
       isSuperuser: false,
       permissions: [Permission.ManageMetadataConfig],
     });
-    queueRepo.getStatusSummary.mockResolvedValue({ queued: 1, processing: 2, failed: 3 });
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 1, processing: 2, failed: 3, latestFailureAt: '2026-01-01T00:00:00.000Z' });
     configService.isPaused.mockResolvedValue(true);
     session.getSnapshot.mockReturnValue({ sessionTotal: 9, sessionDone: 4, currentItemName: 'Book' });
     const client = {
@@ -82,6 +82,7 @@ describe('BookMetadataFetchGateway', () => {
       queued: 1,
       processing: 2,
       failed: 3,
+      latestFailureAt: '2026-01-01T00:00:00.000Z',
       paused: true,
       sessionTotal: 9,
       sessionDone: 4,

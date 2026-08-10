@@ -14,6 +14,7 @@ describe('BookDockGateway', () => {
       id: 'socket-1',
       handshake: { auth: {} },
       data: {},
+      emit: vi.fn(),
       disconnect: vi.fn(),
     } as any;
 
@@ -30,6 +31,7 @@ describe('BookDockGateway', () => {
       id: 'socket-2',
       handshake: { auth: { token: 'jwt' } },
       data: {},
+      emit: vi.fn(),
       disconnect: vi.fn(),
     } as any;
 
@@ -48,6 +50,7 @@ describe('BookDockGateway', () => {
       id: 'socket-3',
       handshake: { auth: { token: 'jwt' } },
       data: {},
+      emit: vi.fn(),
       disconnect: vi.fn(),
     } as any;
 
@@ -57,19 +60,13 @@ describe('BookDockGateway', () => {
     expect(client.disconnect).not.toHaveBeenCalled();
   });
 
-  it('emitSummary broadcasts summary payload on websocket namespace', () => {
+  it('broadcasts an invalidation event without leaking a global summary', () => {
     const { gateway } = makeGateway();
     const emit = vi.fn();
     gateway.server = { emit } as any;
 
-    gateway.emitSummary({ pending: 2, ready: 4, error: 1, total: 7, paused: true });
+    gateway.emitChanged();
 
-    expect(emit).toHaveBeenCalledWith('book-dock:summary', {
-      pending: 2,
-      ready: 4,
-      error: 1,
-      total: 7,
-      paused: true,
-    });
+    expect(emit).toHaveBeenCalledWith('book-dock:changed');
   });
 });

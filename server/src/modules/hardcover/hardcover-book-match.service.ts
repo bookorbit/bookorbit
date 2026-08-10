@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import type { HardcoverEdition as HardcoverEditionSummary, HardcoverEditionsResult } from '@bookorbit/types';
 
+import { parsePublishedDateKey } from '../../common/utils/published-date.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { BookSyncData } from './hardcover.repository';
 import { HardcoverClientService } from './hardcover-client.service';
@@ -107,6 +109,90 @@ interface BooksQueryResult {
     id: number;
     editions?: HardcoverEdition[];
   }>;
+}
+
+// Hardcover reading_format_id: 1 = physical, 2 = audiobook, 4 = ebook.
+const AUDIOBOOK_READING_FORMAT_ID = 2;
+const EBOOK_READING_FORMAT_ID = 4;
+
+export const EDITION_DISPLAY_LIMIT = 50;
+
+const EDITION_DISPLAY_FIELDS = `
+      id
+      title
+      pages
+      isbn_10
+      isbn_13
+      publisher { name }
+      language { code2 }
+      release_date
+      reading_format_id
+      audio_seconds
+      image { url }`;
+
+// Ordered so the capped window is deterministic: without order_by, two calls can return a
+// different slice of the same catalogue and a legitimate pick would fail validation.
+// One over the cap, so the caller can tell a full page apart from a truncated one.
+const FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY = `
+query FindBookEditionsForDisplay($id: Int!) {
+  books(where: { id: { _eq: $id } }, limit: 1) {
+    id
+    editions(limit: ${EDITION_DISPLAY_LIMIT + 1}, order_by: { id: asc }) {${EDITION_DISPLAY_FIELDS}
+    }
+  }
+}`;
+
+// Validates a single edition by asking for it scoped to the book, instead of re-listing the
+// capped window and checking membership - an edition past the cap is still a valid pick.
+const FIND_BOOK_EDITION_BY_ID_QUERY = `
+query FindBookEditionById($id: Int!, $editionId: Int!) {
+  books(where: { id: { _eq: $id } }, limit: 1) {
+    id
+    editions(where: { id: { _eq: $editionId } }, limit: 1) {${EDITION_DISPLAY_FIELDS}
+    }
+  }
+}`;
+
+interface HardcoverEditionDisplayRow {
+  id: number;
+  title?: string | null;
+  pages?: number | null;
+  isbn_10?: string | null;
+  isbn_13?: string | null;
+  publisher?: { name?: string | null } | null;
+  language?: { code2?: string | null } | null;
+  release_date?: string | null;
+  reading_format_id?: number | null;
+  audio_seconds?: number | null;
+  image?: { url?: string | null } | null;
+}
+
+interface BooksDisplayQueryResult {
+  books: Array<{
+    id: number;
+    editions?: HardcoverEditionDisplayRow[];
+  }>;
+}
+
+function editionFormatLabel(edition: HardcoverEditionDisplayRow): string {
+  if (edition.reading_format_id === AUDIOBOOK_READING_FORMAT_ID || (edition.audio_seconds ?? 0) > 0) return 'Audiobook';
+  if (edition.reading_format_id === EBOOK_READING_FORMAT_ID) return 'E-Book';
+  return 'Physical Book';
+}
+
+function mapEditionForDisplay(edition: HardcoverEditionDisplayRow): HardcoverEditionSummary {
+  return {
+    id: edition.id,
+    title: edition.title ?? null,
+    format: editionFormatLabel(edition),
+    pages: typeof edition.pages === 'number' && edition.pages > 0 ? edition.pages : null,
+    isbn10: edition.isbn_10 ?? null,
+    isbn13: edition.isbn_13 ?? null,
+    publisher: edition.publisher?.name ?? null,
+    language: edition.language?.code2 ?? null,
+    publishedDate: parsePublishedDateKey(edition.release_date) ?? null,
+    coverUrl: edition.image?.url ?? null,
+  };
 }
 
 interface SearchBooksResult {
@@ -285,6 +371,54 @@ export class HardcoverBookMatchService {
         `[hardcover.book_match] [fail] userId=${userId} bookId=${book.bookId} method=title_author error="${error}" - title lookup failed`,
       );
       return null;
+    }
+  }
+
+  // A failed upstream lookup must not be reported as "no editions" - the caller (and the user)
+  // needs to be able to tell an empty catalog apart from a provider outage and retry.
+  async listEditions(userId: number, token: string, hardcoverBookId: number): Promise<HardcoverEditionsResult> {
+    const data = await this.queryEditions(userId, token, hardcoverBookId, 'list_editions', FIND_BOOK_EDITIONS_FOR_DISPLAY_QUERY, {
+      id: hardcoverBookId,
+    });
+
+    const rows = data.books?.[0]?.editions ?? [];
+    return {
+      editions: rows.slice(0, EDITION_DISPLAY_LIMIT).map(mapEditionForDisplay),
+      truncated: rows.length > EDITION_DISPLAY_LIMIT,
+    };
+  }
+
+  // Resolves one edition scoped to the book it must belong to. Null means Hardcover knows of no
+  // such edition on that book, which is exactly the "not yours to pick" case the caller rejects.
+  async findEditionForBook(userId: number, token: string, hardcoverBookId: number, editionId: number): Promise<HardcoverEditionSummary | null> {
+    const data = await this.queryEditions(userId, token, hardcoverBookId, 'find_edition', FIND_BOOK_EDITION_BY_ID_QUERY, {
+      id: hardcoverBookId,
+      editionId,
+    });
+
+    const edition = data.books?.[0]?.editions?.[0];
+    return edition ? mapEditionForDisplay(edition) : null;
+  }
+
+  // A failed upstream lookup must not be reported as "no editions" - the caller (and the user)
+  // needs to be able to tell an empty catalog apart from a provider outage and retry.
+  private async queryEditions(
+    userId: number,
+    token: string,
+    hardcoverBookId: number,
+    event: string,
+    query: string,
+    variables: Record<string, unknown>,
+  ): Promise<BooksDisplayQueryResult> {
+    const startedAt = Date.now();
+    try {
+      return await this.client.query<BooksDisplayQueryResult>(userId, token, query, variables);
+    } catch (err) {
+      const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[hardcover.${event}] [fail] userId=${userId} hardcoverBookId=${hardcoverBookId} durationMs=${Date.now() - startedAt} errorClass=${err?.constructor?.name ?? 'Error'} error="${error}" - edition lookup failed`,
+      );
+      throw new InternalServerErrorException('Failed to load Hardcover editions');
     }
   }
 

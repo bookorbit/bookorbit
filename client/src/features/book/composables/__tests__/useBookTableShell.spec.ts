@@ -198,6 +198,30 @@ describe('useBookTableShell', () => {
       expect(quickViewOpen.value).toBe(false)
       expect(mocks.promptDelete).toHaveBeenCalledWith(5)
     })
+
+    it('delegates a single-book move to the host view', () => {
+      const books = ref([makeBook({ id: 9 })])
+      const onMoveToLibrary = vi.fn<(bookId: number) => void>()
+      const { handleBookAction, quickViewOpen } = useBookTableShell({ books, onMoveToLibrary })
+      quickViewOpen.value = true
+
+      handleBookAction(makeBook({ id: 9 }), 'move-to-library')
+
+      expect(onMoveToLibrary).toHaveBeenCalledWith(9)
+      expect(quickViewOpen.value).toBe(false)
+      // A quick move must not drag the book into the global selection.
+      expect(mocks.enterSelectionMode).not.toHaveBeenCalled()
+      expect(mocks.toggleBook).not.toHaveBeenCalled()
+      expect(mocks.promptDelete).not.toHaveBeenCalled()
+    })
+
+    it('ignores a move when the host view provides no handler', () => {
+      const books = ref([makeBook({ id: 9 })])
+      const { handleBookAction } = useBookTableShell({ books })
+
+      expect(() => handleBookAction(makeBook({ id: 9 }), 'move-to-library')).not.toThrow()
+      expect(mocks.promptDelete).not.toHaveBeenCalled()
+    })
   })
 
   describe('handleEditIndividually', () => {

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, ChevronUp, GripVertical, Plus, RotateCcw, Trash2 } from '@lucide/vue'
+import { ChevronDown, ChevronUp, Columns2, GripVertical, Plus, RotateCcw, Rows3, Trash2 } from '@lucide/vue'
 
 import type { ScrollerConfig, ScrollerType, WidgetConfig } from '@bookorbit/types'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
-import { DEFAULT_SCROLLERS, SCROLLER_LABELS, useDashboardConfig } from '../composables/useDashboardConfig'
+import { DEFAULT_SCROLLERS, SCROLLER_LABELS, SHELF_LAYOUT, useDashboardConfig, type DashboardShelfLayout } from '../composables/useDashboardConfig'
 import { useDashboardLabels } from '../composables/useDashboardLabels'
 import { useDashboardWidgets } from '../composables/useDashboardWidgets'
 import { useDraggableList } from '../composables/useDraggableList'
@@ -16,13 +16,14 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 
 const { t } = useI18n()
 
-const { scrollers, saveScrollers, MAX_SCROLLERS } = useDashboardConfig()
+const { scrollers, shelfLayout, saveShelfSettings, MAX_SCROLLERS } = useDashboardConfig()
 const { widgets, saveWidgets, DEFAULT_WIDGETS } = useDashboardWidgets()
 const { smartScopes, fetchSmartScopes } = useSmartScopes()
 const { widgetName, shelfTypeName } = useDashboardLabels()
 
 const activeTab = ref<'widgets' | 'shelves'>('widgets')
 const draft = ref<ScrollerConfig[]>([])
+const shelfLayoutDraft = ref<DashboardShelfLayout>(SHELF_LAYOUT.WIDE)
 const widgetDraft = ref<WidgetConfig[]>([])
 const widgetSaving = ref(false)
 
@@ -31,6 +32,7 @@ watch(
   (isOpen) => {
     if (isOpen) {
       draft.value = (Array.isArray(scrollers.value) ? scrollers.value : DEFAULT_SCROLLERS).map((s) => ({ ...s }))
+      shelfLayoutDraft.value = shelfLayout.value
       widgetDraft.value = widgets.value.map((w) => ({ ...w }))
       fetchSmartScopes()
     }
@@ -97,8 +99,16 @@ function onSmartScopeChange(scroller: ScrollerConfig) {
 
 // ── Save / Reset / Close ─────────────────────────────────────
 function saveShelves() {
-  saveScrollers(draft.value)
+  saveShelfSettings(draft.value, shelfLayoutDraft.value)
   emit('update:open', false)
+}
+
+function selectWideShelfLayout() {
+  shelfLayoutDraft.value = SHELF_LAYOUT.WIDE
+}
+
+function selectTwoColumnShelfLayout() {
+  shelfLayoutDraft.value = SHELF_LAYOUT.TWO_COLUMNS
 }
 
 async function saveWidgetSettings() {
@@ -124,13 +134,14 @@ function resetToDefault() {
     widgetDraft.value = DEFAULT_WIDGETS.map((w) => ({ ...w }))
   } else {
     draft.value = DEFAULT_SCROLLERS.map((s) => ({ ...s }))
+    shelfLayoutDraft.value = SHELF_LAYOUT.WIDE
   }
 }
 </script>
 
 <template>
   <Sheet :open="open" @update:open="emit('update:open', $event)">
-    <SheetContent side="right" class="flex w-[90vw] max-w-[420px] flex-col gap-0 p-0">
+    <SheetContent side="right" class="flex w-[90vw] max-w-[440px] flex-col gap-0 p-0">
       <!-- Header -->
       <SheetHeader class="border-b border-border px-5 py-4">
         <SheetTitle class="text-base font-semibold">{{ t('dashboard.settings.title') }}</SheetTitle>
@@ -221,6 +232,47 @@ function resetToDefault() {
 
         <!-- SHELVES TAB -->
         <div v-show="activeTab === 'shelves'">
+          <fieldset class="mb-5">
+            <legend class="text-sm font-medium text-foreground">{{ t('dashboard.settings.shelfLayout.title') }}</legend>
+            <p class="mt-1 text-xs text-muted-foreground">{{ t('dashboard.settings.shelfLayout.description') }}</p>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                class="flex min-w-0 flex-col items-start gap-2 rounded-lg border p-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :class="
+                  shelfLayoutDraft === SHELF_LAYOUT.WIDE
+                    ? 'border-primary bg-primary/5 text-foreground'
+                    : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                "
+                :aria-pressed="shelfLayoutDraft === SHELF_LAYOUT.WIDE"
+                @click="selectWideShelfLayout"
+              >
+                <Rows3 :size="18" aria-hidden="true" />
+                <span>
+                  <span class="block text-sm font-medium">{{ t('dashboard.settings.shelfLayout.wide') }}</span>
+                  <span class="mt-0.5 block text-xs font-normal">{{ t('dashboard.settings.shelfLayout.wideDescription') }}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="flex min-w-0 flex-col items-start gap-2 rounded-lg border p-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :class="
+                  shelfLayoutDraft === SHELF_LAYOUT.TWO_COLUMNS
+                    ? 'border-primary bg-primary/5 text-foreground'
+                    : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                "
+                :aria-pressed="shelfLayoutDraft === SHELF_LAYOUT.TWO_COLUMNS"
+                @click="selectTwoColumnShelfLayout"
+              >
+                <Columns2 :size="18" aria-hidden="true" />
+                <span>
+                  <span class="block text-sm font-medium">{{ t('dashboard.settings.shelfLayout.twoColumns') }}</span>
+                  <span class="mt-0.5 block text-xs font-normal">{{ t('dashboard.settings.shelfLayout.twoColumnsDescription') }}</span>
+                </span>
+              </button>
+            </div>
+          </fieldset>
+
           <p class="mb-4 text-xs text-muted-foreground">{{ t('dashboard.settings.reorderHintShelf') }}</p>
 
           <div class="space-y-2">
@@ -350,7 +402,7 @@ function resetToDefault() {
 </template>
 
 <style scoped>
-/* On pointer-fine devices (mouse), hide the up/down buttons — drag handles suffice */
+/* On pointer-fine devices (mouse), hide the up/down buttons; drag handles suffice */
 @media (pointer: fine) {
   .touch-reorder-btn {
     display: none;

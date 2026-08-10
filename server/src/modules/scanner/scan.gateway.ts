@@ -1,4 +1,4 @@
-import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Logger, OnModuleDestroy, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
@@ -23,6 +23,7 @@ import {
   type BookProgressChangedPayload,
 } from '../achievement/achievement-events.service';
 import { ScanJobStore } from './scan-job-store.service';
+import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 
 @WebSocketGateway({ namespace: '/scan', cors: { credentials: true } })
 export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
@@ -63,10 +64,10 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   async handleConnection(client: Socket): Promise<void> {
     try {
       const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new Error('No token provided');
+      if (!token) throw new UnauthorizedException('No token provided');
       const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
       const user = await this.authService.validateUser(payload.sub, payload.ver);
-      if (!user) throw new Error('User not found or token revoked');
+      if (!user) throw new UnauthorizedException('User not found or token revoked');
       (client.data as Record<string, unknown>).user = user;
       await client.join(`user:${user.id}`);
       this.logger.debug(`[scanner.ws_connection] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
@@ -74,7 +75,7 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       this.logger.warn(
         `[scanner.ws_connection] [fail] socketId=${client.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - websocket rejected`,
       );
-      client.disconnect();
+      rejectSocketConnection(client, err);
     }
   }
 

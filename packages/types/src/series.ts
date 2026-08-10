@@ -24,6 +24,8 @@ export type SeriesDetail = {
   readCount: number;
   authors: string[];
   possibleGaps: number[];
+  /** Total books a metadata provider reports for the series, or null when no provider has told us. */
+  expectedBookCount: number | null;
 };
 
 export type SeriesBooksPage = BooksPage & {

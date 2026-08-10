@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesPage, SeriesSummary } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import type { RequestUser } from '../../common/types/request-user';
+import { MAX_SERIES_TOTAL_BOOKS, normalizeSeriesTotalBooks } from '../../common/utils/series-total-books.utils';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
@@ -114,6 +115,7 @@ export class SeriesService {
             readCount: 0,
             authors: existsInAnyLibrary.authors,
             possibleGaps: [],
+            expectedBookCount: existsInAnyLibrary.expectedBookCount ?? null,
           };
           return { items: [], total: 0, page, size, seriesInfo: emptyInfo };
         }
@@ -121,7 +123,7 @@ export class SeriesService {
       throw new NotFoundException('Series not found');
     }
 
-    const possibleGaps = this.computeGaps(detail.indices);
+    const possibleGaps = this.computeGaps(detail.indices, detail.bookCount, detail.expectedBookCount);
 
     let items: BooksPage['items'] = [];
     if (bookPage.bookIds.length > 0) {
@@ -160,24 +162,58 @@ export class SeriesService {
       readCount: detail.readCount,
       authors: detail.authors,
       possibleGaps,
+      expectedBookCount: detail.expectedBookCount ?? null,
     };
 
     return { items, total: bookPage.total, page, size, seriesInfo };
   }
 
-  private computeGaps(indices: number[]): number[] {
+  private computeGaps(indices: number[], bookCount: number, expectedBookCount: number | null): number[] {
     const integerIndices = indices.filter((idx) => Math.abs(Math.round(idx) - idx) < 0.01).map((idx) => Math.round(idx));
-
-    if (integerIndices.length < 2) return [];
+    if (integerIndices.length === 0) return [];
 
     const min = Math.min(...integerIndices);
     const max = Math.max(...integerIndices);
+    if (min < 1 || max > MAX_SERIES_TOTAL_BOOKS) return [];
 
-    if (min < 1 || max > 10_000) return [];
+    const expectedMax = this.resolveTrustedExpectedMax(indices, bookCount, integerIndices, expectedBookCount);
 
+    // With no trusted total only interior holes are knowable, and one book has no interior.
+    if (expectedMax === undefined) {
+      if (integerIndices.length < 2) return [];
+      return this.collectMissing(integerIndices, min, max);
+    }
+
+    return this.collectMissing(integerIndices, 1, expectedMax);
+  }
+
+  /**
+   * A provider total turns "the books you own" into "the books the series has", which is the whole
+   * point, but it also lets us name books as missing. Only trust it when nothing about the local
+   * data contradicts it, because a false "you are missing #5" is worse than staying quiet.
+   */
+  private resolveTrustedExpectedMax(
+    indices: number[],
+    bookCount: number,
+    integerIndices: number[],
+    expectedBookCount: number | null,
+  ): number | undefined {
+    const expected = normalizeSeriesTotalBooks(expectedBookCount);
+    if (expected === undefined) return undefined;
+
+    // An owned book with no usable index would be reported missing, so every book must be numbered.
+    if (indices.length !== bookCount || integerIndices.length !== indices.length) return undefined;
+
+    // Owning a book numbered past the total means the total is stale or matched the wrong series.
+    if (Math.max(...integerIndices) > expected) return undefined;
+
+    return expected;
+  }
+
+  private collectMissing(integerIndices: number[], from: number, to: number): number[] {
     const present = new Set(integerIndices);
     const gaps: number[] = [];
-    for (let i = min; i <= max; i++) {
+    for (let i = from; i <= to; i++) {
       if (!present.has(i)) {
         gaps.push(i);
       }

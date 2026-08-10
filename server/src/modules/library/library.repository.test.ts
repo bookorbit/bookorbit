@@ -6,6 +6,7 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
+import { libraries } from '../../db/schema';
 import { LibraryRepository } from './library.repository';
 
 describe('LibraryRepository', () => {
@@ -49,6 +50,24 @@ describe('LibraryRepository', () => {
     expect(txUpdate).toHaveBeenCalledTimes(2);
     expect(txUpdateSet).toHaveBeenNthCalledWith(1, { displayOrder: 5 });
     expect(txUpdateSet).toHaveBeenNthCalledWith(2, { displayOrder: 6 });
+  });
+
+  it('findAllForUser includes file rename eligibility in the scoped library projection', async () => {
+    const orderBy = vi.fn().mockResolvedValue([]);
+    const groupBy = vi.fn().mockReturnValue({ orderBy });
+    const leftJoin = vi.fn().mockReturnValue({ groupBy });
+    const innerJoin = vi.fn().mockReturnValue({ leftJoin });
+    const from = vi.fn().mockReturnValue({ innerJoin });
+    db.select.mockReturnValue({ from });
+
+    await repo.findAllForUser(42);
+
+    expect(db.select).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileRenameEnabled: libraries.fileRenameEnabled,
+      }),
+    );
+    expect(orderBy).toHaveBeenCalledWith(libraries.displayOrder, libraries.name);
   });
 
   it('getStats aggregates counts, sizes, and format map', async () => {

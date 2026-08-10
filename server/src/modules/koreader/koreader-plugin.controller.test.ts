@@ -28,6 +28,7 @@ function makeController() {
   };
   const packageService = {
     getVersionInfo: vi.fn().mockResolvedValue({ pluginVersion: '0.4.0', serverVersion: '1.0.0' }),
+    getVersionInfoForSelfUpdate: vi.fn().mockResolvedValue({ pluginVersion: '0.4.0', serverVersion: '1.0.0' }),
     buildPluginPackage: vi.fn().mockResolvedValue(Buffer.from('fake-zip-content')),
     buildRawPluginPackage: vi.fn().mockResolvedValue(Buffer.from('fake-zip-content')),
   };
@@ -156,12 +157,14 @@ describe('KoreaderPluginController', () => {
     expect(pluginService.sweepComplete).toHaveBeenCalledWith(user, dto);
   });
 
-  it('getVersion returns plugin and server versions from package service', async () => {
+  it('getVersion scopes the version check to the calling user so self-update can be gated', async () => {
     const { controller, packageService } = makeController();
+    const user = { id: 7 } as never;
 
-    const result = await controller.getVersion();
+    const result = await controller.getVersion(user);
 
-    expect(packageService.getVersionInfo).toHaveBeenCalledTimes(1);
+    expect(packageService.getVersionInfoForSelfUpdate).toHaveBeenCalledWith(7);
+    expect(packageService.getVersionInfo).not.toHaveBeenCalled();
     expect(result).toEqual({ pluginVersion: '0.4.0', serverVersion: '1.0.0' });
   });
 

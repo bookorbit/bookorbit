@@ -31,6 +31,11 @@ export interface KoreaderDeviceSweepInfo {
   pluginVersion: string | null;
   latestPluginVersion: string | null;
   updateAvailable: boolean | null;
+  /**
+   * The device runs a plugin too old to install its own updates, so the server
+   * withholds the update offer and the user must install the zip by hand.
+   */
+  requiresManualUpdate: boolean;
   lastSweepAt: string;
   lastSweepBooksMatched: number;
   lastSweepPageStats: number;
@@ -148,8 +153,10 @@ export type KoreaderCatalogSortOrder = "asc" | "desc";
 export type KoreaderCatalogReadStatusFilter = "unread" | "reading" | "finished";
 
 // Read statuses the catalog detail page can set on a book. A subset of the
-// full ReadStatus enum, chosen for reading-device ergonomics.
-export type KoreaderCatalogSettableReadStatus = "want_to_read" | "reading" | "on_hold" | "read" | "abandoned";
+// full ReadStatus enum, chosen for reading-device ergonomics. "unread" is the
+// default state, so it has to stay settable or a device write becomes a one-way
+// door that only the web dashboard can undo.
+export type KoreaderCatalogSettableReadStatus = "unread" | "want_to_read" | "reading" | "on_hold" | "read" | "abandoned";
 
 export interface KoreaderCatalogSeriesSummary {
   total: number;
@@ -298,11 +305,25 @@ export interface KoreaderCatalogDashboardSection {
   books: KoreaderCatalogBookListItem[];
 }
 
+// Totals behind the dashboard's Browse tiles. Optional so a plugin reading an
+// older server simply renders the tiles without badges. There is deliberately
+// no not-on-device total: which books are on a device is local KOReader state
+// the server never sees.
+export interface KoreaderCatalogBrowseCounts {
+  inProgress: number;
+  libraries: number;
+  authors: number;
+  series: number;
+  collections: number;
+  smartScopes: number;
+}
+
 export interface KoreaderCatalogDashboardResponse {
   generatedAt: string;
   username: string;
   displayName: string;
   totalBooks: number;
+  browseCounts?: KoreaderCatalogBrowseCounts;
   sections: KoreaderCatalogEntry[];
   continueReading: KoreaderCatalogBookListItem[];
   // Legacy Discover row. Populated only for requests that name no section, so a

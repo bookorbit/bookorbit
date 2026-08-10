@@ -10,6 +10,7 @@ import {
 } from '@bookorbit/types';
 import { of } from 'rxjs';
 
+import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
@@ -50,6 +51,7 @@ describe('MetadataFetchPipeline', () => {
   let resolver: Mocked<MetadataPreferenceResolver>;
   let registry: Mocked<ProviderRegistry>;
   let throttleTracker: Mocked<Pick<ProviderThrottleTracker, 'isThrottled'>>;
+  let seriesExpectedCount: Mocked<Pick<SeriesExpectedCountService, 'recordFromCandidates'>>;
   let pipeline: MetadataFetchPipeline;
 
   beforeEach(() => {
@@ -76,6 +78,7 @@ describe('MetadataFetchPipeline', () => {
     } as unknown as Mocked<ProviderRegistry>;
 
     throttleTracker = { isThrottled: vi.fn().mockReturnValue(false) };
+    seriesExpectedCount = { recordFromCandidates: vi.fn().mockResolvedValue(0) };
     pipeline = new MetadataFetchPipeline(
       fetchService,
       preferencesService,
@@ -83,6 +86,7 @@ describe('MetadataFetchPipeline', () => {
       registry,
       throttleTracker as ProviderThrottleTracker,
       providerConfig,
+      seriesExpectedCount as unknown as SeriesExpectedCountService,
     );
   });
 
@@ -114,6 +118,44 @@ describe('MetadataFetchPipeline', () => {
     await pipeline.run({ title: 'Query' }, {});
 
     expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
+  });
+
+  describe('series expected counts', () => {
+    function primePreferences() {
+      const global = createPreferences();
+      preferencesService.getGlobal.mockResolvedValue(global);
+      resolver.resolve.mockReturnValue(global);
+      resolver.withForwardCompatibility.mockReturnValue(global);
+      registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    }
+
+    it('forwards every candidate, not just the one that wins field resolution', async () => {
+      primePreferences();
+      fetchService.search.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'g1', { seriesName: 'Dune', seriesTotalBooks: 6 }),
+          candidate(MetadataProviderKey.OPEN_LIBRARY, 'o1', { seriesName: 'Dune', seriesTotalBooks: 8 }),
+        ),
+      );
+
+      await pipeline.run({ title: 'Query' }, {});
+
+      expect(seriesExpectedCount.recordFromCandidates).toHaveBeenCalledTimes(1);
+      expect(seriesExpectedCount.recordFromCandidates).toHaveBeenCalledWith([
+        expect.objectContaining({ providerId: 'g1', seriesTotalBooks: 6 }),
+        expect.objectContaining({ providerId: 'o1', seriesTotalBooks: 8 }),
+      ]);
+    });
+
+    it('still resolves fields when recording the totals fails', async () => {
+      primePreferences();
+      seriesExpectedCount.recordFromCandidates.mockRejectedValueOnce(new Error('unreachable'));
+      fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { title: 'Fetched Title' })));
+
+      const resolved = await pipeline.run({ title: 'Query' }, {});
+
+      expect(resolved.title).toBe('Fetched Title');
+    });
   });
 
   it('filters derived provider keys by enabled provider config', async () => {

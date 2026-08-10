@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue'
-import { io, Socket } from 'socket.io-client'
+import { Socket } from 'socket.io-client'
 import { formatRelativeTime as formatLocaleRelativeTime } from '@/i18n/formatters'
-import { api, getAccessToken } from '@/lib/api'
+import { api } from '@/lib/api'
+import { createAuthenticatedSocket } from '@/lib/socket'
 import type { AchievementRarity, NotificationItem, NotificationPage } from '@bookorbit/types'
 import { NotificationType } from '@bookorbit/types'
 import { showAchievementToast } from '@/features/achievements/utils/achievementToast'
@@ -80,9 +81,7 @@ function requestUnreadCount(): Promise<void> {
 
 function getSocket(): Socket {
   if (!socket) {
-    socket = io('/notifications', {
-      auth: (cb: (data: object) => void) => cb({ token: getAccessToken() }),
-      transports: ['websocket'],
+    socket = createAuthenticatedSocket('/notifications', {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,

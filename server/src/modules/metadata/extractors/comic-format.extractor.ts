@@ -40,6 +40,7 @@ export class ComicFormatExtractor implements FormatExtractor {
       language: comicMetadata?.language ?? null,
       seriesName: comicMetadata?.seriesName ?? null,
       seriesIndex: comicMetadata?.seriesIndex ?? null,
+      seriesTotalBooks: comicMetadata?.seriesTotalBooks ?? null,
       authors: comicMetadata?.authors ?? [],
       genres: comicMetadata?.genres?.length ? comicMetadata.genres : (comicMetadata?.tags ?? []),
       googleBooksId: comicMetadata?.googleBooksId ?? null,

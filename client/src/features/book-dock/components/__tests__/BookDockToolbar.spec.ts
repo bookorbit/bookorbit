@@ -1,10 +1,12 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
+import { Permission } from '@bookorbit/types'
 import BookDockToolbar from '../BookDockToolbar.vue'
 
 const permissionState = {
   demoRestricted: false,
+  permissions: new Set<Permission>(),
 }
 
 const files = ref<{ status: 'done' | 'error' | 'uploading' }[]>([])
@@ -20,6 +22,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
         return permissionState.demoRestricted
       },
     },
+    hasPermission: (permission: Permission) => permissionState.permissions.has(permission),
   }),
 }))
 
@@ -62,6 +65,7 @@ describe('BookDockToolbar demo restriction', () => {
   beforeEach(() => {
     vi.useRealTimers()
     permissionState.demoRestricted = false
+    permissionState.permissions = new Set([Permission.LibraryUpload, Permission.ManageBookDock])
     files.value = []
     isUploading.value = false
     addFiles.mockReset()
@@ -80,6 +84,22 @@ describe('BookDockToolbar demo restriction', () => {
     const wrapper = mountToolbar()
     expect(wrapper.find('[data-testid="book-dock-bulk-edit"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Finalize')
+  })
+
+  it('hides library finalization without upload permission', () => {
+    permissionState.permissions.delete(Permission.LibraryUpload)
+    const wrapper = mountToolbar()
+
+    expect(wrapper.find('[data-testid="book-dock-finalize"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="book-dock-set-destination"]').exists()).toBe(false)
+  })
+
+  it('hides global processing controls without Book Dock management permission', () => {
+    permissionState.permissions.delete(Permission.ManageBookDock)
+    const wrapper = mountToolbar()
+
+    expect(wrapper.find('[data-testid="book-dock-processing-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="book-dock-rescan"]').exists()).toBe(false)
   })
 
   it('emits status filter and search events', async () => {

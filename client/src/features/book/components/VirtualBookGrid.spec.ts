@@ -114,6 +114,7 @@ describe('VirtualBookGrid', () => {
 
     expect(wrapper.find('[data-testid="recycle-scroller"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="book-card"]')).toHaveLength(27)
+    expect(wrapper.get('[data-testid="book-grid-static"]').classes()).toContain('items-end')
   })
 
   it('keeps book actions wired in direct render mode', async () => {
