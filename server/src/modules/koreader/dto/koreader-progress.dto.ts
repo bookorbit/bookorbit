@@ -1,12 +1,12 @@
 import { Transform } from 'class-transformer';
-import { IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsNumber, IsObject, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
 
 export class KoreaderSaveProgressDto {
   @IsString()
   document!: string;
 
   @IsObject()
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   metadata?: Record<string, unknown>;
 
   @IsNumber()

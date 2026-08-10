@@ -24,6 +24,13 @@ describe('KoreaderSaveProgressDto', () => {
     expect(errors).toEqual([expect.objectContaining({ property: 'metadata' })]);
   });
 
+  it('rejects explicit null metadata', async () => {
+    const dto = plainToInstance(KoreaderSaveProgressDto, { ...BASE, metadata: null });
+    const errors = await validate(dto);
+
+    expect(errors).toEqual([expect.objectContaining({ property: 'metadata' })]);
+  });
+
   it('accepts an xpointer string progress from reflowable documents', async () => {
     const dto = plainToInstance(KoreaderSaveProgressDto, { ...BASE, progress: '/body/DocFragment[8]/body/p[12]/text().0' });
     const errors = await validate(dto);
