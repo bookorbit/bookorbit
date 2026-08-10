@@ -150,6 +150,22 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
     expect((await readerProgress(epub.bookFileId)).pageNumber).toBeNull();
   });
 
+  it('accepts document metadata on progress sync requests', async () => {
+    const response = await ctx.app.inject({
+      method: 'PUT',
+      url: '/api/v1/koreader/syncs/progress',
+      headers: deviceHeaders(),
+      payload: {
+        document: epubHash,
+        percentage: 0.35,
+        progress: XPOINTER,
+        metadata: { filename: 'progress-position-book.epub', title: 'Progress Position Book', authors: 'Test Author' },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it('replaces a page saved by the web reader instead of discarding it', async () => {
     await saveFromWebReader(comic.bookFileId, { percentage: 12, pageNumber: 34 });
     expect((await storedProgress(comic.bookFileId))?.pageNumber).toBe(34);

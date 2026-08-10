@@ -1,9 +1,13 @@
 import { Transform } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class KoreaderSaveProgressDto {
   @IsString()
   document!: string;
+
+  @IsObject()
+  @IsOptional()
+  metadata?: Record<string, unknown>;
 
   @IsNumber()
   @Min(0)
