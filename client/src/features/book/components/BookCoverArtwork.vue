@@ -144,9 +144,10 @@ function handleImageError() {
   <template v-if="canRenderImage">
     <span
       :class="[
-        'absolute inset-0 z-0 animate-pulse bg-foreground/5 transition-opacity duration-200 ease-out',
-        loaded ? 'opacity-0 pointer-events-none' : 'opacity-100',
+        'absolute inset-0 z-0 bg-foreground/5 transition-opacity duration-200 ease-out',
+        loaded ? 'opacity-0 pointer-events-none' : 'animate-pulse opacity-100',
       ]"
+      data-testid="cover-skeleton"
       aria-hidden="true"
     />
     <img
