@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { EpubReaderSettings } from '@bookorbit/types'
-import { fontCssFamilyGroupName } from '@bookorbit/types'
+import { isCustomFontCssFamily } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { themes } from '@/features/reader/epub/constants/themes'
@@ -29,7 +29,14 @@ const customFonts = useCustomFonts()
 
 const customFontOptions = computed(() =>
   customFonts.families.value.map((f) => ({
-    id: fontCssFamilyGroupName(f.name),
+    id: f.cssFamilyName,
+    label: formatFontFamilyLabel(f.name),
+  })),
+)
+
+const serverFontOptions = computed(() =>
+  customFonts.visibleServerFamilies.value.map((f) => ({
+    id: f.cssFamilyName,
     label: formatFontFamilyLabel(f.name),
   })),
 )
@@ -50,15 +57,15 @@ function injectPreviewStyles(css: string) {
 }
 
 watch(
-  () => customFonts.fonts.value,
+  () => [customFonts.fonts.value, customFonts.serverFonts.value, customFonts.hiddenServerFamilies.value],
   () => {
     injectPreviewStyles(customFonts.generateFontFaceCSS())
 
-    // If the saved font family is a custom font that no longer exists, reset it.
+    // Reset a saved font that is no longer on offer: deleted by its owner, removed by an
+    // administrator, or a server font this reader has since hidden.
     const saved = effective.value.fontFamily
-    if (saved?.startsWith('__userfont_')) {
-      const stillExists = customFonts.families.value.some((f) => fontCssFamilyGroupName(f.name) === saved)
-      if (!stillExists) update({ fontFamily: null })
+    if (isCustomFontCssFamily(saved) && !customFonts.cssFamilyAvailable(saved)) {
+      update({ fontFamily: null })
     }
   },
   { immediate: true },
@@ -66,7 +73,7 @@ watch(
 
 onMounted(async () => {
   await load()
-  await customFonts.fetchFonts()
+  await customFonts.fetchAllFonts()
 })
 
 onUnmounted(() => {
@@ -219,36 +226,41 @@ function setFixedLayoutSpreadNone() {
         </div>
         <!-- Theme swatches -->
         <div class="grid grid-cols-[repeat(auto-fill,minmax(64px,1fr))] gap-3">
-          <button v-for="t in themes" :key="t.name" class="flex flex-col items-center gap-1.5 group" @click="update({ themeName: t.name })">
+          <button
+            v-for="theme in themes"
+            :key="theme.name"
+            class="flex flex-col items-center gap-1.5 group"
+            @click="update({ themeName: theme.name })"
+          >
             <div
               class="relative w-full aspect-[4/3] rounded-lg overflow-hidden transition-all ring-2 ring-offset-2 ring-offset-card"
-              :class="effective.themeName === t.name ? 'ring-primary' : 'ring-transparent group-hover:ring-border'"
-              :style="{ background: effective.isDark ? t.dark.bg : t.light.bg }"
+              :class="effective.themeName === theme.name ? 'ring-primary' : 'ring-transparent group-hover:ring-border'"
+              :style="{ background: effective.isDark ? theme.dark.bg : theme.light.bg }"
             >
               <!-- Top accent strip -->
-              <div class="absolute top-0 left-0 right-0 h-[3px]" :style="{ background: effective.isDark ? t.dark.link : t.light.link }" />
+              <div class="absolute top-0 left-0 right-0 h-[3px]" :style="{ background: effective.isDark ? theme.dark.link : theme.light.link }" />
               <!-- Title line -->
               <div
                 class="absolute top-[10px] left-[8px] right-[12px] h-[3px] rounded-full"
-                :style="{ background: effective.isDark ? t.dark.fg : t.light.fg, opacity: 0.85 }"
+                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.85 }"
               />
               <!-- Body text lines -->
               <div
                 class="absolute top-[18px] left-[8px] right-[8px] h-[2px] rounded-full"
-                :style="{ background: effective.isDark ? t.dark.fg : t.light.fg, opacity: 0.35 }"
+                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.35 }"
               />
               <div
                 class="absolute top-[23px] left-[8px] right-[16px] h-[2px] rounded-full"
-                :style="{ background: effective.isDark ? t.dark.fg : t.light.fg, opacity: 0.35 }"
+                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.35 }"
               />
               <div
                 class="absolute top-[28px] left-[8px] right-[10px] h-[2px] rounded-full"
-                :style="{ background: effective.isDark ? t.dark.fg : t.light.fg, opacity: 0.35 }"
+                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.35 }"
               />
               <!-- Link dot -->
               <div
                 class="absolute bottom-[7px] left-[8px] h-[2px] w-[14px] rounded-full opacity-80"
-                :style="{ background: effective.isDark ? t.dark.link : t.light.link }"
+                :style="{ background: effective.isDark ? theme.dark.link : theme.light.link }"
               />
               <!-- Selected checkmark -->
               <Transition
@@ -258,7 +270,7 @@ function setFixedLayoutSpreadNone() {
                 leave-to-class="opacity-0"
               >
                 <div
-                  v-if="effective.themeName === t.name"
+                  v-if="effective.themeName === theme.name"
                   class="absolute bottom-[5px] right-[6px] w-4 h-4 rounded-full bg-primary flex items-center justify-center shadow"
                 >
                   <Check :size="9" class="text-primary-foreground" :stroke-width="3" />
@@ -267,9 +279,9 @@ function setFixedLayoutSpreadNone() {
             </div>
             <span
               class="text-xs font-medium transition-colors leading-none text-center"
-              :class="effective.themeName === t.name ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'"
+              :class="effective.themeName === theme.name ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'"
             >
-              {{ t.label }}
+              {{ t(theme.labelKey) }}
             </span>
           </button>
         </div>
@@ -292,7 +304,10 @@ function setFixedLayoutSpreadNone() {
             @change="update({ fontFamily: ($event.target as HTMLSelectElement).value || null })"
           >
             <optgroup :label="t('settings.reader.ebook.builtInFonts')">
-              <option v-for="f in BUILTIN_READER_FONT_OPTIONS" :key="String(f.value)" :value="f.value ?? ''">{{ f.label }}</option>
+              <option v-for="f in BUILTIN_READER_FONT_OPTIONS" :key="String(f.value)" :value="f.value ?? ''">{{ t(f.labelKey) }}</option>
+            </optgroup>
+            <optgroup v-if="serverFontOptions.length > 0" :label="t('reader.settings.fontServer')">
+              <option v-for="f in serverFontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
             </optgroup>
             <optgroup v-if="customFontOptions.length > 0" :label="t('settings.reader.ebook.yourFonts')">
               <option v-for="f in customFontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>

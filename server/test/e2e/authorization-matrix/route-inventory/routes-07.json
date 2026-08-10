@@ -24,6 +24,18 @@
     "useGuards": []
   },
   {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "unlockUser",
+    "httpMethod": "POST",
+    "path": "/users/:id/unlock",
+    "permissions": ["Permission.ManageUsers"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
     "className": "UserStatisticsController",
     "methodName": "getSummary",

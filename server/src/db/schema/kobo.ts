@@ -144,6 +144,9 @@ export const koboSnapshotBooks = pgTable(
     isNew: boolean('is_new').notNull().default(true),
     removedByDevice: boolean('removed_by_device').notNull().default(false),
     needsLegacyNumericRemoval: boolean('needs_legacy_numeric_removal').notNull().default(false),
+    // The hash this row has been reconciled against, which is not always the hash of the bytes on
+    // the device: a metadata write that rewrites the file records its new hash here so reconcile
+    // does not re-deliver the book as a NewEntitlement and cost the device its annotations.
     fileHash: varchar('file_hash', { length: 64 }),
     deliveryHash: varchar('delivery_hash', { length: 64 }),
     metadataHash: varchar('metadata_hash', { length: 64 }),

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import { SQL, and, asc, count, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { SUPPORTED_BOOK_FORMATS } from '../upload/upload-validator.service';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -579,6 +579,21 @@ export class BookRepository {
     return { rows, ...enrichment, total: Number(total) };
   }
 
+  async findCardIds(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number; userId: number }): Promise<number[]> {
+    const rows = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .leftJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, opts.userId)))
+      .where(this.visibleWhere(opts.where))
+      .orderBy(...opts.orderBy)
+      .limit(opts.limit)
+      .offset(opts.offset);
+
+    return rows.map((row) => row.id);
+  }
+
   private async enrichBookIds(bookRefs: Array<{ id: number; primaryFileId: number | null }>, userId: number) {
     const bookIds = bookRefs.map((book) => book.id);
     const primaryFileIds = bookRefs.map((book) => book.primaryFileId).filter((id): id is number => id != null);
@@ -605,6 +620,7 @@ export class BookRepository {
           seriesName: string;
           seriesIndex: number | null;
           displayOrder: number;
+          expectedBookCount: number | null;
         }[],
       };
     }
@@ -644,6 +660,7 @@ export class BookRepository {
             seriesName: bookSeries.name,
             seriesIndex: bookSeriesMemberships.seriesIndex,
             displayOrder: bookSeriesMemberships.displayOrder,
+            expectedBookCount: bookSeries.expectedBookCount,
           })
           .from(bookSeriesMemberships)
           .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
@@ -783,7 +800,14 @@ export class BookRepository {
       updatedAt: Date;
     }[];
     narratorRows: { bookId: number; name: string }[];
-    seriesMembershipRows: { bookId: number; seriesId: number; seriesName: string; seriesIndex: number | null; displayOrder: number }[];
+    seriesMembershipRows: {
+      bookId: number;
+      seriesId: number;
+      seriesName: string;
+      seriesIndex: number | null;
+      displayOrder: number;
+      expectedBookCount: number | null;
+    }[];
     total: number;
   }> {
     const { where, sort, limit, offset, userId } = opts;
@@ -1339,6 +1363,7 @@ export class BookRepository {
           seriesName: bookSeries.name,
           seriesIndex: bookSeriesMemberships.seriesIndex,
           displayOrder: bookSeriesMemberships.displayOrder,
+          expectedBookCount: bookSeries.expectedBookCount,
         })
         .from(bookSeriesMemberships)
         .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
@@ -1908,6 +1933,21 @@ export class BookRepository {
       await this.seriesMemberships?.syncPrimaryFromMetadata(bookId, executor);
     }
     await executor.update(books).set({ updatedAt: new Date() }).where(eq(books.id, bookId));
+  }
+
+  // Only fills a missing shared edition id - never overwrites a value already set by someone
+  // else (via metadata edit/refresh) so a per-user sync pick can't silently change shared metadata.
+  async setHardcoverEditionIdIfEmpty(bookId: number, hardcoverEditionId: string): Promise<boolean> {
+    const [row] = await this.db
+      .update(bookMetadata)
+      .set({ hardcoverEditionId, updatedAt: new Date() })
+      .where(and(eq(bookMetadata.bookId, bookId), isNull(bookMetadata.hardcoverEditionId)))
+      .returning({ bookId: bookMetadata.bookId });
+    return row != null;
+  }
+
+  async updateAddedAt(bookId: number, addedAt: Date): Promise<void> {
+    await this.db.update(books).set({ addedAt, updatedAt: new Date() }).where(eq(books.id, bookId));
   }
 
   async replaceCommunityRatings(

@@ -58,6 +58,8 @@ local DEFAULT_GRID_COLUMNS = CatalogUtil.DEFAULT_GRID_COLUMNS
 local DEFAULT_GRID_ROWS = CatalogUtil.DEFAULT_GRID_ROWS
 local MAX_RECENT_SEARCHES = CatalogUtil.MAX_RECENT_SEARCHES
 local ON_DEVICE_MAX_IDS = CatalogUtil.ON_DEVICE_MAX_IDS
+local NOT_ON_DEVICE_SCAN_SIZE = CatalogUtil.NOT_ON_DEVICE_SCAN_SIZE
+local scanNotOnDeviceIds = CatalogUtil.scanNotOnDeviceIds
 local SORTS = CatalogUtil.SORTS
 local SORT_LABELS = CatalogUtil.SORT_LABELS
 local NATURAL_ORDER = CatalogUtil.NATURAL_ORDER
@@ -236,6 +238,7 @@ function BookOrbitCatalog:init()
     self.settings = self.settings or {}
     CatalogWidgets.setAssetIconFiles({
         on_device = self:pluginAssetFile("bookorbit.on-device.svg"),
+        download = self:pluginAssetFile(DOWNLOAD_ICON_FILE),
         shuffle = self:pluginAssetFile("bookorbit.shuffle.svg"),
         in_progress = self:pluginAssetFile("bookorbit.in-progress.svg"),
         collections = self:pluginAssetFile("bookorbit.collections.svg"),
@@ -713,8 +716,12 @@ function BookOrbitCatalog:rootItems()
     end
     table.insert(items, {
         text = _("On device"),
-        mandatory = on_device_count > 0 and tostring(on_device_count) or nil,
+        mandatory = on_device_count > 0 and CatalogUtil.formatCount(on_device_count) or nil,
         kind = "on-device",
+    })
+    table.insert(items, {
+        text = _("Not on device"),
+        kind = "not-on-device",
     })
 
     return items
@@ -1006,27 +1013,33 @@ function BookOrbitCatalog:paramsForEntry(section, entry)
     return params
 end
 
+-- Assumes an already-wrapped Trapper coroutine, so a caller that has its own
+-- requests to make first can reuse it without nesting another wrap.
+function BookOrbitCatalog:fetchBookPage(params, title, push)
+    local query = cloneParams(params)
+    query.page = query.page or 1
+    query.size = self:itemsPerPage()
+    query.sort = query.sort or self.default_sort or "recently_added"
+    query.order = self:effectiveOrder(query)
+
+    local body, err = self:fetch(_("Loading books..."), function()
+        return self.client:catalogBooks(query)
+    end)
+    if not body then
+        if err ~= "cancelled" then
+            self:showRetry(err, function()
+                self:loadBooks(params, title, push)
+            end)
+        end
+        return
+    end
+
+    self:showBookPage(body, query, title or _("Books"), push ~= false)
+end
+
 function BookOrbitCatalog:loadBooks(params, title, push)
     self:runConnected(function()
-        local query = cloneParams(params)
-        query.page = query.page or 1
-        query.size = self:itemsPerPage()
-        query.sort = query.sort or self.default_sort or "recently_added"
-        query.order = self:effectiveOrder(query)
-
-        local body, err = self:fetch(_("Loading books..."), function()
-            return self.client:catalogBooks(query)
-        end)
-        if not body then
-            if err ~= "cancelled" then
-                self:showRetry(err, function()
-                    self:loadBooks(params, title, push)
-                end)
-            end
-            return
-        end
-
-        self:showBookPage(body, query, title or _("Books"), push ~= false)
+        self:fetchBookPage(params, title, push)
     end)
 end
 
@@ -1046,6 +1059,55 @@ function BookOrbitCatalog:loadOnDevice()
         capped[i] = ids[i]
     end
     self:loadBooks({ ids = table.concat(capped, ","), sort = "title" }, _("On device"), true)
+end
+
+function BookOrbitCatalog:collectNotOnDeviceIds()
+    return scanNotOnDeviceIds(function(page)
+        return self:fetch(_("Finding books not on device..."), function()
+            return self.client:catalogBooks({
+                page = page,
+                size = NOT_ON_DEVICE_SCAN_SIZE,
+                sort = "recently_added",
+                order = "desc",
+            })
+        end)
+    end, function(book)
+        return self:isOnDevice(book)
+    end)
+end
+
+function BookOrbitCatalog:loadNotOnDevice()
+    self:runConnected(function()
+        -- Without the maps every book reads as absent, which would list books
+        -- that are already here. refreshOnDevice starts the scan; the list is
+        -- worth waiting for rather than showing wrong.
+        if not self:refreshOnDevice() then
+            UIManager:show(InfoMessage:new{
+                text = _("Still checking which books are on this device. Try again in a moment."),
+                timeout = 3,
+            })
+            return
+        end
+        local ids, err = self:collectNotOnDeviceIds()
+        if not ids then
+            if err ~= "cancelled" then
+                self:showRetry(err, function()
+                    self:loadNotOnDevice()
+                end)
+            end
+            return
+        end
+        if #ids == 0 then
+            UIManager:show(InfoMessage:new{
+                text = _("The newest books in your library are already on this device."),
+                timeout = 3,
+            })
+            return
+        end
+        -- The tile says "Not on device"; the list says what it actually holds,
+        -- since the walk covers recent additions rather than the whole library.
+        self:fetchBookPage({ ids = table.concat(ids, ","), sort = "recently_added" }, _("Not on device (recent)"), true)
+    end)
 end
 
 function BookOrbitCatalog:scopeParams(query)
@@ -2224,6 +2286,8 @@ function BookOrbitCatalog:onMenuSelect(item)
         end
     elseif item.kind == "on-device" then
         self:loadOnDevice()
+    elseif item.kind == "not-on-device" then
+        self:loadNotOnDevice()
     elseif item.kind == "books" then
         self:loadBooks(item.params or {}, item.list_title or item.text)
     elseif item.kind == "book" then

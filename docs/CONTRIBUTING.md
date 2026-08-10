@@ -7,6 +7,7 @@ Thanks for your interest in contributing to BookOrbit. Whether you are fixing a 
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Local setup, architecture, commands, and technical reference.
 - [TESTING.md](TESTING.md) - Test architecture, E2E suites, coverage thresholds, and harness details.
 - [COMMIT_GUIDELINES.md](COMMIT_GUIDELINES.md) - Commit message format, types, scopes, and examples.
+- [LOCALIZATION.md](LOCALIZATION.md) - User-facing copy, ICU messages, Crowdin, and adding languages.
 
 ---
 
@@ -43,7 +44,8 @@ This is the end-to-end journey from idea to merged PR. Each phase builds on the 
 
 ### Phase 1: Find or Create an Issue
 
-> **Issue first, PR second.** Every pull request must link to an approved issue. PRs without one will be closed.
+> **Issue first, PR second.** Every pull request must link to an approved issue assigned to the
+> contributor. PRs without prior approval and assignment will be closed without review.
 
 - Browse [open issues](../../issues) for something you want to tackle.
 - If you have a new idea, open one using the [bug report](../../issues/new?template=bug_report.yml) or [feature request](../../issues/new?template=feature_request.yml) template.
@@ -51,12 +53,22 @@ This is the end-to-end journey from idea to merged PR. Each phase builds on the 
 
 ### Phase 2: Get Maintainer Approval
 
-Wait for explicit approval before writing code. Approval looks like:
+Before writing code, comment on the issue to say that you want to implement it and briefly describe
+your proposed approach. Then wait for both:
 
-- A :+1: reaction on your issue.
-- A comment such as "go ahead", "approved", or "approved to proceed".
+- A maintainer comment explicitly approving the implementation.
+- A maintainer assigning the issue to you.
 
-This step prevents wasted effort on changes that conflict with the project direction. Small bug fixes with clear reproduction are usually approved quickly.
+Do not start implementation or open a pull request, including a draft, until both have happened. A
+reaction or lack of a response does not count as approval.
+
+If nobody responds within seven days, leave one polite follow-up comment and @mention the maintainers
+or contributors already involved in the issue. People have responsibilities outside the project and
+may simply have missed the original notification, so a reminder is welcome. Continue waiting for an
+explicit reply before starting implementation or opening a pull request.
+
+This step prevents wasted effort on changes that conflict with the project direction. Small bug fixes
+with clear reproduction are usually approved quickly.
 
 ### Phase 3: Fork and Clone
 
@@ -109,17 +121,29 @@ Refer to [DEVELOPMENT.md](DEVELOPMENT.md) for architecture details, project stru
 - **No unapproved dependencies.** Propose new dependencies in the linked issue first (see [Adding Dependencies](#adding-dependencies)).
 - **Keep the scope tight.** If you discover something unrelated that needs fixing, open a separate issue for it.
 
+#### Localizing User-Facing Text
+
+BookOrbit uses Vue I18n, with English as the complete source catalog and Crowdin as the source of truth for every other language.
+
+- Add every new user-facing message, including accessibility labels and transient states, to `client/src/locales/en.json` and reference it through Vue I18n.
+- Do not add the key or an English fallback to any non-English catalog. Target catalogs are intentionally sparse, and missing messages fall back to English at runtime.
+- Do not create or improve target-language translations in a feature pull request. Translate them in [Crowdin](https://crowdin.com/project/bookorbit); the controlled translation workflow will open a separate PR.
+- Run `pnpm --filter client validate:locales` after changing `en.json`.
+- Read [LOCALIZATION.md](LOCALIZATION.md) before changing ICU plural structure, changing the meaning of an existing message, or adding a language.
+
+CI rejects edits to existing non-English catalogs in ordinary pull requests. A deliberate new-language setup may add only an empty target catalog until Crowdin export is enabled.
+
 ### Phase 7: Write and Run Tests
 
 Testing expectations depend on what you changed:
 
-| Change type             | What is expected                                |
-| ----------------------- | ----------------------------------------------- |
-| Bug fix                 | Regression test proving the bug is fixed        |
-| New backend feature/API | Server unit tests for the new behavior          |
-| New frontend logic      | Client unit tests (composables, utilities)      |
-| UI-only change          | Manual verification evidence (screenshot/video) |
-| Refactor                | Existing tests stay green, no new tests needed  |
+| Change type             | What is expected                               |
+| ----------------------- | ---------------------------------------------- |
+| Bug fix                 | Regression test proving the bug is fixed       |
+| New backend feature/API | Server unit tests for the new behavior         |
+| New frontend logic      | Client unit tests (composables, utilities)     |
+| UI-only change          | Screenshots, plus a recording for interactions |
+| Refactor                | Existing tests stay green, no new tests needed |
 
 Run the full test suite:
 
@@ -170,20 +194,25 @@ git push origin BO-123-your-feature-name
 
 When creating the PR:
 
-- **Fill out the PR template.** It asks for a summary, testing evidence, screenshots (if UI changed), and non-obvious decisions.
+- **Fill out the PR template.** It asks for the linked approval, a summary, the commands you ran with
+  their real output, what you did while manually testing, end-to-end evidence, and an authorship note
+  covering any AI assistance.
 - **Use a Conventional Commit-style PR title** (for example: `fix(reader): correct page count for multi-volume PDFs`).
 - **Link your issue** with a GitHub closing keyword in the description (`close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`) and an issue reference (`#123` or `owner/repo#123`).
   Example:
 
   ```md
-  ## What does this PR do?
+  ## What changed
 
   Correct page count handling for multi-volume PDFs.
 
   Fixes: #123
   ```
 
-- **Open as a draft** if you want early direction feedback before the code is complete.
+- **Open as a draft** if the implementation is incomplete after the linked issue has been approved and
+  assigned. Use the issue for direction before approval.
+- **Attach end-to-end evidence.** Upload a recording showing the changed behavior through the real
+  client. Ready-for-review PRs without the required evidence will not be reviewed.
 - **Disclose AI usage** if applicable. See [AI_POLICY.md](AI_POLICY.md) for the format and expectations.
 
 ### Phase 11: Respond to Review
@@ -216,7 +245,8 @@ Before marking your PR ready for review, confirm:
 - [ ] `pnpm verify` passes locally
 - [ ] Tests included per the [testing expectations table](#phase-7-write-and-run-tests)
 - [ ] Full-stack behavior manually validated
-- [ ] UI changes include screenshot or recording
+- [ ] UI changes include screenshots, plus a recording when behavior or interaction changed
+- [ ] User-facing text uses keys added only to `client/src/locales/en.json`; non-English catalogs are unchanged
 - [ ] PR template fully completed
 - [ ] No unintended files (build artifacts, `.env`, personal configs)
 - [ ] No unapproved new dependencies

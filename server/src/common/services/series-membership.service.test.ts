@@ -62,8 +62,8 @@ describe('SeriesMembershipService', () => {
     );
 
     expect(result).toEqual([
-      { seriesId: 101, seriesName: 'Dune', seriesIndex: 1, displayOrder: 0 },
-      { seriesId: 202, seriesName: 'The Expanse', seriesIndex: 5, displayOrder: 1 },
+      { seriesId: 101, seriesName: 'Dune', seriesIndex: 1, displayOrder: 0, expectedBookCount: null },
+      { seriesId: 202, seriesName: 'The Expanse', seriesIndex: 5, displayOrder: 1, expectedBookCount: null },
     ]);
     expect(deleteFrom).toHaveBeenCalledTimes(1);
     expect(identity.resolveSeriesId).toHaveBeenCalledTimes(2);

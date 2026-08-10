@@ -25,6 +25,7 @@ export const KOREADER_CATALOG_SORT_ORDERS = ['asc', 'desc'] as const satisfies r
 export const KOREADER_CATALOG_READ_STATUS_FILTERS = ['unread', 'reading', 'finished'] as const satisfies readonly KoreaderCatalogReadStatusFilter[];
 
 export const KOREADER_CATALOG_SETTABLE_READ_STATUSES = [
+  'unread',
   'want_to_read',
   'reading',
   'on_hold',

@@ -15,11 +15,13 @@ interface BookTableShellOptions {
   loading?: Ref<boolean>
   exitSelectionMode?: () => void
   querySelection?: Ref<QuerySelectionState | null>
+  /** Called for a single-book move; the host view owns the destination sheet. */
+  onMoveToLibrary?: (bookId: number) => void
 }
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 
-export function useBookTableShell({ books, querySelection }: BookTableShellOptions) {
+export function useBookTableShell({ books, querySelection, onMoveToLibrary }: BookTableShellOptions) {
   const router = useRouter()
   const { setBookContext } = useBookNavigation()
   const tableControls = useTableViewControls()
@@ -68,6 +70,11 @@ export function useBookTableShell({ books, querySelection }: BookTableShellOptio
         selection.toggleBook(book.id)
       }
       addToCollectionOpen.value = true
+      return
+    }
+
+    if (action === 'move-to-library') {
+      onMoveToLibrary?.(book.id)
       return
     }
 

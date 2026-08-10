@@ -282,8 +282,8 @@ onMounted(async () => {
   // Specialized readers own their own progress/settings/loading lifecycle.
   if (isAudioFormat || isPdfFormat || isComicFormat) return
 
-  await customFonts.fetchFonts()
-  setFontFaceCSS(customFonts.generateFontFaceCSS())
+  await customFonts.fetchAllFonts()
+  await refreshFontFaces()
 
   await progress.load()
 
@@ -379,6 +379,18 @@ async function applyUpdate(partial: Partial<ReaderState>) {
   }
 }
 
+// Drops this book's overrides and falls back to the reader defaults. The renderer keeps
+// injecting styles so the change is visible immediately rather than only after a reopen.
+async function resetSettings() {
+  const previousSpread = state.value.fixedLayoutSpread
+  bookSettings.resetBookSettings()
+  shouldApplyStyles.value = true
+  seedState(bookSettings.effective.value as EpubReaderSettings)
+  if (state.value.fixedLayoutSpread !== previousSpread) {
+    await reopenEpubAtCurrentLocation()
+  }
+}
+
 watch(
   () => footerMode.value,
   (mode) => {
@@ -398,14 +410,18 @@ watch(showSettings, (open) => {
   setVisibilityLock(open)
 })
 
-watch(
-  () => customFonts.fonts.value,
-  () => {
-    setFontFaceCSS(customFonts.generateFontFaceCSS())
-    const renderer = getRenderer()
-    if (renderer && shouldApplyStyles.value) applyToRenderer(renderer, isFixedLayout.value ? { flow: 'paginated' } : undefined)
-  },
-)
+// Only the selected family is held in memory, so the blob URLs backing the injected
+// CSS have to be refreshed whenever either the selection or the font list changes.
+async function refreshFontFaces() {
+  await customFonts.ensureCssFamilyLoaded(state.value.fontFamily)
+  setFontFaceCSS(customFonts.generateFontFaceCSS())
+  const renderer = getRenderer()
+  if (renderer && shouldApplyStyles.value) applyToRenderer(renderer, isFixedLayout.value ? { flow: 'paginated' } : undefined)
+}
+
+watch(() => [customFonts.fonts.value, customFonts.serverFonts.value], refreshFontFaces)
+
+watch(() => state.value.fontFamily, refreshFontFaces)
 
 function handleDeleteAnnotation(id: number) {
   const ann = annotations.annotations.value.find((a) => a.id === id)
@@ -585,7 +601,14 @@ watch(
       @startReading="startTrackedReading"
     >
       <template #settingsPanel>
-        <ReaderSettingsPanel :state="state" :customFonts="customFonts" :is-fixed-layout="isFixedLayout" @update="applyUpdate" />
+        <ReaderSettingsPanel
+          :state="state"
+          :customFonts="customFonts"
+          :is-fixed-layout="isFixedLayout"
+          :can-reset="bookSettings.isCustomized.value"
+          @update="applyUpdate"
+          @reset="resetSettings"
+        />
       </template>
     </ReaderHeader>
 

@@ -3240,31 +3240,6 @@
       "moveDown": "Spostati giù",
       "ascending": "Ascendente",
       "descending": "Discendente",
-      "fields": {
-        "author": "Author",
-        "title": "Title",
-        "series": "Series",
-        "seriesIndex": "Series #",
-        "addedAt": "Date Added",
-        "updatedAt": "Date Updated",
-        "publishedDate": "Published Date",
-        "publishedYear": "Published Year",
-        "pageCount": "Page Count",
-        "rating": "Rating",
-        "publisher": "Publisher",
-        "fileSize": "File Size",
-        "readProgress": "Read Progress",
-        "readStatus": "Read Status",
-        "format": "Format",
-        "lastReadAt": "Last Read",
-        "startedAt": "Date Started",
-        "finishedAt": "Date Finished",
-        "random": "Random",
-        "language": "Language",
-        "metadataScore": "Metadata Score"
-      },
-      "customFieldsGroup": "Custom fields",
-      "customFieldFallback": "Custom field",
       "remove": "Rimuovi",
       "emptyState": "Nessun ordinamento configurato. Verrà utilizzato il titolo crescente.",
       "addLevel": "Aggiungi livello di ordinamento"
@@ -3274,65 +3249,6 @@
       "all": "TUTTI",
       "any": "QUALSIASI",
       "ofFollowingRules": "delle seguenti regole",
-      "fields": {
-        "title": "Title",
-        "publisher": "Publisher",
-        "language": "Language",
-        "series": "Series",
-        "seriesIndex": "Series Index",
-        "publishedDate": "Published Date",
-        "publishedYear": "Published Year",
-        "pageCount": "Page Count",
-        "author": "Author",
-        "genre": "Genre",
-        "tag": "Tag",
-        "collection": "Collection",
-        "library": "Library",
-        "format": "Format",
-        "addedAt": "Added Date",
-        "startedAt": "Date Started",
-        "finishedAt": "Date Finished",
-        "fileAvailability": "File Availability",
-        "rating": "Rating",
-        "communityRating": "Community Rating",
-        "readProgress": "Reading Progress",
-        "readStatus": "Read Status",
-        "description": "Description",
-        "isbn": "ISBN",
-        "metadataScore": "Metadata Score",
-        "cover": "Cover",
-        "lockStatus": "Lock Status",
-        "seriesStatus": "Series Status"
-      },
-      "operators": {
-        "contains": "contains",
-        "notContains": "does not contain",
-        "startsWith": "starts with",
-        "endsWith": "ends with",
-        "eq": "is",
-        "notEq": "is not",
-        "isEmpty": "is empty",
-        "isNotEmpty": "is not empty",
-        "gt": "greater than",
-        "gte": "at least",
-        "lt": "less than",
-        "lte": "at most",
-        "between": "between",
-        "includesAny": "includes any of",
-        "includesAll": "includes all of",
-        "excludesAll": "excludes all of",
-        "before": "before",
-        "after": "after",
-        "withinLast": "within last",
-        "isMissing": "is missing",
-        "isPresent": "is present",
-        "isUnread": "is unread",
-        "isInProgress": "is in progress",
-        "isFinished": "is finished",
-        "isLocked": "is locked",
-        "isUnlocked": "is unlocked",
-        "isUpNext": "is up next"
-      },
       "anyProvider": "Qualsiasi fornitore",
       "communityRatingProvider": "Fornitore di valutazioni della comunità",
       "loadingLibraries": "Caricamento librerie...",
@@ -4158,6 +4074,14 @@
       "text": {
         "openDetails": "Apri i dettagli"
       }
+    },
+    "move": {
+      "title": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
+      "folderCount": "{count, plural, one {# folder} many {# folders} other {# folders}}",
+      "confirm": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
+      "review": {
+        "collisions": "{count, plural, one {# name conflict} many {# name conflicts} other {# name conflicts}}"
+      }
     }
   },
   "bookMetadataFetch": {
@@ -4667,29 +4591,6 @@
       "tabs": {
         "widgets": "Widget",
         "shelves": "Scaffali"
-      },
-      "widgetNames": {
-        "readingStreak": "Striscia di lettura",
-        "currentlyReading": "Attualmente sto leggendo",
-        "readingGoal": "Reading Goal",
-        "readingDna": "Leggere il DNA",
-        "monthlyChallenge": "Sfida mensile",
-        "highlightOfTheDay": "Momento clou della giornata",
-        "neglectedGems": "Gemme trascurate",
-        "readingRhythm": "Ritmo di lettura",
-        "diversityScore": "Punteggio di diversità",
-        "libraryOverview": "Panoramica della biblioteca",
-        "yearProjection": "Proiezione dell'anno",
-        "longWait": "La lunga attesa"
-      },
-      "shelfNames": {
-        "recentlyAdded": "Recently Added",
-        "continueReading": "Continue Reading",
-        "continueListening": "Continue Listening",
-        "wantToRead": "Want to Read",
-        "upNextInSeries": "Up Next in Series",
-        "random": "Discover Something New",
-        "smartScope": "Smart Scope"
       },
       "reorderHintWidget": "Trascina per riordinare. Seleziona per mostrare o nascondere un widget.",
       "reorderHintShelf": "Trascina per riordinare. Attiva/disattiva per mostrare o nascondere uno scaffale.",
@@ -5863,47 +5764,22 @@
     "settings": {
       "title": "Impostazioni",
       "ariaLabel": "Impostazioni del lettore",
-      "tabs": {
-        "appearance": "Aspetto",
-        "text": "Testo",
-        "layout": "Disposizione"
-      },
-      "appearance": {
-        "mode": "Modalità",
+      "mode": {
         "light": "Luce",
-        "dark": "Buio",
-        "colorTheme": "Tema del colore"
+        "dark": "Buio"
       },
-      "text": {
-        "fontSize": "Dimensione del carattere",
-        "fontSizeRange": "Intervallo: 10-32px",
-        "lineHeight": "Altezza della linea",
-        "lineHeightRange": "Intervallo: 0,8-3,0",
-        "fontFamily": "Famiglia di caratteri",
-        "fontFamilyDescription": "Scegli i caratteri incorporati o caricati per il corpo del testo.",
-        "builtIn": "Integrato",
-        "yourFonts": "I tuoi caratteri"
-      },
-      "layout": {
-        "pageSpreads": "La pagina si allarga",
-        "pageSpreadsDescription": "Scegli come questo EPUB basato su immagini accoppia le pagine.",
+      "fontBuiltIn": "Integrato",
+      "fontYours": "I tuoi caratteri",
+      "readingFlow": "Flusso di lettura",
+      "pageSpreads": "La pagina si allarga",
+      "pageSpreadsHint": "Scegli come questo EPUB basato su immagini accoppia le pagine.",
+      "spread": {
         "bookDefault": "Prenota predefinito",
-        "singlePage": "Pagina singola",
-        "readingFlow": "Flusso di lettura",
-        "readingFlowDescription": "Passa dallo scorrimento pagina a quello continuo.",
-        "paginated": "Paginato",
-        "scrolled": "Scorrito",
-        "textColumns": "Colonne di testo",
-        "textColumnsRange": "Intervallo: 1-10",
-        "columnGap": "Spazio tra le colonne",
-        "columnGapRange": "Intervallo: 0-50%",
-        "maxWidth": "Larghezza massima",
-        "maxWidthRange": "Intervallo: 400-1600",
-        "justifyText": "Giustificare il testo",
-        "justifyTextDescription": "Abilita l'allineamento del paragrafo a larghezza intera.",
-        "hyphenation": "Sillabazione",
-        "hyphenationDescription": "Abilita la sillabazione automatica delle interruzioni di parola."
-      }
+        "singlePage": "Pagina singola"
+      },
+      "columnGap": "Spazio tra le colonne",
+      "justifyText": "Giustificare il testo",
+      "hyphenation": "Sillabazione"
     },
     "search": {
       "placeholder": "Cerca nel libro (min {min} caratteri)...",
@@ -5992,29 +5868,17 @@
       "cycleFooterMode": "Scorri la modalità informazioni piè di pagina"
     },
     "cbz": {
-      "tabs": {
-        "view": "Visualizza",
-        "reading": "Lettura",
-        "layout": "Disposizione"
-      },
       "fitMode": "Modalità adatta",
       "background": "Sfondo",
       "scrollMode": "Modalità di scorrimento",
       "scrollModeHint": "Utilizza \"Nessun intervallo\" per i webtoon e le strisce verticali.",
       "readingDirection": "Direzione della lettura",
       "pageView": "Visualizzazione della pagina",
-      "autoFallback": "Modalità alternativa automatica",
       "spreadAlignmentLabel": "Allineamento della diffusione",
-      "spreadAlignmentHint": "L'allineamento delle pagine non è disponibile nella modalità alternativa automatica.",
       "spreadGap": "Divario di diffusione",
       "spreadGapValue": "{value}px",
-      "focusTwoPageToggle": "Attiva/disattiva Focus su due pagine",
       "forceTwoPage": "Forza due pagine",
-      "off": "Spento",
-      "on": "Su",
       "widePages": "Pagine larghe",
-      "resetBookViewSettings": "Ripristina le impostazioni di visualizzazione del libro",
-      "resetConfirm": "Ripristinare le impostazioni di visualizzazione di questo libro sui valori predefiniti globali?",
       "firstPage": "Prima pagina",
       "lastPage": "Ultima pagina",
       "fit": {
@@ -6162,8 +6026,6 @@
   "smartScope": {
     "syncToKobo": "Sincronizza con Kobo",
     "syncToKoboHint": "I libri corrispondenti a questo ambito verranno visualizzati sul tuo dispositivo Kobo",
-    "visibleToAll": "Visible to all users",
-    "visibleToAllHint": "Every user can see and use this smart scope",
     "dialog": {
       "name": "Nome",
       "namePlaceholder": "ad es. Fantascienza non letta",
@@ -6765,11 +6627,6 @@
       "defaultName": "Ambito intelligente",
       "filter": "Filtra",
       "edit": "Modifica ambito intelligente",
-      "koboSync": {
-        "label": "Sync to my Kobo",
-        "enabledHint": "Books in this shared Smart Scope sync to your Kobo device. Turn off to stop syncing them.",
-        "disabledHint": "Turn on to sync books in this shared Smart Scope to your Kobo device."
-      },
       "showControlsAria": "Mostra i controlli Smart Scope",
       "hideFilter": "Nascondi filtro",
       "showFilter": "Mostra filtro",
@@ -6777,10 +6634,7 @@
       "loadError": "Impossibile caricare questo SmartScope",
       "toast": {
         "deleted": "\"{name}\" eliminato",
-        "deleteFailed": "Impossibile eliminare \"{name}\"",
-        "koboSyncEnabled": "\"{name}\" now syncs to your Kobo",
-        "koboSyncDisabled": "\"{name}\" no longer syncs to your Kobo",
-        "koboSyncFailed": "Failed to update Kobo sync for \"{name}\""
+        "deleteFailed": "Impossibile eliminare \"{name}\""
       },
       "empty": {
         "noRules": "Nessuna regola configurata",

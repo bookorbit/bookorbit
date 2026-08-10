@@ -1,5 +1,20 @@
 import { FileWriteRepository } from './file-write.repository';
 
+function extractSqlStrings(value: unknown): string[] {
+  if (!value || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.queryChunks)) return record.queryChunks.flatMap(extractSqlStrings);
+  if (Array.isArray(record.value)) return record.value.filter((entry): entry is string => typeof entry === 'string');
+  return [];
+}
+
+function extractSqlParams(value: unknown): unknown[] {
+  if (typeof value === 'number' || typeof value === 'string' || value === null || typeof value === 'boolean') return [value];
+  if (!value || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  return Array.isArray(record.queryChunks) ? record.queryChunks.flatMap(extractSqlParams) : [];
+}
+
 describe('FileWriteRepository', () => {
   function chain<T>(result: T) {
     return {
@@ -321,5 +336,81 @@ describe('FileWriteRepository', () => {
 
     // innerJoin is called exactly once per query (books -> libraries only, no bookFiles join)
     expect(c1.innerJoin).toHaveBeenCalledTimes(1);
+  });
+
+  it('atomically acknowledges a metadata-only primary file hash transition in matching Kobo snapshots', async () => {
+    const set = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const tx = { update: vi.fn().mockReturnValue({ set }), execute };
+    const db = {
+      transaction: vi.fn().mockImplementation(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx)),
+    };
+    const repo = new FileWriteRepository(db as never);
+    const mtime = new Date('2026-08-08T00:00:00.000Z');
+
+    await repo.updateFileStateAfterMetadataWrite(5, 11, 'oldhash', {
+      fileHash: 'newhash',
+      mtime,
+      sizeBytes: 57,
+      ino: 99n,
+    });
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith({ fileHash: 'newhash', mtime, sizeBytes: 57, ino: 99n, updatedAt: expect.any(Date) });
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    const statement = execute.mock.calls[0]![0];
+    const text = extractSqlStrings(statement).join(' ');
+    expect(text).toContain('book.primary_file_id =');
+    expect(text).toContain('snapshot.file_hash IS NOT DISTINCT FROM');
+    expect(extractSqlParams(statement)).toEqual(expect.arrayContaining(['newhash', 'oldhash', 5, 11]));
+  });
+
+  it('leaves snapshots the device no longer holds out of the hash acknowledgement', async () => {
+    const set = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const tx = { update: vi.fn().mockReturnValue({ set }), execute };
+    const db = {
+      transaction: vi.fn().mockImplementation(async (callback: (value: typeof tx) => Promise<unknown>) => callback(tx)),
+    };
+    const repo = new FileWriteRepository(db as never);
+
+    await repo.updateFileStateAfterMetadataWrite(5, 11, 'oldhash', { fileHash: 'newhash' });
+
+    const text = extractSqlStrings(execute.mock.calls[0]![0]).join(' ');
+    expect(text).toContain('snapshot.pending_delete = false');
+    expect(text).toContain('snapshot.removed_by_device = false');
+  });
+
+  it('does not acknowledge Kobo snapshots when the post-write hash is unavailable', async () => {
+    const set = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const db = {
+      update: vi.fn().mockReturnValue({ set }),
+      transaction: vi.fn(),
+    };
+    const repo = new FileWriteRepository(db as never);
+    const mtime = new Date('2026-08-08T00:00:00.000Z');
+
+    await repo.updateFileStateAfterMetadataWrite(5, 11, 'oldhash', { mtime, sizeBytes: 57, ino: 99n });
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith({ mtime, sizeBytes: 57, ino: 99n, updatedAt: expect.any(Date) });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not acknowledge Kobo snapshots when the rewrite left the hash unchanged', async () => {
+    const set = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const db = {
+      update: vi.fn().mockReturnValue({ set }),
+      transaction: vi.fn(),
+    };
+    const repo = new FileWriteRepository(db as never);
+    const mtime = new Date('2026-08-08T00:00:00.000Z');
+
+    await repo.updateFileStateAfterMetadataWrite(5, 11, 'samehash', { fileHash: 'samehash', mtime, sizeBytes: 57, ino: 99n });
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith({ fileHash: 'samehash', mtime, sizeBytes: 57, ino: 99n, updatedAt: expect.any(Date) });
+    expect(db.transaction).not.toHaveBeenCalled();
   });
 });

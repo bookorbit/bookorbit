@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
+import { normalizeSeriesTotalBooks } from '../../../../common/utils/series-total-books.utils';
 
 export interface AmazonBookData {
   title?: string;
@@ -17,6 +18,7 @@ export interface AmazonBookData {
   pageCount?: number;
   seriesName?: string;
   seriesIndex?: number;
+  seriesTotalBooks?: number;
   coverUrl?: string;
   tags?: string[];
   communityRating?: number;
@@ -43,6 +45,7 @@ export function parseBookPage(html: string): AmazonBookData {
     pageCount: extractPageCount($),
     seriesName: extractSeriesName($),
     seriesIndex: extractSeriesIndex($),
+    seriesTotalBooks: extractSeriesTotalBooks($),
     coverUrl: extractCoverUrl($),
     tags: extractCategories($),
     communityRating: extractCommunityRating($),
@@ -219,12 +222,24 @@ function extractSeriesName($: CheerioAPI): string | undefined {
   return $('#rpi-attribute-book_details-series .rpi-attribute-value a span').first().text().trim() || undefined;
 }
 
+function seriesLabel($: CheerioAPI): string {
+  return $('#rpi-attribute-book_details-series .rpi-attribute-label span').first().text();
+}
+
 function extractSeriesIndex($: CheerioAPI): number | undefined {
-  const label = $('#rpi-attribute-book_details-series .rpi-attribute-label span').first().text();
-  const match = label.match(/book\s+(\d+(?:\.\d+)?)\s+of/i);
+  const match = seriesLabel($).match(/book\s+(\d+(?:\.\d+)?)\s+of/i);
   if (!match) return undefined;
   const n = parseFloat(match[1]);
   return Number.isNaN(n) ? undefined : n;
+}
+
+/**
+ * The same "Book 3 of 7" label that yields the index also states the series length. Optional
+ * trailing group so a label that stops after "of" simply yields no total.
+ */
+function extractSeriesTotalBooks($: CheerioAPI): number | undefined {
+  const match = seriesLabel($).match(/book\s+\d+(?:\.\d+)?\s+of\s+(\d+)/i);
+  return match ? normalizeSeriesTotalBooks(match[1]) : undefined;
 }
 
 function extractCoverUrl($: CheerioAPI): string | undefined {

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { OidcProviderPublic } from '@bookorbit/types'
+import { useRoute } from 'vue-router'
+import { LoginErrorCode, type OidcProviderPublic } from '@bookorbit/types'
 import { Moon, Sun, Wallpaper } from '@lucide/vue'
 import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThemeStore } from '@/stores/theme'
-import { useAuth } from './composables/useAuth'
+import { LoginError, useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
 import { useSetupStatus } from './composables/useSetupStatus'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -52,7 +53,10 @@ function closeAll() {
 
 const { login } = useAuth()
 const { getPublicProviders, initiateLogin } = useOidc()
-const { setupStatusError } = useSetupStatus()
+const { allowRegistration, setupStatusError } = useSetupStatus()
+
+const route = useRoute()
+const justRegistered = computed(() => route.query.registered === '1')
 
 const username = ref('')
 const password = ref('')
@@ -63,6 +67,11 @@ const oidcLoadingSlug = ref<string | null>(null)
 
 function resolveLoginError(err: unknown): string {
   if (!(err instanceof Error)) return t('auth.login.errors.invalidCredentials')
+
+  if (err instanceof LoginError && err.errorCode === LoginErrorCode.ACCOUNT_LOCKED) {
+    const minutes = Math.max(1, Math.ceil((err.retryAfterSeconds ?? 0) / 60))
+    return t('auth.login.errors.accountLocked', { minutes })
+  }
 
   const normalizedMessage = err.message.trim().toLowerCase()
   if (normalizedMessage.includes('too many requests')) {
@@ -198,6 +207,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
                     <TooltipTrigger as-child>
                       <button
                         class="w-4 h-4 rounded-full transition-all hover:scale-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card shrink-0"
+                        :class="opt.swatchClass"
                         :aria-label="t(opt.labelKey)"
                         :style="{
                           backgroundColor: opt.color,
@@ -220,7 +230,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         <Tooltip>
           <TooltipTrigger as-child>
             <button class="theme-btn" @click="openAccent()">
-              <span class="w-3.5 h-3.5 rounded-full block" :style="{ backgroundColor: currentAccent?.color }" />
+              <span class="w-3.5 h-3.5 rounded-full block" :class="currentAccent?.swatchClass" :style="{ backgroundColor: currentAccent?.color }" />
             </button>
           </TooltipTrigger>
           <TooltipContent>{{ t('auth.themePicker.changeAccent') }}</TooltipContent>
@@ -235,6 +245,10 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
       <div class="text-center mb-8 animate-fade-up">
         <h1 class="text-2xl font-serif font-semibold text-foreground">Book<span class="text-primary"> Orbit</span></h1>
         <p class="text-sm text-muted-foreground mt-1">{{ t('auth.login.subtitle') }}</p>
+      </div>
+
+      <div v-if="justRegistered" role="status" class="mb-4 rounded-md border border-primary/30 bg-primary/10 px-3 py-2.5 text-sm text-foreground">
+        {{ t('auth.login.registeredNotice') }}
       </div>
 
       <form @submit.prevent="handleSubmit" class="space-y-4">
@@ -262,7 +276,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
           />
         </div>
 
-        <div v-if="error" class="text-sm text-destructive animate-shake">{{ error }}</div>
+        <div v-if="error" role="alert" class="text-sm text-destructive animate-shake">{{ error }}</div>
         <div v-if="setupStatusError" class="text-sm text-destructive animate-shake">{{ setupStatusError }}</div>
 
         <button
@@ -299,6 +313,11 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
 
       <p class="mt-6 text-center text-sm text-muted-foreground">
         <RouterLink to="/forgot-password" class="text-primary hover:underline">{{ t('auth.login.forgotPassword') }}</RouterLink>
+      </p>
+
+      <p v-if="allowRegistration" class="mt-2 text-center text-sm text-muted-foreground">
+        {{ t('auth.login.noAccount') }}
+        <RouterLink to="/register" class="text-primary hover:underline">{{ t('auth.login.signUp') }}</RouterLink>
       </p>
     </div>
   </div>

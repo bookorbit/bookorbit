@@ -10,7 +10,7 @@ import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover
 import { isBookPlaceholder, type BookSlot } from '../composables/useBookWindow'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 
 const props = withDefaults(
   defineProps<{
@@ -24,6 +24,7 @@ const props = withDefaults(
     squareCoverScale?: number
     railGutter?: boolean
     railGutterKind?: JumpBucketKind | null
+    allowMoveToLibrary?: boolean
   }>(),
   {
     selectionMode: false,
@@ -284,6 +285,7 @@ defineExpose({ scrollToIndex })
           :cover-aspect-ratio="staticCoverAspectRatio(book)"
           :selection-mode="selectionMode"
           :selected="isSelected?.(book.id) ?? false"
+          :allow-move-to-library="allowMoveToLibrary"
           @action="emit('action', book, $event)"
           @select="emit('select', book.id, $event)"
           @update:book="emit('update:book', $event)"
@@ -291,7 +293,7 @@ defineExpose({ scrollToIndex })
       </div>
     </div>
 
-    <div v-else-if="!virtualized" class="grid w-full max-w-full items-start" :style="staticGridStyle" data-testid="book-grid-static">
+    <div v-else-if="!virtualized" class="grid w-full max-w-full items-end" :style="staticGridStyle" data-testid="book-grid-static">
       <div v-for="book in staticBooks" :key="book.id" class="min-w-0" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
         <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
         <BookCoverCard
@@ -300,6 +302,7 @@ defineExpose({ scrollToIndex })
           :show-label="showLabel"
           :selection-mode="selectionMode"
           :selected="isSelected?.(book.id) ?? false"
+          :allow-move-to-library="allowMoveToLibrary"
           @action="emit('action', book, $event)"
           @select="emit('select', book.id, $event)"
           @update:book="emit('update:book', $event)"
@@ -332,6 +335,7 @@ defineExpose({ scrollToIndex })
             :show-label="showLabel"
             :selection-mode="selectionMode"
             :selected="isSelected?.(item.id) ?? false"
+            :allow-move-to-library="allowMoveToLibrary"
             @action="emit('action', asBook(item), $event)"
             @select="emit('select', item.id, $event)"
             @update:book="emit('update:book', $event)"
@@ -363,7 +367,9 @@ defineExpose({ scrollToIndex })
 }
 
 .book-grid-cell {
-  height: calc(var(--book-grid-height) + var(--book-grid-label-height, 0px));
+  display: grid;
+  align-items: end;
+  height: calc(var(--book-grid-height) + var(--book-grid-label-height, 0px) + var(--book-grid-gap));
   box-sizing: border-box;
   padding-left: 0;
   padding-right: var(--book-grid-gap);

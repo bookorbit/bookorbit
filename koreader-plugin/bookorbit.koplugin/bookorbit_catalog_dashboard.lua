@@ -350,43 +350,60 @@ function CatalogDashboard.dashboardBooks(dashboard)
     return books
 end
 
-function CatalogDashboard:dashboardActionEntries(total_books)
+-- Badges come from the server alongside the rest of the dashboard, so a server
+-- too old to send them just leaves the tiles unbadged. Not on device is the one
+-- tile that never carries a count: learning it would cost the whole-library walk
+-- the tile exists to avoid.
+function CatalogDashboard:dashboardActionEntries(total_books, browse_counts)
+    local counts = type(browse_counts) == "table" and browse_counts or {}
+    local badge = CatalogUtil.formatCount
+
     return {
         {
             text = _("In progress"),
             icon = "dogear.reading",
             icon_file = CatalogWidgets.assetIconFile("in_progress"),
+            mandatory = badge(counts.inProgress),
             kind = "books",
             params = { sort = "recently_read", readStatus = "reading" },
         },
         {
             text = _("On device"),
             icon = "appbar.filebrowser",
-            mandatory = tostring(self:onDeviceCount()),
+            mandatory = badge(self:onDeviceCount()),
             kind = "on-device",
+        },
+        {
+            text = _("Not on device"),
+            icon = "appbar.filebrowser",
+            icon_file = CatalogWidgets.assetIconFile("download"),
+            kind = "not-on-device",
         },
         {
             text = _("Libraries"),
             icon = "column.two",
+            mandatory = badge(counts.libraries),
             kind = "section",
             section = "libraries",
         },
         {
             text = _("All Books"),
             icon = "appbar.pageview",
-            mandatory = total_books and tostring(total_books) or nil,
+            mandatory = badge(total_books),
             kind = "books",
             params = { sort = "title" },
         },
         {
             text = _("Authors"),
             icon = "bookmark",
+            mandatory = badge(counts.authors),
             kind = "section",
             section = "authors",
         },
         {
             text = _("Series"),
             icon = "book.opened",
+            mandatory = badge(counts.series),
             kind = "section",
             section = "series",
         },
@@ -394,19 +411,16 @@ function CatalogDashboard:dashboardActionEntries(total_books)
             text = _("Collections"),
             icon = "texture-box",
             icon_file = CatalogWidgets.assetIconFile("collections"),
+            mandatory = badge(counts.collections),
             kind = "section",
             section = "collections",
         },
         {
             text = _("SmartScopes"),
             icon = "cre.render.working",
+            mandatory = badge(counts.smartScopes),
             kind = "section",
             section = "smart-scopes",
-        },
-        {
-            text = _("Search"),
-            icon = "appbar.search",
-            kind = "dashboard-search",
         },
     }
 end
@@ -933,7 +947,7 @@ function CatalogDashboard:updateDashboardItems(select_number, no_recalculate_dim
     local context = self.current_context or {}
     local dashboard = context.dashboard or {}
     local continue_books = dashboard.continueReading or {}
-    local action_entries = self:dashboardActionEntries(tonumber(dashboard.totalBooks or dashboard.bookCount))
+    local action_entries = self:dashboardActionEntries(tonumber(dashboard.totalBooks or dashboard.bookCount), dashboard.browseCounts)
     local summary = self:dashboardStatsSummary() or { today_seconds = 0, week_seconds = 0, streak_days = 0 }
     local stale_sections = type(context.section_stale) == "table" and context.section_stale or {}
     local highlight = type(dashboard.highlightOfTheDay) == "table" and dashboard.highlightOfTheDay or nil

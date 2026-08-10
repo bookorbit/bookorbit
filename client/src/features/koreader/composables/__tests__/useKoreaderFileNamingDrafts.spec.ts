@@ -10,6 +10,7 @@ function device(overrides: Partial<KoreaderDeviceSweepInfo> = {}): KoreaderDevic
     pluginVersion: null,
     latestPluginVersion: null,
     updateAvailable: null,
+    requiresManualUpdate: false,
     lastSweepAt: '2026-07-01T00:00:00.000Z',
     lastSweepBooksMatched: 0,
     lastSweepPageStats: 0,

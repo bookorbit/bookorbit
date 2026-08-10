@@ -18,6 +18,9 @@ describe('useReaderState', () => {
     expect(state.gap.value).toBe(0.5)
     expect(state.maxInlineSize.value).toBe(400)
     expect(state.maxBlockSize.value).toBe(2400)
+
+    state.setFontSize(1)
+    expect(state.fontSize.value).toBe(6)
   })
 
   it('selects default theme when unknown theme name is set', () => {

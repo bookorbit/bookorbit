@@ -2,7 +2,7 @@
 import { computed, inject, ref } from 'vue'
 import type { MetadataCandidate, MetadataProviderInfo } from '@bookorbit/types'
 import { Star } from '@lucide/vue'
-import { getProviderLabel, hideOnError, providerBadgeStyle, toDisplayCoverUrl } from '../../../lib/metadata-fetch'
+import { getProviderLabel, hideOnError, providerBadgeStyle, resolveCandidateDisplayTitle, toDisplayCoverUrl } from '../../../lib/metadata-fetch'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 import { formatCommunityRatingValue } from '../../../lib/community-rating'
 import { displayPublishedDate } from '../../../lib/published-date'
@@ -19,7 +19,8 @@ const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT
 
 const providerLabel = computed(() => getProviderLabel(props.candidate.provider, props.providers))
 const displayCoverUrl = computed(() => toDisplayCoverUrl(props.candidate.coverUrl))
-const candidateSeed = computed(() => props.candidate.title ?? props.candidate.provider)
+const displayTitle = computed(() => resolveCandidateDisplayTitle(props.candidate))
+const candidateSeed = computed(() => displayTitle.value ?? props.candidate.provider)
 const candidateAuthorLine = computed(() => props.candidate.authors?.join(', ') || null)
 const communityRatingDisplay = computed(() => formatCommunityRatingValue(props.candidate.communityRating, props.candidate.communityRatingCount))
 const publishedDisplay = computed(() => displayPublishedDate(props.candidate.publishedDate, props.candidate.publishedYear))
@@ -39,7 +40,7 @@ function handleSelect() {
       <img
         v-if="displayCoverUrl"
         :src="displayCoverUrl"
-        :alt="candidate.title"
+        alt=""
         class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
         @error="hideOnError"
       />
@@ -48,7 +49,7 @@ function handleSelect() {
 
     <!-- Info -->
     <span class="flex-1 min-w-0 flex flex-col justify-center gap-1.5 py-0.5">
-      <span class="text-sm font-semibold leading-snug line-clamp-2 text-foreground">{{ candidate.title }}</span>
+      <span class="text-sm font-semibold leading-snug line-clamp-2 text-foreground">{{ displayTitle }}</span>
       <span v-if="candidate.authors?.length" class="text-xs text-muted-foreground line-clamp-1 block leading-tight">
         {{ candidate.authors.join(', ') }}
       </span>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Settings2, Sparkles } from '@lucide/vue'
+import { AlertTriangle, Loader2, RefreshCw, Settings2, Sparkles } from '@lucide/vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { useAuth } from '@/features/auth/composables/useAuth'
@@ -12,7 +12,7 @@ import DashboardScroller from '@/features/dashboard/components/DashboardScroller
 import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
 import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.vue'
 import DashboardWidgetRow from '@/features/dashboard/components/DashboardWidgetRow.vue'
-import { useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
+import { SHELF_LAYOUT, useDashboardConfig } from '@/features/dashboard/composables/useDashboardConfig'
 import { useDashboardLabels } from '@/features/dashboard/composables/useDashboardLabels'
 import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
@@ -20,8 +20,8 @@ import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScope
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const { user } = useAuth()
-const { libraries, loading: librariesLoading, fetchLibraries } = useLibraries()
-const { scrollers, pruneDeletedSmartScopeScrollers } = useDashboardConfig()
+const { libraries, loading: librariesLoading, loaded: librariesLoaded, error: librariesError, fetchLibraries } = useLibraries()
+const { scrollers, shelfLayout, pruneDeletedSmartScopeScrollers } = useDashboardConfig()
 const { shelfTitle } = useDashboardLabels()
 const { maybeStartTour } = useOnboardingTour()
 const { smartScopes, loaded: smartScopesLoaded, fetchSmartScopes } = useSmartScopes()
@@ -34,7 +34,15 @@ const enabledScrollers = computed(() =>
   (Array.isArray(scrollers.value) ? scrollers.value : []).filter((s) => s.enabled).sort((a, b) => a.order - b.order),
 )
 
-const hasNoLibraries = computed(() => !librariesLoading.value && libraries.value.length === 0)
+const shelfLayoutClass = computed(() =>
+  shelfLayout.value === SHELF_LAYOUT.TWO_COLUMNS ? 'grid min-w-0 items-start gap-5 xl:grid-cols-2' : 'space-y-5',
+)
+
+const libraryState = computed(() => {
+  if (librariesLoaded.value) return libraries.value.length === 0 ? 'empty' : 'ready'
+  if (librariesError.value) return 'error'
+  return 'loading'
+})
 const greetingText = computed(() => t(`views.dashboard.greeting.${getDashboardGreetingLabel(now.value, user.value?.settings?.timezone)}`))
 const greetingName = computed(() => {
   const fullName = user.value?.name?.trim()
@@ -51,9 +59,13 @@ watch(
   { immediate: true },
 )
 
+function handleRetryLibraries() {
+  void fetchLibraries()
+}
+
 onMounted(() => {
-  fetchLibraries()
-  fetchSmartScopes()
+  void fetchLibraries()
+  void fetchSmartScopes()
   greetingTimer = window.setInterval(() => {
     now.value = new Date()
   }, 60_000)
@@ -95,7 +107,29 @@ onUnmounted(() => {
 
       <!-- Scrollers / Welcome -->
       <div class="space-y-5 pb-8 pt-4 sm:pr-2">
-        <DashboardWelcome v-if="hasNoLibraries" :can-create="hasPermission('manage_libraries')" />
+        <div v-if="libraryState === 'loading'" role="status" class="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+          <Loader2 :size="18" class="animate-spin" aria-hidden="true" />
+          <span>{{ t('common.loading') }}</span>
+        </div>
+        <div
+          v-else-if="libraryState === 'error'"
+          role="alert"
+          class="mx-auto flex max-w-md flex-col items-center rounded-2xl border border-destructive/30 bg-card/30 px-8 py-12 text-center shadow-sm"
+        >
+          <AlertTriangle :size="28" class="mb-4 text-destructive" aria-hidden="true" />
+          <h2 class="text-lg font-semibold text-foreground">{{ t('dashboard.libraryLoad.errorTitle') }}</h2>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ t('dashboard.libraryLoad.errorDescription') }}</p>
+          <button
+            type="button"
+            class="mt-6 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="librariesLoading"
+            @click="handleRetryLibraries"
+          >
+            <RefreshCw :size="15" aria-hidden="true" />
+            {{ t('common.retry') }}
+          </button>
+        </div>
+        <DashboardWelcome v-else-if="libraryState === 'empty'" :can-create="hasPermission('manage_libraries')" />
         <template v-else>
           <div class="animate-fade-up flex items-center gap-2 px-1" style="animation-delay: 40ms">
             <Sparkles :size="16" class="shrink-0 text-primary" />
@@ -106,16 +140,18 @@ onUnmounted(() => {
           </div>
 
           <DashboardWidgetRow class="animate-fade-up" />
-          <DashboardScroller
-            v-for="(scroller, index) in enabledScrollers"
-            :key="`${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}`"
-            :type="scroller.type"
-            :title="shelfTitle(scroller)"
-            :limit="scroller.limit"
-            :smartScope-id="scroller.smartScopeId"
-            class="animate-fade-up"
-            :style="{ animationDelay: `${index * 100}ms` }"
-          />
+          <div v-if="enabledScrollers.length > 0" :class="shelfLayoutClass">
+            <DashboardScroller
+              v-for="(scroller, index) in enabledScrollers"
+              :key="`${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}`"
+              :type="scroller.type"
+              :title="shelfTitle(scroller)"
+              :limit="scroller.limit"
+              :smartScope-id="scroller.smartScopeId"
+              class="min-w-0 animate-fade-up"
+              :style="{ animationDelay: `${index * 100}ms` }"
+            />
+          </div>
           <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
             <p class="text-sm text-muted-foreground">{{ t('views.dashboard.allShelvesHidden') }}</p>
             <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">{{ t('views.dashboard.customize') }}</button>

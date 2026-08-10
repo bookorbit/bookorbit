@@ -1,13 +1,14 @@
 import { ref } from 'vue'
-import { io, Socket } from 'socket.io-client'
+import { Socket } from 'socket.io-client'
 import type { AuthorEnrichmentStatusEvent } from '@bookorbit/types'
-import { getAccessToken } from '@/lib/api'
+import { createAuthenticatedSocket } from '@/lib/socket'
 
 const status = ref<AuthorEnrichmentStatusEvent>({
   queued: 0,
   processing: 0,
   rateLimited: 0,
   failed: 0,
+  latestFailureAt: null,
   done: 0,
   total: 0,
   paused: false,
@@ -21,9 +22,7 @@ let socket: Socket | null = null
 
 function getSocket(): Socket {
   if (!socket) {
-    socket = io('/authors-enrichment', {
-      auth: (cb: (data: object) => void) => cb({ token: getAccessToken() }),
-      transports: ['websocket'],
+    socket = createAuthenticatedSocket('/authors-enrichment', {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,
@@ -62,6 +61,7 @@ export function disconnectAuthorEnrichmentSocket() {
     processing: 0,
     rateLimited: 0,
     failed: 0,
+    latestFailureAt: null,
     done: 0,
     total: 0,
     paused: false,

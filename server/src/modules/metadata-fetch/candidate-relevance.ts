@@ -25,7 +25,10 @@ export function filterAndRank(candidates: MetadataCandidate[], params: MetadataS
   }
 
   return candidates
-    .filter((c) => !c.title || !SKIP_TITLE_PATTERNS.some((pattern) => pattern.test(c.title)))
+    .filter((c) => {
+      const matchable = matchableTitle(c);
+      return !matchable || !SKIP_TITLE_PATTERNS.some((pattern) => pattern.test(matchable));
+    })
     .map((c) => ({ candidate: c, score: scoreCandidate(c, params) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)
@@ -41,8 +44,9 @@ function scoreCandidate(candidate: MetadataCandidate, params: MetadataSearchPara
 
   let score = 0;
 
-  if (params.title && candidate.title) {
-    score += scoreTitle(normalize(params.title), normalize(candidate.title));
+  const matchable = matchableTitle(candidate);
+  if (params.title && matchable) {
+    score += scoreTitle(normalize(params.title), normalize(matchable));
   }
 
   // Author only boosts when there is already a positive title signal.
@@ -52,6 +56,15 @@ function scoreCandidate(candidate: MetadataCandidate, params: MetadataSearchPara
   }
 
   return score;
+}
+
+/**
+ * The string a candidate should be matched against. `displayTitle` carries the provider's own
+ * disambiguating label (ComicVine's "<volume> #<issue> - <name>"), which is what a user's query
+ * is shaped like; `title` alone can be just an issue name, or absent entirely.
+ */
+function matchableTitle(candidate: MetadataCandidate): string | undefined {
+  return candidate.displayTitle ?? candidate.title;
 }
 
 function scoreTitle(query: string, candidate: string): number {

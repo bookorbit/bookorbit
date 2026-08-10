@@ -34,7 +34,6 @@ import { BookDockService } from './book-dock.service';
 import { BookDockIngestService } from './book-dock-ingest.service';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
 import { BookDockWatcherService } from './book-dock-watcher.service';
-import { BookDockRepository } from './book-dock.repository';
 import { ListBookDockFilesDto } from './dto/list-book-dock-files.dto';
 import {
   UpdateBookDockFileDto,
@@ -57,7 +56,6 @@ export class BookDockController {
     private readonly ingestService: BookDockIngestService,
     private readonly finalizeService: BookDockFinalizeService,
     private readonly watcherService: BookDockWatcherService,
-    private readonly repo: BookDockRepository,
     private readonly appSettings: AppSettingsService,
   ) {}
 
@@ -71,22 +69,24 @@ export class BookDockController {
       order: query.order ?? 'desc',
       search: query.search,
       userId: user.id,
-      isSuperuser: user.isSuperuser,
+      canManageAll: this.canManageAll(user),
     });
   }
 
   @Get('summary')
   getSummary(@CurrentUser() user: RequestUser) {
-    return this.service.getSummary(user.id, user.isSuperuser);
+    return this.service.getSummary(user.id, this.canManageAll(user));
   }
 
   @Post('pause')
+  @RequirePermission(Permission.ManageBookDock)
   @HttpCode(HttpStatus.OK)
   pause() {
     return this.service.pauseProcessing();
   }
 
   @Post('resume')
+  @RequirePermission(Permission.ManageBookDock)
   @HttpCode(HttpStatus.OK)
   resume() {
     return this.service.resumeProcessing();
@@ -94,26 +94,25 @@ export class BookDockController {
 
   @Get('statistics')
   getStatistics(@CurrentUser() user: RequestUser) {
-    return this.service.getStatistics(user.id, user.isSuperuser);
+    return this.service.getStatistics(user.id, this.canManageAll(user));
   }
 
   @Get('files/:id')
-  getFile(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getFile(id);
+  getFile(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
+    return this.service.getFile(id, user.id, this.canManageAll(user));
   }
 
   @Get('files/:id/cover')
-  async getCover(@Param('id', ParseIntPipe) id: number, @Res() reply: FastifyReply) {
-    const row = await this.repo.findById(id);
-    if (!row?.coverPath) throw new NotFoundException('No cover available');
+  async getCover(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Res() reply: FastifyReply) {
+    const coverPath = await this.service.getCoverPath(id, user.id, this.canManageAll(user));
 
-    const exists = await access(row.coverPath)
+    const exists = await access(coverPath)
       .then(() => true)
       .catch(() => false);
     if (!exists) throw new NotFoundException('Cover file not found on disk');
 
-    const stream = createReadStream(row.coverPath);
-    const contentType = imageContentTypeFromPath(row.coverPath);
+    const stream = createReadStream(coverPath);
+    const contentType = imageContentTypeFromPath(coverPath);
     reply.header('Content-Type', contentType);
     reply.header('Cache-Control', 'private, max-age=3600');
     return reply.send(stream);
@@ -127,34 +126,34 @@ export class BookDockController {
     if (!data) throw new BadRequestException('No file provided');
 
     const fileId = await this.ingestService.ingestUpload(data.filename, data.file as unknown as Readable, user.id);
-    return this.service.getFile(fileId);
+    return this.service.getFile(fileId, user.id, this.canManageAll(user));
   }
 
   @Patch('files/:id')
-  updateFile(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookDockFileDto) {
-    return this.service.updateFile(id, dto);
+  updateFile(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBookDockFileDto) {
+    return this.service.updateFile(id, dto, user.id, this.canManageAll(user));
   }
 
   @Delete('files/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  discardFile(@Param('id', ParseIntPipe) id: number) {
-    return this.service.discardFile(id);
+  discardFile(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
+    return this.service.discardFile(id, user.id, this.canManageAll(user));
   }
 
   @Post('files/discard')
   @HttpCode(HttpStatus.NO_CONTENT)
   bulkDiscard(@CurrentUser() user: RequestUser, @Body() dto: BulkDiscardDto) {
-    return this.service.bulkDiscard(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
+    return this.service.bulkDiscard(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, this.canManageAll(user));
   }
 
   @Post('files/apply-fetched')
   applyFetched(@CurrentUser() user: RequestUser, @Body() dto: BulkApplyFetchedDto) {
-    return this.service.bulkApplyFetched(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
+    return this.service.bulkApplyFetched(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, this.canManageAll(user));
   }
 
   @Post('files/retry-fetch')
   retryFetch(@CurrentUser() user: RequestUser, @Body() dto: BulkRetryFetchDto) {
-    return this.service.bulkRetryFetch(dto.fileIds, dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
+    return this.service.bulkRetryFetch(dto.fileIds, dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, this.canManageAll(user));
   }
 
   @Post('files/set-target')
@@ -168,13 +167,13 @@ export class BookDockController {
       dto.status,
       dto.search,
       user.id,
-      user.isSuperuser,
+      this.canManageAll(user),
     );
   }
 
   @Post('files/selection-summary')
   selectionSummary(@CurrentUser() user: RequestUser, @Body() dto: SelectionSummaryDto) {
-    return this.service.selectionSummary(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, user.isSuperuser);
+    return this.service.selectionSummary(dto.fileIds ?? [], dto.selectAll, dto.excludedIds, dto.status, dto.search, user.id, this.canManageAll(user));
   }
 
   @Post('files/bulk-edit')
@@ -190,7 +189,7 @@ export class BookDockController {
       dto.status,
       dto.search,
       user.id,
-      user.isSuperuser,
+      this.canManageAll(user),
     );
   }
 
@@ -202,18 +201,20 @@ export class BookDockController {
       dto.excludedIds,
       dto.defaultLibraryId,
       user.id,
-      user.isSuperuser,
+      this.canManageAll(user),
       dto.status,
       dto.search,
     );
   }
 
   @Post('finalize/preview')
+  @RequirePermission(Permission.BookDockAccess, Permission.LibraryUpload)
   @HttpCode(HttpStatus.OK)
   previewFinalize(@CurrentUser() user: RequestUser, @Body() dto: FinalizeBookDockDto) {
     return this.finalizeService.previewFinalize(
       user.id,
       user.isSuperuser,
+      this.canManageAll(user),
       dto.fileIds,
       dto.selectAll,
       dto.excludedIds,
@@ -226,11 +227,13 @@ export class BookDockController {
   }
 
   @Post('finalize/discard-duplicates')
+  @RequirePermission(Permission.BookDockAccess, Permission.LibraryUpload)
   @HttpCode(HttpStatus.OK)
   discardFinalizeDuplicates(@CurrentUser() user: RequestUser, @Body() dto: FinalizeBookDockDto) {
     return this.finalizeService.discardDuplicateCandidates(
       user.id,
       user.isSuperuser,
+      this.canManageAll(user),
       dto.fileIds,
       dto.selectAll,
       dto.excludedIds,
@@ -243,6 +246,7 @@ export class BookDockController {
   }
 
   @Post('finalize')
+  @RequirePermission(Permission.BookDockAccess, Permission.LibraryUpload)
   @Auditable({
     action: AuditAction.BookDockFinalize,
     resource: AuditResource.BookDockFile,
@@ -258,6 +262,7 @@ export class BookDockController {
     return this.finalizeService.finalize(
       user.id,
       isSuperuser,
+      this.canManageAll(user),
       dto.fileIds,
       dto.selectAll,
       dto.excludedIds,
@@ -270,8 +275,13 @@ export class BookDockController {
   }
 
   @Post('rescan')
+  @RequirePermission(Permission.ManageBookDock)
   @HttpCode(HttpStatus.NO_CONTENT)
   rescan() {
     return this.watcherService.rescan();
+  }
+
+  private canManageAll(user: RequestUser): boolean {
+    return user.isSuperuser || user.permissions.includes(Permission.ManageBookDock);
   }
 }

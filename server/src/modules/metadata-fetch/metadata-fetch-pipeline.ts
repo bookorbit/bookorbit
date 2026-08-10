@@ -17,6 +17,7 @@ import { firstValueFrom, toArray } from 'rxjs';
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
+import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { createGenreBlocklistTokenSet, filterGenresAgainstBlocklist } from '../../common/utils/genre-blocklist.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { MetadataFetchService } from './metadata-fetch.service';
@@ -80,6 +81,7 @@ export class MetadataFetchPipeline {
     private readonly registry: ProviderRegistry,
     private readonly throttleTracker: ProviderThrottleTracker,
     private readonly providerConfig: ProviderConfigService,
+    private readonly seriesExpectedCount: SeriesExpectedCountService,
   ) {}
 
   async run(
@@ -132,6 +134,12 @@ export class MetadataFetchPipeline {
           defaultValue: [] as MetadataCandidate[],
         })
       : [];
+
+    // The service already swallows its own failures; this guards the invariant at the boundary so
+    // that a future change there can never turn a series total into a failed metadata refresh.
+    await this.seriesExpectedCount.recordFromCandidates(candidates).catch((err: Error) => {
+      this.logger.warn(`[metadata.seriesTotals] [fail] errorClass=${err.name} - series totals not recorded; resolution continues`);
+    });
 
     const byProvider = new Map<string, MetadataCandidate>();
     for (const c of candidates) {

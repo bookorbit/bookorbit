@@ -1,3 +1,5 @@
+import type { BookCard } from "./book";
+
 export const SCROLLER_TYPE = {
   RECENTLY_ADDED: "recently-added",
   CONTINUE_READING: "continue-reading",
@@ -11,6 +13,28 @@ export const SCROLLER_TYPE = {
 export type ScrollerType = (typeof SCROLLER_TYPE)[keyof typeof SCROLLER_TYPE];
 export const SCROLLER_TYPES = Object.values(SCROLLER_TYPE) as ReadonlyArray<ScrollerType>;
 
+export const DASHBOARD_SCROLLER_BATCH_MAX = 8;
+
+export interface DashboardScrollerBatchItem {
+  id: string;
+  type: ScrollerType;
+  limit: number;
+  smartScopeId?: number;
+}
+
+export interface DashboardScrollerBatchRequest {
+  items: DashboardScrollerBatchItem[];
+}
+
+export interface DashboardScrollerBatchResult {
+  id: string;
+  books: BookCard[];
+  failed: boolean;
+}
+
+export interface DashboardScrollerBatchResponse {
+  items: DashboardScrollerBatchResult[];
+}
 export interface ScrollerConfig {
   id: string;
   type: ScrollerType;

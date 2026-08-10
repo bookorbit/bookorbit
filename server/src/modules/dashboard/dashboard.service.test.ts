@@ -42,6 +42,7 @@ function makeService() {
   };
   const smartScopeService = {
     executeSmartScope: vi.fn(),
+    executeSmartScopeBookIds: vi.fn(),
   };
 
   const service = new DashboardService(dashboardRepo as never, bookReadService as never, libraryService as never, smartScopeService as never);
@@ -226,5 +227,70 @@ describe('DashboardService', () => {
     expect(dashboardRepo.findRandomBookIds).toHaveBeenCalledWith([901], 3, 20, EMPTY_CONTENT_FILTER_RULES);
     expect(result).toEqual([]);
     expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
+  });
+
+  it('batches shelf selection and hydrates overlapping books once', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService } = makeService();
+    const user = makeUser({ id: 8 });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([10]);
+    dashboardRepo.findRecentlyAddedBookIds.mockResolvedValue([9, 3]);
+    dashboardRepo.findWantToReadBookIds.mockResolvedValue([3, 7]);
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([3, 7, 9]));
+
+    const result = await service.getScrollers(
+      {
+        items: [
+          { id: 'recent', type: 'recently-added', limit: 20 },
+          { id: 'wanted', type: 'want-to-read', limit: 20 },
+        ],
+      },
+      user,
+    );
+
+    expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledOnce();
+    expect(bookReadService.findCardsByBookIds).toHaveBeenCalledExactlyOnceWith([9, 3, 7], 8);
+    expect(result.items.map((item) => ({ id: item.id, ids: item.books.map((book) => book.id), failed: item.failed }))).toEqual([
+      { id: 'recent', ids: [9, 3], failed: false },
+      { id: 'wanted', ids: [3, 7], failed: false },
+    ]);
+  });
+
+  it('keeps successful shelves when one batched selection fails', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService, smartScopeService } = makeService();
+    const user = makeUser({ id: 8 });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([10]);
+    dashboardRepo.findRecentlyAddedBookIds.mockResolvedValue([9]);
+    smartScopeService.executeSmartScopeBookIds.mockRejectedValue(new Error('scope unavailable'));
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([9]));
+
+    const result = await service.getScrollers(
+      {
+        items: [
+          { id: 'recent', type: 'recently-added', limit: 20 },
+          { id: 'scope', type: 'smart-scope', limit: 20, smartScopeId: 7 },
+        ],
+      },
+      user,
+    );
+
+    expect(result.items[0]).toMatchObject({ id: 'recent', failed: false });
+    expect(result.items[0]?.books.map((book) => book.id)).toEqual([9]);
+    expect(result.items[1]).toEqual({ id: 'scope', books: [], failed: true });
+  });
+
+  it('rejects duplicate batch item ids', async () => {
+    const { service } = makeService();
+
+    await expect(
+      service.getScrollers(
+        {
+          items: [
+            { id: 'same', type: 'recently-added', limit: 20 },
+            { id: 'same', type: 'random', limit: 20 },
+          ],
+        },
+        makeUser(),
+      ),
+    ).rejects.toThrow(BadRequestException);
   });
 });

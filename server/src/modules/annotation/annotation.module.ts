@@ -13,6 +13,7 @@ import { AnnotationRepository } from './annotation.repository';
 import { AnnotationService } from './annotation.service';
 import { AnnotationSyncRepository } from './annotation-sync.repository';
 import { AnnotationSyncService } from './annotation-sync.service';
+import { DevicePositionRebuilderRegistry } from './device-position-rebuilder';
 
 @Module({
   imports: [BookModule, AchievementModule, PositionConverterModule],
@@ -26,7 +27,8 @@ import { AnnotationSyncService } from './annotation-sync.service';
     AnnotationConversionService,
     AnnotationExportService,
     AnnotationHubService,
+    DevicePositionRebuilderRegistry,
   ],
-  exports: [AnnotationSyncService, AnnotationHubService],
+  exports: [AnnotationSyncService, AnnotationHubService, DevicePositionRebuilderRegistry],
 })
 export class AnnotationModule {}

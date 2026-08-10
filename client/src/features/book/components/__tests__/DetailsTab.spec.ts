@@ -40,6 +40,7 @@ vi.mock('@/lib/api', () => ({
     ok: false,
     json: async () => ({}),
   })),
+  setOnAuthFailure: vi.fn<(callback: () => void) => void>(),
 }))
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg', bumpVersion: vi.fn<(...args: unknown[]) => void>() }),
@@ -69,6 +70,7 @@ const globalStubs = {
     DialogContent: { template: '<div><slot /></div>' },
     DialogClose: { template: '<button><slot /></button>' },
     AddToCollectionSheet: true,
+    MoveToLibrarySheet: true,
     DeleteBookDialog: true,
     ResetReadingStateDialog: true,
   },

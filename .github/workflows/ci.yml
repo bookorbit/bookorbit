@@ -190,6 +190,25 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           pnpm-version: ${{ env.PNPM_VERSION }}
 
+      - name: Enforce localization change policy
+        shell: bash
+        env:
+          IS_CROWDIN: ${{ steps.crowdin.outputs.is_crowdin }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          validator="$RUNNER_TEMP/validate-locale-pr.mjs"
+          if git cat-file -e "$PR_BASE_SHA:scripts/validate-locale-pr.mjs" 2>/dev/null; then
+            git show "$PR_BASE_SHA:scripts/validate-locale-pr.mjs" > "$validator"
+          else
+            git show "$PR_HEAD_SHA:scripts/validate-locale-pr.mjs" > "$validator"
+          fi
+          node "$validator" "$PR_BASE_SHA" "$PR_HEAD_SHA" "$IS_CROWDIN"
+
+      - name: Test PR policy scripts
+        run: node --test scripts/validate-locale-pr.test.mjs
+
       - name: Lint PR title
         shell: bash
         env:
@@ -242,6 +261,9 @@ jobs:
           filters: |
             server:
               - 'server/**'
+              # Server tests assert against the plugin sources, so plugin-only
+              # changes can break them.
+              - 'koreader-plugin/**'
               - 'packages/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -256,6 +278,7 @@ jobs:
               - 'pnpm-workspace.yaml'
               - '.github/actions/setup-node-pnpm/action.yml'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/crowdin-translations.yml'
 
       - name: Print change scope
         shell: bash
@@ -696,7 +719,7 @@ jobs:
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4.5.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.repository_owner }}

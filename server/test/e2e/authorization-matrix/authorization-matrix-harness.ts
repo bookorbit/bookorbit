@@ -82,6 +82,7 @@ export interface CreateBookDockRowInput {
   confidence?: number | null;
   errorMessage?: string | null;
   metadataEditedAt?: Date | null;
+  uploadedBy?: number | null;
 }
 
 export interface CreateReadingSessionInput {
@@ -347,6 +348,7 @@ export async function createBookDockRow(
       confidence: input.confidence ?? null,
       errorMessage: input.errorMessage ?? null,
       metadataEditedAt: input.metadataEditedAt ?? null,
+      uploadedBy: input.uploadedBy ?? null,
     })
     .returning();
 

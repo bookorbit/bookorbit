@@ -98,6 +98,10 @@ const routeInventory = loadRouteInventory();
 
 const supportedMethods = new Set<SupportedHttpMethod>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
+function isSupportedMethod(method: string): method is SupportedHttpMethod {
+  return supportedMethods.has(method as SupportedHttpMethod);
+}
+
 function loadRouteInventory(): RouteInventory {
   const inventoryDir = join(currentDir, 'e2e/authorization-matrix/route-inventory');
   const manifest = JSON.parse(readFileSync(join(inventoryDir, 'manifest.json'), 'utf8')) as RouteInventoryManifest;
@@ -111,6 +115,36 @@ function loadRouteInventory(): RouteInventory {
     byLibraryAccess: manifest.byLibraryAccess,
     routes,
   };
+}
+
+function liveRouteLabels(app: NestFastifyApplication): string[] {
+  const allMethodPaths = new Set(routeInventory.routes.filter((route) => route.httpMethod === 'ALL').map((route) => route.path));
+  const labels = new Set<string>();
+  const printedRoutes = app.getHttpAdapter().getInstance().printRoutes({ commonPrefix: false });
+  const pathAtDepth: string[] = [];
+
+  // This test-only parser intentionally follows Fastify's printRoutes tree layout.
+  // A Fastify formatting change should fail parity and be updated here explicitly.
+  for (const line of printedRoutes.split('\n')) {
+    const match = line.match(/^((?:│ {3}| {4})*)[├└]── (.+?)(?: \(([^)]+)\))?$/);
+    if (!match) continue;
+    const [, indentation = '', pathPart, rawMethods] = match;
+    const depth = indentation.length / 4;
+    pathAtDepth.length = depth;
+    pathAtDepth.push(pathPart ?? '');
+    if (!rawMethods) continue;
+
+    const prefixedPath = pathAtDepth.join('');
+    if (!prefixedPath?.startsWith('/api/v1')) continue;
+    const path = prefixedPath.slice('/api/v1'.length) || '/';
+    if (allMethodPaths.has(path)) continue;
+
+    for (const method of rawMethods?.split(', ') ?? []) {
+      if (isSupportedMethod(method)) labels.add(`${method} ${path}`);
+    }
+  }
+
+  return [...labels].sort();
 }
 
 describe('Authorization matrix (e2e)', () => {
@@ -173,7 +207,7 @@ describe('Authorization matrix (e2e)', () => {
       koboActive: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboDisabled: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       koboRevoked: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
-      bookDockUser: await createUserAndLogin(ctx, { permissions: [Permission.BookDockAccess] }),
+      bookDockUser: await createUserAndLogin(ctx, { permissions: [Permission.BookDockAccess, Permission.LibraryUpload] }),
       uploadUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryUpload] }),
       ownerUser: await createUserAndLogin(ctx),
       otherUser: await createUserAndLogin(ctx),
@@ -440,6 +474,31 @@ describe('Authorization matrix (e2e)', () => {
   });
 
   describe('guard matrix - jwt/permission/library/default-password', () => {
+    it('keeps the dashboard scroller inventory in parity with the live application', () => {
+      expect(routeInventory.routes).toHaveLength(routeInventory.totalRoutes);
+      const inventoryLabels = routeInventory.routes
+        .filter((route) => isSupportedMethod(route.httpMethod) && route.path.startsWith('/dashboard/scrollers'))
+        .map(routeLabel)
+        .sort();
+      const liveLabels = liveRouteLabels(ctx.app).filter((label) => label.includes(' /dashboard/scrollers'));
+
+      expect(liveLabels).toEqual(inventoryLabels);
+    });
+
+    it('serves the authenticated random scroller through the batch route', async () => {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/dashboard/scrollers/batch',
+        headers: authHeader(personas.allPermsUser.accessToken),
+        payload: { items: [{ id: 'random', type: 'random', limit: 3 }] },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        items: [{ id: 'random', books: expect.any(Array), failed: false }],
+      });
+    });
+
     it('rejects unauthenticated access to every non-public route', async () => {
       const failures: MatrixFailure[] = [];
       const protectedRoutes = routeInventory.routes.filter((route) => !route.isPublic && isSupportedMethod(route.httpMethod));
@@ -569,6 +628,11 @@ describe('Authorization matrix (e2e)', () => {
         [Permission.ManageAppSettings]: {
           method: 'GET',
           path: '/app-settings',
+          token: 'allPerms',
+        },
+        [Permission.ManageBookDock]: {
+          method: 'POST',
+          path: '/book-dock/rescan',
           token: 'allPerms',
         },
         [Permission.ManageUsers]: {
@@ -1142,18 +1206,41 @@ describe('Authorization matrix (e2e)', () => {
   });
 
   describe('service authz - library scoped data and mixed batch semantics', () => {
+    it("prevents Book Dock users from reading or mutating another user's entries", async () => {
+      const foreignRow = await createBookDockRow(ctx, {
+        fileName: `authz-foreign-book-dock-${randomUUID()}.fb2`,
+        uploadedBy: personas.otherUser.userId,
+      });
+
+      for (const request of [
+        { method: 'GET' as const, payload: undefined },
+        { method: 'PATCH' as const, payload: { selectedMetadata: { title: 'Unauthorized edit' } } },
+        { method: 'DELETE' as const, payload: undefined },
+      ]) {
+        const response = await ctx.app.inject({
+          method: request.method,
+          url: `/api/v1/book-dock/files/${foreignRow.id}`,
+          headers: authHeader(personas.bookDockUser.accessToken),
+          payload: request.payload,
+        });
+        expectError(response, 403, 'You do not have access to this Book Dock file');
+      }
+    });
+
     it('returns mixed-result finalize envelope for Book Dock authorization failures', async () => {
       const accessibleRow = await createBookDockRow(ctx, {
         fileName: `authz-finalize-ok-${randomUUID()}.fb2`,
         targetLibraryId: libraryA.libraryId,
         targetFolderId: libraryA.libraryFolderId,
         status: 'ready',
+        uploadedBy: personas.bookDockUser.userId,
       });
       const inaccessibleRow = await createBookDockRow(ctx, {
         fileName: `authz-finalize-denied-${randomUUID()}.fb2`,
         targetLibraryId: libraryB.libraryId,
         targetFolderId: libraryB.libraryFolderId,
         status: 'ready',
+        uploadedBy: personas.bookDockUser.userId,
       });
 
       const response = await ctx.app.inject({
@@ -1297,10 +1384,6 @@ describe('Authorization matrix (e2e)', () => {
       expect([403, 404]).toContain(response.statusCode);
     });
   });
-
-  function isSupportedMethod(method: string): method is SupportedHttpMethod {
-    return supportedMethods.has(method as SupportedHttpMethod);
-  }
 
   function routeLabel(route: Pick<RouteInventoryRoute, 'httpMethod' | 'path'>): string {
     return `${route.httpMethod} ${route.path}`;

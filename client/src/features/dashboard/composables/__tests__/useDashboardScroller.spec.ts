@@ -32,6 +32,18 @@ function mockResponse(data: unknown, ok = true): Response {
   } as Response
 }
 
+function mockSuccessfulBatch(books: unknown[], failed = false): void {
+  mockApi.mockImplementation(async (_input, init) => {
+    const body = JSON.parse(String(init?.body)) as { items: Array<{ id: string }> }
+    return mockResponse({ items: body.items.map((item) => ({ id: item.id, books, failed })) })
+  })
+}
+
+function batchBody(): { items: Array<{ id: string; type: string; limit: number; smartScopeId?: number }> } {
+  const init = mockApi.mock.calls.at(-1)?.[1]
+  return JSON.parse(String(init?.body))
+}
+
 function mountComposable(type: ScrollerType, limit = 20, smartScopeId?: number) {
   let result!: ReturnType<typeof useDashboardScroller>
   mount(
@@ -56,41 +68,60 @@ describe('useDashboardScroller', () => {
   })
 
   it('loads books for up-next-in-series on mount', async () => {
-    mockApi.mockResolvedValue(mockResponse([{ id: 7 }, { id: 2 }]))
+    mockSuccessfulBatch([{ id: 7 }, { id: 2 }])
     const state = mountComposable('up-next-in-series', 12)
 
     expect(state.loading.value).toBe(true)
     await flushPromises()
 
-    expect(mockApi).toHaveBeenCalledWith('/api/v1/dashboard/scrollers/up-next-in-series?limit=12')
+    expect(mockApi).toHaveBeenCalledWith('/api/v1/dashboard/scrollers/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: expect.any(String),
+    })
+    expect(batchBody().items).toEqual([{ id: expect.any(String), type: 'up-next-in-series', limit: 12 }])
     expect(state.books.value).toEqual([{ id: 7 }, { id: 2 }])
     expect(state.error.value).toBe(false)
     expect(state.loading.value).toBe(false)
   })
 
   it('includes smartScopeId only for smart-scope requests', async () => {
-    mockApi.mockResolvedValue(mockResponse([]))
+    mockSuccessfulBatch([])
     mountComposable('smart-scope', 30, 99)
 
     await flushPromises()
 
-    expect(mockApi).toHaveBeenCalledWith('/api/v1/dashboard/scrollers/smart-scope?limit=30&smartScopeId=99')
+    expect(batchBody().items).toEqual([{ id: expect.any(String), type: 'smart-scope', limit: 30, smartScopeId: 99 }])
   })
 
   it.each([
-    ['continue-listening', '/api/v1/dashboard/scrollers/continue-listening?limit=8'],
-    ['want-to-read', '/api/v1/dashboard/scrollers/want-to-read?limit=9'],
-  ] as const)('loads books for %s on mount', async (type, expectedPath) => {
-    mockApi.mockResolvedValue(mockResponse([{ id: 1 }]))
+    ['continue-listening', 8],
+    ['want-to-read', 9],
+  ] as const)('loads books for %s on mount', async (type, limit) => {
+    mockSuccessfulBatch([{ id: 1 }])
 
-    mountComposable(type, type === 'continue-listening' ? 8 : 9)
+    mountComposable(type, limit)
     await flushPromises()
 
-    expect(mockApi).toHaveBeenCalledWith(expectedPath)
+    expect(batchBody().items[0]).toMatchObject({ type, limit })
+  })
+
+  it('consolidates shelves mounted in the same turn into one request', async () => {
+    mockSuccessfulBatch([{ id: 1 }])
+
+    mountComposable('recently-added', 20)
+    mountComposable('want-to-read', 10)
+    await flushPromises()
+
+    expect(mockApi).toHaveBeenCalledOnce()
+    expect(batchBody().items.map(({ type, limit }) => ({ type, limit }))).toEqual([
+      { type: 'recently-added', limit: 20 },
+      { type: 'want-to-read', limit: 10 },
+    ])
   })
 
   it('sets error=true when API response is not ok', async () => {
-    mockApi.mockResolvedValue(mockResponse([], false))
+    mockApi.mockResolvedValue(mockResponse({}, false))
     const state = mountComposable('continue-reading', 5)
 
     await flushPromises()
@@ -101,7 +132,10 @@ describe('useDashboardScroller', () => {
   })
 
   it('refresh retries after an error and updates books', async () => {
-    mockApi.mockResolvedValueOnce(mockResponse([], false)).mockResolvedValueOnce(mockResponse([{ id: 42 }], true))
+    mockApi.mockResolvedValueOnce(mockResponse({}, false)).mockImplementationOnce(async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { items: Array<{ id: string }> }
+      return mockResponse({ items: body.items.map((item) => ({ id: item.id, books: [{ id: 42 }], failed: false })) })
+    })
     const state = mountComposable('continue-reading', 5)
 
     await flushPromises()
@@ -116,7 +150,7 @@ describe('useDashboardScroller', () => {
 
   it('debounces progress events and refreshes dashboard membership', async () => {
     vi.useFakeTimers()
-    mockApi.mockResolvedValue(mockResponse([{ id: 42 }]))
+    mockSuccessfulBatch([{ id: 42 }])
     mountComposable('continue-reading', 5)
     await flushPromises()
     mockApi.mockClear()
@@ -128,6 +162,7 @@ describe('useDashboardScroller', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     await flushPromises()
-    expect(mockApi).toHaveBeenCalledExactlyOnceWith('/api/v1/dashboard/scrollers/continue-reading?limit=5')
+    expect(mockApi).toHaveBeenCalledOnce()
+    expect(batchBody().items[0]).toMatchObject({ type: 'continue-reading', limit: 5 })
   })
 })

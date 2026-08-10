@@ -6,6 +6,7 @@ import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AnnotationModule } from '../annotation/annotation.module';
 import { BookmarkModule } from '../bookmark/bookmark.module';
 import { BookModule } from '../book/book.module';
+import { BrowseCountsModule } from '../browse-counts/browse-counts.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
 import { OpdsModule } from '../opds/opds.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
@@ -43,6 +44,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
     AnnotationModule,
     BookModule,
     BookmarkModule,
+    BrowseCountsModule,
     DashboardModule,
     OpdsModule,
     PositionConverterModule,

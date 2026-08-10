@@ -97,6 +97,25 @@ describe('useAuth', () => {
     )
   })
 
+  it('carries the lockout code and retry window off a rejected login', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>().mockResolvedValue({
+        ok: false,
+        json: async () => ({ message: 'Account temporarily locked', errorCode: 'account_locked', retryAfterSeconds: 540 }),
+      } as Response),
+    )
+    const { useAuth, LoginError } = await import('../useAuth')
+
+    const error = await useAuth()
+      .login('ada', 'correct-horse')
+      .catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(LoginError)
+    expect((error as InstanceType<typeof LoginError>).errorCode).toBe('account_locked')
+    expect((error as InstanceType<typeof LoginError>).retryAfterSeconds).toBe(540)
+  })
+
   it('clears user-scoped sidebar caches on logout', async () => {
     const { useAuth } = await import('../useAuth')
 

@@ -65,7 +65,7 @@ describe('FileWriteService', () => {
       findLibraryWriteSettingsForBook: vi.fn(),
       insertLog: vi.fn().mockResolvedValue(undefined),
       setLastWrittenAt: vi.fn().mockResolvedValue(undefined),
-      updateFileStat: vi.fn().mockResolvedValue(undefined),
+      updateFileStateAfterMetadataWrite: vi.fn().mockResolvedValue(undefined),
       recordHashHistory: vi.fn().mockResolvedValue(undefined),
     };
     const writer = {
@@ -449,7 +449,7 @@ describe('FileWriteService', () => {
 
     await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
 
-    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledWith(1, {
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenCalledWith(5, 1, 'oldhash', {
       fileHash: 'newhash',
       mtime: POST_WRITE_MTIME,
       sizeBytes: 57,
@@ -474,7 +474,7 @@ describe('FileWriteService', () => {
 
     await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
 
-    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledWith(1, {
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenCalledWith(5, 1, 'oldhash', {
       mtime: POST_WRITE_MTIME,
       sizeBytes: 57,
       ino: 9_007_199_254_740_993n,
@@ -499,7 +499,7 @@ describe('FileWriteService', () => {
     await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
 
     expect(mockStat).toHaveBeenCalledTimes(2);
-    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledTimes(1);
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenCalledTimes(1);
   });
 
   it('retries transient scanner identity persistence failures before reporting success', async () => {
@@ -514,13 +514,13 @@ describe('FileWriteService', () => {
     });
     fileWriteRepo.loadPayload.mockResolvedValue({ title: 'Book' });
     fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteWriteCover: false });
-    fileWriteRepo.updateFileStat.mockRejectedValueOnce(new Error('temporary database failure'));
+    fileWriteRepo.updateFileStateAfterMetadataWrite.mockRejectedValueOnce(new Error('temporary database failure'));
     writer.write.mockResolvedValue({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
 
     await expect(service.writeToFile(5, 'auto')).resolves.toEqual({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
 
     expect(mockStat).toHaveBeenCalledTimes(2);
-    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledTimes(2);
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenCalledTimes(2);
     expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledTimes(1);
   });
 
@@ -541,7 +541,7 @@ describe('FileWriteService', () => {
       expect(selfWriteRegistry.isSuppressed(path)).toBe(true);
       return Promise.resolve({ status: 'success', fieldsWritten: ['title'], durationMs: 5 });
     });
-    fileWriteRepo.updateFileStat.mockImplementation(() => {
+    fileWriteRepo.updateFileStateAfterMetadataWrite.mockImplementation(() => {
       expect(selfWriteRegistry.isSuppressed(path)).toBe(true);
       return Promise.resolve();
     });
@@ -574,7 +574,7 @@ describe('FileWriteService', () => {
     });
 
     expect(mockStat).toHaveBeenCalledTimes(3);
-    expect(fileWriteRepo.updateFileStat).not.toHaveBeenCalled();
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).not.toHaveBeenCalled();
     expect(fileWriteRepo.setLastWrittenAt).not.toHaveBeenCalled();
     expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(
       expect.objectContaining({ result: expect.objectContaining({ status: 'failed', reason: 'post-write file state refresh failed' }) }),
@@ -754,8 +754,20 @@ describe('FileWriteService', () => {
     );
     expect(fileWriteRepo.recordHashHistory).toHaveBeenNthCalledWith(1, 1, 'm4bhash', 'file_write');
     expect(fileWriteRepo.recordHashHistory).toHaveBeenNthCalledWith(2, 2, 'mp3hash', 'file_write');
-    expect(fileWriteRepo.updateFileStat).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ fileHash: 'new-m4b' }));
-    expect(fileWriteRepo.updateFileStat).toHaveBeenNthCalledWith(2, 2, expect.objectContaining({ fileHash: 'new-mp3' }));
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenNthCalledWith(
+      1,
+      20,
+      1,
+      'm4bhash',
+      expect.objectContaining({ fileHash: 'new-m4b' }),
+    );
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenNthCalledWith(
+      2,
+      20,
+      2,
+      'mp3hash',
+      expect.objectContaining({ fileHash: 'new-mp3' }),
+    );
     expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledTimes(1);
   });
 
@@ -838,7 +850,7 @@ describe('FileWriteService', () => {
     expect(result.status).toBe('failed');
     expect(result.reason).toBe('1 of 2 file writes failed');
     expect(result.fieldsWritten).toEqual(['coverBytes']);
-    expect(fileWriteRepo.updateFileStat).toHaveBeenCalledWith(1, expect.objectContaining({ fileHash: 'new-m4b' }));
+    expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenCalledWith(20, 1, 'm4bhash', expect.objectContaining({ fileHash: 'new-m4b' }));
     expect(fileWriteRepo.setLastWrittenAt).not.toHaveBeenCalled();
     expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(
       expect.objectContaining({

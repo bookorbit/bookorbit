@@ -16,6 +16,7 @@ import {
   FolderPlus,
   LibraryBig,
   Loader2,
+  FolderInput,
   MoreHorizontal,
   PanelRight,
   Pencil,
@@ -45,9 +46,11 @@ const props = defineProps<{
   book: BookCard
   selectionMode?: boolean
   selected?: boolean
+  /** Opt-in: only views that host the destination sheet should offer this. */
+  allowMoveToLibrary?: boolean
 }>()
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 const emit = defineEmits<{
   action: [type: BookActionType]
   select: [event: MouseEvent]
@@ -435,6 +438,10 @@ function handleRowClick(event: MouseEvent) {
             <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />
             <RefreshCw v-else class="size-4 mr-2" />
             {{ t('book.actions.refreshMetadata') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem v-if="allowMoveToLibrary && hasPermission('library_edit_metadata')" @click="emit('action', 'move-to-library')">
+            <FolderInput class="size-4 mr-2" />
+            {{ t('book.move.action') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="emit('action', 'add-to-collection')">
             <FolderPlus class="size-4 mr-2" />

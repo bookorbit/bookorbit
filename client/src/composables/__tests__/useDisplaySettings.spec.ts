@@ -22,6 +22,7 @@ function resetDisplaySettings() {
   settings.showSpineOnComics.value = false
   settings.bookShadowStrength.value = 'default'
   settings.bookCoverDisplayMode.value = 'blurred-fit'
+  settings.bookDetailCoverTint.value = 'single'
   settings.seriesCardCoverMode.value = 'stack'
   settings.gridCardPrimaryLabel.value = 'hidden'
   settings.gridCardSecondaryLabel.value = 'hidden'
@@ -199,6 +200,26 @@ describe('useDisplaySettings preferences helpers', () => {
   it('applies showSpineOnComics from preferences', () => {
     applyDisplayPreferences({ showSpineOnComics: true })
     expect(settings.showSpineOnComics.value).toBe(true)
+  })
+
+  it('includes bookDetailCoverTint in snapshot', () => {
+    settings.bookDetailCoverTint.value = 'duotone'
+    expect(getDisplayPreferencesSnapshot().bookDetailCoverTint).toBe('duotone')
+  })
+
+  it('defaults bookDetailCoverTint to single', () => {
+    resetDisplaySettings()
+    expect(settings.bookDetailCoverTint.value).toBe('single')
+  })
+
+  it('sanitizes bookDetailCoverTint and drops unknown values', () => {
+    expect(sanitizeDisplayPreferences({ bookDetailCoverTint: 'off' })).toEqual({ bookDetailCoverTint: 'off' })
+    expect(sanitizeDisplayPreferences({ bookDetailCoverTint: 'rainbow' })).toEqual({})
+  })
+
+  it('applies bookDetailCoverTint from preferences', () => {
+    applyDisplayPreferences({ bookDetailCoverTint: 'off' })
+    expect(settings.bookDetailCoverTint.value).toBe('off')
   })
 
   it('includes thumbnailClickAction in snapshot', () => {

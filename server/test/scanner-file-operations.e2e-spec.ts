@@ -1113,6 +1113,7 @@ async function seedStatefulData(db: ScannerE2EContext['db'], bookId: number, pri
     {
       userId: userA,
       bookFileId: primaryFileId,
+      bookId,
       sessionId: `session-${suffix}-a`,
       startedAt: new Date(now.getTime() - 300_000),
       endedAt: new Date(now.getTime() - 240_000),
@@ -1123,6 +1124,7 @@ async function seedStatefulData(db: ScannerE2EContext['db'], bookId: number, pri
     {
       userId: userB,
       bookFileId: primaryFileId,
+      bookId,
       sessionId: `session-${suffix}-b`,
       startedAt: new Date(now.getTime() - 180_000),
       endedAt: new Date(now.getTime() - 120_000),

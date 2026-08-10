@@ -49,6 +49,7 @@ export interface BookMetadataFetchStatus {
   queued: number;
   processing: number;
   failed: number;
+  latestFailureAt: string | null;
   paused: boolean;
 }
 

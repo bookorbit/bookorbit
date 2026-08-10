@@ -11,6 +11,7 @@ import { DEFAULT_KOREADER_DEVICE_PATTERN, resolveUploadPath } from '@bookorbit/t
 import type {
   KoreaderCatalogBookDetail,
   KoreaderCatalogBookListItem,
+  KoreaderCatalogBrowseCounts,
   KoreaderCatalogDashboardResponse,
   KoreaderCatalogDashboardSection,
   KoreaderCatalogDashboardSectionResponse,
@@ -42,6 +43,7 @@ import { contentDispositionHeader } from '../../common/utils/content-disposition
 import { storageConfig } from '../../config/config';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
+import { BrowseCountsService } from '../browse-counts/browse-counts.service';
 import type { BookDetailDto } from '../book/dto/book-detail.dto';
 import { DashboardService } from '../dashboard/dashboard.service';
 import { DashboardWidgetService } from '../dashboard/dashboard-widget.service';
@@ -140,6 +142,7 @@ export class KoreaderCatalogService {
     private readonly userBookStatusService: UserBookStatusService,
     private readonly dashboardService: DashboardService,
     private readonly dashboardWidgetService: DashboardWidgetService,
+    private readonly browseCountsService: BrowseCountsService,
     private readonly recommendationService: RecommendationService,
     private readonly appSettingsService: AppSettingsService,
     private readonly koreaderService: KoreaderService,
@@ -159,7 +162,7 @@ export class KoreaderCatalogService {
       readStatus: 'reading' as const,
     });
 
-    const [continueReading, discover, dashboardSection, readingGoal, readingStreak, highlightOfTheDay, totalBooks] = await Promise.all([
+    const [continueReading, discover, dashboardSection, readingGoal, readingStreak, highlightOfTheDay, totalBooks, browseCounts] = await Promise.all([
       this.getBooksPage(user, continueReadingQuery),
       section ? Promise.resolve<KoreaderCatalogBookListItem[]>([]) : this.buildDiscover(user),
       section ? this.buildDashboardSection(user, section) : Promise.resolve(undefined),
@@ -167,6 +170,7 @@ export class KoreaderCatalogService {
       this.dashboardWidgetService.getReadingStreak(user),
       this.dashboardWidgetService.getHighlightOfTheDay(user),
       this.countBooks(user, {}),
+      this.buildBrowseCounts(user),
     ]);
 
     return {
@@ -174,6 +178,7 @@ export class KoreaderCatalogService {
       username: user.username,
       displayName: user.name || user.username,
       totalBooks,
+      browseCounts,
       sections: ROOT_SECTIONS.map((rootSection) => ({ ...rootSection })),
       continueReading: continueReading.items,
       discover,
@@ -623,6 +628,29 @@ export class KoreaderCatalogService {
     return suffix ? `${CATALOG_BASE}/sections/${section}?${suffix}` : `${CATALOG_BASE}/sections/${section}`;
   }
 
+  // Badges for the dashboard Browse tiles. Every total here is a count query:
+  // authors and series reuse the cached ones the web sidebar already asks for,
+  // and the rest deliberately avoid the list methods behind the section
+  // endpoints, which aggregate per-entity book counts a badge never reads.
+  private async buildBrowseCounts(user: RequestUser): Promise<KoreaderCatalogBrowseCounts> {
+    const [inProgress, sidebarCounts, libraryIds, collections, smartScopes] = await Promise.all([
+      this.countBooks(user, { readStatus: 'reading' }),
+      this.browseCountsService.getCounts(user),
+      this.opdsBookService.getAccessibleLibraryIds(user.id, user.isSuperuser),
+      this.opdsBookService.countUserCollections(user.id),
+      this.opdsBookService.countUserSmartScopes(user.id),
+    ]);
+
+    return {
+      inProgress,
+      libraries: libraryIds.length,
+      authors: sidebarCounts.authors,
+      series: sidebarCounts.series,
+      collections,
+      smartScopes,
+    };
+  }
+
   private async countBooks(
     user: RequestUser,
     filters: {
@@ -633,8 +661,7 @@ export class KoreaderCatalogService {
       readStatus?: 'unread' | 'reading' | 'finished';
     },
   ): Promise<number> {
-    const result = await this.opdsBookService.getBooksPage(user.id, 'title_asc', 1, 1, filters, user.isSuperuser, user.contentFilters);
-    return result.total;
+    return this.opdsBookService.countBooks(user.id, filters, user.isSuperuser, user.contentFilters);
   }
 
   private async computeSeriesSummary(user: RequestUser, filters: { series?: string; seriesId?: number }): Promise<KoreaderCatalogSeriesSummary> {

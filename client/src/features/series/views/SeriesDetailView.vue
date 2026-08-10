@@ -26,6 +26,7 @@ import BookQuickView from '@/features/book/components/BookQuickView.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import SeriesCompletionBar from '../components/SeriesCompletionBar.vue'
+import SeriesOwnershipBar from '../components/SeriesOwnershipBar.vue'
 import SeriesGapBanner from '../components/SeriesGapBanner.vue'
 import { fetchSeriesBooks } from '../api/series'
 import { groupSeriesBooksByMedia } from '../composables/useSeriesBookMediaGroups'
@@ -136,7 +137,9 @@ const leadMetaItems = computed(() => {
   return items
 })
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+// 'move-to-library' is part of the shared card contract; this view does not
+// opt in, so it never fires here.
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 
 function loadGroupByMediaPreference(): boolean {
   try {
@@ -548,7 +551,14 @@ defineOptions({ name: 'SeriesDetailView' })
                 </button>
               </div>
 
-              <SeriesCompletionBar :read-count="seriesInfo.readCount" :total-count="seriesInfo.bookCount" class="mt-3 max-w-xs" />
+              <div class="mt-3 grid max-w-md gap-3 sm:grid-cols-2">
+                <SeriesCompletionBar :read-count="seriesInfo.readCount" :total-count="seriesInfo.bookCount" />
+                <SeriesOwnershipBar
+                  v-if="seriesInfo.expectedBookCount !== null"
+                  :owned-count="seriesInfo.bookCount"
+                  :expected-count="seriesInfo.expectedBookCount"
+                />
+              </div>
               <SeriesGapBanner v-if="seriesInfo.possibleGaps.length > 0" :gaps="seriesInfo.possibleGaps" class="mt-3" />
 
               <div class="mt-4 border-t border-border/60 pt-4">

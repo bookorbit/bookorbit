@@ -19,6 +19,7 @@ import { GetBooksDto } from './get-books.dto';
 import { SaveProgressDto } from './save-progress.dto';
 import { SearchBooksDto } from './search-books.dto';
 import { UpdateBookMetadataDto } from './update-book-metadata.dto';
+import { UpdateBookAddedAtDto } from './update-book-added-at.dto';
 import { UpdatePersonalNoteDto } from './update-personal-note.dto';
 import { UpdateRatingDto } from './update-rating.dto';
 import { UpsertAudioProgressDto } from './upsert-audio-progress.dto';
@@ -197,6 +198,13 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { authors: ['ok', 1] })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { language: 'a'.repeat(101) })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { isbn10: '12345678901' })).length).toBeGreaterThan(0);
+  });
+
+  it('requires an ISO date key when updating the added date', async () => {
+    expect((await errorsFor(UpdateBookAddedAtDto, { addedAt: '2020-06-15' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookAddedAtDto, { addedAt: '2020-6-15' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookAddedAtDto, { addedAt: '2020-06-15T00:00:00.000Z' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookAddedAtDto, {})).length).toBeGreaterThan(0);
   });
 
   it('accepts aladinId and enforces its length bound', async () => {

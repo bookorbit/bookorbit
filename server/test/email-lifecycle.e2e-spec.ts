@@ -41,6 +41,7 @@ function buildProviderPayload(
     auth: boolean;
     ssl: boolean;
     startTls: boolean;
+    tlsRejectUnauthorized: boolean;
     username: string;
     password: string;
     fromName: string;
@@ -54,6 +55,7 @@ function buildProviderPayload(
     auth: overrides.auth ?? false,
     ssl: overrides.ssl ?? false,
     startTls: overrides.startTls ?? false,
+    tlsRejectUnauthorized: overrides.tlsRejectUnauthorized ?? true,
     ...(overrides.username !== undefined ? { username: overrides.username } : {}),
     ...(overrides.password !== undefined ? { password: overrides.password } : {}),
     ...(overrides.fromName !== undefined ? { fromName: overrides.fromName } : {}),

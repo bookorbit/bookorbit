@@ -19,6 +19,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { extractEpubMetadata } from '../metadata/lib/epub';
@@ -80,7 +81,11 @@ import { FileWriteService } from '../file-write/file-write.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { UserBookNoteService } from '../user-book-note/user-book-note.service';
 import { UserBookStatusService, type AutoReadingActivity } from '../user-book-status/user-book-status.service';
-import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED } from '../achievement/achievement-events.service';
+import {
+  ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED,
+  ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED,
+  AchievementEventsService,
+} from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookRepository } from './book.repository';
@@ -95,6 +100,7 @@ import type { MetadataExportColumnMode } from './dto/metadata-export-options.dto
 import { SaveProgressDto } from './dto/save-progress.dto';
 import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
+import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
 import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import type { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { buildBookDetailSupplementalFields } from './utils/build-book-detail-supplemental-fields';
@@ -265,6 +271,7 @@ export class BookService {
     @Optional() private readonly fileRenameService: FileRenameService,
     @Optional() private readonly achievementEvents: AchievementEventsService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
+    @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -482,6 +489,10 @@ export class BookService {
       const passes = await this.checkBookPassesContentFilters(bookId, user.contentFilters);
       if (!passes) throw new NotFoundException(`Book ${bookId} not found`);
     }
+  }
+
+  setHardcoverEditionIdIfEmpty(bookId: number, hardcoverEditionId: string): Promise<boolean> {
+    return this.bookRepo.setHardcoverEditionIdIfEmpty(bookId, hardcoverEditionId);
   }
 
   async verifyFileAccess(fileId: number, user: RequestUser): Promise<NonNullable<Awaited<ReturnType<BookRepository['findFileById']>>>> {
@@ -1139,6 +1150,18 @@ export class BookService {
     return result;
   }
 
+  async executeBookIdsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<number[]> {
+    const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes);
+    return this.bookRepo.findCardIds({
+      where,
+      orderBy,
+      limit: query.pagination.size,
+      offset: query.pagination.page * query.pagination.size,
+      userId,
+    });
+  }
+
   async queryJumpBucketsForLibrary(user: RequestUser, libraryId: number, query: JumpBucketsQuery): Promise<JumpBucketsResponse> {
     await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     const timeZone = this.resolveUserTimeZone(user);
@@ -1587,6 +1610,15 @@ export class BookService {
     }
   }
 
+  async updateAddedAt(id: number, dto: UpdateBookAddedAtDto, user: RequestUser): Promise<BookDetailDto> {
+    await this.verifyBookAccess(id, user);
+    const timeZone = this.resolveUserTimeZone(user);
+    if (!isDateKey(dto.addedAt)) throw new BadRequestException('addedAt must be a valid date');
+    if (dto.addedAt > toDateKeyInTimeZone(new Date(), timeZone)) throw new BadRequestException('addedAt cannot be in the future');
+    await this.bookRepo.updateAddedAt(id, toTimeZoneStartOfDay(dto.addedAt, timeZone));
+    return this.getDetail(id, user);
+  }
+
   async updateMetadataAndLocks(
     id: number,
     dto: UpdateBookMetadataAndLocksDto,
@@ -1709,6 +1741,11 @@ export class BookService {
 
       if (dto.seriesMemberships !== undefined) {
         await this.seriesMemberships?.replaceForBook(id, dto.seriesMemberships, tx);
+        // After replaceForBook, because it is what creates any series row the editor named.
+        for (const membership of dto.seriesMemberships ?? []) {
+          if (membership.expectedBookCount === undefined) continue;
+          await this.seriesExpectedCount?.setManual(membership.seriesName, membership.expectedBookCount ?? null, tx);
+        }
       }
       this.throwIfMetadataUpdateFailpoint('afterSeriesMembershipsReplace');
 
@@ -1763,6 +1800,15 @@ export class BookService {
         userId: user.id,
         bookIds: [id],
         rating,
+      });
+    }
+
+    // Clearing is intentionally not propagated, so it can't disrupt an unrelated active sync.
+    if (dto.hardcoverEditionId != null) {
+      this.achievementEvents?.emit(ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED, {
+        userId: user.id,
+        bookId: id,
+        hardcoverEditionId: dto.hardcoverEditionId,
       });
     }
 
@@ -2629,7 +2675,10 @@ export class BookService {
         title: meta?.title ?? undefined,
         author: authorRows[0]?.name ?? undefined,
         isbn: meta?.isbn13 ?? meta?.isbn10 ?? undefined,
+        seriesName: meta?.seriesName ?? undefined,
+        seriesIndex: meta?.seriesIndex ?? undefined,
         existingProviderIds: providerIds,
+        hardcoverEditionId: meta?.hardcoverEditionId ?? undefined,
         isAudiobook: (meta?.durationSeconds !== null && meta?.durationSeconds !== undefined) || !!meta?.audibleId || !!meta?.librofmId,
         maxCandidatesPerProvider: 1,
       };

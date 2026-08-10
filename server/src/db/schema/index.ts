@@ -7,6 +7,7 @@ export * from './migration';
 export * from './libraries';
 export * from './books';
 export * from './book-duplicates';
+export * from './book-move';
 export * from './collections';
 export * from './smart-scopes';
 export * from './series';

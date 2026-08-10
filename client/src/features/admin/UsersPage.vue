@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { KeyRound, MoreVertical, Pencil, Save, Search, ShieldAlert, ShieldCheck, Trash2, UserPlus } from '@lucide/vue'
+import { KeyRound, LockOpen, MoreVertical, Pencil, Save, Search, ShieldAlert, ShieldCheck, Trash2, UserPlus } from '@lucide/vue'
 import { Permission, type AuthUser, type DefaultLibraryAccessConfig } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useUsers, type UserRow } from './composables/useUsers'
+import { useSelfRegistration } from './composables/useSelfRegistration'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'
 import StatusPill from './components/StatusPill.vue'
@@ -14,6 +15,7 @@ import type { StatusPillTone } from './lib/status-pill-styles'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
 const { t } = useI18n()
 const { isSuperuser, hasPermission } = usePermissions()
@@ -49,6 +51,15 @@ const savingDefaultLibraryAccess = ref(false)
 const defaultLibraryAccessError = ref<string | null>(null)
 
 const canManageUserDefaults = computed(() => hasPermission(Permission.ManageUsers))
+const canManageAppSettings = computed(() => hasPermission(Permission.ManageAppSettings))
+
+const {
+  allowRegistration,
+  saving: savingSelfRegistration,
+  error: selfRegistrationError,
+  load: loadSelfRegistration,
+  setAllowRegistration,
+} = useSelfRegistration()
 
 const hasActiveFilters = computed(() => search.value.length > 0 || state.value.length > 0 || sortBy.value !== 'username' || sortDir.value !== 'asc')
 
@@ -61,7 +72,10 @@ const sortSelection = computed<string>({
   },
 })
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  if (canManageAppSettings.value) await loadSelfRegistration()
+})
 
 function applyFilters() {
   page.value = 1
@@ -123,6 +137,20 @@ function resetPasswordHint(user: UserRow): string {
   return t('adminFeature.usersPage.resetPassword')
 }
 
+function isLocked(user: UserRow): boolean {
+  return Boolean(user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now())
+}
+
+async function handleUnlock(userId: number) {
+  actionError.value = null
+  const res = await api(`/api/v1/users/${userId}/unlock`, { method: 'POST' })
+  if (!res.ok) {
+    actionError.value = t('adminFeature.usersPage.errors.unlock')
+    return
+  }
+  await load()
+}
+
 async function handleResetPassword(userId: number) {
   const res = await api(`/api/v1/users/${userId}/reset-password`, { method: 'POST' })
   if (!res.ok) {
@@ -166,6 +194,11 @@ async function onSaved(newResetUrl?: string) {
   drawerOpen.value = false
   if (newResetUrl) resetUrl.value = newResetUrl
   await load()
+}
+
+async function toggleSelfRegistration() {
+  if (savingSelfRegistration.value) return
+  await setAllowRegistration(!allowRegistration.value)
 }
 
 async function saveDefaultLibraryAccess() {
@@ -303,9 +336,14 @@ async function saveDefaultLibraryAccess() {
                 </div>
               </td>
               <td class="px-3 py-2">
-                <StatusPill :tone="user.active ? 'success' : 'danger'">
-                  {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
-                </StatusPill>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <StatusPill :tone="user.active ? 'success' : 'danger'">
+                    {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
+                  </StatusPill>
+                  <StatusPill v-if="isLocked(user)" tone="warning">
+                    {{ t('adminFeature.usersPage.lockedBadge') }}
+                  </StatusPill>
+                </div>
               </td>
               <td class="px-3 py-2">
                 <div class="flex items-center justify-end gap-1">
@@ -322,6 +360,19 @@ async function saveDefaultLibraryAccess() {
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>{{ t('common.edit') }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip v-if="isLocked(user)">
+                      <TooltipTrigger as-child>
+                        <button
+                          type="button"
+                          class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          :aria-label="t('adminFeature.usersPage.unlockAria', { name: user.name })"
+                          @click="handleUnlock(user.id)"
+                        >
+                          <LockOpen :size="14" aria-hidden="true" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ t('adminFeature.usersPage.unlockHint') }}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>
@@ -383,6 +434,9 @@ async function saveDefaultLibraryAccess() {
               <ShieldAlert :size="11" aria-hidden="true" />
               {{ t('adminFeature.usersPage.filteredBadge') }}
             </StatusPill>
+            <StatusPill v-if="isLocked(user)" tone="warning">
+              {{ t('adminFeature.usersPage.lockedBadge') }}
+            </StatusPill>
           </div>
           <div v-if="canManage(user)" class="mt-3 flex items-center gap-2 border-t border-border pt-3">
             <button
@@ -403,6 +457,9 @@ async function saveDefaultLibraryAccess() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-56">
+                <DropdownMenuItem v-if="isLocked(user)" @click="handleUnlock(user.id)">
+                  {{ t('adminFeature.usersPage.unlockAccount') }}
+                </DropdownMenuItem>
                 <DropdownMenuItem :disabled="!isPasswordResettable(user)" @click="handleResetPassword(user.id)">
                   {{ t('adminFeature.usersPage.resetPassword') }}
                 </DropdownMenuItem>
@@ -435,6 +492,40 @@ async function saveDefaultLibraryAccess() {
         </div>
       </nav>
     </template>
+
+    <section v-if="!loading && !error && canManageAppSettings" aria-labelledby="self-registration-heading" class="space-y-3 pt-6">
+      <div>
+        <h3 id="self-registration-heading" class="settings-group-label mb-1">
+          {{ t('adminFeature.usersPage.selfRegistration.title') }}
+        </h3>
+        <p class="text-sm text-muted-foreground">{{ t('adminFeature.usersPage.selfRegistration.subtitle') }}</p>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-4 shadow-xs">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="min-w-0">
+            <p class="settings-label">{{ t('adminFeature.usersPage.selfRegistration.label') }}</p>
+            <p class="settings-hint">{{ t('adminFeature.usersPage.selfRegistration.hint') }}</p>
+          </div>
+          <ToggleSwitch
+            :model-value="allowRegistration"
+            :disabled="savingSelfRegistration"
+            :aria-label="t('adminFeature.usersPage.selfRegistration.label')"
+            class="self-start md:self-auto"
+            @update:model-value="toggleSelfRegistration"
+          />
+        </div>
+        <p v-if="allowRegistration" class="mt-3 text-sm text-muted-foreground">
+          {{ t('adminFeature.usersPage.selfRegistration.enabledNotice') }}
+        </p>
+        <p v-if="selfRegistrationError" role="alert" class="mt-3 text-sm text-destructive">
+          {{
+            selfRegistrationError === 'save'
+              ? t('adminFeature.usersPage.selfRegistration.saveError')
+              : t('adminFeature.usersPage.selfRegistration.loadError')
+          }}
+        </p>
+      </div>
+    </section>
 
     <section v-if="!loading && !error && canManageUserDefaults" aria-labelledby="default-library-access-heading" class="space-y-3 pt-6">
       <div>

@@ -1,6 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
 
-import { COMMUNITY_RATING_PROVIDER_KEYS, FIELD_OPERATORS, RULE_OPERATORS, type RuleField, type RuleOperator } from '@bookorbit/types';
+import {
+  COMMUNITY_RATING_PROVIDER_KEYS,
+  CUSTOM_FIELD_TYPE_OPERATORS,
+  FIELD_OPERATORS,
+  RULE_OPERATORS,
+  customRuleField,
+  type CustomMetadataFieldType,
+  type RuleField,
+  type RuleOperator,
+} from '@bookorbit/types';
 
 import { validateGroupRule, groupRuleSchema } from './group-rule.validator';
 
@@ -28,6 +37,8 @@ function validRuleValue(operator: RuleOperator, field: RuleField): { value?: unk
     case 'isLocked':
     case 'isUnlocked':
     case 'isUpNext':
+    case 'isTrue':
+    case 'isFalse':
       return {};
     case 'before':
     case 'after':
@@ -55,6 +66,21 @@ function validRuleValue(operator: RuleOperator, field: RuleField): { value?: unk
       const _exhaustive: never = operator;
       return _exhaustive;
     }
+  }
+}
+
+/** The value a client sends for a custom field of the given type. */
+function validCustomRuleValue(operator: RuleOperator, type: CustomMetadataFieldType): { value?: unknown; valueTo?: unknown } {
+  if (operator === 'isEmpty' || operator === 'isNotEmpty' || type === 'boolean') return {};
+  switch (type) {
+    case 'number':
+      return operator === 'between' ? { value: 1, valueTo: 5 } : { value: 1 };
+    case 'date':
+      if (operator === 'between') return { value: '2024-01-01', valueTo: '2024-06-01' };
+      return operator === 'withinLast' ? { value: 7 } : { value: '2024-01-01' };
+    case 'text':
+    case 'url':
+      return { value: 'test' };
   }
 }
 
@@ -453,5 +479,97 @@ describe('field × operator exhaustive validation', () => {
 
     const rule = { type: 'rule', field, operator: disallowedOp, value: 'test' };
     expect(() => validateGroupRule({ type: 'group', join: 'AND', rules: [rule] })).toThrow(BadRequestException);
+  });
+});
+
+describe('custom metadata field rules', () => {
+  function validate(rule: Record<string, unknown>) {
+    return validateGroupRule({ type: 'group', join: 'AND', rules: [{ type: 'rule', field: customRuleField(7), ...rule }] });
+  }
+
+  it.each(Object.entries(CUSTOM_FIELD_TYPE_OPERATORS) as [CustomMetadataFieldType, RuleOperator[]][])(
+    'accepts every operator a custom %s field offers',
+    (type, operators) => {
+      for (const operator of operators) {
+        const { value, valueTo } = validCustomRuleValue(operator, type);
+        const rule: Record<string, unknown> = { operator };
+        if (value !== undefined) rule.value = value;
+        if (valueTo !== undefined) rule.valueTo = valueTo;
+
+        expect(() => validate(rule), `custom ${type} field should accept operator '${operator}'`).not.toThrow();
+      }
+    },
+  );
+
+  it('round-trips a custom field rule unchanged', () => {
+    const rule = {
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'custom:12', operator: 'contains', value: 'signed' }],
+    };
+
+    expect(validateGroupRule(rule)).toEqual(rule);
+  });
+
+  it('accepts custom field rules nested inside groups alongside built-in rules', () => {
+    const rule = {
+      type: 'group',
+      join: 'AND',
+      rules: [
+        { type: 'rule', field: 'title', operator: 'contains', value: 'Dune' },
+        { type: 'group', join: 'OR', rules: [{ type: 'rule', field: 'custom:3', operator: 'isTrue' }] },
+      ],
+    };
+
+    expect(validateGroupRule(rule)).toEqual(rule);
+  });
+
+  it.each([
+    ['custom:0', 'a zero id'],
+    ['custom:', 'no id'],
+    ['custom:abc', 'a non-numeric id'],
+    ['custom:1234567890', 'an id wider than the field id column'],
+    ['custom:1; DROP TABLE books', 'trailing SQL'],
+    ['custom:1.5', 'a fractional id'],
+    ['custom: 1', 'a leading space'],
+  ])('rejects %s (%s)', (field) => {
+    expect(() => validateGroupRule({ type: 'group', join: 'AND', rules: [{ type: 'rule', field, operator: 'isNotEmpty' }] })).toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('rejects operators no custom field type offers', () => {
+    expect(() => validate({ operator: 'includesAny', value: ['a'] })).toThrow(BadRequestException);
+    expect(() => validate({ operator: 'isUpNext' })).toThrow(BadRequestException);
+  });
+
+  it('rejects list values, which would not resolve to a single typed column', () => {
+    expect(() => validate({ operator: 'eq', value: ['a', 'b'] })).toThrow(BadRequestException);
+  });
+
+  it('rejects numeric comparisons whose value is not a number', () => {
+    for (const operator of ['gt', 'gte', 'lt', 'lte']) {
+      expect(() => validate({ operator, value: '12' }), `operator '${operator}' should require a number`).toThrow(BadRequestException);
+    }
+  });
+
+  it('rejects date comparisons whose value is not a date', () => {
+    expect(() => validate({ operator: 'before', value: 'yesterday' })).toThrow(BadRequestException);
+    expect(() => validate({ operator: 'after', value: '2024-13-45' })).toThrow(BadRequestException);
+  });
+
+  it('accepts a between range whose bounds suit the same column', () => {
+    expect(() => validate({ operator: 'between', value: 1, valueTo: 5 })).not.toThrow();
+    expect(() => validate({ operator: 'between', value: '2024-01-01', valueTo: '2024-06-01' })).not.toThrow();
+  });
+
+  it('rejects a between range whose bounds would read different columns', () => {
+    expect(() => validate({ operator: 'between', value: 1, valueTo: '2024-06-01' })).toThrow(BadRequestException);
+    expect(() => validate({ operator: 'between', value: '2024-01-01', valueTo: 'not a date' })).toThrow(BadRequestException);
+    expect(() => validate({ operator: 'between', value: '2024-01-01' })).toThrow(BadRequestException);
+  });
+
+  it('rejects a provider on a custom field rule', () => {
+    expect(() => validate({ operator: 'contains', value: 'signed', provider: 'any' })).toThrow(BadRequestException);
   });
 });

@@ -460,6 +460,14 @@ export class KoreaderPluginRepository {
       .orderBy(desc(schema.koreaderDeviceSweeps.lastSweepAt));
   }
 
+  async listDevicePluginVersions(userId: number): Promise<(string | null)[]> {
+    const rows = await this.db
+      .selectDistinct({ pluginVersion: schema.koreaderDeviceSweeps.pluginVersion })
+      .from(schema.koreaderDeviceSweeps)
+      .where(eq(schema.koreaderDeviceSweeps.userId, userId));
+    return rows.map((row) => row.pluginVersion);
+  }
+
   async getPluginTotals(userId: number): Promise<{
     matchedBooks: number;
     pageStatEvents: number;

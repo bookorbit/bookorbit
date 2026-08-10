@@ -95,8 +95,8 @@ describe('KOReader plugin update source wiring', () => {
     expect(catalogUtil).toContain('dashboard and dashboard.readingStreak');
     expect(catalogUtil).toContain('reading_streak and tonumber(reading_streak.currentStreak)');
     expect(dashboard).toContain('local streak_days = readingStreakDays(dashboard, summary.streak_days)');
-    expect(dashboard).toContain('{ value = tostring(streak_days), label = _("Day streak") }');
-    expect(dashboard).not.toContain('{ value = tostring(summary.streak_days or 0), label = _("Day streak") }');
+    expect(dashboard).toContain('value = tostring(streak_days),\n            label = _("Day streak"),');
+    expect(dashboard).not.toContain('tostring(summary.streak_days');
   });
 
   it('uses tall detail space for measured related-book grids', async () => {
@@ -277,7 +277,7 @@ describe('KOReader plugin update source wiring', () => {
 
     expect(widgets).toContain('function CatalogWidgets.buildSelectionBadge(max_width)');
     expect(widgets).toContain('function CatalogWidgets.buildDownloadedBadge(max_width)');
-    expect(widgets).toContain('icon = "appbar.filebrowser"');
+    expect(widgets).toContain('local opts = iconOrFile("appbar.filebrowser", CatalogWidgets.assetIconFile("on_device"))');
     expect(widgets).toContain('function CatalogWidgets.buildCoverWithStateBadges');
     expect(widgets).toContain('local show_label = self.menu.mosaic_show_titles == true');
     expect(widgets).toContain('local label_text = shortText(book and book.title or _("Untitled"), 30)');

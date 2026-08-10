@@ -1,4 +1,4 @@
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 
 import { BookDockService } from './book-dock.service';
 
@@ -26,6 +26,7 @@ function row(overrides?: Record<string, unknown>) {
     metadataEditedAt: null,
     absolutePath: '/bucket/book.epub',
     coverPath: null,
+    uploadedBy: 1,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
@@ -66,7 +67,7 @@ function makeService() {
     resume: vi.fn().mockResolvedValue(undefined),
   };
   const gateway = {
-    emitSummary: vi.fn(),
+    emitChanged: vi.fn(),
   };
   const service = new BookDockService(
     db as never,
@@ -101,7 +102,7 @@ describe('BookDockService', () => {
       sort: 'createdAt',
       order: 'desc',
       userId: 1,
-      isSuperuser: false,
+      canManageAll: false,
     });
 
     expect(result.total).toBe(1);
@@ -141,7 +142,7 @@ describe('BookDockService', () => {
       total: 1,
     });
 
-    const result = await service.listFiles({ page: 1, limit: 20, sort: 'createdAt', order: 'desc', userId: 1, isSuperuser: false });
+    const result = await service.listFiles({ page: 1, limit: 20, sort: 'createdAt', order: 'desc', userId: 1, canManageAll: false });
 
     const normalizedMetadata = {
       title: 'Fetched',
@@ -157,7 +158,18 @@ describe('BookDockService', () => {
     const { service, repo } = makeService();
     repo.findById.mockResolvedValue(undefined);
 
-    await expect(service.getFile(123)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getFile(123, 1, false)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('enforces ownership for individual file reads and allows Book Dock managers to bypass it', async () => {
+    const { service, repo } = makeService();
+    repo.findById.mockResolvedValue(row({ uploadedBy: 2 }));
+
+    await expect(service.getFile(1, 1, false)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getFile(1, 1, true)).resolves.toEqual(expect.objectContaining({ id: 1 }));
+
+    repo.findById.mockResolvedValue(row({ uploadedBy: null }));
+    await expect(service.getFile(1, 1, false)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('updateFile validates destination and stamps metadataEditedAt for selected metadata updates', async () => {
@@ -166,11 +178,16 @@ describe('BookDockService', () => {
     repo.update.mockResolvedValue(row({ selectedMetadata: { title: 'Edited' } }));
     const assertValidTarget = vi.spyOn(service as any, 'assertValidTarget').mockResolvedValue(undefined);
 
-    await service.updateFile(1, {
-      selectedMetadata: { title: 'Edited' },
-      targetLibraryId: 5,
-      targetFolderId: 9,
-    });
+    await service.updateFile(
+      1,
+      {
+        selectedMetadata: { title: 'Edited' },
+        targetLibraryId: 5,
+        targetFolderId: 9,
+      },
+      1,
+      false,
+    );
 
     expect(assertValidTarget).toHaveBeenCalledWith(5, 9);
     expect(repo.update).toHaveBeenCalledWith(
@@ -187,7 +204,7 @@ describe('BookDockService', () => {
     repo.findById.mockResolvedValue(row());
     repo.update.mockResolvedValue(undefined);
 
-    await expect(service.updateFile(1, {})).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.updateFile(1, {}, 1, false)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('bulkApplyFetched counts applied, skipped, and skipped-edited records', async () => {
@@ -289,7 +306,7 @@ describe('BookDockService', () => {
       .mockResolvedValueOnce([row({ id: 2, absolutePath: '/bucket/2.epub', coverPath: '/covers/2.png' })])
       .mockResolvedValueOnce([]);
 
-    await service.discardFile(1);
+    await service.discardFile(1, 1, false);
     await service.bulkDiscard([], true);
 
     expect(vi.mocked(unlink)).toHaveBeenCalledWith('/bucket/book.epub');
@@ -318,7 +335,7 @@ describe('BookDockService', () => {
     expect(processingState.pause).toHaveBeenCalledTimes(1);
     expect(ingestService.pauseProcessing).toHaveBeenCalledTimes(1);
     expect(finalizeService.pauseProcessing).toHaveBeenCalledTimes(1);
-    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 4, ready: 5, error: 0, total: 9, paused: true });
+    expect(gateway.emitChanged).toHaveBeenCalledTimes(1);
   });
 
   it('resumeProcessing resumes queues, broadcasts summary, and starts recovery once', async () => {
@@ -337,6 +354,6 @@ describe('BookDockService', () => {
     expect(ingestService.requeueProcessableFiles).toHaveBeenCalledTimes(1);
     expect(finalizeService.requeueAutoFinalizeCandidates).toHaveBeenCalledTimes(1);
     expect(watcherService.rescan).toHaveBeenCalledTimes(1);
-    expect(gateway.emitSummary).toHaveBeenCalledWith({ pending: 2, ready: 3, error: 1, total: 6, paused: false });
+    expect(gateway.emitChanged).toHaveBeenCalledTimes(1);
   });
 });

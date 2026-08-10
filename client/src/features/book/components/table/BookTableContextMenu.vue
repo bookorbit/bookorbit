@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
+import { BookOpen, ExternalLink, FolderInput, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetadata'
 import { useBookRefreshFeedback } from '@/features/book/composables/useBookRefreshFeedback'
@@ -11,7 +11,7 @@ import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/l
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import type { BookCard } from '@bookorbit/types'
 
-type BookActionType = 'quick-view' | 'add-to-collection' | 'delete'
+type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 
 const props = defineProps<{
   book: BookCard | null
@@ -178,6 +178,14 @@ onBeforeUnmount(() => {
       <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="emitAction('add-to-collection')">
         <FolderPlus :size="14" />
         {{ t('book.table.actions.addToCollection') }}
+      </button>
+      <button
+        v-if="hasPermission('library_edit_metadata')"
+        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+        @click="emitAction('move-to-library')"
+      >
+        <FolderInput :size="14" />
+        {{ t('book.move.action') }}
       </button>
       <button
         v-if="hasPermission('email_send')"

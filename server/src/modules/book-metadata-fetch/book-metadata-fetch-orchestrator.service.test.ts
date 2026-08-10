@@ -25,7 +25,7 @@ function makeService(withGateway = true) {
     markDone: vi.fn().mockResolvedValue(undefined),
     markFailed: vi.fn().mockResolvedValue(undefined),
     deferProcessing: vi.fn().mockResolvedValue(undefined),
-    getStatusSummary: vi.fn().mockResolvedValue({ queued: 0, processing: 0, failed: 0 }),
+    getStatusSummary: vi.fn().mockResolvedValue({ queued: 0, processing: 0, failed: 0, latestFailureAt: null }),
     scheduleEligibleBooksInBatches: vi.fn().mockResolvedValue(0),
     cancelPending: vi.fn().mockResolvedValue(0),
     requeueFailed: vi.fn().mockResolvedValue(0),
@@ -321,7 +321,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
 
   it('emitStatus is a no-op when gateway is not configured', async () => {
     const { service, queueRepo } = makeService(false);
-    queueRepo.getStatusSummary.mockResolvedValue({ queued: 1, processing: 0, failed: 0 });
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 1, processing: 0, failed: 0, latestFailureAt: null });
 
     await expect((service as any).emitStatus()).resolves.toBeUndefined();
   });
@@ -527,11 +527,11 @@ describe('BookMetadataFetchOrchestratorService', () => {
     await (service as any).unpauseIfNeeded();
     expect(configService.setPaused).toHaveBeenCalledWith(false);
 
-    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, failed: 0 });
+    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, failed: 0, latestFailureAt: null });
     await (service as any).checkAndResetSession();
     expect(resetSpy).toHaveBeenCalledTimes(1);
 
-    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 1, processing: 0, failed: 0 });
+    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 1, processing: 0, failed: 0, latestFailureAt: null });
     await (service as any).checkAndResetSession();
     expect(resetSpy).toHaveBeenCalledTimes(1);
   });
@@ -599,6 +599,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
           goodreadsId: 'goodreads-1',
           amazonId: 'amazon-1',
           hardcoverId: 'hardcover-1',
+          hardcoverEditionId: 'hardcover-edition-1',
           openLibraryId: 'open-library-1',
           itunesId: 'itunes-1',
           audibleId: 'audible-1',
@@ -624,6 +625,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
         author: undefined,
         isbn: 'isbn-10',
         isAudiobook: true,
+        hardcoverEditionId: 'hardcover-edition-1',
         existingProviderIds: {
           [MetadataProviderKey.GOOGLE]: 'google-1',
           [MetadataProviderKey.GOODREADS]: 'goodreads-1',
@@ -760,13 +762,13 @@ describe('BookMetadataFetchOrchestratorService', () => {
     const { service, queueRepo, session, notificationService } = makeService();
     session.addToTotal(2);
     session.incrementDone();
-    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, failed: 0 });
+    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, failed: 0, latestFailureAt: null });
 
     await (service as any).checkAndResetSession();
 
     session.addToTotal(3);
     session.incrementDone();
-    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, failed: 1 });
+    queueRepo.getStatusSummary.mockResolvedValueOnce({ queued: 0, processing: 0, failed: 1, latestFailureAt: '2026-01-01T00:00:00.000Z' });
 
     await (service as any).checkAndResetSession();
 

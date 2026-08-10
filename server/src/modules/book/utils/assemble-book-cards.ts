@@ -51,7 +51,14 @@ type CollapsedBookRow = BookRow & {
 type NameRow = { bookId: number; name: string };
 type NarratorRow = { bookId: number; name: string };
 type FileRow = { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null };
-type SeriesMembershipRow = { bookId: number; seriesId: number; seriesName: string; seriesIndex: number | null; displayOrder: number };
+type SeriesMembershipRow = {
+  bookId: number;
+  seriesId: number;
+  seriesName: string;
+  seriesIndex: number | null;
+  displayOrder: number;
+  expectedBookCount?: number | null;
+};
 type ProgressRow = { bookFileId: number; percentage: number | null };
 type StatusRow = {
   bookId: number;
@@ -195,6 +202,7 @@ export function assembleBookCards(
           seriesName: membership.seriesName,
           seriesIndex: membership.seriesIndex,
           displayOrder: membership.displayOrder,
+          expectedBookCount: membership.expectedBookCount ?? null,
         })),
       authors: authorsByBook.get(row.id) ?? [],
       files,

@@ -6,7 +6,8 @@ const mockApi = vi.fn<(...args: unknown[]) => unknown>()
 const mockGetAccessToken = vi.fn<(...args: unknown[]) => unknown>().mockReturnValue('token')
 vi.mock('@/lib/api', () => ({
   api: (...args: unknown[]) => mockApi(...args),
-  getAccessToken: () => mockGetAccessToken(),
+  getValidToken: () => Promise.resolve(mockGetAccessToken()),
+  refreshAccessToken: () => Promise.resolve(mockGetAccessToken()),
 }))
 
 const mockIo = vi.fn<(...args: unknown[]) => unknown>()
