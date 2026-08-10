@@ -14,9 +14,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import { DASHBOARD_SCROLLER_BATCH_MAX, SCROLLER_TYPES, type ScrollerType } from '@bookorbit/types';
+import { DASHBOARD_SCROLLER_BATCH_MAX, DASHBOARD_SCROLLER_MAX_LIMIT, SCROLLER_TYPES, type ScrollerType } from '@bookorbit/types';
 
-export const DASHBOARD_SCROLLER_MAX_LIMIT = 50;
+export { DASHBOARD_SCROLLER_MAX_LIMIT };
 
 export class DashboardScrollerBatchItemDto {
   @IsString()

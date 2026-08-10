@@ -32,7 +32,7 @@ export function useTableKeyboard(opts: {
   virtualizer: Ref<{ scrollToIndex: (index: number, opts?: Record<string, unknown>) => void }>
   isCellReadOnly: (book: BookCard, col: { id: string; isEditable: boolean }) => boolean
   onActivate: (book: BookCard, colId: string) => void
-  onSelect: (id: number, event: MouseEvent) => void
+  onSelect: (book: BookCard, event: MouseEvent) => void
   onCopyRow?: (book: BookCard) => void
   columnMapGetter?: () => Map<string, ColumnDef>
 }) {
@@ -158,7 +158,7 @@ export function useTableKeyboard(opts: {
       event.preventDefault()
       if (focusedRowIndex.value >= books.length) return
       const book = books[focusedRowIndex.value]
-      if (book) opts.onSelect(book.id, event as unknown as MouseEvent)
+      if (book) opts.onSelect(book, event as unknown as MouseEvent)
     } else if (isCopyShortcut) {
       event.preventDefault()
       const target = resolveCopyTarget(event, books, columns)

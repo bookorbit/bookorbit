@@ -4866,6 +4866,11 @@
         "twoColumns": "Two columns",
         "twoColumnsDescription": "Show two shelves per row."
       },
+      "shelfRows": {
+        "label": "Rows of books",
+        "option": "{count, plural, one {One row of books} other {# rows of books}}",
+        "hint": "Set how many rows of books each shelf shows. Narrow screens show at most two."
+      },
       "reorderHintWidget": "Drag to reorder. Toggle to show or hide a widget.",
       "reorderHintShelf": "Drag to reorder. Toggle to show or hide a shelf.",
       "smartScope": "Smart Scope",
@@ -6899,6 +6904,7 @@
       "clearAllFilters": "Clear all filters",
       "expandSeries": "Expand series",
       "collapseSeries": "Collapse series",
+      "collapseLockedWhileSelecting": "Series stay expanded while selecting",
       "expanded": "Expanded",
       "exportMetadata": "Export metadata",
       "showControlsAria": "Show library controls",

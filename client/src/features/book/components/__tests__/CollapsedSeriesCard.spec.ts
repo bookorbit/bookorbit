@@ -217,6 +217,24 @@ describe('CollapsedSeriesCard', () => {
     })
   })
 
+  it('does not navigate while selection mode is replacing collapsed rows', async () => {
+    gridCardPrimaryLabel.value = 'series-title'
+    gridCardSecondaryLabel.value = 'author'
+    cardInfoMode.value = 'below-cover'
+    const wrapper = mount(CollapsedSeriesCard, {
+      props: { book: makeBook(), selectionMode: true, showLabel: true },
+    })
+
+    await wrapper.trigger('click')
+    await wrapper.find('[data-testid="series-hover-action"]').trigger('click')
+    await wrapper.find('[data-testid="grid-card-label-primary"]').trigger('click')
+    await wrapper.find('[data-testid="grid-card-label-secondary"]').trigger('click')
+
+    expect(wrapper.attributes('inert')).toBeDefined()
+    expect(mockRouterPush).not.toHaveBeenCalled()
+    expect(mockFetchAuthors).not.toHaveBeenCalled()
+  })
+
   it('uses series id even when series name has special characters', async () => {
     const wrapper = mount(CollapsedSeriesCard, {
       props: { book: makeBook({ seriesId: 43, seriesName: 'The Wheel & Time' }) },

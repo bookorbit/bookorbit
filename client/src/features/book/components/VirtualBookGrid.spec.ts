@@ -38,8 +38,9 @@ vi.mock('./BookCoverCard.vue', () => ({
 vi.mock('./CollapsedSeriesCard.vue', () => ({
   default: {
     name: 'CollapsedSeriesCard',
-    props: ['book', 'showLabel'],
-    template: '<div data-testid="collapsed-series-card">{{ book.id }}<span v-if="showLabel" data-testid="series-card-label-slot" /></div>',
+    props: ['book', 'showLabel', 'selectionMode'],
+    template:
+      '<div data-testid="collapsed-series-card" :data-selection-mode="String(selectionMode)">{{ book.id }}<span v-if="showLabel" data-testid="series-card-label-slot" /></div>',
   },
 }))
 
@@ -175,6 +176,28 @@ describe('VirtualBookGrid', () => {
     const updatedBook = updateEvent?.[0]?.[0] as BookCard | undefined
     expect(updatedBook).toBeDefined()
     expect(updatedBook?.title).toBe('Updated')
+  })
+
+  it.each([false, true])('forwards selection mode to collapsed series cards when virtualized=%s', (virtualized) => {
+    const seriesBook = makeBook(4, {
+      collapsedSeries: {
+        bookCount: 3,
+        readCount: 0,
+        coverBookIds: [4],
+        seriesLatestAddedAt: null,
+      },
+    })
+    const wrapper = mount(VirtualBookGrid, {
+      props: {
+        books: [seriesBook],
+        coverSize: 120,
+        gridGap: 12,
+        selectionMode: true,
+        virtualized,
+      },
+    })
+
+    expect(wrapper.get('[data-testid="collapsed-series-card"]').attributes('data-selection-mode')).toBe('true')
   })
 
   it('scales square cover slots independently of media format in static mode', () => {

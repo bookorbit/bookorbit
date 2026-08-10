@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ref, type Ref } from 'vue'
+import { nextTick, ref, type Ref } from 'vue'
 import type { BookCard, ScrollerType } from '@bookorbit/types'
 
 type DashboardScrollerState = {
@@ -11,6 +11,21 @@ type DashboardScrollerState = {
 }
 
 type UseDashboardScrollerMock = (type: ScrollerType, limit?: number, smartScopeId?: number) => DashboardScrollerState
+
+// `sm` is true at or above the Tailwind sm breakpoint, so a false value is the
+// compact viewport where the row count gets capped. A real ref keeps the mock
+// reactive, so crossing the breakpoint after mount is exercised too.
+const breakpoint = vi.hoisted(() => ({ sm: null as null | Ref<boolean> }))
+vi.mock('@vueuse/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@vueuse/core')>()
+  const { ref: createRef } = await import('vue')
+  breakpoint.sm = createRef(true)
+  return { ...actual, useBreakpoints: () => ({ sm: breakpoint.sm }) }
+})
+
+function setCompactViewport(compact: boolean) {
+  if (breakpoint.sm) breakpoint.sm.value = !compact
+}
 
 const deleteMocks = vi.hoisted(() => ({
   promptDelete: vi.fn<(id: number) => void>(),
@@ -116,12 +131,16 @@ function mountScroller({
   books = [],
   loading = false,
   error = false,
+  rows,
+  limit,
   refresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }: {
   type: ScrollerType
   books?: BookCard[]
   loading?: boolean
   error?: boolean
+  rows?: number
+  limit?: number
   refresh?: () => Promise<void>
 }) {
   mockUseDashboardScroller.mockReturnValue({
@@ -135,13 +154,20 @@ function mountScroller({
     props: {
       type,
       title: 'Shelf',
+      ...(rows === undefined ? {} : { rows }),
+      ...(limit === undefined ? {} : { limit }),
     },
   })
+}
+
+function bandTitles(wrapper: ReturnType<typeof mountScroller>): string[][] {
+  return wrapper.findAll('[data-testid="shelf-band"]').map((band) => band.findAll('.book-card').map((card) => card.text()))
 }
 
 describe('DashboardScroller', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setCompactViewport(false)
   })
 
   it.each([
@@ -151,7 +177,7 @@ describe('DashboardScroller', () => {
     const wrapper = mountScroller({ type })
 
     expect(wrapper.text()).toContain(copy)
-    expect(mockUseDashboardScroller).toHaveBeenCalledWith(type, undefined, undefined)
+    expect(mockUseDashboardScroller).toHaveBeenCalledWith(type, 20, undefined)
   })
 
   it.each([
@@ -201,6 +227,77 @@ describe('DashboardScroller', () => {
 
     expect(wrapper.get('.book-card').attributes('data-aspect')).toBe('2/3')
     expect(wrapper.get('.book-card').element.parentElement?.classList.contains('w-[120px]')).toBe(true)
+  })
+
+  it('renders a single band when no row count is configured', () => {
+    const wrapper = mountScroller({ type: 'recently-added', books: [makeBook(1, 'epub'), makeBook(2, 'epub'), makeBook(3, 'epub')] })
+
+    expect(bandTitles(wrapper)).toEqual([['Book 1', 'Book 2', 'Book 3']])
+  })
+
+  it('fills bands left to right so reading order survives extra rows', () => {
+    const books = Array.from({ length: 6 }, (_, index) => makeBook(index + 1, 'epub'))
+
+    const wrapper = mountScroller({ type: 'continue-reading', books, rows: 3 })
+
+    expect(bandTitles(wrapper)).toEqual([
+      ['Book 1', 'Book 2'],
+      ['Book 3', 'Book 4'],
+      ['Book 5', 'Book 6'],
+    ])
+  })
+
+  it('caps a three-row shelf at two bands below the sm breakpoint', () => {
+    setCompactViewport(true)
+    const books = Array.from({ length: 6 }, (_, index) => makeBook(index + 1, 'epub'))
+
+    const wrapper = mountScroller({ type: 'continue-reading', books, rows: 3 })
+
+    expect(bandTitles(wrapper)).toEqual([
+      ['Book 1', 'Book 2', 'Book 3'],
+      ['Book 4', 'Book 5', 'Book 6'],
+    ])
+  })
+
+  it('re-flows its bands when the viewport crosses the sm breakpoint', async () => {
+    const books = Array.from({ length: 6 }, (_, index) => makeBook(index + 1, 'epub'))
+    const wrapper = mountScroller({ type: 'continue-reading', books, rows: 3 })
+
+    expect(bandTitles(wrapper)).toHaveLength(3)
+
+    setCompactViewport(true)
+    await nextTick()
+
+    expect(bandTitles(wrapper)).toEqual([
+      ['Book 1', 'Book 2', 'Book 3'],
+      ['Book 4', 'Book 5', 'Book 6'],
+    ])
+  })
+
+  it('requests more books as rows are added', () => {
+    mountScroller({ type: 'recently-added', rows: 2, limit: 20 })
+
+    expect(mockUseDashboardScroller).toHaveBeenCalledWith('recently-added', 40, undefined)
+  })
+
+  it('never requests more books than the server accepts', () => {
+    mountScroller({ type: 'recently-added', rows: 3, limit: 20 })
+
+    expect(mockUseDashboardScroller).toHaveBeenCalledWith('recently-added', 50, undefined)
+  })
+
+  it('requests only what a capped mobile shelf can render', () => {
+    setCompactViewport(true)
+
+    mountScroller({ type: 'recently-added', rows: 3, limit: 20 })
+
+    expect(mockUseDashboardScroller).toHaveBeenCalledWith('recently-added', 40, undefined)
+  })
+
+  it('scales loading skeletons with the row count', () => {
+    const wrapper = mountScroller({ type: 'recently-added', rows: 2, loading: true })
+
+    expect(wrapper.findAll('.animate-pulse')).toHaveLength(16)
   })
 
   it('opens related book actions from card events', async () => {

@@ -277,7 +277,7 @@ defineExpose({ scrollToIndex })
         :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }"
         :style="staticItemStyle(book)"
       >
-        <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
+        <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" :selection-mode="selectionMode" />
         <BookCoverCard
           v-else
           :book="book"
@@ -295,7 +295,7 @@ defineExpose({ scrollToIndex })
 
     <div v-else-if="!virtualized" class="grid w-full max-w-full items-end" :style="staticGridStyle" data-testid="book-grid-static">
       <div v-for="book in staticBooks" :key="book.id" class="min-w-0" :class="{ 'book-grid-cell--new': props.newBookIds.has(book.id) }">
-        <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" />
+        <CollapsedSeriesCard v-if="book.collapsedSeries" :book="book" :show-label="showLabel" :selection-mode="selectionMode" />
         <BookCoverCard
           v-else
           :book="book"
@@ -328,7 +328,12 @@ defineExpose({ scrollToIndex })
       <template #default="{ item }">
         <div class="book-grid-cell" :class="{ 'book-grid-cell--new': props.newBookIds.has(item.id) }">
           <BookCoverSkeleton v-if="isBookPlaceholder(item)" />
-          <CollapsedSeriesCard v-else-if="asBook(item).collapsedSeries" :book="asBook(item)" :show-label="showLabel" />
+          <CollapsedSeriesCard
+            v-else-if="asBook(item).collapsedSeries"
+            :book="asBook(item)"
+            :show-label="showLabel"
+            :selection-mode="selectionMode"
+          />
           <BookCoverCard
             v-else
             :book="asBook(item)"

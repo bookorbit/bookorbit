@@ -11,6 +11,7 @@ import { useBookBulkActions, type QuerySelectionState } from './useBookBulkActio
 interface BookTableShellOptions {
   viewType?: 'library' | 'collection' | 'smartScope'
   books: Ref<BookCard[]>
+  selectionMode?: Ref<boolean>
   total?: Ref<number>
   loading?: Ref<boolean>
   exitSelectionMode?: () => void
@@ -21,11 +22,11 @@ interface BookTableShellOptions {
 
 type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 
-export function useBookTableShell({ books, querySelection, onMoveToLibrary }: BookTableShellOptions) {
+export function useBookTableShell({ books, selectionMode, querySelection, onMoveToLibrary }: BookTableShellOptions) {
   const router = useRouter()
   const { setBookContext } = useBookNavigation()
   const tableControls = useTableViewControls()
-  const selection = useBookViewSelection(books)
+  const selection = useBookViewSelection(books, selectionMode)
 
   const {
     pendingId: deleteBookId,

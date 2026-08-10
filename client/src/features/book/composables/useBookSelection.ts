@@ -1,7 +1,6 @@
-import { computed, ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 
-export function useBookSelection() {
-  const selectionMode = ref(false)
+export function useBookSelection(selectionMode: Ref<boolean> = ref(false)) {
   const selectedIds = ref<Set<number>>(new Set())
   const selectedCount = computed(() => selectedIds.value.size)
   const anchorId = ref<number | null>(null)

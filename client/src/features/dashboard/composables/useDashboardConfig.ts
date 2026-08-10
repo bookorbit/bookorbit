@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 import { SCROLLER_TYPES, type ScrollerConfig, type ScrollerType } from '@bookorbit/types'
+import { normalizeShelfRows } from '../lib/shelf-rows'
 
 const STORAGE_KEY = 'bookorbit:dashboard:config'
 const MAX_SCROLLERS = 8
@@ -18,12 +19,12 @@ interface StoredDashboardConfig {
 }
 
 export const DEFAULT_SCROLLERS: ScrollerConfig[] = [
-  { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20 },
-  { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 2, limit: 20 },
-  { id: '1', type: 'continue-reading', label: 'Continue Reading', enabled: true, order: 3, limit: 20 },
-  { id: '5', type: 'continue-listening', label: 'Continue Listening', enabled: true, order: 4, limit: 20 },
-  { id: '6', type: 'want-to-read', label: 'Want to Read', enabled: false, order: 5, limit: 20 },
-  { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 6, limit: 20 },
+  { id: '2', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20, rows: 1 },
+  { id: '3', type: 'random', label: 'Discover Something New', enabled: true, order: 2, limit: 20, rows: 1 },
+  { id: '1', type: 'continue-reading', label: 'Continue Reading', enabled: true, order: 3, limit: 20, rows: 1 },
+  { id: '5', type: 'continue-listening', label: 'Continue Listening', enabled: true, order: 4, limit: 20, rows: 1 },
+  { id: '6', type: 'want-to-read', label: 'Want to Read', enabled: false, order: 5, limit: 20, rows: 1 },
+  { id: '4', type: 'up-next-in-series', label: 'Up Next in Series', enabled: false, order: 6, limit: 20, rows: 1 },
 ]
 
 // Persisted-only. Shelf headings and the type selector resolve their text from the active
@@ -104,6 +105,7 @@ function normalizeScroller(value: unknown, index: number): ScrollerConfig | null
     enabled: normalizeBoolean(raw.enabled, true),
     order: index + 1,
     limit: normalizePositiveNumber(raw.limit, 20),
+    rows: normalizeShelfRows(raw.rows),
     ...(smartScopeId === undefined ? {} : { smartScopeId }),
   }
 }
@@ -150,6 +152,7 @@ function areScrollersEqual(left: ScrollerConfig[], right: ScrollerConfig[]): boo
       scroller.enabled === other.enabled &&
       scroller.order === other.order &&
       scroller.limit === other.limit &&
+      scroller.rows === other.rows &&
       scroller.smartScopeId === other.smartScopeId
     )
   })
@@ -195,6 +198,7 @@ export function useDashboardConfig() {
       enabled: true,
       order: scrollers.value.length + 1,
       limit: 20,
+      rows: 1,
     })
     save()
   }

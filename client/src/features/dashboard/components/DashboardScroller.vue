@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
 import { Aperture, BookMarked, BookmarkPlus, ChevronLeft, ChevronRight, Headphones, ListOrdered, RefreshCw, Shuffle, Sparkles } from '@lucide/vue'
 
 import type { BookCard, ScrollerType } from '@bookorbit/types'
@@ -10,6 +11,7 @@ import AddToCollectionSheet from '@/features/collection/components/AddToCollecti
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useDashboardScroller } from '../composables/useDashboardScroller'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
+import { MIN_SHELF_ROWS, chunkIntoBands, effectiveShelfRows, shelfBookLimit } from '../lib/shelf-rows'
 
 defineOptions({
   inheritAttrs: false,
@@ -19,13 +21,27 @@ const props = defineProps<{
   type: ScrollerType
   title: string
   limit?: number
+  rows?: number
   smartScopeId?: number
 }>()
 
 const attrs = useAttrs()
 const { t } = useI18n()
 
-const { books, loading, error, refresh } = useDashboardScroller(props.type, props.limit, props.smartScopeId)
+const DEFAULT_BOOKS_PER_ROW = 20
+
+const { sm } = useBreakpoints(breakpointsTailwind)
+const shelfRows = computed(() => effectiveShelfRows(props.rows ?? MIN_SHELF_ROWS, !sm.value))
+
+// Snapshotted at setup so resizing across the breakpoint re-flows the books
+// already fetched instead of firing another batch request.
+const { books, loading, error, refresh } = useDashboardScroller(
+  props.type,
+  shelfBookLimit(props.limit ?? DEFAULT_BOOKS_PER_ROW, shelfRows.value),
+  props.smartScopeId,
+)
+
+const bands = computed(() => chunkIntoBands(books.value, shelfRows.value))
 
 const scrollEl = ref<HTMLElement | null>(null)
 
@@ -43,7 +59,8 @@ const typeIcon = computed(() => {
   return Shuffle
 })
 
-const SKELETONS = Array.from({ length: 8 })
+const SKELETONS_PER_BAND = 8
+const skeletonBands = computed(() => Array.from({ length: shelfRows.value }, () => Array.from({ length: SKELETONS_PER_BAND })))
 const PORTRAIT_COVER_WIDTH_CLASS = 'w-[120px]'
 const SQUARE_COVER_WIDTH_CLASS = 'w-[150px]'
 
@@ -86,6 +103,10 @@ function handleBookAction(book: BookCard, action: BookActionType) {
 function coverWidthClass(book: BookCard): string {
   return book.coverAspectRatio === '1/1' ? SQUARE_COVER_WIDTH_CLASS : PORTRAIT_COVER_WIDTH_CLASS
 }
+
+function coverAnimationDelay(index: number): string {
+  return `${index * 35}ms`
+}
 </script>
 
 <template>
@@ -121,9 +142,11 @@ function coverWidthClass(book: BookCard): string {
     </div>
 
     <!-- Skeleton -->
-    <div v-if="loading" class="flex gap-3 overflow-hidden px-5 pb-5">
-      <div v-for="(_, n) in SKELETONS" :key="n" class="w-[120px] shrink-0">
-        <div class="w-full animate-pulse rounded-lg bg-muted" style="aspect-ratio: 2/3" />
+    <div v-if="loading" class="flex flex-col gap-5 overflow-hidden px-5 pb-5">
+      <div v-for="(skeletonBand, bandIndex) in skeletonBands" :key="bandIndex" class="flex gap-3">
+        <div v-for="(_, n) in skeletonBand" :key="n" class="w-[120px] shrink-0">
+          <div class="w-full animate-pulse rounded-lg bg-muted" style="aspect-ratio: 2/3" />
+        </div>
       </div>
     </div>
 
@@ -152,17 +175,21 @@ function coverWidthClass(book: BookCard): string {
       </p>
     </div>
 
-    <!-- Books row -->
-    <div v-else ref="scrollEl" class="flex items-end gap-5 overflow-x-auto px-5 pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div
-        v-for="(book, index) in books"
-        :key="book.id"
-        class="shrink-0"
-        :class="coverWidthClass(book)"
-        style="animation: dashboardFadeUp 0.35s ease both"
-        :style="{ animationDelay: `${index * 35}ms` }"
-      >
-        <BookCoverCard :book="book" :cover-aspect-ratio="book.coverAspectRatio" @action="handleBookAction(book, $event)" />
+    <!-- Books rows -->
+    <div v-else ref="scrollEl" class="overflow-x-auto px-5 pb-5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div class="flex w-max flex-col gap-5">
+        <div v-for="(band, bandIndex) in bands" :key="bandIndex" data-testid="shelf-band" class="flex items-end gap-5">
+          <div
+            v-for="(book, index) in band"
+            :key="book.id"
+            class="shrink-0"
+            :class="coverWidthClass(book)"
+            style="animation: dashboardFadeUp 0.35s ease both"
+            :style="{ animationDelay: coverAnimationDelay(index) }"
+          >
+            <BookCoverCard :book="book" :cover-aspect-ratio="book.coverAspectRatio" @action="handleBookAction(book, $event)" />
+          </div>
+        </div>
       </div>
     </div>
   </section>
