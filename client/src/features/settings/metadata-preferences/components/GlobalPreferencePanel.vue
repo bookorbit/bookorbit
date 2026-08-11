@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, RotateCcw, Save, Settings, Trash2 } from '@lucide/vue'
+import { MAX_METADATA_GENRE_COUNT } from '@bookorbit/types'
 import type { FieldPreference, MetadataFetchPreferences, MetadataField, ProviderStatus } from '@bookorbit/types'
 import FieldPreferenceTable from './FieldPreferenceTable.vue'
 
@@ -28,6 +29,7 @@ function withDefaultOptions(prefs: MetadataFetchPreferences): MetadataFetchPrefe
       genres: {
         mode: prefs.options?.genres.mode ?? 'merge',
         blocklist: prefs.options?.genres.blocklist ?? [],
+        maxCount: prefs.options?.genres.maxCount ?? null,
       },
       saveProviderIds: prefs.options?.saveProviderIds ?? true,
     },
@@ -48,18 +50,34 @@ function onFieldChange(field: MetadataField, pref: FieldPreference) {
 }
 
 function save() {
-  if (!draft.value) return
+  if (!draft.value || !isGenreMaxCountValid.value) return
   emit('save', draft.value)
 }
 
-function setGenreMerge(enabled: boolean) {
+function toggleGenreMerge() {
   if (!draft.value?.options) return
-  draft.value.options.genres.mode = enabled ? 'merge' : 'firstProvider'
+  draft.value.options.genres.mode = draft.value.options.genres.mode === 'merge' ? 'firstProvider' : 'merge'
 }
 
 function toggleSaveProviderIds() {
   if (!draft.value?.options) return
   draft.value.options.saveProviderIds = !draft.value.options.saveProviderIds
+}
+
+const genreMaxCount = computed(() => draft.value?.options?.genres.maxCount ?? null)
+const isGenreMaxCountValid = computed(
+  () =>
+    genreMaxCount.value === null ||
+    (Number.isInteger(genreMaxCount.value) && genreMaxCount.value >= 1 && genreMaxCount.value <= MAX_METADATA_GENRE_COUNT),
+)
+const genreMaxCountDescriptionIds = computed(() =>
+  isGenreMaxCountValid.value ? 'genre-max-count-hint' : 'genre-max-count-hint genre-max-count-error',
+)
+
+function setGenreMaxCount(event: Event) {
+  if (!draft.value?.options) return
+  const value = (event.target as HTMLInputElement).valueAsNumber
+  draft.value.options.genres.maxCount = Number.isNaN(value) ? null : value
 }
 
 function handleClearAll() {
@@ -98,7 +116,7 @@ function handleResetToDefault() {
           <RotateCcw :size="13" />
           <span>{{ t('settings.metadata.fieldRules.resetToDefault') }}</span>
         </button>
-        <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft" @click="save">
+        <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft || !isGenreMaxCountValid" @click="save">
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
           <span>{{ t('settings.metadata.fieldRules.global.saveDefaults') }}</span>
@@ -123,7 +141,7 @@ function handleResetToDefault() {
           <RotateCcw :size="13" />
           <span>{{ t('settings.metadata.fieldRules.reset') }}</span>
         </button>
-        <button class="settings-btn-primary h-8 px-3 justify-center ml-auto" :disabled="saving || !draft" @click="save">
+        <button class="settings-btn-primary h-8 px-3 justify-center ml-auto" :disabled="saving || !draft || !isGenreMaxCountValid" @click="save">
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
           <span>{{ t('settings.metadata.fieldRules.global.saveDefaults') }}</span>
@@ -141,49 +159,84 @@ function handleResetToDefault() {
           <h4 class="settings-group-label !mb-0">{{ t('settings.metadata.fieldRules.advanced.title') }}</h4>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <!-- Genre Behavior -->
-          <div class="space-y-4">
-            <label class="flex items-start gap-3 group cursor-pointer">
-              <div
-                class="relative flex h-5 w-9 shrink-0 items-center rounded-full transition-colors mt-0.5"
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div class="h-full rounded-lg border border-border bg-background/60 p-4 shadow-xs">
+            <div class="flex items-start justify-between gap-4">
+              <span id="combine-genres-label" class="text-sm font-medium leading-5 text-foreground">
+                {{ t('settings.metadata.fieldRules.advanced.combineGenres.label') }}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="draft.options?.genres.mode === 'merge'"
+                aria-labelledby="combine-genres-label"
+                aria-describedby="combine-genres-hint"
+                class="relative flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 :class="draft.options?.genres.mode === 'merge' ? 'bg-primary' : 'bg-muted border border-border'"
-                @click.prevent="setGenreMerge(draft.options?.genres.mode !== 'merge')"
+                @click="toggleGenreMerge"
               >
                 <span
                   class="inline-block h-4 w-4 rounded-full bg-white shadow-xs transition-transform"
                   :class="draft.options?.genres.mode === 'merge' ? 'translate-x-4.5' : 'translate-x-0.5'"
                 />
-              </div>
-              <div class="space-y-1">
-                <span class="text-sm font-medium text-foreground">{{ t('settings.metadata.fieldRules.advanced.combineGenres.label') }}</span>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('settings.metadata.fieldRules.advanced.combineGenres.hint') }}
-                </p>
-              </div>
-            </label>
+              </button>
+            </div>
+            <p id="combine-genres-hint" class="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {{ t('settings.metadata.fieldRules.advanced.combineGenres.hint') }}
+            </p>
           </div>
 
-          <!-- IDs Behavior -->
-          <div class="space-y-4">
-            <label class="flex items-start gap-3 group cursor-pointer">
-              <div
-                class="relative flex h-5 w-9 shrink-0 items-center rounded-full transition-colors mt-0.5"
+          <div class="h-full rounded-lg border border-border bg-background/60 p-4 shadow-xs">
+            <div class="flex items-start justify-between gap-4">
+              <label for="genre-max-count" class="text-sm font-medium leading-5 text-foreground">
+                {{ t('settings.metadata.fieldRules.advanced.maxGenres.label') }}
+              </label>
+              <input
+                id="genre-max-count"
+                type="number"
+                min="1"
+                :max="MAX_METADATA_GENRE_COUNT"
+                step="1"
+                :value="draft.options?.genres.maxCount ?? ''"
+                :placeholder="t('settings.metadata.fieldRules.advanced.maxGenres.unlimited')"
+                :aria-invalid="!isGenreMaxCountValid"
+                :aria-describedby="genreMaxCountDescriptionIds"
+                class="h-8 w-24 shrink-0 rounded-md border border-input bg-background px-2 text-center text-sm tabular-nums outline-none transition-shadow focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+                @input="setGenreMaxCount"
+              />
+            </div>
+            <p id="genre-max-count-hint" class="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {{ t('settings.metadata.fieldRules.advanced.maxGenres.hint') }}
+            </p>
+            <p v-if="!isGenreMaxCountValid" id="genre-max-count-error" class="text-xs text-destructive">
+              {{ t('settings.metadata.fieldRules.advanced.maxGenres.error', { max: MAX_METADATA_GENRE_COUNT }) }}
+            </p>
+          </div>
+
+          <div class="h-full rounded-lg border border-border bg-background/60 p-4 shadow-xs">
+            <div class="flex items-start justify-between gap-4">
+              <span id="store-provider-ids-label" class="text-sm font-medium leading-5 text-foreground">
+                {{ t('settings.metadata.fieldRules.advanced.storeProviderIds.label') }}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="draft.options?.saveProviderIds"
+                aria-labelledby="store-provider-ids-label"
+                aria-describedby="store-provider-ids-hint"
+                class="relative flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 :class="draft.options?.saveProviderIds ? 'bg-primary' : 'bg-muted border border-border'"
-                @click.prevent="toggleSaveProviderIds"
+                @click="toggleSaveProviderIds"
               >
                 <span
                   class="inline-block h-4 w-4 rounded-full bg-white shadow-xs transition-transform"
                   :class="draft.options?.saveProviderIds ? 'translate-x-4.5' : 'translate-x-0.5'"
                 />
-              </div>
-              <div class="space-y-1">
-                <span class="text-sm font-medium text-foreground">{{ t('settings.metadata.fieldRules.advanced.storeProviderIds.label') }}</span>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('settings.metadata.fieldRules.advanced.storeProviderIds.hint') }}
-                </p>
-              </div>
-            </label>
+              </button>
+            </div>
+            <p id="store-provider-ids-hint" class="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {{ t('settings.metadata.fieldRules.advanced.storeProviderIds.hint') }}
+            </p>
           </div>
         </div>
       </div>

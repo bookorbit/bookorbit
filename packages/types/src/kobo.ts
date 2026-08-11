@@ -17,6 +17,7 @@ export interface KoboSyncSettings {
   kepubConversionLimitMb: number;
   twoWayProgressSync: boolean;
   syncBookOrbitAnnotationsToKobo: boolean;
+  storeSync: boolean;
 }
 
 export type KoboSyncHistoryEvent = "library_sync" | "book_download" | "progress_update" | "annotations_pull" | "annotations_push";
@@ -54,4 +55,5 @@ export interface UpdateKoboSyncSettingsRequest {
   kepubConversionLimitMb?: number;
   twoWayProgressSync?: boolean;
   syncBookOrbitAnnotationsToKobo?: boolean;
+  storeSync?: boolean;
 }

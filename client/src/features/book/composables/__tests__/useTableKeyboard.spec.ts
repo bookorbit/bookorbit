@@ -32,7 +32,7 @@ describe('useTableKeyboard', () => {
   let displayColumns: Ref<ColumnDef[]>
   let activeCellKey: Ref<string | null>
   let onActivate: (book: BookCard, colId: string) => void
-  let onSelect: (id: number, event: MouseEvent) => void
+  let onSelect: (book: BookCard, event: MouseEvent) => void
   let scrollToIndexSpy: ReturnType<typeof vi.fn>
 
   function createKeyboard() {
@@ -58,7 +58,7 @@ describe('useTableKeyboard', () => {
     displayColumns = ref(makeColumns())
     activeCellKey = ref(null)
     onActivate = vi.fn<(book: BookCard, colId: string) => void>()
-    onSelect = vi.fn<(id: number, event: MouseEvent) => void>()
+    onSelect = vi.fn<(book: BookCard, event: MouseEvent) => void>()
     scrollToIndexSpy = vi.fn<() => void>()
   })
 
@@ -180,7 +180,7 @@ describe('useTableKeyboard', () => {
     })
     keyboard.handleTableKeydown(keyEvent('ArrowDown'))
     keyboard.handleTableKeydown(keyEvent(' '))
-    expect(onSelect).toHaveBeenCalledWith(1, expect.anything())
+    expect(onSelect).toHaveBeenCalledWith(books[0], expect.anything())
   })
 
   it('does nothing when activeCell is set', () => {

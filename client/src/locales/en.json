@@ -1360,6 +1360,12 @@
             "label": "Combine genres from all selected providers",
             "hint": "Collect and deduplicate genres from every provider assigned to the Genres field, rather than stopping at the first result."
           },
+          "maxGenres": {
+            "label": "Maximum genres per book",
+            "hint": "Applied after exclusions and duplicate removal. Leave empty for unlimited. This affects future metadata fetches.",
+            "unlimited": "Unlimited",
+            "error": "Enter a whole number from 1 to {max}, or leave the field empty."
+          },
           "storeProviderIds": {
             "label": "Store provider IDs on books",
             "hint": "When fetching metadata, save the returned provider IDs (ISBN, ASIN, Goodreads ID, etc.) on the book record for more accurate future lookups."
@@ -1870,6 +1876,8 @@
         "twoWaySyncHint": "Sync reading position between BookOrbit and Kobo. Requires KEPUB delivery for precise locations and reliable page restore.",
         "syncHighlights": "Sync BookOrbit highlights to Kobo",
         "syncHighlightsHint": "Send highlights made in BookOrbit or KOReader to your Kobo. Kobo highlights are imported into BookOrbit even when this is off. Linked annotations sync edits and deletes both ways. Requires KEPUB delivery; the book on Kobo must be the KEPUB downloaded from BookOrbit.",
+        "storeSync": "Include Kobo store titles",
+        "storeSyncHint": "Also deliver books from your Kobo account, including Kobo Plus and purchases, alongside your BookOrbit library. Without this, only BookOrbit books reach the device. Store titles are downloaded from Kobo directly and are not added to your BookOrbit library.",
         "convertKepub": "Convert to KEPUB",
         "convertKepubHint": "Send eligible EPUBs as KEPUB. This stays on when progress sync or BookOrbit-to-Kobo highlights are enabled. On the next Kobo sync, affected books are offered again as KEPUB downloads; remove any old EPUB copy if Kobo keeps opening it.",
         "forceHyphenation": "Force hyphenation",
@@ -4854,6 +4862,11 @@
         "twoColumns": "Two columns",
         "twoColumnsDescription": "Show two shelves per row."
       },
+      "shelfRows": {
+        "label": "Rows of books",
+        "option": "{count, plural, one {One row of books} other {# rows of books}}",
+        "hint": "Set how many rows of books each shelf shows. Narrow screens show at most two."
+      },
       "reorderHintWidget": "Drag to reorder. Toggle to show or hide a widget.",
       "reorderHintShelf": "Drag to reorder. Toggle to show or hide a shelf.",
       "smartScope": "Smart Scope",
@@ -6871,6 +6884,7 @@
       "clearAllFilters": "Clear all filters",
       "expandSeries": "Expand series",
       "collapseSeries": "Collapse series",
+      "collapseLockedWhileSelecting": "Series stay expanded while selecting",
       "expanded": "Expanded",
       "exportMetadata": "Export metadata",
       "showControlsAria": "Show library controls",

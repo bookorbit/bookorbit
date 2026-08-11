@@ -2,8 +2,8 @@ import { computed, type Ref } from 'vue'
 import type { BookCard } from '@bookorbit/types'
 import { useBookSelection } from './useBookSelection'
 
-export function useBookViewSelection(books: Ref<BookCard[]>) {
-  const selection = useBookSelection()
+export function useBookViewSelection(books: Ref<BookCard[]>, selectionMode?: Ref<boolean>) {
+  const selection = useBookSelection(selectionMode)
 
   const bookIds = computed(() => books.value.map((book) => book.id))
 

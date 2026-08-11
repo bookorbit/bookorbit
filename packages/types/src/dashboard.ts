@@ -15,6 +15,10 @@ export const SCROLLER_TYPES = Object.values(SCROLLER_TYPE) as ReadonlyArray<Scro
 
 export const DASHBOARD_SCROLLER_BATCH_MAX = 8;
 
+// The server rejects a larger per-shelf limit. Shared so the client can size a
+// multi-row shelf without guessing the ceiling it will be validated against.
+export const DASHBOARD_SCROLLER_MAX_LIMIT = 50;
+
 export interface DashboardScrollerBatchItem {
   id: string;
   type: ScrollerType;
@@ -41,7 +45,9 @@ export interface ScrollerConfig {
   label: string;
   enabled: boolean;
   order: number;
+  // Books per row. The shelf fetches `limit * rows`, capped at DASHBOARD_SCROLLER_MAX_LIMIT.
   limit: number;
+  rows: number;
   smartScopeId?: number;
 }
 

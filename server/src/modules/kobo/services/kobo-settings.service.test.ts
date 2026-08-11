@@ -11,6 +11,7 @@ function makeRow(overrides: Partial<Record<string, unknown>> = {}) {
     forceEnableHyphenation: false,
     kepubConversionLimitMb: 100,
     twoWayProgressSync: false,
+    storeSync: false,
     ...overrides,
   };
 }
@@ -64,6 +65,7 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
       twoWayProgressSync: false,
+      storeSync: false,
     });
     expect(db.insert).not.toHaveBeenCalled();
   });
@@ -81,6 +83,7 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 150,
       twoWayProgressSync: false,
+      storeSync: false,
     });
     expect(db.insertValues).toHaveBeenCalledWith({ userId: 7 });
   });
@@ -98,6 +101,7 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
       twoWayProgressSync: true,
+      storeSync: false,
     });
     expect(db.updateSet).toHaveBeenCalledWith(expect.objectContaining({ convertToKepub: true }));
     expect(db.execute).toHaveBeenCalledTimes(1);
@@ -122,6 +126,7 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
       twoWayProgressSync: false,
+      storeSync: false,
     });
     db.updateReturning.mockResolvedValue([
       makeRow({
@@ -129,6 +134,7 @@ describe('KoboSettingsService', () => {
         forceEnableHyphenation: true,
         kepubConversionLimitMb: 200,
         twoWayProgressSync: true,
+        storeSync: false,
       }),
     ]);
 
@@ -139,11 +145,13 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: true,
       kepubConversionLimitMb: 200,
       twoWayProgressSync: true,
+      storeSync: false,
     });
     expect(db.updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         convertToKepub: true,
         twoWayProgressSync: true,
+        storeSync: false,
       }),
     );
     expect(db.execute).toHaveBeenCalledTimes(1);
@@ -159,6 +167,7 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
       twoWayProgressSync: false,
+      storeSync: false,
     });
     db.updateReturning.mockResolvedValue([makeRow({ readingThreshold: 5, finishedThreshold: 95 })]);
 
@@ -169,7 +178,27 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
       twoWayProgressSync: false,
+      storeSync: false,
     });
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  it('toggles store sync without forcing every Kobo book to be re-delivered', async () => {
+    const db = makeDb();
+    const service = new KoboSettingsService(db as never);
+    vi.spyOn(service, 'getSettings').mockResolvedValue({
+      readingThreshold: 1,
+      finishedThreshold: 99,
+      convertToKepub: true,
+      forceEnableHyphenation: false,
+      kepubConversionLimitMb: 100,
+      twoWayProgressSync: false,
+      storeSync: false,
+    });
+    db.updateReturning.mockResolvedValue([makeRow({ storeSync: true })]);
+
+    await expect(service.updateSettings(9, { storeSync: true })).resolves.toMatchObject({ storeSync: true });
+    expect(db.updateSet).toHaveBeenCalledWith(expect.objectContaining({ storeSync: true }));
     expect(db.execute).not.toHaveBeenCalled();
   });
 
@@ -183,6 +212,7 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
       twoWayProgressSync: false,
+      storeSync: false,
     });
     db.updateReturning.mockResolvedValue([]);
 
@@ -199,6 +229,7 @@ describe('KoboSettingsService', () => {
       forceEnableHyphenation: false,
       kepubConversionLimitMb: 100,
       twoWayProgressSync: false,
+      storeSync: false,
     });
 
     await expect(service.updateSettings(9, { readingThreshold: 99, finishedThreshold: 99 })).rejects.toThrow(

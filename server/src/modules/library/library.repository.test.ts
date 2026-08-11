@@ -6,7 +6,8 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { libraries } from '../../db/schema';
+import { books, libraries } from '../../db/schema';
+import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
 import { LibraryRepository } from './library.repository';
 
 describe('LibraryRepository', () => {
@@ -52,7 +53,25 @@ describe('LibraryRepository', () => {
     expect(txUpdateSet).toHaveBeenNthCalledWith(2, { displayOrder: 6 });
   });
 
-  it('findAllForUser includes file rename eligibility in the scoped library projection', async () => {
+  it('findAll counts only present books while retaining empty libraries', async () => {
+    const orderBy = vi.fn().mockResolvedValue([]);
+    const groupBy = vi.fn().mockReturnValue({ orderBy });
+    const leftJoin = vi.fn().mockReturnValue({ groupBy });
+    const from = vi.fn().mockReturnValue({ leftJoin });
+    db.select.mockReturnValue({ from });
+
+    await repo.findAll();
+
+    expect(leftJoin).toHaveBeenCalledWith(books, {
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: books.libraryId, right: libraries.id },
+        { op: 'eq', left: books.status, right: LIBRARY_BOOK_STATUS_PRESENT },
+      ],
+    });
+  });
+
+  it('findAllForUser includes file rename eligibility and counts only present books', async () => {
     const orderBy = vi.fn().mockResolvedValue([]);
     const groupBy = vi.fn().mockReturnValue({ orderBy });
     const leftJoin = vi.fn().mockReturnValue({ groupBy });
@@ -67,6 +86,13 @@ describe('LibraryRepository', () => {
         fileRenameEnabled: libraries.fileRenameEnabled,
       }),
     );
+    expect(leftJoin).toHaveBeenCalledWith(books, {
+      op: 'and',
+      clauses: [
+        { op: 'eq', left: books.libraryId, right: libraries.id },
+        { op: 'eq', left: books.status, right: LIBRARY_BOOK_STATUS_PRESENT },
+      ],
+    });
     expect(orderBy).toHaveBeenCalledWith(libraries.displayOrder, libraries.name);
   });
 

@@ -154,6 +154,70 @@ describe('KoboProxyService', () => {
     expect(reply.send).toHaveBeenCalledWith({ message: 'Upstream Kobo API unavailable' });
   });
 
+  describe('request', () => {
+    function stubUpstream(headers: Record<string, string>, body = '[]') {
+      const fetchMock = vi.fn().mockResolvedValue({
+        status: 200,
+        headers: new Headers(headers),
+        arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode(body).buffer),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    const syncRequest = {
+      method: 'GET',
+      url: '/api/v1/kobo/dev/v1/library/sync?Filter=ALL',
+      headers: { authorization: 'Bearer kobo-jwt', 'x-kobo-synctoken': 'PX.composite' },
+    };
+
+    it('returns the upstream response with lowercased headers instead of piping it', async () => {
+      stubUpstream({ 'X-Kobo-Sync': 'continue', 'X-Kobo-SyncToken': 'kobo-cursor' }, '[{"a":1}]');
+
+      const response = await new KoboProxyService().request(syncRequest as never, 'dev');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['x-kobo-sync']).toBe('continue');
+      expect(response.headers['x-kobo-synctoken']).toBe('kobo-cursor');
+      expect(JSON.parse(response.body.toString('utf8'))).toEqual([{ a: 1 }]);
+    });
+
+    it('overrides a forwarded header with extraHeaders', async () => {
+      const fetchMock = stubUpstream({});
+
+      await new KoboProxyService().request(syncRequest as never, 'dev', { extraHeaders: { 'x-kobo-synctoken': 'kobo-cursor' } });
+
+      expect(fetchMock.mock.calls[0][1].headers).toMatchObject({ authorization: 'Bearer kobo-jwt', 'x-kobo-synctoken': 'kobo-cursor' });
+    });
+
+    it('drops a forwarded header listed in omitHeaders while keeping the device credential', async () => {
+      const fetchMock = stubUpstream({});
+
+      await new KoboProxyService().request(syncRequest as never, 'dev', { omitHeaders: ['X-Kobo-SyncToken'] });
+
+      const sentHeaders = fetchMock.mock.calls[0][1].headers;
+      expect(sentHeaders).not.toHaveProperty('x-kobo-synctoken');
+      expect(sentHeaders.authorization).toBe('Bearer kobo-jwt');
+    });
+
+    it('attaches an abort signal only when a timeout is requested', async () => {
+      const fetchMock = stubUpstream({});
+      const service = new KoboProxyService();
+
+      await service.request(syncRequest as never, 'dev');
+      expect(fetchMock.mock.calls[0][1].signal).toBeUndefined();
+
+      await service.request(syncRequest as never, 'dev', { timeoutMs: 8000 });
+      expect(fetchMock.mock.calls[1][1].signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('propagates upstream failures to the caller rather than swallowing them', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+
+      await expect(new KoboProxyService().request(syncRequest as never, 'dev')).rejects.toThrow('network down');
+    });
+  });
+
   describe('buildTargetUrl', () => {
     let service: KoboProxyService;
 

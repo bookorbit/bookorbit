@@ -54,6 +54,7 @@ export const koboSyncSettings = pgTable(
     kepubConversionLimitMb: integer('kepub_conversion_limit_mb').notNull().default(100),
     twoWayProgressSync: boolean('two_way_progress_sync').notNull().default(false),
     syncBookOrbitAnnotationsToKobo: boolean('sync_bookorbit_annotations_to_kobo').notNull().default(false),
+    storeSync: boolean('store_sync').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

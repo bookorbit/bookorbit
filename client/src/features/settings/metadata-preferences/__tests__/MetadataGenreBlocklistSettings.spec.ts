@@ -47,6 +47,7 @@ function makePrefs(blocklist: string[], marker = 'initial'): MetadataFetchPrefer
       genres: {
         mode: 'merge',
         blocklist,
+        maxCount: 3,
       },
       saveProviderIds: true,
     },
@@ -92,6 +93,7 @@ describe('MetadataGenreBlocklistSettings', () => {
     const body = putBodyAt(2)
     expect(body.fields.title.providers).toEqual(['latest'])
     expect(body.options?.genres.blocklist).toEqual(['Audiobook', 'Adult'])
+    expect(body.options?.genres.maxCount).toBe(3)
   })
 
   it('does not submit duplicate genre values', async () => {

@@ -46,6 +46,7 @@ const forceEnableHyphenation = ref(false)
 const kepubConversionLimitMb = ref(100)
 const twoWayProgressSync = ref(false)
 const syncBookOrbitAnnotationsToKobo = ref(false)
+const storeSync = ref(false)
 const savingSettings = ref(false)
 const settingsError = ref<string | null>(null)
 const refreshingHistory = ref(false)
@@ -118,6 +119,7 @@ function applySettingsToLocal() {
   kepubConversionLimitMb.value = settings.value.kepubConversionLimitMb
   twoWayProgressSync.value = settings.value.twoWayProgressSync
   syncBookOrbitAnnotationsToKobo.value = settings.value.syncBookOrbitAnnotationsToKobo
+  storeSync.value = settings.value.storeSync
 }
 
 function formatLastSeen(date: string | null): string {
@@ -615,6 +617,7 @@ async function saveSettings() {
       kepubConversionLimitMb: kepubConversionLimitMb.value,
       twoWayProgressSync: twoWayProgressSync.value,
       syncBookOrbitAnnotationsToKobo: syncBookOrbitAnnotationsToKobo.value,
+      storeSync: storeSync.value,
     })
     applySettingsToLocal()
     toast.success(t('settings.reader.kobo.settingsSaved'))
@@ -997,6 +1000,16 @@ async function saveSettings() {
             </p>
           </div>
           <ToggleSwitch v-model="syncBookOrbitAnnotationsToKobo" />
+        </div>
+
+        <div class="flex items-center justify-between px-5 py-4 bg-card">
+          <div class="pr-8">
+            <p class="settings-label">{{ t('settings.reader.kobo.storeSync') }}</p>
+            <p class="settings-hint">
+              {{ t('settings.reader.kobo.storeSyncHint') }}
+            </p>
+          </div>
+          <ToggleSwitch v-model="storeSync" />
         </div>
 
         <div class="flex items-center justify-between px-5 py-4 bg-card">

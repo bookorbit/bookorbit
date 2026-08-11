@@ -30,6 +30,10 @@ export class UpdateSettingsDto {
   syncBookOrbitAnnotationsToKobo?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  storeSync?: boolean;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(500)

@@ -26,6 +26,7 @@ import { toast } from 'vue-sonner'
 import { useCollections } from '@/features/collection/composables/useCollections'
 import { useBookViewWindow } from '@/features/book/composables/useBookViewWindow'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
+import { useEffectiveSeriesCollapse } from '@/features/book/composables/useEffectiveSeriesCollapse'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
@@ -67,6 +68,8 @@ usePageTitle(pageTitle)
 
 const { getEffectivePreference, setPreference, prefs } = useSeriesCollapsePreference()
 const collapseEnabledRef = ref(getEffectivePreference({ collectionId: collectionId.value }))
+const selectionMode = ref(false)
+const effectiveCollapseEnabled = useEffectiveSeriesCollapse(collapseEnabledRef, selectionMode)
 
 watch(collectionId, (id) => {
   collapseEnabledRef.value = getEffectivePreference({ collectionId: id })
@@ -113,7 +116,7 @@ const {
   viewMode: effectiveViewMode,
   railEnabled: showJumpRails,
   railViewport: mainRef,
-  collapseEnabled: collapseEnabledRef,
+  collapseEnabled: effectiveCollapseEnabled,
   q: debouncedQuery,
 })
 const { sortModel: tableSortModel } = useViewSort(tableSort, 'collection', collectionId)
@@ -170,7 +173,7 @@ function handleTableDensityChange(value: 'compact' | 'comfortable' | 'roomy') {
 }
 
 function handleSelectAllLoaded(checked: boolean) {
-  const ids = books.value.map((book) => book.id)
+  const ids = books.value.filter((book) => !book.collapsedSeries).map((book) => book.id)
   if (checked) selectAll(ids)
   else deselectAll(ids)
 }
@@ -187,7 +190,6 @@ const {
   handleDuplicateTablePreset,
   handleTogglePresetFavorite,
   handleImportPresetBackup,
-  selectionMode,
   selectedIds,
   selectedCount,
   enterSelectionMode,
@@ -220,6 +222,7 @@ const {
   handleEditIndividually,
 } = useBookTableShell({
   books,
+  selectionMode,
   onMoveToLibrary: (bookId) => openMoveForBook(bookId),
 })
 
@@ -323,7 +326,14 @@ async function handleBulkEditConfirm(fields: BulkEditFields) {
   }
 }
 
+const collapseToggleLabel = computed(() => (effectiveCollapseEnabled.value ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')))
+const collapseToggleHint = computed(() => (selectionMode.value ? t('views.bookView.collapseLockedWhileSelecting') : collapseToggleLabel.value))
+const collapseMenuLabel = computed(() =>
+  selectionMode.value ? t('views.bookView.collapseLockedWhileSelecting') : t('views.bookView.collapseSeries'),
+)
+
 async function handleToggleCollapse() {
+  if (selectionMode.value) return
   const next = !collapseEnabledRef.value
   collapseEnabledRef.value = next
   await setPreference({ collectionId: collectionId.value }, next)
@@ -482,19 +492,20 @@ defineOptions({ name: 'CollectionView' })
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+                class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md border transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
                 :class="
-                  collapseEnabledRef
+                  effectiveCollapseEnabled
                     ? 'border-primary text-primary bg-primary/10'
                     : 'border-input text-muted-foreground bg-background hover:text-foreground hover:bg-muted'
                 "
-                :aria-label="collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')"
+                :aria-label="collapseToggleLabel"
+                :aria-disabled="selectionMode || undefined"
                 @click="handleToggleCollapse"
               >
                 <Layers :size="14" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>{{ collapseEnabledRef ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries') }}</TooltipContent>
+            <TooltipContent>{{ collapseToggleHint }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -534,10 +545,10 @@ defineOptions({ name: 'CollectionView' })
           </button>
         </template>
         <template #mobile-menu>
-          <DropdownMenuItem @click="handleToggleCollapse">
-            <CheckSquare v-if="collapseEnabledRef" :size="14" class="mr-2" />
+          <DropdownMenuItem :disabled="selectionMode" @click="handleToggleCollapse">
+            <CheckSquare v-if="effectiveCollapseEnabled" :size="14" class="mr-2" />
             <Square v-else :size="14" class="mr-2" />
-            {{ t('views.bookView.collapseSeries') }}
+            {{ collapseMenuLabel }}
           </DropdownMenuItem>
         </template>
         <template v-if="effectiveViewMode === 'table'" #columns>
