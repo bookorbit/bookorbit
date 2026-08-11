@@ -20,49 +20,86 @@ const FORWARD_HEADERS = [
   'x-kobo-synctokenversion',
 ];
 
+const HOP_BY_HOP_HEADERS = ['transfer-encoding', 'connection', 'content-encoding', 'content-length'];
+
+export type KoboProxyResponse = {
+  status: number;
+  headers: Record<string, string>;
+  body: Buffer;
+};
+
+export type KoboProxyRequestOptions = {
+  extraHeaders?: Record<string, string>;
+  /** Drops headers FORWARD_HEADERS would otherwise copy from the device request. */
+  omitHeaders?: string[];
+  timeoutMs?: number;
+};
+
 @Injectable()
 export class KoboProxyService {
   private readonly logger = new Logger(KoboProxyService.name);
 
-  async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string) {
-    const rawUrl = req.url;
-    const prefix = `/api/v1/kobo/${deviceToken}`;
-    const koboPath = rawUrl.startsWith(prefix) ? rawUrl.slice(prefix.length) : rawUrl;
-
-    const targetUrl = this.buildTargetUrl(koboPath);
+  /** Calls Kobo with the device's own credentials and hands the response back instead of piping it. */
+  async request(req: FastifyRequest, deviceToken: string, options: KoboProxyRequestOptions = {}): Promise<KoboProxyResponse> {
+    const targetUrl = this.resolveTargetUrl(req, deviceToken);
 
     const headers: Record<string, string> = {};
     for (const key of FORWARD_HEADERS) {
       const val = req.headers[key];
       if (val) headers[key] = Array.isArray(val) ? val[0] : val;
     }
+    for (const key of options.omitHeaders ?? []) {
+      delete headers[key.toLowerCase()];
+    }
+    for (const [key, value] of Object.entries(options.extraHeaders ?? {})) {
+      headers[key.toLowerCase()] = value;
+    }
+
+    let body: string | undefined;
+    if (!['GET', 'HEAD'].includes(req.method) && req.body != null) {
+      body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    }
+
+    // codeql[js/request-forgery] - hostname validated by buildTargetUrl() to KOBO_API_HOSTNAME
+    const upstream = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body,
+      ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
+    });
+
+    const responseHeaders: Record<string, string> = {};
+    upstream.headers.forEach((value, key) => {
+      responseHeaders[key.toLowerCase()] = value;
+    });
+
+    return { status: upstream.status, headers: responseHeaders, body: Buffer.from(await upstream.arrayBuffer()) };
+  }
+
+  async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string) {
+    const targetUrl = this.resolveTargetUrl(req, deviceToken);
 
     try {
-      let body: string | undefined;
-      if (!['GET', 'HEAD'].includes(req.method) && req.body != null) {
-        body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      }
+      const { status, headers, body } = await this.request(req, deviceToken);
 
-      // codeql[js/request-forgery] - hostname validated by buildTargetUrl() to KOBO_API_HOSTNAME
-      const upstream = await fetch(targetUrl, {
-        method: req.method,
-        headers,
-        body,
-      });
-
-      reply.status(upstream.status);
-      upstream.headers.forEach((value, key) => {
-        if (!['transfer-encoding', 'connection', 'content-encoding', 'content-length'].includes(key.toLowerCase())) {
+      reply.status(status);
+      for (const [key, value] of Object.entries(headers)) {
+        if (!HOP_BY_HOP_HEADERS.includes(key)) {
           reply.header(key, value);
         }
-      });
-
-      const responseBody = await upstream.arrayBuffer();
-      reply.send(Buffer.from(responseBody));
+      }
+      reply.send(body);
     } catch (err) {
       this.logger.warn(`Proxy failed for ${targetUrl}: ${(err as Error).message}`);
       reply.status(502).send({ message: 'Upstream Kobo API unavailable' });
     }
+  }
+
+  private resolveTargetUrl(req: FastifyRequest, deviceToken: string): string {
+    const rawUrl = req.url;
+    const prefix = `/api/v1/kobo/${deviceToken}`;
+    const koboPath = rawUrl.startsWith(prefix) ? rawUrl.slice(prefix.length) : rawUrl;
+    return this.buildTargetUrl(koboPath);
   }
 
   private buildTargetUrl(koboPath: string): string {

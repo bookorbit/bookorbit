@@ -3,7 +3,7 @@ import { APPEARANCE_TABS, normalizeAppearanceTab } from '../appearance-tabs'
 
 describe('appearance-tabs', () => {
   it('keeps the public tab order stable', () => {
-    expect(APPEARANCE_TABS).toEqual(['theme', 'book-covers', 'icons', 'layout', 'behavior'])
+    expect(APPEARANCE_TABS).toEqual(['theme', 'book-covers', 'icons', 'layout', 'behavior', 'language'])
   })
 
   it('normalizes invalid values to theme', () => {

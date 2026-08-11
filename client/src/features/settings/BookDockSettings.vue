@@ -11,7 +11,9 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useAppInfo } from './composables/useAppInfo'
 
 const { t } = useI18n()
-const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+})
 const autoFetch = ref(true)
 const autoFinalizeEnabled = ref(false)
 const autoFinalizeThreshold = ref(85)
@@ -142,7 +144,9 @@ async function onMetadataModeChange(event: Event) {
     :subtitle="t('settings.reader.bookDock.subtitle')"
   />
   <div v-if="!props.embedded" class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.reader.bookDock.title') }}</h1>
+    <h1 class="text-xl font-semibold tracking-tight text-foreground">
+      {{ t('settings.reader.bookDock.title') }}
+    </h1>
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
@@ -156,10 +160,14 @@ async function onMetadataModeChange(event: Event) {
 
   <div v-else class="mt-5 md:mt-0 space-y-6">
     <div>
-      <p class="settings-group-label">{{ t('settings.reader.bookDock.dropFolder') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.bookDock.dropFolder') }}
+      </p>
       <div class="mt-4 border border-border rounded-lg overflow-hidden shadow-xs">
         <div class="px-4 py-3.5 bg-card md:px-5 md:py-4">
-          <p class="settings-label">{{ t('settings.reader.bookDock.containerPath') }}</p>
+          <p class="settings-label">
+            {{ t('settings.reader.bookDock.containerPath') }}
+          </p>
           <p class="settings-hint mb-2">
             {{ t('settings.reader.bookDock.containerPathHint') }}
           </p>
@@ -170,20 +178,26 @@ async function onMetadataModeChange(event: Event) {
             >{{ bookDockPath }}</code
           >
           <p class="settings-hint mt-2">
-            {{ t('settings.reader.bookDock.changePathPrefix') }} <code class="text-xs font-mono">BOOK_DOCK_PATH</code>
-            {{ t('settings.reader.bookDock.changePathMiddle') }} <code class="text-xs font-mono">.env</code>
+            {{ t('settings.reader.bookDock.changePathPrefix') }}
+            <code class="text-xs font-mono">BOOK_DOCK_PATH</code>
+            {{ t('settings.reader.bookDock.changePathMiddle') }}
+            <code class="text-xs font-mono">.env</code>
             {{ t('settings.reader.bookDock.changePathSuffix') }}
           </p>
         </div>
       </div>
     </div>
 
-    <p class="settings-group-label">{{ t('settings.reader.bookDock.metadata') }}</p>
+    <p class="settings-group-label">
+      {{ t('settings.reader.bookDock.metadata') }}
+    </p>
 
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+    <div class="settings-card">
       <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
         <div class="min-w-0">
-          <p class="settings-label">{{ t('settings.reader.bookDock.autoFetch') }}</p>
+          <p class="settings-label">
+            {{ t('settings.reader.bookDock.autoFetch') }}
+          </p>
           <p class="settings-hint">
             {{ t('settings.reader.bookDock.autoFetchHint') }}
           </p>
@@ -193,12 +207,18 @@ async function onMetadataModeChange(event: Event) {
     </div>
 
     <div class="mt-6 space-y-4">
-      <p class="settings-group-label">{{ t('settings.reader.bookDock.autoFinalize') }}</p>
-      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+      <p class="settings-group-label">
+        {{ t('settings.reader.bookDock.autoFinalize') }}
+      </p>
+      <div class="settings-card">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
-            <p class="settings-label">{{ t('settings.reader.bookDock.enableAutoFinalize') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.bookDock.enableAutoFinalizeHint') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.bookDock.enableAutoFinalize') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.bookDock.enableAutoFinalizeHint') }}
+            </p>
           </div>
           <ToggleSwitch
             :model-value="autoFinalizeEnabled"
@@ -211,7 +231,11 @@ async function onMetadataModeChange(event: Event) {
         <div v-if="autoFinalizeEnabled" class="px-4 py-3.5 bg-card space-y-4 md:px-5 md:py-4">
           <label class="block">
             <span class="text-xs font-medium text-muted-foreground">
-              {{ t('settings.reader.bookDock.confidenceThreshold', { value: autoFinalizeThreshold }) }}
+              {{
+                t('settings.reader.bookDock.confidenceThreshold', {
+                  value: autoFinalizeThreshold,
+                })
+              }}
               <span v-if="!isThresholdApplicable"> {{ t('settings.reader.bookDock.thresholdIgnored') }}</span>
             </span>
             <input
@@ -233,25 +257,39 @@ async function onMetadataModeChange(event: Event) {
           <label class="block">
             <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.destinationLibrary') }}</span>
             <select class="select-field mt-1 w-full" :value="autoFinalizeLibraryId ?? ''" @change="onLibraryChange">
-              <option value="" disabled>{{ t('settings.reader.bookDock.selectLibrary') }}</option>
-              <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
+              <option value="" disabled>
+                {{ t('settings.reader.bookDock.selectLibrary') }}
+              </option>
+              <option v-for="lib in libraries" :key="lib.id" :value="lib.id">
+                {{ lib.name }}
+              </option>
             </select>
           </label>
 
           <label class="block">
             <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.metadataMode') }}</span>
             <select class="select-field mt-1 w-full" :value="autoFinalizeMetadataMode" @change="onMetadataModeChange">
-              <option value="safe_merge">{{ t('settings.reader.bookDock.metadataModeSafeMerge') }}</option>
-              <option value="fetched_only">{{ t('settings.reader.bookDock.metadataModeFetchedOnly') }}</option>
-              <option value="embedded_only">{{ t('settings.reader.bookDock.metadataModeEmbeddedOnly') }}</option>
+              <option value="safe_merge">
+                {{ t('settings.reader.bookDock.metadataModeSafeMerge') }}
+              </option>
+              <option value="fetched_only">
+                {{ t('settings.reader.bookDock.metadataModeFetchedOnly') }}
+              </option>
+              <option value="embedded_only">
+                {{ t('settings.reader.bookDock.metadataModeEmbeddedOnly') }}
+              </option>
             </select>
           </label>
 
           <label class="block">
             <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.destinationFolder') }}</span>
             <select class="select-field mt-1 w-full" :value="autoFinalizeFolderId ?? ''" @change="onFolderChange">
-              <option value="" disabled>{{ t('settings.reader.bookDock.selectFolder') }}</option>
-              <option v-for="folder in autoFinalizeFolders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
+              <option value="" disabled>
+                {{ t('settings.reader.bookDock.selectFolder') }}
+              </option>
+              <option v-for="folder in autoFinalizeFolders" :key="folder.id" :value="folder.id">
+                {{ folder.path }}
+              </option>
             </select>
           </label>
         </div>

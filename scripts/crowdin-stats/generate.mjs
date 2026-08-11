@@ -14,21 +14,21 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 1_000_000;
 const SOURCE_LANGUAGE_ID = "en";
 
-const WIDTH = 540;
-const PADDING_X = 24;
+const WIDTH = 460;
+const PADDING_X = 20;
 const DIVIDER_Y = 51;
 
 const ROW_BASELINE = 78;
-const ROW_HEIGHT = 28;
-const BAR_HEIGHT = 8;
-const BAR_RADIUS = 4;
-const BAR_BASELINE_OFFSET = 9;
+const ROW_HEIGHT = 25;
+const BAR_HEIGHT = 6;
+const BAR_RADIUS = 3;
+const BAR_BASELINE_OFFSET = 8;
 
 const FLAG_WIDTH = 26;
-const LABEL_CHAR_WIDTH = 7.6;
-const LABEL_MAX_WIDTH = 180;
+const LABEL_CHAR_WIDTH = 7.1;
+const LABEL_MAX_WIDTH = 140;
 const LABEL_GAP = 18;
-const PERCENT_WIDTH = 42;
+const PERCENT_WIDTH = 38;
 const PERCENT_GAP = 14;
 
 const LEGEND_SWATCH = 8;
@@ -179,9 +179,17 @@ function flagFromLocale(locale) {
   return String.fromCodePoint(...[...region.toUpperCase()].map((letter) => letter.codePointAt(0) + 0x1f1a5));
 }
 
+// The label column is sized by the single widest name, so Crowdin's Chinese names
+// would cost every other row roughly 60px of bar. The flags already carry the
+// region, leaving the script marker as the only part the name has to supply.
+const DISPLAY_NAME_OVERRIDES = new Map([
+  ["zh-CN", "Chinese (S)"],
+  ["zh-TW", "Chinese (T)"],
+]);
+
 function displayFor(languageId, apiLanguage) {
   const flag = flagFromLocale(apiLanguage?.locale);
-  const name = apiLanguage?.name || languageId;
+  const name = DISPLAY_NAME_OVERRIDES.get(languageId) || apiLanguage?.name || languageId;
 
   return {
     name: flag ? name.split(",")[0].trim() : name,
@@ -320,7 +328,7 @@ export function generateSvg(statsData) {
   const targetCount = languages.filter((language) => !language.isSource).length;
   const summary =
     targetCount > 0
-      ? `Crowdin · ${targetCount} target ${targetCount === 1 ? "language" : "languages"} · ${averagePercent(languages)}% average`
+      ? `Crowdin · ${targetCount} ${targetCount === 1 ? "language" : "languages"} · ${averagePercent(languages)}% average`
       : "Crowdin · no translation data";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${layout.height}" viewBox="0 0 ${WIDTH} ${layout.height}" fill="none" role="img" aria-label="BookOrbit translation progress">
@@ -329,8 +337,8 @@ export function generateSvg(statsData) {
     .card { fill: #0d1117; stroke: #30363d; stroke-width: 1px; rx: 12px; }
     .title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; fill: #f0f6fc; }
     .subtitle { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 400; fill: #8b949e; }
-    .lang-label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 500; fill: #e6edf3; }
-    .pct-label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13.5px; font-weight: 600; fill: #e6edf3; font-variant-numeric: tabular-nums; }
+    .lang-label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 500; fill: #e6edf3; }
+    .pct-label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 600; fill: #e6edf3; font-variant-numeric: tabular-nums; }
     .legend-label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 400; fill: #8b949e; }
     .grid { stroke: #21262d; stroke-width: 1; }
     .bar-bg { fill: #21262d; }

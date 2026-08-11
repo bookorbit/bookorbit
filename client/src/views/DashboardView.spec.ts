@@ -4,6 +4,8 @@ import { ref, type Ref } from 'vue'
 import type { Library, SmartScope } from '@bookorbit/types'
 
 import DashboardView from './DashboardView.vue'
+import DashboardScroller from '@/features/dashboard/components/DashboardScroller.vue'
+import DashboardSettingsSheet from '@/features/dashboard/components/DashboardSettingsSheet.vue'
 import DashboardWelcome from '@/features/dashboard/components/DashboardWelcome.vue'
 import DashboardWidgetRow from '@/features/dashboard/components/DashboardWidgetRow.vue'
 
@@ -151,6 +153,43 @@ describe('DashboardView library loading states', () => {
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false)
     expect(wrapper.findComponent(DashboardWidgetRow).exists()).toBe(true)
+  })
+
+  it('offers a labelled customize control beside the greeting that opens the settings sheet', async () => {
+    mocks.libraries.value = [{ id: 7 } as Library]
+    mocks.librariesLoaded.value = true
+    wrapper = await mountView()
+
+    // Named for assistive tech at every width, since the visible label is hidden below sm.
+    const customizeButton = wrapper.findAll('button').find((button) => button.attributes('aria-label') === 'Customize dashboard')
+    expect(customizeButton).toBeDefined()
+    expect(customizeButton?.text()).toBe('Customize dashboard')
+
+    await customizeButton?.trigger('click')
+
+    expect(wrapper.findComponent(DashboardSettingsSheet).props('open')).toBe(true)
+  })
+
+  it('remounts a shelf when its row count changes so it refetches enough books', async () => {
+    mocks.libraries.value = [{ id: 7 } as Library]
+    mocks.librariesLoaded.value = true
+    mocks.scrollers = ref([{ id: '1', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20, rows: 1 }]) as Ref<never[]>
+    wrapper = await mountView()
+
+    const shelf = wrapper.findComponent(DashboardScroller)
+    expect(shelf.props('rows')).toBe(1)
+    const before = shelf.element
+
+    mocks.scrollers.value = [
+      { id: '1', type: 'recently-added', label: 'Recently Added', enabled: true, order: 1, limit: 20, rows: 3 },
+    ] as unknown as never[]
+    await flushPromises()
+
+    const after = wrapper.findComponent(DashboardScroller)
+    expect(after.props('rows')).toBe(3)
+    // A shelf snapshots its fetch limit on setup, so the row count has to be part
+    // of the key or three rows would re-flow the books fetched for one.
+    expect(after.element).not.toBe(before)
   })
 
   it('moves from the error state to dashboard content after a successful retry', async () => {

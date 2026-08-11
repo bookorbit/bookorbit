@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import { KeyRound, LoaderCircle } from '@lucide/vue'
 import type { DocumentState } from '@embedpdf/core'
 import { useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/vue'
+import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 
 const props = defineProps<{ documentState: DocumentState }>()
 const emit = defineEmits<{ back: [] }>()
@@ -49,12 +50,12 @@ function handleSubmit() {
         <input
           ref="passwordInput"
           v-model="password"
-          type="password"
-          autocomplete="off"
+          v-bind="SECRET_INPUT_ATTRS"
+          type="text"
           autofocus
           :disabled="submitting"
           placeholder="Document password"
-          class="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+          class="input-secret h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
         />
         <p v-if="errorMessage" class="mt-2 text-xs text-destructive">{{ errorMessage }}</p>
         <div class="mt-4 grid grid-cols-2 gap-2">

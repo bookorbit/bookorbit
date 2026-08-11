@@ -4,30 +4,39 @@ BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the sou
 
 ## Supported Catalogs
 
-| Application locale   | Crowdin language ID | Catalog   |
-| -------------------- | ------------------- | --------- |
-| English              | Source language     | `en.json` |
-| Czech                | `cs`                | `cs.json` |
-| Danish               | `da`                | `da.json` |
-| German               | `de`                | `de.json` |
-| Spanish              | `es-ES`             | `es.json` |
-| Finnish              | `fi`                | `fi.json` |
-| French               | `fr`                | `fr.json` |
-| Italian              | `it`                | `it.json` |
-| Dutch                | `nl`                | `nl.json` |
-| Polish               | `pl`                | `pl.json` |
-| Brazilian Portuguese | `pt-BR`             | `pt.json` |
-| Russian              | `ru`                | `ru.json` |
-| Slovenian            | `sl`                | `sl.json` |
-| Swedish              | `sv-SE`             | `sv.json` |
-| Ukrainian            | `uk`                | `uk.json` |
-| Simplified Chinese   | `zh-CN`             | `zh.json` |
+| Application locale   | Crowdin language ID | Catalog        |
+| -------------------- | ------------------- | -------------- |
+| English              | Source language     | `en.json`      |
+| Czech                | `cs`                | `cs.json`      |
+| Danish               | `da`                | `da.json`      |
+| German               | `de`                | `de.json`      |
+| Greek                | `el`                | `el.json`      |
+| Spanish              | `es-ES`             | `es.json`      |
+| Finnish              | `fi`                | `fi.json`      |
+| French               | `fr`                | `fr.json`      |
+| Hungarian            | `hu`                | `hu.json`      |
+| Indonesian           | `id`                | `id.json`      |
+| Italian              | `it`                | `it.json`      |
+| Japanese             | `ja`                | `ja.json`      |
+| Korean               | `ko`                | `ko.json`      |
+| Dutch                | `nl`                | `nl.json`      |
+| Polish               | `pl`                | `pl.json`      |
+| Brazilian Portuguese | `pt-BR`             | `pt.json`      |
+| Romanian             | `ro`                | `ro.json`      |
+| Russian              | `ru`                | `ru.json`      |
+| Slovak               | `sk`                | `sk.json`      |
+| Slovenian            | `sl`                | `sl.json`      |
+| Swedish              | `sv-SE`             | `sv.json`      |
+| Turkish              | `tr`                | `tr.json`      |
+| Ukrainian            | `uk`                | `uk.json`      |
+| Simplified Chinese   | `zh-CN`             | `zh.json`      |
+| Traditional Chinese  | `zh-TW`             | `zh-Hant.json` |
 
 Crowdin's `%two_letters_code%` placeholder reduces the regional IDs above to BookOrbit's application locale and filename: `es-ES` to `es`, `pt-BR` to `pt`, `sv-SE` to `sv`, and `zh-CN` to `zh`.
 
 Verify every ID against Crowdin's language list rather than assuming the two-letter form exists. Several languages have no bare two-letter ID at all: Swedish is `sv-SE`, and `sv-FI` reduces to the same `sv.json`, so enabling both would collide.
 
-Chinese ships as Simplified only under the bare `zh` locale, so every `zh-*` browser resolves to it, including Traditional readers. Adding Traditional later means a new `zh-Hant` catalog with a `languages_mapping` entry for `zh-TW`; `zh` keeps its Simplified meaning, so no rename or stored-preference migration is needed. That addition also requires matching by script subtag in `client/src/stores/locale.ts`, because the current base-language fallback would send `zh-Hant` to `zh`.
+Chinese uses separate application locales for each script. Simplified Chinese remains under `zh`, while Traditional Chinese uses `zh-Hant`. The `languages_mapping` entry in `crowdin.yml` maps Crowdin's `zh-TW` target to `zh-Hant.json` so it cannot collide with the Simplified catalog. Browser matching uses explicit or inferred script subtags: `zh-CN` and `zh-SG` resolve to `zh`, while `zh-TW`, `zh-HK`, and `zh-MO` resolve to `zh-Hant`.
 
 ## Adding User-Facing Copy
 
@@ -92,7 +101,7 @@ After an English source change reaches `main`:
 4. The workflow requests only translated strings, removes the empty values Crowdin emits for untranslated nested JSON entries, and validates the resulting sparse catalogs.
 5. Before writing, the workflow rejects exports that omit an existing translation or replace one with English source text.
 6. Only after validation and retention checks pass, the workflow updates `l10n_main` and opens a pull request to `main`.
-7. CI verifies that the pull request changes only the fifteen target catalogs and runs the normal client checks.
+7. CI verifies that the pull request changes only the twenty-four target catalogs and runs the normal client checks.
 8. A maintainer reviews and squash-merges the pull request.
 9. The `.github/workflows/crowdin-branch-cleanup.yml` workflow deletes the `l10n_main` service branch. The next export recreates it from the current `main` when translations change.
 

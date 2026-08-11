@@ -17,6 +17,7 @@ const STACK_COVER_STEP_PCT = 8
 const props = defineProps<{
   book: BookCard
   showLabel?: boolean
+  selectionMode?: boolean
 }>()
 
 const route = useRoute()
@@ -115,11 +116,13 @@ function handleClick() {
 }
 
 function openSeriesDetails() {
+  if (props.selectionMode) return
   if (props.book.seriesId == null) return
   void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } })
 }
 
 async function openAuthorDetails() {
+  if (props.selectionMode) return
   const authorName = authorQuery.value?.trim()
   if (!authorName) return
 
@@ -138,6 +141,7 @@ async function openAuthorDetails() {
 }
 
 function handleLabelClick(field: GridCardLabelField) {
+  if (props.selectionMode) return
   if (field === 'author') {
     void openAuthorDetails()
     return
@@ -193,7 +197,12 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
 </script>
 
 <template>
-  <div class="flex flex-col @container cursor-pointer" @click="handleClick">
+  <div
+    class="flex flex-col @container"
+    :class="selectionMode ? 'cursor-default' : 'cursor-pointer'"
+    :inert="selectionMode || undefined"
+    @click="handleClick"
+  >
     <!-- Cover -->
     <div class="group">
       <BookCoverSurface

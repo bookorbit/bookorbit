@@ -357,7 +357,7 @@ describe('KoreaderService', () => {
 
   describe('saveProgress', () => {
     it('resolves the book file, parses progress, extracts chapters, and updates synced progress', async () => {
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format: 'epub' });
       mockChapterService.parseChapterIndexFromProgress.mockReturnValue(6);
       mockChapterExtractor.extractAndStoreChapters.mockRejectedValueOnce(new Error('extract failed'));
 
@@ -383,11 +383,18 @@ describe('KoreaderService', () => {
         chapterIndex: 6,
         syncTimestamp: 1700000000,
       });
-      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith(44, 12, 50, null, '/body/DocFragment[7]');
+      expect(mockRepo.upsertReadingProgress).toHaveBeenCalledWith({
+        bookFileId: 44,
+        userId: 12,
+        percentage: 50,
+        cfi: null,
+        xpointer: '/body/DocFragment[7]',
+        pageNumber: null,
+      });
       expect(mockBookService.syncKoboReadingStateForExternalProgress).toHaveBeenCalledWith(12, 44, 50);
       expect(mockBookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
         12,
-        { id: 44, bookId: 55, libraryId: 3 },
+        { id: 44, bookId: 55, libraryId: 3, format: 'epub' },
         50,
         expect.objectContaining({ origin: 'koreader', strongRereadEvidence: false }),
       );
@@ -438,7 +445,7 @@ describe('KoreaderService', () => {
     });
 
     it('uses the default device and generated device id when the payload leaves them empty', async () => {
-      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 88, bookId: 99, libraryId: 4 });
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 88, bookId: 99, libraryId: 4, format: 'epub' });
 
       await service.saveProgress(12, {
         document: 'default-device-document',
@@ -458,11 +465,71 @@ describe('KoreaderService', () => {
     });
   });
 
+  describe('shared progress position routing', () => {
+    async function syncFormat(format: string | null, progress?: string) {
+      mockRepo.resolveBookFileByHash.mockResolvedValue({ id: 44, bookId: 55, libraryId: 3, format });
+      await service.saveProgress(12, { document: 'abcdef1234567890fedcba', percentage: 0.5, progress });
+      return mockRepo.upsertReadingProgress.mock.calls[0]![0] as { cfi: string | null; pageNumber: number | null; xpointer: string | null };
+    }
+
+    it.each(['pdf', 'cbz', 'cbr', 'cb7', 'PDF'])('stores the KOReader page as pageNumber for %s', async (format) => {
+      const written = await syncFormat(format, '117');
+
+      expect(written.pageNumber).toBe(117);
+      expect(written.cfi).toBeNull();
+      expect(mockPositionConverter.xpointerPointToCfi).not.toHaveBeenCalled();
+    });
+
+    it('keeps the raw device position alongside the parsed page', async () => {
+      const written = await syncFormat('pdf', '117');
+
+      expect(written.xpointer).toBe('117');
+    });
+
+    it('converts the xpointer to a cfi and writes no page for a reflowable format', async () => {
+      mockPositionConverter.xpointerPointToCfi.mockResolvedValue({ status: 'exact', cfi: 'epubcfi(/6/14!/4/2/6)' });
+
+      const written = await syncFormat('epub', '/body/DocFragment[7]/body/p[3]/text().0');
+
+      expect(written.cfi).toBe('epubcfi(/6/14!/4/2/6)');
+      expect(written.pageNumber).toBeNull();
+      expect(mockPositionConverter.xpointerPointToCfi).toHaveBeenCalledWith({ bookFileId: 44, pos: '/body/DocFragment[7]/body/p[3]/text().0' });
+    });
+
+    it('treats an unknown format as reflowable', async () => {
+      const written = await syncFormat(null, '/body/DocFragment[7]');
+
+      expect(written.pageNumber).toBeNull();
+      expect(mockPositionConverter.xpointerPointToCfi).toHaveBeenCalled();
+    });
+
+    it('clears the stored page when a paged sync carries no position', async () => {
+      const written = await syncFormat('pdf', undefined);
+
+      expect(written.pageNumber).toBeNull();
+      expect(written.cfi).toBeNull();
+      expect(written.xpointer).toBeNull();
+    });
+
+    it('clears the stored page rather than storing an xpointer that reached a paged file', async () => {
+      const written = await syncFormat('pdf', '/body/DocFragment[7]/body/p[3]/text().0');
+
+      expect(written.pageNumber).toBeNull();
+      expect(written.cfi).toBeNull();
+    });
+
+    it('still records the percentage when the page cannot be parsed', async () => {
+      const written = (await syncFormat('pdf', 'not-a-page')) as unknown as { percentage: number };
+
+      expect(written.percentage).toBe(50);
+    });
+  });
+
   describe('applyBulkProgress', () => {
     const device = { device: 'Kobo Libra 2', deviceId: 'device-a' };
 
-    function bookFile(id: number, bookId = id * 10) {
-      return { id, bookId, libraryId: 1 };
+    function bookFile(id: number, bookId = id * 10, format: string | null = 'epub') {
+      return { id, bookId, libraryId: 1, format };
     }
 
     it('reads state once, writes one device statement, and applies shared progress per entry', async () => {
@@ -486,6 +553,31 @@ describe('KoreaderService', () => {
       ]);
       expect(mockRepo.upsertReadingProgress).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ shared: 2, stale: 0 });
+    });
+
+    it('routes each entry by its own format within a single sweep', async () => {
+      mockPositionConverter.xpointerPointToCfi.mockResolvedValue({ status: 'exact', cfi: 'epubcfi(/6/14!/4/2/6)' });
+
+      await service.applyBulkProgress(
+        7,
+        [
+          { bookFile: bookFile(10, 100, 'pdf'), percentage: 0.5, progress: '84' },
+          { bookFile: bookFile(11, 110, 'epub'), percentage: 0.2, progress: '/body/DocFragment[3]' },
+          { bookFile: bookFile(12, 120, 'cbz'), percentage: 0.9, progress: '31' },
+        ],
+        device,
+      );
+
+      const written = new Map(
+        mockRepo.upsertReadingProgress.mock.calls.map((call) => {
+          const entry = call[0] as { bookFileId: number };
+          return [entry.bookFileId, entry];
+        }),
+      );
+
+      expect(written.get(10)).toEqual(expect.objectContaining({ pageNumber: 84, cfi: null }));
+      expect(written.get(11)).toEqual(expect.objectContaining({ pageNumber: null, cfi: 'epubcfi(/6/14!/4/2/6)' }));
+      expect(written.get(12)).toEqual(expect.objectContaining({ pageNumber: 31, cfi: null }));
     });
 
     it('issues no query for an empty entry list', async () => {
@@ -550,7 +642,7 @@ describe('KoreaderService', () => {
 
       expect(mockBookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
         7,
-        { id: 10, bookId: 100, libraryId: 1 },
+        { id: 10, bookId: 100, libraryId: 1, format: 'epub' },
         5,
         expect.objectContaining({ origin: 'koreader', strongRereadEvidence: true }),
       );

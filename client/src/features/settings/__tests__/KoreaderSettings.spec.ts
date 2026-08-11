@@ -293,8 +293,10 @@ describe('KoreaderSettings', () => {
     expect(wrapper.text()).not.toContain('Setup Guide')
 
     await buttonByText(wrapper, 'Create credentials')!.trigger('click')
-    await wrapper.find('input[type="text"]').setValue('new-reader')
-    await wrapper.find('input[type="password"]').setValue('secret1')
+    const [usernameField, passwordField] = wrapper.findAll('input[type="text"]')
+    expect(passwordField.classes()).toContain('input-secret')
+    await usernameField.setValue('new-reader')
+    await passwordField.setValue('secret1')
     await buttonByText(wrapper, 'Create')!.trigger('click')
 
     expect(koreaderMock.createCredentials).toHaveBeenCalledWith({ username: 'new-reader', password: 'secret1' })

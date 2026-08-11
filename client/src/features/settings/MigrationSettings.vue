@@ -41,6 +41,7 @@ import {
 } from '@/features/migration/lib/migration-api'
 import { useMigrationPolling } from '@/features/migration/composables/useMigrationPolling'
 import { useMigrationProgress } from '@/features/migration/composables/useMigrationProgress'
+import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 
 const { t } = useI18n()
 
@@ -1352,8 +1353,10 @@ function formatSourceCountLabel(key: string) {
                 <div class="relative mt-1">
                   <input
                     v-model="sourceDraft.password"
+                    v-bind="SECRET_INPUT_ATTRS"
                     class="input-field w-full pr-9"
-                    :type="showPassword ? 'text' : 'password'"
+                    :class="{ 'input-secret': !showPassword }"
+                    type="text"
                     :placeholder="
                       source ? t('settings.admin.migration.passwordSavedPlaceholder') : t('settings.admin.migration.passwordEmptyPlaceholder')
                     "

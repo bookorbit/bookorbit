@@ -116,11 +116,15 @@ function setFixedLayoutSpreadNone() {
 
     <!-- Formatting source -->
     <div class="mb-6">
-      <p class="settings-group-label">{{ t('settings.reader.ebook.newBooks') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.ebook.newBooks') }}
+      </p>
       <div class="border border-border rounded-lg overflow-hidden bg-card">
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between px-4 py-3.5 md:px-5 md:py-4">
           <div>
-            <p class="settings-label">{{ t('settings.reader.ebook.applySettings') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.ebook.applySettings') }}
+            </p>
             <p class="settings-hint">
               {{ t('settings.reader.ebook.applySettingsHint') }}
             </p>
@@ -136,13 +140,19 @@ function setFixedLayoutSpreadNone() {
 
     <!-- Layout -->
     <div class="mb-6">
-      <p class="settings-group-label">{{ t('settings.reader.ebook.layout') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.ebook.layout') }}
+      </p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Flow -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.ebook.readingFlow') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.ebook.readingFlowHint') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.ebook.readingFlow') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.readingFlowHint') }}
+            </p>
           </div>
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
@@ -163,10 +173,14 @@ function setFixedLayoutSpreadNone() {
         </div>
 
         <!-- Fixed-layout spread -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.ebook.fixedLayoutSpread') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.ebook.fixedLayoutSpreadHint') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.ebook.fixedLayoutSpread') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.fixedLayoutSpreadHint') }}
+            </p>
           </div>
           <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
             <button
@@ -194,10 +208,14 @@ function setFixedLayoutSpreadNone() {
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="settings-label">{{ t('settings.reader.ebook.columns') }}</p>
+              <p class="settings-label">
+                {{ t('settings.reader.ebook.columns') }}
+              </p>
               <span class="settings-value">{{ effective.maxColumnCount }}</span>
             </div>
-            <p class="settings-hint">{{ t('settings.reader.ebook.columnsHint') }}</p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.columnsHint') }}
+            </p>
           </div>
           <input
             type="range"
@@ -206,7 +224,11 @@ function setFixedLayoutSpreadNone() {
             step="1"
             class="w-full accent-primary cursor-pointer"
             :value="effective.maxColumnCount"
-            @input="update({ maxColumnCount: Number(($event.target as HTMLInputElement).value) })"
+            @input="
+              update({
+                maxColumnCount: Number(($event.target as HTMLInputElement).value),
+              })
+            "
           />
         </div>
       </div>
@@ -219,8 +241,12 @@ function setFixedLayoutSpreadNone() {
         <!-- Dark mode toggle -->
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
           <div>
-            <p class="settings-label">{{ t('settings.reader.ebook.darkMode') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.ebook.darkModeHint') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.ebook.darkMode') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.darkModeHint') }}
+            </p>
           </div>
           <ToggleSwitch class="self-start" :model-value="effective.isDark" @update:model-value="update({ isDark: $event })" />
         </div>
@@ -235,32 +261,53 @@ function setFixedLayoutSpreadNone() {
             <div
               class="relative w-full aspect-[4/3] rounded-lg overflow-hidden transition-all ring-2 ring-offset-2 ring-offset-card"
               :class="effective.themeName === theme.name ? 'ring-primary' : 'ring-transparent group-hover:ring-border'"
-              :style="{ background: effective.isDark ? theme.dark.bg : theme.light.bg }"
+              :style="{
+                background: effective.isDark ? theme.dark.bg : theme.light.bg,
+              }"
             >
               <!-- Top accent strip -->
-              <div class="absolute top-0 left-0 right-0 h-[3px]" :style="{ background: effective.isDark ? theme.dark.link : theme.light.link }" />
+              <div
+                class="absolute top-0 left-0 right-0 h-[3px]"
+                :style="{
+                  background: effective.isDark ? theme.dark.link : theme.light.link,
+                }"
+              />
               <!-- Title line -->
               <div
                 class="absolute top-[10px] left-[8px] right-[12px] h-[3px] rounded-full"
-                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.85 }"
+                :style="{
+                  background: effective.isDark ? theme.dark.fg : theme.light.fg,
+                  opacity: 0.85,
+                }"
               />
               <!-- Body text lines -->
               <div
                 class="absolute top-[18px] left-[8px] right-[8px] h-[2px] rounded-full"
-                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.35 }"
+                :style="{
+                  background: effective.isDark ? theme.dark.fg : theme.light.fg,
+                  opacity: 0.35,
+                }"
               />
               <div
                 class="absolute top-[23px] left-[8px] right-[16px] h-[2px] rounded-full"
-                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.35 }"
+                :style="{
+                  background: effective.isDark ? theme.dark.fg : theme.light.fg,
+                  opacity: 0.35,
+                }"
               />
               <div
                 class="absolute top-[28px] left-[8px] right-[10px] h-[2px] rounded-full"
-                :style="{ background: effective.isDark ? theme.dark.fg : theme.light.fg, opacity: 0.35 }"
+                :style="{
+                  background: effective.isDark ? theme.dark.fg : theme.light.fg,
+                  opacity: 0.35,
+                }"
               />
               <!-- Link dot -->
               <div
                 class="absolute bottom-[7px] left-[8px] h-[2px] w-[14px] rounded-full opacity-80"
-                :style="{ background: effective.isDark ? theme.dark.link : theme.light.link }"
+                :style="{
+                  background: effective.isDark ? theme.dark.link : theme.light.link,
+                }"
               />
               <!-- Selected checkmark -->
               <Transition
@@ -290,27 +337,41 @@ function setFixedLayoutSpreadNone() {
 
     <!-- Typography -->
     <div class="mb-6">
-      <p class="settings-group-label">{{ t('settings.reader.ebook.typography') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.ebook.typography') }}
+      </p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Font family -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
             <p class="settings-label">{{ t('settings.reader.ebook.font') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.ebook.fontHint') }}</p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.fontHint') }}
+            </p>
           </div>
           <select
             class="text-xs border border-border rounded-md px-2 py-2 md:py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary self-start min-w-40"
             :value="effective.fontFamily ?? ''"
-            @change="update({ fontFamily: ($event.target as HTMLSelectElement).value || null })"
+            @change="
+              update({
+                fontFamily: ($event.target as HTMLSelectElement).value || null,
+              })
+            "
           >
             <optgroup :label="t('settings.reader.ebook.builtInFonts')">
-              <option v-for="f in BUILTIN_READER_FONT_OPTIONS" :key="String(f.value)" :value="f.value ?? ''">{{ t(f.labelKey) }}</option>
+              <option v-for="f in BUILTIN_READER_FONT_OPTIONS" :key="String(f.value)" :value="f.value ?? ''">
+                {{ t(f.labelKey) }}
+              </option>
             </optgroup>
             <optgroup v-if="serverFontOptions.length > 0" :label="t('reader.settings.fontServer')">
-              <option v-for="f in serverFontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
+              <option v-for="f in serverFontOptions" :key="f.id" :value="f.id">
+                {{ f.label }}
+              </option>
             </optgroup>
             <optgroup v-if="customFontOptions.length > 0" :label="t('settings.reader.ebook.yourFonts')">
-              <option v-for="f in customFontOptions" :key="f.id" :value="f.id">{{ f.label }}</option>
+              <option v-for="f in customFontOptions" :key="f.id" :value="f.id">
+                {{ f.label }}
+              </option>
             </optgroup>
           </select>
         </div>
@@ -319,10 +380,14 @@ function setFixedLayoutSpreadNone() {
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="settings-label">{{ t('settings.reader.ebook.fontSize') }}</p>
+              <p class="settings-label">
+                {{ t('settings.reader.ebook.fontSize') }}
+              </p>
               <span class="settings-value">{{ effective.fontSize }}px</span>
             </div>
-            <p class="settings-hint">{{ t('settings.reader.ebook.fontSizeHint') }}</p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.fontSizeHint') }}
+            </p>
           </div>
           <input
             type="range"
@@ -331,7 +396,11 @@ function setFixedLayoutSpreadNone() {
             step="1"
             class="w-full accent-primary cursor-pointer"
             :value="effective.fontSize"
-            @input="update({ fontSize: Number(($event.target as HTMLInputElement).value) })"
+            @input="
+              update({
+                fontSize: Number(($event.target as HTMLInputElement).value),
+              })
+            "
           />
         </div>
 
@@ -339,10 +408,14 @@ function setFixedLayoutSpreadNone() {
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="settings-label">{{ t('settings.reader.ebook.lineHeight') }}</p>
+              <p class="settings-label">
+                {{ t('settings.reader.ebook.lineHeight') }}
+              </p>
               <span class="settings-value">{{ effective.lineHeight.toFixed(1) }}</span>
             </div>
-            <p class="settings-hint">{{ t('settings.reader.ebook.lineHeightHint') }}</p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.lineHeightHint') }}
+            </p>
           </div>
           <input
             type="range"
@@ -351,24 +424,36 @@ function setFixedLayoutSpreadNone() {
             step="0.1"
             class="w-full accent-primary cursor-pointer"
             :value="effective.lineHeight"
-            @input="update({ lineHeight: Number(($event.target as HTMLInputElement).value) })"
+            @input="
+              update({
+                lineHeight: Number(($event.target as HTMLInputElement).value),
+              })
+            "
           />
         </div>
 
         <!-- Justify -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.ebook.justify') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.ebook.justifyHint') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.ebook.justify') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.justifyHint') }}
+            </p>
           </div>
           <ToggleSwitch class="self-start" :model-value="effective.justify" @update:model-value="update({ justify: $event })" />
         </div>
 
         <!-- Hyphenation -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.ebook.hyphenation') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.ebook.hyphenationHint') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.ebook.hyphenation') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.hyphenationHint') }}
+            </p>
           </div>
           <ToggleSwitch class="self-start" :model-value="effective.hyphenate" @update:model-value="update({ hyphenate: $event })" />
         </div>
@@ -377,16 +462,22 @@ function setFixedLayoutSpreadNone() {
 
     <!-- Advanced -->
     <div class="mb-6">
-      <p class="settings-group-label">{{ t('settings.reader.ebook.advanced') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.ebook.advanced') }}
+      </p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Max inline size -->
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="settings-label">{{ t('settings.reader.ebook.maxContentWidth') }}</p>
+              <p class="settings-label">
+                {{ t('settings.reader.ebook.maxContentWidth') }}
+              </p>
               <span class="settings-value">{{ effective.maxInlineSize }}px</span>
             </div>
-            <p class="settings-hint">{{ t('settings.reader.ebook.maxContentWidthHint') }}</p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.maxContentWidthHint') }}
+            </p>
           </div>
           <input
             type="range"
@@ -395,7 +486,11 @@ function setFixedLayoutSpreadNone() {
             step="40"
             class="w-full accent-primary cursor-pointer"
             :value="effective.maxInlineSize"
-            @input="update({ maxInlineSize: Number(($event.target as HTMLInputElement).value) })"
+            @input="
+              update({
+                maxInlineSize: Number(($event.target as HTMLInputElement).value),
+              })
+            "
           />
         </div>
 
@@ -403,10 +498,14 @@ function setFixedLayoutSpreadNone() {
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="settings-label">{{ t('settings.reader.ebook.columnGap') }}</p>
+              <p class="settings-label">
+                {{ t('settings.reader.ebook.columnGap') }}
+              </p>
               <span class="settings-value">{{ Math.round(effective.gap * 100) }}%</span>
             </div>
-            <p class="settings-hint">{{ t('settings.reader.ebook.columnGapHint') }}</p>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.columnGapHint') }}
+            </p>
           </div>
           <input
             type="range"

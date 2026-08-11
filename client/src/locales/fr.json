@@ -254,6 +254,22 @@
           "label": "Montrer le dos des bandes dessinées",
           "hint": "Appliquer l'effet dos et brillant aux couvertures de bandes dessinées (cbz, cbr, cb7)"
         },
+        "detailCoverTint": {
+          "title": "Teinte des détails du livre",
+          "hint": "Fondu de la couleur échantillonnée à partir de la couleur derrière l'illustration et le titre sur la page de détails du livre",
+          "off": {
+            "label": "Désactiver",
+            "hint": "Arrière-plan uni"
+          },
+          "single": {
+            "label": "Couleur unique",
+            "hint": "Couleur dominante de la couverture uniquement"
+          },
+          "duotone": {
+            "label": "Deux couleurs",
+            "hint": "Ajoute la couleur d'accentuation de la couverture lorsqu'elle est différente"
+          }
+        },
         "shadow": {
           "title": "Couvrir la force de l'ombre",
           "hint": "Contrôle la profondeur sous les couvertures dans les vignettes de la grille, de la liste, du tableau et du tableau de bord",
@@ -2026,6 +2042,8 @@
         "daysAgo": "Il y a {count}j",
         "unknown": "Inconnu",
         "updateAvailable": "Mise à jour disponible",
+        "manualUpdateRequired": "Mise à jour manuelle requise",
+        "manualUpdateExplanation": "Cette version du plugin ne peut pas se mettre à jour. Téléchargez le plugin et copiez bookorbit.koplugin dans koreader/plugins/ sur cet appareil.",
         "upToDate": "À jour",
         "versionUnknown": "Version inconnue",
         "latestPlugin": "Dernier plugin : v{version}",
@@ -2094,6 +2112,7 @@
         "stockStep1Prefix": "Sur votre appareil KOReader, accédez à",
         "stockStep1Suffix": ".",
         "stockStep2": "Définissez le serveur de synchronisation personnalisé sur URL indiqué ci-dessus.",
+        "stockStep2InlineUrl": "Définir le serveur de synchronisation personnalisé à l'URL suivante :",
         "stockStep3": "Saisissez le nom d'utilisateur et le mot de passe que vous avez créés, puis appuyez sur Connexion.",
         "locationNote": "BookOrbit enregistre les emplacements EPUB compatibles KOReader à partir du lecteur Web. La restauration doit atterrir à proximité de la même position, bien que l'emplacement exact de la ligne puisse varier selon le lecteur et la disposition EPUB.",
         "dangerZone": "Zone dangereuse",
@@ -2517,6 +2536,10 @@
       "contentRestrictionsActive": "Restrictions de contenu actives",
       "statusActive": "Actif",
       "statusInactive": "Inactif",
+      "lockedBadge": "Verrouillé",
+      "unlockAccount": "Déverrouiller le compte",
+      "unlockHint": "Supprimer le blocage de connexion",
+      "unlockAria": "Déverrouiller {name}",
       "resetPassword": "Réinitialiser le mot de passe",
       "resetPasswordOidcHint": "OIDC utilisateurs réinitialisent les mots de passe dans leur fournisseur d'identité",
       "resetPasswordSharedHint": "Les comptes partagés n'ont pas de mot de passe",
@@ -2529,7 +2552,17 @@
       "errors": {
         "load": "Échec du chargement",
         "deleteUser": "Échec de la suppression de l'utilisateur",
-        "resetPassword": "Échec de la création d'un lien de réinitialisation du mot de passe"
+        "resetPassword": "Échec de la création d'un lien de réinitialisation du mot de passe",
+        "unlock": "Le déverrouillage du compte a échoué"
+      },
+      "selfRegistration": {
+        "title": "Auto-inscription",
+        "subtitle": "Définir si les visiteurs peuvent créer leurs propres comptes.",
+        "label": "Autoriser l’auto-inscription",
+        "hint": "Lorsque cette option est activée, la page de connexion affiche un lien pour créer un compte.",
+        "enabledNotice": "Les nouveaux comptes ont par défaut uniquement les accès à la bibliothèque ci-dessous. Définissez les permissions nécessaires pour qu'ils puissent utiliser des fonctionnalités protégées.",
+        "loadError": "Échec du chargement des paramètres d'auto-inscription",
+        "saveError": "Échec de la mise à jour des paramètres d'auto-inscription"
       },
       "defaultLibraryAccess": {
         "title": "Accès à la bibliothèque par défaut",
@@ -2861,6 +2894,7 @@
       "UserSuperuserEnable": "Activer l'accès superutilisateur",
       "UserSuperuserDisable": "Désactiver l'accès superutilisateur",
       "UserContentFiltersSet": "Mettre à jour les filtres de contenu",
+      "UserUnlock": "Déverrouiller le compte",
       "ReadingInsightsSharingUpdate": "Mettre à jour le partage d'informations",
       "ReadingInsightsProfileView": "Afficher les informations partagées",
       "LibraryCreate": "Créer une bibliothèque",
@@ -2966,9 +3000,13 @@
       "signingIn": "Connexion...",
       "orDivider": "ou",
       "forgotPassword": "Mot de passe oublié ?",
+      "noAccount": "Vous n'avez pas de compte ?",
+      "signUp": "Inscrivez-vous",
+      "registeredNotice": "Compte créé. Connectez-vous pour continuer. Un administrateur doit vous accorder les permissions nécessaires avant de pouvoir accéder à la bibliothèque.",
       "errors": {
         "invalidCredentials": "Nom d'utilisateur ou mot de passe invalide",
-        "tooManyAttempts": "Trop de tentatives de connexion. Veuillez patienter une minute et réessayer."
+        "tooManyAttempts": "Trop de tentatives de connexion. Veuillez patienter une minute et réessayer.",
+        "accountLocked": "Votre mot de passe est correct, mais ce compte est temporairement verrouillé après trop de tentatives de connexion infructueuses. Réessayez dans {minutes, plural, one {# minute} many {# de minutes} other {# minutes}}, ou réinitialisez votre mot de passe pour le déverrouiller maintenant."
       }
     },
     "oidc": {
@@ -3007,6 +3045,29 @@
       "errors": {
         "invalidLink": "Lien de réinitialisation invalide. Veuillez en demander un nouveau.",
         "invalidOrExpired": "Lien de réinitialisation invalide ou expiré. Veuillez en demander un nouveau."
+      }
+    },
+    "register": {
+      "title": "Créez votre compte",
+      "subtitle": "Inscrivez-vous pour commencer.",
+      "createAccount": "Créer un compte",
+      "creatingAccount": "Création du compte...",
+      "haveAccount": "Vous avez déjà un compte ?",
+      "signIn": "Connectez-vous",
+      "errors": {
+        "closed": "L'auto-inscription n'est pas possible sur ce serveur.",
+        "taken": "Ce nom d'utilisateur ou cette adresse email est déjà utilisé.",
+        "invalid": "Vérifiez les informations saisies et réessayez.",
+        "tooManyAttempts": "Trop de tentatives de connexion. Veuillez patienter une minute et réessayez.",
+        "failed": "Échec de création du compte",
+        "username": {
+          "unsafeCharacters": "Votre nom d'utilisateur ne peut pas contenir de caractères cachés ou de direction textuelle.",
+          "untrimmed": "Votre nom d'utilisateur ne peut pas commencer ou terminer par un espace."
+        },
+        "name": {
+          "unsafeCharacters": "Votre nom ne peut pas contenir de caractères cachés ou de direction textuelle.",
+          "untrimmed": "Votre nom ne peut pas commencer ou terminer par un espace."
+        }
       }
     },
     "setup": {
@@ -3678,6 +3739,8 @@
         "fileSize": "Taille du fichier",
         "library": "Bibliothèque",
         "added": "Ajouté",
+        "cancelDateAddedEdit": "Annuler la modification de la date d'ajout",
+        "editDateAdded": "Modifier la date d'ajout",
         "dateStarted": "Date de début",
         "saving": "Sauvegarde...",
         "cancelDateStartedEdit": "Annuler la date de début de la modification",
@@ -3689,9 +3752,12 @@
         "synopsis": "Résumé",
         "noDescription": "Aucune description disponible.",
         "dateStartedFutureError": "La date de début ne peut pas être postérieure.",
+        "dateAddedRequiredError": "La date d'ajout est requise.",
+        "dateAddedFutureError": "La date d'ajout ne peut pas être postérieure.",
         "dateFinishedFutureError": "La date de fin ne peut pas être postérieure.",
         "dateFinishedBeforeStartedError": "La date de fin doit être identique ou postérieure à la date de début.",
         "saveReadingDatesError": "Échec de l'enregistrement des dates de lecture.",
+        "saveAddedDateError": "Échec d'enregistrement de la date d'ajout.",
         "koboPendingDelete": "En attente de suppression de l'appareil",
         "koboPendingDeleteTooltip": "Kobo le supprimera lors de la prochaine synchronisation.",
         "koboRemovedByDevice": "Supprimé par appareil",
@@ -4735,6 +4801,10 @@
       "cover": "Couverture",
       "bookCover": "Couverture du livre"
     },
+    "libraryLoad": {
+      "errorTitle": "Impossible de charger vos bibliothèques",
+      "errorDescription": "BookOrbit n'a pas pu récupérer vos bibliothèques. Les données de votre bibliothèque n'ont pas été supprimées."
+    },
     "scroller": {
       "failedToLoad": "Échec du chargement.",
       "empty": {
@@ -5268,6 +5338,43 @@
       },
       "column": {
         "progress": "Progrès"
+      }
+    },
+    "linkedBooks": {
+      "title": "Livres associés",
+      "description": "Affiche les livres que vous lisez actuellement. Une fois un livre est associé à un Hardcover, choisissez une autre édition (physique, ebook, audiobook) ici pour modifier les données de lecture synchronisées.",
+      "loading": "Chargement des livres...",
+      "loadError": "Échec du chargement des livres.",
+      "retry": "Réessayer",
+      "empty": "Aucun livre en cours de lecture.",
+      "untitled": "Sans titre",
+      "unknownAuthor": "Auteur inconnu",
+      "matchMethod": {
+        "isbn": "ISBN",
+        "title": "Titre",
+        "cached": "En cache",
+        "manual": "Manuelle",
+        "metadata_id": "Correspondance des métadonnées"
+      },
+      "status": {
+        "error": "Erreur : {error}",
+        "linked": "Associé",
+        "linkedWithMethod": "Associé({method})",
+        "notLinked": "Pas encore associé"
+      },
+      "unmatchedHint": "Ce livre n'a pas encore été associé à un Hardcover. Il sera automatiquement associé lors de sa prochaine synchronisation.",
+      "editionsLoadError": "Échec du chargement des éditions.",
+      "viewEditions": "Afficher les éditions",
+      "noEditionsFound": "Aucune édition trouvée.",
+      "booksTruncated": "Afficher les {count} premiers livres que vous lisez.",
+      "editionsTruncated": "Afficher les {count} premières éditions.",
+      "pages": "{count, plural, one {# page} many {# de pages} other {# pages}}",
+      "isbn": "ISBN {isbn}",
+      "current": "Actuels",
+      "useThis": "Utiliser ceci",
+      "toast": {
+        "switched": "Changer vers {format}",
+        "switchFailed": "Échec du changement d'édition"
       }
     }
   },
@@ -6111,6 +6218,9 @@
       "scrollModeHint": "Utilisez \"Pas d'espaces\" pour les webtoons et les bandes verticales.",
       "readingDirection": "Sens de lecture",
       "pageView": "Affichage des pages",
+      "twoPagePagedOnly": "Les double-pages ne sont affichées qu'en mode paginé.",
+      "spreadSection": "Double-pages étendues",
+      "spreadFallbackHint": "Cet écran est trop étroit pour les double-pages, affichage en page simple uniquement.",
       "spreadAlignmentLabel": "Alignement de la propagation",
       "spreadGap": "Écart de propagation",
       "spreadGapValue": "{value}px",
@@ -6118,6 +6228,9 @@
       "widePages": "Pages larges",
       "firstPage": "Première page",
       "lastPage": "Dernière page",
+      "zoomControls": "Contrôles du zoom",
+      "zoomOut": "Zoom arrière",
+      "zoomIn": "Zoom avant",
       "fit": {
         "page": "Ajustement de la page",
         "width": "Largeur de page",
@@ -6946,6 +7059,7 @@
     "notFound": "Introuvable",
     "signIn": "Connectez-vous",
     "initialSetup": "Configuration initiale",
+    "register": "Créer un Compte",
     "forgotPassword": "Mot de passe oublié",
     "resetPassword": "Réinitialiser le mot de passe",
     "completingSignIn": "Terminer la connexion",

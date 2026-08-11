@@ -40,11 +40,17 @@ const statusLabel = computed<string | null>(() => {
   const remaining = status.value.queued + status.value.processing
   if (remaining > 0) {
     return status.value.paused
-      ? t('settings.metadata.autoFetch.status.inQueuePaused', { count: remaining })
+      ? t('settings.metadata.autoFetch.status.inQueuePaused', {
+          count: remaining,
+        })
       : t('settings.metadata.autoFetch.status.remaining', { count: remaining })
   }
   if (eligibleCount.value !== null) {
-    return countLoading.value ? null : t('settings.metadata.autoFetch.status.eligible', { count: eligibleCount.value })
+    return countLoading.value
+      ? null
+      : t('settings.metadata.autoFetch.status.eligible', {
+          count: eligibleCount.value,
+        })
   }
   return null
 })
@@ -53,9 +59,17 @@ const activeConditionSummary = computed(() => {
   const parts: string[] = []
   if (c.neverFetched.enabled) parts.push(t('settings.metadata.autoFetch.conditions.neverFetched.summary'))
   if (c.scoreThreshold.enabled)
-    parts.push(t('settings.metadata.autoFetch.conditions.scoreThreshold.summary', { threshold: c.scoreThreshold.threshold }))
+    parts.push(
+      t('settings.metadata.autoFetch.conditions.scoreThreshold.summary', {
+        threshold: c.scoreThreshold.threshold,
+      }),
+    )
   if (c.missingFields.enabled && c.missingFields.fields.length > 0)
-    parts.push(t('settings.metadata.autoFetch.conditions.missingFields.summary', { count: c.missingFields.fields.length }))
+    parts.push(
+      t('settings.metadata.autoFetch.conditions.missingFields.summary', {
+        count: c.missingFields.fields.length,
+      }),
+    )
   return parts.length > 0 ? parts.join(' • ') : t('settings.metadata.autoFetch.conditions.noneEnabled')
 })
 
@@ -68,14 +82,26 @@ const lastRunLabel = computed(() => {
   const diffMins = Math.floor(diffMs / (1000 * 60))
   let when: string
   if (diffMins < 2) when = t('settings.metadata.autoFetch.lastRun.justNow')
-  else if (diffMins < 60) when = t('settings.metadata.autoFetch.lastRun.minutesAgo', { count: diffMins })
-  else if (diffHours < 24) when = t('settings.metadata.autoFetch.lastRun.hoursAgo', { count: diffHours })
+  else if (diffMins < 60)
+    when = t('settings.metadata.autoFetch.lastRun.minutesAgo', {
+      count: diffMins,
+    })
+  else if (diffHours < 24)
+    when = t('settings.metadata.autoFetch.lastRun.hoursAgo', {
+      count: diffHours,
+    })
   else if (diffDays === 1) when = t('settings.metadata.autoFetch.lastRun.yesterday')
-  else when = t('settings.metadata.autoFetch.lastRun.daysAgo', { count: diffDays })
+  else
+    when = t('settings.metadata.autoFetch.lastRun.daysAgo', {
+      count: diffDays,
+    })
   const queued = libraryData.value.lastQueuedCount
   if (queued === null) return t('settings.metadata.autoFetch.lastRun.label', { when })
   return queued > 0
-    ? t('settings.metadata.autoFetch.lastRun.labelQueued', { when, count: queued })
+    ? t('settings.metadata.autoFetch.lastRun.labelQueued', {
+        when,
+        count: queued,
+      })
     : t('settings.metadata.autoFetch.lastRun.labelNoneEligible', { when })
 })
 
@@ -166,14 +192,16 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
 </script>
 
 <template>
-  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+  <div class="settings-card">
     <button
       class="w-full flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card text-left"
       @click="cardOpen = !cardOpen"
     >
       <div>
         <p class="settings-label">{{ props.library.name }}</p>
-        <p v-if="lastRunLabel" class="text-xs text-muted-foreground mt-0.5">{{ lastRunLabel }}</p>
+        <p v-if="lastRunLabel" class="text-xs text-muted-foreground mt-0.5">
+          {{ lastRunLabel }}
+        </p>
         <p class="text-xs text-muted-foreground mt-1 line-clamp-1">
           {{ inheriting ? t('settings.metadata.autoFetch.library.inheritingGlobal') : activeConditionSummary }}
         </p>
@@ -186,20 +214,28 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
       </div>
     </button>
 
-    <div v-if="loading && cardOpen" class="px-4 py-3.5 md:px-5 md:py-4 bg-card text-xs text-muted-foreground">{{ t('common.loading') }}</div>
+    <div v-if="loading && cardOpen" class="px-4 py-3.5 md:px-5 md:py-4 bg-card text-xs text-muted-foreground">
+      {{ t('common.loading') }}
+    </div>
 
     <template v-else-if="cardOpen">
       <div v-if="inheriting" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
-        <p class="text-xs text-muted-foreground italic">{{ t('settings.metadata.autoFetch.library.usingGlobalDefaults') }}</p>
+        <p class="text-xs text-muted-foreground italic">
+          {{ t('settings.metadata.autoFetch.library.usingGlobalDefaults') }}
+        </p>
       </div>
 
       <div v-else class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
         <button class="w-full flex items-center justify-between gap-2 text-left" @click="conditionsOpen = !conditionsOpen">
-          <p class="settings-label">{{ t('settings.metadata.autoFetch.conditions.title') }}</p>
+          <p class="settings-label">
+            {{ t('settings.metadata.autoFetch.conditions.title') }}
+          </p>
           <ChevronUp v-if="conditionsOpen" :size="15" class="text-muted-foreground shrink-0" />
           <ChevronDown v-else :size="15" class="text-muted-foreground shrink-0" />
         </button>
-        <p class="text-xs text-muted-foreground mt-1 mb-3">{{ activeConditionSummary }}</p>
+        <p class="text-xs text-muted-foreground mt-1 mb-3">
+          {{ activeConditionSummary }}
+        </p>
         <ConditionConfigurator v-if="conditionsOpen" v-model="local!.conditions" :disabled="!displayConfig.enabled" />
       </div>
 

@@ -446,6 +446,21 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(searchResponse.body).toContain('/api/v1/opds/catalog?q={searchTerms}');
     });
 
+    // Clients that skip OpenSearch discovery need the templated link inline, on every
+    // feed they can land on, or they show no search affordance at all (issue #860).
+    it('advertises the inline templated search link on every navigable feed', async () => {
+      const paths = ['/api/v1/opds', '/api/v1/opds/libraries', '/api/v1/opds/collections', '/api/v1/opds/smart-scopes'];
+      const acquisitionPaths = ['/api/v1/opds/authors', '/api/v1/opds/series', '/api/v1/opds/catalog', '/api/v1/opds/recent'];
+
+      for (const path of [...paths, ...acquisitionPaths]) {
+        const response = await opdsGet(path, ownerCredentials);
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toContain(
+          '<link rel="search" href="/api/v1/opds/catalog?q={searchTerms}" type="application/atom+xml" title="Search"/>',
+        );
+      }
+    });
+
     it('scopes libraries, collections, smartScopes, authors, and series to the authenticated parent user', async () => {
       const librariesResponse = await opdsGet('/api/v1/opds/libraries', ownerCredentials);
       expect(librariesResponse.statusCode).toBe(200);

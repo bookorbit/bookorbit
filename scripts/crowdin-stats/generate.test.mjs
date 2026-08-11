@@ -95,6 +95,13 @@ test("extractLanguages derives flags from the locale and defaults missing progre
 
   const [unknown] = extractLanguages({ progress: [{ data: { languageId: "eo" } }] });
   assert.equal(unknown.name, "eo");
+
+  // Crowdin's own Chinese names are long enough to widen the label column for every row.
+  const [simplified] = extractLanguages({ progress: [language("zh-CN", "Chinese Simplified", "zh-CN", "99%")] });
+  assert.equal(simplified.name, "Chinese (S)");
+
+  const [traditional] = extractLanguages({ progress: [language("zh-TW", "Chinese Traditional", "zh-TW", "0%")] });
+  assert.equal(traditional.name, "Chinese (T)");
   assert.equal(unknown.flag, "");
   assert.equal(unknown.percent, 0);
 });
@@ -107,7 +114,7 @@ test("generateSvg renders every target language with its percentage", () => {
   assert.match(svg, /🇧🇷 {2}Portuguese</);
   assert.match(svg, /🇸🇮 {2}Slovenian/);
   assert.match(svg, />97%</);
-  assert.match(svg, /4 target languages · 96% average/);
+  assert.match(svg, /4 languages · 96% average/);
   assert.match(svg, /English/);
 });
 
@@ -120,20 +127,20 @@ test("generateSvg renders the source language like any other completed row but k
   assert.equal(source.percent, 100);
   assert.doesNotMatch(svg, /bar-source/);
   // English sits at 100%, so it takes the completed tier and fills the whole bar.
-  assert.match(svg, new RegExp(`width="${layout.barWidth}" height="8" rx="4" class="bar-done"`));
+  assert.match(svg, new RegExp(`width="${layout.barWidth}" height="6" rx="3" class="bar-done"`));
   assert.match(svg, /96% average/);
 });
 
 test("generateSvg renders at its natural size so label type is never scaled down", () => {
   const { height } = computeLayout(extractLanguages(sampleStats));
-  assert.match(generateSvg(sampleStats), new RegExp(`<svg [^>]*width="540" height="${height}" viewBox="0 0 540 ${height}"`));
+  assert.match(generateSvg(sampleStats), new RegExp(`<svg [^>]*width="460" height="${height}" viewBox="0 0 460 ${height}"`));
 });
 
 test("generateSvg grows the canvas instead of overflowing when languages are added", () => {
   const withExtra = generateSvg({ progress: [...sampleStats.progress, language("es", "Spanish", "es-ES", "40%", 4000, 19358)] });
-  assert.match(withExtra, /viewBox="0 0 540 278"/);
+  assert.match(withExtra, /viewBox="0 0 460 263"/);
   assert.match(withExtra, /🇪🇸 {2}Spanish/);
-  assert.match(generateSvg(sampleStats), /viewBox="0 0 540 250"/);
+  assert.match(generateSvg(sampleStats), /viewBox="0 0 460 238"/);
 });
 
 test("computeLayout keeps horizontal rows at any language count", () => {
@@ -142,7 +149,7 @@ test("computeLayout keeps horizontal rows at any language count", () => {
   const twenty = computeLayout(rows(20));
 
   assert.equal(nine.count, 9);
-  assert.equal(twenty.height - nine.height, 11 * 28, "each extra language adds exactly one row");
+  assert.equal(twenty.height - nine.height, 11 * 25, "each extra language adds exactly one row");
 });
 
 test("generateSvg renders many languages as rows without rotating labels", () => {
@@ -156,7 +163,7 @@ test("generateSvg renders many languages as rows without rotating labels", () =>
   const svg = generateSvg(many);
 
   assert.equal(layout.count, 13);
-  assert.match(svg, new RegExp(`viewBox="0 0 540 ${layout.height}"`));
+  assert.match(svg, new RegExp(`viewBox="0 0 460 ${layout.height}"`));
   assert.equal(svg.match(/class="bar-bg"/g).length, 13);
   assert.doesNotMatch(svg, /rotate\(/);
 });
@@ -183,8 +190,8 @@ test("generateSvg keeps bars inside the card", () => {
   assert.equal(svg.match(/class="bar-bg"/g).length, 5, "one track per language row");
 
   for (const [, x, width] of svg.matchAll(/<rect x="(\d+)" y="\d+" width="(\d+)"[^>]*class="bar-(?:bg|done|progress|low)"/g)) {
-    assert.ok(Number(x) >= 24, "bar must not overflow the left padding");
-    assert.ok(Number(x) + Number(width) <= 540 - 24, "bar must not overflow the right padding");
+    assert.ok(Number(x) >= 20, "bar must not overflow the left padding");
+    assert.ok(Number(x) + Number(width) <= 460 - 20, "bar must not overflow the right padding");
   }
 });
 
@@ -209,6 +216,6 @@ test("generateSvg escapes language names and handles empty data", () => {
 
   const empty = generateSvg({ progress: [] });
   assert.match(empty, /no translation data/);
-  assert.match(empty, /viewBox="0 0 540 96"/);
+  assert.match(empty, /viewBox="0 0 460 96"/);
   assert.doesNotMatch(empty, /NaN|undefined/);
 });

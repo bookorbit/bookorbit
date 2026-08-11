@@ -9,6 +9,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useMediaQuery } from '@vueuse/core'
+import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 
 const { t } = useI18n()
 const {
@@ -259,9 +260,9 @@ watch(
           </label>
           <input
             v-model="form.password"
-            type="password"
-            autocomplete="new-password"
-            class="w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            v-bind="SECRET_INPUT_ATTRS"
+            type="text"
+            class="input-secret w-full h-9 px-3 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <div>

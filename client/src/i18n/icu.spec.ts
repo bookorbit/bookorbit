@@ -4,19 +4,28 @@ import type { Locale } from '@bookorbit/types'
 import cs from '@/locales/cs.json'
 import da from '@/locales/da.json'
 import de from '@/locales/de.json'
+import greek from '@/locales/el.json'
 import en from '@/locales/en.json'
 import fi from '@/locales/fi.json'
 import spanish from '@/locales/es.json'
 import french from '@/locales/fr.json'
+import hungarian from '@/locales/hu.json'
+import indonesian from '@/locales/id.json'
 import italian from '@/locales/it.json'
+import japanese from '@/locales/ja.json'
+import korean from '@/locales/ko.json'
 import nl from '@/locales/nl.json'
 import polish from '@/locales/pl.json'
 import pt from '@/locales/pt.json'
+import romanian from '@/locales/ro.json'
 import ru from '@/locales/ru.json'
+import slovak from '@/locales/sk.json'
 import sl from '@/locales/sl.json'
 import sv from '@/locales/sv.json'
+import turkish from '@/locales/tr.json'
 import uk from '@/locales/uk.json'
 import zh from '@/locales/zh.json'
+import traditionalChinese from '@/locales/zh-Hant.json'
 import { compileIcuCatalog, icuCountValues, isIcuPluralMessage, splitIcuCount } from './icu'
 import { i18n as applicationI18n } from './index'
 
@@ -313,20 +322,29 @@ describe('ICU message compilation', () => {
     ['cs', cs, [0, 1, 2, 5, 1.5]],
     ['da', da, [0, 1, 2]],
     ['de', de, [0, 1, 2]],
+    ['el', greek, [0, 1, 2]],
     ['es', spanish, [0, 1, 2, 1_000_000]],
     ['fi', fi, [0, 1, 2]],
     ['fr', french, [0, 1, 2, 1_000_000]],
+    ['hu', hungarian, [0, 1, 2]],
+    ['id', indonesian, [0, 1, 2]],
     ['it', italian, [0, 1, 2, 1_000_000]],
+    ['ja', japanese, [0, 1, 2]],
+    ['ko', korean, [0, 1, 2]],
     ['nl', nl, [0, 1, 2]],
     // Polish reserves `other` for fractions, exactly as Czech does.
     ['pl', polish, [0, 1, 2, 5, 1.5, 1_000_000]],
     ['pt', pt, [0, 1, 2, 1_000_000]],
+    ['ro', romanian, [0, 1, 2, 20]],
     // Russian and Ukrainian reach `other` only through a fraction; 5 is `many`.
     ['ru', ru, [0, 1, 2, 5, 1.5]],
+    ['sk', slovak, [0, 1, 2, 5, 1.1]],
     ['sl', sl, [0, 1, 2, 3, 5]],
     ['sv', sv, [0, 1, 2]],
+    ['tr', turkish, [0, 1, 2]],
     ['uk', uk, [0, 1, 2, 5, 1.5]],
     ['zh', zh, [0, 1, 2]],
+    ['zh-Hant', traditionalChinese, [0, 1, 2]],
   ] as const)('formats every ICU message for all relevant plural categories in %s', (locale, catalog, counts) => {
     const testI18n = createCatalogI18n(locale, catalog)
 

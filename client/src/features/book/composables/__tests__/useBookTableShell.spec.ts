@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   confirmDelete: vi.fn<() => void>(),
   routerPush: vi.fn<(to: unknown) => void>(),
   setBookContext: vi.fn<(ids: number[], total: number) => void>(),
+  useBookViewSelectionCalls: [] as Array<[unknown, { value: boolean } | undefined]>,
   useBookBulkActions: vi.fn<(...args: unknown[]) => object>(() => ({
     handleBulkRefreshMetadata: vi.fn<() => void>(),
     handleBulkReExtractCover: vi.fn<() => void>(),
@@ -41,15 +42,18 @@ vi.mock('../useTableViewControls', () => ({
 }))
 
 vi.mock('../useBookViewSelection', () => ({
-  useBookViewSelection: () => ({
-    selectedIds: mockSelectedIds,
-    selectionMode: mockSelectionMode,
-    enterSelectionMode: mocks.enterSelectionMode,
-    exitSelectionMode: mocks.exitSelectionMode,
-    toggleBook: mocks.toggleBook,
-    handleSelect: vi.fn<() => void>(),
-    toggleSelectionMode: vi.fn<() => void>(),
-  }),
+  useBookViewSelection: (books: unknown, selectionMode?: { value: boolean }) => {
+    mocks.useBookViewSelectionCalls.push([books, selectionMode])
+    return {
+      selectedIds: mockSelectedIds,
+      selectionMode: selectionMode ?? mockSelectionMode,
+      enterSelectionMode: mocks.enterSelectionMode,
+      exitSelectionMode: mocks.exitSelectionMode,
+      toggleBook: mocks.toggleBook,
+      handleSelect: vi.fn<() => void>(),
+      toggleSelectionMode: vi.fn<() => void>(),
+    }
+  },
 }))
 
 vi.mock('../useDeleteBook', () => ({
@@ -116,6 +120,7 @@ describe('useBookTableShell', () => {
     mocks.cancelDelete.mockClear()
     mocks.confirmDelete.mockClear()
     mocks.useBookBulkActions.mockClear()
+    mocks.useBookViewSelectionCalls.length = 0
     mocks.routerPush.mockClear()
     mocks.setBookContext.mockClear()
   })
@@ -147,6 +152,16 @@ describe('useBookTableShell', () => {
     const call = mocks.useBookBulkActions.mock.calls[0]!
     const [, , thirdArg] = call
     expect(thirdArg).toBe(books)
+  })
+
+  it('passes an external selection-mode ref to the view selection state', () => {
+    const books = ref([makeBook()])
+    const selectionMode = ref(false)
+
+    const shell = useBookTableShell({ books, selectionMode })
+
+    expect(mocks.useBookViewSelectionCalls).toEqual([[books, selectionMode]])
+    expect(shell.selectionMode).toBe(selectionMode)
   })
 
   describe('handleBookAction', () => {

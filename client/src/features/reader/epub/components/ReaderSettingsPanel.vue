@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { EPUB_FONT_SIZE_MAX, EPUB_FONT_SIZE_MIN } from '@bookorbit/types'
 import {
   BookOpen,
   ChevronDown,
@@ -37,8 +38,6 @@ const emit = defineEmits<{
   reset: []
 }>()
 
-const FONT_SIZE_MIN = 10
-const FONT_SIZE_MAX = 32
 const COLUMN_MIN = 1
 const COLUMN_MAX = 10
 
@@ -92,11 +91,11 @@ function selectTheme(themeName: string) {
 }
 
 function decreaseTextSize() {
-  emit('update', { fontSize: Math.max(FONT_SIZE_MIN, props.state.fontSize - 1) })
+  emit('update', { fontSize: Math.max(EPUB_FONT_SIZE_MIN, props.state.fontSize - 1) })
 }
 
 function increaseTextSize() {
-  emit('update', { fontSize: Math.min(FONT_SIZE_MAX, props.state.fontSize + 1) })
+  emit('update', { fontSize: Math.min(EPUB_FONT_SIZE_MAX, props.state.fontSize + 1) })
 }
 
 function selectBuiltInFont(font: ReaderBuiltInFontOption) {
@@ -231,7 +230,7 @@ const cardBaseClass =
             type="button"
             :class="stepperButtonClass"
             class="text-sm"
-            :disabled="state.fontSize <= FONT_SIZE_MIN"
+            :disabled="state.fontSize <= EPUB_FONT_SIZE_MIN"
             :aria-label="t('reader.settings.textSizeSmaller')"
             @click="decreaseTextSize"
           >
@@ -244,7 +243,7 @@ const cardBaseClass =
             type="button"
             :class="stepperButtonClass"
             class="text-xl"
-            :disabled="state.fontSize >= FONT_SIZE_MAX"
+            :disabled="state.fontSize >= EPUB_FONT_SIZE_MAX"
             :aria-label="t('reader.settings.textSizeLarger')"
             @click="increaseTextSize"
           >

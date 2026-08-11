@@ -28,11 +28,16 @@ export class PermissionGuard implements CanActivate {
       throw new ForbiddenException(forbidden.message ?? `Forbidden permission: ${forbidden.permission}`);
     }
 
-    const required = this.reflector.getAllAndOverride<Permission | undefined>(PERMISSION_KEY, [context.getHandler(), context.getClass()]);
+    const required = this.reflector.getAllAndOverride<Permission | Permission[] | undefined>(PERMISSION_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (!required) return true;
 
-    if (!this.permissionService.userHas(user, required)) {
-      throw new ForbiddenException(`Missing permission: ${required}`);
+    const permissions = Array.isArray(required) ? required : [required];
+    const missing = permissions.find((permission) => !this.permissionService.userHas(user, permission));
+    if (missing) {
+      throw new ForbiddenException(`Missing permission: ${missing}`);
     }
     return true;
   }

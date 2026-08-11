@@ -3,6 +3,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 import { useStorygraphSettings } from '../composables/useStorygraphSettings'
 
 const { settings, saving, validating, error, fetchSettings, saveSettings, disconnect, validateCookies } = useStorygraphSettings()
@@ -138,10 +139,11 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
         <div class="flex gap-2">
           <input
             v-model="sessionCookieInput"
-            :type="cookiesVisible ? 'text' : 'password'"
+            v-bind="SECRET_INPUT_ATTRS"
+            type="text"
             placeholder="Paste the _storygraph_session cookie value"
             class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            autocomplete="off"
+            :class="{ 'input-secret': !cookiesVisible }"
           />
         </div>
       </div>
@@ -151,10 +153,11 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
         <div class="flex gap-2">
           <input
             v-model="rememberTokenInput"
-            :type="cookiesVisible ? 'text' : 'password'"
+            v-bind="SECRET_INPUT_ATTRS"
+            type="text"
             placeholder="Paste the remember_user_token cookie value"
             class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            autocomplete="off"
+            :class="{ 'input-secret': !cookiesVisible }"
           />
           <button
             type="button"

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
 import { Permission } from '@bookorbit/types'
 import ProvidersTab from './ProvidersTab.vue'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
+import SettingsTabs from '@/features/settings/components/SettingsTabs.vue'
+import { useRouteTab } from '@/features/settings/composables/useRouteTab'
 import RecipientsTab from './RecipientsTab.vue'
 import GroupsTab from './GroupsTab.vue'
 import TemplatesTab from './TemplatesTab.vue'
@@ -42,32 +43,13 @@ const tabs = computed<{ id: Tab; label: string }[]>(() => {
   return result
 })
 
-const route = useRoute()
-const router = useRouter()
-
-function resolveTab(value: unknown): Tab {
-  const normalized = normalizeEmailTab(value)
-  if (tabs.value.some((t) => t.id === normalized)) return normalized
-  return tabs.value[0]?.id ?? 'recipients'
-}
-
-const activeTab = ref<Tab>(resolveTab(route.query.tab))
-
-if (!route.query.tab) {
-  router.replace({ name: 'settings-email', query: { ...route.query, tab: activeTab.value } })
-}
-
-watch(
-  () => route.query.tab,
-  (value) => {
-    activeTab.value = resolveTab(value)
-  },
-)
-
-function selectTab(tab: Tab) {
-  activeTab.value = tab
-  router.replace({ name: 'settings-email', query: { ...route.query, tab } })
-}
+const availableTabIds = computed(() => tabs.value.map((tab) => tab.id))
+const { activeTab, selectTab } = useRouteTab<Tab>({
+  routeName: 'settings-email',
+  normalize: normalizeEmailTab,
+  availableTabs: availableTabIds,
+  fallback: 'recipients',
+})
 
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -87,37 +69,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <SettingsPageHeader class="hidden md:flex" :title="t('email.title')" :subtitle="t('email.subtitle')" />
-  <div class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('email.title') }}</h1>
-    <p
-      class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
-    >
-      {{ t('email.subtitle') }}
-    </p>
-  </div>
+  <SettingsPageHeader :title="t('email.title')" :subtitle="t('email.subtitle')" />
 
-  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">{{ t('common.loading') }}</div>
+  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">
+    {{ t('common.loading') }}
+  </div>
   <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
   <template v-else>
-    <!-- Tab bar -->
-    <div
-      class="flex gap-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x"
-    >
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        class="px-3 py-3 md:py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors snap-start"
-        :class="
-          activeTab === tab.id
-            ? 'border-primary text-foreground'
-            : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-        "
-        @click="selectTab(tab.id)"
-      >
-        {{ tab.label }}
-      </button>
-    </div>
+    <SettingsTabs :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
 
     <ProvidersTab v-if="activeTab === 'providers'" />
     <RecipientsTab v-else-if="activeTab === 'recipients'" />

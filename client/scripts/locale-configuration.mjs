@@ -19,6 +19,7 @@ const CROWDIN_LANGUAGE_ID_OVERRIDES = new Map([
   ['pt', 'pt-BR'],
   ['sv', 'sv-SE'],
   ['zh', 'zh-CN'],
+  ['zh-Hant', 'zh-TW'],
 ])
 
 for (const locale of CROWDIN_LANGUAGE_ID_OVERRIDES.keys()) {

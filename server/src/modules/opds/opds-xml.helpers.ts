@@ -55,3 +55,7 @@ export function fileMimeType(format: string): string {
 export const OPDS_MIME_NAV = 'application/atom+xml;profile=opds-catalog;kind=navigation';
 export const OPDS_MIME_ACQ = 'application/atom+xml;profile=opds-catalog;kind=acquisition';
 export const OPDS_MIME_SEARCH = 'application/opensearchdescription+xml';
+// Bare atom type, used only on the inline templated search link. Clients that skip
+// OpenSearch discovery match this type by equality, so the profile/kind parameters
+// carried by OPDS_MIME_ACQ must not be attached here.
+export const OPDS_MIME_ATOM = 'application/atom+xml';

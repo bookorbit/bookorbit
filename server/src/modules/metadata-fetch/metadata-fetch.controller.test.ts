@@ -165,19 +165,27 @@ describe('MetadataFetchController', () => {
     expect(service.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }), [MetadataProviderKey.KOBO]);
   });
 
-  it('filters blocklisted genres from streamed metadata candidates', async () => {
+  it('applies genre exclusions, de-duplication, and limits to streamed metadata candidates', async () => {
     const resolver = new MetadataPreferenceResolver();
     const preferences = resolver.getDefaultPreferences();
     preferences.options!.genres.blocklist = ['Audiobook'];
+    preferences.options!.genres.maxCount = 2;
     metadataPreferences.getGlobal.mockResolvedValue(preferences);
     service.search.mockReturnValue(
-      of({ provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First', genres: ['Science Fiction', 'audiobook'] }),
+      of({
+        provider: MetadataProviderKey.GOOGLE,
+        providerId: 'vol-1',
+        title: 'First',
+        genres: ['Science Fiction', 'science fiction', 'audiobook', 'Space Opera', 'Fantasy'],
+      }),
     );
 
     const stream = await controller.stream({ title: 'Dune' }, user);
     const events = await firstValueFrom(stream.pipe(toArray()));
 
-    expect(events).toEqual([{ data: { provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First', genres: ['Science Fiction'] } }]);
+    expect(events).toEqual([
+      { data: { provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First', genres: ['Science Fiction', 'Space Opera'] } },
+    ]);
   });
 
   it('skips stored provider lookup when bookId is not provided', async () => {
@@ -325,7 +333,7 @@ describe('MetadataFetchController', () => {
     );
   });
 
-  it('delegates lookup requests to the metadata fetch service and filters blocklisted genres', async () => {
+  it('delegates lookup requests and applies genre fetch options', async () => {
     providerConfig.getConfig.mockResolvedValue(
       makeProviderConfig({
         amazon: { enabled: true, domain: 'amazon.com', cookie: '' },
@@ -334,12 +342,13 @@ describe('MetadataFetchController', () => {
     const resolver = new MetadataPreferenceResolver();
     const preferences = resolver.getDefaultPreferences();
     preferences.options!.genres.blocklist = ['Adult'];
+    preferences.options!.genres.maxCount = 1;
     metadataPreferences.getGlobal.mockResolvedValue(preferences);
     service.lookupById.mockResolvedValue({
       provider: MetadataProviderKey.AMAZON,
       providerId: 'B123',
       title: 'Amazon Title',
-      genres: ['Adult', 'Mystery'],
+      genres: ['Adult', 'Mystery', 'Thriller'],
     });
 
     const dto: LookupMetadataDto = { provider: MetadataProviderKey.AMAZON, id: 'B123' };

@@ -15,6 +15,7 @@ export interface KoboSettings {
   kepubConversionLimitMb: number;
   twoWayProgressSync: boolean;
   syncBookOrbitAnnotationsToKobo: boolean;
+  storeSync: boolean;
 }
 
 @Injectable()
@@ -50,6 +51,7 @@ export class KoboSettingsService {
       kepubConversionLimitMb: row.kepubConversionLimitMb,
       twoWayProgressSync: row.twoWayProgressSync,
       syncBookOrbitAnnotationsToKobo: row.syncBookOrbitAnnotationsToKobo,
+      storeSync: row.storeSync,
     };
   }
 
@@ -76,6 +78,7 @@ export class KoboSettingsService {
         kepubConversionLimitMb: patch.kepubConversionLimitMb ?? current.kepubConversionLimitMb,
         twoWayProgressSync: newTwoWayProgressSync,
         syncBookOrbitAnnotationsToKobo: newAnnotationSync,
+        storeSync: patch.storeSync ?? current.storeSync,
         updatedAt: sql`now()`,
       })
       .where(eq(schema.koboSyncSettings.userId, userId))
@@ -97,6 +100,7 @@ export class KoboSettingsService {
       kepubConversionLimitMb: updated.kepubConversionLimitMb,
       twoWayProgressSync: updated.twoWayProgressSync,
       syncBookOrbitAnnotationsToKobo: updated.syncBookOrbitAnnotationsToKobo,
+      storeSync: updated.storeSync,
     };
   }
 

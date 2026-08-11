@@ -25,6 +25,7 @@ describe('KoboSyncController', () => {
   };
   const proxyService = {
     forward: vi.fn(),
+    request: vi.fn(),
   };
   const bookIdentityService = {
     resolveBookIdByEntitlementId: vi.fn(),
@@ -213,6 +214,187 @@ describe('KoboSyncController', () => {
     expect(reply.header).toHaveBeenCalledWith('x-kobo-sync', 'continue');
     expect(reply.header).toHaveBeenCalledWith('x-kobo-synctoken', 'SYNC-2');
     expect(reply.send).toHaveBeenCalledWith([{ NewEntitlement: { BookEntitlement: { Id: '12' } } }]);
+  });
+
+  describe('store sync', () => {
+    const SNAPSHOT_TOKEN = `PX.${Buffer.from(JSON.stringify({ snapshotId: 4 })).toString('base64')}`;
+
+    function syncRequest(incomingSyncToken?: string) {
+      return {
+        headers: { host: 'kobo.local', ...(incomingSyncToken ? { 'x-kobo-synctoken': incomingSyncToken } : {}) },
+        protocol: 'http',
+        hostname: 'kobo.local',
+        socket: { localPort: 3000 },
+      };
+    }
+
+    function storeResponse(entitlements: unknown[], headers: Record<string, string> = {}) {
+      return { status: 200, headers, body: Buffer.from(JSON.stringify(entitlements), 'utf8') };
+    }
+
+    async function runSync(reply: ReturnType<typeof makeReply>, incomingSyncToken?: string) {
+      await controller.librarySync(
+        { deviceId: 9, deviceToken: 'token-9' } as never,
+        { id: 21 } as never,
+        syncRequest(incomingSyncToken) as never,
+        reply as never,
+      );
+    }
+
+    beforeEach(() => {
+      syncService.getDelta.mockResolvedValue({ entitlements: [{ Local: 1 }], hasMore: false, syncToken: SNAPSHOT_TOKEN });
+      settingsService.getSettings.mockResolvedValue({ storeSync: true });
+    });
+
+    it('does not touch the store when the user has store sync disabled', async () => {
+      settingsService.getSettings.mockResolvedValue({ storeSync: false });
+      const reply = makeReply();
+
+      await runSync(reply);
+
+      expect(proxyService.request).not.toHaveBeenCalled();
+      expect(reply.send).toHaveBeenCalledWith([{ Local: 1 }]);
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-sync', '');
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-synctoken', SNAPSHOT_TOKEN);
+      expect(historyService.recordSuccess).toHaveBeenCalledWith(expect.objectContaining({ counts: { entitlements: 1, hasMore: false } }));
+    });
+
+    it('parks an unused Kobo cursor in the token while store sync is off, so enabling it later resumes', async () => {
+      settingsService.getSettings.mockResolvedValue({ storeSync: false });
+      const reply = makeReply();
+
+      await runSync(reply, 'kobo-native-token');
+
+      expect(proxyService.request).not.toHaveBeenCalled();
+      expect(reply.header).toHaveBeenCalledWith(
+        'x-kobo-synctoken',
+        `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-native-token' })).toString('base64')}`,
+      );
+    });
+
+    it('appends store entitlements and stamps Kobo’s cursor into the sync token', async () => {
+      proxyService.request.mockResolvedValue(storeResponse([{ Store: 1 }, { Store: 2 }], { 'x-kobo-synctoken': 'kobo-cursor-2' }));
+      const reply = makeReply();
+
+      await runSync(reply, `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-1' })).toString('base64')}`);
+
+      expect(proxyService.request).toHaveBeenCalledWith(
+        expect.anything(),
+        'token-9',
+        expect.objectContaining({ extraHeaders: { 'x-kobo-synctoken': 'kobo-cursor-1' } }),
+      );
+      expect(reply.send).toHaveBeenCalledWith([{ Local: 1 }, { Store: 1 }, { Store: 2 }]);
+      expect(reply.header).toHaveBeenCalledWith(
+        'x-kobo-synctoken',
+        `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-2' })).toString('base64')}`,
+      );
+      expect(historyService.recordSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ counts: { entitlements: 3, hasMore: false, storeEntitlements: 2 } }),
+      );
+    });
+
+    it('never forwards our own composite token upstream when Kobo’s cursor is unknown', async () => {
+      proxyService.request.mockResolvedValue(storeResponse([]));
+      const reply = makeReply();
+
+      await runSync(reply, SNAPSHOT_TOKEN);
+
+      expect(proxyService.request).toHaveBeenCalledWith(expect.anything(), 'token-9', expect.objectContaining({ omitHeaders: ['x-kobo-synctoken'] }));
+      expect(proxyService.request.mock.calls[0][2]).not.toHaveProperty('extraHeaders');
+    });
+
+    it('forwards a raw Kobo token from a device that synced with Kobo before BookOrbit', async () => {
+      proxyService.request.mockResolvedValue(storeResponse([]));
+
+      await runSync(makeReply(), 'kobo-native-token');
+
+      expect(proxyService.request).toHaveBeenCalledWith(
+        expect.anything(),
+        'token-9',
+        expect.objectContaining({ extraHeaders: { 'x-kobo-synctoken': 'kobo-native-token' } }),
+      );
+    });
+
+    it('keeps paging while the store cursor advances', async () => {
+      proxyService.request.mockResolvedValue(storeResponse([{ Store: 1 }], { 'x-kobo-sync': 'continue', 'x-kobo-synctoken': 'kobo-cursor-2' }));
+      const reply = makeReply();
+
+      await runSync(reply, `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-1' })).toString('base64')}`);
+
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-sync', 'continue');
+    });
+
+    it('stops paging when the store says continue without advancing its cursor', async () => {
+      proxyService.request.mockResolvedValue(storeResponse([{ Store: 1 }], { 'x-kobo-sync': 'continue', 'x-kobo-synctoken': 'kobo-cursor-1' }));
+      const reply = makeReply();
+
+      await runSync(reply, `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-1' })).toString('base64')}`);
+
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-sync', '');
+      expect(reply.send).toHaveBeenCalledWith([{ Local: 1 }, { Store: 1 }]);
+    });
+
+    it.each([
+      ['the store rejects the credential', () => proxyService.request.mockResolvedValue({ status: 401, headers: {}, body: Buffer.from('nope') })],
+      ['the store times out', () => proxyService.request.mockRejectedValue(new Error('The operation was aborted due to timeout'))],
+      ['the store returns a non-array body', () => proxyService.request.mockResolvedValue(storeResponse({ error: 'nope' } as never))],
+      ['the store returns unparseable JSON', () => proxyService.request.mockResolvedValue({ status: 200, headers: {}, body: Buffer.from('<html>') })],
+      ['the store returns an empty body', () => proxyService.request.mockResolvedValue({ status: 200, headers: {}, body: Buffer.from('   ') })],
+      ['reading the store sync setting fails', () => settingsService.getSettings.mockRejectedValue(new Error('settings row race'))],
+    ])('still serves BookOrbit entitlements when %s', async (_label, arrange) => {
+      arrange();
+      const reply = makeReply();
+
+      await runSync(reply);
+
+      expect(reply.send).toHaveBeenCalledWith([{ Local: 1 }]);
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-sync', '');
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-synctoken', SNAPSHOT_TOKEN);
+      expect(historyService.recordSuccess).toHaveBeenCalledWith(expect.objectContaining({ counts: { entitlements: 1, hasMore: false } }));
+    });
+
+    it('records the sync as a success rather than a 500 when the store sync setting cannot be read', async () => {
+      settingsService.getSettings.mockRejectedValue(new Error('settings row race'));
+      const reply = makeReply();
+
+      await expect(runSync(reply)).resolves.toBeUndefined();
+
+      expect(proxyService.request).not.toHaveBeenCalled();
+      expect(historyService.recordFailure).not.toHaveBeenCalled();
+      expect(historyService.recordSuccess).toHaveBeenCalledWith(expect.objectContaining({ event: 'library_sync' }));
+    });
+
+    it('treats a capitalised continue header as more pages', async () => {
+      proxyService.request.mockResolvedValue(storeResponse([{ Store: 1 }], { 'x-kobo-sync': 'Continue', 'x-kobo-synctoken': 'kobo-cursor-2' }));
+      const reply = makeReply();
+
+      await runSync(reply, `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-1' })).toString('base64')}`);
+
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-sync', 'continue');
+    });
+
+    it('drops an upstream cursor too large to carry and leaves the token without one', async () => {
+      const oversized = 'x'.repeat(4097);
+      proxyService.request.mockResolvedValue(storeResponse([{ Store: 1 }], { 'x-kobo-synctoken': oversized }));
+      const reply = makeReply();
+
+      await runSync(reply, SNAPSHOT_TOKEN);
+
+      expect(reply.send).toHaveBeenCalledWith([{ Local: 1 }, { Store: 1 }]);
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-synctoken', SNAPSHOT_TOKEN);
+    });
+
+    it('preserves a known Kobo cursor across a failed store call so paging resumes next sync', async () => {
+      proxyService.request.mockRejectedValue(new Error('upstream down'));
+      const reply = makeReply();
+
+      await runSync(reply, `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-1' })).toString('base64')}`);
+
+      expect(reply.header).toHaveBeenCalledWith(
+        'x-kobo-synctoken',
+        `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-1' })).toString('base64')}`,
+      );
+    });
   });
 
   it('records failed library sync operations before rethrowing', async () => {

@@ -188,6 +188,7 @@ function collapsedCoverSrc(bookId: number): string {
 
 function handleRowClick(event: MouseEvent) {
   if (props.selectionMode) {
+    if (isCollapsedSeries.value) return
     emit('select', event)
     return
   }
@@ -212,19 +213,11 @@ function handleRowClick(event: MouseEvent) {
     data-testid="collapsed-series-list-row"
     class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors"
     :class="[
-      selectionMode ? 'cursor-pointer select-none' : canOpenSeries ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default',
+      selectionMode ? 'cursor-default select-none' : canOpenSeries ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default',
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
     ]"
     @click="handleRowClick"
   >
-    <div
-      v-if="selectionMode"
-      class="h-5 w-5 rounded shrink-0 flex items-center justify-center transition-colors"
-      :class="selected ? 'bg-primary' : 'border border-border bg-background'"
-    >
-      <Check v-if="selected" class="text-primary-foreground" :size="12" />
-    </div>
-
     <div :class="collapsedCoverContainerClass">
       <template v-if="collapsedCoverIds.length > 0">
         <BookCoverSurface
@@ -306,6 +299,7 @@ function handleRowClick(event: MouseEvent) {
     <!-- Selection checkbox -->
     <div
       v-if="selectionMode"
+      data-testid="book-selection-checkbox"
       class="h-5 w-5 rounded shrink-0 flex items-center justify-center transition-colors"
       :class="selected ? 'bg-primary' : 'border border-border bg-background'"
     >

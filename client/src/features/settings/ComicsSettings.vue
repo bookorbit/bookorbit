@@ -58,9 +58,11 @@ onMounted(load)
       <p class="settings-group-label">{{ t('settings.reader.comics.view') }}</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Scroll mode -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.readingMode') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.readingMode') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.readingModeHint') }}
             </p>
@@ -95,9 +97,11 @@ onMounted(load)
         </div>
 
         <!-- View mode -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.pageView') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.pageView') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.pageViewHint') }}
             </p>
@@ -121,9 +125,11 @@ onMounted(load)
         </div>
 
         <!-- Fit mode -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.fitMode') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.fitMode') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.fitModeHint') }}
             </p>
@@ -131,10 +137,22 @@ onMounted(load)
           <div class="flex flex-wrap gap-2 self-start md:self-auto md:justify-end">
             <button
               v-for="opt in [
-                { id: 'fit-page' as const, label: t('settings.reader.comics.fitPage') },
-                { id: 'fit-width' as const, label: t('settings.reader.comics.fitWidth') },
-                { id: 'fit-height' as const, label: t('settings.reader.comics.fitHeight') },
-                { id: 'actual' as const, label: t('settings.reader.comics.fitActual') },
+                {
+                  id: 'fit-page' as const,
+                  label: t('settings.reader.comics.fitPage'),
+                },
+                {
+                  id: 'fit-width' as const,
+                  label: t('settings.reader.comics.fitWidth'),
+                },
+                {
+                  id: 'fit-height' as const,
+                  label: t('settings.reader.comics.fitHeight'),
+                },
+                {
+                  id: 'actual' as const,
+                  label: t('settings.reader.comics.fitActual'),
+                },
               ]"
               :key="opt.id"
               class="h-8 md:h-7 px-3 text-xs border-2 transition-colors font-medium rounded-md"
@@ -151,9 +169,11 @@ onMounted(load)
         </div>
 
         <!-- Reading direction -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.readingDirection') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.readingDirection') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.readingDirectionHint') }}
             </p>
@@ -177,9 +197,11 @@ onMounted(load)
         </div>
 
         <!-- Spread alignment -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.spreadAlignment') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.spreadAlignment') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.spreadAlignmentHint') }}
             </p>
@@ -206,7 +228,7 @@ onMounted(load)
           </div>
         </div>
 
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
             <label for="default-cbz-spread-gap" class="settings-label">{{ t('settings.reader.comics.spreadGap') }}</label>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
@@ -224,15 +246,21 @@ onMounted(load)
               @input="updateSpreadGapFromEvent"
             />
             <span class="w-12 text-end text-xs tabular-nums text-muted-foreground">
-              {{ t('settings.reader.comics.spreadGapValue', { value: effective.spreadGap }) }}
+              {{
+                t('settings.reader.comics.spreadGapValue', {
+                  value: effective.spreadGap,
+                })
+              }}
             </span>
           </div>
         </div>
 
         <!-- Wide page handling -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.widePageHandling') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.widePageHandling') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.widePageHandlingHint') }}
             </p>
@@ -262,9 +290,11 @@ onMounted(load)
         </div>
 
         <!-- Force two-page -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.forceTwoPage') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.forceTwoPage') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.forceTwoPageHint') }}
             </p>
@@ -291,12 +321,16 @@ onMounted(load)
 
     <!-- Display -->
     <div class="mb-6">
-      <p class="settings-group-label">{{ t('settings.reader.comics.display') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.comics.display') }}
+      </p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Background color -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.comics.backgroundColor') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.backgroundColor') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.comics.backgroundColorHint') }}
             </p>
@@ -304,9 +338,18 @@ onMounted(load)
           <div class="flex flex-wrap gap-2 self-start">
             <button
               v-for="opt in [
-                { id: 'black' as const, label: t('settings.reader.comics.bgBlack') },
-                { id: 'gray' as const, label: t('settings.reader.comics.bgGray') },
-                { id: 'white' as const, label: t('settings.reader.comics.bgWhite') },
+                {
+                  id: 'black' as const,
+                  label: t('settings.reader.comics.bgBlack'),
+                },
+                {
+                  id: 'gray' as const,
+                  label: t('settings.reader.comics.bgGray'),
+                },
+                {
+                  id: 'white' as const,
+                  label: t('settings.reader.comics.bgWhite'),
+                },
               ]"
               :key="opt.id"
               class="h-8 md:h-7 px-3 text-xs border-2 transition-colors font-medium rounded-md"

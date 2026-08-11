@@ -83,6 +83,7 @@ vi.mock('@/stores/theme', () => ({
 
 vi.mock('@/stores/locale', () => ({
   useLocaleStore: () => ({ locale: 'en', setLocale: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined) }),
+  matchSupportedLocale: () => null,
 }))
 
 vi.mock('@/components/ui/sidebar', () => ({

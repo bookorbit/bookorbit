@@ -61,7 +61,7 @@ describe('KoreaderRepository', () => {
     });
 
     it('returns the book file when found by current hash', async () => {
-      const file = { id: 10, bookId: 20, libraryId: 1 };
+      const file = { id: 10, bookId: 20, libraryId: 1, format: 'epub' };
       db.select.mockReturnValue(makeQueryChain([file]));
 
       const result = await repo.resolveBookFileByHash('abc123', null);
@@ -71,7 +71,7 @@ describe('KoreaderRepository', () => {
     });
 
     it('falls back to hash history when current hash lookup returns nothing', async () => {
-      const file = { id: 10, bookId: 20, libraryId: 1 };
+      const file = { id: 10, bookId: 20, libraryId: 1, format: 'pdf' };
       db.select.mockReturnValueOnce(makeQueryChain([])).mockReturnValueOnce(makeQueryChain([file]));
 
       const result = await repo.resolveBookFileByHash('oldhash', null);
@@ -81,7 +81,7 @@ describe('KoreaderRepository', () => {
     });
 
     it('falls back to a user-scoped manual link after direct and history lookups miss', async () => {
-      const file = { id: 10, bookId: 20, libraryId: 1 };
+      const file = { id: 10, bookId: 20, libraryId: 1, format: 'cbz' };
       db.select
         .mockReturnValueOnce(makeQueryChain([]))
         .mockReturnValueOnce(makeQueryChain([]))
@@ -91,6 +91,17 @@ describe('KoreaderRepository', () => {
 
       expect(result).toEqual(file);
       expect(db.select).toHaveBeenCalledTimes(3);
+    });
+
+    it('selects the file format on every lookup so callers can route the position', async () => {
+      db.select.mockReturnValueOnce(makeQueryChain([])).mockReturnValueOnce(makeQueryChain([])).mockReturnValueOnce(makeQueryChain([]));
+
+      await repo.resolveBookFileByHash('manualhash', [1], 7);
+
+      expect(db.select).toHaveBeenCalledTimes(3);
+      for (const call of db.select.mock.calls) {
+        expect(call[0]).toHaveProperty('format');
+      }
     });
 
     it('returns null when a user-scoped manual link lookup also misses', async () => {
@@ -122,40 +133,51 @@ describe('KoreaderRepository', () => {
       db.select
         .mockReturnValueOnce(
           makeQueryChain([
-            { hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31 },
-            { hash: null, bookFileId: 12, bookId: 22, libraryId: 32 },
+            { hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' },
+            { hash: null, bookFileId: 12, bookId: 22, libraryId: 32, format: 'epub' },
           ]),
         )
-        .mockReturnValueOnce(makeQueryChain([{ hash: 'old', bookFileId: 13, bookId: 23, libraryId: 33 }]));
+        .mockReturnValueOnce(makeQueryChain([{ hash: 'old', bookFileId: 13, bookId: 23, libraryId: 33, format: 'pdf' }]));
 
       const result = await repo.resolveBookFilesByHashes(['current', 'old'], [31, 33]);
 
-      expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31 });
-      expect(result.get('old')).toEqual({ bookFileId: 13, bookId: 23, libraryId: 33 });
+      expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' });
+      expect(result.get('old')).toEqual({ bookFileId: 13, bookId: 23, libraryId: 33, format: 'pdf' });
       expect(result.size).toBe(2);
       expect(db.select).toHaveBeenCalledTimes(2);
     });
 
     it('skips hash history lookup when all hashes resolve directly', async () => {
-      db.select.mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31 }]));
+      db.select.mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31, format: 'pdf' }]));
 
       const result = await repo.resolveBookFilesByHashes(['current'], null);
 
-      expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31 });
+      expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'pdf' });
       expect(db.select).toHaveBeenCalledTimes(1);
     });
 
     it('resolves remaining hashes from user-scoped manual links', async () => {
       db.select
-        .mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31 }]))
+        .mockReturnValueOnce(makeQueryChain([{ hash: 'current', bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' }]))
         .mockReturnValueOnce(makeQueryChain([]))
-        .mockReturnValueOnce(makeQueryChain([{ hash: 'manual', bookFileId: 12, bookId: 22, libraryId: 32 }]));
+        .mockReturnValueOnce(makeQueryChain([{ hash: 'manual', bookFileId: 12, bookId: 22, libraryId: 32, format: 'cbr' }]));
 
       const result = await repo.resolveBookFilesByHashes(['current', 'manual'], [31, 32], 7);
 
-      expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31 });
-      expect(result.get('manual')).toEqual({ bookFileId: 12, bookId: 22, libraryId: 32 });
+      expect(result.get('current')).toEqual({ bookFileId: 11, bookId: 21, libraryId: 31, format: 'epub' });
+      expect(result.get('manual')).toEqual({ bookFileId: 12, bookId: 22, libraryId: 32, format: 'cbr' });
       expect(db.select).toHaveBeenCalledTimes(3);
+    });
+
+    it('selects the file format on every lookup so callers can route the position', async () => {
+      db.select.mockReturnValueOnce(makeQueryChain([])).mockReturnValueOnce(makeQueryChain([])).mockReturnValueOnce(makeQueryChain([]));
+
+      await repo.resolveBookFilesByHashes(['current', 'manual'], [31, 32], 7);
+
+      expect(db.select).toHaveBeenCalledTimes(3);
+      for (const call of db.select.mock.calls) {
+        expect(call[0]).toHaveProperty('format');
+      }
     });
   });
 
@@ -743,12 +765,22 @@ describe('KoreaderRepository', () => {
   });
 
   describe('upsertReadingProgress', () => {
-    it('upserts percentage and clears stale web locator fields on conflict', async () => {
+    function mockUpsertChain() {
       const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
       const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
       db.insert.mockReturnValue({ values });
+      return { onConflictDoUpdate, values };
+    }
 
-      await repo.upsertReadingProgress(44, 12, 41.25);
+    function conflictSet(onConflictDoUpdate: ReturnType<typeof vi.fn>) {
+      const arg = onConflictDoUpdate.mock.calls[0]?.[0] as { set?: Record<string, unknown> } | undefined;
+      return arg?.set;
+    }
+
+    it('upserts percentage and clears stale web locator fields on conflict', async () => {
+      const { onConflictDoUpdate, values } = mockUpsertChain();
+
+      await repo.upsertReadingProgress({ bookFileId: 44, userId: 12, percentage: 41.25 });
 
       expect(db.insert).toHaveBeenCalledTimes(1);
       expect(values).toHaveBeenCalledWith(
@@ -756,6 +788,9 @@ describe('KoreaderRepository', () => {
           bookFileId: 44,
           userId: 12,
           percentage: 41.25,
+          cfi: null,
+          pageNumber: null,
+          koreaderProgress: null,
         }),
       );
 
@@ -767,12 +802,47 @@ describe('KoreaderRepository', () => {
             cfi: null,
             pageNumber: null,
             koreaderProgress: null,
+            koboLocationSource: null,
+            koboLocationType: null,
+            koboLocationValue: null,
+            koboContentSourceProgressPercent: null,
           }),
         }),
       );
 
-      const conflictArg = onConflictDoUpdate.mock.calls[0]?.[0] as { set?: Record<string, unknown> } | undefined;
-      expect(conflictArg?.set?.['updatedAt']).toBeDefined();
+      expect(conflictSet(onConflictDoUpdate)?.['updatedAt']).toBeDefined();
+    });
+
+    it('persists a paged position on both the insert and the conflict update', async () => {
+      const { onConflictDoUpdate, values } = mockUpsertChain();
+
+      await repo.upsertReadingProgress({ bookFileId: 44, userId: 12, percentage: 30, xpointer: '117', pageNumber: 117 });
+
+      expect(values).toHaveBeenCalledWith(expect.objectContaining({ pageNumber: 117, cfi: null, koreaderProgress: '117' }));
+      expect(conflictSet(onConflictDoUpdate)).toEqual(expect.objectContaining({ pageNumber: 117, cfi: null, koreaderProgress: '117' }));
+    });
+
+    it('persists a reflowable position without touching the page column', async () => {
+      const { onConflictDoUpdate, values } = mockUpsertChain();
+
+      await repo.upsertReadingProgress({
+        bookFileId: 44,
+        userId: 12,
+        percentage: 30,
+        cfi: 'epubcfi(/6/14!/4/2/6)',
+        xpointer: '/body/DocFragment[7]',
+      });
+
+      expect(values).toHaveBeenCalledWith(expect.objectContaining({ cfi: 'epubcfi(/6/14!/4/2/6)', pageNumber: null }));
+      expect(conflictSet(onConflictDoUpdate)).toEqual(expect.objectContaining({ cfi: 'epubcfi(/6/14!/4/2/6)', pageNumber: null }));
+    });
+
+    it('clears a stale stored page when the sync carries no page', async () => {
+      const { onConflictDoUpdate } = mockUpsertChain();
+
+      await repo.upsertReadingProgress({ bookFileId: 44, userId: 12, percentage: 30, pageNumber: null });
+
+      expect(conflictSet(onConflictDoUpdate)).toEqual(expect.objectContaining({ pageNumber: null }));
     });
   });
 

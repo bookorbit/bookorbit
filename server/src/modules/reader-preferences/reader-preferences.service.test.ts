@@ -265,6 +265,23 @@ describe('ReaderPreferencesService', () => {
       expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 22, { fixedLayoutSpread: 'none' });
     });
 
+    it('accepts the minimum epub font size', async () => {
+      const user = makeUser();
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+
+      await service.upsertPreference(user, 24, { fontSize: 6 });
+
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 24, { fontSize: 6 });
+    });
+
+    it('rejects epub font sizes below the minimum', async () => {
+      const user = makeUser();
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+
+      await expect(service.upsertPreference(user, 25, { fontSize: 5 })).rejects.toThrow(BadRequestException);
+      expect(mockRepo.upsertPreference).not.toHaveBeenCalled();
+    });
+
     it('rejects partial epub per-book settings with invalid footerDisplayMode', async () => {
       const user = makeUser();
       mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });

@@ -4,18 +4,27 @@ export_languages:
   - cs
   - da
   - de
+  - el
   - es-ES
   - fi
   - fr
+  - hu
+  - id
   - it
+  - ja
+  - ko
   - nl
   - pl
   - pt-BR
+  - ro
   - ru
+  - sk
   - sl
   - sv-SE
+  - tr
   - uk
   - zh-CN
+  - zh-TW
 
 pull_request_title: "i18n(client): sync translations from Crowdin"
 commit_message: |-
@@ -27,4 +36,7 @@ append_commit_message: false
 files:
   - source: /client/src/locales/en.json
     translation: /client/src/locales/%two_letters_code%.json
+    languages_mapping:
+      two_letters_code:
+        zh-TW: zh-Hant
     update_option: update_as_unapproved

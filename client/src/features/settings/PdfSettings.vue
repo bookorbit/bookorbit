@@ -93,9 +93,11 @@ function handleCustomScale(event: Event) {
       <p class="settings-group-label">{{ t('settings.reader.pdf.layout') }}</p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Scroll mode -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.pdf.scrollMode') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.pdf.scrollMode') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.pdf.scrollModeHint') }}
             </p>
@@ -128,9 +130,11 @@ function handleCustomScale(event: Event) {
         </div>
 
         <!-- Page spread -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.pdf.pageSpread') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.pdf.pageSpread') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.pdf.pageSpreadHint') }}
             </p>
@@ -176,7 +180,9 @@ function handleCustomScale(event: Event) {
         <!-- Zoom mode -->
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
-            <p class="settings-label">{{ t('settings.reader.pdf.defaultFit') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.pdf.defaultFit') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.pdf.defaultFitHint') }}
             </p>
@@ -208,7 +214,9 @@ function handleCustomScale(event: Event) {
         <div v-if="showZoom" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="settings-label">{{ t('settings.reader.pdf.zoomLevel') }}</p>
+              <p class="settings-label">
+                {{ t('settings.reader.pdf.zoomLevel') }}
+              </p>
               <span class="settings-value">{{ Math.round(effective.customScale * 100) }}%</span>
             </div>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">

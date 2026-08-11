@@ -290,7 +290,7 @@ describe('BookListRow collapsed series', () => {
     expect(wrapper.emitted('action')).toBeUndefined()
   })
 
-  it('selects the collapsed row instead of navigating in selection mode', async () => {
+  it('does not select a representative book or navigate in selection mode', async () => {
     const wrapper = mount(BookListRow, {
       props: { book: collapsedSeriesBook, selectionMode: true },
       global: globalStubs,
@@ -298,8 +298,9 @@ describe('BookListRow collapsed series', () => {
 
     await wrapper.get('[data-testid="collapsed-series-list-row"]').trigger('click')
 
-    expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(wrapper.emitted('select')).toBeUndefined()
     expect(routerPushMock).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="book-selection-checkbox"]').exists()).toBe(false)
   })
 
   it('renders a fallback cover when collapsed cover ids are unavailable', () => {

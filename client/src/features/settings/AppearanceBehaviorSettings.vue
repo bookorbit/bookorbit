@@ -13,7 +13,14 @@ const { prefs, setPreference } = useSeriesCollapsePreference()
 
 const globalCollapseEnabled = computed(() => prefs.value?.global ?? false)
 
-const thumbnailClickOptions = computed<{ id: BookThumbnailClickAction; label: string; hint: string; icon: typeof BookOpen }[]>(() => [
+const thumbnailClickOptions = computed<
+  {
+    id: BookThumbnailClickAction
+    label: string
+    hint: string
+    icon: typeof BookOpen
+  }[]
+>(() => [
   {
     id: 'reader',
     label: t('settings.appearance.behavior.thumbnailClicks.readFirst'),
@@ -39,11 +46,15 @@ function setThumbnailClickAction(action: BookThumbnailClickAction) {
 
 <template>
   <div>
-    <p class="settings-group-label">{{ t('settings.appearance.behavior.title') }}</p>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+    <p class="settings-group-label">
+      {{ t('settings.appearance.behavior.title') }}
+    </p>
+    <div class="settings-card">
       <div class="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center md:justify-between md:px-5 md:py-4 bg-card">
         <div class="min-w-0">
-          <p class="settings-label">{{ t('settings.appearance.behavior.thumbnailClicks.label') }}</p>
+          <p class="settings-label">
+            {{ t('settings.appearance.behavior.thumbnailClicks.label') }}
+          </p>
           <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
             {{ t('settings.appearance.behavior.thumbnailClicks.hint') }}
           </p>
@@ -69,7 +80,9 @@ function setThumbnailClickAction(action: BookThumbnailClickAction) {
       </div>
       <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
         <div class="min-w-0">
-          <p class="settings-label">{{ t('settings.appearance.behavior.filterPreview.label') }}</p>
+          <p class="settings-label">
+            {{ t('settings.appearance.behavior.filterPreview.label') }}
+          </p>
           <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
             {{ t('settings.appearance.behavior.filterPreview.hint') }}
           </p>
@@ -78,7 +91,9 @@ function setThumbnailClickAction(action: BookThumbnailClickAction) {
       </div>
       <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
         <div class="min-w-0">
-          <p class="settings-label">{{ t('settings.appearance.behavior.collapseSeries.label') }}</p>
+          <p class="settings-label">
+            {{ t('settings.appearance.behavior.collapseSeries.label') }}
+          </p>
           <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
             Group books in the same series into a single card in library, collection, and Smart Scope views
           </p>

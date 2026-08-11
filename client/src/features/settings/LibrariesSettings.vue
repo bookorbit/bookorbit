@@ -122,7 +122,9 @@ watch(progressMap, (map) => {
 
 async function scan(lib: LibraryType) {
   try {
-    const res = await api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
+    const res = await api(`/api/v1/scanner/libraries/${lib.id}/scan`, {
+      method: 'POST',
+    })
     if (res.ok) {
       toast.success(t('settings.admin.libraries.scanStarted', { name: lib.name }))
       subscribeLibrary(lib.id)
@@ -202,7 +204,9 @@ async function confirmDelete() {
   const deletedId = deletingLibrary.value.id
   const deletedName = deletingLibrary.value.name
   try {
-    const res = await api(`/api/v1/libraries/${deletedId}`, { method: 'DELETE' })
+    const res = await api(`/api/v1/libraries/${deletedId}`, {
+      method: 'DELETE',
+    })
     if (res.ok) {
       toast.success(t('settings.admin.libraries.libraryDeleted', { name: deletedName }))
       deletingLibrary.value = null
@@ -232,11 +236,23 @@ function scanProgressLabel(libraryId: number): string {
   if (p.status === 'running') {
     if (p.total === 0) return t('settings.admin.libraries.scanning')
     const pct = Math.floor((p.processed / p.total) * 100)
-    return t('settings.admin.libraries.scanningProgress', { pct, processed: p.processed, total: p.total })
+    return t('settings.admin.libraries.scanningProgress', {
+      pct,
+      processed: p.processed,
+      total: p.total,
+    })
   }
-  if (p.status === 'completed') return t('settings.admin.libraries.scanDone', { added: p.added, updated: p.updated })
+  if (p.status === 'completed')
+    return t('settings.admin.libraries.scanDone', {
+      added: p.added,
+      updated: p.updated,
+    })
   if (p.status === 'failed')
-    return p.errorMessage ? t('settings.admin.libraries.scanFailedWithError', { error: p.errorMessage }) : t('settings.admin.libraries.scanFailed')
+    return p.errorMessage
+      ? t('settings.admin.libraries.scanFailedWithError', {
+          error: p.errorMessage,
+        })
+      : t('settings.admin.libraries.scanFailed')
   return ''
 }
 
@@ -245,7 +261,11 @@ function coverRefreshLabel(libraryId: number): string {
   if (!p) return ''
   if (p.status === 'running') {
     const pct = p.total > 0 ? Math.floor((p.processed / p.total) * 100) : 0
-    return t('settings.admin.libraries.refreshingCovers', { pct, processed: p.processed, total: p.total })
+    return t('settings.admin.libraries.refreshingCovers', {
+      pct,
+      processed: p.processed,
+      total: p.total,
+    })
   }
   if (p.status === 'completed') return t('settings.admin.libraries.coversRefreshed', { count: p.total })
   return ''
@@ -253,12 +273,18 @@ function coverRefreshLabel(libraryId: number): string {
 </script>
 
 <template>
-  <div class="md:hidden mb-3">
-    <h2 class="settings-title">{{ t('settings.admin.libraries.title') }}</h2>
-    <p class="settings-subtitle overflow-hidden" style="display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2">
-      {{ t('settings.admin.libraries.subtitle') }}
-    </p>
-  </div>
+  <SettingsPageHeader :title="t('settings.admin.libraries.title')" :subtitle="t('settings.admin.libraries.subtitle')">
+    <div class="hidden items-center gap-2 md:flex">
+      <button class="settings-btn-outline" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
+        <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
+        {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
+      </button>
+      <button class="settings-btn-primary" @click="openCreate">
+        <Plus :size="14" />
+        {{ t('settings.admin.libraries.addLibrary') }}
+      </button>
+    </div>
+  </SettingsPageHeader>
   <div
     class="md:hidden sticky top-0 z-20 mb-4 -mx-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
   >
@@ -274,23 +300,12 @@ function coverRefreshLabel(libraryId: number): string {
     </div>
   </div>
 
-  <SettingsPageHeader :title="t('settings.admin.libraries.title')" :subtitle="t('settings.admin.libraries.subtitle')" class="hidden md:flex">
-    <button class="settings-btn-outline" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
-      <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
-      {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
-    </button>
-    <button class="settings-btn-primary" @click="openCreate">
-      <Plus :size="14" />
-      {{ t('settings.admin.libraries.addLibrary') }}
-    </button>
-  </SettingsPageHeader>
-
   <!-- Library cards -->
   <TooltipProvider>
     <div class="space-y-2 md:space-y-4">
       <div v-for="lib in libraries" :key="lib.id" class="rounded-lg border border-border bg-card overflow-hidden shadow-xs">
         <div class="px-4 py-3.5 md:px-5 md:py-4">
-          <div class="flex items-center gap-3">
+          <div class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 md:flex md:items-center">
             <!-- Icon -->
             <RouterLink
               :to="{ name: 'library', params: { id: lib.id } }"
@@ -311,12 +326,20 @@ function coverRefreshLabel(libraryId: number): string {
                 <!-- Col 1 -->
                 <span v-if="stats[lib.id]" class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
                   <BookOpen :size="11" class="shrink-0" />
-                  <span class="truncate">{{ t('settings.admin.libraries.bookCount', { count: stats[lib.id]?.totalBooks ?? 0 }) }}</span>
+                  <span class="truncate">{{
+                    t('settings.admin.libraries.bookCount', {
+                      count: stats[lib.id]?.totalBooks ?? 0,
+                    })
+                  }}</span>
                 </span>
                 <span v-else class="text-xs text-muted-foreground truncate min-w-0">
                   {{
                     t('settings.admin.libraries.addedDate', {
-                      date: formatDate(new Date(lib.createdAt), { year: 'numeric', month: 'short', day: 'numeric' }),
+                      date: formatDate(new Date(lib.createdAt), {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      }),
                     })
                   }}
                 </span>
@@ -342,12 +365,18 @@ function coverRefreshLabel(libraryId: number): string {
                   <TooltipTrigger as-child>
                     <span class="flex items-center gap-1 text-xs text-muted-foreground cursor-default min-w-0">
                       <FolderOpen :size="11" class="shrink-0" />
-                      <span class="truncate">{{ t('settings.admin.libraries.folderCount', { count: lib.folders.length }) }}</span>
+                      <span class="truncate">{{
+                        t('settings.admin.libraries.folderCount', {
+                          count: lib.folders.length,
+                        })
+                      }}</span>
                     </span>
                   </TooltipTrigger>
                   <TooltipContent class="max-w-xs">
                     <div class="space-y-0.5">
-                      <p v-for="folder in lib.folders" :key="folder.id" class="font-mono text-xs break-all">{{ folder.path }}</p>
+                      <p v-for="folder in lib.folders" :key="folder.id" class="font-mono text-xs break-all">
+                        {{ folder.path }}
+                      </p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -386,8 +415,8 @@ function coverRefreshLabel(libraryId: number): string {
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center gap-2 shrink-0">
-              <button class="settings-btn-outline" :disabled="isScanning(lib.id)" @click="scan(lib)">
+            <div class="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:flex md:shrink-0">
+              <button class="settings-btn-outline justify-center md:justify-start" :disabled="isScanning(lib.id)" @click="scan(lib)">
                 <RefreshCw :size="14" :class="isScanning(lib.id) ? 'animate-spin' : ''" />
                 {{ isScanning(lib.id) ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scan') }}
               </button>
@@ -477,8 +506,12 @@ function coverRefreshLabel(libraryId: number): string {
         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted mx-auto mb-4">
           <FolderOpen :size="22" class="text-muted-foreground" />
         </div>
-        <p class="text-sm font-medium text-foreground mb-1">{{ t('settings.admin.libraries.emptyTitle') }}</p>
-        <p class="text-sm text-muted-foreground mb-5">{{ t('settings.admin.libraries.emptyHint') }}</p>
+        <p class="text-sm font-medium text-foreground mb-1">
+          {{ t('settings.admin.libraries.emptyTitle') }}
+        </p>
+        <p class="text-sm text-muted-foreground mb-5">
+          {{ t('settings.admin.libraries.emptyHint') }}
+        </p>
         <button class="settings-btn-primary" @click="openCreate">
           <Plus :size="14" />
           {{ t('settings.admin.libraries.addFirstLibrary') }}
@@ -494,12 +527,18 @@ function coverRefreshLabel(libraryId: number): string {
   <div v-if="deletingLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
     <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
       <h3 class="text-base font-semibold text-foreground mb-1">
-        {{ t('settings.admin.libraries.deleteConfirmTitle', { name: deletingLibrary.name }) }}
+        {{
+          t('settings.admin.libraries.deleteConfirmTitle', {
+            name: deletingLibrary.name,
+          })
+        }}
       </h3>
       <p class="text-sm text-muted-foreground mb-4">
         {{ t('settings.admin.libraries.deleteConfirmBody') }}
       </p>
-      <p class="text-sm text-foreground mb-2">{{ t('settings.admin.libraries.deleteConfirmTypeName') }}</p>
+      <p class="text-sm text-foreground mb-2">
+        {{ t('settings.admin.libraries.deleteConfirmTypeName') }}
+      </p>
       <input
         v-model="deleteConfirmName"
         type="text"
@@ -529,7 +568,9 @@ function coverRefreshLabel(libraryId: number): string {
   <!-- Sync confirmation dialog -->
   <div v-if="confirmSyncLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
     <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
-      <h3 class="text-base font-semibold text-foreground mb-1">{{ t('settings.admin.libraries.syncConfirmTitle') }}</h3>
+      <h3 class="text-base font-semibold text-foreground mb-1">
+        {{ t('settings.admin.libraries.syncConfirmTitle') }}
+      </h3>
       <p class="text-sm text-muted-foreground mb-4">
         {{ t('settings.admin.libraries.syncConfirmBodyPrefix') }}
         <span class="font-medium text-foreground">{{ confirmSyncLibrary.name }}</span>

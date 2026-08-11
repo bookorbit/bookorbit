@@ -17,7 +17,6 @@ import {
   Star,
   ExternalLink,
   Sparkles,
-  Check,
   Languages,
 } from '@lucide/vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -38,7 +37,9 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import AccentPicker from '@/components/AccentPicker.vue'
+import LanguagePicker from '@/components/LanguagePicker.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
@@ -55,7 +56,7 @@ import NotificationSheet from '@/features/notifications/components/NotificationS
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, SUPPORTED_LOCALES, type Locale } from '@bookorbit/types'
+import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, type Locale } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 import { useLocaleStore } from '@/stores/locale'
 import { getFormatColor } from '@/features/book/lib/format-colors'
@@ -71,7 +72,7 @@ const { subscribe: subscribeNotifications } = useNotifications()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const themeStore = useThemeStore()
 const localeStore = useLocaleStore()
-const languageOptions = SUPPORTED_LOCALES.map((id) => ({ id, label: LOCALE_LABELS[id] }))
+const currentLanguageLabel = computed(() => LOCALE_LABELS[localeStore.locale])
 const documentationUrl = 'https://bookorbit.app/what-is-bookorbit'
 const githubRepositoryUrl = 'https://github.com/bookorbit/bookorbit'
 const githubStarPopoverOpen = ref(false)
@@ -125,12 +126,22 @@ function navigateToSettings() {
   router.push({ name: 'settings-libraries' })
 }
 
+const languageSheetOpen = ref(false)
+const languagePopoverOpen = ref(false)
+
 async function selectLanguage(locale: Locale) {
+  languageSheetOpen.value = false
+  languagePopoverOpen.value = false
+
   try {
     await localeStore.setLocale(locale)
   } catch {
     toast.error(t('settings.appearance.language.loadError'))
   }
+}
+
+function openLanguageSheet() {
+  languageSheetOpen.value = true
 }
 
 function navigateToWhatsNew() {
@@ -667,19 +678,11 @@ function formatBadgeStyle(fmt: string) {
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Languages :size="15" class="mr-2 text-muted-foreground" />
-                {{ t('settings.appearance.language.label') }}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent class="w-44">
-                <DropdownMenuItem v-for="option in languageOptions" :key="option.id" @click="selectLanguage(option.id)">
-                  <Check v-if="localeStore.locale === option.id" :size="14" class="mr-2" />
-                  <span v-else class="mr-2 w-3.5" />
-                  {{ option.label }}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <DropdownMenuItem @click="openLanguageSheet">
+              <Languages :size="15" class="mr-2 text-muted-foreground" />
+              {{ t('settings.appearance.language.label') }}
+              <span class="ms-auto ps-3 text-xs text-muted-foreground">{{ currentLanguageLabel }}</span>
+            </DropdownMenuItem>
 
             <DropdownMenuItem @click="navigateToSettings">
               <Settings :size="15" class="mr-2 text-muted-foreground" />
@@ -851,9 +854,9 @@ function formatBadgeStyle(fmt: string) {
           </Tooltip>
 
           <Tooltip>
-            <DropdownMenu>
+            <Popover v-model:open="languagePopoverOpen">
               <TooltipTrigger as-child>
-                <DropdownMenuTrigger as-child>
+                <PopoverTrigger as-child>
                   <Button
                     data-testid="language-control"
                     variant="ghost"
@@ -863,17 +866,12 @@ function formatBadgeStyle(fmt: string) {
                   >
                     <Languages :size="15" />
                   </Button>
-                </DropdownMenuTrigger>
+                </PopoverTrigger>
               </TooltipTrigger>
-              <DropdownMenuContent align="end" class="w-44">
-                <DropdownMenuLabel>{{ t('settings.appearance.language.label') }}</DropdownMenuLabel>
-                <DropdownMenuItem v-for="option in languageOptions" :key="option.id" @click="selectLanguage(option.id)">
-                  <Check v-if="localeStore.locale === option.id" :size="14" class="mr-2" />
-                  <span v-else class="mr-2 w-3.5" />
-                  {{ option.label }}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              <PopoverContent align="end" class="w-80 p-1">
+                <LanguagePicker :autofocus="languagePopoverOpen" class="max-h-[min(26rem,calc(100dvh-8rem))]" @select="selectLanguage" />
+              </PopoverContent>
+            </Popover>
             <TooltipContent>{{ t('settings.appearance.language.label') }}</TooltipContent>
           </Tooltip>
 
@@ -929,4 +927,13 @@ function formatBadgeStyle(fmt: string) {
   </header>
 
   <BookUploadModal v-if="uploadOpen" @close="uploadOpen = false" @uploaded="uploadOpen = false" />
+
+  <Sheet v-model:open="languageSheetOpen">
+    <SheetContent side="bottom" class="h-[85dvh] rounded-t-xl px-2 pb-2">
+      <SheetHeader class="pb-1">
+        <SheetTitle>{{ t('settings.appearance.language.label') }}</SheetTitle>
+      </SheetHeader>
+      <LanguagePicker :autofocus="false" class="min-h-0 flex-1" @select="selectLanguage" />
+    </SheetContent>
+  </Sheet>
 </template>

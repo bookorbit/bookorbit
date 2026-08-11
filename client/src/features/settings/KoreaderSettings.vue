@@ -28,14 +28,18 @@ import {
 import { toast } from 'vue-sonner'
 import type { BookCard, KoreaderDeviceInfo, KoreaderDeviceSweepInfo, KoreaderManualHashLink, KoreaderUnmatchedBook } from '@bookorbit/types'
 import SettingsPageHeader from './SettingsPageHeader.vue'
+import SettingsTabs from './components/SettingsTabs.vue'
 import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useKoreaderSync } from '@/features/koreader/composables/useKoreaderSync'
 import { useGlobalSearch } from '@/features/book/composables/useGlobalSearch'
+import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 
 const { t } = useI18n()
-const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false,
+})
 type Tab = 'settings' | 'file-naming'
 const route = props.embedded ? null : useRoute()
 const router = props.embedded ? null : useRouter()
@@ -45,10 +49,25 @@ function normalizeTab(value: unknown): Tab {
 }
 
 const activeTab = ref<Tab>(normalizeTab(route?.query.tab))
+const tabs = computed(() => [
+  {
+    id: 'settings' as const,
+    label: t('settings.reader.koreader.tabs.sync'),
+    controls: 'koreader-sync-panel',
+  },
+  {
+    id: 'file-naming' as const,
+    label: t('settings.reader.koreader.tabs.fileNaming'),
+    controls: 'koreader-file-naming-panel',
+  },
+])
 
 if (route && router) {
   if (route.query.tab !== activeTab.value) {
-    void router.replace({ name: 'settings-koreader', query: { ...route.query, tab: activeTab.value } })
+    void router.replace({
+      name: 'settings-koreader',
+      query: { ...route.query, tab: activeTab.value },
+    })
   }
 
   watch(
@@ -62,16 +81,11 @@ if (route && router) {
 function selectTab(tab: Tab): void {
   activeTab.value = tab
   if (route && router) {
-    void router.replace({ name: 'settings-koreader', query: { ...route.query, tab } })
+    void router.replace({
+      name: 'settings-koreader',
+      query: { ...route.query, tab },
+    })
   }
-}
-
-function showSettingsTab(): void {
-  selectTab('settings')
-}
-
-function showFileNamingTab(): void {
-  selectTab('file-naming')
 }
 
 const {
@@ -162,7 +176,9 @@ const latestPluginVersion = computed(() => syncStatus.value?.latestPluginVersion
 const pluginUpdateAvailable = computed(() => syncStatus.value?.pluginUpdateAvailable ?? false)
 const latestPluginLabel = computed(() =>
   latestPluginVersion.value
-    ? t('settings.reader.koreader.latestPlugin', { version: latestPluginVersion.value })
+    ? t('settings.reader.koreader.latestPlugin', {
+        version: latestPluginVersion.value,
+      })
     : t('settings.reader.koreader.latestPluginUnavailable'),
 )
 const pendingDeletes = computed(() => pluginTotals.value.pendingDeletes)
@@ -231,7 +247,10 @@ function formatDate(dateStr: string | null | undefined): string {
 
 function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return t('settings.reader.koreader.unknown')
-  return formatLocaleDate(new Date(dateStr), { dateStyle: 'medium', timeStyle: 'short' })
+  return formatLocaleDate(new Date(dateStr), {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
 }
 
 function formatEpochSeconds(seconds: number | null | undefined): string {
@@ -244,7 +263,12 @@ function shortHash(hash: string): string {
 }
 
 function unmatchedBookTitle(book: KoreaderUnmatchedBook): string {
-  return book.title?.trim() || t('settings.reader.koreader.hashLinks.unknownFile', { hash: shortHash(book.hash) })
+  return (
+    book.title?.trim() ||
+    t('settings.reader.koreader.hashLinks.unknownFile', {
+      hash: shortHash(book.hash),
+    })
+  )
 }
 
 function unmatchedBookSubtitle(book: KoreaderUnmatchedBook): string {
@@ -253,7 +277,12 @@ function unmatchedBookSubtitle(book: KoreaderUnmatchedBook): string {
 }
 
 function manualLinkTitle(link: KoreaderManualHashLink): string {
-  return link.koreaderTitle?.trim() || t('settings.reader.koreader.hashLinks.unknownFile', { hash: shortHash(link.hash) })
+  return (
+    link.koreaderTitle?.trim() ||
+    t('settings.reader.koreader.hashLinks.unknownFile', {
+      hash: shortHash(link.hash),
+    })
+  )
 }
 
 function manualLinkSubtitle(link: KoreaderManualHashLink): string {
@@ -295,7 +324,10 @@ onMounted(async () => {
 async function handleCreate() {
   creating.value = true
   try {
-    await createCredentials({ username: newUsername.value, password: newPassword.value })
+    await createCredentials({
+      username: newUsername.value,
+      password: newPassword.value,
+    })
     showSetupForm.value = false
     helpOpen.value = false
     newUsername.value = ''
@@ -455,7 +487,11 @@ async function handleDismissAllUnmatchedBooks() {
   dismissingAll.value = true
   try {
     const result = await dismissAllUnmatchedBooks()
-    toast.success(t('settings.reader.koreader.hashLinks.toast.allDismissed', { count: result.count }))
+    toast.success(
+      t('settings.reader.koreader.hashLinks.toast.allDismissed', {
+        count: result.count,
+      }),
+    )
     dismissAllConfirmOpen.value = false
     unmatchedPage.value = 1
   } catch (e) {
@@ -585,68 +621,29 @@ async function handleDownloadPlugin() {
 </script>
 
 <template>
-  <SettingsPageHeader
-    v-if="!props.embedded"
-    class="hidden md:flex"
-    :title="t('settings.reader.koreader.title')"
-    :subtitle="t('settings.reader.koreader.subtitle')"
-  />
-  <div v-if="!props.embedded" class="mb-5 flex border-b border-border" role="group" :aria-label="t('settings.reader.koreader.title')">
-    <button
-      id="koreader-sync-tab"
-      class="px-4 py-2 text-sm border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      :class="
-        activeTab === 'settings'
-          ? 'border-primary text-foreground font-semibold'
-          : 'border-transparent text-muted-foreground hover:text-foreground font-medium'
-      "
-      :aria-pressed="activeTab === 'settings'"
-      aria-controls="koreader-sync-panel"
-      @click="showSettingsTab"
-    >
-      {{ t('settings.reader.koreader.tabs.sync') }}
-    </button>
-    <button
-      id="koreader-file-naming-tab"
-      class="px-4 py-2 text-sm border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      :class="
-        activeTab === 'file-naming'
-          ? 'border-primary text-foreground font-semibold'
-          : 'border-transparent text-muted-foreground hover:text-foreground font-medium'
-      "
-      :aria-pressed="activeTab === 'file-naming'"
-      aria-controls="koreader-file-naming-panel"
-      @click="showFileNamingTab"
-    >
-      {{ t('settings.reader.koreader.tabs.fileNaming') }}
-    </button>
-  </div>
-
-  <div v-if="!props.embedded" class="md:hidden px-1">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.reader.koreader.title') }}</h1>
-    <p
-      class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
-    >
-      {{ t('settings.reader.koreader.subtitle') }}
-    </p>
-  </div>
+  <SettingsPageHeader v-if="!props.embedded" :title="t('settings.reader.koreader.title')" :subtitle="t('settings.reader.koreader.subtitle')" />
+  <SettingsTabs v-if="!props.embedded" id-prefix="koreader" :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
 
   <div
     id="koreader-sync-panel"
     v-show="activeTab === 'settings' || props.embedded"
-    :aria-labelledby="props.embedded ? undefined : 'koreader-sync-tab'"
+    :aria-labelledby="props.embedded ? undefined : 'koreader-settings-tab'"
   >
     <div v-if="loading" class="mt-5 md:mt-0 border border-border rounded-lg px-5 py-8 bg-card text-sm text-muted-foreground shadow-xs">
       {{ t('settings.reader.koreader.loadingSettings') }}
     </div>
-    <div v-else-if="error" class="border border-destructive/30 rounded-lg px-5 py-4 bg-card text-sm text-destructive shadow-xs">{{ error }}</div>
+    <div v-else-if="error" class="border border-destructive/30 rounded-lg px-5 py-4 bg-card text-sm text-destructive shadow-xs">
+      {{ error }}
+    </div>
     <template v-else>
       <template v-if="!hasCredentials">
         <div v-if="!showSetupForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center shadow-xs">
           <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
             <BookOpen :size="18" class="text-muted-foreground" />
           </div>
-          <p class="text-sm font-medium text-foreground">{{ t('settings.reader.koreader.notConfigured') }}</p>
+          <p class="text-sm font-medium text-foreground">
+            {{ t('settings.reader.koreader.notConfigured') }}
+          </p>
           <p class="text-xs text-muted-foreground mt-1 mb-4 max-w-sm mx-auto">
             {{ t('settings.reader.koreader.notConfiguredHint') }}
           </p>
@@ -657,8 +654,12 @@ async function handleDownloadPlugin() {
         </div>
 
         <div v-else class="border border-border rounded-lg p-4 md:p-5 bg-card space-y-4 shadow-xs">
-          <p class="text-sm font-medium text-foreground">{{ t('settings.reader.koreader.createFormTitle') }}</p>
-          <p class="text-xs text-muted-foreground">{{ t('settings.reader.koreader.createFormHint') }}</p>
+          <p class="text-sm font-medium text-foreground">
+            {{ t('settings.reader.koreader.createFormTitle') }}
+          </p>
+          <p class="text-xs text-muted-foreground">
+            {{ t('settings.reader.koreader.createFormHint') }}
+          </p>
           <div>
             <label class="block text-xs font-medium text-muted-foreground mb-1.5">{{ t('settings.reader.koreader.username') }}</label>
             <input
@@ -674,10 +675,11 @@ async function handleDownloadPlugin() {
             <div class="relative">
               <input
                 v-model="newPassword"
-                :type="showPassword ? 'text' : 'password'"
+                v-bind="SECRET_INPUT_ATTRS"
+                type="text"
                 :placeholder="t('settings.reader.koreader.passwordPlaceholder')"
                 class="input-field w-full pr-10"
-                autocomplete="new-password"
+                :class="{ 'input-secret': !showPassword }"
               />
               <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" @click="handleTogglePassword">
                 <EyeOff v-if="showPassword" :size="14" />
@@ -689,7 +691,9 @@ async function handleDownloadPlugin() {
             <button class="settings-btn-primary" :disabled="createDisabled" @click="handleCreate">
               {{ creating ? t('settings.reader.koreader.creating') : t('settings.reader.koreader.create') }}
             </button>
-            <button class="settings-btn-outline" @click="handleCancelSetup">{{ t('common.cancel') }}</button>
+            <button class="settings-btn-outline" @click="handleCancelSetup">
+              {{ t('common.cancel') }}
+            </button>
           </div>
           <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
             <div class="flex items-center gap-2">
@@ -710,7 +714,9 @@ async function handleDownloadPlugin() {
       <template v-else>
         <div class="mb-8">
           <div class="flex items-center justify-between mb-3">
-            <p class="settings-group-label mb-0">{{ t('settings.reader.koreader.status') }}</p>
+            <p class="settings-group-label mb-0">
+              {{ t('settings.reader.koreader.status') }}
+            </p>
             <button class="settings-btn-outline" @click="handleRefresh">
               <RefreshCw :size="12" />
               {{ t('settings.reader.koreader.refresh') }}
@@ -719,7 +725,9 @@ async function handleDownloadPlugin() {
           <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
             <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
               <div class="min-w-0">
-                <p class="settings-label">{{ t('settings.reader.koreader.progressSync') }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.progressSync') }}
+                </p>
                 <p class="settings-hint">
                   {{ t('settings.reader.koreader.progressSyncHint') }}
                 </p>
@@ -728,31 +736,61 @@ async function handleDownloadPlugin() {
             </div>
             <div class="grid gap-3 px-4 py-4 bg-card md:grid-cols-2 lg:grid-cols-5 md:px-5">
               <div class="min-w-0">
-                <p class="settings-label">{{ t('settings.reader.koreader.username') }}</p>
-                <p class="settings-hint font-mono truncate">{{ credentials?.username }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.username') }}
+                </p>
+                <p class="settings-hint font-mono truncate">
+                  {{ credentials?.username }}
+                </p>
               </div>
               <div>
-                <p class="settings-label">{{ t('settings.reader.koreader.lastSync') }}</p>
-                <p class="settings-hint">{{ formatLastSync(syncStatus?.lastSyncAt ?? null) }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.lastSync') }}
+                </p>
+                <p class="settings-hint">
+                  {{ formatLastSync(syncStatus?.lastSyncAt ?? null) }}
+                </p>
               </div>
               <div>
-                <p class="settings-label">{{ t('settings.reader.koreader.syncedBooks') }}</p>
-                <p class="settings-hint">{{ t('settings.reader.koreader.bookCount', { count: totalSyncedBooks }) }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.syncedBooks') }}
+                </p>
+                <p class="settings-hint">
+                  {{
+                    t('settings.reader.koreader.bookCount', {
+                      count: totalSyncedBooks,
+                    })
+                  }}
+                </p>
               </div>
               <div>
-                <p class="settings-label">{{ t('settings.reader.koreader.devices') }}</p>
-                <p class="settings-hint">{{ t('settings.reader.koreader.deviceCount', { count: deviceCount }) }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.devices') }}
+                </p>
+                <p class="settings-hint">
+                  {{
+                    t('settings.reader.koreader.deviceCount', {
+                      count: deviceCount,
+                    })
+                  }}
+                </p>
               </div>
               <div>
-                <p class="settings-label">{{ t('settings.reader.koreader.credentialsCreatedLabel') }}</p>
-                <p class="settings-hint">{{ formatDate(credentials?.createdAt) }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.credentialsCreatedLabel') }}
+                </p>
+                <p class="settings-hint">
+                  {{ formatDate(credentials?.createdAt) }}
+                </p>
               </div>
             </div>
           </div>
         </div>
 
         <div class="mb-8">
-          <p class="settings-group-label">{{ t('settings.reader.koreader.setup') }}</p>
+          <p class="settings-group-label">
+            {{ t('settings.reader.koreader.setup') }}
+          </p>
           <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
             <div class="px-4 py-4 bg-card md:px-5">
               <div class="mb-2 flex items-center gap-2">
@@ -771,7 +809,9 @@ async function handleDownloadPlugin() {
             <div class="flex flex-col gap-3 px-4 py-4 bg-card md:flex-row md:items-center md:justify-between md:px-5">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <p class="settings-label">{{ t('settings.reader.koreader.preconfiguredPlugin') }}</p>
+                  <p class="settings-label">
+                    {{ t('settings.reader.koreader.preconfiguredPlugin') }}
+                  </p>
                   <span
                     v-if="pluginUpdateAvailable"
                     class="rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
@@ -784,7 +824,13 @@ async function handleDownloadPlugin() {
                   <span class="font-mono text-foreground">koreader/plugins/</span>
                   {{ t('settings.reader.koreader.preconfiguredPluginHintSuffix') }}
                 </p>
-                <p class="settings-hint mt-1">{{ t('settings.reader.koreader.latestPluginNote', { label: latestPluginLabel }) }}</p>
+                <p class="settings-hint mt-1">
+                  {{
+                    t('settings.reader.koreader.latestPluginNote', {
+                      label: latestPluginLabel,
+                    })
+                  }}
+                </p>
               </div>
               <button class="settings-btn-primary self-start md:self-auto" :disabled="downloadingPlugin" @click="handleDownloadPlugin">
                 <Download :size="12" />
@@ -795,12 +841,16 @@ async function handleDownloadPlugin() {
         </div>
 
         <div class="mb-8">
-          <p class="settings-group-label">{{ t('settings.reader.koreader.devices') }}</p>
+          <p class="settings-group-label">
+            {{ t('settings.reader.koreader.devices') }}
+          </p>
           <div v-if="deviceCount === 0" class="border border-border rounded-lg px-5 py-8 bg-card text-center shadow-xs">
             <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
               <Smartphone :size="18" class="text-muted-foreground" />
             </div>
-            <p class="text-sm font-medium text-foreground">{{ t('settings.reader.koreader.noDevicesSynced') }}</p>
+            <p class="text-sm font-medium text-foreground">
+              {{ t('settings.reader.koreader.noDevicesSynced') }}
+            </p>
             <p class="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
               {{ t('settings.reader.koreader.noDevicesSyncedHint') }}
             </p>
@@ -837,7 +887,9 @@ async function handleDownloadPlugin() {
         </div>
 
         <div class="mb-8">
-          <p class="settings-group-label">{{ t('settings.reader.koreader.pluginActivity') }}</p>
+          <p class="settings-group-label">
+            {{ t('settings.reader.koreader.pluginActivity') }}
+          </p>
           <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
             <div v-if="!hasPluginActivity" class="px-4 py-5 bg-card text-sm text-muted-foreground md:px-5">
               {{ t('settings.reader.koreader.noPluginActivity') }}
@@ -858,9 +910,17 @@ async function handleDownloadPlugin() {
                     </span>
                   </div>
                   <p class="settings-hint mt-1">
-                    {{ t('settings.reader.koreader.lastFullSync', { time: formatLastSync(sweep.lastSweepAt) }) }}
+                    {{
+                      t('settings.reader.koreader.lastFullSync', {
+                        time: formatLastSync(sweep.lastSweepAt),
+                      })
+                    }}
                     <span v-if="sweep.updateAvailable === true && sweep.latestPluginVersion && !sweep.requiresManualUpdate">
-                      {{ t('settings.reader.koreader.latestPluginSuffix', { version: sweep.latestPluginVersion }) }}</span
+                      {{
+                        t('settings.reader.koreader.latestPluginSuffix', {
+                          version: sweep.latestPluginVersion,
+                        })
+                      }}</span
                     >
                   </p>
                   <p v-if="sweep.requiresManualUpdate" class="settings-hint mt-1">
@@ -870,15 +930,21 @@ async function handleDownloadPlugin() {
               </div>
               <div class="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ sweep.lastSweepBooksMatched }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ sweep.lastSweepBooksMatched }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.matchedBooks') }}</p>
                 </div>
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ sweep.lastSweepPageStats }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ sweep.lastSweepPageStats }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.readingEvents') }}</p>
                 </div>
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ sweep.lastSweepAnnotations }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ sweep.lastSweepAnnotations }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.highlights') }}</p>
                 </div>
               </div>
@@ -886,37 +952,61 @@ async function handleDownloadPlugin() {
             <div v-if="hasPluginActivity" class="px-4 py-4 bg-card md:px-5">
               <div class="flex items-center gap-2 mb-3">
                 <Library :size="14" class="text-muted-foreground shrink-0" />
-                <p class="settings-label">{{ t('settings.reader.koreader.syncedTotals') }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.syncedTotals') }}
+                </p>
               </div>
               <div class="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-5">
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ pluginTotals.matchedBooks }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ pluginTotals.matchedBooks }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.matchedBooks') }}</p>
                 </div>
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ pluginTotals.pageStatEvents }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ pluginTotals.pageStatEvents }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.readingEvents') }}</p>
                 </div>
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ pluginTotals.annotations }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ pluginTotals.annotations }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.highlights') }}</p>
                 </div>
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ pluginTotals.trashedAnnotations }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ pluginTotals.trashedAnnotations }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.trashedHighlights') }}</p>
                 </div>
                 <div class="rounded-md border border-border bg-background px-3 py-2">
-                  <p class="font-medium text-foreground">{{ unmatchedCount }}</p>
+                  <p class="font-medium text-foreground">
+                    {{ unmatchedCount }}
+                  </p>
                   <p>{{ t('settings.reader.koreader.unmatchedBooks') }}</p>
                 </div>
               </div>
               <div v-if="pendingDeletes > 0" class="mt-3 flex gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-foreground">
                 <AlertTriangle :size="14" class="mt-0.5 shrink-0 text-muted-foreground" />
-                <p>{{ t('settings.reader.koreader.pendingDeletes', { count: pendingDeletes }) }}</p>
+                <p>
+                  {{
+                    t('settings.reader.koreader.pendingDeletes', {
+                      count: pendingDeletes,
+                    })
+                  }}
+                </p>
               </div>
               <div v-if="failedPositions > 0" class="mt-3 flex gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-foreground">
                 <AlertTriangle :size="14" class="mt-0.5 shrink-0 text-muted-foreground" />
-                <p>{{ t('settings.reader.koreader.failedPositions', { count: failedPositions }) }}</p>
+                <p>
+                  {{
+                    t('settings.reader.koreader.failedPositions', {
+                      count: failedPositions,
+                    })
+                  }}
+                </p>
               </div>
             </div>
           </div>
@@ -924,7 +1014,9 @@ async function handleDownloadPlugin() {
 
         <div class="mb-8">
           <div class="flex items-center justify-between gap-3 mb-3">
-            <p class="settings-group-label mb-0">{{ t('settings.reader.koreader.hashLinks.unmatchedTitle') }}</p>
+            <p class="settings-group-label mb-0">
+              {{ t('settings.reader.koreader.hashLinks.unmatchedTitle') }}
+            </p>
             <div class="flex items-center gap-2">
               <button
                 v-if="unmatchedBooks.length > 0"
@@ -952,11 +1044,16 @@ async function handleDownloadPlugin() {
               <div v-for="book in pagedUnmatchedBooks" :key="book.hash" class="px-4 py-4 bg-card md:px-5">
                 <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div class="min-w-0">
-                    <p class="settings-label truncate">{{ unmatchedBookTitle(book) }}</p>
-                    <p class="settings-hint truncate">{{ unmatchedBookSubtitle(book) }}</p>
+                    <p class="settings-label truncate">
+                      {{ unmatchedBookTitle(book) }}
+                    </p>
+                    <p class="settings-hint truncate">
+                      {{ unmatchedBookSubtitle(book) }}
+                    </p>
                     <div class="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
                       <p class="min-w-0 truncate">
-                        {{ t('settings.reader.koreader.hashLinks.hash') }} <span class="font-mono text-foreground">{{ book.hash }}</span>
+                        {{ t('settings.reader.koreader.hashLinks.hash') }}
+                        <span class="font-mono text-foreground">{{ book.hash }}</span>
                       </p>
                       <p>
                         {{ t('settings.reader.koreader.hashLinks.lastOpened') }}
@@ -1006,7 +1103,12 @@ async function handleDownloadPlugin() {
                     {{ t('common.previous') }}
                   </button>
                   <span class="min-w-20 text-center">
-                    {{ t('settings.reader.koreader.hashLinks.pageOf', { page: clampedUnmatchedPage, total: unmatchedTotalPages }) }}
+                    {{
+                      t('settings.reader.koreader.hashLinks.pageOf', {
+                        page: clampedUnmatchedPage,
+                        total: unmatchedTotalPages,
+                      })
+                    }}
                   </span>
                   <button class="settings-btn-outline" :disabled="clampedUnmatchedPage >= unmatchedTotalPages" @click="handleNextUnmatchedPage">
                     {{ t('common.next') }}
@@ -1020,7 +1122,9 @@ async function handleDownloadPlugin() {
 
         <div class="mb-8">
           <div class="flex items-center justify-between gap-3 mb-3">
-            <p class="settings-group-label mb-0">{{ t('settings.reader.koreader.hashLinks.manualTitle') }}</p>
+            <p class="settings-group-label mb-0">
+              {{ t('settings.reader.koreader.hashLinks.manualTitle') }}
+            </p>
             <button class="settings-btn-outline" :disabled="manualLinksLoading" @click="handleRefreshManualLinks">
               <RefreshCw :size="12" />
               {{ t('settings.reader.koreader.hashLinks.refresh') }}
@@ -1038,11 +1142,16 @@ async function handleDownloadPlugin() {
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div class="grid min-w-0 flex-1 gap-4 md:grid-cols-2">
                     <div class="min-w-0">
-                      <p class="settings-label truncate">{{ manualLinkTitle(link) }}</p>
-                      <p class="settings-hint truncate">{{ manualLinkSubtitle(link) }}</p>
+                      <p class="settings-label truncate">
+                        {{ manualLinkTitle(link) }}
+                      </p>
+                      <p class="settings-hint truncate">
+                        {{ manualLinkSubtitle(link) }}
+                      </p>
                       <div class="mt-2 grid gap-1 text-xs text-muted-foreground">
                         <p class="min-w-0 truncate">
-                          {{ t('settings.reader.koreader.hashLinks.hash') }} <span class="font-mono text-foreground">{{ link.hash }}</span>
+                          {{ t('settings.reader.koreader.hashLinks.hash') }}
+                          <span class="font-mono text-foreground">{{ link.hash }}</span>
                         </p>
                         <p>
                           {{ t('settings.reader.koreader.hashLinks.lastOpened') }}
@@ -1051,8 +1160,16 @@ async function handleDownloadPlugin() {
                       </div>
                     </div>
                     <div class="min-w-0">
-                      <p class="settings-label truncate">{{ t('settings.reader.koreader.hashLinks.linkedTo', { title: linkedBookTitle(link) }) }}</p>
-                      <p class="settings-hint truncate">{{ linkedBookAuthors(link) }}</p>
+                      <p class="settings-label truncate">
+                        {{
+                          t('settings.reader.koreader.hashLinks.linkedTo', {
+                            title: linkedBookTitle(link),
+                          })
+                        }}
+                      </p>
+                      <p class="settings-hint truncate">
+                        {{ linkedBookAuthors(link) }}
+                      </p>
                       <div class="mt-2 grid gap-1 text-xs text-muted-foreground">
                         <p>
                           {{ t('settings.reader.koreader.hashLinks.linked') }}
@@ -1085,11 +1202,15 @@ async function handleDownloadPlugin() {
         </div>
 
         <div class="mb-8">
-          <p class="settings-group-label">{{ t('settings.reader.koreader.setupGuide') }}</p>
+          <p class="settings-group-label">
+            {{ t('settings.reader.koreader.setupGuide') }}
+          </p>
           <div class="border border-border rounded-lg bg-card shadow-xs">
             <button class="w-full flex items-center justify-between gap-2 px-4 py-4 text-left md:px-5" @click="handleToggleHelp">
               <div class="flex-1 min-w-0">
-                <p class="settings-label">{{ t('settings.reader.koreader.setupSteps') }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.setupSteps') }}
+                </p>
                 <p class="settings-hint">
                   {{ t('settings.reader.koreader.setupStepsHint') }}
                 </p>
@@ -1099,7 +1220,9 @@ async function handleDownloadPlugin() {
             </button>
             <div v-if="helpOpen" class="border-t border-border px-4 py-4 space-y-4 text-xs text-muted-foreground md:px-5">
               <div>
-                <p class="font-medium text-foreground mb-2">{{ t('settings.reader.koreader.pluginGuideTitle') }}</p>
+                <p class="font-medium text-foreground mb-2">
+                  {{ t('settings.reader.koreader.pluginGuideTitle') }}
+                </p>
                 <ol class="list-decimal list-inside space-y-2 pl-1">
                   <li>{{ t('settings.reader.koreader.pluginStep1') }}</li>
                   <li>
@@ -1118,7 +1241,9 @@ async function handleDownloadPlugin() {
                 </ol>
               </div>
               <div>
-                <p class="font-medium text-foreground mb-2">{{ t('settings.reader.koreader.stockGuideTitle') }}</p>
+                <p class="font-medium text-foreground mb-2">
+                  {{ t('settings.reader.koreader.stockGuideTitle') }}
+                </p>
                 <ol class="list-decimal list-outside space-y-2 pl-5">
                   <li>
                     {{ t('settings.reader.koreader.stockStep1Prefix') }}
@@ -1158,12 +1283,18 @@ async function handleDownloadPlugin() {
         </div>
 
         <div class="mb-6">
-          <p class="settings-group-label">{{ t('settings.reader.koreader.dangerZone') }}</p>
+          <p class="settings-group-label">
+            {{ t('settings.reader.koreader.dangerZone') }}
+          </p>
           <div class="border border-destructive/30 rounded-lg overflow-hidden shadow-xs">
             <div class="flex flex-col gap-3 px-4 py-4 bg-card md:flex-row md:items-center md:justify-between md:px-5">
               <div class="min-w-0">
-                <p class="settings-label">{{ t('settings.reader.koreader.deleteCredentials') }}</p>
-                <p class="settings-hint">{{ t('settings.reader.koreader.deleteCredentialsHint') }}</p>
+                <p class="settings-label">
+                  {{ t('settings.reader.koreader.deleteCredentials') }}
+                </p>
+                <p class="settings-hint">
+                  {{ t('settings.reader.koreader.deleteCredentialsHint') }}
+                </p>
               </div>
               <button
                 class="self-start md:self-auto flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shrink-0"
@@ -1184,7 +1315,9 @@ async function handleDownloadPlugin() {
       >
         <button class="absolute inset-0 bg-black/45" @click="handleCloseDeleteConfirm" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-          <p class="text-base font-semibold text-foreground">{{ t('settings.reader.koreader.deleteConfirmTitle') }}</p>
+          <p class="text-base font-semibold text-foreground">
+            {{ t('settings.reader.koreader.deleteConfirmTitle') }}
+          </p>
           <p class="mt-1 text-sm text-muted-foreground">
             {{ t('settings.reader.koreader.deleteConfirmBody') }}
           </p>
@@ -1212,13 +1345,23 @@ async function handleDownloadPlugin() {
       >
         <button class="absolute inset-0 bg-black/45" @click="handleCloseUnlink" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
-          <p class="text-base font-semibold text-foreground">{{ t('settings.reader.koreader.hashLinks.unlinkConfirmTitle') }}</p>
+          <p class="text-base font-semibold text-foreground">
+            {{ t('settings.reader.koreader.hashLinks.unlinkConfirmTitle') }}
+          </p>
           <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.reader.koreader.hashLinks.unlinkConfirmBody', { title: linkedBookTitle(unlinkConfirmLink) }) }}
+            {{
+              t('settings.reader.koreader.hashLinks.unlinkConfirmBody', {
+                title: linkedBookTitle(unlinkConfirmLink),
+              })
+            }}
           </p>
           <div class="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <p class="font-mono text-foreground truncate">{{ unlinkConfirmLink.hash }}</p>
-            <p class="mt-1 truncate">{{ manualLinkTitle(unlinkConfirmLink) }}</p>
+            <p class="font-mono text-foreground truncate">
+              {{ unlinkConfirmLink.hash }}
+            </p>
+            <p class="mt-1 truncate">
+              {{ manualLinkTitle(unlinkConfirmLink) }}
+            </p>
           </div>
           <div class="mt-4 flex items-center justify-end gap-2">
             <button
@@ -1250,7 +1393,11 @@ async function handleDownloadPlugin() {
         <button class="absolute inset-0 bg-black/45" @click="handleCloseRemoveDevice" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
-            {{ t('settings.reader.koreader.removeDeviceConfirmTitle', { device: removeDeviceConfirmTarget.device }) }}
+            {{
+              t('settings.reader.koreader.removeDeviceConfirmTitle', {
+                device: removeDeviceConfirmTarget.device,
+              })
+            }}
           </p>
           <p class="mt-1 text-sm text-muted-foreground">
             {{ t('settings.reader.koreader.removeDeviceConfirmBody') }}
@@ -1285,13 +1432,19 @@ async function handleDownloadPlugin() {
         <button class="absolute inset-0 bg-black/45" @click="handleCloseDismiss" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
-            {{ t('settings.reader.koreader.hashLinks.dismissConfirmTitle', { title: unmatchedBookTitle(dismissConfirmBook) }) }}
+            {{
+              t('settings.reader.koreader.hashLinks.dismissConfirmTitle', {
+                title: unmatchedBookTitle(dismissConfirmBook),
+              })
+            }}
           </p>
           <p class="mt-1 text-sm text-muted-foreground">
             {{ t('settings.reader.koreader.hashLinks.dismissConfirmBody') }}
           </p>
           <div class="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            <p class="font-mono text-foreground truncate">{{ dismissConfirmBook.hash }}</p>
+            <p class="font-mono text-foreground truncate">
+              {{ dismissConfirmBook.hash }}
+            </p>
           </div>
           <div class="mt-4 flex items-center justify-end gap-2">
             <button
@@ -1323,7 +1476,11 @@ async function handleDownloadPlugin() {
         <button class="absolute inset-0 bg-black/45" @click="handleCloseDismissAll" />
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
-            {{ t('settings.reader.koreader.hashLinks.dismissAllConfirmTitle', { count: unmatchedBooks.length }) }}
+            {{
+              t('settings.reader.koreader.hashLinks.dismissAllConfirmTitle', {
+                count: unmatchedBooks.length,
+              })
+            }}
           </p>
           <div class="mt-2 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <AlertTriangle :size="14" class="mt-0.5 shrink-0" />
@@ -1359,8 +1516,12 @@ async function handleDownloadPlugin() {
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-2xl md:rounded-lg md:p-5">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-base font-semibold text-foreground">{{ linkDialogTitle }}</p>
-              <p class="mt-1 text-sm text-muted-foreground truncate">{{ selectedLinkLabel }}</p>
+              <p class="text-base font-semibold text-foreground">
+                {{ linkDialogTitle }}
+              </p>
+              <p class="mt-1 text-sm text-muted-foreground truncate">
+                {{ selectedLinkLabel }}
+              </p>
             </div>
             <button class="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" @click="handleCloseLink">
               <X :size="16" />
@@ -1423,30 +1584,48 @@ async function handleDownloadPlugin() {
             </template>
           </div>
           <div v-if="pendingLinkTarget" class="mt-4 rounded-md border border-border bg-muted/30 p-3">
-            <p class="text-sm font-medium text-foreground">{{ t('settings.reader.koreader.hashLinks.confirmLinkTitle') }}</p>
+            <p class="text-sm font-medium text-foreground">
+              {{ t('settings.reader.koreader.hashLinks.confirmLinkTitle') }}
+            </p>
             <div class="mt-3 grid gap-3 md:grid-cols-2">
               <div class="min-w-0 rounded-md border border-border bg-background px-3 py-2">
                 <p class="text-xs font-medium text-muted-foreground">KOReader</p>
-                <p class="mt-1 text-sm font-medium text-foreground truncate">{{ selectedLinkLabel }}</p>
-                <p class="text-xs text-muted-foreground truncate">{{ selectedLinkSubtitle }}</p>
+                <p class="mt-1 text-sm font-medium text-foreground truncate">
+                  {{ selectedLinkLabel }}
+                </p>
+                <p class="text-xs text-muted-foreground truncate">
+                  {{ selectedLinkSubtitle }}
+                </p>
                 <p class="mt-1 text-xs text-muted-foreground">
                   {{ t('settings.reader.koreader.hashLinks.lastOpened') }}
                   <span class="text-foreground">{{ formatEpochSeconds(selectedLinkLastOpen) }}</span>
                 </p>
-                <p class="mt-1 font-mono text-xs text-muted-foreground truncate">{{ selectedLinkHash }}</p>
+                <p class="mt-1 font-mono text-xs text-muted-foreground truncate">
+                  {{ selectedLinkHash }}
+                </p>
               </div>
               <div class="min-w-0 rounded-md border border-border bg-background px-3 py-2">
                 <p class="text-xs font-medium text-muted-foreground">BookOrbit</p>
                 <p class="mt-1 text-sm font-medium text-foreground truncate">
                   {{ pendingLinkTarget.title ?? t('settings.reader.koreader.hashLinks.untitledBook') }}
                 </p>
-                <p class="text-xs text-muted-foreground truncate">{{ bookSearchSubtitle(pendingLinkTarget) }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">{{ t('settings.reader.koreader.hashLinks.bookId', { id: pendingLinkTarget.id }) }}</p>
+                <p class="text-xs text-muted-foreground truncate">
+                  {{ bookSearchSubtitle(pendingLinkTarget) }}
+                </p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {{
+                    t('settings.reader.koreader.hashLinks.bookId', {
+                      id: pendingLinkTarget.id,
+                    })
+                  }}
+                </p>
               </div>
             </div>
             <div class="mt-3 flex gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
               <AlertTriangle :size="14" class="mt-0.5 shrink-0" />
-              <p>{{ t('settings.reader.koreader.hashLinks.syncedStatsNote') }}</p>
+              <p>
+                {{ t('settings.reader.koreader.hashLinks.syncedStatsNote') }}
+              </p>
             </div>
             <div class="mt-3 flex items-center justify-end gap-2">
               <button

@@ -69,7 +69,7 @@ function resolveAccountTitle(to: RouteLocationNormalizedLoaded): string {
 
 function resolveIntegrationTitle(to: RouteLocationNormalizedLoaded): string {
   const tab = normalizeIntegrationTab(to.query.tab)
-  return INTEGRATION_TAB_INFO[tab].titleLabel
+  return t(INTEGRATION_TAB_INFO[tab].titleKey)
 }
 
 function resolveStatisticsTitle(): string {
@@ -112,13 +112,19 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'notifications',
             name: 'settings-notifications',
-            redirect: () => ({ name: 'settings-account', query: { tab: 'notifications' } }),
+            redirect: () => ({
+              name: 'settings-account',
+              query: { tab: 'notifications' },
+            }),
           },
           {
             path: 'libraries',
             name: 'settings-libraries',
             component: () => import('@/features/settings/LibrariesSettings.vue'),
-            meta: { maxWidth: 'max-w-[52rem]', title: () => t('titles.libraries') },
+            meta: {
+              maxWidth: 'max-w-[52rem]',
+              title: () => t('titles.libraries'),
+            },
           },
           {
             path: 'appearance',
@@ -152,22 +158,34 @@ export const routes: RouteRecordRaw[] = [
             path: 'koreader',
             name: 'settings-koreader',
             component: () => import('@/features/settings/KoreaderSettings.vue'),
-            meta: { maxWidth: 'max-w-4xl', title: () => t('titles.koreaderSync') },
+            meta: {
+              maxWidth: 'max-w-4xl',
+              title: () => t('titles.koreaderSync'),
+            },
           },
           {
             path: 'hardcover',
             name: 'settings-hardcover',
-            redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'hardcover' } }),
+            redirect: (to) => ({
+              name: 'settings-integrations',
+              query: { ...to.query, tab: 'hardcover' },
+            }),
           },
           {
             path: 'readwise',
             name: 'settings-readwise',
-            redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'readwise' } }),
+            redirect: (to) => ({
+              name: 'settings-integrations',
+              query: { ...to.query, tab: 'readwise' },
+            }),
           },
           {
             path: 'storygraph',
             name: 'settings-storygraph',
-            redirect: (to) => ({ name: 'settings-integrations', query: { ...to.query, tab: 'storygraph' } }),
+            redirect: (to) => ({
+              name: 'settings-integrations',
+              query: { ...to.query, tab: 'storygraph' },
+            }),
           },
           {
             path: 'email',
@@ -184,17 +202,26 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'reader/ebook',
             name: 'settings-reader-ebook',
-            redirect: { name: 'settings-reader-general', query: { tab: 'ebook' } },
+            redirect: {
+              name: 'settings-reader-general',
+              query: { tab: 'ebook' },
+            },
           },
           {
             path: 'reader/pdf',
             name: 'settings-reader-pdf',
-            redirect: { name: 'settings-reader-general', query: { tab: 'pdf' } },
+            redirect: {
+              name: 'settings-reader-general',
+              query: { tab: 'pdf' },
+            },
           },
           {
             path: 'reader/comics',
             name: 'settings-reader-comics',
-            redirect: { name: 'settings-reader-general', query: { tab: 'comics' } },
+            redirect: {
+              name: 'settings-reader-general',
+              query: { tab: 'comics' },
+            },
           },
           {
             path: 'admin',
@@ -205,7 +232,10 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admin/users',
             name: 'settings-admin-users',
-            redirect: () => ({ name: 'settings-admin', query: { tab: 'users' } }),
+            redirect: () => ({
+              name: 'settings-admin',
+              query: { tab: 'users' },
+            }),
           },
           {
             path: 'admin/account-activity/:userId/insights',
@@ -223,12 +253,18 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admin/metadata-auto-fetch',
             name: 'settings-admin-metadata-auto-fetch',
-            redirect: { name: 'settings-admin-metadata', query: { tab: 'auto-fetch' } },
+            redirect: {
+              name: 'settings-admin-metadata',
+              query: { tab: 'auto-fetch' },
+            },
           },
           {
             path: 'admin/oidc',
             name: 'settings-admin-oidc',
-            redirect: () => ({ name: 'settings-admin', query: { tab: 'oidc' } }),
+            redirect: () => ({
+              name: 'settings-admin',
+              query: { tab: 'oidc' },
+            }),
           },
           {
             path: 'system',
@@ -239,27 +275,42 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admin/file-naming',
             name: 'settings-admin-file-naming',
-            redirect: () => ({ name: 'settings-system', query: { tab: 'file-naming' } }),
+            redirect: () => ({
+              name: 'settings-system',
+              query: { tab: 'file-naming' },
+            }),
           },
           {
             path: 'admin/book-dock',
             name: 'settings-admin-book-dock',
-            redirect: () => ({ name: 'settings-system', query: { tab: 'book-dock' } }),
+            redirect: () => ({
+              name: 'settings-system',
+              query: { tab: 'book-dock' },
+            }),
           },
           {
             path: 'admin/maintenance',
             name: 'settings-admin-maintenance',
-            redirect: () => ({ name: 'settings-system', query: { tab: 'maintenance' } }),
+            redirect: () => ({
+              name: 'settings-system',
+              query: { tab: 'maintenance' },
+            }),
           },
           {
             path: 'admin/audit-log',
             name: 'settings-admin-audit-log',
-            redirect: () => ({ name: 'settings-system', query: { tab: 'audit-log' } }),
+            redirect: () => ({
+              name: 'settings-system',
+              query: { tab: 'audit-log' },
+            }),
           },
           {
             path: 'admin/magic-links',
             name: 'settings-admin-magic-links',
-            redirect: () => ({ name: 'settings-admin', query: { tab: 'magic-links' } }),
+            redirect: () => ({
+              name: 'settings-admin',
+              query: { tab: 'magic-links' },
+            }),
           },
           { path: ':pathMatch(.*)*', redirect: { name: 'settings-libraries' } },
         ],
@@ -321,19 +372,25 @@ export const routes: RouteRecordRaw[] = [
         path: '/library/:id',
         name: 'library',
         component: () => import('@/views/HomeView.vue'),
-        meta: { title: (to) => fallbackById('titles.library', numericParam(to, 'id')) },
+        meta: {
+          title: (to) => fallbackById('titles.library', numericParam(to, 'id')),
+        },
       },
       {
         path: '/smart-scope/:id',
         name: 'smartScope',
         component: () => import('@/views/SmartScopeView.vue'),
-        meta: { title: (to) => fallbackById('titles.smartScope', numericParam(to, 'id')) },
+        meta: {
+          title: (to) => fallbackById('titles.smartScope', numericParam(to, 'id')),
+        },
       },
       {
         path: '/collection/:id',
         name: 'collection',
         component: () => import('@/views/CollectionView.vue'),
-        meta: { title: (to) => fallbackById('titles.collection', numericParam(to, 'id')) },
+        meta: {
+          title: (to) => fallbackById('titles.collection', numericParam(to, 'id')),
+        },
       },
       {
         path: '/authors',
@@ -345,7 +402,9 @@ export const routes: RouteRecordRaw[] = [
         path: '/authors/:id',
         name: 'author-detail',
         component: () => import('@/features/author/views/AuthorDetailView.vue'),
-        meta: { title: (to) => fallbackById('titles.author', numericParam(to, 'id')) },
+        meta: {
+          title: (to) => fallbackById('titles.author', numericParam(to, 'id')),
+        },
       },
       {
         path: '/series',
@@ -357,7 +416,9 @@ export const routes: RouteRecordRaw[] = [
         path: '/series/:seriesId',
         name: 'series-detail',
         component: () => import('@/features/series/views/SeriesDetailView.vue'),
-        meta: { title: (to) => fallbackById('titles.seriesItem', numericParam(to, 'seriesId')) },
+        meta: {
+          title: (to) => fallbackById('titles.seriesItem', numericParam(to, 'seriesId')),
+        },
       },
       {
         path: '/tools',
@@ -382,14 +443,19 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/features/tools/book-duplicates/views/BookDuplicatesView.vue'),
             meta: { title: () => t('titles.duplicateBooks') },
           },
-          { path: ':pathMatch(.*)*', redirect: { name: 'tools-entity-manager' } },
+          {
+            path: ':pathMatch(.*)*',
+            redirect: { name: 'tools-entity-manager' },
+          },
         ],
       },
       {
         path: '/book/:bookId',
         name: 'book-detail',
         component: () => import('@/views/BookDetailView.vue'),
-        meta: { title: (to) => fallbackById('titles.book', numericParam(to, 'bookId')) },
+        meta: {
+          title: (to) => fallbackById('titles.book', numericParam(to, 'bookId')),
+        },
         beforeEnter: (to) => {
           if (!to.query.tab) {
             return { ...to, query: { ...to.query, tab: 'details' } }
@@ -398,26 +464,46 @@ export const routes: RouteRecordRaw[] = [
       },
       {
         path: '/book/:bookId/files',
-        redirect: (to) => ({ name: 'book-detail', params: to.params, query: { tab: 'files' } }),
+        redirect: (to) => ({
+          name: 'book-detail',
+          params: to.params,
+          query: { tab: 'files' },
+        }),
       },
       {
         path: '/book/:bookId/edit',
-        redirect: (to) => ({ name: 'book-detail', params: to.params, query: { tab: 'edit' } }),
+        redirect: (to) => ({
+          name: 'book-detail',
+          params: to.params,
+          query: { tab: 'edit' },
+        }),
       },
-      { path: ':pathMatch(.*)*', component: () => import('@/views/NotFoundView.vue'), meta: { title: () => t('titles.notFound') } },
+      {
+        path: ':pathMatch(.*)*',
+        component: () => import('@/views/NotFoundView.vue'),
+        meta: { title: () => t('titles.notFound') },
+      },
     ],
   },
   {
     path: '/read/:bookId/:fileId',
     name: 'reader',
     component: () => import('@/features/reader/ReaderView.vue'),
-    meta: { title: (to) => `${t('titles.readPrefix')} · ${fallbackById('titles.book', numericParam(to, 'bookId'))}` },
+    meta: {
+      title: (to) => `${t('titles.readPrefix')} · ${fallbackById('titles.book', numericParam(to, 'bookId'))}`,
+    },
   },
   {
     path: '/login',
     name: 'login',
     component: () => import('@/features/auth/LoginPage.vue'),
     meta: { public: true, title: () => t('titles.signIn') },
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/features/auth/RegisterPage.vue'),
+    meta: { public: true, title: () => t('titles.register') },
   },
   {
     path: '/setup',

@@ -152,7 +152,7 @@ export const readingProgress = pgTable(
     percentage: real('percentage').notNull().default(0),
     // EPUB: CFI string pinpoints exact location
     cfi: varchar('cfi', { length: 2000 }),
-    // PDF / CBX / CBR: zero-based page index
+    // PDF / CBX / CBR: 1-based page number
     pageNumber: integer('page_number'),
     // Audio: playback position in seconds
     positionSeconds: real('position_seconds'),

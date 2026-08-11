@@ -5,25 +5,25 @@ export const INTEGRATION_TABS = ['hardcover', 'readwise', 'storygraph'] as const
 export type IntegrationTab = (typeof INTEGRATION_TABS)[number]
 
 type IntegrationTabInfo = {
-  navLabel: string
-  titleLabel: string
+  labelKey: string
+  titleKey: string
   permission: Permission
 }
 
 export const INTEGRATION_TAB_INFO: Record<IntegrationTab, IntegrationTabInfo> = {
   hardcover: {
-    navLabel: 'Hardcover',
-    titleLabel: 'Hardcover',
+    labelKey: 'settings.integrations.tabs.hardcover',
+    titleKey: 'settings.integrations.tabs.hardcover',
     permission: Permission.HardcoverSync,
   },
   readwise: {
-    navLabel: 'Readwise',
-    titleLabel: 'Readwise',
+    labelKey: 'settings.integrations.tabs.readwise',
+    titleKey: 'settings.integrations.tabs.readwise',
     permission: Permission.ReadwiseSync,
   },
   storygraph: {
-    navLabel: 'StoryGraph',
-    titleLabel: 'StoryGraph',
+    labelKey: 'settings.integrations.tabs.storygraph',
+    titleKey: 'settings.integrations.tabs.storygraph',
     permission: Permission.StorygraphSync,
   },
 }

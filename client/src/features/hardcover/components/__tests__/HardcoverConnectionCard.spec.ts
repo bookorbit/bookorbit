@@ -170,9 +170,11 @@ describe('HardcoverConnectionCard', () => {
     const disconnectButton = wrapper.findAll('button').find((button) => button.text().includes('Disconnect'))!
     const saveButton = wrapper.findAll('button').find((button) => button.text().includes('Save'))!
 
-    expect(tokenInput.attributes('type')).toBe('password')
+    expect(tokenInput.attributes('type')).toBe('text')
+    expect(tokenInput.classes()).toContain('input-secret')
     await showButton.trigger('click')
     expect(tokenInput.attributes('type')).toBe('text')
+    expect(tokenInput.classes()).not.toContain('input-secret')
 
     await validateButton.trigger('click')
     expect(toastError).toHaveBeenCalledWith('Enter your Hardcover API token first')

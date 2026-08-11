@@ -144,11 +144,18 @@ describe('accent option collections', () => {
   })
 
   it('previews the applied primary color for light and dark themes', () => {
-    for (const option of ACCENT_OPTIONS) {
+    for (const option of ACCENT_OPTIONS.filter((candidate) => candidate.id !== 'white')) {
       const [lightL, lightC, darkL, darkC] = ACCENT_PRIMARY[option.id]
       const hue = ACCENT_HUE[option.id]
       expect(option.color).toBe(`light-dark(oklch(${lightL} ${lightC} ${hue}), oklch(${darkL} ${darkC} ${hue}))`)
     }
+  })
+
+  it('always previews the white accent as white', () => {
+    expect(ACCENT_OPTIONS.find((option) => option.id === 'white')).toMatchObject({
+      color: 'oklch(0.985 0 0)',
+      swatchClass: 'ring-1 ring-border',
+    })
   })
 })
 

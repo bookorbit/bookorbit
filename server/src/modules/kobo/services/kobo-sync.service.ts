@@ -14,13 +14,13 @@ import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { normalizeKoboLanguage, selectKoboIsbn } from './kobo-metadata.utils';
 import { KoboReadingStateService } from './kobo-reading-state.service';
+import { encodeSyncToken } from './kobo-sync-token';
 
 type Db = NodePgDatabase<typeof schema>;
 
 const SYNC_PAGE_SIZE = 5;
 const SNAPSHOT_RECONCILE_BATCH_SIZE = 5000;
 const SNAPSHOT_CREATE_BATCH_SIZE = 5000;
-const TOKEN_PREFIX = 'PX.';
 const METADATA_SERIALIZER_VERSION = 2;
 
 type EligibleSnapshotRow = {
@@ -90,10 +90,6 @@ export interface KoboBookEntry {
   collectionNames: string[];
   addedAt: Date;
   updatedAt: Date;
-}
-
-function encodeSyncToken(snapshotId: number): string {
-  return TOKEN_PREFIX + Buffer.from(JSON.stringify({ snapshotId })).toString('base64');
 }
 
 @Injectable()

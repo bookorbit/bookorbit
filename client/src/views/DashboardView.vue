@@ -2,7 +2,6 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, Loader2, RefreshCw, Settings2, Sparkles } from '@lucide/vue'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { getDashboardGreetingLabel } from '@/features/dashboard/lib/greeting'
@@ -63,6 +62,10 @@ function handleRetryLibraries() {
   void fetchLibraries()
 }
 
+function handleOpenSettings() {
+  settingsOpen.value = true
+}
+
 onMounted(() => {
   void fetchLibraries()
   void fetchSmartScopes()
@@ -85,26 +88,6 @@ onUnmounted(() => {
 <template>
   <div>
     <main class="relative flex-none">
-      <!-- Floating Settings Button -->
-      <div class="pointer-events-none fixed bottom-6 right-6 z-50">
-        <div
-          class="pointer-events-auto animate-fade-up"
-          style="animation-delay: 400ms; animation-duration: 0.3s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1)"
-        >
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                class="flex h-11 w-11 items-center justify-center rounded-full border-2 border-primary/40 bg-background/90 text-primary shadow-2xl backdrop-blur-md transition-all hover:bg-primary hover:text-primary-foreground active:scale-95"
-                @click="settingsOpen = true"
-              >
-                <Settings2 :size="18" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left" align="center">{{ t('views.dashboard.customize') }}</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
       <!-- Scrollers / Welcome -->
       <div class="space-y-5 pb-8 pt-4 sm:pr-2">
         <div v-if="libraryState === 'loading'" role="status" class="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -131,22 +114,35 @@ onUnmounted(() => {
         </div>
         <DashboardWelcome v-else-if="libraryState === 'empty'" :can-create="hasPermission('manage_libraries')" />
         <template v-else>
-          <div class="animate-fade-up flex items-center gap-2 px-1" style="animation-delay: 40ms">
-            <Sparkles :size="16" class="shrink-0 text-primary" />
-            <p class="text-[1.05rem] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[1.18rem]">
-              <span class="text-foreground">{{ greetingText }}</span>
-              <span class="ml-1 font-semibold text-primary">{{ greetingName }}</span>
-            </p>
+          <div class="animate-fade-up flex items-center justify-between gap-3 px-1" style="animation-delay: 40ms">
+            <div class="flex min-w-0 items-center gap-2">
+              <Sparkles :size="16" class="shrink-0 text-primary" />
+              <p class="truncate text-[1.05rem] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[1.18rem]">
+                <span class="text-foreground">{{ greetingText }}</span>
+                <span class="ml-1 font-semibold text-primary">{{ greetingName }}</span>
+              </p>
+            </div>
+            <!-- Icon-only below sm so the greeting keeps its width; the label stays available to assistive tech. -->
+            <button
+              type="button"
+              :aria-label="t('views.dashboard.customize')"
+              class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-primary/40 bg-card/40 px-2 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/70 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-2.5"
+              @click="handleOpenSettings"
+            >
+              <Settings2 :size="15" aria-hidden="true" />
+              <span class="hidden sm:inline">{{ t('views.dashboard.customize') }}</span>
+            </button>
           </div>
 
           <DashboardWidgetRow class="animate-fade-up" />
           <div v-if="enabledScrollers.length > 0" :class="shelfLayoutClass">
             <DashboardScroller
               v-for="(scroller, index) in enabledScrollers"
-              :key="`${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}`"
+              :key="`${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}-${scroller.rows}`"
               :type="scroller.type"
               :title="shelfTitle(scroller)"
               :limit="scroller.limit"
+              :rows="scroller.rows"
               :smartScope-id="scroller.smartScopeId"
               class="min-w-0 animate-fade-up"
               :style="{ animationDelay: `${index * 100}ms` }"
@@ -154,7 +150,7 @@ onUnmounted(() => {
           </div>
           <div v-if="enabledScrollers.length === 0" class="px-2 py-12 text-center">
             <p class="text-sm text-muted-foreground">{{ t('views.dashboard.allShelvesHidden') }}</p>
-            <button class="mt-2 text-sm text-primary hover:underline" @click="settingsOpen = true">{{ t('views.dashboard.customize') }}</button>
+            <button class="mt-2 text-sm text-primary hover:underline" @click="handleOpenSettings">{{ t('views.dashboard.customize') }}</button>
           </div>
         </template>
       </div>

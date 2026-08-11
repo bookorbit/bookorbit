@@ -44,9 +44,10 @@ function getSocket(): Socket {
       reconnectionDelayMax: 10000,
     })
 
-    socket.on('book-dock:summary', (data: BookDockSummary) => {
-      summary.value = data
-      for (const fn of changeListeners) fn()
+    socket.on('book-dock:changed', () => {
+      void restFetchSummary().finally(() => {
+        for (const fn of changeListeners) fn()
+      })
     })
 
     socket.on('connect', () => {

@@ -71,6 +71,53 @@ describe('OpdsService', () => {
     });
   });
 
+  // Moon+ Reader and CrossPoint never fetch the OpenSearch description; they detect search
+  // only from a rel="search" href that already carries {searchTerms} (issue #860).
+  describe('inline templated search link', () => {
+    const feeds: [string, () => string][] = [
+      ['root', () => makeService().generateRootNavigation()],
+      ['libraries', () => makeService().generateLibrariesNavigation([{ id: 1, name: 'Main', bookCount: 2 }])],
+      ['collections', () => makeService().generateCollectionsNavigation([{ id: 1, name: 'Favourites', bookCount: 2 }])],
+      ['smart scopes', () => makeService().generateSmartScopesNavigation([{ id: 1, name: 'Unread', icon: null }])],
+      ['authors', () => makeService().generateAuthorsNavigation([{ name: 'Brandon Sanderson', bookCount: 2 }])],
+      ['series', () => makeService().generateSeriesNavigation([{ id: 1, name: 'Mistborn', bookCount: 2 }])],
+      ['acquisition', () => makeService().generateAcquisitionFeed('Catalog', 'urn:bookorbit:catalog', [], 0, 1, 50, `${BASE}/catalog`, 'tok')],
+    ];
+
+    it.each(feeds)('%s feed advertises both search links', (_name, generate) => {
+      const xml = generate();
+
+      expect(xml).toContain(`<link rel="search" href="${BASE}/search.opds" type="application/opensearchdescription+xml"/>`);
+      expect(xml).toContain(`<link rel="search" href="${BASE}/catalog?q={searchTerms}" type="application/atom+xml" title="Search"/>`);
+    });
+
+    it('leaves the searchTerms placeholder unescaped so clients can substitute it', () => {
+      const xml = makeService().generateRootNavigation();
+
+      expect(xml).toContain('{searchTerms}');
+      expect(xml).not.toContain('%7BsearchTerms%7D');
+    });
+
+    it('keeps the templated link type free of profile and kind parameters', () => {
+      const xml = makeService().generateRootNavigation();
+      const templated = xml.split('\n').find((line) => line.includes('{searchTerms}'))!;
+
+      expect(templated).toContain('type="application/atom+xml"');
+      expect(templated).not.toContain('profile=opds-catalog');
+    });
+
+    it('matches the template advertised by the OpenSearch description', () => {
+      const service = makeService();
+      const templated = service
+        .generateRootNavigation()
+        .split('\n')
+        .find((line) => line.includes('{searchTerms}'))!;
+
+      expect(service.generateOpenSearchDescription()).toContain(`template="${BASE}/catalog?q={searchTerms}"`);
+      expect(templated).toContain(`href="${BASE}/catalog?q={searchTerms}"`);
+    });
+  });
+
   describe('generateLibrariesNavigation', () => {
     it('generates entries for each library', () => {
       const service = makeService();

@@ -17,11 +17,7 @@ describe('Architecture boundaries', () => {
   const modulesRoot = join(process.cwd(), 'src/modules');
 
   it('prevents controllers from importing repositories directly', async () => {
-    const allowlist = [
-      'src/modules/authors/authors.controller.ts',
-      'src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts',
-      'src/modules/book-dock/book-dock.controller.ts',
-    ].sort();
+    const allowlist = ['src/modules/authors/authors.controller.ts', 'src/modules/book-metadata-fetch/book-metadata-fetch.controller.ts'].sort();
 
     const allFiles = await listFilesRecursive(modulesRoot);
     const controllerFiles = allFiles.filter((file) => file.endsWith('.controller.ts'));

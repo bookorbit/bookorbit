@@ -17,7 +17,10 @@ const DEFAULT_CONFIG: AuthorAutoEnrichmentConfig = {
   conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
 }
 
-const config = ref<AuthorAutoEnrichmentConfig>({ ...DEFAULT_CONFIG, conditions: { ...DEFAULT_CONFIG.conditions } })
+const config = ref<AuthorAutoEnrichmentConfig>({
+  ...DEFAULT_CONFIG,
+  conditions: { ...DEFAULT_CONFIG.conditions },
+})
 const saving = ref(false)
 const authorBackfillRunning = ref(false)
 const authorBackfillAllRunning = ref(false)
@@ -59,11 +62,20 @@ function toggleEnabled() {
 }
 
 function toggleTriggerOnImport() {
-  config.value = { ...config.value, triggerOnImport: !config.value.triggerOnImport }
+  config.value = {
+    ...config.value,
+    triggerOnImport: !config.value.triggerOnImport,
+  }
 }
 
 function toggleCondition(key: keyof AuthorAutoEnrichmentConfig['conditions']) {
-  config.value = { ...config.value, conditions: { ...config.value.conditions, [key]: !config.value.conditions[key] } }
+  config.value = {
+    ...config.value,
+    conditions: {
+      ...config.value.conditions,
+      [key]: !config.value.conditions[key],
+    },
+  }
 }
 
 function onWriteModeChange(event: Event) {
@@ -75,7 +87,9 @@ async function runAuthorBackfill() {
   if (authorBackfillRunning.value) return
   authorBackfillRunning.value = true
   try {
-    const res = await api('/api/v1/authors/enrichment/backfill', { method: 'POST' })
+    const res = await api('/api/v1/authors/enrichment/backfill', {
+      method: 'POST',
+    })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const { queued } = await res.json()
     if (queued === 0) toast.info(t('settings.admin.authorEnrichment.noEligibleAuthors'))
@@ -90,7 +104,9 @@ async function runAuthorBackfillAll() {
   if (authorBackfillAllRunning.value) return
   authorBackfillAllRunning.value = true
   try {
-    const res = await api('/api/v1/authors/enrichment/backfill-all', { method: 'POST' })
+    const res = await api('/api/v1/authors/enrichment/backfill-all', {
+      method: 'POST',
+    })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const { queued } = await res.json()
     if (queued === 0) toast.info(t('settings.admin.authorEnrichment.noAuthorsToEnrich'))
@@ -103,7 +119,9 @@ async function runAuthorBackfillAll() {
 </script>
 
 <template>
-  <p class="settings-group-label">{{ t('settings.admin.authorEnrichment.configuration') }}</p>
+  <p class="settings-group-label">
+    {{ t('settings.admin.authorEnrichment.configuration') }}
+  </p>
   <div
     class="md:hidden sticky top-11 z-10 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
   >
@@ -122,39 +140,59 @@ async function runAuthorBackfillAll() {
       </button>
     </div>
   </div>
-  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+  <div class="settings-card">
     <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
       <div>
-        <p class="settings-label">{{ t('settings.admin.authorEnrichment.enableTitle') }}</p>
-        <p class="settings-hint">{{ t('settings.admin.authorEnrichment.enableHint') }}</p>
+        <p class="settings-label">
+          {{ t('settings.admin.authorEnrichment.enableTitle') }}
+        </p>
+        <p class="settings-hint">
+          {{ t('settings.admin.authorEnrichment.enableHint') }}
+        </p>
       </div>
       <ToggleSwitch class="self-start" :model-value="config.enabled" :disabled="saving" @update:model-value="toggleEnabled" />
     </div>
 
     <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
       <div>
-        <p class="settings-label">{{ t('settings.admin.authorEnrichment.updateStrategyTitle') }}</p>
-        <p class="settings-hint">{{ t('settings.admin.authorEnrichment.updateStrategyHint') }}</p>
+        <p class="settings-label">
+          {{ t('settings.admin.authorEnrichment.updateStrategyTitle') }}
+        </p>
+        <p class="settings-hint">
+          {{ t('settings.admin.authorEnrichment.updateStrategyHint') }}
+        </p>
       </div>
       <select class="select-field w-full md:w-64" :value="config.writeMode" :disabled="saving" @change="onWriteModeChange">
-        <option value="missing_only">{{ t('settings.admin.authorEnrichment.writeModeMissingOnly') }}</option>
-        <option value="always_refetch">{{ t('settings.admin.authorEnrichment.writeModeAlwaysRefetch') }}</option>
+        <option value="missing_only">
+          {{ t('settings.admin.authorEnrichment.writeModeMissingOnly') }}
+        </option>
+        <option value="always_refetch">
+          {{ t('settings.admin.authorEnrichment.writeModeAlwaysRefetch') }}
+        </option>
       </select>
     </div>
 
     <template v-if="config.enabled">
       <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
         <div>
-          <p class="settings-label">{{ t('settings.admin.authorEnrichment.triggerOnImportTitle') }}</p>
-          <p class="settings-hint">{{ t('settings.admin.authorEnrichment.triggerOnImportHint') }}</p>
+          <p class="settings-label">
+            {{ t('settings.admin.authorEnrichment.triggerOnImportTitle') }}
+          </p>
+          <p class="settings-hint">
+            {{ t('settings.admin.authorEnrichment.triggerOnImportHint') }}
+          </p>
         </div>
         <ToggleSwitch class="self-start" :model-value="config.triggerOnImport" :disabled="saving" @update:model-value="toggleTriggerOnImport" />
       </div>
     </template>
 
     <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
-      <p class="settings-label mb-1">{{ t('settings.admin.authorEnrichment.eligibilityTitle') }}</p>
-      <p class="settings-hint mb-3">{{ t('settings.admin.authorEnrichment.eligibilityHint') }}</p>
+      <p class="settings-label mb-1">
+        {{ t('settings.admin.authorEnrichment.eligibilityTitle') }}
+      </p>
+      <p class="settings-hint mb-3">
+        {{ t('settings.admin.authorEnrichment.eligibilityHint') }}
+      </p>
       <div class="flex flex-col gap-4">
         <label class="flex items-center gap-3 cursor-pointer select-none">
           <input
@@ -166,7 +204,9 @@ async function runAuthorBackfillAll() {
           />
           <div>
             <span class="text-sm font-medium">{{ t('settings.admin.authorEnrichment.neverEnrichedTitle') }}</span>
-            <p class="text-xs text-muted-foreground">{{ t('settings.admin.authorEnrichment.neverEnrichedHint') }}</p>
+            <p class="text-xs text-muted-foreground">
+              {{ t('settings.admin.authorEnrichment.neverEnrichedHint') }}
+            </p>
           </div>
         </label>
         <label class="flex items-center gap-3 cursor-pointer select-none">
@@ -179,7 +219,9 @@ async function runAuthorBackfillAll() {
           />
           <div>
             <span class="text-sm font-medium">{{ t('settings.admin.authorEnrichment.missingBioTitle') }}</span>
-            <p class="text-xs text-muted-foreground">{{ t('settings.admin.authorEnrichment.missingBioHint') }}</p>
+            <p class="text-xs text-muted-foreground">
+              {{ t('settings.admin.authorEnrichment.missingBioHint') }}
+            </p>
           </div>
         </label>
         <label class="flex items-center gap-3 cursor-pointer select-none">
@@ -192,7 +234,9 @@ async function runAuthorBackfillAll() {
           />
           <div>
             <span class="text-sm font-medium">{{ t('settings.admin.authorEnrichment.missingPhotoTitle') }}</span>
-            <p class="text-xs text-muted-foreground">{{ t('settings.admin.authorEnrichment.missingPhotoHint') }}</p>
+            <p class="text-xs text-muted-foreground">
+              {{ t('settings.admin.authorEnrichment.missingPhotoHint') }}
+            </p>
           </div>
         </label>
       </div>
@@ -209,7 +253,13 @@ async function runAuthorBackfillAll() {
         {{ authorBackfillRunning ? t('settings.admin.authorEnrichment.running') : t('settings.admin.authorEnrichment.runForEligibleAuthors') }}
       </button>
       <span v-if="eligibleCount !== null" class="text-xs text-muted-foreground">
-        {{ countLoading ? '...' : t('settings.admin.authorEnrichment.eligibleCount', { count: eligibleCount }) }}
+        {{
+          countLoading
+            ? '...'
+            : t('settings.admin.authorEnrichment.eligibleCount', {
+                count: eligibleCount,
+              })
+        }}
       </span>
       <div class="w-px h-4 bg-border shrink-0" />
       <button class="settings-btn-outline" :disabled="authorBackfillAllRunning" @click="runAuthorBackfillAll">

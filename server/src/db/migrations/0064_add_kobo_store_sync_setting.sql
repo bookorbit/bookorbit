@@ -1,0 +1,1 @@
+ALTER TABLE "kobo_sync_settings" ADD COLUMN "store_sync" boolean DEFAULT false NOT NULL;

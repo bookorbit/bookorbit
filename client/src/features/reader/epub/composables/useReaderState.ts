@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { EpubReaderSettings } from '@bookorbit/types'
+import { EPUB_FONT_SIZE_MAX, EPUB_FONT_SIZE_MIN, type EpubReaderSettings } from '@bookorbit/types'
 import { themes } from '../constants/themes'
 import type { Theme, ThemeMode } from '../constants/themes'
 import type { FoliateRenderer } from './useFoliate'
@@ -215,7 +215,7 @@ export function useReaderState() {
   }
 
   function setFontSize(v: number) {
-    fontSize.value = Math.max(10, Math.min(32, v))
+    fontSize.value = Math.max(EPUB_FONT_SIZE_MIN, Math.min(EPUB_FONT_SIZE_MAX, v))
   }
   function setLineHeight(v: number) {
     lineHeight.value = Math.max(0.8, Math.min(3, Math.round(v * 10) / 10))

@@ -16,9 +16,15 @@ function canonicalizeLocale(value: string): string | null {
 
 export function matchSupportedLocale(candidates: readonly string[]): Locale | null {
   const supportedByCanonical = new Map<string, Locale>()
+  const supportedByLanguageAndScript = new Map<string, Locale>()
   for (const locale of SUPPORTED_LOCALES) {
     const canonical = canonicalizeLocale(locale)
-    if (canonical) supportedByCanonical.set(canonical.toLowerCase(), locale)
+    if (!canonical) continue
+    supportedByCanonical.set(canonical.toLowerCase(), locale)
+    const maximized = new Intl.Locale(canonical).maximize()
+    if (maximized.script) {
+      supportedByLanguageAndScript.set(`${maximized.language.toLowerCase()}-${maximized.script.toLowerCase()}`, locale)
+    }
   }
 
   for (const candidate of candidates) {
@@ -26,7 +32,12 @@ export function matchSupportedLocale(candidates: readonly string[]): Locale | nu
     if (!canonical) continue
     const exact = supportedByCanonical.get(canonical.toLowerCase())
     if (exact) return exact
-    const language = new Intl.Locale(canonical).language.toLowerCase()
+    const maximized = new Intl.Locale(canonical).maximize()
+    const language = maximized.language.toLowerCase()
+    if (maximized.script) {
+      const scriptMatch = supportedByLanguageAndScript.get(`${language}-${maximized.script.toLowerCase()}`)
+      if (scriptMatch) return scriptMatch
+    }
     const baseLocale = supportedByCanonical.get(language)
     if (baseLocale) return baseLocale
   }

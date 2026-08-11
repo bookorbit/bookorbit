@@ -11,7 +11,9 @@ import { useMetadataScoreWeights } from '@/features/metadata-score/composables/u
 const { t } = useI18n()
 const { resetFetchCache } = useMetadataScoreWeights()
 
-const weights = reactive<MetadataScoreWeights>({ ...DEFAULT_METADATA_SCORE_WEIGHTS })
+const weights = reactive<MetadataScoreWeights>({
+  ...DEFAULT_METADATA_SCORE_WEIGHTS,
+})
 const saving = ref(false)
 const recalculating = ref(false)
 const resetConfirming = ref(false)
@@ -30,7 +32,11 @@ const totalWeight = computed(() => Object.values(weights).reduce((s, w) => s + (
 const groupOrder: MetadataScoreGroup[] = ['core', 'publishing', 'classification', 'enrichment', 'providers']
 
 type FieldEntry = { field: MetadataScoreField; label: string }
-type GroupEntry = { group: MetadataScoreGroup; label: string; fields: FieldEntry[] }
+type GroupEntry = {
+  group: MetadataScoreGroup
+  label: string
+  fields: FieldEntry[]
+}
 
 const groups = computed<GroupEntry[]>(() => {
   const map = new Map<MetadataScoreGroup, FieldEntry[]>()
@@ -39,7 +45,13 @@ const groups = computed<GroupEntry[]>(() => {
     list.push({ field, label: meta.label })
     map.set(meta.group, list)
   }
-  return groupOrder.filter((g) => map.has(g)).map((g) => ({ group: g, label: METADATA_SCORE_GROUP_LABELS[g], fields: map.get(g)! }))
+  return groupOrder
+    .filter((g) => map.has(g))
+    .map((g) => ({
+      group: g,
+      label: METADATA_SCORE_GROUP_LABELS[g],
+      fields: map.get(g)!,
+    }))
 })
 
 function groupTotal(entry: GroupEntry): number {
@@ -72,7 +84,9 @@ async function recalculateAll() {
   if (recalculating.value) return
   recalculating.value = true
   try {
-    const res = await api('/api/v1/metadata-score/recalculate', { method: 'POST' })
+    const res = await api('/api/v1/metadata-score/recalculate', {
+      method: 'POST',
+    })
     if (res.ok) {
       toast.success(t('settings.admin.scoreWeights.recalcStarted'))
     } else {
@@ -105,7 +119,9 @@ function handleResetClick() {
   <div class="mb-4">
     <div class="md:flex md:items-start md:justify-between md:gap-4">
       <div>
-        <p class="settings-group-label !mb-0">{{ t('settings.admin.scoreWeights.groupLabel') }}</p>
+        <p class="settings-group-label !mb-0">
+          {{ t('settings.admin.scoreWeights.groupLabel') }}
+        </p>
         <p class="settings-hint mt-0.5">
           {{ t('settings.admin.scoreWeights.assignHintPrefix') }}
           <span class="font-medium text-foreground">{{ totalWeight }}</span
@@ -157,11 +173,17 @@ function handleResetClick() {
     </div>
   </div>
 
-  <div class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+  <div class="settings-card">
     <div v-for="group in groups" :key="group.group" class="px-5 py-4 bg-card">
       <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{{ group.label }}</p>
-        <span class="text-xs text-muted-foreground">{{ t('settings.admin.scoreWeights.subtotal', { count: groupTotal(group) }) }}</span>
+        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          {{ group.label }}
+        </p>
+        <span class="text-xs text-muted-foreground">{{
+          t('settings.admin.scoreWeights.subtotal', {
+            count: groupTotal(group),
+          })
+        }}</span>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
         <div v-for="entry in group.fields" :key="entry.field" class="flex items-start md:items-center gap-2">

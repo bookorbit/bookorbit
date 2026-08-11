@@ -47,12 +47,16 @@ onMounted(load)
 
     <!-- Playback -->
     <div class="mb-6">
-      <p class="settings-group-label">{{ t('settings.reader.audio.playback') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.audio.playback') }}
+      </p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Playback speed -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.audio.playbackSpeed') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.audio.playbackSpeed') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.audio.playbackSpeedHint') }}
             </p>
@@ -78,7 +82,9 @@ onMounted(load)
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
             <div class="flex items-center justify-between gap-3">
-              <p class="settings-label">{{ t('settings.reader.audio.volume') }}</p>
+              <p class="settings-label">
+                {{ t('settings.reader.audio.volume') }}
+              </p>
               <span class="settings-value">{{ Math.round(effective.volume * 100) }}%</span>
             </div>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
@@ -92,7 +98,11 @@ onMounted(load)
             step="0.05"
             :value="effective.volume"
             class="w-full accent-primary"
-            @input="update({ volume: parseFloat(($event.target as HTMLInputElement).value) })"
+            @input="
+              update({
+                volume: parseFloat(($event.target as HTMLInputElement).value),
+              })
+            "
           />
         </div>
       </div>
@@ -100,12 +110,16 @@ onMounted(load)
 
     <!-- Skip controls -->
     <div class="mb-6">
-      <p class="settings-group-label">{{ t('settings.reader.audio.skipControls') }}</p>
+      <p class="settings-group-label">
+        {{ t('settings.reader.audio.skipControls') }}
+      </p>
       <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
         <!-- Skip back -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.audio.skipBack') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.audio.skipBack') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.audio.skipBackHint') }}
             </p>
@@ -128,9 +142,11 @@ onMounted(load)
         </div>
 
         <!-- Skip forward -->
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card">
+        <div class="settings-row">
           <div>
-            <p class="settings-label">{{ t('settings.reader.audio.skipForward') }}</p>
+            <p class="settings-label">
+              {{ t('settings.reader.audio.skipForward') }}
+            </p>
             <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
               {{ t('settings.reader.audio.skipForwardHint') }}
             </p>

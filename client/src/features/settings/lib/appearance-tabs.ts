@@ -1,4 +1,4 @@
-export const APPEARANCE_TABS = ['theme', 'book-covers', 'icons', 'layout', 'behavior'] as const
+export const APPEARANCE_TABS = ['theme', 'book-covers', 'icons', 'layout', 'behavior', 'language'] as const
 
 export type AppearanceTab = (typeof APPEARANCE_TABS)[number]
 

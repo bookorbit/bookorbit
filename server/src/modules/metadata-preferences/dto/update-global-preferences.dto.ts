@@ -3,8 +3,11 @@ import {
   IsIn,
   IsBoolean,
   IsArray,
+  IsInt,
   IsString,
+  Max,
   MaxLength,
+  Min,
   IsOptional,
   Validate,
   ValidateNested,
@@ -13,7 +16,7 @@ import {
   validateSync,
 } from 'class-validator';
 import { plainToInstance, Type } from 'class-transformer';
-import { ALL_METADATA_FIELDS, GENRE_MERGE_MODES, MERGE_STRATEGIES, MetadataProviderKey } from '@bookorbit/types';
+import { ALL_METADATA_FIELDS, GENRE_MERGE_MODES, MAX_METADATA_GENRE_COUNT, MERGE_STRATEGIES, MetadataProviderKey } from '@bookorbit/types';
 import type { GenreMergeMode, MergeStrategy, MetadataField } from '@bookorbit/types';
 const PROVIDER_KEYS = Object.values(MetadataProviderKey);
 
@@ -40,6 +43,12 @@ export class GenreOptionsDto {
   @IsString({ each: true })
   @MaxLength(120, { each: true })
   blocklist!: string[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_METADATA_GENRE_COUNT)
+  maxCount: number | null = null;
 }
 
 export class MetadataFetchOptionsDto {

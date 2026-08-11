@@ -6,6 +6,7 @@ import { MetadataProviderKey } from '@bookorbit/types'
 import type { ProviderConfigurations, ProviderConnectionTestResult, ProviderStatus, ProviderThrottleRuntimeState } from '@bookorbit/types'
 import { toast } from 'vue-sonner'
 import { Badge } from '@/components/ui/badge'
+import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 import { stripBearerPrefix } from '../lib/provider-token'
 
 const { t } = useI18n()
@@ -443,18 +444,13 @@ const visibleRows = computed(() => {
               <input
                 v-else
                 v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
-                :type="field.type === 'password' ? 'password' : field.type"
+                v-bind="SECRET_INPUT_ATTRS"
+                :type="field.type === 'password' ? 'text' : field.type"
                 :name="`metadata-${row.key}-${field.key}`"
                 :placeholder="field.placeholder ?? field.label"
                 :disabled="!canEditField(row, field)"
-                autocomplete="off"
-                autocorrect="off"
-                autocapitalize="off"
-                spellcheck="false"
-                :data-lpignore="field.type === 'password' ? 'true' : undefined"
-                :data-1p-ignore="field.type === 'password' ? 'true' : undefined"
-                :data-form-type="field.type === 'password' ? 'other' : undefined"
                 class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-xs font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all md:w-72 lg:w-80"
+                :class="{ 'input-secret': field.type === 'password' }"
               />
               <p v-if="field.helper" class="mt-0.5 max-w-72 text-[10px] leading-snug text-muted-foreground md:text-right">
                 {{ field.helper }}

@@ -31,22 +31,30 @@ describe('locale store', () => {
 
     expect(matchSupportedLocale(['nl-NL', 'en-US'])).toBe('nl')
     expect(matchSupportedLocale(['de-DE', 'en-GB'])).toBe('de')
+    expect(matchSupportedLocale(['el-GR', 'en-GB'])).toBe('el')
     expect(matchSupportedLocale(['es-ES', 'en-GB'])).toBe('es')
     expect(matchSupportedLocale(['fr-FR', 'en-GB'])).toBe('fr')
+    expect(matchSupportedLocale(['hu-HU', 'en-GB'])).toBe('hu')
+    expect(matchSupportedLocale(['id-ID', 'en-GB'])).toBe('id')
     expect(matchSupportedLocale(['it-IT', 'en-GB'])).toBe('it')
+    expect(matchSupportedLocale(['ja-JP', 'en-GB'])).toBe('ja')
+    expect(matchSupportedLocale(['ko-KR', 'en-GB'])).toBe('ko')
     expect(matchSupportedLocale(['nl-BE', 'en'])).toBe('nl')
     expect(matchSupportedLocale(['pl-PL', 'en-GB'])).toBe('pl')
     expect(matchSupportedLocale(['pt-BR'])).toBe('pt')
+    expect(matchSupportedLocale(['ro-RO', 'en-GB'])).toBe('ro')
     expect(matchSupportedLocale(['ru-RU', 'en-GB'])).toBe('ru')
+    expect(matchSupportedLocale(['sk-SK', 'en-GB'])).toBe('sk')
     expect(matchSupportedLocale(['uk-UA', 'en-GB'])).toBe('uk')
     expect(matchSupportedLocale(['cs-CZ', 'en-GB'])).toBe('cs')
     expect(matchSupportedLocale(['da-DK', 'en-GB'])).toBe('da')
     expect(matchSupportedLocale(['fi-FI', 'en-GB'])).toBe('fi')
     expect(matchSupportedLocale(['sv-SE', 'en-GB'])).toBe('sv')
     expect(matchSupportedLocale(['sv-FI', 'en-GB'])).toBe('sv')
+    expect(matchSupportedLocale(['tr-TR', 'en-GB'])).toBe('tr')
   })
 
-  it('resolves every Chinese script and region variant to the Simplified catalog', async () => {
+  it('distinguishes Simplified and Traditional Chinese scripts and regions', async () => {
     const { matchSupportedLocale } = await import('../locale')
 
     expect(matchSupportedLocale(['zh'])).toBe('zh')
@@ -54,11 +62,11 @@ describe('locale store', () => {
     expect(matchSupportedLocale(['zh-Hans-CN'])).toBe('zh')
     expect(matchSupportedLocale(['zh-SG'])).toBe('zh')
 
-    // Traditional readers intentionally land on Simplified until a zh-Hant
-    // catalog exists. Adding one means matching by script before base language.
-    expect(matchSupportedLocale(['zh-TW'])).toBe('zh')
-    expect(matchSupportedLocale(['zh-Hant'])).toBe('zh')
-    expect(matchSupportedLocale(['zh-HK'])).toBe('zh')
+    expect(matchSupportedLocale(['zh-TW'])).toBe('zh-Hant')
+    expect(matchSupportedLocale(['zh-Hant'])).toBe('zh-Hant')
+    expect(matchSupportedLocale(['zh-Hant-HK'])).toBe('zh-Hant')
+    expect(matchSupportedLocale(['zh-HK'])).toBe('zh-Hant')
+    expect(matchSupportedLocale(['zh-MO'])).toBe('zh-Hant')
   })
 
   it('prefers the stored locale over browser detection', async () => {

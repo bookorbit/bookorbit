@@ -18,7 +18,7 @@ import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-pre
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
-import { createGenreBlocklistTokenSet, filterGenresAgainstBlocklist } from '../../common/utils/genre-blocklist.utils';
+import { applyGenreFetchOptions, createGenreBlocklistTokenSet } from '../../common/utils/genre-fetch-options.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
@@ -260,7 +260,8 @@ export class MetadataFetchPipeline {
   ): { resolved: ResolvedMetadataFields; sources: Record<string, string>; providerIds: ResolvedProviderIds } {
     const result: ResolvedMetadataFields = {};
     const sources: Record<string, string> = {};
-    const blockedGenreTokens = createGenreBlocklistTokenSet(preferences.options?.genres.blocklist);
+    const genreOptions = preferences.options?.genres;
+    const blockedGenreTokens = createGenreBlocklistTokenSet(genreOptions?.blocklist);
 
     for (const field of Object.keys(preferences.fields) as MetadataField[]) {
       const fieldPreference = preferences.fields[field];
@@ -268,7 +269,12 @@ export class MetadataFetchPipeline {
       const mergeStrategy = options?.preserveExisting ? 'fillMissing' : fieldPreference.mergeStrategy;
 
       if (field === 'genres' && preferences.options?.genres.mode === 'merge') {
-        const { genres, sourceProvider } = this.mergeGenres(fieldPreference.providers as MetadataProviderKey[], byProvider, blockedGenreTokens);
+        const { genres, sourceProvider } = this.mergeGenres(
+          fieldPreference.providers as MetadataProviderKey[],
+          byProvider,
+          blockedGenreTokens,
+          genreOptions?.maxCount,
+        );
         if (!genres.length) continue;
 
         const existingValue = existing[field];
@@ -315,11 +321,11 @@ export class MetadataFetchPipeline {
           break;
         }
 
-        if (field === 'genres' && blockedGenreTokens.size > 0) {
+        if (field === 'genres') {
           if (!Array.isArray(value)) continue;
-          const filteredGenres = filterGenresAgainstBlocklist(value, blockedGenreTokens);
-          if (!filteredGenres.length) continue;
-          value = filteredGenres;
+          const genres = applyGenreFetchOptions(value, blockedGenreTokens, genreOptions?.maxCount);
+          if (!genres.length) continue;
+          value = genres;
         }
 
         const existingValue = existing[field];
@@ -478,25 +484,26 @@ export class MetadataFetchPipeline {
     return normalized;
   }
 
-  private mergeGenres(providerKeys: MetadataProviderKey[], byProvider: Map<string, MetadataCandidate>, blockedGenreTokens: ReadonlySet<string>) {
+  private mergeGenres(
+    providerKeys: MetadataProviderKey[],
+    byProvider: Map<string, MetadataCandidate>,
+    blockedGenreTokens: ReadonlySet<string>,
+    maxCount: number | null | undefined,
+  ) {
     const merged: string[] = [];
-    const seen = new Set<string>();
     let sourceProvider: MetadataProviderKey | undefined;
 
     for (const providerKey of providerKeys) {
       const candidate = byProvider.get(providerKey);
       if (!candidate?.genres?.length) continue;
 
-      for (const genre of filterGenresAgainstBlocklist(candidate.genres, blockedGenreTokens)) {
-        const token = genre.toLowerCase();
-        if (seen.has(token)) continue;
-        if (!sourceProvider) sourceProvider = providerKey;
-        seen.add(token);
-        merged.push(genre);
-      }
+      const providerGenres = applyGenreFetchOptions(candidate.genres, blockedGenreTokens, null);
+      if (!providerGenres.length) continue;
+      if (!sourceProvider) sourceProvider = providerKey;
+      merged.push(...providerGenres);
     }
 
-    return { genres: merged, sourceProvider };
+    return { genres: applyGenreFetchOptions(merged, blockedGenreTokens, maxCount), sourceProvider };
   }
 
   private isMissing(value: unknown): boolean {

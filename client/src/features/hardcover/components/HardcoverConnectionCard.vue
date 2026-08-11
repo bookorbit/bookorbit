@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 import { useHardcoverSettings } from '../composables/useHardcoverSettings'
 
 const { t } = useI18n()
@@ -116,10 +117,11 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
       <div class="flex gap-2">
         <input
           v-model="tokenInput"
-          :type="tokenVisible ? 'text' : 'password'"
+          v-bind="SECRET_INPUT_ATTRS"
+          type="text"
           :placeholder="t('hardcover.connection.tokenPlaceholder')"
           class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          autocomplete="off"
+          :class="{ 'input-secret': !tokenVisible }"
         />
         <button
           type="button"

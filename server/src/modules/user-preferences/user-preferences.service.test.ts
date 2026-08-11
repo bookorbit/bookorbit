@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Accent, DisplayPreferences, LocalePreferences, ServerFontPreferences, ThemePreferences } from '@bookorbit/types';
-import { MAX_SERVER_FONTS } from '@bookorbit/types';
+import { MAX_SERVER_FONTS, SUPPORTED_LOCALES } from '@bookorbit/types';
 
 import { UserPreferencesRepository } from './user-preferences.repository';
 import { UserPreferencesService } from './user-preferences.service';
@@ -139,7 +139,7 @@ describe('UserPreferencesService', () => {
     expect(repo.upsert).toHaveBeenCalledWith(11, 'locale', validLocalePreferences);
   });
 
-  it.each(['es', 'fr', 'pl'] as const)('upsertLocalePreferences accepts the %s locale', async (locale) => {
+  it.each(SUPPORTED_LOCALES)('upsertLocalePreferences accepts the %s locale', async (locale) => {
     const preferences: LocalePreferences = { locale };
 
     await expect(service.upsertLocalePreferences(11, preferences)).resolves.toBeUndefined();

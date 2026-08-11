@@ -53,6 +53,7 @@ vi.mock('../composables/useDashboardWidgets', () => ({
 }))
 
 import DashboardSettingsSheet from './DashboardSettingsSheet.vue'
+import { useDashboardConfig } from '../composables/useDashboardConfig'
 
 const ALL_WIDGETS: WidgetConfig[] = WIDGET_TYPES.map((type, index) => ({
   id: String(index + 1),
@@ -77,6 +78,17 @@ function widgetRowLabels(wrapper: VueWrapper): string[] {
   return wrapper.findAll('span.flex-1').map((span) => span.text())
 }
 
+function rowButtons(wrapper: VueWrapper, shelfIndex = 0) {
+  const group = wrapper.findAll('[data-testid="shelf-rows"]')[shelfIndex]
+  return group?.findAll('button') ?? []
+}
+
+function storedRows(): number[] {
+  const raw = localStorage.getItem('bookorbit:dashboard:config')
+  const parsed = JSON.parse(raw ?? '{}') as { scrollers?: { rows: number }[] }
+  return (parsed.scrollers ?? []).map((scroller) => scroller.rows)
+}
+
 function shelfOptionLabels(wrapper: VueWrapper): string[] {
   return wrapper
     .find('select')
@@ -87,6 +99,9 @@ function shelfOptionLabels(wrapper: VueWrapper): string[] {
 beforeEach(async () => {
   vi.clearAllMocks()
   localStorage.clear()
+  // useDashboardConfig keeps module-level state, so a shelf edit in one test
+  // would otherwise seed the next test's draft.
+  useDashboardConfig().reset()
   widgetsRef.value = []
   await setI18nLocale('en')
 })
@@ -137,6 +152,73 @@ describe('DashboardSettingsSheet', () => {
     await nextTick()
 
     expect(shelfOptionLabels(wrapper).sort()).toEqual(Object.values(PT_SHELF_NAMES).sort())
+  })
+
+  it('opens on the shelves tab and lists it before widgets', async () => {
+    const wrapper = await openSheet()
+
+    const tabLabels = wrapper
+      .findAll('button')
+      .map((button) => button.text())
+      .filter((label) => label === en.dashboard.settings.tabs.shelves || label === en.dashboard.settings.tabs.widgets)
+    expect(tabLabels).toEqual([en.dashboard.settings.tabs.shelves, en.dashboard.settings.tabs.widgets])
+
+    const shelvesTab = wrapper.findAll('button').find((button) => button.text() === en.dashboard.settings.tabs.shelves)
+    const widgetsTab = wrapper.findAll('button').find((button) => button.text() === en.dashboard.settings.tabs.widgets)
+    expect(shelvesTab?.classes()).toContain('bg-background')
+    expect(widgetsTab?.classes()).not.toContain('bg-background')
+  })
+
+  it('offers one, two and three rows per shelf and starts on one', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    const buttons = rowButtons(wrapper)
+
+    expect(buttons.map((button) => button.text())).toEqual(['1', '2', '3'])
+    expect(buttons.map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
+  })
+
+  it('labels each row choice for assistive technology', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    expect(rowButtons(wrapper).map((button) => button.attributes('aria-label'))).toEqual(['One row of books', '2 rows of books', '3 rows of books'])
+  })
+
+  it('selects a row count without touching the other shelves', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    await rowButtons(wrapper)[2]?.trigger('click')
+
+    expect(rowButtons(wrapper).map((button) => button.attributes('aria-pressed'))).toEqual(['false', 'false', 'true'])
+    expect(rowButtons(wrapper, 1).map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
+  })
+
+  it('persists the chosen row count on save', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    await rowButtons(wrapper)[1]?.trigger('click')
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === en.common.save)
+    await saveButton?.trigger('click')
+
+    expect(storedRows()[0]).toBe(2)
+    expect(storedRows().slice(1)).toEqual([1, 1, 1, 1, 1])
+  })
+
+  it('discards a row change when the sheet is cancelled and reopened', async () => {
+    const wrapper = await openSheet()
+    await openShelvesTab(wrapper)
+
+    await rowButtons(wrapper)[2]?.trigger('click')
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    await nextTick()
+    await openShelvesTab(wrapper)
+
+    expect(rowButtons(wrapper).map((button) => button.attributes('aria-pressed'))).toEqual(['true', 'false', 'false'])
   })
 
   it('renders every widget name from the catalog rather than a hardcoded map', async () => {

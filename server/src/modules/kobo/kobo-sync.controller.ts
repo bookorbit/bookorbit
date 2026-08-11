@@ -32,6 +32,16 @@ import { KoboProxyService } from './services/kobo-proxy.service';
 import { KOBO_STORE_RESOURCES } from './kobo-store-resources';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
+import { decodeSyncToken, isUsableKoboSyncToken, withKoboSyncToken } from './services/kobo-sync-token';
+
+const STORE_SYNC_TIMEOUT_MS = 8_000;
+const KOBO_SYNC_TOKEN_HEADER = 'x-kobo-synctoken';
+
+type StoreSyncResult = {
+  entitlements: unknown[];
+  hasMore: boolean;
+  syncToken: string | undefined;
+};
 
 function readHeaderValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -145,19 +155,119 @@ export class KoboSyncController {
       throw error;
     }
     const { entitlements, hasMore, syncToken } = result;
+
+    // Reach for the store only once BookOrbit has drained its own pages, so the device is never
+    // asked to reconcile two independent cursors out of a single response.
+    const incomingKoboSyncToken = decodeSyncToken(readHeaderValue(req.headers[KOBO_SYNC_TOKEN_HEADER])).koboSyncToken;
+    const store = hasMore ? null : await this.fetchStoreEntitlements(req, device, user.id, incomingKoboSyncToken);
+
+    const merged = store ? [...entitlements, ...store.entitlements] : entitlements;
+
+    // Kobo's cursor rides inside our token, so one too large to carry means the next store sync
+    // starts over. Say so rather than letting the store silently resend its whole library.
+    if (store?.syncToken !== undefined && !isUsableKoboSyncToken(store.syncToken)) {
+      this.logger.warn(
+        `[kobo.store_sync] [fail] userId=${user.id} deviceId=${device.deviceId} errorClass=StoreCursorTooLarge tokenLength=${store.syncToken.length} - upstream cursor dropped, the next store sync starts from the beginning`,
+      );
+    }
+
+    // Replaying an unchanged cursor returns the same page forever, so keep paging the store only
+    // while its token actually advances. The page just fetched is still delivered either way.
+    const storeCursorAdvanced = store?.syncToken !== undefined && store.syncToken !== incomingKoboSyncToken;
+    if (store?.hasMore === true && !storeCursorAdvanced) {
+      this.logger.warn(
+        `[kobo.store_sync] [fail] userId=${user.id} deviceId=${device.deviceId} errorClass=StoreCursorStalled error="continue without an advanced sync token" - store paging stopped to avoid a sync loop`,
+      );
+    }
+    const combinedHasMore = hasMore || (store?.hasMore === true && storeCursorAdvanced);
+
     this.logger.debug(
-      `[kobo.library_sync] [end] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} entitlementCount=${entitlements.length} hasMore=${hasMore} - library sync completed`,
+      `[kobo.library_sync] [end] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} entitlementCount=${entitlements.length} storeEntitlementCount=${store?.entitlements.length ?? 0} hasMore=${combinedHasMore} - library sync completed`,
     );
     await this.historyService.recordSuccess({
       userId: user.id,
       deviceId: device.deviceId,
       event: 'library_sync',
       durationMs: Date.now() - startedAt,
-      counts: { entitlements: entitlements.length, hasMore },
+      counts: {
+        entitlements: merged.length,
+        hasMore: combinedHasMore,
+        ...(store ? { storeEntitlements: store.entitlements.length } : {}),
+      },
     });
-    reply.header('x-kobo-sync', hasMore ? 'continue' : '');
-    reply.header('x-kobo-synctoken', syncToken);
-    reply.send(entitlements);
+    reply.header('x-kobo-sync', combinedHasMore ? 'continue' : '');
+    reply.header('x-kobo-synctoken', withKoboSyncToken(syncToken, store?.syncToken ?? incomingKoboSyncToken));
+    reply.send(merged);
+  }
+
+  /**
+   * Pulls the device's Kobo Plus and Kobo store entitlements using the device's own Kobo
+   * credentials, which reach us because initialization leaves device_auth and device_refresh
+   * pointing at Kobo. Returns null when the user has store sync switched off.
+   *
+   * Never throws: reading the setting, or a store that is slow, down or unauthorized, costs the
+   * store page and never the BookOrbit half of the sync.
+   */
+  private async fetchStoreEntitlements(
+    req: FastifyRequest,
+    device: KoboDeviceContext,
+    userId: number,
+    koboSyncToken: string | undefined,
+  ): Promise<StoreSyncResult | null> {
+    const startedAt = Date.now();
+    try {
+      const { storeSync } = await this.settingsService.getSettings(userId);
+      if (!storeSync) return null;
+
+      this.logger.debug(
+        `[kobo.store_sync] [start] userId=${userId} deviceId=${device.deviceId} hasKoboToken=${Boolean(koboSyncToken)} - upstream store sync started`,
+      );
+
+      // Our own composite token means nothing to Kobo, so it is replaced when we hold Kobo's
+      // cursor and dropped entirely when we do not, which asks the store for a full sync.
+      const response = await this.proxyService.request(req, device.deviceToken, {
+        ...(koboSyncToken ? { extraHeaders: { [KOBO_SYNC_TOKEN_HEADER]: koboSyncToken } } : { omitHeaders: [KOBO_SYNC_TOKEN_HEADER] }),
+        timeoutMs: STORE_SYNC_TIMEOUT_MS,
+      });
+
+      if (response.status < 200 || response.status >= 300) {
+        this.logger.warn(
+          `[kobo.store_sync] [fail] userId=${userId} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} status=${response.status} - upstream store sync returned an error status`,
+        );
+        return null;
+      }
+
+      // An empty body carries no cursor we can trust, so treat it as no store data this round
+      // rather than advancing past a page Kobo may still owe us.
+      const rawBody = response.body.toString('utf8').trim();
+      if (rawBody.length === 0) {
+        this.logger.warn(
+          `[kobo.store_sync] [fail] userId=${userId} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} status=${response.status} - upstream store sync returned an empty body`,
+        );
+        return null;
+      }
+
+      const parsed: unknown = JSON.parse(rawBody);
+      if (!Array.isArray(parsed)) {
+        this.logger.warn(
+          `[kobo.store_sync] [fail] userId=${userId} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} status=${response.status} - upstream store sync returned a non-array body`,
+        );
+        return null;
+      }
+
+      const hasMore = response.headers['x-kobo-sync']?.trim().toLowerCase() === 'continue';
+      this.logger.debug(
+        `[kobo.store_sync] [end] userId=${userId} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} storeEntitlementCount=${parsed.length} hasMore=${hasMore} - upstream store sync completed`,
+      );
+      return { entitlements: parsed, hasMore, syncToken: response.headers[KOBO_SYNC_TOKEN_HEADER] };
+    } catch (error: unknown) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+      this.logger.warn(
+        `[kobo.store_sync] [fail] userId=${userId} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - upstream store sync failed, serving BookOrbit entitlements only`,
+      );
+      return null;
+    }
   }
 
   @Post('v1/library/tags/:tagId/items/delete')

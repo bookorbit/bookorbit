@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, inArray, isNull, notInArray, or, sum, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, notInArray, sum, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -25,7 +25,7 @@ export interface ListOptions {
   order: string;
   search?: string;
   userId: number;
-  isSuperuser: boolean;
+  canManageAll: boolean;
 }
 
 export interface SelectionBatchOptions {
@@ -35,7 +35,7 @@ export interface SelectionBatchOptions {
   status?: string;
   search?: string;
   userId: number;
-  isSuperuser: boolean;
+  canManageAll: boolean;
 }
 
 @Injectable()
@@ -43,7 +43,7 @@ export class BookDockRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findAll(opts: ListOptions): Promise<{ items: BookDockFileRow[]; total: number }> {
-    const conditions = this.buildSelectionConditions(opts.status, opts.search, opts.userId, opts.isSuperuser);
+    const conditions = this.buildSelectionConditions(opts.status, opts.search, opts.userId, opts.canManageAll);
 
     const where = conditions.length ? and(...conditions) : undefined;
 
@@ -98,19 +98,19 @@ export class BookDockRepository {
     await this.db.delete(bookDockFiles).where(eq(bookDockFiles.absolutePath, path));
   }
 
-  async findAllIds(excludedIds?: number[], status?: string, search?: string, userId?: number, isSuperuser?: boolean): Promise<number[]> {
-    const conditions = this.buildSelectionConditions(status, search, userId, isSuperuser ?? true);
+  async findAllIds(excludedIds?: number[], status?: string, search?: string, userId?: number, canManageAll?: boolean): Promise<number[]> {
+    const conditions = this.buildSelectionConditions(status, search, userId, canManageAll ?? true);
     if (excludedIds?.length) conditions.push(notInArray(bookDockFiles.id, excludedIds));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await this.db.select({ id: bookDockFiles.id }).from(bookDockFiles).where(where);
     return rows.map((r) => r.id);
   }
 
-  async findByIds(ids: number[], userId?: number, isSuperuser?: boolean): Promise<BookDockFileRow[]> {
+  async findByIds(ids: number[], userId?: number, canManageAll?: boolean): Promise<BookDockFileRow[]> {
     if (ids.length === 0) return [];
     const conditions: SQL[] = [inArray(bookDockFiles.id, ids)];
-    if (userId !== undefined && !isSuperuser) {
-      conditions.push(or(eq(bookDockFiles.uploadedBy, userId), isNull(bookDockFiles.uploadedBy))!);
+    if (userId !== undefined && !canManageAll) {
+      conditions.push(eq(bookDockFiles.uploadedBy, userId));
     }
     return this.db
       .select()
@@ -134,7 +134,7 @@ export class BookDockRepository {
   }
 
   async findSelectionBatch(options: SelectionBatchOptions): Promise<BookDockFileRow[]> {
-    const conditions = this.buildSelectionConditions(options.status, options.search, options.userId, options.isSuperuser);
+    const conditions = this.buildSelectionConditions(options.status, options.search, options.userId, options.canManageAll);
     if (options.excludedIds?.length) conditions.push(notInArray(bookDockFiles.id, options.excludedIds));
     if (options.afterId !== undefined) conditions.push(gt(bookDockFiles.id, options.afterId));
     const where = conditions.length ? and(...conditions) : undefined;
@@ -151,8 +151,8 @@ export class BookDockRepository {
     return updated.length;
   }
 
-  async countsByStatus(userId?: number, isSuperuser?: boolean): Promise<{ pending: number; ready: number; error: number; total: number }> {
-    const visibilityCondition = userId !== undefined ? this.buildVisibilityCondition(userId, isSuperuser ?? true) : undefined;
+  async countsByStatus(userId?: number, canManageAll?: boolean): Promise<{ pending: number; ready: number; error: number; total: number }> {
+    const visibilityCondition = userId !== undefined ? this.buildVisibilityCondition(userId, canManageAll ?? true) : undefined;
     const rows = await this.db
       .select({
         status: bookDockFiles.status,
@@ -175,12 +175,12 @@ export class BookDockRepository {
 
   async getStatistics(
     userId?: number,
-    isSuperuser?: boolean,
+    canManageAll?: boolean,
   ): Promise<{
     totalSizeBytes: number;
     byFormat: { format: string; count: number; sizeBytes: number }[];
   }> {
-    const visibilityCondition = userId !== undefined ? this.buildVisibilityCondition(userId, isSuperuser ?? true) : undefined;
+    const visibilityCondition = userId !== undefined ? this.buildVisibilityCondition(userId, canManageAll ?? true) : undefined;
     const rows = await this.db
       .select({
         format: bookDockFiles.format,
@@ -201,12 +201,12 @@ export class BookDockRepository {
     return { totalSizeBytes, byFormat };
   }
 
-  private buildVisibilityCondition(userId: number, isSuperuser: boolean): SQL | undefined {
-    if (isSuperuser) return undefined;
-    return or(eq(bookDockFiles.uploadedBy, userId), isNull(bookDockFiles.uploadedBy));
+  private buildVisibilityCondition(userId: number, canManageAll: boolean): SQL | undefined {
+    if (canManageAll) return undefined;
+    return eq(bookDockFiles.uploadedBy, userId);
   }
 
-  private buildSelectionConditions(status?: string, search?: string, userId?: number, isSuperuser?: boolean): SQL[] {
+  private buildSelectionConditions(status?: string, search?: string, userId?: number, canManageAll?: boolean): SQL[] {
     const conditions: SQL[] = [];
     if (status === 'pending') {
       conditions.push(inArray(bookDockFiles.status, ['pending', 'extracting', 'fetching']));
@@ -214,8 +214,8 @@ export class BookDockRepository {
       conditions.push(eq(bookDockFiles.status, status));
     }
     if (search) conditions.push(accentInsensitiveIlike(bookDockFiles.fileName, `%${search}%`));
-    if (userId !== undefined && !isSuperuser) {
-      conditions.push(or(eq(bookDockFiles.uploadedBy, userId), isNull(bookDockFiles.uploadedBy))!);
+    if (userId !== undefined && !canManageAll) {
+      conditions.push(eq(bookDockFiles.uploadedBy, userId));
     }
     return conditions;
   }

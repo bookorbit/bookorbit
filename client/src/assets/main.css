@@ -385,6 +385,12 @@
   .settings-value {
     @apply text-sm font-medium tabular-nums text-foreground;
   }
+  .settings-card {
+    @apply overflow-hidden rounded-lg border border-border divide-y divide-border shadow-xs;
+  }
+  .settings-row {
+    @apply flex flex-col gap-3 bg-card px-4 py-3.5 md:flex-row md:items-center md:justify-between md:px-5 md:py-4;
+  }
 
   /* ── Settings form controls ─────────────────────────────────
      Use .input-field on <input> and .select-field on <select>
@@ -400,6 +406,14 @@
     @apply h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground cursor-pointer
            focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary
            disabled:opacity-50 transition-colors;
+  }
+
+  /* Masks a secret that is not a BookOrbit login credential (API keys, sync
+     tokens, SMTP passwords). Pair with type="text" and SECRET_INPUT_ATTRS from
+     @/lib/secret-input so Chrome's password manager ignores the field; see that
+     module for why type="password" cannot be used here. */
+  .input-secret {
+    -webkit-text-security: disc;
   }
 
   /* ── Settings action buttons ─────────────────────────────────

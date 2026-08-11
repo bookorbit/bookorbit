@@ -13,6 +13,7 @@ import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.se
 import { KoreaderPackageService } from './koreader-package.service';
 import { pluginRequiresManualUpdate } from './koreader-plugin-update.util';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
+import { isPagedReadingFormat, parseKoreaderPageNumber } from './koreader-progress-position.util';
 import { BookService } from '../book/book.service';
 import { PositionConverterService } from '../position-converter/position-converter.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
@@ -28,8 +29,16 @@ const FILE_NAMING_CACHE_MAX_ENTRIES = 5_000;
 const SHARED_PROGRESS_CONCURRENCY = 4;
 const CHAPTER_EXTRACTION_CONCURRENCY = 2;
 
+/** `format` routes the incoming position to the cfi or the pageNumber column. */
+export interface KoreaderProgressBookFile {
+  id: number;
+  bookId: number;
+  libraryId: number;
+  format: string | null;
+}
+
 export interface BulkProgressEntry {
-  bookFile: { id: number; bookId: number; libraryId: number };
+  bookFile: KoreaderProgressBookFile;
   percentage: number;
   progress?: string;
   timestamp?: number;
@@ -160,7 +169,7 @@ export class KoreaderService {
 
   async applyProgressForResolvedFile(
     userId: number,
-    bookFile: { id: number; bookId: number; libraryId: number },
+    bookFile: KoreaderProgressBookFile,
     data: { percentage: number; progress?: string; device: string; deviceId: string; timestamp?: number },
     options?: { skipSharedProgress?: boolean },
   ) {
@@ -287,13 +296,25 @@ export class KoreaderService {
 
   private async applySharedProgress(
     userId: number,
-    bookFile: { id: number; bookId: number; libraryId: number },
+    bookFile: KoreaderProgressBookFile,
     data: { percentage: number; progress?: string; timestamp?: number },
     previousPercentage: number | null,
   ) {
     const bookorbitPercentage = toBookorbitPercentage(data.percentage);
-    const cfi = data.progress ? await this.convertProgressToCfi(bookFile.id, data.progress) : null;
-    await this.repo.upsertReadingProgress(bookFile.id, userId, bookorbitPercentage, cfi, data.progress ?? null);
+    // KOReader reports a paged document's position as a page number and a reflowable one's as
+    // an xpointer, and the web reader resumes from a different column for each, so the format
+    // decides which one this position becomes.
+    const paged = isPagedReadingFormat(bookFile.format);
+    const cfi = !paged && data.progress ? await this.convertProgressToCfi(bookFile.id, data.progress) : null;
+    const pageNumber = paged ? parseKoreaderPageNumber(data.progress) : null;
+    await this.repo.upsertReadingProgress({
+      bookFileId: bookFile.id,
+      userId,
+      percentage: bookorbitPercentage,
+      cfi,
+      xpointer: data.progress ?? null,
+      pageNumber,
+    });
     await this.bookService.syncKoboReadingStateForExternalProgress(userId, bookFile.id, bookorbitPercentage).catch(() => undefined);
     const strongRereadEvidence = previousPercentage !== null && previousPercentage - bookorbitPercentage >= 10;
     await this.bookService.autoUpdateReadStatusForProgress(userId, bookFile, bookorbitPercentage, {
