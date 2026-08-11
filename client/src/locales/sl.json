@@ -1170,14 +1170,30 @@
         "opds": "OPDS",
         "kobo": "Kobo",
         "koreader": "KOReader",
+        "integrations": "Integracije",
         "hardcover": "Hardcover",
         "admin": "Skrbnik",
         "system": "Sistem",
         "account": "Račun"
       }
     },
+    "integrations": {
+      "title": "Integracije",
+      "subtitle": "Za sinhronizacijo podatkov o branju in poudarkov povežite zunanje storitve.",
+      "noPermission": "Nimate dovoljenja za uporabo nobenih integracij.",
+      "tabs": {
+        "hardcover": "Hardcover",
+        "readwise": "Readwise",
+        "storygraph": "StoryGraph"
+      },
+      "providerSubtitles": {
+        "readwise": "Samodejno pošljite svoje poudarke v Readwise.",
+        "storygraph": "Sinhronizirajte svoj napredek in stanje branja s StoryGraphom."
+      }
+    },
     "metadata": {
       "title": "Metapodatki",
+      "subtitle": "Konfigurirajte ponudnike metapodatkov, pravila ujemanja, avtomatizacijo in obogatitev avtorjev.",
       "noPermission": "Nimate dovoljenja za upravljanje nastavitev metapodatkov.",
       "fields": {
         "title": "Naslov",
@@ -1359,6 +1375,12 @@
           "combineGenres": {
             "label": "Združi žanre vseh izbranih ponudnikov",
             "hint": "Zberi in odstrani podvojene žanre vseh ponudnikov, dodeljenih polju Žanri, namesto da se ustavi pri prvem rezultatu."
+          },
+          "maxGenres": {
+            "label": "Največje število žanrov na knjigo",
+            "hint": "Uporabljeno po izključitvah in odstranitvi podvojenih podatkov. Za neomejeno število pustite prazno. To vpliva na prihodnje pridobivanje metapodatkov.",
+            "unlimited": "Neomejeno",
+            "error": "Vnesite celo število od 1 do {max} ali pustite polje prazno."
           },
           "storeProviderIds": {
             "label": "Shrani ID-je ponudnikov na knjigah",
@@ -1870,6 +1892,8 @@
         "twoWaySyncHint": "Sinhronizirajte položaj branja med BookOrbit in Kobo. Za natančne lokacije in zanesljivo obnovitev strani je potrebna dostava KEPUB.",
         "syncHighlights": "Sinhroniziraj označbe BookOrbit v Kobo",
         "syncHighlightsHint": "Pošljite označbe, ustvarjene v BookOrbit ali KOReader, v vašo napravo Kobo. Označbe iz naprave Kobo se uvozijo v BookOrbit tudi, kadar je to izklopljeno. Povezane opombe sinhronizirajo urejanja in brisanja v obe smeri. Zahteva dostavo KEPUB; knjiga na napravi Kobo mora biti KEPUB, prenesen iz BookOrbit.",
+        "storeSync": "Vključi naslove trgovine Kobo",
+        "storeSyncHint": "Knjige iz vašega računa Kobo, vključno s Kobo Plus in nakupi, dostavljajte tudi iz vaše knjižnice BookOrbit. Brez tega bodo v napravo prispele samo knjige iz BookOrbit. Naslovi iz trgovine se prenesejo neposredno iz Kobo in se ne dodajo v vašo knjižnico BookOrbit.",
         "convertKepub": "Pretvori v KEPUB",
         "convertKepubHint": "Pošlji ustrezne datoteke EPUB kot KEPUB. To ostane vklopljeno, kadar sta omogočena sinhronizacija napredka ali označbe iz BookOrbit v Kobo. Ob naslednji sinhronizaciji s Kobo bodo prizadete knjige znova ponujene kot prenosi KEPUB; odstranite morebitno staro kopijo EPUB, če jo Kobo še vedno odpira.",
         "forceHyphenation": "Prisili deljenje besed",
@@ -2536,6 +2560,10 @@
       "contentRestrictionsActive": "Omejitve vsebine aktivne",
       "statusActive": "Aktivno",
       "statusInactive": "Neaktivno",
+      "lockedBadge": "Zaklenjeno",
+      "unlockAccount": "Odkleni račun",
+      "unlockHint": "Odkleni prijavo",
+      "unlockAria": "Odkleni {name}",
       "resetPassword": "Ponastavi geslo",
       "resetPasswordOidcHint": "Uporabniki OIDC ponastavijo gesla pri svojem ponudniku identitete",
       "resetPasswordSharedHint": "Skupni računi nimajo gesel",
@@ -2548,7 +2576,17 @@
       "errors": {
         "load": "Nalaganje ni uspelo",
         "deleteUser": "Brisanje uporabnika ni uspelo",
-        "resetPassword": "Ustvarjanje povezave za ponastavitev gesla ni uspelo"
+        "resetPassword": "Ustvarjanje povezave za ponastavitev gesla ni uspelo",
+        "unlock": "Računa ni bilo mogoče odkleniti"
+      },
+      "selfRegistration": {
+        "title": "Samoregistracija",
+        "subtitle": "Nadzorujte, ali lahko obiskovalci ustvarijo lastne račune.",
+        "label": "Dovoli samoregistracijo",
+        "hint": "Ko je omogočeno, se na strani za prijavo prikaže povezava za ustvarjanje računa.",
+        "enabledNotice": "Novi računi imajo spodaj navedeni privzeti dostop do knjižnice in nobenih drugih dovoljenj. Preden lahko uporabljajo zaščitene funkcije, jim morate dodeliti dovoljenja.",
+        "loadError": "Nalaganje nastavitve samoregistracije ni uspelo",
+        "saveError": "Posodobitev nastavitve samoregistracije ni uspela"
       },
       "defaultLibraryAccess": {
         "title": "Privzet dostop do knjižnice",
@@ -2880,6 +2918,7 @@
       "UserSuperuserEnable": "Omogočanje dostopa superuporabnika",
       "UserSuperuserDisable": "Onemogočanje dostopa superuporabnika",
       "UserContentFiltersSet": "Posodobi filtre vsebine",
+      "UserUnlock": "Odkleni račun",
       "ReadingInsightsSharingUpdate": "Posodobi deljenje vpogledov",
       "ReadingInsightsProfileView": "Ogled deljenih vpogledov",
       "LibraryCreate": "Ustvari knjižnico",
@@ -2985,9 +3024,13 @@
       "signingIn": "Prijavljanje ...",
       "orDivider": "ali",
       "forgotPassword": "Ste pozabili geslo?",
+      "noAccount": "Še nimate računa?",
+      "signUp": "Prijavi se",
+      "registeredNotice": "Račun je ustvarjen. Za nadaljevanje se prijavite. Skrbnik mora podeliti dovoljenja, preden lahko dostopate do knjižnice.",
       "errors": {
         "invalidCredentials": "Neveljavno uporabniško ime ali geslo",
-        "tooManyAttempts": "Preveč poskusov prijave. Počakajte minuto in poskusite znova."
+        "tooManyAttempts": "Preveč poskusov prijave. Počakajte minuto in poskusite znova.",
+        "accountLocked": "Vaše geslo je pravilno, vendar je ta račun zaradi prevelikega števila neuspešnih poskusov prijave začasno zaklenjen. Poskusite znova čez {minutes, plural, one {# minuto} two {# minuti} few {# minute} other {# minut}} ali pa za takojšnjo odklepanje ponastavite svoje geslo."
       }
     },
     "oidc": {
@@ -3026,6 +3069,29 @@
       "errors": {
         "invalidLink": "Neveljavna povezava za ponastavitev. Zahtevajte novo.",
         "invalidOrExpired": "Neveljavna ali potekla povezava za ponastavitev. Zahtevajte novo."
+      }
+    },
+    "register": {
+      "title": "Ustvarite svoj račun",
+      "subtitle": "Prijavite se za začetek.",
+      "createAccount": "Ustvarite račun",
+      "creatingAccount": "Ustvarjanje računa...",
+      "haveAccount": "Že imate račun?",
+      "signIn": "Prijava",
+      "errors": {
+        "closed": "Samoregistracija na tem strežniku ni mogoča.",
+        "taken": "To uporabniško ime ali e-poštni naslov je že v uporabi.",
+        "invalid": "Preverite vnesene podatke in poskusite znova.",
+        "tooManyAttempts": "Preveč poskusov. Počakajte minuto in poskusite znova.",
+        "failed": "Ustvarjanje računa ni uspelo",
+        "username": {
+          "unsafeCharacters": "Vaše uporabniško ime ne sme vsebovati skritih znakov ali znakov za smer besedila.",
+          "untrimmed": "Vaše uporabniško ime se ne sme začeti ali končati s presledkom."
+        },
+        "name": {
+          "unsafeCharacters": "Vaše ime ne sme vsebovati skritih znakov ali znakov za smer besedila.",
+          "untrimmed": "Vaše ime se ne sme začeti ali končati s presledkom."
+        }
       }
     },
     "setup": {
@@ -4812,6 +4878,11 @@
         "twoColumns": "Dva stolpca",
         "twoColumnsDescription": "Prikažite dve polici na vrsto."
       },
+      "shelfRows": {
+        "label": "Vrste knjig",
+        "option": "{count, plural, one {Ena vrsta knjig} two {# vrsti knjig} few {# vrste knjig} other {# vrstic knjig}}",
+        "hint": "Nastavite, koliko vrstic knjig prikazuje vsaka polica. Ozki zasloni prikazujejo največ dve."
+      },
       "reorderHintWidget": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje gradnika.",
       "reorderHintShelf": "Povleci za spremembo vrstnega reda. Preklopi za prikaz ali skritje police.",
       "smartScope": "Pametni obseg",
@@ -5296,6 +5367,43 @@
       },
       "column": {
         "progress": "Napredek"
+      }
+    },
+    "linkedBooks": {
+      "title": "Povezane knjige",
+      "description": "Prikazuje knjige, ki jih trenutno berete. Ko je knjiga ujemajoča se s trdo vezavo, tukaj izberite drugo izdajo (fizično, e-knjigo, zvočno knjigo), da spremenite, s čim se sinhronizira vaš napredek branja.",
+      "loading": "Nalaganje knjig...",
+      "loadError": "Nalaganje knjig ni uspelo.",
+      "retry": "Poskusi znova",
+      "empty": "Trenutno se ne bere nobena knjiga.",
+      "untitled": "Brez naslova",
+      "unknownAuthor": "Neznan avtor",
+      "matchMethod": {
+        "isbn": "ISBN",
+        "title": "Naslov",
+        "cached": "Predpomnjeno",
+        "manual": "Ročno",
+        "metadata_id": "Ujemanje metapodatkov"
+      },
+      "status": {
+        "error": "Napaka {error}",
+        "linked": "Povezano",
+        "linkedWithMethod": "Povezano ({method})",
+        "notLinked": "Še ni povezano"
+      },
+      "unmatchedHint": "Ta knjiga še ni bila usklajena s trdo vezavo. Ujemanje bo samodejno nastavljeno ob naslednji sinhronizaciji.",
+      "editionsLoadError": "Nalaganje izdaj ni uspelo.",
+      "viewEditions": "Prikazi izdaje",
+      "noEditionsFound": "Ni najdenih izdaj.",
+      "booksTruncated": "Prikazanih je prvih {count} knjig, ki jih berete.",
+      "editionsTruncated": "Prikazanih je prvih {count} izdaj.",
+      "pages": "{count, plural, one {# stran} two {# strani} few {# strani} other {# strani}}",
+      "isbn": "ISBN {isbn}",
+      "current": "Trenutno",
+      "useThis": "Uporabi to",
+      "toast": {
+        "switched": "Preklopljeno na {format}",
+        "switchFailed": "Preklop izdaje ni uspel"
       }
     }
   },
@@ -6792,6 +6900,7 @@
       "clearAllFilters": "Počisti vse filtre",
       "expandSeries": "Razširi serijo",
       "collapseSeries": "Strni serijo",
+      "collapseLockedWhileSelecting": "Med izbiranjem ostanejo serije razširjene",
       "expanded": "Razširjeno",
       "exportMetadata": "Izvozi metapodatke",
       "showControlsAria": "Prikaži kontrolnike knjižnice",
@@ -6980,6 +7089,7 @@
     "notFound": "Ni najdeno",
     "signIn": "Prijava",
     "initialSetup": "Začetna nastavitev",
+    "register": "Ustvari račun",
     "forgotPassword": "Pozabljeno geslo",
     "resetPassword": "Ponastavitev gesla",
     "completingSignIn": "Dokončevanje prijave",
