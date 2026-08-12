@@ -20,7 +20,7 @@
     "privacySharing": {
       "title": "隐私与共享",
       "subtitle": "控制管理员是否可以看到您的阅读活动的可识别摘要。",
-      "levelLegend": "读取洞察力共享级别",
+      "levelLegend": "阅读数据分享权限等级",
       "current": "当前设置",
       "levels": {
         "private": {
@@ -37,32 +37,32 @@
         }
       },
       "fields": {
-        "frequency": "读取频率和活动天数",
-        "completion": "集合书已开始并完成",
-        "formats": "格式分布",
-        "genres": "广义流派分布",
+        "frequency": "阅读频率和活动天数",
+        "completion": "整合书籍开始，并已完成",
+        "formats": "阅读格式分布",
+        "genres": "格式分布",
         "trend": "总阅读趋势",
         "books": "当前、最近和阅读最多的书标题",
-        "authors": "顶级作者",
-        "series": "顶部系列",
-        "narrators": "顶级用药器"
+        "authors": "热门作者",
+        "series": "热门系列",
+        "narrators": "热门有声书主播"
       },
       "confirm": {
         "shareTitle": "是否启用 {level}？",
         "shareDescription": "拥有权限的管理员可以看到以下信息。",
         "stopTitle": "停止分享阅读见解？",
         "stopDescription": "管理员的访问将立即被阻止。现有的访问记录仍在您的历史中。",
-        "recordedNotice": "每个管理员个人资料视图都被录制并出现在您的访问历史中。"
+        "recordedNotice": "每个管理员个人资料视图都被记录并出现在您的访问历史中。"
       },
       "preview": {
         "title": "预览您共享的个人资料",
-        "description": "查看授权管理员当前可用的信息。",
+        "description": "查看当前可供授权管理员使用的信息。",
         "action": "加载预览",
         "readingTime": "阅读时间",
         "activeDays": "活动天数",
-        "started": "书籍已开始",
-        "completed": "书已完成",
-        "topBooks": "热门书"
+        "started": "已开始阅读书籍",
+        "completed": "已读完书籍",
+        "topBooks": "热门书籍"
       },
       "history": {
         "title": "个人资料访问历史",
@@ -180,7 +180,7 @@
           "reset": "重置"
         },
         "libraryBackground": {
-          "title": "书库背景",
+          "title": "书库背景图",
           "pattern": {
             "label": "背景图案",
             "hint": "书籍网格后显示的图案"
@@ -297,7 +297,7 @@
             "hint": "左下角的星级评分指示器"
           },
           "readStatus": {
-            "label": "读取状态",
+            "label": "阅读进度",
             "hint": "左上角显示当前阅读状态的颜色图标"
           },
           "seriesPosition": {
@@ -399,7 +399,7 @@
         "thumbnailClicks": {
           "label": "缩略图点击",
           "hint": "选择从网格和列表视图打开一本书时发生的行为",
-          "readFirst": "先阅读",
+          "readFirst": "首先阅读",
           "readFirstHint": "存在可读文件时直接打开阅读器",
           "openDetails": "打开详情",
           "openDetailsHint": "从网格和列表的缩略图进入书籍详情页"
@@ -463,7 +463,8 @@
         "book-covers": "书封面",
         "icons": "图标",
         "layout": "布局",
-        "behavior": "行为"
+        "behavior": "行为",
+        "language": "语言设置"
       }
     },
     "account": {
@@ -580,12 +581,12 @@
           "description": "带有任意这些标签的书籍都会对您隐藏。"
         },
         "allowedGenres": {
-          "title": "允许的流派",
-          "description": "只有包含其中任意一个流派的书籍才会显示给您。"
+          "title": "允许的体裁",
+          "description": "只有包含其中任意一个体裁的书籍才会显示给您。"
         },
         "blockedGenres": {
-          "title": "已屏蔽的流派",
-          "description": "包含任意这些流派的书籍都会对您隐藏。"
+          "title": "已屏蔽的体裁",
+          "description": "包含这些体裁中任何一种的书籍，都会对你隐藏。"
         }
       },
       "groups": {
@@ -598,7 +599,7 @@
       "title": "魔法链接",
       "subtitle": "为共享帐户创建可共享的登录链接。",
       "createLink": "创建链接",
-      "noSharedAccounts": "未找到共享账户",
+      "noSharedAccounts": "未找到可共享账户",
       "noSharedAccountsHint": "请先前往 {usersPage} 创建共享账号，方可生成免登录链接。",
       "activeLinks": "活动链接",
       "inactiveLinks": "非活动链接",
@@ -786,7 +787,7 @@
         "continueSetup": "继续设置",
         "viewDetails": "查看详情",
         "refreshRecommendationIndex": "刷新建议索引",
-        "refreshRecommendationHint": "使用您最新的库更改更新推荐引擎。此过程正在后台运行。",
+        "refreshRecommendationHint": "根据你最新的书库变动更新推荐引擎。此过程将在后台运行。",
         "booksQueuedForProcessing": "{count, plural, =0 {没有待处理的书籍} other {# 本图书待处理}}",
         "run": "运行",
         "running": "运行中……",
@@ -1019,7 +1020,7 @@
         "metadataOverlaysApplied": "已应用元数据叠加层",
         "authorMappingsReplaced": "作者映射已替换",
         "narratorMappingsReplaced": "朗读者映射已替换",
-        "genreMappingsReplaced": "流派映射已替换",
+        "genreMappingsReplaced": "体裁映射已替换",
         "tagMappingsReplaced": "标签映射已替换",
         "coversImported": "封面已导入",
         "coverImportSkipped": "封面导入已跳过 - 源上没有配置媒体根路径",
@@ -1038,7 +1039,7 @@
         "sourceBookFallback": "源图书 {id}",
         "libraryBookFallback": "馆藏图书 {id}",
         "unresolvedBooksHeading": "待处理图书（{count} 本）",
-        "unresolvedBooksHint": "这些书存在于源代码中，但无法与您的书库中的任何书匹配。",
+        "unresolvedBooksHint": "这些书籍在源数据中存在，但无法匹配到您书库中的任何书籍。",
         "mappedUsersHeading": "已匹配用户（{count} 人）",
         "mappedUsersHint": "每个用户的合计来自随迁移计划缓存的试运行预览。",
         "coverImportsFailed": "{count} 条封面导入失败，未保存失败明细。",
@@ -1167,14 +1168,30 @@
         "opds": "OPDS",
         "kobo": "Kobo",
         "koreader": "KOReader",
+        "integrations": "集成",
         "hardcover": "硬封面",
         "admin": "管理员",
         "system": "系统",
         "account": "账户"
       }
     },
+    "integrations": {
+      "title": "集成",
+      "subtitle": "连接外部服务以同步您的阅读数据和高亮。",
+      "noPermission": "您没有权限使用任何集成。",
+      "tabs": {
+        "hardcover": "Hardcover",
+        "readwise": "Readwise",
+        "storygraph": "StoryGraph"
+      },
+      "providerSubtitles": {
+        "readwise": "自动将您的高亮发送到Readwise。",
+        "storygraph": "同步您的阅读进度和状态到 StoryGraph。"
+      }
+    },
     "metadata": {
       "title": "元数据",
+      "subtitle": "配置元数据提供方、匹配规则、自动化流程以及作者信息增强。",
       "noPermission": "您没有管理元数据设置的权限。",
       "fields": {
         "title": "标题",
@@ -1189,7 +1206,7 @@
         "communityRating": "社区评分",
         "seriesName": "系列名称",
         "seriesIndex": "系列索引",
-        "genres": "Genres",
+        "genres": "体裁",
         "narrators": "神秘者",
         "duration": "期限",
         "abridged": "桥接的"
@@ -1211,8 +1228,8 @@
       "autoFetch": {
         "globalSettings": "全局设置",
         "perLibraryOverrides": "超媒体库覆盖",
-        "saving": "保存中...",
-        "running": "运行中...",
+        "saving": "保存中",
+        "running": "运行中",
         "runNow": "立即运行",
         "runForEligible": "为合格的书籍运行",
         "enable": {
@@ -1221,7 +1238,7 @@
         },
         "triggerOnImport": {
           "label": "导入时触发",
-          "hint": "书籍首次接入书库时，将符合条件的书籍加入任务队列"
+          "hint": "书籍首次接入书库时，将符合条件的书籍加入任务队列。"
         },
         "status": {
           "inQueuePaused": "队列内 {count} 项任务，已暂停",
@@ -1233,7 +1250,7 @@
           "noneFound": "没有找到合格的书"
         },
         "lastRun": {
-          "justNow": "就在这里",
+          "justNow": "刚刚",
           "minutesAgo": "{count} 分钟前",
           "hoursAgo": "{count} 小时前",
           "yesterday": "昨天",
@@ -1359,7 +1376,9 @@
           },
           "maxGenres": {
             "label": "每本书的最大流派数",
-            "unlimited": "无限制"
+            "hint": "在排除（过滤）和去重之后应用。留空则表示无限制。此设置会影响后续的元数据获取。",
+            "unlimited": "无限制",
+            "error": "请输入一个从 1 到 {max} 之间的整数，或将该字段留空。"
           },
           "storeProviderIds": {
             "label": "在书籍上存储提供商ID",
@@ -1871,6 +1890,8 @@
         "twoWaySyncHint": "同步BookOrbit 和 Kobo之间的阅读位置。需要KEPUB 送货以获取准确的位置和可靠的页面恢复。",
         "syncHighlights": "同步 BookOrbit 高亮到 Kobo",
         "syncHighlightsHint": "将BookOrbit或 KOReader 制作的高亮发送给您的 Kobo 高亮即使关闭，Kobo 高亮也会导入BookOrbit 链接注释同步编辑并删除这两种方式。需要 KEPUB 交付；Kobo 上的书必须是 BookOrbit 下载的 KEPUB 。",
+        "storeSync": "包含 Kobo Store标题",
+        "storeSyncHint": "此功能还会将您 Kobo 账户中的书籍（包括 Kobo Plus 订阅和已购书籍）与您的 BookOrbit 书库一并投送到设备上。若未启用此功能，则只有 BookOrbit 的书籍会同步到设备。商店中的书籍直接从 Kobo 下载，不会添加到您的 BookOrbit 书库中。",
         "convertKepub": "转换为 KEPUB",
         "convertKepubHint": "以 KEPUB 发送合格的 EPUB。当进度同步或 BookOrbit到 Kobo 高亮启用时，此操作将保持不变。 在下一个 Kobo 同步时，受影响的书籍将再次以 KEPUB 下载的形式提供；如果Kobo 继续打开，则删除任何旧的 EPUB 副本。",
         "forceHyphenation": "强制连线",
@@ -3278,7 +3299,7 @@
       "audiobook": "音频簿"
     },
     "actions": {
-      "read": "已读",
+      "read": "阅读",
       "listen": "监听",
       "peek": "佩克",
       "quickView": "快速视图",
@@ -3514,7 +3535,7 @@
       "pinnedRight": "固定的权利",
       "columns": {
         "cover": "封面",
-        "read": "已读",
+        "read": "阅读",
         "actions": "行动"
       }
     },
@@ -3702,7 +3723,7 @@
         "ratingLocked": "评分已锁定",
         "rateStar": "评分 {star} 星",
         "listen": "监听",
-        "read": "已读",
+        "read": "阅读",
         "chooseFormat": "选择格式",
         "audiobook": "音频簿",
         "primary": "主要的",
@@ -3947,7 +3968,7 @@
         "fieldsWritten": "{count, plural, =0 {没有字段} one {一个字段} other {# 字段}}",
         "track": "音轨 {number}",
         "primary": "主要的",
-        "read": "已读",
+        "read": "阅读",
         "play": "播放",
         "peek": "佩克",
         "download": "下载",
@@ -4231,7 +4252,7 @@
       },
       "read": {
         "play": "播放",
-        "read": "已读",
+        "read": "阅读",
         "primary": "主要的",
         "peekFormat": "预览 {format} 格式文件",
         "chooseFormat": "选择要读取或播放的格式",
@@ -4732,6 +4753,13 @@
       "dark": "深色",
       "system": "系统"
     },
+    "languagePicker": {
+      "searchPlaceholder": "搜索语言",
+      "suggested": "推荐的",
+      "all": "所有语言",
+      "results": "匹配内容条数",
+      "empty": "未找到与“{query}”匹配的语言"
+    },
     "userAvatar": {
       "profilePicture": "个人资料图片",
       "profilePictureOf": "{name} 的头像"
@@ -4856,6 +4884,8 @@
         "twoColumnsDescription": "每行展示两个书架。"
       },
       "shelfRows": {
+        "label": "书籍行数",
+        "option": "{count, plural, one {共1行书} other {共#行书}}",
         "hint": "设定每个书架显示的书行数。窄屏幕显示最多两行。"
       },
       "reorderHintWidget": "拖动以重新排序。切换以显示或隐藏部件。",
@@ -4954,8 +4984,8 @@
       },
       "readingStreak": {
         "title": "读取串流",
-        "empty": "即刻阅读以开始您的串行",
-        "streakLabel": "{count, plural, =0 {白天街道} one {一天街道} other {几天街道}}",
+        "empty": "咱今儿就读起来，把那个连续天数给它练起来",
+        "streakLabel": "{count, plural, =0 {坚持天数} one {坚持天数} other {坚持天数}}",
         "best": "{count, plural, =0 {最佳: # 天} one {最佳: # 天} other {最佳: # 天}}",
         "lastSevenDays": "过去 7 天"
       },
@@ -6875,6 +6905,7 @@
       "clearAllFilters": "清除所有过滤器",
       "expandSeries": "展开系列",
       "collapseSeries": "折叠系列",
+      "collapseLockedWhileSelecting": "在选择时继续保持扩展",
       "expanded": "扩展",
       "exportMetadata": "导出元数据",
       "showControlsAria": "显示库控制",
@@ -7081,7 +7112,8 @@
       "book-covers": "书封面",
       "icons": "图标",
       "layout": "显示布局",
-      "behavior": "书库行为"
+      "behavior": "书库行为",
+      "language": "语言"
     },
     "reader": {
       "general": "阅读器设置",

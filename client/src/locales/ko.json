@@ -1,1 +1,24 @@
-{}
+{
+  "common": {
+    "resetSortAria": "정렬 기본값으로 재설정",
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "edit": "편집",
+    "close": "닫기",
+    "confirm": "확인",
+    "loading": "불러오는 중",
+    "search": "검색",
+    "back": "후방",
+    "next": "다음",
+    "previous": "이전",
+    "retry": "다시 시도",
+    "yes": "네",
+    "no": "아니오"
+  },
+  "settings": {
+    "privacySharing": {
+      "title": "프라이버시 & 공유"
+    }
+  }
+}

@@ -218,6 +218,12 @@
       },
       "bookCovers": {
         "title": "Portadas de libros",
+        "coverSearch": {
+          "label": "Proveedor de búsqueda de portada por defecto",
+          "hint": "Selecciona la fuente seleccionada cuando se abre la búsqueda de portada en línea. Guardado en tu cuenta, así que se aplica en cada dispositivo.",
+          "loadError": "Error al cargar el proveedor de búsqueda de portadas por defecto",
+          "saveError": "Error al guardar el proveedor de búsqueda de portadas por defecto"
+        },
         "displayMode": {
           "title": "Modo de visualización de portada",
           "hint": "Controla cómo encajan las portadas reales dentro de las ranuras para libros cuando las relaciones de aspecto difieren",
@@ -464,7 +470,8 @@
         "book-covers": "Portadas de libros",
         "icons": "Iconos",
         "layout": "Diseño",
-        "behavior": "Comportamiento"
+        "behavior": "Comportamiento",
+        "language": "Idioma"
       }
     },
     "account": {
@@ -1170,14 +1177,30 @@
         "opds": "OPDS",
         "kobo": "Kobo",
         "koreader": "KOReader",
+        "integrations": "Integraciones",
         "hardcover": "Hardcover",
         "admin": "administrador",
         "system": "Sistema",
         "account": "cuenta"
       }
     },
+    "integrations": {
+      "title": "Integraciones",
+      "subtitle": "Conecta servicios externos para sincronizar tus datos de lectura y resaltados.",
+      "noPermission": "No tiene permiso para usar ninguna integración.",
+      "tabs": {
+        "hardcover": "Hardcover",
+        "readwise": "De acuerdo",
+        "storygraph": "Historial gráfico"
+      },
+      "providerSubtitles": {
+        "readwise": "Envía tus destacados a Readwise automáticamente.",
+        "storygraph": "Sincroniza tu progreso y estado de lectura a The StoryGraph."
+      }
+    },
     "metadata": {
       "title": "Metadatos",
+      "subtitle": "Configurar proveedores de metadatos, reglas coincidentes, automatización y enriquecimiento del autor.",
       "noPermission": "No tienes permiso para administrar la configuración de metadatos.",
       "fields": {
         "title": "Título",
@@ -1359,6 +1382,12 @@
           "combineGenres": {
             "label": "Combina géneros de todos los proveedores seleccionados.",
             "hint": "Recopile y elimine los duplicados de géneros de cada proveedor asignado al campo Géneros, en lugar de detenerse en el primer resultado."
+          },
+          "maxGenres": {
+            "label": "Máximo de géneros por libro",
+            "hint": "Aplicado después de exclusiones y eliminación duplicada. Dejar en blanco para ilimitado. Esto afecta a futuras recuperaciones de metadatos.",
+            "unlimited": "Ilimitado ",
+            "error": "Introduzca un número entero de 1 a {max}, o deje el campo vacío."
           },
           "storeProviderIds": {
             "label": "Almacenar ID de proveedores en libros",
@@ -1826,6 +1855,7 @@
         "tokenPublisher": "Editorial",
         "tokenIsbn": "ISBN-13",
         "tokenLanguage": "Idioma",
+        "tokenLibrary": "Nombre de la biblioteca",
         "tokenOriginalFilename": "Nombre de archivo original (sin extensión)",
         "tokenExtension": "Extensión de archivo (sin punto)",
         "patternHelpIntro": "Los patrones usan tokens como {titleToken} y {authorsToken}, además de modificadores y segmentos opcionales.",
@@ -1870,6 +1900,8 @@
         "twoWaySyncHint": "Sincronizar la posición de lectura entre BookOrbit y Kobo. Requiere entrega KEPUB para ubicaciones precisas y restauración de página confiable.",
         "syncHighlights": "Sincronizar BookOrbit aspectos destacados con Kobo",
         "syncHighlightsHint": "Envía los momentos destacados realizados en BookOrbit o KOReader a tu Kobo. Kobo los aspectos destacados se importan a BookOrbit incluso cuando esto está desactivado. Las anotaciones vinculadas sincronizan las ediciones y eliminaciones en ambos sentidos. Requiere entrega KEPUB; el libro en Kobo debe ser el KEPUB descargado de BookOrbit.",
+        "storeSync": "Incluye títulos de la tienda Kobo",
+        "storeSyncHint": "También entrega libros desde tu cuenta de Kobo, incluyendo Kobo Plus y compras, junto a tu biblioteca BookOrbit. Sin esto, sólo los libros BookOrbit llegan al dispositivo. Los títulos de la tienda se descargan directamente de Kobo y no se añaden a su biblioteca de BookOrbit.",
         "convertKepub": "Convertir a KEPUB",
         "convertKepubHint": "Envíe EPUB elegibles como KEPUB. Esto permanece activado cuando la sincronización de progreso o los aspectos destacados de BookOrbit-to-Kobo están habilitados. En la siguiente sincronización Kobo, los libros afectados se ofrecen nuevamente como descargas de KEPUB; elimine cualquier copia antigua de EPUB si Kobo sigue abriéndola.",
         "forceHyphenation": "Forzar separación de palabras",
@@ -3336,7 +3368,8 @@
         "finishedAt": "Fecha de finalización",
         "random": "Aleatorio",
         "language": "Idioma",
-        "metadataScore": "Puntuación de metadatos"
+        "metadataScore": "Puntuación de metadatos",
+        "collectionOrder": "Orden añadido"
       },
       "customFieldsGroup": "Campos personalizados",
       "customFieldFallback": "Campo personalizado",
@@ -4502,6 +4535,70 @@
       "alreadyExistsSaveAs": "Ya existe - guardar como:",
       "renamePlaceholder": "por ej. {name} (2)",
       "import": "Importar"
+    },
+    "layout": {
+      "pause": "Pausa",
+      "resume": "Continuar",
+      "pauseUpdateFailed": "Pausar actualización fallida",
+      "clearSearch": "Borrar búsqueda",
+      "filter": {
+        "all": "Todos",
+        "needsReview": "Necesita revisión",
+        "pending": "Pendiente",
+        "ready": "Listo",
+        "error": "Error"
+      },
+      "working": {
+        "label": "{count} funcionando"
+      },
+      "row": {
+        "select": "Seleccionar {title}",
+        "setDestination": "Elegir destino",
+        "file": "Archivo",
+        "match": "{percent} coincidencias",
+        "noAuthor": "Aún no hay autor",
+        "proposedChanges": "Cambios propuestos",
+        "noChanges": "No hay metadatos todavía",
+        "editDetails": "Editar detalles",
+        "noMatch": "Sin coincidencias",
+        "applied": "Aplicado",
+        "refetch": "Actualizar metadatos",
+        "clickToZoom": "Haga clic en una portada para agrandar",
+        "changedFields": "{count, plural, one {# campo} other {# campos}}",
+        "needMore": "¿Necesitas buscar proveedores o editar otros campos?"
+      },
+      "selection": {
+        "fileToLibrary": "{count, plural, =0 {ninguno ya en la biblioteca} one {# ya en la biblioteca} other {# ya en la biblioteca} many {# ya en la biblioteca}}",
+        "nSelected": "{count} seleccionados",
+        "nReadyToFile": "{count} listo para cargar"
+      },
+      "empty": {
+        "nothingToReview": "Nada necesita ser revisado. Cada archivo listo tiene un destino y una coincidencia segura.",
+        "dropHint": "O suelte archivos en cualquier parte de esta página."
+      },
+      "selectAllOnPage": "Seleccionar todos los archivos en esta página",
+      "showingOf": "{shown} de {total}",
+      "keyboardHint": "J / K para mover · espacio para seleccionar · entrar para expandir",
+      "allOnPageSelected": "Todos los {count} de esta página han sido seleccionados.",
+      "selectAllMatching": "Seleccione todos los {count} libros coincidentes",
+      "allMatchingSelected": "Todos los archivos {count} coincidentes han sido seleccionados",
+      "sort": {
+        "label": "Ordenar por",
+        "attention": "Requiere atención",
+        "createdAt": "Añadido recientemente",
+        "fileName": "Nombre de archivo",
+        "fileSize": "Tamaño",
+        "format": "Formato",
+        "status": "Estado"
+      },
+      "conflict": {
+        "duplicate": "Duplicar",
+        "destination_conflict": "Ruta tomada",
+        "invalid_target": "Destino incorrecto",
+        "access_denied": "Inaccesible",
+        "invalid_format": "Formato incorrecto",
+        "error": "Fallaría"
+      }
     }
   },
   "collection": {
@@ -4730,6 +4827,13 @@
       "light": "Luz",
       "dark": "oscuro",
       "system": "Sistema"
+    },
+    "languagePicker": {
+      "searchPlaceholder": "Buscar idiomas",
+      "suggested": "Suguerido",
+      "all": "Todos los idiomas",
+      "results": "Resultados",
+      "empty": "Ningún idioma coincide con \"{query}\""
     },
     "userAvatar": {
       "profilePicture": "Foto de perfil",
@@ -7083,7 +7187,8 @@
       "book-covers": "Portadas de libros",
       "icons": "Iconos",
       "layout": "Diseño de pantalla",
-      "behavior": "Comportamiento de la biblioteca"
+      "behavior": "Comportamiento de la biblioteca",
+      "language": "Idioma"
     },
     "reader": {
       "general": "Configuración del lector",
