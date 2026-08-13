@@ -7094,7 +7094,7 @@
       "filter": "Filtrar",
       "edit": "Editar alcance inteligente",
       "koboSync": {
-        "label": "Sincronizar con Kobo",
+        "label": "Sincronizar con mi Kobo",
         "enabledHint": "Los libros en este Alcance Inteligente compartido se sincronizan con tu dispositivo Kobo. Desactiva para dejar de sincronizarlos.",
         "disabledHint": "Activa para sincronizar los libros de este Alcance Inteligente compartido con tu dispositivo Kobo."
       },
@@ -7106,9 +7106,9 @@
       "toast": {
         "deleted": "\"{name}\" eliminado",
         "deleteFailed": "No se pudo eliminar \"{name}\"",
-        "koboSyncEnabled": "\"{name}\" ahora sincroniza con tu Kobo",
+        "koboSyncEnabled": "\"{name}\" ahora se sincroniza con tu Kobo",
         "koboSyncDisabled": "\"{name}\" ya no sincroniza con tu Kobo",
-        "koboSyncFailed": "Error al actualizar la sincronización de Kobo para \"{name}\""
+        "koboSyncFailed": "Error al actualizar la sincronización del Kobo \"{name}\""
       },
       "empty": {
         "noRules": "No hay reglas configuradas",
@@ -7121,8 +7121,8 @@
     }
   },
   "whatsNew": {
-    "title": "¿Qué hay de nuevo?",
-    "subtitle": "Todo lo que se envía, lo más nuevo primero.",
+    "title": "Nuevas Novedades",
+    "subtitle": "Todo lo que se entrega, primero lo más reciente.",
     "versionPrefix": "Versión {version}",
     "newUpdates": "{count, plural, =0 {no hay nuevas actualizaciones} one {una nueva actualización} other {# nuevas actualizaciones} many {# nuevas actualizaciones}}",
     "remindLater": "Recuérdamelo más tarde",
@@ -7147,24 +7147,24 @@
     "retry": "Reintentar",
     "imageViewer": "Visor de imágenes",
     "closeImage": "Cerrar imagen",
-    "previousImage": "Imagen anterior",
+    "previousImage": "Anterior imagen",
     "nextImage": "Siguiente imagen"
   },
   "titles": {
-    "dashboard": "Panel de control",
+    "dashboard": "Panel",
     "libraries": "Bibliotecas",
     "opds": "OPDS",
-    "koboSync": "Kobo Sincronización",
-    "koreaderSync": "KOReader Sincronización",
+    "koboSync": "Sincronización de Kobo",
+    "koreaderSync": "Sincronización de KOReader",
     "bookDock": "Book Dock",
-    "whatsNew": "¿Qué hay de nuevo?",
+    "whatsNew": "Novedades",
     "annotations": "Anotaciones",
     "achievements": "Logros",
     "statistics": "Estadísticas",
     "authors": "Autores",
     "series": "Serie",
-    "entityManager": "Gerente de entidad",
-    "bulkRename": "Cambio de nombre masivo",
+    "entityManager": "Gestor de entidades",
+    "bulkRename": "Renombrar en masa",
     "duplicateBooks": "Libros duplicados",
     "notFound": "No encontrado",
     "signIn": "Iniciar sesión",
@@ -7193,7 +7193,7 @@
     "reader": {
       "general": "Configuración del lector",
       "ebook": "Lector de libros electrónicos",
-      "pdf": "PDF Lector",
+      "pdf": "Lector de PDF",
       "comics": "Lector de cómics",
       "audio": "Reproductor de audiolibros",
       "fonts": "Fuentes del lector"
@@ -7204,7 +7204,7 @@
       "groups": "Grupos",
       "templates": "Plantillas",
       "preferences": "Preferencias",
-      "history": "Historia"
+      "history": "Historial"
     },
     "metadata": {
       "providers": "Proveedores",
@@ -7224,12 +7224,12 @@
     },
     "system": {
       "file-naming": "Nomenclatura de archivos",
-      "book-dock": "Book Dock",
+      "book-dock": "Libros a Revisar",
       "maintenance": "Mantenimiento",
       "audit-log": "Registro de auditoría"
     },
     "account": {
-      "profile": "cuenta",
+      "profile": "Cuenta",
       "privacy": "Privacidad y uso compartido",
       "notifications": "Notificaciones",
       "restrictions": "Restricciones de contenido"
