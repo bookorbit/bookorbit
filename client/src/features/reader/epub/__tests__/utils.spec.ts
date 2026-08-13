@@ -19,7 +19,7 @@ describe('epub utils', () => {
 
   it('formats dates using locale short month/day/year format', () => {
     const iso = '2026-02-14T12:00:00.000Z'
-    const expected = new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    const expected = new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
     expect(formatDate(iso)).toBe(expected)
   })

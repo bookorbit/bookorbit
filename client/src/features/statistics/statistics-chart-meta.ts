@@ -11,6 +11,7 @@ import {
   GitMerge,
   Goal,
   Globe,
+  MapPin,
   Gauge,
   HardDrive,
   Layers,
@@ -151,6 +152,12 @@ export const STATISTICS_CHART_META: Record<StatisticsChartId, StatisticsChartMet
     label: 'Publication Year Timeline',
     icon: TrendingUp,
     size: '4x1',
+    category: 'library',
+  },
+  'country-distribution': {
+    label: 'Geographic Distribution',
+    icon: MapPin,
+    size: '2x1',
     category: 'library',
   },
   'reading-heatmap': {

@@ -96,6 +96,7 @@ function makeBook(id: number, format: string, coverAspectRatio: BookCard['coverA
   return {
     id,
     status: 'present',
+    originCountry: null,
     coverAspectRatio,
     title: `Book ${id}`,
     authors: [],

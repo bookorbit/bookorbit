@@ -22,6 +22,7 @@ const ROOT_FIELDS = [
   'subtitle',
   'description',
   'publisher',
+  'originCountry',
   'publishedDate',
   'publishedYear',
   'language',
@@ -119,6 +120,7 @@ export function useMetadataEditor() {
     subtitle: null as string | null,
     description: null as string | null,
     publisher: null as string | null,
+    originCountry: null as string | null,
     publishedDate: null as string | null,
     publishedYear: null as number | null,
     language: null as string | null,
@@ -175,6 +177,7 @@ export function useMetadataEditor() {
     form.subtitle = book.subtitle
     form.description = book.description
     form.publisher = book.publisher
+    form.originCountry = book.originCountry ?? null
     form.publishedDate = book.publishedDate
     form.publishedYear = book.publishedYear
     form.language = book.language

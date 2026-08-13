@@ -59,6 +59,7 @@ function makeBook(id: number, overrides: Partial<BookCard> = {}): BookCard {
     id,
     status: 'present',
     coverAspectRatio: '2/3',
+    originCountry: null,
     title: `Book ${id}`,
     authors: [],
     seriesName: null,
@@ -203,12 +204,13 @@ describe('VirtualBookGrid', () => {
     const books = [
       makeBook(1, {
         coverAspectRatio: '2/3',
+        originCountry: null,
         files: [
           { id: 11, format: 'epub', role: 'primary', sizeBytes: null },
           { id: 12, format: 'm4b', role: 'content', sizeBytes: null },
         ],
       }),
-      makeBook(2, { coverAspectRatio: '1/1', files: [{ id: 22, format: 'epub', role: 'primary', sizeBytes: null }] }),
+      makeBook(2, { coverAspectRatio: '1/1', originCountry: null, files: [{ id: 22, format: 'epub', role: 'primary', sizeBytes: null }] }),
     ]
 
     const wrapper = mount(VirtualBookGrid, {

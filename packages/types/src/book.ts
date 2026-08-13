@@ -139,6 +139,7 @@ export type BookCard = {
   rating: number | null;
   readingProgress: number | null;
   readStatus: UserBookStatus | null;
+  originType?: string;
   addedAt: string;
   updatedAt: string | null;
   metadataScore: number | null;
@@ -147,6 +148,7 @@ export type BookCard = {
   lockedFields: BookMetadataLockField[];
   subtitle: string | null;
   publisher: string | null;
+  originCountry: string | null;
   pageCount: number | null;
   isbn13: string | null;
   hardcoverId?: string | null;
@@ -205,6 +207,8 @@ export type BookDetail = {
   publishedYear: number | null;
   language: string | null;
   pageCount: number | null;
+  originCountry: string | null;
+  originType: "file" | "manual_entry" | string;
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;
@@ -245,6 +249,7 @@ export type BookMetadataRefreshPreviewFields = {
   authors?: string[];
   genres?: string[];
   publisher?: string | null;
+  originCountry?: string | null;
   publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;

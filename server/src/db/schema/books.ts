@@ -10,12 +10,12 @@ export const books = pgTable(
     libraryId: integer('library_id')
       .notNull()
       .references(() => libraries.id, { onDelete: 'cascade' }),
-    libraryFolderId: integer('library_folder_id')
-      .notNull()
-      .references(() => libraryFolders.id, { onDelete: 'cascade' }),
+    libraryFolderId: integer('library_folder_id').references(() => libraryFolders.id, { onDelete: 'cascade' }),
     primaryFileId: integer('primary_file_id').references(() => bookFiles.id, { onDelete: 'set null' }),
     primaryAuthorSortName: varchar('primary_author_sort_name', { length: 500 }),
-    folderPath: varchar('folder_path', { length: 4096 }).notNull(),
+    folderPath: varchar('folder_path', { length: 4096 }),
+    originCountry: varchar('origin_country', { length: 2 }),
+    originType: varchar('origin_type', { length: 20 }).notNull().default('file_system'),
     status: varchar('status', { length: 20 }).notNull().default('present'),
     addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -44,6 +44,7 @@ export const books = pgTable(
       name: 'books_library_folder_library_fk',
     }),
     check('books_status_chk', sql`${t.status} in ('present', 'missing', 'processing')`),
+    check('books_origin_type_chk', sql`${t.originType} in ('file_system', 'manual_entry')`),
   ],
 );
 

@@ -13,6 +13,7 @@ import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { NarratorModule } from '../narrator/narrator.module';
 import { UserBookNoteModule } from '../user-book-note/user-book-note.module';
 import { UserBookStatusModule } from '../user-book-status/user-book-status.module';
+import { StatisticsModule } from '../statistics/statistics.module';
 import { BookReadService } from './book-read.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
@@ -37,6 +38,7 @@ import { ReadingAttemptController } from './reading-attempt.controller';
     UserBookNoteModule,
     UserBookStatusModule,
     AchievementModule,
+    StatisticsModule,
   ],
   controllers: [BookController, ReadingAttemptController],
   providers: [BookService, BookRepository, BookReadService, BookSortBuilder, BookQueryBuilder, BookAuthorSortKeyBackfillService],

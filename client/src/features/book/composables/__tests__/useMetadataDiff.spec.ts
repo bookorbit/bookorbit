@@ -5,6 +5,7 @@ import { useMetadataDiff } from '../useMetadataDiff'
 
 describe('useMetadataDiff', () => {
   const mockCurrent: MetadataSource = {
+    originCountry: null,
     title: 'Original Title',
     subtitle: 'Original Subtitle',
     authors: ['Original Author'],

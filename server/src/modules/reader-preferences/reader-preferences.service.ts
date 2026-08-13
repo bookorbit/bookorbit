@@ -70,11 +70,15 @@ const AUDIO_SETTINGS_SCHEMA = z
   })
   .strict();
 
+// 1. Criação do schema vazio para livros físicos
+const PHYSICAL_SETTINGS_SCHEMA = z.object({}).strict();
+
 const FULL_SETTINGS_SCHEMA_BY_GROUP = {
   epub: EPUB_SETTINGS_SCHEMA,
   pdf: PDF_SETTINGS_SCHEMA,
   cbx: CBX_SETTINGS_SCHEMA,
   audio: AUDIO_SETTINGS_SCHEMA,
+  physical: PHYSICAL_SETTINGS_SCHEMA, // 2. Adição do schema físico
 } satisfies Record<ReaderFormatGroup, z.ZodTypeAny>;
 
 const PARTIAL_SETTINGS_SCHEMA_BY_GROUP = {
@@ -82,6 +86,7 @@ const PARTIAL_SETTINGS_SCHEMA_BY_GROUP = {
   pdf: PDF_SETTINGS_SCHEMA.partial(),
   cbx: CBX_SETTINGS_SCHEMA.partial(),
   audio: AUDIO_SETTINGS_SCHEMA.partial(),
+  physical: PHYSICAL_SETTINGS_SCHEMA.partial(), // 3. Adição do schema físico parcial
 } satisfies Record<ReaderFormatGroup, z.ZodTypeAny>;
 
 function normalizeFormatGroup(formatGroup: string): ReaderFormatGroup {

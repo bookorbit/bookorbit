@@ -71,6 +71,15 @@ function getUtcDaysSinceYearStartInclusive(): number {
   return Math.floor((todayUtc - yearStartUtc) / 86_400_000) + 1
 }
 
+export interface CountryDistributionItem {
+  country: string
+  count: number
+}
+
+export async function fetchCountryDistribution(filters: StatisticsFilterConfig): Promise<StatisticsResult<CountryDistributionItem>> {
+  return parseResult(await api(`/api/v1/statistics/country-distribution${buildParams(filters)}`))
+}
+
 export async function fetchFormatDistribution(filters: StatisticsFilterConfig): Promise<StatisticsResult<FormatDistributionItem>> {
   return parseResult(await api(`/api/v1/statistics/format-distribution${buildParams(filters)}`))
 }

@@ -10,8 +10,10 @@ vi.mock('@/lib/api', () => ({
 
 function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
+    originCountry: null,
     id: 1,
     libraryId: 1,
+    originType: 'file',
     libraryName: 'Test Library',
     status: 'present',
     folderPath: '/books',

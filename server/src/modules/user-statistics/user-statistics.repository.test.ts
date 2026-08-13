@@ -139,7 +139,7 @@ describe('UserStatisticsRepository', () => {
     expect(params.filter((param) => param === 'Australia/Brisbane')).toHaveLength(1);
     expect(text).toContain('"reading_sessions"."started_at" AT TIME ZONE $1');
     expect(text).toContain('from (select');
-    expect(text).toContain('group by "hour", "format", "session_buckets"."source"');
+    expect(text).toContain('group by "hour", "format", "source"');
     expect(text.match(/AT TIME ZONE/g)).toHaveLength(1);
   });
 

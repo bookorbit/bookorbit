@@ -30,6 +30,7 @@ import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { basename, dirname, extname, join } from 'path';
+import { StatisticsService } from '../statistics/statistics.service';
 
 import {
   BOOK_METADATA_LOCK_FIELDS,
@@ -277,6 +278,7 @@ export class BookService {
     @Optional() private readonly fileRenameService: FileRenameService,
     @Optional() private readonly achievementEvents: AchievementEventsService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
+    @Optional() private readonly statisticsService?: StatisticsService,
     @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
@@ -1570,6 +1572,7 @@ export class BookService {
         const errorClass = reason instanceof Error ? reason.name : 'Error';
         const errorMessage = sanitizeLogValue(reason instanceof Error ? reason.message : String(reason));
         const pathValue = sanitizeLogValue(target.path);
+        this.statisticsService?.invalidateUserCache(user.id);
         this.logger.warn(
           `[${event}] [fail] userId=${user.id} path="${pathValue}" kind=${target.kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
         );
@@ -1688,6 +1691,9 @@ export class BookService {
     if (dto.subtitle !== undefined) scalarFields.subtitle = dto.subtitle ?? null;
     if (dto.description !== undefined) scalarFields.description = dto.description ?? null;
     if (dto.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(dto.publisher);
+    if (dto.originCountry !== undefined) {
+      (scalarFields as any).originCountry = normalizeMetadataText(dto.originCountry);
+    }
     if (dto.publishedDate !== undefined) {
       const publishedDate = this.normalizeUpdatePublishedDate(dto.publishedDate);
       scalarFields.publishedDate = publishedDate;
@@ -1852,6 +1858,7 @@ export class BookService {
         }
       }
       await this.scoreService.calculateAndSave(id);
+      this.statisticsService?.invalidateUserCache(user.id);
     }
 
     const detail = await this.getDetail(id, user);
@@ -2086,6 +2093,7 @@ export class BookService {
       } else {
         await this.userBookStatusService.autoUpdate(userId, file.bookId, percentage, library.readingThreshold, library.markAsFinishedPercentComplete);
       }
+      this.statisticsService?.invalidateUserCache(userId);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.warn(
@@ -2206,6 +2214,7 @@ export class BookService {
       Object.keys(dateKeys).length > 0
         ? await this.userBookStatusService.updateManual(user.id, bookId, patch, dateKeys)
         : await this.userBookStatusService.updateManual(user.id, bookId, patch);
+    this.statisticsService?.invalidateUserCache(user.id);
     return this.toDateOnlyReadStatus(updated, timeZone);
   }
 
@@ -2274,6 +2283,7 @@ export class BookService {
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} status=${status} durationMs=${Date.now() - startedAt} - bulk set status completed`,
     );
+    this.statisticsService?.invalidateUserCache(user.id);
   }
 
   async bulkSetRating(bookIds: number[], rating: number | null, user: RequestUser): Promise<void> {
@@ -3061,7 +3071,7 @@ export class BookService {
       libraryId: book.books.libraryId,
       libraryName: book.libraries?.name ?? '',
       status: book.books.status,
-      folderPath: book.books.folderPath,
+      folderPath: book.books.folderPath ?? '',
       addedAt: book.books.addedAt,
       updatedAt: book.books.updatedAt ?? null,
       title: meta?.title ?? null,
@@ -3070,6 +3080,7 @@ export class BookService {
       isbn10: meta?.isbn10 ?? null,
       isbn13: meta?.isbn13 ?? null,
       publisher: meta?.publisher ?? null,
+      originCountry: book.books.originCountry ?? null,
       publishedDate: meta?.publishedDate ?? null,
       publishedYear: meta?.publishedYear ?? null,
       language: meta?.language ?? null,
@@ -3374,6 +3385,7 @@ export class BookService {
     }
 
     await this.scoreService.calculateAndSaveMany(bookIds);
+    this.statisticsService?.invalidateUserCache(userId);
   }
 
   private resolveChapters(

@@ -24,8 +24,8 @@ describe('LibraryCreatorFolders', () => {
     })
 
     expect(wrapper.text()).toContain('Accessible')
-    expect(wrapper.text()).toContain('Accessible · 1,250 files')
-    expect(wrapper.text()).toContain('1,250 matching files across 1 folder.')
+    expect(wrapper.text()).toContain('Accessible · 1.250 files')
+    expect(wrapper.text()).toContain('1.250 matching files across 1 folder.')
   })
 })
 

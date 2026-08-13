@@ -12,6 +12,7 @@ export type StatisticsChartId =
   | "format-share-over-time"
   | "page-count-distribution"
   | "reading-heatmap"
+  | 'country-distribution'
   | "reading-source-distribution"
   | "peak-reading-hours"
   | "favorite-reading-days"
@@ -75,6 +76,7 @@ export const DEFAULT_LIBRARY_CHART_ORDER: StatisticsChartId[] = [
   "top-series",
   "books-added-over-time",
   "publication-year-timeline",
+  "country-distribution",
 ];
 
 export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [
@@ -143,6 +145,11 @@ export interface FormatDistributionItem {
 
 export interface LanguageDistributionItem {
   language: string;
+  count: number;
+}
+
+export interface CountryDistributionItem {
+  country: string;
   count: number;
 }
 

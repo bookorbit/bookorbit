@@ -64,6 +64,7 @@
     "@formatjs/icu-messageformat-parser": "^3.5.15",
     "@lucide/vue": "1.27.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/vue-query": "^5.101.4",
     "@tanstack/vue-table": "^8.21.3",
     "@tanstack/vue-virtual": "^3.13.34",
     "@tiptap/extension-link": "^3.29.1",

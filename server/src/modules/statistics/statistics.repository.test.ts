@@ -11,12 +11,13 @@ function makeChain(result: unknown) {
     limit: vi.fn(),
     offset: vi.fn(),
     as: vi.fn(),
+    unionAll: vi.fn(),
     then: (onFulfilled: (value: unknown) => unknown, onRejected?: (error: unknown) => unknown) =>
       Promise.resolve(result).then(onFulfilled, onRejected),
     catch: (onRejected: (error: unknown) => unknown) => Promise.resolve(result).catch(onRejected),
   };
 
-  for (const key of ['from', 'where', 'innerJoin', 'leftJoin', 'groupBy', 'orderBy', 'limit', 'offset', 'as']) {
+  for (const key of ['from', 'where', 'innerJoin', 'leftJoin', 'groupBy', 'orderBy', 'limit', 'offset', 'as', 'unionAll']) {
     (chain[key] as ReturnType<typeof vi.fn>).mockReturnValue(chain);
   }
 
@@ -27,10 +28,16 @@ function makeDb(selectQueue: unknown[] = [], executeQueue: unknown[] = []) {
   const selects = [...selectQueue];
   const executes = [...executeQueue];
 
-  return {
+  const dbMock = {
     select: vi.fn(() => makeChain(selects.shift() ?? [])),
     execute: vi.fn(() => Promise.resolve({ rows: executes.shift() ?? [] })),
+    $with: vi.fn(() => ({
+      as: vi.fn((query) => query),
+    })),
+    with: vi.fn(() => dbMock),
   };
+
+  return dbMock;
 }
 
 function makeSummaryDb(totalStorageBytes: string) {
@@ -94,7 +101,9 @@ describe('StatisticsRepository', () => {
   it('executes all public statistic queries with expected return shaping', async () => {
     const db = makeDb(
       [
-        [{ format: 'epub', count: 4 }],
+        [], // CTE auxiliar 1 para formatDistribution
+        [], // CTE auxiliar 2 para formatDistribution
+        [{ format: 'epub', count: 4 }], // Query principal para formatDistribution
         [{ language: 'en', count: 8 }],
         [{ unknownCount: 2 }],
         [{ year: 2026, month: 0, count: 5 }],

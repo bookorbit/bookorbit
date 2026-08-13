@@ -17,6 +17,7 @@ const FORMAT_COLORS: Record<string, string> = {
   opus: '#06b6d4',
   ogg: '#84cc16',
   flac: '#10b981',
+  phy: '#8b5cf6',
 }
 
 export function getFormatColor(format: string | null | undefined): string {

@@ -1,4 +1,4 @@
-export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
+export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio" | "physical";
 
 export const EPUB_FONT_SIZE_MIN = 6;
 export const EPUB_FONT_SIZE_MAX = 32;
@@ -46,6 +46,7 @@ export const FORMAT_TO_GROUP: Record<string, ReaderFormatGroup> = {
   opus: "audio",
   ogg: "audio",
   flac: "audio",
+  phy: "physical",
 };
 
 export function getFormatGroup(format: string): ReaderFormatGroup {
@@ -106,9 +107,10 @@ export type ReaderSettingsMap = {
   pdf: PdfReaderSettings;
   cbx: CbxReaderSettings;
   audio: AudioReaderSettings;
+  physical: Record<string, never>;
 };
 
-export type ReaderSettings = EpubReaderSettings | PdfReaderSettings | CbxReaderSettings | AudioReaderSettings;
+export type ReaderSettings = EpubReaderSettings | PdfReaderSettings | CbxReaderSettings | AudioReaderSettings | Record<string, never>;
 
 export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
   themeName: "default",
@@ -160,4 +162,5 @@ export const READER_GROUP_DEFAULTS: ReaderSettingsMap = {
   pdf: PDF_READER_DEFAULTS,
   cbx: CBX_READER_DEFAULTS,
   audio: AUDIO_READER_DEFAULTS,
+  physical: {},
 };

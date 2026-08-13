@@ -6,7 +6,9 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
     id: 137,
     libraryId: 1,
+    originType: 'file',
     libraryName: 'Books',
+    originCountry: null,
     status: 'present',
     folderPath: '/books/a-little-life',
     addedAt: '2026-01-01T00:00:00.000Z',

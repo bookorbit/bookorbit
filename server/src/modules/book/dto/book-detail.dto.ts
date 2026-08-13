@@ -34,7 +34,7 @@ export class BookDetailDto {
   libraryId: number;
   libraryName: string;
   status: string;
-  folderPath: string;
+  folderPath: string | null;
   addedAt: Date;
   updatedAt: Date | null;
   title: string | null;
@@ -43,6 +43,7 @@ export class BookDetailDto {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  originCountry: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;

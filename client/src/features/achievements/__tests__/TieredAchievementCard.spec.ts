@@ -191,7 +191,7 @@ describe('TieredAchievementCard', () => {
   it('expanded panel shows tier dates for earned tiers', async () => {
     const wrapper = mount(TieredAchievementCard, { props: { group: makeGroup() } })
     await wrapper.trigger('click')
-    const expectedDate = new Date('2026-05-15T00:00:00Z').toLocaleDateString(undefined, {
+    const expectedDate = new Date('2026-05-15T00:00:00Z').toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

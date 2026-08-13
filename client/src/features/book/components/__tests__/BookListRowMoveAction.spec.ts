@@ -14,6 +14,7 @@ const book: BookCard = {
   id: 12,
   status: 'present',
   coverAspectRatio: '2/3',
+  originCountry: null,
   title: 'Dune',
   authors: ['Frank Herbert'],
   seriesName: null,

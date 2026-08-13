@@ -82,6 +82,8 @@ type CollapsedRawRow = {
   hardcover_id: string | null;
   hardcover_edition_id: string | null;
   publisher: string | null;
+  origin_country: string | null;
+  origin_type: string;
   page_count: number | null;
   sort_title: string | null;
   sort_added_at: string | null;
@@ -100,6 +102,7 @@ type PatternMetadataRow = {
   title: string | null;
   subtitle: string | null;
   publisher: string | null;
+  originCountry: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
@@ -556,6 +559,8 @@ export class BookRepository {
         lockedFields: bookMetadata.lockedFields,
         subtitle: bookMetadata.subtitle,
         publisher: bookMetadata.publisher,
+        originCountry: books.originCountry,
+        originType: books.originType,
         pageCount: bookMetadata.pageCount,
         isbn13: bookMetadata.isbn13,
         hardcoverId: bookMetadata.hardcoverId,
@@ -775,6 +780,8 @@ export class BookRepository {
       lockedFields: string[] | null;
       subtitle: string | null;
       publisher: string | null;
+      originCountry: string | null;
+      originType: string;
       pageCount: number | null;
       isbn13: string | null;
       hardcoverId: string | null;
@@ -840,6 +847,8 @@ export class BookRepository {
           books.primary_file_id,
           books.primary_author_sort_name,
           books.folder_path,
+          books.origin_country,
+          books.origin_type,
           books.added_at,
           books.updated_at,
           book_metadata.title,
@@ -975,6 +984,8 @@ export class BookRepository {
           base.cover_aspect_ratio,
           base.primary_file_id,
           base.folder_path,
+          base.origin_country,
+          base.origin_type,
           base.added_at,
           base.updated_at,
           base.title,
@@ -1058,6 +1069,8 @@ export class BookRepository {
       lockedFields: r.locked_fields,
       subtitle: r.subtitle,
       publisher: r.publisher,
+      originCountry: r.origin_country,
+      originType: r.origin_type,
       pageCount: r.page_count !== null ? Number(r.page_count) : null,
       isbn13: r.isbn13,
       hardcoverId: r.hardcover_id,
@@ -1757,6 +1770,7 @@ export class BookRepository {
           title: bookMetadata.title,
           subtitle: bookMetadata.subtitle,
           publisher: bookMetadata.publisher,
+          originCountry: books.originCountry,
           publishedDate: bookMetadata.publishedDate,
           publishedYear: bookMetadata.publishedYear,
           language: bookMetadata.language,
@@ -1943,17 +1957,30 @@ export class BookRepository {
 
   async updateMetadataFields(
     bookId: number,
-    fields: Partial<typeof bookMetadata.$inferInsert>,
+    fields: Partial<typeof bookMetadata.$inferInsert> & { originCountry?: string | null },
     executor: MetadataUpdateExecutor = this.db,
   ): Promise<void> {
     const shouldSyncSeries =
       Object.prototype.hasOwnProperty.call(fields, 'seriesName') || Object.prototype.hasOwnProperty.call(fields, 'seriesIndex');
-    const patch = (await this.seriesIdentity?.resolveMetadataPatch(fields, executor)) ?? fields;
-    await executor.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
+
+    const { originCountry, ...metadataPatch } = fields;
+
+    const patch = (await this.seriesIdentity?.resolveMetadataPatch(metadataPatch, executor)) ?? metadataPatch;
+
+    if (Object.keys(patch).length > 0) {
+      await executor.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
+    }
+
     if (shouldSyncSeries) {
       await this.seriesMemberships?.syncPrimaryFromMetadata(bookId, executor);
     }
-    await executor.update(books).set({ updatedAt: new Date() }).where(eq(books.id, bookId));
+
+    const bookUpdate: Partial<typeof books.$inferInsert> = { updatedAt: new Date() };
+    if (originCountry !== undefined) {
+      bookUpdate.originCountry = originCountry;
+    }
+
+    await executor.update(books).set(bookUpdate).where(eq(books.id, bookId));
   }
 
   // Only fills a missing shared edition id - never overwrites a value already set by someone
@@ -1994,18 +2021,33 @@ export class BookRepository {
 
   async bulkUpdateMetadataFields(
     bookIds: number[],
-    fields: Partial<typeof bookMetadata.$inferInsert>,
+    fields: Partial<typeof bookMetadata.$inferInsert> & { originCountry?: string | null },
     executor: MetadataUpdateExecutor = this.db,
   ): Promise<void> {
     if (bookIds.length === 0) return;
     const shouldSyncSeries =
       Object.prototype.hasOwnProperty.call(fields, 'seriesName') || Object.prototype.hasOwnProperty.call(fields, 'seriesIndex');
-    const patch = (await this.seriesIdentity?.resolveMetadataPatch(fields, executor)) ?? fields;
-    await executor.update(bookMetadata).set(patch).where(inArray(bookMetadata.bookId, bookIds));
+
+    // Extraia o originCountry
+    const { originCountry, ...metadataPatch } = fields;
+
+    const patch = (await this.seriesIdentity?.resolveMetadataPatch(metadataPatch, executor)) ?? metadataPatch;
+
+    if (Object.keys(patch).length > 0) {
+      await executor.update(bookMetadata).set(patch).where(inArray(bookMetadata.bookId, bookIds));
+    }
+
     if (shouldSyncSeries) {
       await this.seriesMemberships?.syncPrimaryFromMetadataForBooks(bookIds, executor);
     }
-    await executor.update(books).set({ updatedAt: new Date() }).where(inArray(books.id, bookIds));
+
+    // Prepare a atualização da tabela `books`
+    const bookUpdate: Partial<typeof books.$inferInsert> = { updatedAt: new Date() };
+    if (originCountry !== undefined) {
+      bookUpdate.originCountry = originCountry;
+    }
+
+    await executor.update(books).set(bookUpdate).where(inArray(books.id, bookIds));
   }
 
   async upsertProgress(

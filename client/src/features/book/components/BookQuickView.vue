@@ -70,8 +70,14 @@ watch(
 const { coverUrl } = useCoverVersions()
 const coverSrc = computed(() => (detail.value ? coverUrl(detail.value.id, 'cover', detail.value.updatedAt ?? detail.value.addedAt) : null))
 
-const coverSeed = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? String(detail.value.id)) : ''))
-const coverPlaceholderTitle = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath.split('/').pop() ?? null) : null))
+const coverSeed = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath?.split('/').pop() ?? String(detail.value.id)) : ''))
+const coverPlaceholderTitle = computed(() => (detail.value ? (detail.value.title ?? detail.value.folderPath?.split('/').pop() ?? null) : null))
+
+const isManualEntry = computed(() => {
+  if (!detail.value) return false
+  const hasPhyFile = detail.value.files.some((f) => f.format?.toLowerCase() === 'phy')
+  return detail.value.originType === 'manual_entry' || hasPhyFile
+})
 
 const seriesLine = computed(() => {
   if (!detail.value?.seriesName) return null
@@ -239,7 +245,7 @@ function handleCoverClick() {
 }
 
 function openBookWithMode(mode?: 'peek') {
-  if (!primaryFile.value || !detail.value) return
+  if (!primaryFile.value || !detail.value || isManualEntry.value) return
   router.push({
     name: 'reader',
     params: { bookId: detail.value.id, fileId: primaryFile.value.id },
@@ -308,7 +314,7 @@ function handleDelete() {
               <BookCoverSurface
                 size="mini"
                 class="book-cover-surface--spine-fitted w-24 shrink-0 rounded overflow-hidden relative"
-                :disable-spine="isPrimaryAudio"
+                :disable-spine="isPrimaryAudio || isManualEntry"
                 :is-comic="isPrimaryComic"
                 :class="detail.coverSource && !coverFailed ? 'cursor-zoom-in' : ''"
                 :style="{ aspectRatio: quickViewCoverAspectRatio }"
@@ -324,7 +330,7 @@ function handleDelete() {
                   :alt="detail.title ?? ''"
                   :frame-aspect-ratio="quickViewCoverAspectRatio"
                   loading="eager"
-                  :spine="!isPrimaryAudio"
+                  :spine="!isPrimaryAudio && !isManualEntry"
                   :is-comic="isPrimaryComic"
                   @load="handleCoverLoad"
                   @error="handleCoverError"
@@ -392,7 +398,15 @@ function handleDelete() {
               <!-- Format badges + meta chips -->
               <div class="flex flex-wrap gap-1.5">
                 <span
+                  v-if="isManualEntry"
+                  class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+                  style="color: rgb(147, 51, 234); border-color: rgba(147, 51, 234, 0.4); background-color: rgba(147, 51, 234, 0.1)"
+                >
+                  PHY
+                </span>
+                <span
                   v-for="fmt in knownFormats"
+                  v-else
                   :key="fmt"
                   class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
                   :style="formatBadgeStyle(fmt)"
@@ -418,8 +432,8 @@ function handleDelete() {
                 {{ detail.publisher }}
               </p>
 
-              <!-- Primary file summary -->
-              <div v-if="primaryFile" class="rounded-md border border-border bg-muted/20 px-3 py-2.5">
+              <!-- Primary file summary (Hidden for manual/physical entries) -->
+              <div v-if="primaryFile && !isManualEntry" class="rounded-md border border-border bg-muted/20 px-3 py-2.5">
                 <p class="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{{ t('book.quickView.primaryFile') }}</p>
                 <p class="text-xs text-foreground mt-1 truncate">
                   {{ primaryFile.filename ?? t('book.quickView.fileNumber', { id: primaryFile.id }) }}
@@ -502,7 +516,9 @@ function handleDelete() {
 
           <!-- Footer: actions -->
           <div class="p-4 border-t shrink-0 flex gap-2">
+            <!-- Read / Listen Button (Disabled/Hidden for manual entries since there is no file) -->
             <button
+              v-if="!isManualEntry"
               class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
               :disabled="!primaryFile"
               :aria-label="isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read')"
@@ -512,6 +528,7 @@ function handleDelete() {
               <BookOpen v-else class="size-4" />
               <span class="hidden sm:inline">{{ isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read') }}</span>
             </button>
+
             <button
               class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"
               :aria-label="t('book.actions.details')"
@@ -520,7 +537,9 @@ function handleDelete() {
               <ExternalLink class="size-4" />
               <span class="hidden sm:inline">{{ t('book.actions.details') }}</span>
             </button>
-            <Tooltip>
+
+            <!-- Peek Button (Hidden for manual entries) -->
+            <Tooltip v-if="!isManualEntry">
               <TooltipTrigger as-child>
                 <button
                   class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
@@ -533,6 +552,7 @@ function handleDelete() {
               </TooltipTrigger>
               <TooltipContent>{{ t('book.actions.peek') }}</TooltipContent>
             </Tooltip>
+
             <Tooltip v-if="hasPermission('library_edit_metadata')">
               <TooltipTrigger as-child>
                 <button

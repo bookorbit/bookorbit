@@ -222,6 +222,7 @@ describe('BookTableReadButtonCell', () => {
       id: 42,
       status,
       coverAspectRatio: '2/3',
+      originCountry: null,
       title: 'Example Book',
       authors: ['Author'],
       seriesName: null,

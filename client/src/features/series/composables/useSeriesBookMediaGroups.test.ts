@@ -7,6 +7,7 @@ function makeBook(format: string | null | undefined, overrides: Partial<BookCard
     id: 1,
     status: 'present',
     coverAspectRatio: '2/3',
+    originCountry: null,
     title: 'Series Book',
     authors: [],
     seriesId: 42,
