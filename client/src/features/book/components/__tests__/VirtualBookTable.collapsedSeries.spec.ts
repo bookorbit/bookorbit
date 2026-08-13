@@ -39,6 +39,7 @@ function makeBook(id: number, overrides: Partial<BookCard> = {}): BookCard {
     authors: [],
     seriesName: null,
     seriesIndex: null,
+    originCountry: null,
     files: [],
     publishedDate: null,
     publishedYear: null,
