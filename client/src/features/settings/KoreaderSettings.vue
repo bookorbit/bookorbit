@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import {
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   BookOpen,
   Calendar,
   Check,
@@ -16,6 +18,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  KeyRound,
   Library,
   Link2,
   RefreshCw,
@@ -26,9 +29,17 @@ import {
   X,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BookCard, KoreaderDeviceInfo, KoreaderDeviceSweepInfo, KoreaderManualHashLink, KoreaderUnmatchedBook } from '@bookorbit/types'
+import type {
+  BookCard,
+  KoreaderDeviceInfo,
+  KoreaderDeviceSweepInfo,
+  KoreaderManualHashLink,
+  KoreaderUnmatchedBook,
+  UpdateKoreaderCredentialsPayload,
+} from '@bookorbit/types'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import SettingsTabs from './components/SettingsTabs.vue'
+import KoreaderCredentialsDialog from './KoreaderCredentialsDialog.vue'
 import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { copyToClipboard } from '@/lib/clipboard'
@@ -109,6 +120,7 @@ const {
   dismissAllUnmatchedBooks,
   relinkManualHashLink,
   unlinkManualHashLink,
+  setDeviceRetired,
   removeDevice,
 } = useKoreaderSync()
 
@@ -118,9 +130,12 @@ const newUsername = ref('')
 const newPassword = ref('')
 const creating = ref(false)
 const showPassword = ref(false)
+const changeCredentialsOpen = ref(false)
+const changingCredentials = ref(false)
+const changeCredentialsError = ref<string | null>(null)
 const deleteConfirmOpen = ref(false)
 const helpOpen = ref(false)
-const copiedUrlTarget = ref<'plugin' | 'stock' | null>(null)
+const urlCopied = ref(false)
 const selectedUnmatched = ref<KoreaderUnmatchedBook | null>(null)
 const selectedManualLink = ref<KoreaderManualHashLink | null>(null)
 const linkSearchQuery = ref('')
@@ -130,6 +145,8 @@ const unlinkConfirmLink = ref<KoreaderManualHashLink | null>(null)
 const unlinkingHash = ref<string | null>(null)
 const removeDeviceConfirmTarget = ref<KoreaderDeviceInfo | null>(null)
 const removingDeviceId = ref<string | null>(null)
+const retiringDeviceId = ref<string | null>(null)
+const retiredDevicesOpen = ref(false)
 const dismissConfirmBook = ref<KoreaderUnmatchedBook | null>(null)
 const dismissingHash = ref<string | null>(null)
 const dismissAllConfirmOpen = ref(false)
@@ -152,14 +169,13 @@ onUnmounted(() => {
   if (copiedUrlTimer) clearTimeout(copiedUrlTimer)
 })
 
-const syncUrl = computed(() => getSyncUrl())
-const stockSyncUrl = computed(() => new URL('/api/v1/koreader', syncUrl.value).toString())
-const urlCopied = computed(() => copiedUrlTarget.value === 'plugin')
-const stockUrlCopied = computed(() => copiedUrlTarget.value === 'stock')
+const syncUrl = computed(() => new URL('/api/v1/koreader', getSyncUrl()).toString())
 const hasCredentials = computed(() => !!credentials.value)
-const deviceCount = computed(() => syncStatus.value?.devices.length ?? 0)
+const activeDevices = computed(() => (syncStatus.value?.devices ?? []).filter((device) => device.retiredAt === null))
+const retiredDevices = computed(() => (syncStatus.value?.devices ?? []).filter((device) => device.retiredAt !== null))
+const deviceCount = computed(() => activeDevices.value.length)
 const totalSyncedBooks = computed(() => syncStatus.value?.totalSyncedBooks ?? 0)
-const sweeps = computed(() => syncStatus.value?.sweeps ?? [])
+const sweeps = computed(() => (syncStatus.value?.sweeps ?? []).filter((sweep) => sweep.retiredAt === null))
 const pluginTotals = computed(
   () =>
     syncStatus.value?.pluginTotals ?? {
@@ -352,6 +368,31 @@ function handleTogglePassword() {
   showPassword.value = !showPassword.value
 }
 
+function handleOpenChangeCredentials() {
+  changeCredentialsError.value = null
+  changeCredentialsOpen.value = true
+}
+
+function handleChangeCredentialsOpenChange(open: boolean) {
+  if (changingCredentials.value) return
+  changeCredentialsOpen.value = open
+  if (!open) changeCredentialsError.value = null
+}
+
+async function handleChangeCredentials(payload: UpdateKoreaderCredentialsPayload) {
+  changingCredentials.value = true
+  changeCredentialsError.value = null
+  try {
+    await updateCredentials(payload)
+    changeCredentialsOpen.value = false
+    toast.success(t('settings.reader.koreader.changeCredentials.updated'))
+  } catch (e) {
+    changeCredentialsError.value = e instanceof Error ? e.message : t('settings.reader.koreader.changeCredentials.updateFailed')
+  } finally {
+    changingCredentials.value = false
+  }
+}
+
 function handleOpenDeleteConfirm() {
   deleteConfirmOpen.value = true
 }
@@ -383,28 +424,20 @@ async function handleDelete() {
   }
 }
 
-async function copyUrlWithFeedback(url: string, target: 'plugin' | 'stock') {
-  const copied = await copyToClipboard(url)
+async function handleCopySyncUrl() {
+  const copied = await copyToClipboard(syncUrl.value)
   if (!copied) {
     toast.error(t('settings.reader.koreader.syncUrlCopyFailed'))
     return
   }
 
-  copiedUrlTarget.value = target
+  urlCopied.value = true
   toast.success(t('settings.reader.koreader.syncUrlCopied'))
   if (copiedUrlTimer) clearTimeout(copiedUrlTimer)
   copiedUrlTimer = setTimeout(() => {
-    copiedUrlTarget.value = null
+    urlCopied.value = false
     copiedUrlTimer = null
   }, 2000)
-}
-
-async function handleCopyUrl() {
-  await copyUrlWithFeedback(syncUrl.value, 'plugin')
-}
-
-async function handleCopyStockUrl() {
-  await copyUrlWithFeedback(stockSyncUrl.value, 'stock')
 }
 
 async function handleRefresh() {
@@ -573,6 +606,36 @@ async function handleUnlinkManualLink() {
   }
 }
 
+function formatRetiredAt(value: string | null): string {
+  if (!value) return t('settings.reader.koreader.never')
+  return formatLocaleDate(new Date(value), { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function handleToggleRetiredDevices() {
+  retiredDevicesOpen.value = !retiredDevicesOpen.value
+}
+
+async function applyDeviceRetired(device: KoreaderDeviceInfo, retired: boolean) {
+  retiringDeviceId.value = device.deviceId
+  try {
+    await setDeviceRetired(device.deviceId, retired)
+    toast.success(retired ? t('settings.reader.koreader.deviceRetired') : t('settings.reader.koreader.deviceRestored'))
+  } catch (e) {
+    const fallback = retired ? t('settings.reader.koreader.retireDeviceFailed') : t('settings.reader.koreader.restoreDeviceFailed')
+    toast.error(e instanceof Error ? e.message : fallback)
+  } finally {
+    retiringDeviceId.value = null
+  }
+}
+
+function handleRetireDevice(device: KoreaderDeviceInfo) {
+  return applyDeviceRetired(device, true)
+}
+
+function handleRestoreDevice(device: KoreaderDeviceInfo) {
+  return applyDeviceRetired(device, false)
+}
+
 function handleOpenRemoveDevice(device: KoreaderDeviceInfo) {
   removeDeviceConfirmTarget.value = device
 }
@@ -681,9 +744,18 @@ async function handleDownloadPlugin() {
                 class="input-field w-full pr-10"
                 :class="{ 'input-secret': !showPassword }"
               />
-              <button class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" @click="handleTogglePassword">
-                <EyeOff v-if="showPassword" :size="14" />
-                <Eye v-else :size="14" />
+              <button
+                type="button"
+                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :aria-label="
+                  showPassword
+                    ? t('settings.reader.koreader.changeCredentials.hidePassword')
+                    : t('settings.reader.koreader.changeCredentials.showPassword')
+                "
+                @click="handleTogglePassword"
+              >
+                <EyeOff v-if="showPassword" :size="14" aria-hidden="true" />
+                <Eye v-else :size="14" aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -742,6 +814,14 @@ async function handleDownloadPlugin() {
                 <p class="settings-hint font-mono truncate">
                   {{ credentials?.username }}
                 </p>
+                <button
+                  type="button"
+                  class="mt-2 inline-flex items-center gap-1.5 rounded-md text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  @click="handleOpenChangeCredentials"
+                >
+                  <KeyRound :size="12" aria-hidden="true" />
+                  {{ t('settings.reader.koreader.changeCredentials.action') }}
+                </button>
               </div>
               <div>
                 <p class="settings-label">
@@ -793,13 +873,24 @@ async function handleDownloadPlugin() {
           </p>
           <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
             <div class="px-4 py-4 bg-card md:px-5">
-              <div class="mb-2 flex items-center gap-2">
-                <BookOpen :size="14" class="text-muted-foreground shrink-0" />
-                <label for="koreader-plugin-server-url" class="settings-label">{{ t('settings.reader.koreader.pluginServerUrl') }}</label>
+              <div class="flex items-start gap-3">
+                <div class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                  <Link2 :size="15" class="text-muted-foreground" />
+                </div>
+                <div class="min-w-0">
+                  <label for="koreader-sync-url" class="settings-label">{{ t('settings.reader.koreader.syncUrl') }}</label>
+                  <p class="settings-hint mt-1">
+                    {{ t('settings.reader.koreader.syncUrlHint') }}
+                  </p>
+                </div>
               </div>
-              <div class="flex flex-col gap-2 md:flex-row md:items-center">
-                <input id="koreader-plugin-server-url" :value="syncUrl" readonly class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm" />
-                <button class="settings-btn-outline w-full min-h-10 justify-center md:w-auto md:min-h-0" @click="handleCopyUrl">
+              <div class="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+                <input id="koreader-sync-url" :value="syncUrl" readonly class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm" />
+                <button
+                  id="koreader-sync-url-copy"
+                  class="settings-btn-outline w-full min-h-10 justify-center md:w-auto md:min-h-0"
+                  @click="handleCopySyncUrl"
+                >
                   <Check v-if="urlCopied" :size="12" />
                   <Copy v-else :size="12" />
                   {{ urlCopied ? t('settings.reader.koreader.copied') : t('settings.reader.koreader.copyUrl') }}
@@ -844,6 +935,9 @@ async function handleDownloadPlugin() {
           <p class="settings-group-label">
             {{ t('settings.reader.koreader.devices') }}
           </p>
+          <p class="settings-hint mb-3">
+            {{ t('settings.reader.koreader.devicesHint') }}
+          </p>
           <div v-if="deviceCount === 0" class="border border-border rounded-lg px-5 py-8 bg-card text-center shadow-xs">
             <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
               <Smartphone :size="18" class="text-muted-foreground" />
@@ -856,7 +950,7 @@ async function handleDownloadPlugin() {
             </p>
           </div>
           <div v-else class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
-            <div v-for="device in syncStatus?.devices ?? []" :key="device.deviceId" class="px-4 py-4 bg-card md:px-5">
+            <div v-for="device in activeDevices" :key="device.deviceId" class="px-4 py-4 bg-card md:px-5">
               <div class="flex items-start gap-3">
                 <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
                   <Smartphone :size="16" />
@@ -875,12 +969,63 @@ async function handleDownloadPlugin() {
                   </div>
                 </div>
                 <button
-                  class="flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-                  @click="handleOpenRemoveDevice(device)"
+                  class="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-60"
+                  :disabled="retiringDeviceId === device.deviceId"
+                  @click="handleRetireDevice(device)"
                 >
-                  <Trash2 :size="12" />
-                  {{ t('settings.reader.koreader.remove') }}
+                  <Archive :size="12" />
+                  {{ retiringDeviceId === device.deviceId ? t('settings.reader.koreader.retiring') : t('settings.reader.koreader.retire') }}
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="retiredDevices.length > 0" class="mt-3 border border-border rounded-lg overflow-hidden shadow-xs">
+            <button
+              class="flex w-full items-center justify-between gap-3 px-4 py-3 bg-card text-left text-foreground hover:bg-muted transition-colors md:px-5"
+              :aria-expanded="retiredDevicesOpen"
+              aria-controls="koreader-retired-devices"
+              @click="handleToggleRetiredDevices"
+            >
+              <span class="text-sm font-medium">
+                {{ t('settings.reader.koreader.retiredDevices', { count: retiredDevices.length }) }}
+              </span>
+              <ChevronDown v-if="!retiredDevicesOpen" :size="16" class="text-muted-foreground shrink-0" />
+              <ChevronUp v-else :size="16" class="text-muted-foreground shrink-0" />
+            </button>
+            <div v-if="retiredDevicesOpen" id="koreader-retired-devices" class="divide-y divide-border border-t border-border">
+              <div v-for="device in retiredDevices" :key="device.deviceId" class="px-4 py-4 bg-card md:px-5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+                  <div class="flex flex-1 min-w-0 items-start gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
+                      <Archive :size="16" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="settings-label truncate">{{ device.device }}</p>
+                      <p class="mt-1 text-xs text-muted-foreground">
+                        {{ t('settings.reader.koreader.retiredOnLabel') }}
+                        <span class="text-foreground">{{ formatRetiredAt(device.retiredAt) }}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button
+                      class="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-60"
+                      :disabled="retiringDeviceId === device.deviceId"
+                      @click="handleRestoreDevice(device)"
+                    >
+                      <ArchiveRestore :size="12" />
+                      {{ retiringDeviceId === device.deviceId ? t('settings.reader.koreader.restoring') : t('settings.reader.koreader.restore') }}
+                    </button>
+                    <button
+                      class="flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                      @click="handleOpenRemoveDevice(device)"
+                    >
+                      <Trash2 :size="12" />
+                      {{ t('settings.reader.koreader.deleteSyncedData') }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1249,26 +1394,7 @@ async function handleDownloadPlugin() {
                     {{ t('settings.reader.koreader.stockStep1Prefix') }}
                     <span class="font-mono text-foreground">Tools &gt; Progress sync</span>{{ t('settings.reader.koreader.stockStep1Suffix') }}
                   </li>
-                  <li class="space-y-2">
-                    <label for="koreader-stock-server-url">{{ t('settings.reader.koreader.stockStep2InlineUrl') }}</label>
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <input
-                        id="koreader-stock-server-url"
-                        :value="stockSyncUrl"
-                        readonly
-                        class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm"
-                      />
-                      <button
-                        id="koreader-stock-server-url-copy"
-                        class="settings-btn-outline w-full min-h-10 justify-center shrink-0 sm:w-auto sm:min-h-0"
-                        @click="handleCopyStockUrl"
-                      >
-                        <Check v-if="stockUrlCopied" :size="12" />
-                        <Copy v-else :size="12" />
-                        {{ stockUrlCopied ? t('settings.reader.koreader.copied') : t('settings.reader.koreader.copyUrl') }}
-                      </button>
-                    </div>
-                  </li>
+                  <li>{{ t('settings.reader.koreader.stockStep2') }}</li>
                   <li>{{ t('settings.reader.koreader.stockStep3') }}</li>
                 </ol>
               </div>
@@ -1307,6 +1433,15 @@ async function handleDownloadPlugin() {
           </div>
         </div>
       </template>
+
+      <KoreaderCredentialsDialog
+        :open="changeCredentialsOpen"
+        :current-username="credentials?.username ?? ''"
+        :saving="changingCredentials"
+        :error="changeCredentialsError"
+        @update:open="handleChangeCredentialsOpenChange"
+        @submit="handleChangeCredentials"
+      />
 
       <div
         v-if="deleteConfirmOpen"
@@ -1394,13 +1529,13 @@ async function handleDownloadPlugin() {
         <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
           <p class="text-base font-semibold text-foreground">
             {{
-              t('settings.reader.koreader.removeDeviceConfirmTitle', {
+              t('settings.reader.koreader.deleteDeviceDataConfirmTitle', {
                 device: removeDeviceConfirmTarget.device,
               })
             }}
           </p>
           <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.reader.koreader.removeDeviceConfirmBody') }}
+            {{ t('settings.reader.koreader.deleteDeviceDataConfirmBody') }}
           </p>
           <div class="mt-4 flex items-center justify-end gap-2">
             <button
@@ -1416,8 +1551,8 @@ async function handleDownloadPlugin() {
             >
               {{
                 removingDeviceId === removeDeviceConfirmTarget.deviceId
-                  ? t('settings.reader.koreader.removing')
-                  : t('settings.reader.koreader.remove')
+                  ? t('settings.reader.koreader.deletingSyncedData')
+                  : t('settings.reader.koreader.deleteSyncedData')
               }}
             </button>
           </div>

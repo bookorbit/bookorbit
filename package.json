@@ -100,9 +100,9 @@
       "ws": "^8.21.0"
     },
     "packageExtensions": {
-      "@embedpdf/utils@2.14.4": {
+      "@embedpdf/utils@2.15.0": {
         "dependencies": {
-          "@embedpdf/models": "2.14.4"
+          "@embedpdf/models": "2.15.0"
         }
       }
     },
@@ -115,9 +115,9 @@
       "unrs-resolver"
     ],
     "patchedDependencies": {
-      "@embedpdf/core@2.14.4": "patches/@embedpdf__core@2.14.4.patch",
-      "@embedpdf/engines@2.14.4": "patches/@embedpdf__engines@2.14.4.patch",
-      "@embedpdf/plugin-scroll@2.14.4": "patches/@embedpdf__plugin-scroll@2.14.4.patch"
+      "@embedpdf/core@2.15.0": "patches/@embedpdf__core@2.15.0.patch",
+      "@embedpdf/engines@2.15.0": "patches/@embedpdf__engines@2.15.0.patch",
+      "@embedpdf/plugin-scroll@2.15.0": "patches/@embedpdf__plugin-scroll@2.15.0.patch"
     }
   }
 }

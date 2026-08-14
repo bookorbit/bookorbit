@@ -118,6 +118,24 @@ export const koreaderDeviceSettings = pgTable(
 export type KoreaderDeviceSetting = typeof koreaderDeviceSettings.$inferSelect;
 export type NewKoreaderDeviceSetting = typeof koreaderDeviceSettings.$inferInsert;
 
+// Retiring a device hides it without touching its synced data. A marker table rather than a
+// column because device identity is implicit: a device exists because it has progress, sweep
+// or settings rows, so there is no single row to carry the flag.
+export const koreaderDeviceRetirements = pgTable(
+  'koreader_device_retirements',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    retiredAt: timestamp('retired_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.deviceId] }), index('koreader_device_retirements_user_id_idx').on(t.userId)],
+);
+
+export type KoreaderDeviceRetirement = typeof koreaderDeviceRetirements.$inferSelect;
+export type NewKoreaderDeviceRetirement = typeof koreaderDeviceRetirements.$inferInsert;
+
 export const bookFileHashHistory = pgTable(
   'book_file_hash_history',
   {

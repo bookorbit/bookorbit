@@ -41,6 +41,16 @@ describe('Library DTO validation', () => {
     expect(await hasErrors(plainToInstance(UpdateLibraryDto, { icon: 'BookOpen' }))).toBe(false);
   });
 
+  it('validates five-field scan cron expressions semantically', async () => {
+    const base = { name: 'Sci-Fi', icon: 'BookOpen', folders: ['/books/scifi'] };
+
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, autoScanCronExpression: '0 4 * * *' }))).toBe(false);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, autoScanCronExpression: '0 99 * * *' }))).toBe(true);
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, autoScanCronExpression: '* * * * * *' }))).toBe(true);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { autoScanCronExpression: null }))).toBe(false);
+    expect(await hasErrors(plainToInstance(UpdateLibraryDto, { autoScanCronExpression: 'invalid' }))).toBe(true);
+  });
+
   it('UpdateLibraryDto allows explicit null fileNamingPattern while validating string values', async () => {
     expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileNamingPattern: null }))).toBe(false);
     expect(await hasErrors(plainToInstance(UpdateLibraryDto, { fileNamingPattern: 123 }))).toBe(true);

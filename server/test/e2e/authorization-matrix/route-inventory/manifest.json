@@ -1,5 +1,5 @@
 {
-  "totalRoutes": 372,
+  "totalRoutes": 374,
   "byPermission": {
     "(none)": 166,
     "Permission.ManageMetadataConfig": 32,
@@ -20,7 +20,7 @@
     "Permission.LibraryDeleteBooks": 1,
     "Permission.LibraryDownload": 1,
     "Permission.LibraryUpload": 2,
-    "Permission.ManageBookDock": 1,
+    "Permission.ManageBookDock": 3,
     "Permission.ManageIcons": 1,
     "Permission.HardcoverSync": 1,
     "Permission.ReadwiseSync": 1,

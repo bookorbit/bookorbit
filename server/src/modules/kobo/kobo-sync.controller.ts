@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   HttpCode,
+  HttpException,
   HttpStatus,
   Logger,
   Param,
@@ -28,6 +29,7 @@ import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { KoboSettingsService } from './services/kobo-settings.service';
 import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
+import type { KoboProxyResponse } from './services/kobo-proxy.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
 import { KOBO_STORE_RESOURCES } from './kobo-store-resources';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
@@ -36,6 +38,12 @@ import { decodeSyncToken, isUsableKoboSyncToken, withKoboSyncToken } from './ser
 
 const STORE_SYNC_TIMEOUT_MS = 8_000;
 const KOBO_SYNC_TOKEN_HEADER = 'x-kobo-synctoken';
+
+// Kobo answers a delete for a tag it does not know with a client error, and the device keeps the
+// operation queued until it succeeds, so relaying that error strands a tag that no longer exists
+// anywhere in a delete it can never complete. Server faults and auth failures still reach the
+// device, because those mean "try again later" rather than "already gone".
+const TAG_ALREADY_GONE_STATUSES: number[] = [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.GONE];
 
 type StoreSyncResult = {
   entitlements: unknown[];
@@ -278,7 +286,7 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
+    if (!isBookOrbitTag(tagId)) return this.forwardTagDelete(req, reply, device, tagId);
     reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
   }
 
@@ -292,8 +300,41 @@ export class KoboSyncController {
   @Delete('v1/library/tags/:tagId')
   @HttpCode(HttpStatus.OK)
   async deleteTag(@Param('tagId') tagId: string, @KoboDevice() device: KoboDeviceContext, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
-    if (!isBookOrbitTag(tagId)) return this.proxyService.forward(req, reply, device.deviceToken);
+    if (!isBookOrbitTag(tagId)) return this.forwardTagDelete(req, reply, device, tagId);
     reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
+  }
+
+  /**
+   * Forwards a delete for a tag BookOrbit does not own, reporting success when Kobo says the tag is
+   * not there. Only deletes get this treatment: a failed add must stay a failure, because reporting
+   * success would drop the device's pending change instead of retrying it.
+   */
+  private async forwardTagDelete(req: FastifyRequest, reply: FastifyReply, device: KoboDeviceContext, tagId: string): Promise<void> {
+    let response: KoboProxyResponse;
+    try {
+      response = await this.proxyService.request(req, device.deviceToken);
+    } catch (error: unknown) {
+      // A path that does not resolve to Kobo is rejected before the request leaves, and that stays
+      // the client error the shared proxy raises rather than becoming an upstream fault.
+      if (error instanceof HttpException) throw error;
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+      this.logger.warn(
+        `[kobo.tag_delete] [fail] deviceId=${device.deviceId} errorClass=${errorClass} error="${errorMessage}" - upstream tag delete failed`,
+      );
+      reply.status(HttpStatus.BAD_GATEWAY).send({ message: 'Upstream Kobo API unavailable' });
+      return;
+    }
+
+    if (TAG_ALREADY_GONE_STATUSES.includes(response.status)) {
+      this.logger.warn(
+        `[kobo.tag_delete] [end] deviceId=${device.deviceId} tagId="${sanitizeLogValue(tagId)}" status=${response.status} - upstream does not know this tag, reporting success so the device stops retrying`,
+      );
+      reply.status(HttpStatus.OK).send({ RequestResult: 'Success' });
+      return;
+    }
+
+    this.proxyService.sendUpstream(reply, response);
   }
 
   @Get('v1/library/:bookId/metadata')

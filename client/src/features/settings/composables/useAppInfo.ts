@@ -7,7 +7,6 @@ import { api } from '@/lib/api'
 const version = ref('')
 const updateAvailable = ref<boolean | null>(null)
 const latestVersion = ref<string | null>(null)
-const bookDockPath = ref('')
 const maxUploadSizeMb = ref(500)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
@@ -24,7 +23,6 @@ export function useAppInfo() {
       version.value = data.version
       updateAvailable.value = data.updateAvailable
       latestVersion.value = data.latestVersion
-      bookDockPath.value = data.bookDockPath ?? ''
       maxUploadSizeMb.value = data.maxUploadSizeMb ?? 500
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load app info'
@@ -33,5 +31,5 @@ export function useAppInfo() {
     }
   }
 
-  return { version, updateAvailable, latestVersion, bookDockPath, maxUploadSizeMb, isLoading, error, loadAppInfo }
+  return { version, updateAvailable, latestVersion, maxUploadSizeMb, isLoading, error, loadAppInfo }
 }

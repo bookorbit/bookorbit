@@ -20,6 +20,7 @@ function makeRepo(): jest.Mocked<AppSettingsRepository> {
     findExistingLibraryIds: vi.fn().mockResolvedValue([]),
     updateByKey: vi.fn().mockResolvedValue(null),
     upsert: vi.fn().mockResolvedValue(undefined),
+    upsertMany: vi.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<AppSettingsRepository>;
 }
 
@@ -41,7 +42,7 @@ describe('AppSettingsService', () => {
   beforeEach(() => {
     repo = makeRepo();
     config = makeConfig();
-    service = new AppSettingsService(repo, config);
+    service = new AppSettingsService(repo, config, { appDataPath: '/data', bookDockPath: '/data/book-dock', libraryBrowseRoot: '/' });
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
   });
@@ -90,6 +91,19 @@ describe('AppSettingsService', () => {
     it('throws NotFoundException when key does not exist', async () => {
       repo.updateByKey.mockResolvedValue(null);
       await expect(service.update('nonexistent_key', 'value')).rejects.toThrow(NotFoundException);
+    });
+
+    it.each([
+      'book_dock_paused',
+      'book_dock_auto_fetch_metadata',
+      'book_dock_auto_finalize_enabled',
+      'book_dock_auto_finalize_threshold',
+      'book_dock_auto_finalize_library_id',
+      'book_dock_auto_finalize_folder_id',
+      'book_dock_auto_finalize_metadata_mode',
+    ])('rejects %s so it cannot bypass the Book Dock validation', async (key) => {
+      await expect(service.update(key, 'anything')).rejects.toThrow(BadRequestException);
+      expect(repo.updateByKey).not.toHaveBeenCalled();
     });
   });
 
@@ -350,7 +364,11 @@ describe('AppSettingsService', () => {
     });
 
     it('passes allowLocal: false when nodeEnv is production', async () => {
-      const prodService = new AppSettingsService(repo, makeConfig('production'));
+      const prodService = new AppSettingsService(repo, makeConfig('production'), {
+        appDataPath: '/data',
+        bookDockPath: '/data/book-dock',
+        libraryBrowseRoot: '/',
+      });
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
       await prodService.testOidcConnection('https://kc.example.com/realms/main');
       expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://kc.example.com/realms/main', { allowLocal: false, allowPrivate: false });
@@ -358,7 +376,11 @@ describe('AppSettingsService', () => {
     });
 
     it('passes allowLocal: true when production override is enabled', async () => {
-      const prodService = new AppSettingsService(repo, makeConfig('production', true));
+      const prodService = new AppSettingsService(repo, makeConfig('production', true), {
+        appDataPath: '/data',
+        bookDockPath: '/data/book-dock',
+        libraryBrowseRoot: '/',
+      });
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(discoveryDoc) }));
       await prodService.testOidcConnection('https://kc.example.com/realms/main');
       expect(vi.mocked(ensureSafeUrl)).toHaveBeenCalledWith('https://kc.example.com/realms/main', { allowLocal: true, allowPrivate: true });
@@ -419,6 +441,73 @@ describe('AppSettingsService', () => {
 
       const result = await service.getAutoFinalizeSettings();
       expect(result.metadataMode).toBe('embedded_only');
+    });
+  });
+
+  describe('Book Dock settings', () => {
+    it('returns the protected configuration with safe defaults', async () => {
+      repo.findMany.mockResolvedValue([
+        { key: 'book_dock_auto_fetch_metadata', value: 'invalid' },
+        { key: 'book_dock_auto_finalize_enabled', value: 'invalid' },
+        { key: 'book_dock_auto_finalize_threshold', value: '101' },
+        { key: 'book_dock_auto_finalize_library_id', value: '-1' },
+        { key: 'book_dock_auto_finalize_folder_id', value: 'abc' },
+        { key: 'book_dock_auto_finalize_metadata_mode', value: 'invalid' },
+      ] as never);
+
+      await expect(service.getBookDockSettings()).resolves.toEqual({
+        bookDockPath: '/data/book-dock',
+        autoFetchMetadata: true,
+        autoFinalizeEnabled: false,
+        autoFinalizeThreshold: 85,
+        autoFinalizeLibraryId: null,
+        autoFinalizeFolderId: null,
+        autoFinalizeMetadataMode: 'safe_merge',
+      });
+    });
+
+    it('parses stored configuration values', async () => {
+      repo.findMany.mockResolvedValue([
+        { key: 'book_dock_auto_fetch_metadata', value: 'false' },
+        { key: 'book_dock_auto_finalize_enabled', value: 'true' },
+        { key: 'book_dock_auto_finalize_threshold', value: '95' },
+        { key: 'book_dock_auto_finalize_library_id', value: '7' },
+        { key: 'book_dock_auto_finalize_folder_id', value: '11' },
+        { key: 'book_dock_auto_finalize_metadata_mode', value: 'embedded_only' },
+      ] as never);
+
+      await expect(service.getBookDockSettings()).resolves.toMatchObject({
+        autoFetchMetadata: false,
+        autoFinalizeEnabled: true,
+        autoFinalizeThreshold: 95,
+        autoFinalizeLibraryId: 7,
+        autoFinalizeFolderId: 11,
+        autoFinalizeMetadataMode: 'embedded_only',
+      });
+    });
+
+    it('updates the complete configuration together and returns the refreshed settings', async () => {
+      repo.findMany.mockResolvedValue([]);
+      const request = {
+        autoFetchMetadata: false,
+        autoFinalizeEnabled: true,
+        autoFinalizeThreshold: 90,
+        autoFinalizeLibraryId: 4,
+        autoFinalizeFolderId: null,
+        autoFinalizeMetadataMode: 'fetched_only' as const,
+      };
+
+      await service.updateBookDockSettings(request);
+
+      expect(repo.upsertMany).toHaveBeenCalledWith([
+        { key: 'book_dock_auto_fetch_metadata', value: 'false' },
+        { key: 'book_dock_auto_finalize_enabled', value: 'true' },
+        { key: 'book_dock_auto_finalize_threshold', value: '90' },
+        { key: 'book_dock_auto_finalize_library_id', value: '4' },
+        { key: 'book_dock_auto_finalize_folder_id', value: '' },
+        { key: 'book_dock_auto_finalize_metadata_mode', value: 'fetched_only' },
+      ]);
+      expect(repo.findMany).toHaveBeenCalledAfter(repo.upsertMany);
     });
   });
 

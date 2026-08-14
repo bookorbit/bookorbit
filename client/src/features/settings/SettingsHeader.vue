@@ -85,7 +85,7 @@ const sections = computed<Section[]>(() => {
     })
   }
 
-  if (su || perms.includes('manage_app_settings') || perms.includes('book_dock_access')) {
+  if (su || perms.includes(Permission.ManageAppSettings) || perms.includes(Permission.ManageBookDock)) {
     result.push({
       id: 'settings-system',
       label: t('settings.common.nav.system'),

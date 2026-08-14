@@ -1,4 +1,4 @@
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export const KOREADER_DEVICE_ID_REGEX = /^[A-Za-z0-9-]{1,100}$/;
 
@@ -8,4 +8,9 @@ export class KoreaderDeviceParamDto {
   @MaxLength(100)
   @Matches(KOREADER_DEVICE_ID_REGEX)
   deviceId!: string;
+}
+
+export class UpdateKoreaderDeviceDto {
+  @IsBoolean()
+  retired!: boolean;
 }

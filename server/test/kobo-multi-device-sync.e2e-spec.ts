@@ -6,6 +6,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { Client } from 'pg';
 
 import * as schema from '../src/db/schema';
+import { SYNC_PAGE_SIZE } from '../src/modules/kobo/services/kobo-sync.service';
 import { waitForCondition } from './e2e/app-harness';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
@@ -24,6 +25,9 @@ type SyncResponse = { entries: unknown[]; hasMore: boolean; syncToken: string };
 type NewEntitlement = { BookEntitlement: { Id: string }; ReadingState: Record<string, unknown> };
 
 const MIGRATIONS_DIRECTORY = join(dirname(fileURLToPath(import.meta.url)), '../src/db/migrations');
+
+// One book past a full page, so the suite keeps exercising a page boundary whatever SYNC_PAGE_SIZE is.
+const LIBRARY_BOOK_COUNT = SYNC_PAGE_SIZE + 1;
 
 function escapeIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`;
@@ -240,7 +244,7 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
     library = await createLibraryWithFolder(ctx, { name: `kobo-multi-device-${randomUUID()}` });
 
     const paths = await Promise.all(
-      Array.from({ length: 6 }, (_, index) =>
+      Array.from({ length: LIBRARY_BOOK_COUNT }, (_, index) =>
         createEpubFixture(library.folderPath, `kobo-multi-device-${index + 1}.epub`, {
           title: `Kobo Multi Device ${index + 1}`,
           uid: `urn:uuid:${randomUUID()}`,
@@ -291,7 +295,7 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
     const first = await sync(echoDevice);
     const firstEntitlements = newEntitlements(first.entries);
     expect(first.hasMore).toBe(true);
-    expect(firstEntitlements).toHaveLength(5);
+    expect(firstEntitlements).toHaveLength(SYNC_PAGE_SIZE);
 
     for (const entitlement of firstEntitlements) {
       await putReadingState(echoDevice, entitlement.BookEntitlement.Id, entitlement.ReadingState);
@@ -323,8 +327,8 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
     const bFirst = await sync(deviceB);
     expect(aFirst.hasMore).toBe(true);
     expect(bFirst.hasMore).toBe(true);
-    expect(entitlementIds(aFirst.entries)).toHaveLength(5);
-    expect(entitlementIds(bFirst.entries)).toHaveLength(5);
+    expect(entitlementIds(aFirst.entries)).toHaveLength(SYNC_PAGE_SIZE);
+    expect(entitlementIds(bFirst.entries)).toHaveLength(SYNC_PAGE_SIZE);
 
     const aSecond = await sync(deviceA, aFirst.syncToken);
     expect(aSecond.hasMore).toBe(false);
@@ -373,7 +377,7 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
           snapshots.map((snapshot) => snapshot.id),
         ),
       );
-    expect(rows).toHaveLength(12);
+    expect(rows).toHaveLength(LIBRARY_BOOK_COUNT * 2);
     expect(rows.every((row) => row.synced)).toBe(true);
   });
 
@@ -482,7 +486,7 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
             .map((snapshot) => snapshot.id),
         ),
       );
-    expect(aAndBRows).toHaveLength(12);
+    expect(aAndBRows).toHaveLength(LIBRARY_BOOK_COUNT * 2);
     expect(aAndBRows.every((row) => row.synced)).toBe(true);
 
     const [targetIdentity] = await ctx.db

@@ -3,6 +3,7 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   getTableColumns: vi.fn(() => ({})),
   inArray: vi.fn((left: unknown, right: unknown[]) => ({ op: 'inArray', left, right })),
+  isNotNull: vi.fn((value: unknown) => ({ op: 'isNotNull', value })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
@@ -94,6 +95,22 @@ describe('LibraryRepository', () => {
       ],
     });
     expect(orderBy).toHaveBeenCalledWith(libraries.displayOrder, libraries.name);
+  });
+
+  it('findAutoScanSchedules selects only libraries with a configured expression', async () => {
+    const orderBy = vi.fn().mockResolvedValue([{ id: 4, autoScanCronExpression: '0 4 * * *' }]);
+    const where = vi.fn().mockReturnValue({ orderBy });
+    const from = vi.fn().mockReturnValue({ where });
+    db.select.mockReturnValue({ from });
+
+    await expect(repo.findAutoScanSchedules()).resolves.toEqual([{ id: 4, autoScanCronExpression: '0 4 * * *' }]);
+
+    expect(db.select).toHaveBeenCalledWith({
+      id: libraries.id,
+      autoScanCronExpression: libraries.autoScanCronExpression,
+    });
+    expect(where).toHaveBeenCalledWith({ op: 'isNotNull', value: libraries.autoScanCronExpression });
+    expect(orderBy).toHaveBeenCalledWith(libraries.id);
   });
 
   it('getStats aggregates counts, sizes, and format map', async () => {

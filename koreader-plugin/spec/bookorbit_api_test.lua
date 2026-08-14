@@ -108,6 +108,11 @@ local function assertEqual(actual, expected, label)
     end
 end
 
+assertEqual(BookOrbitApi.normalizeServerUrl("https://bookorbit.example.com"),
+    "https://bookorbit.example.com/api/v1", "origin-only server URL is normalized")
+assertEqual(BookOrbitApi.normalizeServerUrl("https://bookorbit.example.com/api/v1/koreader"),
+    "https://bookorbit.example.com/api/v1", "stock sync URL is normalized")
+
 local decoded, err = BookOrbitApi.decodeResponse({ "" })
 assertEqual(type(decoded), "table", "empty body decodes to table")
 assertEqual(err, nil, "empty body has no error")

@@ -18,7 +18,10 @@ import { encodeSyncToken } from './kobo-sync-token';
 
 type Db = NodePgDatabase<typeof schema>;
 
-const SYNC_PAGE_SIZE = 5;
+// A device pauses between sync rounds, so wall-clock time for a long delta tracks the number of
+// round trips rather than the work inside each one: at five books a page, re-announcing a few
+// hundred books cost users tens of minutes of waiting on a mostly idle server.
+export const SYNC_PAGE_SIZE = 50;
 const SNAPSHOT_RECONCILE_BATCH_SIZE = 5000;
 const SNAPSHOT_CREATE_BATCH_SIZE = 5000;
 const METADATA_SERIALIZER_VERSION = 2;
@@ -67,6 +70,8 @@ type SmartScopeMatch = { name: string; bookIds: number[]; where: SQL | undefined
 // caching across requests (this service is a singleton).
 type SmartScopeMatchCache = Map<number, Promise<Map<number, SmartScopeMatch>>>;
 
+type EligibleIdsResolver = () => Promise<Set<number>>;
+
 export interface KoboBookEntry {
   bookId: number;
   koboEntitlementId: string;
@@ -111,9 +116,19 @@ export class KoboSyncService {
     baseUrl: string,
   ): Promise<{ entitlements: unknown[]; hasMore: boolean; syncToken: string }> {
     let snapshot = await this.findDeviceSnapshot(userId, deviceId);
+    const smartScopeMatchCache: SmartScopeMatchCache = new Map();
+
+    // Reconciling costs a pass over the whole library, so a device still working through its
+    // pending rows skips it: those rows already say what it is owed, and whatever changed while
+    // it paged is picked up by the reconcile that opens its next sync.
+    if (snapshot && (await this.hasPendingSnapshotBooks(snapshot.id))) {
+      return this.getPageFromSnapshot(userId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () =>
+        this.fetchEligibleBookIds(userId, true, smartScopeMatchCache),
+      );
+    }
+
     const hadDeviceSnapshot = snapshot ? true : await this.hasDeviceSnapshot(userId);
     const legacyNumericRemovalBookIds = snapshot ? new Set<number>() : await this.getLegacyNumericRemovalBookIds(userId, deviceId);
-    const smartScopeMatchCache: SmartScopeMatchCache = new Map();
     const eligibleSnapshotRows = await this.fetchEligibleSnapshotRows(userId, hadDeviceSnapshot, smartScopeMatchCache);
 
     if (!snapshot) {
@@ -128,14 +143,8 @@ export class KoboSyncService {
       await this.reconcileSnapshot(snapshot.id, eligibleSnapshotRows);
     }
 
-    return this.getPageFromSnapshot(
-      userId,
-      snapshot.id,
-      deviceToken,
-      baseUrl,
-      new Set(eligibleSnapshotRows.map((row) => row.bookId)),
-      smartScopeMatchCache,
-    );
+    const eligibleIds = new Set(eligibleSnapshotRows.map((row) => row.bookId));
+    return this.getPageFromSnapshot(userId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () => Promise.resolve(eligibleIds));
   }
 
   async getBookMetadata(userId: number, bookId: number, deviceToken: string, baseUrl: string): Promise<unknown[]> {
@@ -170,6 +179,24 @@ export class KoboSyncService {
     return this.db.query.koboLibrarySnapshots.findFirst({
       where: and(eq(schema.koboLibrarySnapshots.userId, userId), eq(schema.koboLibrarySnapshots.deviceId, deviceId)),
     });
+  }
+
+  private async hasPendingSnapshotBooks(snapshotId: number): Promise<boolean> {
+    const [row] = await this.db
+      .select({ bookId: schema.koboSnapshotBooks.bookId })
+      .from(schema.koboSnapshotBooks)
+      .where(and(eq(schema.koboSnapshotBooks.snapshotId, snapshotId), eq(schema.koboSnapshotBooks.synced, false)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  private async fetchEligibleBookIds(
+    userId: number,
+    needsLegacyNumericRemovalForNewMappings: boolean,
+    smartScopeMatchCache: SmartScopeMatchCache,
+  ): Promise<Set<number>> {
+    const rows = await this.fetchEligibleSnapshotRows(userId, needsLegacyNumericRemovalForNewMappings, smartScopeMatchCache);
+    return new Set(rows.map((row) => row.bookId));
   }
 
   private async hasDeviceSnapshot(userId: number): Promise<boolean> {
@@ -475,13 +502,18 @@ export class KoboSyncService {
     });
   }
 
+  /**
+   * Serves the next page of a snapshot. Eligibility is resolved lazily because only the final page
+   * needs the full set, and reaching for it on every page is what makes a long delta O(library) per
+   * request.
+   */
   private async getPageFromSnapshot(
     userId: number,
     snapshotId: number,
     deviceToken: string,
     baseUrl: string,
-    eligibleIds: Set<number>,
     smartScopeMatchCache: SmartScopeMatchCache,
+    resolveEligibleIds: EligibleIdsResolver,
   ): Promise<{ entitlements: unknown[]; hasMore: boolean; syncToken: string }> {
     const syncToken = encodeSyncToken(snapshotId);
 
@@ -496,7 +528,7 @@ export class KoboSyncService {
     const page = pending.slice(0, SYNC_PAGE_SIZE);
 
     if (page.length === 0) {
-      const tagItems = await this.buildTagItems(userId, eligibleIds, smartScopeMatchCache);
+      const tagItems = await this.buildTagItems(userId, await resolveEligibleIds(), smartScopeMatchCache);
       return { entitlements: tagItems, hasMore: false, syncToken };
     }
 

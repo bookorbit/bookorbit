@@ -32,6 +32,7 @@ function makeSyncStatus(overrides: Partial<KoreaderSyncStatus> = {}): KoreaderSy
         deviceId: 'device-1',
         lastSyncAt: '2026-01-02T00:00:00.000Z',
         lastBookTitle: 'Project Hail Mary',
+        retiredAt: null,
       },
     ],
     totalSyncedBooks: 14,
@@ -593,6 +594,32 @@ describe('useKoreaderSync', () => {
     expect(apiMock).toHaveBeenCalledWith('/api/v1/koreader/devices/device-1', { method: 'DELETE' })
     expect(syncStatus.value).toEqual(refreshedStatus)
     expect(loading.value).toBe(false)
+  })
+
+  it('setDeviceRetired patches the device and refreshes the sync status', async () => {
+    const refreshedStatus = makeSyncStatus()
+    apiMock.mockResolvedValueOnce(makeResponse({ success: true })).mockResolvedValueOnce(makeResponse(refreshedStatus))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { syncStatus, setDeviceRetired } = useKoreaderSync()
+
+    await expect(setDeviceRetired('device-1', true)).resolves.toBeUndefined()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/koreader/devices/device-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ retired: true }),
+    })
+    expect(syncStatus.value).toEqual(refreshedStatus)
+  })
+
+  it('setDeviceRetired throws the server message on failure', async () => {
+    apiMock.mockResolvedValueOnce(makeResponse({ message: 'KOReader device not found' }, { ok: false, status: 404 }))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { setDeviceRetired } = useKoreaderSync()
+
+    await expect(setDeviceRetired('missing-device', false)).rejects.toThrow('KOReader device not found')
   })
 
   it('removeDevice throws the server message on failure', async () => {

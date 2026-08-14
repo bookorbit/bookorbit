@@ -5,10 +5,9 @@ import { AppSettingsService } from '../app-settings/app-settings.service';
 import { GITHUB_RELEASES_API } from './app-info.constants';
 import { AppInfoService } from './app-info.service';
 
-function makeConfig(version = 'v1.2.3', bookDockPath = '/data/book-dock'): jest.Mocked<ConfigService> {
+function makeConfig(version = 'v1.2.3'): jest.Mocked<ConfigService> {
   return {
     get: vi.fn().mockImplementation((key: string) => {
-      if (key === 'storage.bookDockPath') return bookDockPath;
       if (key === 'app.version') return version;
       return undefined;
     }),
@@ -62,27 +61,16 @@ describe('AppInfoService', () => {
       expect(info.latestVersion).toBeNull();
     });
 
-    it('returns bookDockPath from config', async () => {
-      const service = new AppInfoService(makeConfig('v1.0.0', '/books/bookdrop'), makeAppSettings());
-      expect((await service.getAppInfo()).bookDockPath).toBe('/books/bookdrop');
-    });
-
-    it('falls back to /data/book-dock when storage.bookDockPath is not configured', async () => {
-      const config = { get: vi.fn().mockReturnValue(undefined) } as unknown as ConfigService;
-      const service = new AppInfoService(config, makeAppSettings());
-      expect((await service.getAppInfo()).bookDockPath).toBe('/data/book-dock');
-    });
-
-    it('includes bookDockPath in full response shape', async () => {
-      const service = new AppInfoService(makeConfig('Local build', '/app/data/book-dock'), makeAppSettings());
+    it('does not expose the Book Dock filesystem path', async () => {
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings());
       const info = await service.getAppInfo();
       expect(info).toMatchObject({
         version: 'Local build',
         updateAvailable: null,
         latestVersion: null,
-        bookDockPath: '/app/data/book-dock',
         maxUploadSizeMb: 500,
       });
+      expect(info).not.toHaveProperty('bookDockPath');
     });
 
     it('fetches from GitHub if checked for the first time', async () => {

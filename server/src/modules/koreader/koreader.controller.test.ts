@@ -22,6 +22,7 @@ function makeController() {
     setDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
     clearDeviceFileNamingPattern: vi.fn().mockResolvedValue(undefined),
     removeDevice: vi.fn().mockResolvedValue(undefined),
+    setDeviceRetired: vi.fn().mockResolvedValue(undefined),
     getBookProgress: vi.fn().mockResolvedValue(null),
     testConnection: vi.fn().mockResolvedValue(true),
   };
@@ -156,6 +157,21 @@ describe('KoreaderController', () => {
 
   it('grants Koreader Sync permission for the device removal route', () => {
     expect(Reflect.getMetadata(PERMISSION_KEY, KoreaderController.prototype.removeDevice)).toBe(Permission.KoreaderSync);
+  });
+
+  it('forwards device retirement changes to the service', async () => {
+    const { controller, koreaderService } = makeController();
+    const user = { id: 7 } as never;
+
+    await expect(controller.updateDevice(user, { deviceId: 'device-1' }, { retired: true })).resolves.toEqual({ success: true });
+    expect(koreaderService.setDeviceRetired).toHaveBeenCalledWith(7, 'device-1', true);
+
+    await expect(controller.updateDevice(user, { deviceId: 'device-1' }, { retired: false })).resolves.toEqual({ success: true });
+    expect(koreaderService.setDeviceRetired).toHaveBeenCalledWith(7, 'device-1', false);
+  });
+
+  it('grants Koreader Sync permission for the device update route', () => {
+    expect(Reflect.getMetadata(PERMISSION_KEY, KoreaderController.prototype.updateDevice)).toBe(Permission.KoreaderSync);
   });
 
   it('grants Koreader Sync permission for the unmatched-book dismiss route', () => {

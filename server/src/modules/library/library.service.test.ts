@@ -70,6 +70,10 @@ describe('LibraryService', () => {
     assertWithinBrowseRoot: vi.fn((path: string) => Promise.resolve(path)),
     resolveBrowsePath: vi.fn((path: string) => Promise.resolve(path)),
   };
+  const scanScheduler = {
+    syncSchedule: vi.fn(),
+    removeSchedule: vi.fn(),
+  };
 
   let service: LibraryService;
 
@@ -84,6 +88,7 @@ describe('LibraryService', () => {
       fileWriteService as any,
       achievementEvents as any,
       pathPolicy as any,
+      scanScheduler as any,
     );
 
     mockStat.mockResolvedValue({ isDirectory: () => true } as Awaited<ReturnType<typeof stat>>);
@@ -222,6 +227,21 @@ describe('LibraryService', () => {
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(6);
   });
 
+  it('create registers the configured scan schedule', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 6, name: 'Scheduled', icon: 'BookOpen', watch: false }]);
+    libraryRepo.insertFolder.mockResolvedValueOnce([{ id: 21, path: '/scheduled' }]);
+
+    await service.create({
+      name: 'Scheduled',
+      icon: 'BookOpen',
+      folders: ['/scheduled'],
+      autoScanCronExpression: '0 4 * * *',
+    } as any);
+
+    expect(scanScheduler.syncSchedule).toHaveBeenCalledWith(6, '0 4 * * *');
+  });
+
   it('create rejects duplicate library names', async () => {
     libraryRepo.findByName.mockResolvedValue([{ id: 9 }]);
 
@@ -327,6 +347,18 @@ describe('LibraryService', () => {
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(10);
   });
 
+  it('update replaces or disables the configured scan schedule', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false }]);
+    libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    await service.update(10, { autoScanCronExpression: '0 6 * * *' } as any);
+    await service.update(10, { autoScanCronExpression: null } as any);
+
+    expect(scanScheduler.syncSchedule).toHaveBeenNthCalledWith(1, 10, '0 6 * * *');
+    expect(scanScheduler.syncSchedule).toHaveBeenNthCalledWith(2, 10, null);
+  });
+
   it('update rejects organization mode changes after creation', async () => {
     libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: 'book_per_folder' }]);
 
@@ -417,6 +449,7 @@ describe('LibraryService', () => {
 
     expect(fileWatcherService.stopWatcher).toHaveBeenCalledWith(4);
     expect(libraryRepo.delete).toHaveBeenCalledWith(4);
+    expect(scanScheduler.removeSchedule).toHaveBeenCalledWith(4);
     expect(mockRm).toHaveBeenCalledWith('/books/covers/101', { recursive: true, force: true });
     expect(mockRm).toHaveBeenCalledWith('/books/covers/102', { recursive: true, force: true });
   });

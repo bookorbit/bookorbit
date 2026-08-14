@@ -477,6 +477,13 @@
       "when": 1786500000000,
       "tag": "0067_add_manual_books_support",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1786702179032,
+      "tag": "0068_add_koreader_device_retirements",
+      "breakpoints": true
     }
   ]
 }

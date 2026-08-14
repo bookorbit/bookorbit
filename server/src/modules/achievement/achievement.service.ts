@@ -27,6 +27,7 @@ import type { AchievementRow, UserAchievementRow } from '../../db/schema';
 export class AchievementService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AchievementService.name);
   private readonly eventHandlers = new Map<string, (payload: Record<string, unknown>) => void>();
+  private readonly backfillRuns = new Map<number, { pending: boolean }>();
   private seedPromise: Promise<void> | null = null;
 
   constructor(
@@ -194,6 +195,44 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       };
       this.eventHandlers.set(eventName, handler);
       this.events.on(eventName, handler);
+    }
+
+    const backfillHandler = (payload: Record<string, unknown>): void => {
+      this.handleBackfillEvent(payload);
+    };
+    this.eventHandlers.set(ACHIEVEMENT_EVENT_BACKFILL, backfillHandler);
+    this.events.on(ACHIEVEMENT_EVENT_BACKFILL, backfillHandler);
+  }
+
+  /**
+   * A backfill re-evaluates the whole catalogue and carries no data beyond the user, so emitters that
+   * fire it per unit of work (a KOReader device catching up over many uploads) would otherwise stack
+   * full evaluations for one user in parallel. Runs are serialized per user and a burst collapses into
+   * a single trailing re-run, which still sees the newest data because every evaluator reads the database.
+   */
+  private handleBackfillEvent(payload: Record<string, unknown>): void {
+    const userId = payload.userId as number;
+    if (!userId) return;
+
+    const active = this.backfillRuns.get(userId);
+    if (active) {
+      active.pending = true;
+      return;
+    }
+
+    const run = { pending: false };
+    this.backfillRuns.set(userId, run);
+    void this.drainBackfillRuns(userId, run, payload);
+  }
+
+  private async drainBackfillRuns(userId: number, run: { pending: boolean }, payload: Record<string, unknown>): Promise<void> {
+    try {
+      do {
+        run.pending = false;
+        await this.handleEvent(ACHIEVEMENT_EVENT_BACKFILL, payload);
+      } while (run.pending);
+    } finally {
+      this.backfillRuns.delete(userId);
     }
   }
 

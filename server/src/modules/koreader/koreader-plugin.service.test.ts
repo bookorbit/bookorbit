@@ -29,6 +29,7 @@ describe('KoreaderPluginService', () => {
     resolveBookFilesByHashes: ReturnType<typeof vi.fn>;
     upsertUnmatchedBooks: ReturnType<typeof vi.fn>;
     clearUnmatchedBooks: ReturnType<typeof vi.fn>;
+    restoreDevice: ReturnType<typeof vi.fn>;
   };
   let pluginRepo: {
     getRatings: ReturnType<typeof vi.fn>;
@@ -63,6 +64,7 @@ describe('KoreaderPluginService', () => {
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
       upsertUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
       clearUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
+      restoreDevice: vi.fn().mockResolvedValue(undefined),
     };
     pluginRepo = {
       getRatings: vi.fn().mockResolvedValue(new Map()),

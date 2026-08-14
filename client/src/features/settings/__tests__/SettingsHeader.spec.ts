@@ -190,12 +190,17 @@ describe('SettingsHeader', () => {
       expect(labels).toContain('System')
     })
 
-    it('shows System tab for user with book_dock_access', () => {
+    it('hides System tab for user with book_dock_access only', () => {
       const labels = getTabLabels(mountHeader({ perms: ['book_dock_access'] }))
+      expect(labels).not.toContain('System')
+    })
+
+    it('shows System tab for user with manage_book_dock', () => {
+      const labels = getTabLabels(mountHeader({ perms: ['manage_book_dock'] }))
       expect(labels).toContain('System')
     })
 
-    it('hides System tab when user lacks manage_app_settings and book_dock_access', () => {
+    it('hides System tab when user lacks settings management permissions', () => {
       const labels = getTabLabels(mountHeader({ perms: ['kobo_sync'] }))
       expect(labels).not.toContain('System')
     })

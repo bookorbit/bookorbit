@@ -262,6 +262,7 @@ export class KoreaderPluginService {
       pageStatsUploaded: dto.pageStatsUploaded,
       annotationsUpserted: dto.annotationsUpserted,
     });
+    await this.koreaderRepo.restoreDevice(user.id, dto.deviceId);
 
     const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
     const libraryVersion = await this.computeLibraryVersion(user.id, accessibleLibraryIds);

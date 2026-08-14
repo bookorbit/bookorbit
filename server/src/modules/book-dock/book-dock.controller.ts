@@ -14,6 +14,7 @@ import {
   Query,
   Req,
   Res,
+  Put,
 } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { access } from 'fs/promises';
@@ -35,6 +36,7 @@ import { BookDockIngestService } from './book-dock-ingest.service';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
 import { BookDockWatcherService } from './book-dock-watcher.service';
 import { ListBookDockFilesDto } from './dto/list-book-dock-files.dto';
+import { UpdateBookDockSettingsDto } from './dto/update-book-dock-settings.dto';
 import {
   UpdateBookDockFileDto,
   FinalizeBookDockDto,
@@ -91,6 +93,23 @@ export class BookDockController {
   @HttpCode(HttpStatus.OK)
   resume() {
     return this.service.resumeProcessing();
+  }
+
+  @Get('settings')
+  @RequirePermission(Permission.ManageBookDock)
+  getSettings() {
+    return this.appSettings.getBookDockSettings();
+  }
+
+  @Put('settings')
+  @RequirePermission(Permission.ManageBookDock)
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: 'Updated Book Dock settings',
+  })
+  updateSettings(@Body() dto: UpdateBookDockSettingsDto) {
+    return this.appSettings.updateBookDockSettings(dto);
   }
 
   @Get('statistics')

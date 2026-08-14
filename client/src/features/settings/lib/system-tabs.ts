@@ -1,20 +1,22 @@
+import { Permission } from '@bookorbit/types'
+
 export const SYSTEM_TABS = ['file-naming', 'book-dock', 'maintenance', 'audit-log'] as const
 
 export type SystemTab = (typeof SYSTEM_TABS)[number]
 
 type SystemTabInfo = {
-  permission: string | null
+  permission: Permission | null
 }
 
 export const SYSTEM_TAB_INFO: Record<SystemTab, SystemTabInfo> = {
   'file-naming': {
-    permission: 'manage_app_settings',
+    permission: Permission.ManageAppSettings,
   },
   'book-dock': {
-    permission: 'book_dock_access',
+    permission: Permission.ManageBookDock,
   },
   maintenance: {
-    permission: 'manage_app_settings',
+    permission: Permission.ManageAppSettings,
   },
   'audit-log': {
     permission: null,

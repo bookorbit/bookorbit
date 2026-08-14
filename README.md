@@ -103,7 +103,7 @@ The BookOrbit plugin for KOReader adds progress sync, two-way annotation sync, a
 
 ![BookOrbit KOReader Plugin showing dashboard, catalog search, and book details](docs/images/koreader-plugin-preview.png)
 
-1. In BookOrbit, go to **Settings > Integrations > KOReader** and click **Download Plugin**.
+1. In BookOrbit, go to **Settings > KOReader**, create credentials if prompted, and click **Download Plugin**.
 2. Unzip `bookorbit.koplugin.zip`.
 3. Copy `bookorbit.koplugin` to `koreader/plugins/` on the device.
 4. Restart KOReader and open a book.

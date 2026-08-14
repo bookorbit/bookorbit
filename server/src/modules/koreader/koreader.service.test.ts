@@ -146,6 +146,10 @@ describe('KoreaderService', () => {
       getChapters: vi.fn(),
       getLastFileWriteTime: vi.fn(),
       removeDevice: vi.fn(),
+      listRetiredDeviceIds: vi.fn().mockResolvedValue(new Map()),
+      deviceExists: vi.fn().mockResolvedValue(true),
+      retireDevice: vi.fn().mockResolvedValue(undefined),
+      restoreDevice: vi.fn().mockResolvedValue(undefined),
     };
 
     mockChapterService = {
@@ -391,6 +395,7 @@ describe('KoreaderService', () => {
         xpointer: '/body/DocFragment[7]',
         pageNumber: null,
       });
+      expect(mockRepo.restoreDevice).toHaveBeenCalledWith(12, 'device-12');
       expect(mockBookService.syncKoboReadingStateForExternalProgress).toHaveBeenCalledWith(12, 44, 50);
       expect(mockBookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
         12,
@@ -815,6 +820,7 @@ describe('KoreaderService', () => {
           deviceId: 'device-1',
           lastSyncAt: '2026-02-01T10:00:00.000Z',
           lastBookTitle: null,
+          retiredAt: null,
           fileNamingPattern: null,
           seriesFileNamingPattern: null,
           standaloneFileNamingPattern: null,
@@ -1122,6 +1128,7 @@ describe('KoreaderService', () => {
           deviceId: 'device-1',
           lastSyncAt: '2026-02-01T10:00:00.000Z',
           lastBookTitle: 'Project Hail Mary',
+          retiredAt: null,
           fileNamingPattern: 'Device/{title}',
           seriesFileNamingPattern: 'Series/{title}',
           standaloneFileNamingPattern: null,
@@ -1131,6 +1138,7 @@ describe('KoreaderService', () => {
           deviceId: 'device-2',
           lastSyncAt: '2026-02-01T11:00:00.000Z',
           lastBookTitle: null,
+          retiredAt: null,
           fileNamingPattern: null,
           seriesFileNamingPattern: null,
           standaloneFileNamingPattern: null,
@@ -1248,6 +1256,30 @@ describe('KoreaderService', () => {
 
       await expect(service.removeDevice(7, 'missing-device')).rejects.toThrow(NotFoundException);
       expect(mockRepo.removeDevice).toHaveBeenCalledWith(7, 'missing-device');
+    });
+  });
+
+  describe('setDeviceRetired', () => {
+    it('retires a known device without deleting any of its data', async () => {
+      await service.setDeviceRetired(7, 'device-1', true);
+
+      expect(mockRepo.retireDevice).toHaveBeenCalledWith(7, 'device-1');
+      expect(mockRepo.restoreDevice).not.toHaveBeenCalled();
+      expect(mockRepo.removeDevice).not.toHaveBeenCalled();
+    });
+
+    it('restores a retired device', async () => {
+      await service.setDeviceRetired(7, 'device-1', false);
+
+      expect(mockRepo.restoreDevice).toHaveBeenCalledWith(7, 'device-1');
+      expect(mockRepo.retireDevice).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for a device no table knows about', async () => {
+      mockRepo.deviceExists.mockResolvedValue(false);
+
+      await expect(service.setDeviceRetired(7, 'missing-device', true)).rejects.toThrow(NotFoundException);
+      expect(mockRepo.retireDevice).not.toHaveBeenCalled();
     });
   });
 

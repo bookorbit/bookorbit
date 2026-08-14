@@ -29,6 +29,7 @@ import { ReorderLibrariesDto } from './dto/reorder-libraries.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
 import { DEFAULT_LIBRARY_COVER_ASPECT_RATIO, DEFAULT_LIBRARY_ORGANIZATION_MODE, LIBRARY_METADATA_PRECEDENCE_DEFAULT } from './library.constants';
 import { LibraryRepository } from './library.repository';
+import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 
 interface LibraryMetadataWriteStreamOptions {
   onProgress?: (event: LibraryFileSyncProgressEvent) => void;
@@ -56,6 +57,7 @@ export class LibraryService {
     private readonly fileWriteService: FileWriteService,
     private readonly achievementEvents: AchievementEventsService,
     private readonly pathPolicy: PathPolicyService,
+    private readonly scanScheduler: LibraryScanSchedulerService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -151,6 +153,7 @@ export class LibraryService {
       );
     }
 
+    this.scanScheduler.syncSchedule(library.id, dto.autoScanCronExpression ?? null);
     this.scannerService.startScanAsync(library.id);
 
     return { ...normalizeLibraryOrganizationMode(library), folders: folders.map(([f]) => f) };
@@ -182,6 +185,7 @@ export class LibraryService {
     }
 
     const [updated] = await this.libraryRepo.update(id, fields);
+    if (dto.autoScanCronExpression !== undefined) this.scanScheduler.syncSchedule(id, dto.autoScanCronExpression);
 
     if (folderPaths !== undefined) {
       const existingFolders = await this.libraryRepo.findFoldersByLibrary(id);
@@ -230,6 +234,7 @@ export class LibraryService {
 
     const bookRows = await this.libraryRepo.findBookIdsByLibrary(id);
     await this.libraryRepo.delete(id);
+    this.scanScheduler.removeSchedule(id);
     await this.cleanupCoverDirectories(bookRows.map(({ id: bookId }) => bookId));
   }
 

@@ -623,18 +623,19 @@ describe('KoreaderRepository', () => {
       await expect(repo.getAllDeviceProgress(10, 42)).resolves.toBe(rows);
     });
 
-    it('maps device list rows from raw SQL results', async () => {
+    it('maps device list rows from raw SQL results, carrying the retirement marker', async () => {
       const lastSync = new Date('2026-01-01T00:00:00.000Z');
+      const retiredAt = new Date('2026-02-01T00:00:00.000Z');
       db.execute.mockResolvedValue({
         rows: [
-          { device: 'Kobo', device_id: 'device-1', last_sync_at: lastSync, last_book_title: 'Book' },
-          { device: 'Phone', device_id: 'device-2', last_sync_at: lastSync, last_book_title: null },
+          { device: 'Kobo', device_id: 'device-1', last_sync_at: lastSync, last_book_title: 'Book', retired_at: null },
+          { device: 'Phone', device_id: 'device-2', last_sync_at: lastSync, last_book_title: null, retired_at: retiredAt },
         ],
       });
 
       await expect(repo.getDevicesList(42)).resolves.toEqual([
-        { device: 'Kobo', deviceId: 'device-1', lastSyncAt: lastSync, lastBookTitle: 'Book' },
-        { device: 'Phone', deviceId: 'device-2', lastSyncAt: lastSync, lastBookTitle: null },
+        { device: 'Kobo', deviceId: 'device-1', lastSyncAt: lastSync, lastBookTitle: 'Book', retiredAt: null },
+        { device: 'Phone', deviceId: 'device-2', lastSyncAt: lastSync, lastBookTitle: null, retiredAt: retiredAt },
       ]);
     });
 
@@ -662,8 +663,9 @@ describe('KoreaderRepository', () => {
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(6);
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
-      expect(tx.delete).toHaveBeenCalledTimes(6);
-      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(6);
+      // Six data deletes plus the retirement marker, which is cleared without being counted.
+      expect(tx.delete).toHaveBeenCalledTimes(7);
+      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(7);
       expect(returning).toHaveBeenCalledTimes(6);
       expect(tx.select).toHaveBeenCalledTimes(1);
     });
@@ -682,7 +684,7 @@ describe('KoreaderRepository', () => {
 
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(1);
 
-      expect(tx.delete).toHaveBeenCalledTimes(5);
+      expect(tx.delete).toHaveBeenCalledTimes(6);
       expect(tx.select).not.toHaveBeenCalled();
     });
 
@@ -694,6 +696,49 @@ describe('KoreaderRepository', () => {
 
       await expect(repo.removeDevice(42, 'unknown-device')).resolves.toBe(0);
       expect(tx.select).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('device retirement', () => {
+    it('retireDevice inserts a marker and tolerates one that already exists', async () => {
+      const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+      const values = vi.fn().mockReturnValue({ onConflictDoNothing });
+      db.insert.mockReturnValue({ values });
+
+      await repo.retireDevice(42, 'device-1');
+
+      expect(values).toHaveBeenCalledWith({ userId: 42, deviceId: 'device-1' });
+      expect(onConflictDoNothing).toHaveBeenCalledTimes(1);
+    });
+
+    it('restoreDevice deletes the marker for the given user and device', async () => {
+      const where = vi.fn().mockResolvedValue(undefined);
+      db.delete.mockReturnValue({ where });
+
+      await repo.restoreDevice(42, 'device-1');
+
+      expect(db.delete).toHaveBeenCalledTimes(1);
+      expect(where).toHaveBeenCalledTimes(1);
+    });
+
+    it('listRetiredDeviceIds returns a device-to-timestamp map', async () => {
+      const retiredAt = new Date('2026-02-01T00:00:00.000Z');
+      db.select.mockReturnValue(makeQueryChain([{ deviceId: 'device-1', retiredAt }]));
+
+      await expect(repo.listRetiredDeviceIds(42)).resolves.toEqual(new Map([['device-1', retiredAt]]));
+    });
+
+    it('deviceExists reports a device known to any device-keyed table', async () => {
+      db.execute.mockResolvedValueOnce({ rows: [{ device_exists: true }] }).mockResolvedValueOnce({ rows: [{ device_exists: false }] });
+
+      await expect(repo.deviceExists(42, 'device-1')).resolves.toBe(true);
+      await expect(repo.deviceExists(42, 'device-2')).resolves.toBe(false);
+    });
+
+    it('deviceExists treats an empty result as unknown rather than throwing', async () => {
+      db.execute.mockResolvedValue({ rows: [] });
+
+      await expect(repo.deviceExists(42, 'device-1')).resolves.toBe(false);
     });
   });
 

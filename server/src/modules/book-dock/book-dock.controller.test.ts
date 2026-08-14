@@ -42,7 +42,11 @@ function makeController() {
   const ingestService = { ingestUpload: vi.fn() };
   const finalizeService = { previewNames: vi.fn(), previewFinalize: vi.fn(), discardDuplicateCandidates: vi.fn(), finalize: vi.fn() };
   const watcherService = { rescan: vi.fn() };
-  const appSettings = { getMaxUploadSizeMb: vi.fn().mockResolvedValue(500) };
+  const appSettings = {
+    getMaxUploadSizeMb: vi.fn().mockResolvedValue(500),
+    getBookDockSettings: vi.fn(),
+    updateBookDockSettings: vi.fn(),
+  };
 
   const controller = new BookDockController(
     service as never,
@@ -205,6 +209,29 @@ describe('BookDockController', () => {
     expect(service.resumeProcessing).toHaveBeenCalledTimes(1);
   });
 
+  it('reads and updates Book Dock settings through the scoped service methods', async () => {
+    const { controller, appSettings } = makeController();
+    const settings = {
+      bookDockPath: '/data/book-dock',
+      autoFetchMetadata: true,
+      autoFinalizeEnabled: false,
+      autoFinalizeThreshold: 85,
+      autoFinalizeLibraryId: null,
+      autoFinalizeFolderId: null,
+      autoFinalizeMetadataMode: 'safe_merge' as const,
+    };
+    const update = { ...settings };
+    delete (update as Partial<typeof settings>).bookDockPath;
+    appSettings.getBookDockSettings.mockResolvedValue(settings);
+    appSettings.updateBookDockSettings.mockResolvedValue(settings);
+
+    await expect(controller.getSettings()).resolves.toEqual(settings);
+    await expect(controller.updateSettings(update as any)).resolves.toEqual(settings);
+
+    expect(appSettings.getBookDockSettings).toHaveBeenCalledOnce();
+    expect(appSettings.updateBookDockSettings).toHaveBeenCalledWith(update);
+  });
+
   it('marks bulk edit endpoint as demo-restricted', () => {
     expect(Reflect.getMetadata(FORBIDDEN_PERMISSION_KEY, BookDockController.prototype.bulkEdit)).toEqual({
       permission: Permission.DemoRestricted,
@@ -222,6 +249,8 @@ describe('BookDockController', () => {
     expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.pause)).toBe(Permission.ManageBookDock);
     expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.resume)).toBe(Permission.ManageBookDock);
     expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.rescan)).toBe(Permission.ManageBookDock);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.getSettings)).toBe(Permission.ManageBookDock);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookDockController.prototype.updateSettings)).toBe(Permission.ManageBookDock);
   });
 
   it('grants global scope only to superusers and Book Dock managers', async () => {

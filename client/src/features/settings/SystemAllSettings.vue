@@ -43,7 +43,7 @@ const tabWidths: Record<Tab, string> = {
 
   <SettingsTabs :class="tabWidths[activeTab]" :tabs="availableTabs" :active-tab="activeTab" @select="selectTab" />
 
-  <div :class="tabWidths[activeTab]">
+  <div v-if="availableTabIds.includes(activeTab)" :class="tabWidths[activeTab]">
     <FileNamingSettings v-if="activeTab === 'file-naming'" embedded />
     <BookDockSettings v-else-if="activeTab === 'book-dock'" embedded />
     <MaintenanceSettings v-else-if="activeTab === 'maintenance'" embedded />

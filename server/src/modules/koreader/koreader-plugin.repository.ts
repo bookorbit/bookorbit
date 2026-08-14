@@ -36,7 +36,7 @@ export interface IngestPageStatsResult {
   accepted: number;
   duplicates: number;
   insertedSessions: DerivedKoreaderSession[];
-  updatedSessions: number;
+  updatedSessions: DerivedKoreaderSession[];
   deletedSessions: number;
 }
 
@@ -83,7 +83,7 @@ export class KoreaderPluginRepository {
       const accepted = inserted.length;
       const duplicates = events.length - accepted;
       if (accepted === 0) {
-        return { accepted, duplicates, insertedSessions: [], updatedSessions: 0, deletedSessions: 0 };
+        return { accepted, duplicates, insertedSessions: [], updatedSessions: [], deletedSessions: 0 };
       }
 
       // Only the clusters the new events belong to can change, so derivation reads and
@@ -225,7 +225,7 @@ export class KoreaderPluginRepository {
         accepted,
         duplicates,
         insertedSessions: toInsert,
-        updatedSessions: toUpdate.length,
+        updatedSessions: toUpdate,
         deletedSessions: toDelete.length,
       };
     });

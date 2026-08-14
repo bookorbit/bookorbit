@@ -94,17 +94,30 @@ describe('SystemAllSettings', () => {
   })
 
   describe('user with book_dock_access only', () => {
-    it('sees book-dock tab only', () => {
+    it('cannot see the Book Dock settings tab', () => {
       const wrapper = mountComponent(undefined, { perms: ['book_dock_access'] })
       const labels = wrapper.findAll('button').map((b) => b.text())
-      expect(labels).toContain('Book Dock')
+      expect(labels).not.toContain('Book Dock')
       expect(labels).not.toContain('File Naming')
       expect(labels).not.toContain('Maintenance')
       expect(labels).not.toContain('Audit Log')
     })
 
-    it('defaults to book-dock', () => {
-      const wrapper = mountComponent(undefined, { perms: ['book_dock_access'] })
+    it('does not render protected settings when the Book Dock tab is requested directly', () => {
+      const wrapper = mountComponent('book-dock', { perms: ['book_dock_access'] })
+      expect(wrapper.find('[data-testid="book-dock"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="file-naming"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="maintenance"]').exists()).toBe(false)
+    })
+  })
+
+  describe('user with manage_book_dock', () => {
+    it('sees and defaults to Book Dock settings only', () => {
+      const wrapper = mountComponent(undefined, { perms: ['manage_book_dock'] })
+      const labels = wrapper.findAll('button').map((button) => button.text())
+      expect(labels).toContain('Book Dock')
+      expect(labels).not.toContain('File Naming')
+      expect(labels).not.toContain('Maintenance')
       expect(wrapper.find('[data-testid="book-dock"]').exists()).toBe(true)
     })
   })

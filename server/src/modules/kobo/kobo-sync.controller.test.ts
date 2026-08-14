@@ -1,4 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
 
 import { KoboSyncController } from './kobo-sync.controller';
 
@@ -26,6 +26,7 @@ describe('KoboSyncController', () => {
   const proxyService = {
     forward: vi.fn(),
     request: vi.fn(),
+    sendUpstream: vi.fn(),
   };
   const bookIdentityService = {
     resolveBookIdByEntitlementId: vi.fn(),
@@ -427,14 +428,67 @@ describe('KoboSyncController', () => {
     expect(proxyService.forward).not.toHaveBeenCalled();
   });
 
-  it('proxies delete-items requests for non-BookOrbit Kobo tags', async () => {
+  it('relays the upstream answer for delete-items requests on non-BookOrbit Kobo tags', async () => {
     const req = { method: 'POST', url: '/api/v1/kobo/token/v1/library/tags/kobo-tag/items/delete' };
     const reply = makeReply();
+    const upstream = { status: HttpStatus.OK, headers: {}, body: Buffer.from('[]') };
+    proxyService.request.mockResolvedValue(upstream);
 
-    await controller.deleteTagItems('kobo-tag', { deviceToken: 'token-1' } as never, req as never, reply as never);
+    await controller.deleteTagItems('kobo-tag', { deviceToken: 'token-1', deviceId: 7 } as never, req as never, reply as never);
 
-    expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'token-1');
+    expect(proxyService.request).toHaveBeenCalledWith(req, 'token-1');
+    expect(proxyService.sendUpstream).toHaveBeenCalledWith(reply, upstream);
     expect(reply.send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['delete-items', HttpStatus.BAD_REQUEST],
+    ['delete-items', HttpStatus.NOT_FOUND],
+    ['delete-items', HttpStatus.GONE],
+  ])('reports %s success when Kobo answers %s for a tag it does not know', async (_label, status) => {
+    const req = { method: 'POST', url: '/api/v1/kobo/token/v1/library/tags/BL-MS-2/items/delete' };
+    const reply = makeReply();
+    proxyService.request.mockResolvedValue({ status, headers: {}, body: Buffer.from('') });
+
+    await controller.deleteTagItems('BL-MS-2', { deviceToken: 'token-1', deviceId: 7 } as never, req as never, reply as never);
+
+    expect(reply.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+    expect(proxyService.sendUpstream).not.toHaveBeenCalled();
+  });
+
+  it('relays upstream failures that do not mean the tag is already gone', async () => {
+    const req = { method: 'POST', url: '/api/v1/kobo/token/v1/library/tags/BL-MS-2/items/delete' };
+    const reply = makeReply();
+    const upstream = { status: HttpStatus.UNAUTHORIZED, headers: {}, body: Buffer.from('') };
+    proxyService.request.mockResolvedValue(upstream);
+
+    await controller.deleteTagItems('BL-MS-2', { deviceToken: 'token-1', deviceId: 7 } as never, req as never, reply as never);
+
+    expect(proxyService.sendUpstream).toHaveBeenCalledWith(reply, upstream);
+    expect(reply.send).not.toHaveBeenCalledWith({ RequestResult: 'Success' });
+  });
+
+  it('lets a rejected proxy path stay a client error instead of an upstream fault', async () => {
+    const req = { method: 'DELETE', url: '/api/v1/kobo/token/v1/library/tags/kobo-tag' };
+    const reply = makeReply();
+    proxyService.request.mockRejectedValue(new BadRequestException('Invalid proxy path'));
+
+    await expect(controller.deleteTag('kobo-tag', { deviceToken: 'token-1', deviceId: 7 } as never, req as never, reply as never)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(reply.send).not.toHaveBeenCalled();
+  });
+
+  it('answers 502 when the upstream tag delete cannot be reached', async () => {
+    const req = { method: 'DELETE', url: '/api/v1/kobo/token/v1/library/tags/kobo-tag' };
+    const reply = makeReply();
+    proxyService.request.mockRejectedValue(new Error('socket hang up'));
+
+    await controller.deleteTag('kobo-tag', { deviceToken: 'token-1', deviceId: 7 } as never, req as never, reply as never);
+
+    expect(reply.status).toHaveBeenCalledWith(HttpStatus.BAD_GATEWAY);
+    expect(reply.send).not.toHaveBeenCalledWith({ RequestResult: 'Success' });
   });
 
   it('acknowledges add-items requests for synced BookOrbit collection tags', async () => {
@@ -469,11 +523,23 @@ describe('KoboSyncController', () => {
     expect(proxyService.forward).not.toHaveBeenCalled();
   });
 
-  it('proxies delete-tag requests for non-BookOrbit Kobo tags', async () => {
-    const req = { method: 'DELETE', url: '/api/v1/kobo/token/v1/library/tags/kobo-tag' };
+  it('reports success when Kobo no longer has the tag the device is deleting', async () => {
+    const req = { method: 'DELETE', url: '/api/v1/kobo/token/v1/library/tags/a413bef9' };
+    const reply = makeReply();
+    proxyService.request.mockResolvedValue({ status: HttpStatus.NOT_FOUND, headers: {}, body: Buffer.from('') });
+
+    await controller.deleteTag('a413bef9', { deviceToken: 'token-1', deviceId: 7 } as never, req as never, reply as never);
+
+    expect(reply.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+    expect(proxyService.sendUpstream).not.toHaveBeenCalled();
+  });
+
+  it('never turns a rejected add-items request into a success', async () => {
+    const req = { method: 'POST', url: '/api/v1/kobo/token/v1/library/tags/BL-MS-2/items' };
     const reply = makeReply();
 
-    await controller.deleteTag('kobo-tag', { deviceToken: 'token-1' } as never, req as never, reply as never);
+    await controller.addTagItems('BL-MS-2', { deviceToken: 'token-1', deviceId: 7 } as never, req as never, reply as never);
 
     expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'token-1');
     expect(reply.send).not.toHaveBeenCalled();

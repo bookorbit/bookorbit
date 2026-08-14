@@ -58,8 +58,10 @@ export class KoreaderStatsService {
 
       const results: PageStatsBookResult[] = [];
       const unmatched: string[] = [];
-      const insertedSessions: { session: DerivedKoreaderSession; bookFileId: number }[] = [];
+      const changedSessions: { session: DerivedKoreaderSession; bookFileId: number }[] = [];
       let acceptedTotal = 0;
+      let insertedSessionCount = 0;
+      let updatedSessionCount = 0;
 
       for (const book of dto.books) {
         const hash = book.hash.toLowerCase();
@@ -80,8 +82,13 @@ export class KoreaderStatsService {
         });
 
         acceptedTotal += result.accepted;
+        insertedSessionCount += result.insertedSessions.length;
+        updatedSessionCount += result.updatedSessions.length;
         for (const session of result.insertedSessions) {
-          insertedSessions.push({ session, bookFileId: match.bookFileId });
+          changedSessions.push({ session, bookFileId: match.bookFileId });
+        }
+        for (const session of result.updatedSessions) {
+          changedSessions.push({ session, bookFileId: match.bookFileId });
         }
 
         // Watermark covers every event processed in this batch, duplicates included, so a plugin
@@ -90,10 +97,12 @@ export class KoreaderStatsService {
         results.push({ hash, accepted: result.accepted, duplicates: result.duplicates, watermark });
       }
 
-      this.emitSessionAchievements(user, insertedSessions);
+      if (acceptedTotal > 0) await this.koreaderRepo.restoreDevice(user.id, dto.deviceId);
+
+      this.emitSessionAchievements(user, changedSessions);
 
       this.logger.log(
-        `[${PAGE_STATS_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} accepted=${acceptedTotal} sessionsInserted=${insertedSessions.length} unmatched=${unmatched.length} - page stats upload completed`,
+        `[${PAGE_STATS_EVENT}] [end] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} accepted=${acceptedTotal} sessionsInserted=${insertedSessionCount} sessionsUpdated=${updatedSessionCount} unmatched=${unmatched.length} - page stats upload completed`,
       );
 
       return { results, unmatched };
@@ -106,16 +115,19 @@ export class KoreaderStatsService {
     }
   }
 
-  private emitSessionAchievements(user: RequestUser, inserted: { session: DerivedKoreaderSession; bookFileId: number }[]) {
-    if (inserted.length === 0) return;
+  private emitSessionAchievements(user: RequestUser, sessions: { session: DerivedKoreaderSession; bookFileId: number }[]) {
+    if (sessions.length === 0) return;
 
-    if (inserted.length > KOREADER_BACKFILL_EVENT_THRESHOLD) {
+    // An upload this large is a device catching up rather than a live reading session, so it is
+    // evaluated as a backfill: one pass over the catalogue instead of one per session, and awards
+    // land silently. Notifying per badge here would burst a toast for every historical unlock.
+    if (sessions.length > KOREADER_BACKFILL_EVENT_THRESHOLD) {
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_BACKFILL, { userId: user.id });
       return;
     }
 
     const timezone = resolveTimeZone((user.settings as unknown as UserSettings | undefined)?.timezone, 'UTC');
-    for (const { session, bookFileId } of inserted) {
+    for (const { session, bookFileId } of sessions) {
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
         userId: user.id,
         bookFileId,

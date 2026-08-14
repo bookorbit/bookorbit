@@ -9,7 +9,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -19,8 +18,6 @@ import { Transform } from 'class-transformer';
 import { ICON_VALUE_MAX_LENGTH, type CoverAspectRatio, type OrganizationMode } from '@bookorbit/types';
 
 import {
-  LIBRARY_AUTO_SCAN_CRON_EXPRESSION_ERROR,
-  LIBRARY_AUTO_SCAN_CRON_EXPRESSION_REGEX,
   LIBRARY_COVER_ASPECT_RATIOS,
   LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX,
   LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN,
@@ -30,6 +27,7 @@ import {
   LIBRARY_READING_THRESHOLD_MAX,
   LIBRARY_READING_THRESHOLD_MIN,
 } from '../library.constants';
+import { IsLibraryAutoScanCronExpression } from '../library-cron.validator';
 
 function trimString(value: unknown): unknown {
   return typeof value === 'string' ? value.trim() : value;
@@ -70,9 +68,7 @@ export class CreateLibraryDto {
   @IsOptional()
   @IsString()
   @ValidateIf((o: { autoScanCronExpression?: unknown }) => o.autoScanCronExpression !== null)
-  @Matches(LIBRARY_AUTO_SCAN_CRON_EXPRESSION_REGEX, {
-    message: LIBRARY_AUTO_SCAN_CRON_EXPRESSION_ERROR,
-  })
+  @IsLibraryAutoScanCronExpression()
   autoScanCronExpression?: string | null;
 
   @IsOptional()

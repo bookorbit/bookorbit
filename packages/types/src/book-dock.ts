@@ -4,6 +4,18 @@ import type { ComicMetadataFields, MetadataProviderKey, MetadataSeriesMembership
 export type BookDockFileStatus = "pending" | "extracting" | "fetching" | "ready" | "error";
 export type BookDockAutoFinalizeMetadataMode = "safe_merge" | "fetched_only" | "embedded_only";
 
+export interface BookDockSettings {
+  bookDockPath: string;
+  autoFetchMetadata: boolean;
+  autoFinalizeEnabled: boolean;
+  autoFinalizeThreshold: number;
+  autoFinalizeLibraryId: number | null;
+  autoFinalizeFolderId: number | null;
+  autoFinalizeMetadataMode: BookDockAutoFinalizeMetadataMode;
+}
+
+export type UpdateBookDockSettingsRequest = Omit<BookDockSettings, "bookDockPath">;
+
 export function resolveBookDockSearchTitle(fileName: string, metadataTitle?: string | null): string | undefined {
   const normalizedMetadataTitle = metadataTitle?.trim();
   if (normalizedMetadataTitle) return normalizedMetadataTitle;

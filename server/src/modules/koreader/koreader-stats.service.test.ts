@@ -37,7 +37,11 @@ function makeSession(startEpoch: number): DerivedKoreaderSession {
 }
 
 describe('KoreaderStatsService', () => {
-  let koreaderRepo: { getAccessibleLibraryIds: ReturnType<typeof vi.fn>; resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
+  let koreaderRepo: {
+    getAccessibleLibraryIds: ReturnType<typeof vi.fn>;
+    resolveBookFilesByHashes: ReturnType<typeof vi.fn>;
+    restoreDevice: ReturnType<typeof vi.fn>;
+  };
   let pluginRepo: { ingestAndDeriveForBook: ReturnType<typeof vi.fn> };
   let achievementEvents: { emit: ReturnType<typeof vi.fn> };
   let service: KoreaderStatsService;
@@ -50,9 +54,12 @@ describe('KoreaderStatsService', () => {
     koreaderRepo = {
       getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
+      restoreDevice: vi.fn().mockResolvedValue(undefined),
     };
     pluginRepo = {
-      ingestAndDeriveForBook: vi.fn().mockResolvedValue({ accepted: 2, duplicates: 0, insertedSessions: [], updatedSessions: 0, deletedSessions: 0 }),
+      ingestAndDeriveForBook: vi
+        .fn()
+        .mockResolvedValue({ accepted: 2, duplicates: 0, insertedSessions: [], updatedSessions: [], deletedSessions: 0 }),
     };
     achievementEvents = { emit: vi.fn() };
 
@@ -96,7 +103,7 @@ describe('KoreaderStatsService', () => {
       accepted: 0,
       duplicates: 2,
       insertedSessions: [],
-      updatedSessions: 0,
+      updatedSessions: [],
       deletedSessions: 0,
     });
     const dto = makeDto([
@@ -119,7 +126,7 @@ describe('KoreaderStatsService', () => {
       accepted: 2,
       duplicates: 0,
       insertedSessions: [makeSession(1000), makeSession(5000)],
-      updatedSessions: 0,
+      updatedSessions: [],
       deletedSessions: 0,
     });
     const dto = makeDto([{ hash: HASH_A, events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }] }]);
@@ -133,12 +140,43 @@ describe('KoreaderStatsService', () => {
     );
   });
 
-  it('emits a single backfill event when more sessions than the threshold are inserted', async () => {
+  it('emits a reading-session event with the latest values for an updated session', async () => {
+    const updatedSession = {
+      ...makeSession(1000),
+      durationSeconds: 180,
+      progressDelta: 56,
+      endProgress: 56.5,
+    };
+    pluginRepo.ingestAndDeriveForBook.mockResolvedValue({
+      accepted: 1,
+      duplicates: 0,
+      insertedSessions: [],
+      updatedSessions: [updatedSession],
+      deletedSessions: 0,
+    });
+    const dto = makeDto([{ hash: HASH_A, events: [{ page: 113, startTime: 1200, durationSeconds: 60, totalPages: 200 }] }]);
+
+    await service.uploadPageStats(makeUser(), dto);
+
+    expect(achievementEvents.emit).toHaveBeenCalledOnce();
+    expect(achievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
+      userId: 7,
+      bookFileId: 10,
+      durationSeconds: 180,
+      startedAt: updatedSession.startedAt,
+      endedAt: updatedSession.endedAt,
+      progressDelta: 56,
+      endProgress: 56.5,
+      timezone: 'Asia/Kolkata',
+    });
+  });
+
+  it('emits a single backfill event when inserted and updated sessions together exceed the threshold', async () => {
     pluginRepo.ingestAndDeriveForBook.mockResolvedValue({
       accepted: 30,
       duplicates: 0,
-      insertedSessions: Array.from({ length: 21 }, (_, i) => makeSession(1000 + i * 4000)),
-      updatedSessions: 0,
+      insertedSessions: Array.from({ length: 11 }, (_, i) => makeSession(1000 + i * 4000)),
+      updatedSessions: Array.from({ length: 10 }, (_, i) => makeSession(50_000 + i * 4000)),
       deletedSessions: 0,
     });
     const dto = makeDto([{ hash: HASH_A, events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }] }]);

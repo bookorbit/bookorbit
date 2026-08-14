@@ -26,6 +26,30 @@
   {
     "file": "server/src/modules/book-dock/book-dock.controller.ts",
     "className": "BookDockController",
+    "methodName": "getSettings",
+    "httpMethod": "GET",
+    "path": "/book-dock/settings",
+    "permissions": ["Permission.ManageBookDock"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-dock/book-dock.controller.ts",
+    "className": "BookDockController",
+    "methodName": "updateSettings",
+    "httpMethod": "PUT",
+    "path": "/book-dock/settings",
+    "permissions": ["Permission.ManageBookDock"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-dock/book-dock.controller.ts",
+    "className": "BookDockController",
     "methodName": "getFile",
     "httpMethod": "GET",
     "path": "/book-dock/files/:id",

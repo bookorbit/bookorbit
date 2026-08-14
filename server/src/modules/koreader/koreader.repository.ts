@@ -656,8 +656,9 @@ export class KoreaderRepository {
       device_id: string;
       last_sync_at: Date;
       last_book_title: string | null;
+      retired_at: Date | null;
     }>(sql`
-      SELECT device, device_id, last_sync_at, last_book_title
+      SELECT sub.device, sub.device_id, sub.last_sync_at, sub.last_book_title, r.retired_at
       FROM (
         SELECT DISTINCT ON (d.device, d.device_id)
           d.device,
@@ -670,7 +671,8 @@ export class KoreaderRepository {
         WHERE d.user_id = ${userId} AND d.orphaned = false
         ORDER BY d.device, d.device_id, d.updated_at DESC
       ) sub
-      ORDER BY last_sync_at DESC
+      LEFT JOIN koreader_device_retirements r ON r.user_id = ${userId} AND r.device_id = sub.device_id
+      ORDER BY sub.last_sync_at DESC
     `);
 
     return result.rows.map((r) => ({
@@ -678,7 +680,43 @@ export class KoreaderRepository {
       deviceId: r.device_id,
       lastSyncAt: new Date(r.last_sync_at),
       lastBookTitle: r.last_book_title ?? null,
+      retiredAt: r.retired_at ? new Date(r.retired_at) : null,
     }));
+  }
+
+  async listRetiredDeviceIds(userId: number): Promise<Map<string, Date>> {
+    const rows = await this.db
+      .select({ deviceId: schema.koreaderDeviceRetirements.deviceId, retiredAt: schema.koreaderDeviceRetirements.retiredAt })
+      .from(schema.koreaderDeviceRetirements)
+      .where(eq(schema.koreaderDeviceRetirements.userId, userId));
+    return new Map(rows.map((row) => [row.deviceId, row.retiredAt]));
+  }
+
+  /** True when any device-keyed table still knows this device, which is what makes it listable. */
+  async deviceExists(userId: number, deviceId: string): Promise<boolean> {
+    const result = await this.db.execute<{ device_exists: boolean }>(sql`
+      SELECT
+        EXISTS (SELECT 1 FROM koreader_device_progress WHERE user_id = ${userId} AND device_id = ${deviceId})
+        OR EXISTS (SELECT 1 FROM koreader_device_sweeps WHERE user_id = ${userId} AND device_id = ${deviceId})
+        OR EXISTS (SELECT 1 FROM koreader_device_settings WHERE user_id = ${userId} AND device_id = ${deviceId})
+        AS device_exists
+    `);
+    return result.rows[0]?.device_exists === true;
+  }
+
+  async retireDevice(userId: number, deviceId: string): Promise<void> {
+    await this.db
+      .insert(schema.koreaderDeviceRetirements)
+      .values({ userId, deviceId })
+      .onConflictDoNothing({
+        target: [schema.koreaderDeviceRetirements.userId, schema.koreaderDeviceRetirements.deviceId],
+      });
+  }
+
+  async restoreDevice(userId: number, deviceId: string): Promise<void> {
+    await this.db
+      .delete(schema.koreaderDeviceRetirements)
+      .where(and(eq(schema.koreaderDeviceRetirements.userId, userId), eq(schema.koreaderDeviceRetirements.deviceId, deviceId)));
   }
 
   async getKoreaderUserDefaultPattern(userId: number): Promise<string | null> {
@@ -762,6 +800,11 @@ export class KoreaderRepository {
           .where(and(eq(schema.koreaderDeviceSettings.userId, userId), eq(schema.koreaderDeviceSettings.deviceId, deviceId)))
           .returning({ deviceId: schema.koreaderDeviceSettings.deviceId }),
       ]);
+
+      // Not counted towards the deleted-row total: a marker on its own never made the device listable.
+      await tx
+        .delete(schema.koreaderDeviceRetirements)
+        .where(and(eq(schema.koreaderDeviceRetirements.userId, userId), eq(schema.koreaderDeviceRetirements.deviceId, deviceId)));
 
       // Only drop unmatched-book rows this device orphaned - a hash still reported by another
       // device must stay visible until that device is removed (or the hash is matched/linked).

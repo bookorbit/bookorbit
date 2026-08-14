@@ -11,6 +11,8 @@ export interface KoreaderDeviceInfo {
   deviceId: string;
   lastSyncAt: string;
   lastBookTitle: string | null;
+  /** Set when the device has been retired: its data is kept, but it is no longer treated as active. */
+  retiredAt: string | null;
   fileNamingPattern?: string | null;
   seriesFileNamingPattern?: string | null;
   standaloneFileNamingPattern?: string | null;
@@ -40,6 +42,7 @@ export interface KoreaderDeviceSweepInfo {
   lastSweepBooksMatched: number;
   lastSweepPageStats: number;
   lastSweepAnnotations: number;
+  retiredAt: string | null;
   fileNamingPattern?: string | null;
   seriesFileNamingPattern?: string | null;
   standaloneFileNamingPattern?: string | null;

@@ -117,4 +117,23 @@ describe('AppSettingsRepository', () => {
       await expect(repo.upsert('key', 'value')).resolves.toBeUndefined();
     });
   });
+
+  describe('upsertMany', () => {
+    it('writes all settings in one conflict-safe statement', async () => {
+      const settings = [
+        { key: 'book_dock_auto_fetch_metadata', value: 'false' },
+        { key: 'book_dock_auto_finalize_threshold', value: '90' },
+      ];
+
+      await repo.upsertMany(settings);
+
+      expect(db.values).toHaveBeenCalledWith(settings);
+      expect(db.onConflictDoUpdate).toHaveBeenCalledOnce();
+    });
+
+    it('does not query for an empty update', async () => {
+      await repo.upsertMany([]);
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Permission } from '@bookorbit/types'
 import { SYSTEM_TABS, SYSTEM_TAB_INFO, normalizeSystemTab } from '../lib/system-tabs'
 
 describe('system-tabs', () => {
@@ -27,15 +28,15 @@ describe('system-tabs', () => {
     })
 
     it('file-naming has manage_app_settings permission', () => {
-      expect(SYSTEM_TAB_INFO['file-naming'].permission).toBe('manage_app_settings')
+      expect(SYSTEM_TAB_INFO['file-naming'].permission).toBe(Permission.ManageAppSettings)
     })
 
-    it('book-dock has book_dock_access permission', () => {
-      expect(SYSTEM_TAB_INFO['book-dock'].permission).toBe('book_dock_access')
+    it('book-dock requires management permission', () => {
+      expect(SYSTEM_TAB_INFO['book-dock'].permission).toBe(Permission.ManageBookDock)
     })
 
     it('maintenance has manage_app_settings permission', () => {
-      expect(SYSTEM_TAB_INFO.maintenance.permission).toBe('manage_app_settings')
+      expect(SYSTEM_TAB_INFO.maintenance.permission).toBe(Permission.ManageAppSettings)
     })
 
     it('audit-log has null permission (superuser only)', () => {

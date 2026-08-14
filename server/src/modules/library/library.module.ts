@@ -10,6 +10,7 @@ import { ScannerModule } from '../scanner/scanner.module';
 import { BulkRenameService } from './bulk-rename.service';
 import { LibraryController } from './library.controller';
 import { LibraryRepository } from './library.repository';
+import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 import { LibraryService } from './library.service';
 
 @Module({
@@ -23,7 +24,7 @@ import { LibraryService } from './library.service';
     PathModule,
   ],
   controllers: [LibraryController],
-  providers: [LibraryService, LibraryRepository, BulkRenameService],
+  providers: [LibraryService, LibraryRepository, LibraryScanSchedulerService, BulkRenameService],
   exports: [LibraryService, LibraryRepository],
 })
 export class LibraryModule {}

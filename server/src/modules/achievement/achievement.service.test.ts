@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AchievementService } from './achievement.service';
-import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from './achievement-events.service';
+import { AchievementEventsService, ACHIEVEMENT_EVENT_BACKFILL, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from './achievement-events.service';
 
 function makeRepo() {
   return {
@@ -78,6 +78,44 @@ describe('AchievementService', () => {
     it('seeds the catalogue', async () => {
       await service.onModuleInit();
       expect(repo.upsertCatalogue).toHaveBeenCalledOnce();
+    });
+
+    it('subscribes achievement evaluation to backfill events', async () => {
+      const handleEvent = vi.spyOn(service, 'handleEvent').mockResolvedValue(undefined);
+      await service.onModuleInit();
+
+      events.emit(ACHIEVEMENT_EVENT_BACKFILL, { userId: 7 });
+
+      expect(handleEvent).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BACKFILL, { userId: 7 });
+    });
+
+    it('collapses a burst of backfill events for one user into a single trailing re-run', async () => {
+      const pending: (() => void)[] = [];
+      const handleEvent = vi.spyOn(service, 'handleEvent').mockImplementation(() => new Promise<void>((resolve) => pending.push(resolve)));
+      await service.onModuleInit();
+
+      events.emit(ACHIEVEMENT_EVENT_BACKFILL, { userId: 7 });
+      events.emit(ACHIEVEMENT_EVENT_BACKFILL, { userId: 7 });
+      events.emit(ACHIEVEMENT_EVENT_BACKFILL, { userId: 7 });
+      expect(handleEvent).toHaveBeenCalledOnce();
+
+      pending[0]!();
+      await vi.waitFor(() => expect(handleEvent).toHaveBeenCalledTimes(2));
+
+      pending[1]!();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(handleEvent).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not serialize backfill runs across users', async () => {
+      const handleEvent = vi.spyOn(service, 'handleEvent').mockImplementation(() => new Promise<void>(() => undefined));
+      await service.onModuleInit();
+
+      events.emit(ACHIEVEMENT_EVENT_BACKFILL, { userId: 7 });
+      events.emit(ACHIEVEMENT_EVENT_BACKFILL, { userId: 8 });
+
+      expect(handleEvent).toHaveBeenCalledTimes(2);
+      expect(handleEvent).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BACKFILL, { userId: 8 });
     });
   });
 
@@ -585,6 +623,16 @@ describe('AchievementService', () => {
       expect(registry.evaluate).not.toHaveBeenCalled();
     });
 
+    it('awards backfill achievements without notifying', async () => {
+      registry.evaluate.mockResolvedValueOnce([{ key: 'power_hour', context: { pages: 112 } }]).mockResolvedValueOnce([]);
+      repo.findAchievementByKey.mockResolvedValue({ key: 'power_hour', name: 'Power Hour', rarity: 'rare', iconName: 'zap' });
+
+      await service.handleEvent(ACHIEVEMENT_EVENT_BACKFILL, { userId: 1 });
+
+      expect(repo.award).toHaveBeenCalledWith(1, 'power_hour', { pages: 112 });
+      expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+
     it('handles achievement preference lookup errors gracefully', async () => {
       userService.isAchievementEnabled.mockRejectedValue(new Error('Settings lookup failed'));
 
@@ -604,7 +652,7 @@ describe('AchievementService', () => {
       await service.onModuleInit();
       const removeListenerSpy = vi.spyOn(events, 'removeListener');
       service.onModuleDestroy();
-      expect(removeListenerSpy).toHaveBeenCalledTimes(7);
+      expect(removeListenerSpy).toHaveBeenCalledTimes(8);
     });
   });
 });

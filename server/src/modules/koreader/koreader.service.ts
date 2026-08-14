@@ -22,6 +22,7 @@ const BCRYPT_ROUNDS = 12;
 const SYNC_EVENT = 'koreader.sync';
 const CREDENTIALS_EVENT = 'koreader.credentials';
 const DEVICE_REMOVE_EVENT = 'koreader.device_remove';
+const DEVICE_RETIRE_EVENT = 'koreader.device_retire';
 const FILE_NAMING_EVENT = 'koreader.file_naming';
 const DEFAULT_DEVICE = 'KOReader';
 const FILE_NAMING_CACHE_TTL_MS = 30_000;
@@ -190,6 +191,10 @@ export class KoreaderService {
       syncTimestamp: data.timestamp ?? null,
     });
 
+    // A retired device that syncs again is back in service. Clearing the marker keeps it
+    // visible rather than letting activity accrue against a device the user cannot see.
+    await this.repo.restoreDevice(userId, data.deviceId);
+
     if (options?.skipSharedProgress) return;
 
     const previousPercentage = previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null;
@@ -263,6 +268,7 @@ export class KoreaderService {
       });
     }
     await this.repo.upsertDeviceProgressMany([...deviceUpserts.values()], appliedAt);
+    await this.repo.restoreDevice(userId, device.deviceId);
 
     const shared = plans.filter((plan) => !plan.stale);
     // Chapter extraction parses an EPUB per file, so it stays off the request path as it
@@ -391,7 +397,7 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const [credentials, deviceRows, deviceSettings, totalSyncedBooks, sweepRows, pluginTotals, versionInfo] = await Promise.all([
+    const [credentials, deviceRows, deviceSettings, totalSyncedBooks, sweepRows, pluginTotals, versionInfo, retirements] = await Promise.all([
       this.getCredentials(userId),
       this.repo.getDevicesList(userId),
       this.repo.getDeviceFileNamingPatterns(userId),
@@ -399,9 +405,11 @@ export class KoreaderService {
       this.pluginRepo.listSweeps(userId),
       this.pluginRepo.getPluginTotals(userId),
       this.packageService.getVersionInfo(),
+      this.repo.listRetiredDeviceIds(userId),
     ]);
     const devices = this.mapDevices(deviceRows, deviceSettings);
-    const lastSyncAt = devices.length > 0 ? devices[0]!.lastSyncAt : null;
+    // Rows are ordered newest first, so the first active device is the last sync that still counts.
+    const lastSyncAt = devices.find((device) => device.retiredAt === null)?.lastSyncAt ?? null;
     const latestPluginVersion = versionInfo.pluginVersion === 'unknown' ? null : versionInfo.pluginVersion;
     const settingsByDevice = new Map(deviceSettings.map((setting) => [setting.deviceId, setting]));
     const sweeps = sweepRows.map((row) => {
@@ -417,12 +425,13 @@ export class KoreaderService {
         lastSweepBooksMatched: row.lastSweepBooksMatched,
         lastSweepPageStats: row.lastSweepPageStats,
         lastSweepAnnotations: row.lastSweepAnnotations,
+        retiredAt: retirements.get(row.deviceId)?.toISOString() ?? null,
         fileNamingPattern: setting?.fileNamingPattern ?? null,
         seriesFileNamingPattern: setting?.seriesFileNamingPattern ?? null,
         standaloneFileNamingPattern: setting?.standaloneFileNamingPattern ?? null,
       };
     });
-    const pluginUpdateAvailable = sweeps.some((sweep) => sweep.updateAvailable === true);
+    const pluginUpdateAvailable = sweeps.some((sweep) => sweep.retiredAt === null && sweep.updateAvailable === true);
 
     return { credentials, devices, totalSyncedBooks, lastSyncAt, latestPluginVersion, pluginUpdateAvailable, sweeps, pluginTotals };
   }
@@ -444,6 +453,7 @@ export class KoreaderService {
         deviceId: r.deviceId,
         lastSyncAt: r.lastSyncAt.toISOString(),
         lastBookTitle: r.lastBookTitle,
+        retiredAt: r.retiredAt?.toISOString() ?? null,
         fileNamingPattern: setting?.fileNamingPattern ?? null,
         seriesFileNamingPattern: setting?.seriesFileNamingPattern ?? null,
         standaloneFileNamingPattern: setting?.standaloneFileNamingPattern ?? null,
@@ -544,6 +554,30 @@ export class KoreaderService {
 
     this.logger.log(
       `[${DEVICE_REMOVE_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" durationMs=${Date.now() - startedAt} deletedRows=${deletedRows} - remove device completed`,
+    );
+  }
+
+  /**
+   * Retiring hides a decommissioned device without touching a byte of what it synced.
+   * Restoring is the same call with `retired: false`, and a device that syncs again
+   * restores itself.
+   */
+  async setDeviceRetired(userId: number, deviceId: string, retired: boolean): Promise<void> {
+    const startedAt = Date.now();
+    const safeDeviceId = sanitizeLogValue(deviceId);
+
+    if (!(await this.repo.deviceExists(userId, deviceId))) {
+      this.logger.warn(
+        `[${DEVICE_RETIRE_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" retired=${retired} durationMs=${Date.now() - startedAt} errorClass=NotFoundException error="device not found" - set device retired failed`,
+      );
+      throw new NotFoundException('KOReader device not found');
+    }
+
+    if (retired) await this.repo.retireDevice(userId, deviceId);
+    else await this.repo.restoreDevice(userId, deviceId);
+
+    this.logger.log(
+      `[${DEVICE_RETIRE_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" retired=${retired} durationMs=${Date.now() - startedAt} - set device retired completed`,
     );
   }
 

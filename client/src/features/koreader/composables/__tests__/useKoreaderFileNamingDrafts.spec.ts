@@ -15,6 +15,7 @@ function device(overrides: Partial<KoreaderDeviceSweepInfo> = {}): KoreaderDevic
     lastSweepBooksMatched: 0,
     lastSweepPageStats: 0,
     lastSweepAnnotations: 0,
+    retiredAt: null,
     fileNamingPattern: null,
     seriesFileNamingPattern: null,
     standaloneFileNamingPattern: null,

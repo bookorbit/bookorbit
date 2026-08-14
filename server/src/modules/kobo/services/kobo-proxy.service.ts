@@ -76,19 +76,22 @@ export class KoboProxyService {
     return { status: upstream.status, headers: responseHeaders, body: Buffer.from(await upstream.arrayBuffer()) };
   }
 
+  /** Relays an upstream response to the device, dropping the headers that must not be forwarded. */
+  sendUpstream(reply: FastifyReply, response: KoboProxyResponse): void {
+    reply.status(response.status);
+    for (const [key, value] of Object.entries(response.headers)) {
+      if (!HOP_BY_HOP_HEADERS.includes(key)) {
+        reply.header(key, value);
+      }
+    }
+    reply.send(response.body);
+  }
+
   async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string) {
     const targetUrl = this.resolveTargetUrl(req, deviceToken);
 
     try {
-      const { status, headers, body } = await this.request(req, deviceToken);
-
-      reply.status(status);
-      for (const [key, value] of Object.entries(headers)) {
-        if (!HOP_BY_HOP_HEADERS.includes(key)) {
-          reply.header(key, value);
-        }
-      }
-      reply.send(body);
+      this.sendUpstream(reply, await this.request(req, deviceToken));
     } catch (err) {
       this.logger.warn(`Proxy failed for ${targetUrl}: ${(err as Error).message}`);
       reply.status(502).send({ message: 'Upstream Kobo API unavailable' });

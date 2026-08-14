@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Eye } from '@lucide/vue'
 import cronstrue from 'cronstrue'
+import { isFiveFieldCronExpression } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
 const { t } = useI18n()
@@ -27,8 +28,6 @@ const presets = computed(() => [
   { label: t('library.creator.schedule.presets.custom'), value: '__custom__' },
 ])
 
-const CRON_REGEX = /^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/
-
 const isCustom = computed(() => {
   if (props.autoScanCronExpression === null) return false
   return !presets.value.some((p) => p.value === props.autoScanCronExpression)
@@ -36,7 +35,7 @@ const isCustom = computed(() => {
 
 const isCronValid = computed(() => {
   if (!isCustom.value || !props.autoScanCronExpression) return true
-  return CRON_REGEX.test(props.autoScanCronExpression)
+  return isFiveFieldCronExpression(props.autoScanCronExpression)
 })
 
 const selectedPreset = computed(() => {
@@ -74,7 +73,7 @@ function humanReadableCron(cron: string | null): string {
   try {
     return cronstrue.toString(cron)
   } catch {
-    return 'Enter a valid schedule to see a preview'
+    return t('library.creator.schedule.human.invalid')
   }
 }
 </script>
@@ -98,6 +97,7 @@ function humanReadableCron(cron: string | null): string {
     <!-- Auto-scan schedule -->
     <div>
       <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-3">{{ t('library.creator.schedule.autoScanSchedule') }}</p>
+      <p class="mb-3 text-xs text-muted-foreground">{{ t('library.creator.schedule.timezoneHint') }}</p>
       <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <button
           v-for="preset in presets"

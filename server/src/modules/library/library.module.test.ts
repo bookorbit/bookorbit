@@ -10,13 +10,19 @@ vi.mock('../notification/notification.module', () => ({ NotificationModule: clas
 import { LibraryController } from './library.controller';
 import { LibraryModule } from './library.module';
 import { LibraryRepository } from './library.repository';
+import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 import { LibraryService } from './library.service';
 import { BulkRenameService } from './bulk-rename.service';
 
 describe('LibraryModule', () => {
   it('registers expected controller/providers/exports', () => {
     expect(Reflect.getMetadata('controllers', LibraryModule)).toEqual([LibraryController]);
-    expect(Reflect.getMetadata('providers', LibraryModule)).toEqual([LibraryService, LibraryRepository, BulkRenameService]);
+    expect(Reflect.getMetadata('providers', LibraryModule)).toEqual([
+      LibraryService,
+      LibraryRepository,
+      LibraryScanSchedulerService,
+      BulkRenameService,
+    ]);
     expect(Reflect.getMetadata('exports', LibraryModule)).toEqual([LibraryService, LibraryRepository]);
   });
 });

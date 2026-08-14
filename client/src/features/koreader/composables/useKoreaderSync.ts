@@ -238,6 +238,19 @@ export function useKoreaderSync() {
     await fetchSyncStatus(true)
   }
 
+  async function setDeviceRetired(deviceId: string, retired: boolean): Promise<void> {
+    const res = await api(`/api/v1/koreader/devices/${encodeURIComponent(deviceId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ retired }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.message || 'Failed to update KOReader device')
+    }
+    await fetchSyncStatus(true)
+  }
+
   async function removeDevice(deviceId: string): Promise<void> {
     const res = await api(`/api/v1/koreader/devices/${deviceId}`, { method: 'DELETE' })
     if (!res.ok) {
@@ -274,6 +287,7 @@ export function useKoreaderSync() {
     saveFileNamingPattern,
     saveDeviceFileNamingPattern,
     clearDeviceFileNamingPattern,
+    setDeviceRetired,
     removeDevice,
   }
 }

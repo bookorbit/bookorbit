@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, isNotNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { AccessLevel, ContentFilterRules } from '@bookorbit/types';
 
@@ -53,6 +53,14 @@ export class LibraryRepository {
 
   findAllIds() {
     return this.db.select({ id: libraries.id }).from(libraries).orderBy(libraries.displayOrder, libraries.name);
+  }
+
+  findAutoScanSchedules() {
+    return this.db
+      .select({ id: libraries.id, autoScanCronExpression: libraries.autoScanCronExpression })
+      .from(libraries)
+      .where(isNotNull(libraries.autoScanCronExpression))
+      .orderBy(libraries.id);
   }
 
   findAccessibleIdsForUser(userId: number) {

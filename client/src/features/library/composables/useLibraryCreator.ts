@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS } from '@bookorbit/types'
+import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS, isFiveFieldCronExpression } from '@bookorbit/types'
 import type { CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@bookorbit/types'
 
 export { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS }
@@ -14,7 +14,6 @@ export const METADATA_LABELS: Record<string, string> = {
 
 export type LibraryCreatorSectionId = 'details' | 'folders' | 'scanner' | 'metadata' | 'reading' | 'schedule' | 'fileWrite' | 'access'
 
-const CRON_REGEX = /^((\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)? ){4}(\*|\d+(-\d+)?(,\d+(-\d+)?)*)(\/\d+)?$/
 const FILE_SIZE_MIN_MB = 1
 const FILE_SIZE_MAX_MB = 10_000
 
@@ -66,7 +65,7 @@ export function useLibraryCreator() {
     if (!form.name.trim()) errors.details = 'Enter a library name.'
     else if (!form.icon?.trim()) errors.details = 'Choose an icon.'
     if (form.folders.length === 0) errors.folders = 'Add at least one folder.'
-    if (form.autoScanCronExpression && !CRON_REGEX.test(form.autoScanCronExpression)) {
+    if (form.autoScanCronExpression && !isFiveFieldCronExpression(form.autoScanCronExpression)) {
       errors.schedule = 'Enter a valid 5-field cron expression.'
     }
     if (form.readingThreshold < 0.05 || form.readingThreshold > 5) {

@@ -3,12 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BookDockAutoFinalizeMetadataMode } from '@bookorbit/types'
+import type { BookDockAutoFinalizeMetadataMode, BookDockSettings, UpdateBookDockSettingsRequest } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
-import { useAppInfo } from './composables/useAppInfo'
 
 const { t } = useI18n()
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
@@ -20,11 +19,11 @@ const autoFinalizeThreshold = ref(85)
 const autoFinalizeLibraryId = ref<number | null>(null)
 const autoFinalizeFolderId = ref<number | null>(null)
 const autoFinalizeMetadataMode = ref<BookDockAutoFinalizeMetadataMode>('safe_merge')
+const bookDockPath = ref('')
 const loading = ref(true)
 const saving = ref(false)
 
 const { libraries, fetchLibraries } = useLibraries()
-const { bookDockPath, loadAppInfo } = useAppInfo()
 
 const autoFinalizeLibrary = computed(() => libraries.value.find((l) => l.id === autoFinalizeLibraryId.value))
 const autoFinalizeFolders = computed(() => autoFinalizeLibrary.value?.folders ?? [])
@@ -32,107 +31,97 @@ const isThresholdApplicable = computed(() => autoFinalizeMetadataMode.value !== 
 
 onMounted(async () => {
   try {
-    const [res] = await Promise.all([api('/api/v1/app-settings'), fetchLibraries(), loadAppInfo()])
+    const [res] = await Promise.all([api('/api/v1/book-dock/settings'), fetchLibraries()])
     if (res.ok) {
-      const settings: { key: string; value: string }[] = await res.json()
-      const get = (key: string) => settings.find((s) => s.key === key)?.value
-      autoFetch.value = get('book_dock_auto_fetch_metadata') !== 'false'
-      autoFinalizeEnabled.value = get('book_dock_auto_finalize_enabled') === 'true'
-      autoFinalizeThreshold.value = parseInt(get('book_dock_auto_finalize_threshold') ?? '85', 10)
-      const libId = parseInt(get('book_dock_auto_finalize_library_id') ?? '', 10)
-      const folderId = parseInt(get('book_dock_auto_finalize_folder_id') ?? '', 10)
-      const metadataMode = get('book_dock_auto_finalize_metadata_mode')
-      autoFinalizeLibraryId.value = isNaN(libId) ? null : libId
-      autoFinalizeFolderId.value = isNaN(folderId) ? null : folderId
-      autoFinalizeMetadataMode.value = metadataMode === 'fetched_only' || metadataMode === 'embedded_only' ? metadataMode : 'safe_merge'
+      applySettings(await res.json())
     }
   } finally {
     loading.value = false
   }
 })
 
-async function saveSetting(key: string, value: string) {
-  const res = await api(`/api/v1/app-settings/${key}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ value }),
-  })
-  if (!res.ok) {
-    toast.error(t('settings.reader.bookDock.saveSettingFailed'))
+function applySettings(settings: BookDockSettings) {
+  bookDockPath.value = settings.bookDockPath
+  autoFetch.value = settings.autoFetchMetadata
+  autoFinalizeEnabled.value = settings.autoFinalizeEnabled
+  autoFinalizeThreshold.value = settings.autoFinalizeThreshold
+  autoFinalizeLibraryId.value = settings.autoFinalizeLibraryId
+  autoFinalizeFolderId.value = settings.autoFinalizeFolderId
+  autoFinalizeMetadataMode.value = settings.autoFinalizeMetadataMode
+}
+
+function settingsPayload(overrides: Partial<UpdateBookDockSettingsRequest> = {}): UpdateBookDockSettingsRequest {
+  return {
+    autoFetchMetadata: autoFetch.value,
+    autoFinalizeEnabled: autoFinalizeEnabled.value,
+    autoFinalizeThreshold: autoFinalizeThreshold.value,
+    autoFinalizeLibraryId: autoFinalizeLibraryId.value,
+    autoFinalizeFolderId: autoFinalizeFolderId.value,
+    autoFinalizeMetadataMode: autoFinalizeMetadataMode.value,
+    ...overrides,
   }
 }
 
-async function toggle() {
-  if (saving.value) return
-  const newVal = !autoFetch.value
+async function saveSettings(overrides: Partial<UpdateBookDockSettingsRequest>): Promise<boolean> {
+  if (saving.value) return false
   saving.value = true
   try {
-    const res = await api('/api/v1/app-settings/book_dock_auto_fetch_metadata', {
-      method: 'PATCH',
+    const res = await api('/api/v1/book-dock/settings', {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: String(newVal) }),
+      body: JSON.stringify(settingsPayload(overrides)),
     })
-    if (res.ok) {
-      autoFetch.value = newVal
-      toast.success(newVal ? t('settings.reader.bookDock.autoFetchEnabled') : t('settings.reader.bookDock.autoFetchDisabled'))
-    } else {
-      toast.error(t('settings.reader.bookDock.updateSettingFailed'))
+    if (!res.ok) {
+      toast.error(t('settings.reader.bookDock.saveSettingFailed'))
+      return false
     }
+    applySettings(await res.json())
+    return true
   } finally {
     saving.value = false
   }
 }
 
-async function toggleAutoFinalize() {
-  if (saving.value) return
-  const newVal = !autoFinalizeEnabled.value
-  saving.value = true
-  try {
-    const res = await api('/api/v1/app-settings/book_dock_auto_finalize_enabled', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: String(newVal) }),
-    })
-    if (res.ok) {
-      autoFinalizeEnabled.value = newVal
-      toast.success(newVal ? t('settings.reader.bookDock.autoFinalizeEnabled') : t('settings.reader.bookDock.autoFinalizeDisabled'))
-    } else {
-      toast.error(t('settings.reader.bookDock.updateSettingFailed'))
-    }
-  } finally {
-    saving.value = false
+async function handleAutoFetchChange(enabled: boolean) {
+  if (await saveSettings({ autoFetchMetadata: enabled })) {
+    toast.success(enabled ? t('settings.reader.bookDock.autoFetchEnabled') : t('settings.reader.bookDock.autoFetchDisabled'))
+  }
+}
+
+async function handleAutoFinalizeChange(enabled: boolean) {
+  if (await saveSettings({ autoFinalizeEnabled: enabled })) {
+    toast.success(enabled ? t('settings.reader.bookDock.autoFinalizeEnabled') : t('settings.reader.bookDock.autoFinalizeDisabled'))
   }
 }
 
 async function onLibraryChange(event: Event) {
-  const id = Number((event.target as HTMLSelectElement).value)
-  autoFinalizeLibraryId.value = id
-  const lib = libraries.value.find((l) => l.id === id)
-  autoFinalizeFolderId.value = lib?.folders?.[0]?.id ?? null
-  await Promise.all([
-    saveSetting('book_dock_auto_finalize_library_id', String(id)),
-    saveSetting('book_dock_auto_finalize_folder_id', String(autoFinalizeFolderId.value ?? '')),
-  ])
-  toast.success(t('settings.reader.bookDock.destinationLibraryUpdated'))
+  const libraryId = Number((event.target as HTMLSelectElement).value)
+  const library = libraries.value.find((candidate) => candidate.id === libraryId)
+  const folderId = library?.folders?.[0]?.id ?? null
+  if (await saveSettings({ autoFinalizeLibraryId: libraryId, autoFinalizeFolderId: folderId })) {
+    toast.success(t('settings.reader.bookDock.destinationLibraryUpdated'))
+  }
 }
 
 async function onFolderChange(event: Event) {
-  autoFinalizeFolderId.value = Number((event.target as HTMLSelectElement).value)
-  await saveSetting('book_dock_auto_finalize_folder_id', String(autoFinalizeFolderId.value))
-  toast.success(t('settings.reader.bookDock.destinationFolderUpdated'))
+  const folderId = Number((event.target as HTMLSelectElement).value)
+  if (await saveSettings({ autoFinalizeFolderId: folderId })) {
+    toast.success(t('settings.reader.bookDock.destinationFolderUpdated'))
+  }
 }
 
 async function onThresholdChange() {
   if (!isThresholdApplicable.value) return
-  await saveSetting('book_dock_auto_finalize_threshold', String(autoFinalizeThreshold.value))
-  toast.success(t('settings.reader.bookDock.confidenceThresholdUpdated'))
+  if (await saveSettings({ autoFinalizeThreshold: autoFinalizeThreshold.value })) {
+    toast.success(t('settings.reader.bookDock.confidenceThresholdUpdated'))
+  }
 }
 
 async function onMetadataModeChange(event: Event) {
-  const value = (event.target as HTMLSelectElement).value as BookDockAutoFinalizeMetadataMode
-  autoFinalizeMetadataMode.value = value
-  await saveSetting('book_dock_auto_finalize_metadata_mode', value)
-  toast.success(t('settings.reader.bookDock.metadataModeUpdated'))
+  const metadataMode = (event.target as HTMLSelectElement).value as BookDockAutoFinalizeMetadataMode
+  if (await saveSettings({ autoFinalizeMetadataMode: metadataMode })) {
+    toast.success(t('settings.reader.bookDock.metadataModeUpdated'))
+  }
 }
 </script>
 
@@ -202,7 +191,12 @@ async function onMetadataModeChange(event: Event) {
             {{ t('settings.reader.bookDock.autoFetchHint') }}
           </p>
         </div>
-        <ToggleSwitch :model-value="autoFetch" :disabled="saving" class="self-start md:self-auto md:ml-4" @update:model-value="() => toggle()" />
+        <ToggleSwitch
+          :model-value="autoFetch"
+          :disabled="saving"
+          class="self-start md:self-auto md:ml-4"
+          @update:model-value="handleAutoFetchChange"
+        />
       </div>
     </div>
 
@@ -224,7 +218,7 @@ async function onMetadataModeChange(event: Event) {
             :model-value="autoFinalizeEnabled"
             :disabled="saving"
             class="self-start md:self-auto md:ml-4"
-            @update:model-value="() => toggleAutoFinalize()"
+            @update:model-value="handleAutoFinalizeChange"
           />
         </div>
 

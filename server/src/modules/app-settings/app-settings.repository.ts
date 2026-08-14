@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, inArray, ne } from 'drizzle-orm';
+import { eq, inArray, ne, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -37,5 +37,13 @@ export class AppSettingsRepository {
 
   async upsert(key: string, value: string): Promise<void> {
     await this.db.insert(schema.appSettings).values({ key, value }).onConflictDoUpdate({ target: schema.appSettings.key, set: { value } });
+  }
+
+  async upsertMany(settings: Array<{ key: string; value: string }>): Promise<void> {
+    if (settings.length === 0) return;
+    await this.db
+      .insert(schema.appSettings)
+      .values(settings)
+      .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: sql`excluded.value` } });
   }
 }

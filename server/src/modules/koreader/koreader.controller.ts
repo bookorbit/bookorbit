@@ -32,6 +32,7 @@ import {
   KoreaderSaveProgressDto,
   LinkKoreaderUnmatchedBookDto,
   TestConnectionDto,
+  UpdateKoreaderDeviceDto,
   UpdateKoreaderDeviceFilePatternDto,
   UpdateKoreaderFilePatternDto,
   UpdateKoreaderManualHashLinkDto,
@@ -149,6 +150,13 @@ export class KoreaderController {
   @Delete('devices/:deviceId/file-naming-pattern')
   async clearDeviceFileNamingPattern(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto) {
     await this.koreaderService.clearDeviceFileNamingPattern(user.id, params.deviceId);
+    return { success: true };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Patch('devices/:deviceId')
+  async updateDevice(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto, @Body() dto: UpdateKoreaderDeviceDto) {
+    await this.koreaderService.setDeviceRetired(user.id, params.deviceId, dto.retired);
     return { success: true };
   }
 

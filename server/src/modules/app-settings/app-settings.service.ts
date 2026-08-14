@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService, type ConfigType } from '@nestjs/config';
 
 import {
   AuthorAutoEnrichmentWriteMode,
@@ -10,11 +10,15 @@ import {
   DEFAULT_METADATA_SCORE_WEIGHTS,
   type MetadataScoreWeights,
   type BookDockAutoFinalizeMetadataMode,
+  type BookDockSettings,
+  type UpdateBookDockSettingsRequest,
 } from '@bookorbit/types';
 
 import { StatsCache } from '../../common/cache/stats-cache';
+import { storageConfig } from '../../config/config';
 import {
   APP_SETTING_KEYS,
+  BOOK_DOCK_MANAGED_SETTING_KEYS,
   DEFAULT_LIBRARY_ACCESS_CONFIG,
   DEFAULT_OIDC_CONFIG,
   type OidcFullConfig,
@@ -49,6 +53,7 @@ export class AppSettingsService {
   constructor(
     private readonly repo: AppSettingsRepository,
     private readonly config: ConfigService,
+    @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
   listSettings() {
@@ -66,6 +71,9 @@ export class AppSettingsService {
   }
 
   async update(key: string, value: string) {
+    if (BOOK_DOCK_MANAGED_SETTING_KEYS.includes(key)) {
+      throw new BadRequestException(`Setting '${key}' is managed by the Book Dock endpoints and cannot be written here`);
+    }
     if (key === APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB) {
       const parsed = parseInt(value, 10);
       if (isNaN(parsed) || parsed <= 0) {
@@ -90,6 +98,44 @@ export class AppSettingsService {
 
   async setBookDockPaused(paused: boolean): Promise<void> {
     await this.repo.upsert(APP_SETTING_KEYS.BOOK_DOCK_PAUSED, String(paused));
+  }
+
+  async getBookDockSettings(): Promise<BookDockSettings> {
+    const keys = [
+      APP_SETTING_KEYS.BOOK_DOCK_AUTO_FETCH_METADATA,
+      APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_ENABLED,
+      APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_THRESHOLD,
+      APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_LIBRARY_ID,
+      APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_FOLDER_ID,
+      APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_METADATA_MODE,
+    ];
+    const rows = await this.repo.findMany(keys);
+    const settings = new Map(rows.map((row) => [row.key, row.value]));
+    const libraryId = parseOptionalPositiveInt(settings.get(APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_LIBRARY_ID));
+    const folderId = parseOptionalPositiveInt(settings.get(APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_FOLDER_ID));
+
+    return {
+      bookDockPath: this.storage.bookDockPath,
+      autoFetchMetadata: parseBooleanSetting(settings.get(APP_SETTING_KEYS.BOOK_DOCK_AUTO_FETCH_METADATA), true),
+      autoFinalizeEnabled: parseBooleanSetting(settings.get(APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_ENABLED), false),
+      autoFinalizeThreshold: parseAutoFinalizeThreshold(settings.get(APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_THRESHOLD)),
+      autoFinalizeLibraryId: libraryId,
+      autoFinalizeFolderId: folderId,
+      autoFinalizeMetadataMode: parseAutoFinalizeMetadataMode(settings.get(APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_METADATA_MODE)),
+    };
+  }
+
+  async updateBookDockSettings(settings: UpdateBookDockSettingsRequest): Promise<BookDockSettings> {
+    await this.repo.upsertMany([
+      { key: APP_SETTING_KEYS.BOOK_DOCK_AUTO_FETCH_METADATA, value: String(settings.autoFetchMetadata) },
+      { key: APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_ENABLED, value: String(settings.autoFinalizeEnabled) },
+      { key: APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_THRESHOLD, value: String(settings.autoFinalizeThreshold) },
+      { key: APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_LIBRARY_ID, value: settings.autoFinalizeLibraryId?.toString() ?? '' },
+      { key: APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_FOLDER_ID, value: settings.autoFinalizeFolderId?.toString() ?? '' },
+      { key: APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_METADATA_MODE, value: settings.autoFinalizeMetadataMode },
+    ]);
+
+    return this.getBookDockSettings();
   }
 
   async getAuthorsAutoEnrichmentWriteMode(): Promise<AuthorAutoEnrichmentWriteMode> {
@@ -318,6 +364,17 @@ export class AppSettingsService {
 function parseAutoFinalizeMetadataMode(value: string | undefined): BookDockAutoFinalizeMetadataMode {
   if (value === 'fetched_only' || value === 'embedded_only') return value;
   return 'safe_merge';
+}
+
+function parseOptionalPositiveInt(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseAutoFinalizeThreshold(value: string | undefined): number {
+  const parsed = parseInt(value ?? '85', 10);
+  return Number.isInteger(parsed) && parsed >= 50 && parsed <= 100 ? parsed : 85;
 }
 
 function mergeOidcConfig(base: OidcFullConfig, patch: Partial<OidcFullConfig>): OidcFullConfig {
