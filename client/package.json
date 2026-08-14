@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@bookorbit/types": "workspace:*",
-    "@embedpdf/core": "2.14.4",
+    "@embedpdf/core": "2.15.0",
     "@embedpdf/engines": "2.15.0",
     "@embedpdf/models": "2.15.0",
     "@embedpdf/pdfium": "2.15.0",
@@ -51,7 +51,7 @@
     "@embedpdf/plugin-pan": "2.15.0",
     "@embedpdf/plugin-render": "2.15.0",
     "@embedpdf/plugin-rotate": "2.15.0",
-    "@embedpdf/plugin-scroll": "2.14.4",
+    "@embedpdf/plugin-scroll": "2.15.0",
     "@embedpdf/plugin-search": "2.15.0",
     "@embedpdf/plugin-selection": "2.15.0",
     "@embedpdf/plugin-spread": "2.15.0",
