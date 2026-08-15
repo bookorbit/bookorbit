@@ -402,6 +402,154 @@ describe('MetadataFetchPipeline', () => {
     expect(sources.description).toBe(MetadataProviderKey.OPEN_LIBRARY);
   });
 
+  it('treats an empty array as not provided and falls back under overwriteIfProvided', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.authors = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] }),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { authors: ['Fallback Author'] }),
+      ),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { authors: ['Existing Author'] });
+
+    expect(resolved.authors).toEqual(['Fallback Author']);
+    expect(sources.authors).toBe(MetadataProviderKey.OPEN_LIBRARY);
+  });
+
+  it('does not clear an existing array when overwriteIfProvided providers return empty arrays', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.authors = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(
+      of(candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] }), candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { authors: [] })),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { authors: ['Existing Author'] });
+
+    expect(resolved.authors).toBeUndefined();
+    expect(sources.authors).toBeUndefined();
+  });
+
+  it('falls back from an empty array under fillMissing when the existing field is empty', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.authors = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'fillMissing',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] }),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { authors: ['Fallback Author'] }),
+      ),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { authors: [] });
+
+    expect(resolved.authors).toEqual(['Fallback Author']);
+    expect(sources.authors).toBe(MetadataProviderKey.OPEN_LIBRARY);
+  });
+
+  it('treats a blank string as not provided and falls back under overwriteIfProvided', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.description = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { description: '   ' }),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { description: 'Fallback Description' }),
+      ),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { description: 'Existing Description' });
+
+    expect(resolved.description).toBe('Fallback Description');
+    expect(sources.description).toBe(MetadataProviderKey.OPEN_LIBRARY);
+  });
+
+  it('preserves empty arrays as explicit clears under overwrite', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.authors = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwrite',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
+    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { authors: [] })));
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { authors: ['Existing Author'] });
+
+    expect(resolved.authors).toEqual([]);
+    expect(sources.authors).toBe(MetadataProviderKey.GOOGLE);
+  });
+
+  it('keeps zero and false provider values under overwriteIfProvided', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.duration = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+      fields.abridged = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }] as never);
+    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { durationSeconds: 0, abridged: false })));
+
+    const { resolved } = await pipeline.runWithSources({ title: 'Query' }, { duration: 60, abridged: true });
+
+    expect(resolved.duration).toBe(0);
+    expect(resolved.abridged).toBe(false);
+  });
+
   it('resolves community ratings from every configured provider', async () => {
     const prefs = createPreferences((fields) => {
       for (const field of ALL_METADATA_FIELDS) {

@@ -312,6 +312,7 @@ export class MetadataFetchPipeline {
 
         let value = this.extractField(candidate, field);
         if (value === undefined || value === null) continue;
+        if (mergeStrategy !== 'overwrite' && this.isEmptyProviderValue(value)) continue;
 
         if (field === 'cover') {
           const existingValue = existing[field];
@@ -510,6 +511,11 @@ export class MetadataFetchPipeline {
     if (value === null || value === undefined || value === '') return true;
     if (Array.isArray(value)) return value.length === 0;
     return false;
+  }
+
+  private isEmptyProviderValue(value: unknown): boolean {
+    if (typeof value === 'string') return value.trim().length === 0;
+    return Array.isArray(value) && value.length === 0;
   }
 
   private filterExistingComicMetadata(

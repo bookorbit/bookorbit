@@ -220,6 +220,12 @@
       },
       "bookCovers": {
         "title": "书籍封面",
+        "coverSearch": {
+          "label": "默认封面搜索源",
+          "hint": "选择“在线查找封面”时使用的搜索源。此设置会保存到您的账户中，并在所有设备上生效。",
+          "loadError": "加载默认封面搜索源失败",
+          "saveError": "保存默认封面搜索源失败"
+        },
         "displayMode": {
           "title": "封面显示模式",
           "hint": "控制宽高比不一致时真实封面在书槽内的显示方式",
@@ -274,7 +280,7 @@
         },
         "shadow": {
           "title": "封面阴影强度",
-          "hint": "控制封面在网格、列表、表格和仪表板缩略图下方的阴影深度",
+          "hint": "控制封面在网格、列表、表格和控制面板缩略图下方的阴影深度",
           "default": {
             "label": "默认设置",
             "hint": "当前层级与景深"
@@ -286,7 +292,7 @@
         },
         "overlays": {
           "title": "卡片叠加层",
-          "hint": "选择直接显示在书封面卡上的元数据",
+          "hint": "选择直接显示在书籍封面卡上的元数据",
           "progressBar": {
             "label": "进度条",
             "hint": "沿底部边缘的细彩色线条"
@@ -351,7 +357,7 @@
         },
         "primaryCardLabel": {
           "label": "主卡片标签",
-          "hint": "每本书封面下方显示的文本（第一行）"
+          "hint": "每本书籍封面下方显示的文本（第一行）"
         },
         "secondaryCardLabel": {
           "label": "次卡标签",
@@ -409,7 +415,7 @@
         },
         "filterPreview": {
           "label": "默认显示过滤器预览",
-          "hint": "打开智能范围时展开当前的筛选与排序摘要"
+          "hint": "打开智能书架时展开当前的筛选与排序摘要"
         },
         "collapseSeries": {
           "label": "默认折叠系列",
@@ -440,7 +446,7 @@
         "usage": {
           "libraries": "{count, plural, =0 {没有库} other {# 个库}}",
           "collections": "{count, plural, =0 {没有收藏} other {# 个收藏}}",
-          "smartScopes": "{count, plural, =0 {没有智能范围} other {# 个智能范围}}"
+          "smartScopes": "{count, plural, =0 {没有智能书架} other {# 个智能书架}}"
         },
         "confirm": {
           "deleteOne": "删除 “{name}”？现有使用场景将回退为默认图标。",
@@ -463,7 +469,7 @@
       },
       "tabs": {
         "theme": "主题",
-        "book-covers": "书封面",
+        "book-covers": "书籍封面",
         "icons": "图标",
         "layout": "布局",
         "behavior": "行为",
@@ -566,7 +572,7 @@
       },
       "tour": {
         "title": "功能导览",
-        "description": "重播介绍应用关键功能的引导流程。",
+        "description": "重新介绍应用关键功能的引导流程。",
         "action": "再次游览"
       },
       "restrictions": {
@@ -844,7 +850,7 @@
         "badgeCompleted": "已完成",
         "badgeRunning": "正在运行",
         "badgeFailed": "失败",
-        "mediaPathRequired": "迁移书封面所需。",
+        "mediaPathRequired": "迁移书籍封面所需。",
         "mediaPathAbsolute": "使用绝对路径（例如：/books）。不支持相对路径。",
         "mediaPathConfigured": "已配置封面导入路径。使用测试连接来验证访问权限和 Booklore 图像文件夹结构。",
         "issueSaveSource": "保存源连接设置",
@@ -1180,7 +1186,7 @@
     },
     "integrations": {
       "title": "集成",
-      "subtitle": "连接外部服务以同步您的阅读数据和高亮。",
+      "subtitle": "连接外部服务以同步您的阅读数据和摘录。",
       "noPermission": "您没有权限使用任何集成。",
       "tabs": {
         "hardcover": "Hardcover",
@@ -1188,7 +1194,7 @@
         "storygraph": "StoryGraph"
       },
       "providerSubtitles": {
-        "readwise": "自动将您的高亮发送到Readwise。",
+        "readwise": "自动将您的摘录发送到Readwise。",
         "storygraph": "同步您的阅读进度和状态到 StoryGraph。"
       }
     },
@@ -1565,7 +1571,7 @@
         "applySettings": "应用我的设置到新的书本",
         "applySettingsHint": "关闭后，新打开的书籍将使用出版社设定的字体和版式。只有当您在阅读器中修改设置后，您的设置才会生效。",
         "layout": "布局",
-        "readingFlow": "读取流程",
+        "readingFlow": "阅读模式",
         "readingFlowHint": "分页翻转页面；连续滚动流",
         "paginated": "分页",
         "scrolled": "已滚动",
@@ -1579,11 +1585,11 @@
         "darkMode": "暗色模式",
         "darkModeHint": "使用选中主题的黑暗变体",
         "typography": "图形",
-        "font": "Font",
+        "font": "字体",
         "fontHint": "正文使用的类型",
         "builtInFonts": "内置字体",
         "yourFonts": "您的字体",
-        "fontSize": "Font size",
+        "fontSize": "字号",
         "fontSizeHint": "基本文本像素大小",
         "lineHeight": "行高度",
         "lineHeightHint": "线之间的垂直间距",
@@ -1699,15 +1705,15 @@
         "editVariant": "编辑权重/样式",
         "deleteVariant": "删除变体",
         "styleNormal": "普通的",
-        "styleItalic": "Italic",
+        "styleItalic": "斜体",
         "weightThin": "最小值",
         "weightExtraLight": "额外的光线",
         "weightLight": "亮色的",
         "weightRegular": "常规的",
         "weightMedium": "中",
         "weightSemiBold": "半粗体",
-        "weightBold": "Bold",
-        "weightExtraBold": "Extra Bold",
+        "weightBold": "粗体",
+        "weightExtraBold": "特粗",
         "weightBlack": "黑色",
         "renameFamilyFailed": "重命名字体组失败",
         "renamedTo": "已重命名为 “{name}”",
@@ -1850,6 +1856,7 @@
         "tokenPublisher": "出版社",
         "tokenIsbn": "ISBN-13",
         "tokenLanguage": "语言",
+        "tokenLibrary": "书库名称",
         "tokenOriginalFilename": "原始文件名 (无扩展名)",
         "tokenExtension": "文件扩展名 (无点)",
         "patternHelpIntro": "命名模板可使用 {titleToken}、{authorsToken} 这类占位标识，同时支持修饰符与可选片段",
@@ -1892,8 +1899,8 @@
         "syncPreferences": "同步首选项",
         "twoWaySync": "双向进度同步",
         "twoWaySyncHint": "同步BookOrbit 和 Kobo之间的阅读位置。需要KEPUB 送货以获取准确的位置和可靠的页面恢复。",
-        "syncHighlights": "同步 BookOrbit 高亮到 Kobo",
-        "syncHighlightsHint": "将BookOrbit或 KOReader 制作的高亮发送给您的 Kobo 高亮即使关闭，Kobo 高亮也会导入BookOrbit 链接注释同步编辑并删除这两种方式。需要 KEPUB 交付；Kobo 上的书必须是 BookOrbit 下载的 KEPUB 。",
+        "syncHighlights": "同步 BookOrbit 摘录到 Kobo",
+        "syncHighlightsHint": "将BookOrbit或 KOReader 制作的高亮发送给您的 Kobo 摘录即使关闭，Kobo 高亮也会导入BookOrbit 链接注释同步编辑并删除这两种方式。需要 KEPUB 交付；Kobo 上的书必须是 BookOrbit 下载的 KEPUB 。",
         "storeSync": "包含 Kobo Store标题",
         "storeSyncHint": "此功能还会将您 Kobo 账户中的书籍（包括 Kobo Plus 订阅和已购书籍）与您的 BookOrbit 书库一并投送到设备上。若未启用此功能，则只有 BookOrbit 的书籍会同步到设备。商店中的书籍直接从 Kobo 下载，不会添加到您的 BookOrbit 书库中。",
         "convertKepub": "转换为 KEPUB",
@@ -1932,8 +1939,8 @@
             "librarySync": "检查库的更新",
             "bookDownload": "书已下载",
             "progressUpdate": "读取位置已更新",
-            "annotationsPull": "高亮发给Kobo",
-            "annotationsPush": "从科博收到的要点"
+            "annotationsPull": "摘录发给Kobo",
+            "annotationsPush": "从Kobo收到的摘录"
           },
           "outcome": {
             "failed": "失败",
@@ -1950,8 +1957,8 @@
             "librarySync": "库检查未完成",
             "bookDownload": "下载未完成",
             "progressUpdate": "读取位置未更新",
-            "annotationsPull": "高亮未发送",
-            "annotationsPush": "未导入高光"
+            "annotationsPull": "摘录未发送",
+            "annotationsPush": "未导入摘录"
           },
           "chip": {
             "morePending": "更多待处理",
@@ -1959,7 +1966,7 @@
             "bookCount": "{count, plural, one {# 书} other {# 书}}",
             "deletedAnnotations": "已删除批注 {count} 条",
             "deviceAlreadyCurrent": "设备已经存在",
-            "freshHighlightData": "新鲜高亮数据",
+            "freshHighlightData": "新鲜摘录数据",
             "created": "新增 {count} 条",
             "updated": "更新 {count} 条",
             "deleted": "删除 {count} 条",
@@ -1982,14 +1989,14 @@
             "progressUpdatesSynced": "{count, plural, one {# 进度更新同步} other {# 进度更新同步}}",
             "newReadingPositionFor": "Kobo 同步上报 {title} 最新阅读进度",
             "newReadingPosition": "Kobo报告了一个新的阅读位置",
-            "noHighlightChangesNeededFor": "{title} 的高亮内容无需调整",
-            "noHighlightChangesNeeded": "无需高亮更改",
-            "highlightsSentToKoboFor": "{count, plural, one {# 条高亮已同步至Kobo：{title}} other {# 条高亮已同步至Kobo：{title}}}",
-            "highlightsSentToKobo": "{count, plural, one {# 高亮发送到 Kobo} other {# 高亮发送到 Kobo}}",
-            "noKoboHighlightChangesFor": "{title} 的 Kobo 端无高亮内容变更",
-            "noKoboHighlightChanges": "没有 Kobo 高亮更改",
-            "highlightsImportedFromKoboFor": "{count, plural, one {# 条高亮从Kobo导入：{title}} other {# 条高亮从Kobo导入：{title}}}",
-            "highlightsImportedFromKobo": "{count, plural, one {# 高亮从 Kobo 导入} other {# 从Kobo 导入的高亮内容}}"
+            "noHighlightChangesNeededFor": "{title} 的摘录内容无需调整",
+            "noHighlightChangesNeeded": "无需摘录更改",
+            "highlightsSentToKoboFor": "{count, plural, one {# 条摘录已同步至Kobo：{title}} other {# 条摘录已同步至Kobo：{title}}}",
+            "highlightsSentToKobo": "{count, plural, one {# 摘录发送到 Kobo} other {# 摘录发送到 Kobo}}",
+            "noKoboHighlightChangesFor": "{title} 的 Kobo 端无摘录内容变更",
+            "noKoboHighlightChanges": "没有 Kobo 摘录更改",
+            "highlightsImportedFromKoboFor": "{count, plural, one {# 条高亮从Kobo导入：{title}} other {# 条摘录从Kobo导入：{title}}}",
+            "highlightsImportedFromKobo": "{count, plural, one {# 高亮从 Kobo 导入} other {# 从Kobo 导入的摘录内容}}"
           },
           "timeRange": "{from} 至 {to}",
           "eventsGrouped": "{count, plural, one {# 事件被分组} other {# 事件被分组}}",
@@ -2024,7 +2031,7 @@
       },
       "koreader": {
         "title": "KOReader 同步",
-        "subtitle": "在 KOReader 浏览您的 BookOrbit 目录并同步进度，阅读活动、高亮和注释更改。",
+        "subtitle": "在 KOReader 浏览您的 BookOrbit 目录并同步进度，阅读活动、摘录和注释更改。",
         "tabs": {
           "sync": "同步设置",
           "fileNaming": "文件名称"
@@ -2075,7 +2082,7 @@
         "latestPlugin": "最新插件版本：v {version}",
         "latestPluginUnavailable": "最新插件不可用",
         "notConfigured": "未配置 KOReader 同步",
-        "notConfiguredHint": "创建一组同步凭据，然后使用 BookOrbit KOReader 插件来浏览、下载、进度、阅读事件、高亮和删除。",
+        "notConfiguredHint": "创建一组同步凭据，然后使用 BookOrbit KOReader 插件来浏览、下载、进度、阅读事件、摘录和删除。",
         "createCredentials": "创建凭据",
         "createFormTitle": "创建 KOReader 同步凭据",
         "createFormHint": "这些凭据使用 BookOrbit 认证您的 KOReader 设备。",
@@ -2083,6 +2090,23 @@
         "usernamePlaceholder": "例如：myreader",
         "password": "密码",
         "passwordPlaceholder": "最小6个字符",
+        "changeCredentials": {
+          "action": "更改凭证",
+          "title": "更改 KOReader 凭据",
+          "description": "每个BookOrbit帐户有一个KOReader凭据集。请在此更改而不删除同步数据。",
+          "newPassword": "新密码",
+          "usernameInvalid": "用户名必须介于 3 到 100 个字符之间。",
+          "passwordPlaceholder": "留空表示保持当前密码",
+          "passwordHint": "留空此字段可保留当前密码。",
+          "passwordInvalid": "密码必须介于 6 到 128 个字符之间。",
+          "deviceNotice": "使用先前登录凭据的设备，需要重新连接，或使用新下载的插件包进行更新。",
+          "showPassword": "显示新密码",
+          "hidePassword": "隐藏新密码",
+          "save": "保存登录凭据",
+          "saving": "保存中",
+          "updated": "已更新 KOReader 凭据",
+          "updateFailed": "更新 KOReader 凭据失败"
+        },
         "creating": "创建中...",
         "create": "创建",
         "credentialsCreated": "创建了 KOReader 同步凭据",
@@ -2090,7 +2114,7 @@
         "status": "KO阅读器状态",
         "refresh": "刷新",
         "progressSync": "进度同步",
-        "progressSyncHint": "允许 KOReader 设备与 BookOrbit 同步阅读进度、阅读动态、高亮内容以及批注删除记录",
+        "progressSyncHint": "允许 KOReader 设备与 BookOrbit 同步阅读进度、阅读动态、摘录内容以及批注删除记录",
         "lastSync": "上次同步",
         "syncedBooks": "同步的书",
         "bookCount": "{count, plural, =0 {没有书籍} one {# 书} other {# 书}}",
@@ -2099,6 +2123,8 @@
         "credentialsCreatedLabel": "证书已创建",
         "setup": "设置",
         "pluginServerUrl": "插件服务器 URL",
+        "syncUrl": "KOReader 同步URL",
+        "syncUrlHint": "配合 BookOrbit 插件及 KOReader 内置的进度同步功能使用。",
         "copied": "已复制",
         "copyUrl": "复制 URL",
         "preconfiguredPlugin": "预配置的 BookOrbit 插件",
@@ -2121,8 +2147,8 @@
         "highlights": "高光",
         "syncedTotals": "已同步总计",
         "trashedHighlights": "回收站突出显示",
-        "pendingDeletes": "{count, plural, =0 {没有删除等待KOReader 插件确认的高亮内容。} one {# 删除了等待KOReader 插件确认的高亮内容。} other {# 删除了等待KOReader 插件确认的高亮内容。}}",
-        "failedPositions": "{count, plural, =0 {不需要关注高亮位置。} one {# 高亮位置需要关注。} other {# 高亮位置需要关注。}}",
+        "pendingDeletes": "{count, plural, =0 {没有删除等待KOReader 插件确认的摘录内容。} one {# 删除了等待KOReader 插件确认的摘录内容。} other {# 删除了等待KOReader 插件确认的高亮内容。}}",
+        "failedPositions": "{count, plural, =0 {不需要关注高亮位置。} one {# 摘录位置需要关注。} other {#摘录位置需要关注。}}",
         "setupGuide": "设置指南",
         "setupSteps": "KOReader 设置步骤",
         "setupStepsHint": "使用 BookOrbit 插件进行目录浏览、下载、进度、读取事件和高亮。仅使用库存插件进行进度操作。",
@@ -2256,7 +2282,22 @@
         "deviceRemoved": "设备已删除",
         "removeDeviceFailed": "移除设备失败",
         "removeDeviceConfirmTitle": "是否移除设备 {device}？",
-        "removeDeviceConfirmBody": "这将永久删除此设备的同步进度、阅读活动和任何未匹配的书目不再由另一个设备报告。 如果设备稍后再次同步，它将重新显示为一个新条目。"
+        "removeDeviceConfirmBody": "这将永久删除此设备的同步进度、阅读活动和任何未匹配的书目不再由另一个设备报告。 如果设备稍后再次同步，它将重新显示为一个新条目。",
+        "deleteDeviceDataConfirmTitle": "删除来自“{device}”的同步数据？",
+        "deleteDeviceDataConfirmBody": "此操作将永久删除该设备同步的阅读进度、逐页阅读活动记录，以及不再被其他设备上报的、无法匹配的书籍条目。已计入统计中的阅读时段不受影响。如果该设备后续再次同步，它将作为一个新条目重新出现。",
+        "devicesHint": "停用设备会将其隐藏，并保留所有已同步的内容。删除其同步数据的操作不可撤销。",
+        "retire": "停用",
+        "retiring": "停用中",
+        "restore": "恢复",
+        "restoring": "恢复中...",
+        "deleteSyncedData": "删除数据",
+        "deletingSyncedData": "正在删除…",
+        "deviceRetired": "设备已停用",
+        "deviceRestored": "设备已恢复",
+        "retireDeviceFailed": "停用设备失败",
+        "restoreDeviceFailed": "恢复设备失败",
+        "retiredDevices": "{count, plural, other {# 停用设备}}",
+        "retiredOnLabel": "已停用"
       },
       "opds": {
         "title": "OPDS",
@@ -2633,7 +2674,7 @@
   "annotations": {
     "unknownBook": "未知的书",
     "styles": {
-      "highlight": "高亮",
+      "highlight": "摘录",
       "underline": "下划线",
       "strike": "击杀数",
       "squiggle": "方形",
@@ -2731,7 +2772,7 @@
       "moveToTrash": "移动到回收站"
     },
     "hub": {
-      "title": "说明",
+      "title": "批注",
       "totalCount": "共计 {count} 条",
       "bookCount": "{count, plural, =0 {没有书籍} one {# 书} other {# 书}}",
       "noteCount": "{count, plural, =0 {没有便笺} one {# 笔记} other {# 笔记}}",
@@ -2745,7 +2786,7 @@
       "bulkTrash": "回收站",
       "bulkRestore": "恢复",
       "tabs": {
-        "highlights": "高光",
+        "highlights": "摘录",
         "trash": "回收站"
       },
       "empty": {
@@ -2864,7 +2905,7 @@
       "books": "书籍",
       "users": "用户",
       "libraries": "库",
-      "collections": "A. 收款情况",
+      "collections": "收藏夹",
       "integrations": "集成",
       "settings": "设置",
       "other": "其他"
@@ -2874,7 +2915,7 @@
       "Library": "书库",
       "Book": "书",
       "Collection": "收藏",
-      "SmartScope": "智能范围",
+      "SmartScope": "智能书架",
       "BookDockFile": "Book Dock 文件",
       "Author": "作者",
       "AppSettings": "应用程序设置",
@@ -2939,7 +2980,7 @@
       "BookDelete": "删除书",
       "BookBulkMetadataRefresh": "刷新书籍元数据",
       "BookBulkDelete": "删除书",
-      "BookBulkCoverReextract": "重新提取书封面",
+      "BookBulkCoverReextract": "重新提取书籍封面",
       "BookBulkSetStatus": "设置书状状态",
       "BookBulkSetRating": "设置书评分数",
       "BookBulkSetMetadata": "设置书籍元数据",
@@ -2954,9 +2995,9 @@
       "CollectionDelete": "删除收藏",
       "CollectionBooksAdd": "添加书籍到收藏",
       "CollectionBooksRemove": "从收藏中移除书",
-      "SmartScopeCreate": "创建智能范围",
-      "SmartScopeUpdate": "更新智能范围",
-      "SmartScopeDelete": "删除智能范围",
+      "SmartScopeCreate": "创建智能书架",
+      "SmartScopeUpdate": "更新智能书架",
+      "SmartScopeDelete": "删除智能书架",
       "BookDockFinalize": "完成书停靠文件",
       "AuthorUpdate": "更新作者",
       "AuthorDelete": "删除作者",
@@ -3305,7 +3346,7 @@
     "actions": {
       "read": "阅读",
       "listen": "监听",
-      "peek": "佩克",
+      "peek": "快速预览",
       "quickView": "快速视图",
       "details": "详细信息",
       "bookDetails": "书籍详细信息",
@@ -3365,7 +3406,8 @@
         "finishedAt": "完成日期",
         "random": "随机播放",
         "language": "语言",
-        "metadataScore": "元数据分数"
+        "metadataScore": "元数据分数",
+        "collectionOrder": "添加顺序"
       },
       "customFieldsGroup": "自定义字段",
       "customFieldFallback": "自定义字段",
@@ -3587,7 +3629,7 @@
       "fileNumber": "文件 #{id}",
       "showLess": "显示更少的",
       "showMore": "显示更多",
-      "collections": "A. 收款情况",
+      "collections": "收藏夹",
       "noDescription": "无可用描述。",
       "openMetadataEditor": "打开元数据编辑器",
       "coverPreview": "书籍封面预览",
@@ -3632,7 +3674,7 @@
         "editMetadata": "编辑元数据",
         "files": "文件",
         "readingLog": "阅读日志",
-        "highlights": "高光"
+        "highlights": "摘录"
       },
       "discover": {
         "moreInSeries": "更多在系列中",
@@ -3709,7 +3751,7 @@
       },
       "coverSearch": {
         "title": "在线搜索",
-        "subtitle": "搜索书封面",
+        "subtitle": "搜索书籍封面",
         "titleField": "标题",
         "authorField": "作者",
         "sourceField": "来源",
@@ -3735,7 +3777,7 @@
         "chooseFormat": "选择格式",
         "audiobook": "音频簿",
         "primary": "主要的",
-        "peek": "佩克",
+        "peek": "快速预览",
         "sendViaEmail": "通过电子邮件发送",
         "personalReview": {
           "title": "个人评论",
@@ -3982,7 +4024,7 @@
         "primary": "主要的",
         "read": "阅读",
         "play": "播放",
-        "peek": "佩克",
+        "peek": "快速预览",
         "download": "下载",
         "moreActions": "更多操作",
         "rename": "重命名",
@@ -4028,7 +4070,7 @@
         "untitled": "无标题",
         "trash": "回收站",
         "empty": {
-          "noMatch": "没有高亮匹配您的过滤器。",
+          "noMatch": "没有摘录匹配您的过滤器。",
           "resetFilters": "重置过滤器",
           "none": "尚无高亮显示",
           "hint": "在阅读时选择文本以创建高亮显示"
@@ -4536,6 +4578,70 @@
       "alreadyExistsSaveAs": "已经存在 - 保存为：",
       "renamePlaceholder": "示例：{name}(2)",
       "import": "导入"
+    },
+    "layout": {
+      "pause": "暂停",
+      "resume": "继续",
+      "pauseUpdateFailed": "暂停更新失败",
+      "clearSearch": "清空搜索内容",
+      "filter": {
+        "all": "全部",
+        "needsReview": "待审核",
+        "pending": "待处理",
+        "ready": "就绪",
+        "error": "错误"
+      },
+      "working": {
+        "label": "{count} 个处理中"
+      },
+      "row": {
+        "select": "选择 {title}",
+        "setDestination": "设置目标",
+        "file": "文件",
+        "match": "{percent}% 匹配度",
+        "noAuthor": "尚无作者",
+        "proposedChanges": "修改建议",
+        "noChanges": "尚未获取元数据",
+        "editDetails": "编辑详细信息",
+        "noMatch": "无匹配结果",
+        "applied": "已应用",
+        "refetch": "重新获取元数据",
+        "clickToZoom": "点击扩展封面",
+        "changedFields": "{count, plural, one {# 字段} other {# 字段}}",
+        "needMore": "需要搜索供应商或编辑其他字段？"
+      },
+      "selection": {
+        "fileToLibrary": "{count, plural, =0 {文件到库} other {文件# 到库}}",
+        "nSelected": "已选择 {count}",
+        "nReadyToFile": "{count} 个文件待上传"
+      },
+      "empty": {
+        "nothingToReview": "没有需要复核的内容。所有就绪的文件均已分配目标位置并确认匹配。",
+        "dropHint": "或将文件拖放到这个页面的任意位置。"
+      },
+      "selectAllOnPage": "选择此页面上的所有文件",
+      "showingOf": "共 {total} 条，展示 {shown} 条",
+      "keyboardHint": "要移动的 J / K 空间来选择 · 进入以扩展",
+      "allOnPageSelected": "本页共 {count} 项已全部选中。",
+      "selectAllMatching": "全选全部 {count} 本匹配书籍",
+      "allMatchingSelected": "所有 {count} 个匹配文件已全部选中。",
+      "sort": {
+        "label": "排序方式",
+        "attention": "需关注",
+        "createdAt": "最近添加",
+        "fileName": "文件名称",
+        "fileSize": "文件大小",
+        "format": "格式",
+        "status": "状态"
+      },
+      "conflict": {
+        "duplicate": "创建副本",
+        "destination_conflict": "已使用路径",
+        "invalid_target": "无效目标",
+        "access_denied": "无访问权限",
+        "invalid_format": "格式错误",
+        "error": "将会失败"
+      }
     }
   },
   "collection": {
@@ -4570,7 +4676,7 @@
       "newCollection": "新建收藏",
       "namePlaceholder": "收藏名称",
       "create": "创建",
-      "collections": "A. 收款情况",
+      "collections": "收藏夹",
       "empty": "还没有收藏。请在上面创建。",
       "done": "完成",
       "added": "已添加",
@@ -4606,7 +4712,7 @@
       "bookDock": "Book Dock",
       "statistics": "统计",
       "achievements": "1. 成就",
-      "annotations": "说明",
+      "annotations": "批注",
       "uploadBooks": "上传书",
       "appearance": "外观",
       "theme": "主题",
@@ -4632,17 +4738,17 @@
       "surfaceOpacityValue": "{value}%"
     },
     "sidebar": {
-      "dashboard": "仪表板",
+      "dashboard": "控制面板",
       "authors": "作者",
       "series": "系列",
       "tools": "工具",
       "libraries": "库",
       "newLibrary": "新建库",
       "scanProgress": "书籍扫描进度：{processed}/{total}",
-      "smartScopes": "智能范围",
+      "smartScopes": "智能书架",
       "newSmartScope": "新建智能瞄准镜",
-      "noSmartScopes": "尚无智能范围",
-      "collections": "A. 收款情况",
+      "noSmartScopes": "尚无智能书架",
+      "collections": "收藏夹",
       "newCollection": "新建收藏",
       "noCollections": "尚无收藏",
       "newReleaseNotes": "有新版本备注",
@@ -4662,12 +4768,12 @@
       "filterSummary": "共 {total} 条，已展示 {shown} 条",
       "filterLibraries": "过滤库",
       "filterLibrariesPlaceholder": "筛选书库…",
-      "filterSmartScopes": "筛选智能范围",
-      "filterSmartScopesPlaceholder": "筛选智能范围…",
+      "filterSmartScopes": "筛选智能书架",
+      "filterSmartScopesPlaceholder": "筛选智能书架…",
       "filterCollections": "筛选收藏",
       "filterCollectionsPlaceholder": "筛选合集…",
       "seeAllLibraries": "查看全部书库（{count}）",
-      "seeAllSmartScopes": "查看全部智能范围（{count}）",
+      "seeAllSmartScopes": "查看全部智能书架（{count}）",
       "seeAllCollections": "查看全部合集（{count}）",
       "updateAvailable": "发现 {version} 版本可更新",
       "zones": {
@@ -4802,7 +4908,7 @@
       "noMatchesHint": "尝试一个不同的搜索词。",
       "bookCount": "书籍数量：{count}",
       "librariesEmptyHint": "创建一个库开始添加书籍。",
-      "smartScopesEmptyHint": "智能范围保存您经常使用的一组过滤器。",
+      "smartScopesEmptyHint": "智能书架保存您经常使用的一组过滤器。",
       "collectionsEmptyHint": "收藏群组你手上挑选的书籍。"
     }
   },
@@ -4859,20 +4965,20 @@
       }
     },
     "settings": {
-      "title": "自定义仪表板",
+      "title": "自定义面板",
       "tabs": {
         "widgets": "小部件",
         "shelves": "架子"
       },
       "widgetNames": {
-        "readingStreak": "读取串流",
+        "readingStreak": "阅读连续记录",
         "currentlyReading": "正在阅读",
         "readingGoal": "正在阅读目标",
         "readingDna": "正在读取 DNA",
         "monthlyChallenge": "每月挑战",
-        "highlightOfTheDay": "高亮显示日",
+        "highlightOfTheDay": "每日摘录",
         "neglectedGems": "被忽略的 Gems",
-        "readingRhythm": "读取节日",
+        "readingRhythm": "阅读节奏",
         "diversityScore": "多样性得分",
         "libraryOverview": "书库概览",
         "yearProjection": "年预测",
@@ -4903,7 +5009,7 @@
       "reorderHintWidget": "拖动以重新排序。切换以显示或隐藏部件。",
       "reorderHintShelf": "拖动以重新排序。切换以显示或隐藏架。",
       "smartScope": "智能瞄准镜",
-      "noSmartScopes": "还没有智能范围。请从侧边栏创建。",
+      "noSmartScopes": "尚无智能书架。请从侧边栏创建。",
       "addShelf": "添加书架",
       "resetToDefaults": "重置为默认值"
     },
@@ -4932,7 +5038,7 @@
         }
       },
       "highlightOfTheDay": {
-        "title": "高亮显示日",
+        "title": "每日摘录",
         "empty": "在阅读时高亮显示在这里"
       },
       "libraryOverview": {
@@ -4988,14 +5094,14 @@
         "editGoal": "编辑目标"
       },
       "readingRhythm": {
-        "title": "读取节日",
+        "title": "阅读节奏",
         "empty": "开始阅读，生成你的阅读节奏数据",
         "activeDays": "{count, plural, =0 {没有活动日} one {# 活动日} other {# 活动日}}",
         "consistency": "活跃天数 {activeDays}，坚持率 {percent}%",
         "avgPerDay": "日均阅读 {time}"
       },
       "readingStreak": {
-        "title": "读取串流",
+        "title": "阅读连续记录",
         "empty": "咱今儿就读起来，把那个连续天数给它练起来",
         "streakLabel": "{count, plural, =0 {坚持天数} one {坚持天数} other {坚持天数}}",
         "best": "{count, plural, =0 {最佳: # 天} one {最佳: # 天} other {最佳: # 天}}",
@@ -5590,6 +5696,7 @@
       "schedule": {
         "fileWatching": "文件监视中",
         "autoScanSchedule": "自动扫描计划",
+        "timezoneHint": "计划在服务器时区运行。",
         "cronExpression": "Cron 表达式",
         "cronInvalid": "无效的 cron 表达式。",
         "cronFormat": "格式：每日每分钟时日",
@@ -5608,6 +5715,7 @@
         },
         "human": {
           "disabled": "自动扫描已禁用",
+          "invalid": "输入一个有效的计划表以查看预览",
           "hourly": "每小时",
           "every6Hours": "每 6 小时",
           "every12Hours": "每 12 小时",
@@ -5786,7 +5894,7 @@
         "ssl": "使用 TLS/SSL"
       },
       "mediaPath": {
-        "hintRequired": "迁移书封面所需。",
+        "hintRequired": "迁移书籍封面所需。",
         "hintAbsolute": "使用绝对路径（例如：/books）。不支持相对路径。",
         "hintConfigured": "已配置封面导入路径。使用测试连接来验证访问权限和 Booklore 图像文件夹结构。",
         "buttonOk": "路径确定",
@@ -5907,7 +6015,7 @@
       "audiobookProgressEntries": "音频簿进度条目",
       "readingSessions": "阅读会话",
       "bookmarks": "书签",
-      "annotations": "说明",
+      "annotations": "批注",
       "collectionEntries": "收藏条目",
       "loadFullReportHint": "单击“负载完整报告”以在导出的报告中包含干燥的比赛摘要。",
       "completedNoIssues": "迁移已完成，没有未解决的书籍或故障。",
@@ -6143,7 +6251,7 @@
       "pageWidthMedium": "中等",
       "pageWidthWide": "宽松",
       "pageWidthFull": "全屏宽度",
-      "readingFlow": "读取流程",
+      "readingFlow": "阅读模式",
       "flow": {
         "paginated": "分页模式",
         "scrolled": "滚动模式"
@@ -6439,7 +6547,7 @@
     "syncToKobo": "同步到 Kobo",
     "syncToKoboHint": "匹配此范围的书籍将出现在您的 Kobo 设备上",
     "visibleToAll": "所有用户可见",
-    "visibleToAllHint": "每个用户都可以看到和使用这个智能范围",
+    "visibleToAllHint": "每个用户都可以看到和使用这个智能书架",
     "dialog": {
       "name": "名称",
       "namePlaceholder": "例如：未读 Sci-Fi",
@@ -6458,16 +6566,16 @@
     "saveAsDialog": {
       "title": "另存为 SmartScope",
       "save": "保存 SmartScope",
-      "saveFailed": "无法保存智能范围"
+      "saveFailed": "无法保存智能书架"
     },
     "editorPanel": {
       "untitled": "无标题的 SmartScope",
-      "subtitle": "配置智能范围设置",
+      "subtitle": "配置智能书架设置",
       "counting": "统计中…",
       "bookCount": "{count, plural, =0 {没有书籍} one {一张书} other {# 书}}",
       "identity": "身份",
       "filters": "筛选器",
-      "noFilters": "没有设置过滤器。此智能范围将包含所有可访问的书籍。",
+      "noFilters": "没有设置过滤器。此智能书架将包含所有可访问的书籍。",
       "buildFromScratch": "从零生成",
       "replaceWithTemplate": "用模板替换：",
       "defaultSort": "默认排序",
@@ -6787,7 +6895,7 @@
         "readingStatus": "正在阅读状态",
         "progress": "进展情况",
         "path": "库路径",
-        "collections": "A. 收款情况",
+        "collections": "收藏夹",
         "added": "已添加",
         "updated": "已更新"
       },
@@ -6919,7 +7027,7 @@
       "book": "书",
       "collection": "收藏",
       "library": "书库",
-      "smartScope": "智能范围"
+      "smartScope": "智能书架"
     },
     "common": {
       "retry": "重试"
@@ -6947,7 +7055,7 @@
       "goHome": "返回首页"
     },
     "dashboard": {
-      "customize": "自定义仪表板",
+      "customize": "自定义面板",
       "allShelvesHidden": "所有架子都被隐藏。",
       "greeting": {
         "night": "晚上不错，",
@@ -7019,7 +7127,7 @@
       "filterRules": "过滤规则",
       "saveAsSmartScope": "另存为 Smart Scope",
       "saveScope": "保存范围",
-      "saveAsSmartScopeTooltip": "将此过滤器保存为一个命名的智能范围",
+      "saveAsSmartScopeTooltip": "将此过滤器保存为一个命名的智能书架",
       "saved": "已保存",
       "saveFilter": "保存过滤器",
       "filterSaved": "筛选器已保存",
@@ -7040,10 +7148,10 @@
       }
     },
     "smartScope": {
-      "title": "智能范围",
+      "title": "智能书架",
       "pageTitle": "SmartScope · {name}",
       "pageTitleWithId": "智能检索规则 #{id}",
-      "defaultName": "智能范围",
+      "defaultName": "智能书架",
       "filter": "筛选器",
       "edit": "编辑智能瞄准镜",
       "koboSync": {
@@ -7051,7 +7159,7 @@
         "enabledHint": "在这种共享的智能望远镜同步到您的 Kobo 设备中的书籍。关闭以停止同步。",
         "disabledHint": "开启以同步此共享Smart Scope 中的书籍到您的 Kobo 设备。"
       },
-      "showControlsAria": "显示智能范围控制",
+      "showControlsAria": "显示智能书架控制",
       "hideFilter": "隐藏过滤器",
       "showFilter": "显示过滤器",
       "confirmDelete": "确认？",
@@ -7065,9 +7173,9 @@
       },
       "empty": {
         "noRules": "未配置规则",
-        "noRulesHint": "打开编辑器，使用过滤规则和排序规则来定义在这个智能范围中出现的书籍。",
+        "noRulesHint": "打开编辑器，使用过滤规则和排序规则来定义在这个智能书架中出现的书籍。",
         "configure": "配置 SmartScope",
-        "noMatch": "没有与此智能范围相匹配的书",
+        "noMatch": "没有与此智能书架相匹配的书",
         "noMatchHint": "尝试调整过滤规则。",
         "edit": "编辑 SmartScope"
       }
@@ -7104,14 +7212,14 @@
     "nextImage": "下一张图片"
   },
   "titles": {
-    "dashboard": "仪表板",
+    "dashboard": "控制面板",
     "libraries": "库",
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader 同步",
     "bookDock": "Book Dock",
     "whatsNew": "新功能",
-    "annotations": "说明",
+    "annotations": "批注",
     "achievements": "成就",
     "statistics": "统计",
     "authors": "作者",
@@ -7130,14 +7238,14 @@
     "readPrefix": "已读",
     "emailSuffix": "电子邮件地址",
     "library": "书库",
-    "smartScope": "智能范围",
+    "smartScope": "智能书架",
     "collection": "收藏",
     "author": "作者",
     "book": "书",
     "seriesItem": "系列",
     "appearance": {
       "theme": "显示",
-      "book-covers": "书封面",
+      "book-covers": "书籍封面",
       "icons": "图标",
       "layout": "显示布局",
       "behavior": "书库行为",

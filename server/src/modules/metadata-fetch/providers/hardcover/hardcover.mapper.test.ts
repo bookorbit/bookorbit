@@ -10,6 +10,7 @@ const baseDocument: HardcoverSearchDocument = {
   subtitle: '10th Anniversary Edition',
   description: 'A story about a wizard.',
   author_names: ['Patrick Rothfuss'],
+  contributions: [{ author: { id: 1, name: 'Patrick Rothfuss' }, contribution: 'Author' }],
   isbns: ['9780756404079', '0756404079'],
   pages: 662,
   release_year: 2007,
@@ -134,9 +135,24 @@ describe('mapSearchDocument', () => {
     expect(result.seriesIndex).toBeUndefined();
   });
 
-  it('returns empty authors array when author_names is absent', () => {
-    const doc: HardcoverSearchDocument = { ...baseDocument, author_names: undefined };
-    expect(mapSearchDocument(doc).authors).toEqual([]);
+  it('omits authors when contribution data is absent', () => {
+    const doc: HardcoverSearchDocument = { ...baseDocument, contributions: undefined };
+    expect(mapSearchDocument(doc).authors).toBeUndefined();
+  });
+
+  it('maps only author contributions from search documents', () => {
+    const doc: HardcoverSearchDocument = {
+      ...baseDocument,
+      author_names: ['Primary Author', 'Second Author', 'Audio Narrator', 'Book Translator'],
+      contributions: [
+        { author: { id: 1, name: 'Primary Author' }, contribution: null },
+        { author: { id: 2, name: 'Second Author' }, contribution: ' AUTHOR ' },
+        { author: { id: 3, name: 'Audio Narrator' }, contribution: 'Narrator' },
+        { author: { id: 4, name: 'Book Translator' }, contribution: 'Translator' },
+      ],
+    };
+
+    expect(mapSearchDocument(doc).authors).toEqual(['Primary Author', 'Second Author']);
   });
 
   it('returns undefined coverUrl when image is absent', () => {
@@ -361,6 +377,59 @@ describe('mapBookWithEditions', () => {
       editions: [{ ...baseBook.editions![0], cached_contributors: [] }],
     };
     expect(mapBookWithEditions(book)[0].authors).toEqual(['Book Author']);
+  });
+
+  it('falls back to book authors when the edition has only non-author contributors', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      cached_contributors: [{ author: { id: 2, name: 'Book Author' }, contribution: 'Author' }],
+      editions: [
+        {
+          ...baseBook.editions![0],
+          cached_contributors: [
+            { author: { id: 3, name: 'Audio Narrator' }, contribution: 'Narrator' },
+            { author: { id: 4, name: 'Book Translator' }, contribution: 'Translator' },
+          ],
+        },
+      ],
+    };
+
+    expect(mapBookWithEditions(book)[0].authors).toEqual(['Book Author']);
+  });
+
+  it('maps only author contributions from an edition', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      editions: [
+        {
+          ...baseBook.editions![0],
+          cached_contributors: [
+            { author: { id: 1, name: 'Primary Author' }, contribution: null },
+            { author: { id: 2, name: 'Second Author' }, contribution: 'author' },
+            { author: { id: 3, name: 'Audio Narrator' }, contribution: 'Narrator' },
+            { author: { id: 4, name: 'Book Translator' }, contribution: 'Translator' },
+            { author: { id: 5, name: 'Cover Artist' }, contribution: 'Cover Artist' },
+          ],
+        },
+      ],
+    };
+
+    expect(mapBookWithEditions(book)[0].authors).toEqual(['Primary Author', 'Second Author']);
+  });
+
+  it('omits authors when neither the edition nor the book has an author contribution', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      cached_contributors: [{ author: { id: 2, name: 'Book Translator' }, contribution: 'Translator' }],
+      editions: [
+        {
+          ...baseBook.editions![0],
+          cached_contributors: [{ author: { id: 3, name: 'Audio Narrator' }, contribution: 'Narrator' }],
+        },
+      ],
+    };
+
+    expect(mapBookWithEditions(book)[0].authors).toBeUndefined();
   });
 
   it('falls back to book title when edition title is absent', () => {

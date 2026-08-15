@@ -22,6 +22,7 @@ export interface HardcoverSearchDocument {
   subtitle?: string;
   description?: string;
   author_names?: string[];
+  contributions?: HardcoverCachedContributor[];
   isbns?: string[];
   pages?: number;
   release_date?: string;

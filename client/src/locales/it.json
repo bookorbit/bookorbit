@@ -221,6 +221,10 @@
       },
       "bookCovers": {
         "title": "Copertine di libri",
+        "coverSearch": {
+          "label": "Motore di ricerca predefinito per le copertine",
+          "hint": "Scegli la fonte selezionata all'apertura di \"Trova copertina online\". Verrà salvata sul tuo account, in modo che sia valida su tutti i dispositivi."
+        },
         "displayMode": {
           "title": "Modalità di visualizzazione della copertina",
           "hint": "Controlla il modo in cui le copertine reali si adattano agli slot del libro quando le proporzioni differiscono",

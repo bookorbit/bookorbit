@@ -17,7 +17,14 @@ function parseDate(releaseYear: number | undefined | null, releaseDate: string |
 
 function extractAuthorsFromContributors(contributors: HardcoverCachedContributor[] | undefined): string[] {
   if (!contributors) return [];
-  return contributors.map((c) => c.author?.name).filter((n): n is string => n != null);
+  return contributors
+    .filter(
+      (contributor) =>
+        contributor.contribution == null ||
+        (typeof contributor.contribution === 'string' && contributor.contribution.trim().toLowerCase() === 'author'),
+    )
+    .map((contributor) => contributor.author?.name)
+    .filter((name): name is string => typeof name === 'string' && name.trim().length > 0);
 }
 
 function pickIsbn(isbns: string[] | undefined): { isbn10?: string; isbn13?: string } {
@@ -81,6 +88,7 @@ function normalizeCommunityRatingCount(value: number | undefined): number | unde
 
 export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandidate {
   const { isbn10, isbn13 } = pickIsbn(doc.isbns);
+  const authors = extractAuthorsFromContributors(doc.contributions);
   const communityRating = normalizeCommunityRating(doc.rating);
   const communityRatingCount = normalizeCommunityRatingCount(doc.ratings_count);
   const { title, subtitle } = splitEmbeddedSubtitle(doc.title, doc.subtitle);
@@ -91,7 +99,7 @@ export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandida
     title,
     subtitle,
     description: doc.description,
-    authors: doc.author_names ?? [],
+    ...(authors.length > 0 ? { authors } : {}),
     pageCount: doc.pages,
     publishedDate: parseDate(doc.release_year, doc.release_date),
     publishedYear: parseYear(doc.release_year, doc.release_date),
@@ -126,7 +134,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     title,
     subtitle,
     description: book.description,
-    authors,
+    ...(authors.length > 0 ? { authors } : {}),
     publisher: edition.publisher?.name,
     language: edition.language?.code2,
     pageCount: isAudiobookEdition(edition) ? undefined : (edition.pages ?? book.pages),
