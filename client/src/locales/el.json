@@ -1,1 +1,15 @@
-{}
+{
+  "common": {
+    "resetSortAria": "Επαναφορά ταξινόμησης στις προεπιλογές",
+    "save": "Αποθήκευση"
+  },
+  "settings": {
+    "appearance": {
+      "theme": {
+        "accents": {
+          "grey": "Γκρι"
+        }
+      }
+    }
+  }
+}

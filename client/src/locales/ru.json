@@ -217,6 +217,12 @@
       },
       "bookCovers": {
         "title": "Обложки книг",
+        "coverSearch": {
+          "label": "Поставщик поиска по умолчанию для обложки",
+          "hint": "Выберите источник, выбранный при открытии обложки онлайн. Сохранено в вашей учетной записи, так что это применимо на каждом устройстве",
+          "loadError": "Не удалось загрузить поставщик поиска обложки по умолчанию",
+          "saveError": "Не удалось сохранить поставщик поиска обложки по умолчанию"
+        },
         "displayMode": {
           "title": "Режим отображения обложки",
           "hint": "Управляет тем, насколько настоящие крышки помещаются внутри ячейки книги, когда соотношения сторон различаются",
@@ -252,6 +258,22 @@
         "showSpineOnComics": {
           "label": "Показать позвоночник на комиксах",
           "hint": "Применить эффект позвоночника и глосса к обложкам комиксов (cbz, cbr, cb7)"
+        },
+        "detailCoverTint": {
+          "title": "Цвет обложки для деталей книги",
+          "hint": "Цвет фона, взятый из обложки и заголовка на странице с подробностями книги",
+          "off": {
+            "label": "Откл.",
+            "hint": "Простой фон карты"
+          },
+          "single": {
+            "label": "Одноцветный",
+            "hint": "Только доминирующий цвет обложки"
+          },
+          "duotone": {
+            "label": "Двухцветные",
+            "hint": "Добавляет акцентный цвет обложки, когда она имеет выраженный"
+          }
         },
         "shadow": {
           "title": "Сила тени обложки",
@@ -421,7 +443,7 @@
         "usage": {
           "libraries": "{count, plural, =0 {нет библиотек} one {# библиотека} few {# библиотеки} many {# библиотеки} other {# библиотеки}}",
           "collections": "{count, plural, =0 {нет коллекций} one {# коллекция} few {# коллекций} many {# коллекций} other {# коллекций}}",
-          "smartScopes": "{count, plural, =0 {Нет умных областей} one {# умная область} few {# умные области} many {# умные области} other {# умные области}}"
+          "smartScopes": "{count, plural, =0 {нет умных списков} one {# умный список} few {# умных списков} many {# умных списков} other {# умные списки}}"
         },
         "confirm": {
           "deleteOne": "Удалить \"{name}\"? Существующие приложения вернутся к значку по умолчанию.",
@@ -447,7 +469,8 @@
         "book-covers": "Обложки книг",
         "icons": "Иконки",
         "layout": "Макет",
-        "behavior": "Поведение"
+        "behavior": "Поведение",
+        "language": "Язык"
       }
     },
     "account": {
@@ -759,7 +782,9 @@
         "migrationRunning": "Миграция запущена",
         "migrationCompleted": "Миграция завершена",
         "migrationFailed": "Сбой миграции",
+        "importDescription": "Единоразовый импорт книг, метаданных и прогресс чтения из предыдущей установки Booklore.",
         "configuredDescription": "Источник: {name}. Переход пока не запущен - продолжайте установку для импорта.",
+        "runningDescription": "Этап: {stage} - начато {started}",
         "completedDescription": "От {name} - завершено {date}",
         "migrationErrorGeneric": "Произошла ошибка во время миграции.",
         "stageInitializing": "инициализация",
@@ -846,7 +871,9 @@
         "errorLoadSuggestions": "Не удалось загрузить пользовательское сопоставление предложений",
         "requiredFields": "Требуется имя хоста, пользователя, базы данных и хоста",
         "connectionTestPassedWithWarnings": "Проверка соединения пройдена с предупреждениями",
+        "connectionTestPassedWithCount": "Тест подключения прошел с предупреждением {count}. Первая: {first}",
         "connectionTestPassed": "Проверка соединения пройдена",
+        "connectionOkMissingTables": "Соединение установлено, но не хватает {count} таблиц(ми)",
         "cannotTestMediaPathActiveRun": "Невозможно протестировать путь к медиафайлу, пока запуск активен",
         "mediaRootPathRequiredCover": "Для импортирования необходим корневой путь к файлу.",
         "useAbsolutePath": "Используйте абсолютный путь (например: /books).",
@@ -855,6 +882,7 @@
         "mediaPathValidationFailed": "Ошибка проверки пути к файлу.",
         "connectionFailedBeforeMediaPath": "Проверка соединения не удалась, прежде чем проверка пути к медиафайлу будет завершена.",
         "cannotModifySourceActiveRun": "Невозможно изменить источник, пока запуск активен",
+        "sourceSavedValidatedWarnings": "Источник сохранен и проверен с {count} предупреждением(ми)",
         "sourceSavedValidated": "Источник сохранен и проверен",
         "errorSaveValidateSource": "Не удалось сохранить или проверить источник",
         "cannotSaveMappingsActiveRun": "Невозможно сохранить сопоставления, пока запуск активен",
@@ -1125,7 +1153,15 @@
         "users": "Пользователи",
         "account-activity": "Активность аккаунта",
         "magic-links": "Волшебные ссылки",
-        "oidc": "OIDC / ССО"
+        "oidc": "OIDC / ССО",
+        "server-fonts": "Шрифты сервера"
+      },
+      "serverFonts": {
+        "title": "Шрифты сервера",
+        "subtitle": "Загрузите шрифты, которые каждый пользователь может выбрать в для чтения книг, не загружая свои собственные.",
+        "listLabel": "Шрифты сервера",
+        "noFontsYet": "Пока нет шрифтов сервера",
+        "noFontsHint": "Шрифты, которые вы добавите сюда, появятся у каждого пользователя."
       }
     },
     "common": {
@@ -1138,14 +1174,25 @@
         "opds": "OPDS",
         "kobo": "Kobo",
         "koreader": "KOReader",
+        "integrations": "Интеграции",
         "hardcover": "Хардкокрышка",
         "admin": "Админ",
         "system": "Система",
         "account": "Аккаунт"
       }
     },
+    "integrations": {
+      "title": "Интеграции",
+      "subtitle": "Подключите внешние сервисы для синхронизации данных и цитат.",
+      "noPermission": "У вас нет прав на использование интеграции.",
+      "providerSubtitles": {
+        "readwise": "Отправляйте свои цитаты в \"Readwise\" автоматически.",
+        "storygraph": "Синхронизируйте ваш прогресс чтения и статус с The StoryGraph."
+      }
+    },
     "metadata": {
       "title": "Метаданные",
+      "subtitle": "Настройка поставщиков метаданных, сопоставление правил, автоматизации и инфо об авторах.",
       "noPermission": "У вас нет разрешения на управление настройками метаданных.",
       "fields": {
         "title": "Заголовок",
@@ -1196,6 +1243,7 @@
         },
         "status": {
           "inQueuePaused": "{count} в очереди - приостановлено",
+          "remaining": "Осталось: {count}",
           "eligible": "~{count} права"
         },
         "trigger": {
@@ -1204,6 +1252,7 @@
         },
         "lastRun": {
           "justNow": "только что",
+          "minutesAgo": "{count}м назад",
           "yesterday": "вчера",
           "daysAgo": "{count, plural, one {# день назад} few {# дней назад} many {# дней назад} other {# дней назад}}",
           "label": "Последний запуск: {when}",
@@ -1323,6 +1372,10 @@
           "combineGenres": {
             "label": "Объединить жанры от всех выбранных провайдеров",
             "hint": "Собирайте и deduplicate жанров из каждого поставщика, назначенного в поле Genres, вместо того, чтобы останавливаться на первом результате."
+          },
+          "maxGenres": {
+            "label": "Максимальное количество жанров в книге",
+            "hint": "Применяется после исключений и удаления дубликатов. Оставьте пустым для неограниченного количества. Это влияет на будущие выборки метаданных."
           },
           "storeProviderIds": {
             "label": "ID провайдера магазина в книгах"
@@ -1783,6 +1836,7 @@
         "tokenPublisher": "Издатель",
         "tokenIsbn": "ISBN-13",
         "tokenLanguage": "Язык",
+        "tokenLibrary": "Название библиотеки",
         "tokenOriginalFilename": "Исходное имя файла (без расширения)",
         "tokenExtension": "Расширение файла (без точки)",
         "patternHelpIntro": "Шаблоны используют такие жетоны, как {titleToken} и {authorsToken}, а также модификаторы и необязательные сегменты.",
@@ -1794,6 +1848,7 @@
         "copy": "Копировать",
         "never": "Никогда",
         "justNow": "Только что",
+        "daysAgo": "{count}д назад",
         "loadFailed": "Не удалось загрузить",
         "devicePaired": "Устройство успешно соединено",
         "devicePairedHint": "Вы готовы к настройке Kobo. Следуйте инструкциям ниже.",
@@ -1822,7 +1877,7 @@
         "syncPreferences": "Настройки синхронизации",
         "twoWaySync": "Двухсторонняя синхронизация",
         "twoWaySyncHint": "Синхронизация позиции чтения между BookOrbit и Kobo. Требует доставки KEPUB для точного местоположения и надежного восстановления страницы.",
-        "syncHighlights": "Синхронизировать выделения BookOrbit в Кобо",
+        "syncHighlights": "Синхронизировать цитаты BookOrbit с Kobo",
         "syncHighlightsHint": "Отправляйте на BookOrbit или KOReader в ваш Kobo. Kobo выделения импортированы в BookOrbit, даже когда это не так. Синхронизация связанных аннотаций и удаление обоих способов. Требует KEPUB доставки; Kobo должна быть KEPUB загружен из BookOrbit.",
         "convertKepub": "Преобразовать в KEPUB",
         "convertKepubHint": "Отправлять подходящие EPUB как KEPUB. Это остается, когда включена синхронизация прогресса или поддержка BookOrbit-to-Kobo. При следующей синхронизации Kobo затрагиваемые книги предлагаются снова в виде загрузок KEPUB; удалите любую старую копию EPUB, если Kobo продолжает открывать ее.",
@@ -1860,8 +1915,8 @@
             "librarySync": "Библиотека проверена на обновления",
             "bookDownload": "Книга загружена",
             "progressUpdate": "Чтение позиции обновлено",
-            "annotationsPull": "Отметины в Kobo",
-            "annotationsPush": "Отметины из Kobo"
+            "annotationsPull": "Отправить цитаты в Kobo",
+            "annotationsPush": "Цитаты из Kobo"
           },
           "outcome": {
             "failed": "Неудачный",
@@ -1878,8 +1933,8 @@
             "librarySync": "Проверка библиотеки не завершена",
             "bookDownload": "Загрузка не завершена",
             "progressUpdate": "Позиция чтения не обновлена",
-            "annotationsPull": "Отметины не были отправлены",
-            "annotationsPush": "Подсветки не были импортированы"
+            "annotationsPull": "Цитаты не были отправлены",
+            "annotationsPush": "Цитаты не были импортированы"
           },
           "chip": {
             "morePending": "Еще в ожидании",
@@ -1915,8 +1970,8 @@
             "highlightsSentToKoboFor": "{count, plural, one {# Отправлено в Кобо за {title}} few {# Отправлено в Кобо за {title}} many {# Отправлено в Кобо за {title}} other {# Отправлено в Кобо за {title}}}",
             "highlightsSentToKobo": "{count, plural, one {# Выделено в Кобо} few {# Отправлено в Кобо} many {# Отправлено в Кобо} other {# Отправлено в Кобо}}",
             "noKoboHighlightChangesFor": "Нет изменений в Kobo для {title}",
-            "noKoboHighlightChanges": "Нет изменений в Kobo выделении",
-            "highlightsImportedFromKoboFor": "{count, plural, one {# выделение импортированных из Kobo для {title}} few {# акцентировано из Kobo для {title}} many {# акцентировано из Kobo для {title}} other {# акцентировано из Kobo для {title}}}",
+            "noKoboHighlightChanges": "Нет изменений в цитатах Kobo",
+            "highlightsImportedFromKoboFor": "{count, plural, one {# цитата импортированная из Kobo из {title}} few {# цитат из Kobo из {title}} many {# цитат из Kobo из {title}} other {# цитаты из Kobo из {title}}}",
             "highlightsImportedFromKobo": "{count, plural, one {# выделение импортированных из Kobo} few {# акцентов импортировано из Kobo} many {# акцентов импортировано из Kobo} other {# акцентов импортировано из Kobo}}"
           },
           "timeRange": "{from} до {to}",
@@ -1991,14 +2046,19 @@
         "loadFailed": "Не удалось загрузить настройки KOReader",
         "never": "Никогда",
         "justNow": "Только что",
+        "minutesAgo": "{count}м назад",
+        "hoursAgo": "{count}ч назад",
+        "daysAgo": "{count}д назад",
         "unknown": "Неизвестен",
         "updateAvailable": "Доступно обновление",
+        "manualUpdateRequired": "Требуется обновление вручную",
+        "manualUpdateExplanation": "Эта версия плагина не может установить свои собственные обновления. Загрузите плагин и скопируйте bookorbit.koplugin на koreader/plugins/ на этом устройстве.",
         "upToDate": "Актуально",
         "versionUnknown": "Версия неизвестна",
         "latestPlugin": "Последний плагин: v{version}",
         "latestPluginUnavailable": "Последний плагин недоступен",
         "notConfigured": "Синхронизация KOReader не настроена",
-        "notConfiguredHint": "Создайте один набор данных для синхронизации, затем используйте их с плагином BookOrbit KOReader для просмотра, загрузки, прогресса, чтения событий, подсветки и удаления.",
+        "notConfiguredHint": "Создайте один набор данных для синхронизации, затем используйте их с плагином BookOrbit KOReader для просмотра, загрузки, прогресса, чтения событий, цитаты и удаления.",
         "createCredentials": "Создать учетные данные",
         "createFormTitle": "Создать учётные данные для синхронизации KOReader",
         "createFormHint": "Эти учетные данные аутентифицируют устройства KOReader с помощью BookOrbit.",
@@ -2013,7 +2073,7 @@
         "status": "Статус KOReader",
         "refresh": "Обновить",
         "progressSync": "Синхронизация",
-        "progressSyncHint": "Разрешить устройствам KOReader синхронизировать прогресс, активность чтения, подсветки и удалять примечания с помощью BookOrbit.",
+        "progressSyncHint": "Разрешить устройствам KOReader синхронизировать прогресс, активность чтения, цитаты и удалять примечания с помощью BookOrbit.",
         "lastSync": "Последняя синхронизация",
         "syncedBooks": "Синхронизированные книги",
         "bookCount": "{count, plural, =0 {нет книг} one {# книга} few {# книги} many {# книги} other {# книги}}",
@@ -2041,14 +2101,14 @@
         "latestPluginSuffix": "- последний плагин v{version}",
         "matchedBooks": "Соответствующие книги",
         "readingEvents": "Чтение событий",
-        "highlights": "Отметины",
+        "highlights": "Цитаты",
         "syncedTotals": "Синхронизированные итоги",
         "trashedHighlights": "Удалённые объекты",
-        "pendingDeletes": "{count, plural, =0 {нет удаленных выделений ожидающих подтверждения плагина KOReader.} one {# удалена подсветка, ожидающая подтверждения KOReader.} few {# удалена выделен, ожидающих подтверждения плагина KOReader.} many {# удалена выделен, ожидающих подтверждения плагина KOReader.} other {# удалена выделен, ожидающих подтверждения плагина KOReader.}}",
-        "failedPositions": "{count, plural, =0 {Нет вакансий выделенного значения.} one {# подчеркивать позицию нужно внимание.} few {# подчеркивать позиции нужно внимание.} many {# подчеркивать позиции нужно внимание.} other {# подчеркивать позиции нужно внимание.}}",
+        "pendingDeletes": "{count, plural, =0 {нет удаленных цитат ожидающих подтверждения плагина KOReader.} one {# удалена цитата, ожидающая подтверждения KOReader.} few {# удаленных цитат, ожидающих подтверждения плагина KOReader.} many {# удаленных цитат, ожидающих подтверждения плагина KOReader.} other {# удаленных цитат, ожидающих подтверждения плагина KOReader.}}",
+        "failedPositions": "{count, plural, =0 {нет вакансий выделенного значения.} one {# подчеркивать позицию нужно внимание.} few {# подчеркивать позиции нужно внимание.} many {# подчеркивать позиции нужно внимание.} other {# подчеркивать позиции нужно внимание.}}",
         "setupGuide": "Инструкция по настройке",
         "setupSteps": "Шаги настройки KOReader",
-        "setupStepsHint": "Использовать плагин BookOrbit для просмотра каталогов, загрузок, прогресса, чтения событий и подсветки. Использовать дополнение для склада только для прогресса.",
+        "setupStepsHint": "Использовать плагин BookOrbit для просмотра каталогов, загрузок, прогресса, чтения событий и цитат. Использовать дополнение только для прогресса.",
         "pluginGuideTitle": "Плагин BookOrbit",
         "pluginStep1": "Загрузите предустановленный плагин выше.",
         "pluginStep2Prefix": "Разархивировать и скопировать",
@@ -2637,6 +2697,7 @@
     },
     "hub": {
       "title": "Аннотации",
+      "totalCount": "Всего %{count}",
       "bookCount": "{count, plural, =0 {нет книг} one {# книга} few {# книги} many {# книги} other {# книги}}",
       "noteCount": "{count, plural, =0 {нет заметок} one {# Примечание} few {# заметки} many {# заметки} other {# заметки}}",
       "export": "Экспорт",
@@ -2649,14 +2710,14 @@
       "bulkTrash": "Корзина",
       "bulkRestore": "Восстановить",
       "tabs": {
-        "highlights": "Отметины",
+        "highlights": "Цитаты",
         "trash": "Корзина"
       },
       "empty": {
-        "noMatch": "Нет выделений, соответствующих вашим фильтрам.",
+        "noMatch": "Нет цитат, соответствующих вашим фильтрам.",
         "resetFilters": "Сбросить фильтры",
         "trashEmpty": "Корзина пуста",
-        "noAnnotations": "Аннотаций пока нет. Отметим, что вы создаете в Интернете или ваш электронный читатель появится здесь."
+        "noAnnotations": "Аннотаций пока нет. Цитаты, что вы создаете в Интернете или на вашем устройстве появятся здесь."
       },
       "toast": {
         "movedToTrash": "Перемещено в корзину",
@@ -2824,6 +2885,7 @@
       "UserSuperuserEnable": "Включить доступ суперпользователя",
       "UserSuperuserDisable": "Отключить доступ суперпользователя",
       "UserContentFiltersSet": "Обновить фильтры контента",
+      "UserUnlock": "Разблокировать аккаунт",
       "ReadingInsightsSharingUpdate": "Обновить информацию о пронзании",
       "ReadingInsightsProfileView": "Просмотр общих идей",
       "LibraryCreate": "Создать библиотеку",
@@ -2849,6 +2911,7 @@
       "BookBulkUpdateTags": "Обновить теги книги",
       "BookBulkSetMetadataLock": "Установка блокировок метаданных",
       "BookBulkEditMetadata": "Изменить метаданные книги",
+      "BookBulkMoveLibrary": "Переместить книги в другую библиотеку",
       "BookReadingStateReset": "Сбросить состояние чтения",
       "BookWriteAndRename": "Запись метаданных и переименование файла",
       "CollectionCreate": "Создать коллекцию",
@@ -2928,6 +2991,9 @@
       "signingIn": "Вход...",
       "orDivider": "или",
       "forgotPassword": "Забыли пароль?",
+      "noAccount": "У вас нет учетной записи?",
+      "signUp": "Зарегистрироваться",
+      "registeredNotice": "Учетная запись создана. Войдите, чтобы продолжить. Администратор должен предоставить разрешения для доступа к библиотеке.",
       "errors": {
         "invalidCredentials": "Неверное имя пользователя или пароль",
         "tooManyAttempts": "Слишком много попыток входа. Пожалуйста, подождите минуту и повторите попытку."
@@ -3497,7 +3563,7 @@
         "editMetadata": "Редактировать метаданные",
         "files": "Файлы",
         "readingLog": "Журнал чтения",
-        "highlights": "Отметины"
+        "highlights": "Цитаты"
       },
       "discover": {
         "moreInSeries": "Больше в сериалах",
@@ -3869,7 +3935,7 @@
           "oldest": "Сначала старые"
         },
         "summary": {
-          "highlights": "{count, plural, =0 {Не волнуйтесь} one {один подчеркивает} few {# освещает} many {# освещает} other {# освещает}}",
+          "highlights": "{count, plural, =0 {нет цитат} one {одна цитата} few {# цитат} many {# цитат} other {# цитаты}}",
           "notes": "{count, plural, =0 {нет заметок} one {одна заметка} few {# заметки} many {# заметки} other {# заметки}}",
           "chapters": "{count, plural, =0 {нет глав} one {одна глава} few {# главы} many {# главы} other {# главы}}"
         },
@@ -3878,13 +3944,13 @@
         "untitled": "Без названия",
         "trash": "Корзина",
         "empty": {
-          "noMatch": "Нет выделений, соответствующих вашим фильтрам.",
+          "noMatch": "Нет цитат, соответствующих вашим фильтрам.",
           "resetFilters": "Сбросить фильтры",
-          "none": "Подписей пока нет",
-          "hint": "Выберите текст во время чтения, чтобы создать основные моменты"
+          "none": "Цитат пока нет",
+          "hint": "Выберите текст во время чтения, чтобы сохранить цитату"
         },
         "uncategorized": "Без категории",
-        "paginationUnit": "подсказки"
+        "paginationUnit": "цитаты"
       },
       "readingLog": {
         "moreActionsAria": "Больше действий для чтения журнала",
@@ -4041,7 +4107,10 @@
         "seriesPlaceholder": "Серии",
         "moveUp": "Вверх",
         "moveDown": "Сдвинуть вниз",
-        "removeSeries": "Удалить серию"
+        "removeSeries": "Удалить серию",
+        "seriesIndexLabel": "Позиция в серии",
+        "totalLabel": "Книг в серии",
+        "totalPlaceholder": "из"
       }
     },
     "table": {
@@ -4095,6 +4164,9 @@
         "unlockField": "Разблокировать поле",
         "clickToLock": "Нажмите, чтобы заблокировать",
         "clickToUnlock": "Нажмите, чтобы разблокировать"
+      },
+      "progress": {
+        "complete": "{percent}% завершено"
       },
       "rating": {
         "label": "Рейтинг",
@@ -4421,7 +4493,7 @@
       "libraries": "Библиотеки",
       "newLibrary": "Новая библиотека",
       "scanProgress": "{processed} / {total} книги",
-      "smartScopes": "Умные области",
+      "smartScopes": "Умные списки",
       "newSmartScope": "Новый умный охват",
       "noSmartScopes": "Пока нет умных областей",
       "collections": "Коллекции",
@@ -4449,7 +4521,7 @@
       "filterCollections": "Коллекции фильтров",
       "filterCollectionsPlaceholder": "Подборки фильтров...",
       "seeAllLibraries": "Посмотреть все библиотеки ({count})",
-      "seeAllSmartScopes": "Посмотреть все умные области ({count})",
+      "seeAllSmartScopes": "Посмотреть все умные списки ({count})",
       "seeAllCollections": "Посмотреть все коллекции ({count})",
       "updateAvailable": "Обновить {version}",
       "zones": {
@@ -4577,7 +4649,7 @@
       "noMatchesHint": "Попробуйте другое слово для поиска.",
       "bookCount": "Книги: {count}",
       "librariesEmptyHint": "Создайте библиотеку для добавления книг.",
-      "smartScopesEmptyHint": "Умные области сохраняют часто используемый набор фильтров.",
+      "smartScopesEmptyHint": "Умные списки сохраняют часто используемый набор фильтров.",
       "collectionsEmptyHint": "Коллекции группируют книги, которые вы выбираете вручную."
     }
   },
@@ -4620,7 +4692,7 @@
     "scroller": {
       "failedToLoad": "Не удалось загрузить.",
       "empty": {
-        "continueReading": "Пока нет книг в процессе. Начните читать один, чтобы увидеть его здесь.",
+        "continueReading": "Пока нет читаемых книг. Начните читать книгу, чтобы увидеть ее здесь.",
         "continueListening": "Пока нет ни одного аудиокниги. Начните слушать один, чтобы увидеть его здесь.",
         "wantToRead": "Никаких книг не помечено для чтения.",
         "upNextInSeries": "Пока нет выбора следующей серии. Закончите громкость к поверхности следующей.",
@@ -4638,10 +4710,10 @@
       "widgetNames": {
         "readingStreak": "Счетчик",
         "currentlyReading": "Сейчас читается",
-        "readingGoal": "Чтение цели",
+        "readingGoal": "Цель чтения",
         "readingDna": "Чтение ДНК",
         "monthlyChallenge": "Ежемесячный вызов",
-        "highlightOfTheDay": "Подсветка дня",
+        "highlightOfTheDay": "Цитата дня",
         "neglectedGems": "Отрицательные Самоцветы",
         "readingRhythm": "Чтение ритма",
         "diversityScore": "Оценка разнообразия",
@@ -4654,7 +4726,7 @@
         "continueReading": "Продолжить чтение",
         "continueListening": "Продолжить слушание",
         "wantToRead": "Хотите прочитать",
-        "upNextInSeries": "Вверх в следующем сезоне",
+        "upNextInSeries": "Следующие книги в сериях",
         "random": "Откройте для себя что-то новое",
         "smartScope": "Умный охват"
       },
@@ -4675,7 +4747,7 @@
     "widgets": {
       "currentlyReading": {
         "title": "Сейчас читается",
-        "empty": "Нет книг в процессе. Начните читать один, чтобы увидеть его здесь.",
+        "empty": "Нет читаемых книг. Начните читать книгу, чтобы увидеть ее здесь.",
         "continueReading": "Продолжить чтение"
       },
       "diversityScore": {
@@ -4690,8 +4762,8 @@
         }
       },
       "highlightOfTheDay": {
-        "title": "Подсветка дня",
-        "empty": "Выделите отступы чтением, чтобы увидеть их здесь"
+        "title": "Цитата дня",
+        "empty": "Выделите абзацы в книге, чтобы увидеть их здесь"
       },
       "libraryOverview": {
         "title": "Обзор библиотеки",
@@ -4713,7 +4785,7 @@
       },
       "monthlyChallenge": {
         "title": "Ежемесячный вызов",
-        "complete": "Complete!"
+        "complete": "Завершено!"
       },
       "neglectedGems": {
         "title": "Отрицательные Самоцветы",
@@ -4737,7 +4809,7 @@
         }
       },
       "readingGoal": {
-        "title": "Чтение цели {year}",
+        "title": "Цель чтения {year}",
         "setGoalPrompt": "Настройте цель для чтения для отслеживания вашего прогресса",
         "setGoal": "Установить цель",
         "booksPerYear": "Книги в год",
@@ -4755,8 +4827,8 @@
       "readingStreak": {
         "title": "Счетчик",
         "empty": "Читайте сегодня чтобы начать свою серию",
-        "streakLabel": "{count, plural, =0 {День серия} one {День серия} few {дни серия} many {дни серия} other {дни серия}}",
-        "best": "{count, plural, =0 {Лучша: # день} one {Лучше: # день} few {Лучше: # дни} many {Лучше: # дни} other {Лучше: # дни}}",
+        "streakLabel": "{count, plural, =0 {дней серия} one {день серия} few {дня серия} many {дней серия} other {дней серия}}",
+        "best": "{count, plural, =0 {Лучшая: # дней} one {Лучшая: # день} few {Лучшая: # дня} many {Лучшая: # дней} other {Лучше: # дней}}",
         "lastSevenDays": "Последние 7 дней"
       },
       "yearProjection": {
@@ -5721,7 +5793,7 @@
       "saveFailed": "Не удалось сохранить настройки",
       "savePreferenceFailed": "Не удалось сохранить настройки",
       "whatsNewToggle": "Показывать \"Что нового\" после обновления",
-      "whatsNewToggleHint": "Подсветка новых функций после обновлений приложения. Архив остается доступным в любом случае.",
+      "whatsNewToggleHint": "Обзор новых функций после обновлений приложения. Архив остается доступным в любом случае.",
       "groups": {
         "library": "Библиотека",
         "files": "Файлы",
@@ -5793,7 +5865,7 @@
       "startReading": "Начать чтение"
     },
     "toast": {
-      "linkedHighlightError": "Не удалось открыть связанную позицию подсветки",
+      "linkedHighlightError": "Не удалось открыть связанную позицию для цитаты",
       "resumed": "Возобновлено в {pct}% - {label}"
     },
     "header": {
@@ -5850,7 +5922,7 @@
       "tabs": {
         "chapters": "Главы",
         "bookmarks": "Закладки",
-        "highlights": "Отметины",
+        "highlights": "Цитаты",
         "toc": "Содержание",
         "tocShort": "ТОК",
         "marksShort": "Marks",
@@ -5862,10 +5934,10 @@
       "noChapters": "Главы не найдены",
       "noBookmarks": "Еще нет закладок",
       "noBookmarksMatch": "Нет закладок, соответствующих вашим фильтрам",
-      "noHighlights": "Подписей пока нет",
+      "noHighlights": "Цитат пока нет",
       "noHighlightsMatch": "Нет элементов, соответствующих вашим фильтрам",
       "searchBookmarks": "Поиск закладок...",
-      "searchHighlights": "Поиск подсветки...",
+      "searchHighlights": "Поиск цитат...",
       "bookmarkFallback": "Закладка",
       "locationUnavailable": "Местоположение недоступно",
       "customColor": "Свой ({color})",
@@ -5873,7 +5945,7 @@
       "allChapters": "Все главы",
       "notesOnly": "Только заметки",
       "deleteBookmark": "Удалить закладку",
-      "deleteHighlight": "Удалить подсветку",
+      "deleteHighlight": "Удалить цитату",
       "approximatePosition": "Синхронизировано с устройства; точная позиция недоступна, переходы к главе",
       "sort": {
         "readingOrder": "Порядок чтения",
@@ -6604,7 +6676,7 @@
         "edit": "Редактировать · {base}",
         "files": "Файлы · {base}",
         "readingLog": "Журнал чтения · {base}",
-        "highlights": "Отметины · {base}"
+        "highlights": "Цитаты · {base}"
       }
     },
     "bookDock": {
@@ -6821,7 +6893,7 @@
       "notifications": "Уведомления",
       "restrictions": "Ограничения содержимого"
     },
-    "smartScopes": "Умные области",
+    "smartScopes": "Умные списки",
     "collections": "Коллекции"
   }
 }
