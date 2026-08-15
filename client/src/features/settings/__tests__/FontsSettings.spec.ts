@@ -18,10 +18,6 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: vi.fn<() => unknown>(),
 }))
 
-vi.mock('../SettingsPageHeader.vue', () => ({
-  default: { template: '<div />' },
-}))
-
 const literataFonts = [mockFont(1, 'Literata', 400), mockFont(2, 'Literata', 700)]
 const georgiaPro = mockFont(3, 'Georgia Pro')
 

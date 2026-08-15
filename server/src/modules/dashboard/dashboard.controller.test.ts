@@ -40,6 +40,7 @@ function makeController() {
     getLongWait: vi.fn(),
     getDiversityScore: vi.fn(),
     getReadingRhythm: vi.fn(),
+    getWidgets: vi.fn(),
   };
 
   const controller = new DashboardController(dashboardService as never, widgetService as never);
@@ -79,6 +80,28 @@ describe('DashboardController', () => {
   });
 
   describe('widget endpoints', () => {
+    it('getWidgets delegates the batch to widgetService', async () => {
+      const { controller, widgetService } = makeController();
+      const user = makeUser();
+      const mockResult = { items: [{ type: 'reading-goal' as const, data: null, failed: false }] };
+      widgetService.getWidgets.mockResolvedValue(mockResult);
+
+      const result = await controller.getWidgets(user, { widgets: ['reading-goal', 'reading-dna'] });
+
+      expect(widgetService.getWidgets).toHaveBeenCalledWith(['reading-goal', 'reading-dna'], user);
+      expect(result).toBe(mockResult);
+    });
+
+    it('getWidgets asks for each widget once even when the client repeats one', async () => {
+      const { controller, widgetService } = makeController();
+      const user = makeUser();
+      widgetService.getWidgets.mockResolvedValue({ items: [] });
+
+      await controller.getWidgets(user, { widgets: ['reading-goal', 'reading-goal', 'reading-dna'] });
+
+      expect(widgetService.getWidgets).toHaveBeenCalledWith(['reading-goal', 'reading-dna'], user);
+    });
+
     it('getReadingGoal delegates to widgetService', async () => {
       const { controller, widgetService } = makeController();
       const user = makeUser();

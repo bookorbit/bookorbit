@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, ref, watch, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronRight, Loader2, RotateCcw, Library, Trash2, Save } from '@lucide/vue'
@@ -172,32 +173,24 @@ function onSave() {
             <p class="settings-hint">{{ t('settings.metadata.fieldRules.library.subHint') }}</p>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <button
-              class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-destructive hover:border-destructive/50 hover:bg-destructive/5 transition-colors disabled:opacity-40"
-              :disabled="saving || !draft"
-              @click="onClearAll"
-            >
+            <Button type="button" variant="destructive-outline" size="sm" :disabled="saving || !draft" @click="onClearAll">
               <Trash2 :size="13" />
               <span>{{ t('settings.metadata.fieldRules.clearAllProviders') }}</span>
-            </button>
+            </Button>
             <Tooltip>
               <TooltipTrigger as-child>
-                <button
-                  class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors disabled:opacity-40"
-                  :disabled="saving"
-                  @click="onReset"
-                >
+                <Button type="button" variant="outline" size="sm" :disabled="saving" @click="onReset">
                   <RotateCcw :size="13" />
                   <span>{{ t('settings.metadata.fieldRules.resetToDefault') }}</span>
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent>{{ t('settings.metadata.fieldRules.library.resetTooltip') }}</TooltipContent>
             </Tooltip>
-            <button class="settings-btn-primary h-8 px-3" :disabled="saving || !isDirty" @click="onSave">
+            <Button size="sm" class="px-3" :disabled="saving || !isDirty" @click="onSave" type="button">
               <Loader2 v-if="saving" :size="14" class="animate-spin" />
               <Save v-else :size="14" />
               <span>{{ t('common.save') }}</span>
-            </button>
+            </Button>
           </div>
         </div>
 

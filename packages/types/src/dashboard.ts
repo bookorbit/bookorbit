@@ -209,3 +209,36 @@ export interface ReadingRhythmWidgetData {
   activeDays: number;
   totalDays: number;
 }
+
+/** Maps each widget to the payload its endpoint returns, so the batch stays type-safe per widget. */
+export interface WidgetDataByType {
+  "reading-streak": ReadingStreakWidgetData;
+  "currently-reading": CurrentlyReadingWidgetData;
+  "reading-goal": ReadingGoalWidgetData;
+  "reading-dna": ReadingDnaWidgetData;
+  "monthly-challenge": MonthlyChallengeWidgetData;
+  "highlight-of-the-day": HighlightOfTheDayWidgetData | null;
+  "neglected-gems": NeglectedGemsWidgetData;
+  "reading-rhythm": ReadingRhythmWidgetData;
+  "diversity-score": DiversityScoreWidgetData;
+  "library-overview": LibraryOverviewWidgetData;
+  "year-projection": YearProjectionWidgetData;
+  "long-wait": LongWaitWidgetData | null;
+}
+
+export const DASHBOARD_WIDGET_BATCH_MAX = WIDGET_TYPES.length;
+
+export interface DashboardWidgetBatchRequest {
+  widgets: WidgetType[];
+}
+
+export interface DashboardWidgetBatchResult<T extends WidgetType = WidgetType> {
+  type: T;
+  data: WidgetDataByType[T] | null;
+  // One widget that throws must not cost the other eleven their data.
+  failed: boolean;
+}
+
+export interface DashboardWidgetBatchResponse {
+  items: DashboardWidgetBatchResult[];
+}

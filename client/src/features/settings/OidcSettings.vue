@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
@@ -389,22 +390,22 @@ async function deleteGroupMapping(id: number) {
       </p>
     </div>
 
-    <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">
+    <div v-if="loading" class="settings-loading-state" :class="{ 'mt-5 md:mt-0': !props.embedded }">
       {{ t('common.loading') }}
     </div>
 
-    <div v-else class="mt-5 md:mt-0 space-y-4">
+    <div v-else class="space-y-4" :class="{ 'mt-5 md:mt-0': !props.embedded }">
       <div>
-        <div class="flex items-center justify-between mb-3">
+        <div class="mb-2 flex items-center justify-between">
           <p class="settings-group-label mb-0">
             {{ t('settings.oidc.providers') }}
           </p>
-          <button type="button" class="settings-btn-primary" @click="startCreate">
+          <Button size="sm" type="button" @click="startCreate">
             <Plus :size="12" />
             {{ t('settings.oidc.addProvider') }}
-          </button>
+          </Button>
         </div>
-        <div class="border border-border rounded-lg overflow-hidden shadow-xs">
+        <div class="settings-card">
           <div v-if="providers.length > 0" class="divide-y divide-border">
             <button
               v-for="provider in providers"
@@ -452,9 +453,9 @@ async function deleteGroupMapping(id: number) {
   <!-- Create / Edit view -->
   <template v-else>
     <div class="hidden md:flex items-center gap-3 mb-4">
-      <button type="button" class="p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors" @click="backToList">
+      <Button variant="ghost" size="icon-sm" type="button" @click="backToList">
         <ArrowLeft class="w-5 h-5" />
-      </button>
+      </Button>
       <div
         v-if="viewMode === 'edit' && form.iconUrl"
         class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0 border border-border overflow-hidden"
@@ -471,16 +472,16 @@ async function deleteGroupMapping(id: number) {
       </div>
     </div>
     <div class="md:hidden px-1 mb-4">
-      <button type="button" class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2" @click="backToList">
+      <Button variant="ghost" size="sm" type="button" class="mb-2" @click="backToList">
         <ArrowLeft class="w-4 h-4" />
         {{ t('common.back') }}
-      </button>
+      </Button>
       <h1 class="text-xl font-semibold tracking-tight text-foreground">
         {{ viewMode === 'create' ? t('settings.oidc.addProvider') : form.displayName || t('settings.oidc.editProvider') }}
       </h1>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">
+    <div v-if="loading" class="settings-loading-state">
       {{ t('common.loading') }}
     </div>
 
@@ -572,14 +573,16 @@ async function deleteGroupMapping(id: number) {
             <div class="flex w-full flex-col items-start gap-2 md:w-auto md:items-end">
               <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
                 <input v-model="form.issuerUri" type="url" placeholder="https://accounts.example.com" class="input-field w-full md:w-80" />
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   :disabled="testing || !form.issuerUri"
-                  class="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-primary/50 md:w-auto md:py-1.5"
+                  class="w-full shrink-0 md:w-auto"
                   @click="testConnection"
                 >
                   {{ testing ? t('settings.oidc.form.testing') : t('settings.oidc.form.test') }}
-                </button>
+                </Button>
               </div>
               <div
                 v-if="testResult"
@@ -596,14 +599,9 @@ async function deleteGroupMapping(id: number) {
                         })
                       : (testResult.error ?? t('settings.oidc.test.connectionFailed'))
                   }}</span>
-                  <button
-                    v-if="testResult.success"
-                    type="button"
-                    class="shrink-0 underline underline-offset-2 opacity-70 hover:opacity-100"
-                    @click="toggleTestDetails"
-                  >
+                  <Button variant="link" size="sm" v-if="testResult.success" type="button" class="shrink-0 h-auto p-0" @click="toggleTestDetails">
                     {{ showTestDetails ? t('settings.oidc.test.hide') : t('settings.oidc.test.details') }}
-                  </button>
+                  </Button>
                 </div>
                 <div v-if="testResult.success && showTestDetails" class="mt-2 space-y-0.5 border-t border-green-500/20 pt-2 font-mono text-[10px]">
                   <div v-if="testResult.tokenEndpoint">token: {{ testResult.tokenEndpoint }}</div>
@@ -655,15 +653,17 @@ async function deleteGroupMapping(id: number) {
           <p class="settings-group-label">
             {{ t('settings.oidc.form.claimMapping') }}
           </p>
-          <button
+          <Button
+            variant="link"
+            size="sm"
             v-if="viewMode === 'edit' && form.enabled && form.clientId && form.issuerUri"
             type="button"
             :disabled="previewing"
-            class="text-xs font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50"
+            class="h-auto p-0"
             @click="previewOidcClaims"
           >
             {{ previewing ? t('settings.oidc.form.redirecting') : t('settings.oidc.form.previewClaims') }}
-          </button>
+          </Button>
         </div>
         <div v-if="previewClaims" class="mb-3 rounded-md border border-border bg-card p-3 text-xs">
           <p class="font-medium text-foreground mb-1.5">
@@ -782,13 +782,9 @@ async function deleteGroupMapping(id: number) {
                   }}
                 </p>
               </div>
-              <button
-                type="button"
-                class="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                @click="deleteGroupMapping(mapping.id)"
-              >
+              <Button variant="destructive-ghost" size="icon-sm" type="button" class="shrink-0" @click="deleteGroupMapping(mapping.id)">
                 <Trash2 class="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
           <div v-else class="px-4 py-4 text-sm text-muted-foreground md:px-5">
@@ -811,14 +807,9 @@ async function deleteGroupMapping(id: number) {
                   {{ PERMISSION_LABELS[perm] }}
                 </option>
               </select>
-              <button
-                type="button"
-                :disabled="addingMapping || !newMapping.oidcGroupClaim.trim()"
-                class="settings-btn-primary shrink-0 disabled:opacity-50"
-                @click="addGroupMapping"
-              >
+              <Button size="sm" type="button" :disabled="addingMapping || !newMapping.oidcGroupClaim.trim()" @click="addGroupMapping">
                 {{ addingMapping ? t('settings.oidc.groupMappings.adding') : t('settings.oidc.groupMappings.add') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -826,7 +817,7 @@ async function deleteGroupMapping(id: number) {
 
       <!-- Save + Delete -->
       <div class="hidden md:flex items-center gap-3">
-        <button type="submit" :disabled="saving" class="settings-btn-primary">
+        <Button size="sm" type="submit" :disabled="saving">
           {{
             saving
               ? t('settings.oidc.form.saving')
@@ -834,21 +825,15 @@ async function deleteGroupMapping(id: number) {
                 ? t('settings.oidc.form.createProvider')
                 : t('settings.oidc.form.saveChanges')
           }}
-        </button>
-        <button
-          v-if="viewMode === 'edit'"
-          type="button"
-          :disabled="deleting"
-          class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
-          @click="deleteProvider"
-        >
+        </Button>
+        <Button variant="destructive-outline" size="sm" v-if="viewMode === 'edit'" type="button" :disabled="deleting" @click="deleteProvider">
           {{ deleting ? t('settings.oidc.form.deleting') : t('settings.oidc.form.deleteProvider') }}
-        </button>
+        </Button>
         <p v-if="saveError" class="text-sm text-destructive">{{ saveError }}</p>
       </div>
       <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
         <div class="flex items-center gap-2">
-          <button type="submit" :disabled="saving" class="settings-btn-primary w-full min-h-10 justify-center">
+          <Button size="sm" type="submit" :disabled="saving" class="w-full min-h-10">
             {{
               saving
                 ? t('settings.oidc.form.saving')
@@ -856,16 +841,18 @@ async function deleteGroupMapping(id: number) {
                   ? t('settings.oidc.form.createProvider')
                   : t('settings.oidc.form.saveChanges')
             }}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="destructive-ghost"
+            size="icon-sm"
             v-if="viewMode === 'edit'"
             type="button"
             :disabled="deleting"
-            class="shrink-0 min-h-10 rounded-md border border-destructive/30 bg-destructive/5 px-3 text-sm font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+            class="shrink-0 min-h-10"
             @click="deleteProvider"
           >
             <Trash2 class="w-4 h-4" />
-          </button>
+          </Button>
         </div>
         <p v-if="saveError" class="mt-1.5 text-xs text-destructive line-clamp-2">
           {{ saveError }}

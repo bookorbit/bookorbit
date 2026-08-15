@@ -54,8 +54,7 @@ describe('registerAuthGuard', () => {
     if (!guard) throw new Error('Expected guard to be registered')
 
     await expect(guard({ name: 'achievements', path: '/achievements', fullPath: '/achievements', meta: {} })).resolves.toEqual({
-      name: 'settings-account',
-      query: { tab: 'profile' },
+      name: 'settings-account-profile',
     })
   })
 

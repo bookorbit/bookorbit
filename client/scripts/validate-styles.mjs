@@ -31,6 +31,11 @@ const TUNED_TEXT_TOKENS = [
 // Matches `text-muted-foreground/70` including any Tailwind variant prefix
 // (`hover:`, `placeholder:`, `group-data-[active=true]/item:` and so on).
 const FADED_TEXT_PATTERN = new RegExp(String.raw`(?:[\w[\]=.\-/]+:)*text-(?:${TUNED_TEXT_TOKENS.join('|')})\/\d+`, 'g')
+const LEGACY_SETTINGS_BUTTON_PATTERN = /\bsettings-btn-(?:primary|outline|secondary|danger)\b/g
+const BUTTON_OPENING_TAG_PATTERN = /<Button\b[\s\S]*?>/g
+const DESTRUCTIVE_BUTTON_VARIANT_PATTERN = /\bvariant=["']destructive(?:-outline|-ghost)?["']/
+const DESTRUCTIVE_BUTTON_COLOR_OVERRIDE_PATTERN =
+  /\b(?:text|bg|border)-(?:destructive|destructive-foreground|muted-foreground)\b|\bhover:(?:text|bg|border)-/
 
 /**
  * Decorative, non-informational text that is deliberately near-invisible. Contrast
@@ -48,7 +53,7 @@ async function sourceFiles(directory) {
     entries.map(async (entry) => {
       const entryPath = path.join(directory, entry.name)
       if (entry.isDirectory()) return entry.name === '__tests__' ? [] : sourceFiles(entryPath)
-      return entry.isFile() && /\.(ts|vue)$/.test(entry.name) && !/\.(spec|test)\.ts$/.test(entry.name) ? [entryPath] : []
+      return entry.isFile() && /\.(css|ts|vue)$/.test(entry.name) && !/\.(spec|test)\.ts$/.test(entry.name) ? [entryPath] : []
     }),
   )
   return files.flat()
@@ -63,7 +68,17 @@ for (const file of await sourceFiles(sourceDirectory)) {
   const source = await readFile(file, 'utf8')
   const lines = source.split('\n')
 
+  for (const match of source.matchAll(BUTTON_OPENING_TAG_PATTERN)) {
+    if (!DESTRUCTIVE_BUTTON_VARIANT_PATTERN.test(match[0]) || !DESTRUCTIVE_BUTTON_COLOR_OVERRIDE_PATTERN.test(match[0])) continue
+    const line = source.slice(0, match.index).split('\n').length
+    errors.push(`${relativePath}:${line}: destructive Button color override - keep destructive styling centralized in the shared Button variants.`)
+  }
+
   for (const [index, line] of lines.entries()) {
+    for (const match of line.matchAll(LEGACY_SETTINGS_BUTTON_PATTERN)) {
+      errors.push(`${relativePath}:${index + 1}: ${match[0]} - use the shared Button component and its variants.`)
+    }
+
     for (const match of line.matchAll(FADED_TEXT_PATTERN)) {
       if (ALLOWED.has(relativePath)) {
         unusedAllowances.delete(relativePath)
@@ -84,4 +99,4 @@ if (errors.length > 0) {
   throw new Error(`Style validation failed:\n${errors.join('\n')}`)
 }
 
-console.log('Validated text colour tokens: no alpha-faded text')
+console.log('Validated style tokens and shared settings buttons')

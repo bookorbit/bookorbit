@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -96,32 +97,36 @@ function availableRecipients(group: EmailGroup) {
   const memberIds = new Set(group.members.map((m) => m.id))
   return recipients.value.filter((r) => !memberIds.has(r.id))
 }
+function beginCreate() {
+  showCreate.value = true
+}
+
+function cancelAddingMember() {
+  addingToGroupId.value = null
+}
+
+function cancelDelete() {
+  deleteConfirm.value = null
+}
 </script>
 
 <template>
   <div class="space-y-4">
     <div class="hidden md:flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.groups.heading') }}</p>
-      <button
-        v-if="!showCreate"
-        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        @click="showCreate = true"
-      >
+      <Button size="sm" v-if="!showCreate" @click="beginCreate">
         <Plus :size="12" />
         {{ t('email.groups.create') }}
-      </button>
+      </Button>
     </div>
     <div class="md:hidden flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.groups.heading') }}</p>
     </div>
     <div v-if="!showCreate" class="md:hidden sticky top-11 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
-      <button
-        class="w-full min-h-10 flex items-center justify-center gap-1.5 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        @click="showCreate = true"
-      >
+      <Button size="sm" class="w-full min-h-10" @click="beginCreate">
         <Plus :size="13" />
         {{ t('email.groups.create') }}
-      </button>
+      </Button>
     </div>
 
     <!-- Create form -->
@@ -141,61 +146,48 @@ function availableRecipients(group: EmailGroup) {
       </div>
       <div v-if="createError" class="text-xs text-destructive">{{ createError }}</div>
       <div class="hidden md:flex items-center gap-2">
-        <button
-          class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-          :disabled="creating || !newGroupName.trim()"
-          @click="submitCreate()"
-        >
+        <Button size="sm" :disabled="creating || !newGroupName.trim()" @click="submitCreate">
           {{ creating ? t('email.groups.creating') : t('email.create') }}
-        </button>
-        <button
-          class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-          @click="cancelCreate"
-        >
+        </Button>
+        <Button variant="outline" size="sm" @click="cancelCreate">
           {{ t('common.cancel') }}
-        </button>
+        </Button>
       </div>
       <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
         <div class="flex items-center gap-2">
-          <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="creating || !newGroupName.trim()" @click="submitCreate()">
+          <Button size="sm" class="flex-1 min-h-10" :disabled="creating || !newGroupName.trim()" @click="submitCreate" type="button">
             {{ creating ? t('email.groups.creating') : t('email.create') }}
-          </button>
-          <button
-            class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="cancelCreate"
-          >
+          </Button>
+          <Button variant="outline" size="sm" class="min-h-10" @click="cancelCreate">
             {{ t('common.cancel') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
 
     <!-- Empty state -->
-    <div v-if="groups.length === 0 && !showCreate" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
+    <div v-if="groups.length === 0 && !showCreate" class="settings-empty-state">
       <p class="text-sm text-muted-foreground">{{ t('email.groups.empty') }}</p>
     </div>
 
     <!-- Groups list -->
-    <div v-else-if="groups.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div v-else-if="groups.length > 0" class="settings-card">
       <div v-for="g in groups" :key="g.id" class="bg-card">
         <!-- Group header -->
         <div class="px-4 py-3 flex items-center gap-3">
-          <button class="text-muted-foreground hover:text-foreground transition-colors" @click="toggleExpand(g.id)">
+          <Button variant="ghost" size="icon-sm" @click="toggleExpand(g.id)">
             <ChevronDown v-if="expandedGroupId === g.id" :size="14" />
             <ChevronRight v-else :size="14" />
-          </button>
+          </Button>
           <div class="flex-1 min-w-0">
             <span class="text-sm font-medium text-foreground">{{ g.name }}</span>
             <span class="ml-2 text-xs text-muted-foreground">{{ t('email.groups.memberCount', { count: g.members.length }) }}</span>
           </div>
           <Tooltip>
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                @click="requestRemove(g)"
-              >
+              <Button variant="destructive-ghost" size="icon-sm" @click="requestRemove(g)">
                 <Trash2 :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('email.groups.deleteTooltip') }}</TooltipContent>
           </Tooltip>
@@ -209,13 +201,10 @@ function availableRecipients(group: EmailGroup) {
               <span class="text-sm text-foreground">{{ m.name }}</span>
               <span class="text-xs text-muted-foreground ml-2 line-clamp-1">{{ m.email }}</span>
             </div>
-            <button
-              class="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
-              @click="removeMemberFromGroup(g, m.id)"
-            >
+            <Button variant="destructive-ghost" size="sm" @click="removeMemberFromGroup(g, m.id)">
               <UserMinus :size="12" />
               {{ t('email.groups.removeMember') }}
-            </button>
+            </Button>
           </div>
 
           <!-- Add member -->
@@ -228,28 +217,17 @@ function availableRecipients(group: EmailGroup) {
                 <option :value="null" disabled>{{ t('email.groups.selectRecipient') }}</option>
                 <option v-for="r in availableRecipients(g)" :key="r.id" :value="r.id">{{ r.name }} ({{ r.email }})</option>
               </select>
-              <button
-                class="px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                :disabled="!selectedRecipientId"
-                @click="submitAddMember(g)"
-              >
+              <Button size="sm" :disabled="!selectedRecipientId" @click="submitAddMember(g)">
                 {{ t('email.groups.add') }}
-              </button>
-              <button
-                class="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-                @click="addingToGroupId = null"
-              >
+              </Button>
+              <Button variant="outline" size="sm" @click="cancelAddingMember">
                 {{ t('common.cancel') }}
-              </button>
+              </Button>
             </div>
-            <button
-              v-else-if="availableRecipients(g).length > 0"
-              class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              @click="startAddMember(g.id)"
-            >
+            <Button v-else-if="availableRecipients(g).length > 0" variant="ghost" size="sm" @click="startAddMember(g.id)">
               <UserPlus :size="12" />
               {{ t('email.groups.addMember') }}
-            </button>
+            </Button>
             <p v-else class="text-xs text-muted-foreground">{{ t('email.groups.allRecipientsInGroup') }}</p>
           </div>
         </div>
@@ -257,23 +235,17 @@ function availableRecipients(group: EmailGroup) {
     </div>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
-      <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
+      <button class="absolute inset-0 bg-black/45" @click="cancelDelete" />
       <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">{{ t('email.groups.deleteTitle') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('email.deleteConfirm', { name: deleteConfirm.name }) }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="deleteConfirm = null"
-          >
+          <Button variant="outline" size="sm" @click="cancelDelete">
             {{ t('common.cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-            @click="confirmRemove"
-          >
+          </Button>
+          <Button variant="destructive" size="sm" @click="confirmRemove">
             {{ t('common.delete') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

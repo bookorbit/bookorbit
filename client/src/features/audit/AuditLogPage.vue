@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMediaQuery } from '@vueuse/core'
@@ -182,7 +183,7 @@ watch(
     <p class="mt-1 text-sm leading-5 text-muted-foreground">{{ t('audit.pageSubtitle') }}</p>
   </div>
 
-  <div class="mt-5 space-y-4 md:mt-0">
+  <div class="space-y-4" :class="{ 'mt-5 md:mt-0': !props.embedded }">
     <section class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
       <div>
         <button
@@ -268,32 +269,32 @@ watch(
             <div>
               <span class="text-xs text-muted-foreground">{{ t('audit.quickDates') }}</span>
               <div class="mt-1 flex gap-1">
-                <button type="button" class="settings-btn-outline h-9 px-2.5" @click="handleToday">{{ t('audit.today') }}</button>
-                <button type="button" class="settings-btn-outline h-9 px-2.5" @click="handleSevenDays">{{ t('audit.sevenDays') }}</button>
-                <button type="button" class="settings-btn-outline h-9 px-2.5" @click="handleThirtyDays">{{ t('audit.thirtyDays') }}</button>
+                <Button variant="outline" size="sm" type="button" class="h-9 px-2.5" @click="handleToday">{{ t('audit.today') }}</Button>
+                <Button variant="outline" size="sm" type="button" class="h-9 px-2.5" @click="handleSevenDays">{{ t('audit.sevenDays') }}</Button>
+                <Button variant="outline" size="sm" type="button" class="h-9 px-2.5" @click="handleThirtyDays">{{ t('audit.thirtyDays') }}</Button>
               </div>
             </div>
           </div>
           <div class="flex gap-2">
-            <button type="button" class="settings-btn-primary h-9" @click="handleSearch">
+            <Button size="sm" type="button" @click="handleSearch">
               <Search :size="14" aria-hidden="true" />
               {{ t('common.search') }}
-            </button>
-            <button v-if="hasFilters" type="button" class="settings-btn-outline h-9" @click="handleClear">
+            </Button>
+            <Button variant="outline" size="sm" v-if="hasFilters" type="button" @click="handleClear">
               <X :size="14" aria-hidden="true" />
               {{ t('audit.clear') }}
-            </button>
-            <button type="button" class="settings-btn-outline h-9 px-2.5" :aria-label="t('audit.refresh')" :disabled="loading" @click="handleRefresh">
+            </Button>
+            <Button variant="outline" size="icon-sm" type="button" :aria-label="t('audit.refresh')" :disabled="loading" @click="handleRefresh">
               <RefreshCw :size="14" :class="{ 'animate-spin': loading }" aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
     </section>
 
-    <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+    <p v-if="error" role="alert" class="settings-error-state">{{ error }}</p>
 
-    <div class="hidden overflow-hidden rounded-lg border border-border shadow-xs md:block">
+    <div class="hidden overflow-hidden rounded-lg border border-border bg-card shadow-xs md:block">
       <table class="w-full table-fixed text-sm">
         <thead class="sticky top-0 z-10 bg-muted/70 backdrop-blur">
           <tr>
@@ -318,13 +319,9 @@ watch(
                 <time :datetime="entry.createdAt" :title="exactTimestamp(entry.createdAt)">{{ relativeTimestamp(entry.createdAt) }}</time>
               </td>
               <td class="px-3 py-2.5">
-                <button
-                  type="button"
-                  class="max-w-28 truncate text-start text-xs font-medium text-foreground hover:text-primary hover:underline"
-                  @click="filterActor(entry)"
-                >
+                <Button variant="link" size="sm" type="button" class="h-auto p-0" @click="filterActor(entry)">
                   {{ entry.actorUsername }}
-                </button>
+                </Button>
                 <span v-if="entry.userId !== null" class="ms-1 text-[11px] text-muted-foreground">{{
                   t('audit.userIdCompact', { id: entry.userId })
                 }}</span>
@@ -336,15 +333,17 @@ watch(
                 <div class="flex min-w-0 items-center gap-2">
                   <AuditCategoryBadge class="shrink-0 xl:hidden" :category="getAuditCategory(entry.action)" />
                   <p class="min-w-0 flex-1 truncate font-medium text-foreground" :title="entry.description">{{ entry.description }}</p>
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
-                    class="shrink-0 rounded px-1.5 py-1 text-xs text-primary hover:bg-muted hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="shrink-0"
                     :aria-expanded="isDetailsOpen(entry.id)"
                     :aria-controls="detailRegionId(entry.id, 'desktop')"
                     @click="toggleDetails(entry.id)"
                   >
                     {{ isDetailsOpen(entry.id) ? t('audit.hideDetails') : t('audit.details') }}
-                  </button>
+                  </Button>
                 </div>
               </td>
               <td class="px-3 py-2.5 text-sm text-muted-foreground">{{ targetSummary(entry) }}</td>
@@ -373,18 +372,20 @@ watch(
         <p class="mt-2 font-medium text-foreground">{{ entry.description }}</p>
         <p class="mt-1 text-sm text-muted-foreground">{{ targetSummary(entry) }}</p>
         <div class="mt-2 flex items-center justify-between gap-3">
-          <button type="button" class="text-xs font-medium text-foreground hover:text-primary hover:underline" @click="filterActor(entry)">
+          <Button variant="link" size="sm" type="button" class="h-auto p-0" @click="filterActor(entry)">
             {{ entry.actorUsername }}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="link"
+            size="sm"
             type="button"
-            class="text-xs text-primary hover:underline"
+            class="h-auto p-0"
             :aria-expanded="isDetailsOpen(entry.id)"
             :aria-controls="detailRegionId(entry.id, 'mobile')"
             @click="toggleDetails(entry.id)"
           >
             {{ isDetailsOpen(entry.id) ? t('audit.hideDetails') : t('audit.details') }}
-          </button>
+          </Button>
         </div>
         <AuditEntryDetails v-if="isDetailsOpen(entry.id)" :id="detailRegionId(entry.id, 'mobile')" class="mt-2" :entry="entry" />
       </article>
@@ -393,25 +394,13 @@ watch(
     <div v-if="totalPages > 1" class="flex items-center justify-between text-sm text-muted-foreground">
       <span>{{ t('audit.showing', { from: (page - 1) * pageSize + 1, to: Math.min(page * pageSize, total), total }) }}</span>
       <div class="flex items-center gap-1">
-        <button
-          type="button"
-          class="rounded p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-          :aria-label="t('audit.prev')"
-          :disabled="page <= 1"
-          @click="handlePreviousPage"
-        >
+        <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('audit.prev')" :disabled="page <= 1" @click="handlePreviousPage">
           <ChevronLeft :size="16" aria-hidden="true" />
-        </button>
+        </Button>
         <span class="px-2">{{ page }} / {{ totalPages }}</span>
-        <button
-          type="button"
-          class="rounded p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-          :aria-label="t('common.next')"
-          :disabled="page >= totalPages"
-          @click="handleNextPage"
-        >
+        <Button variant="outline" size="sm" type="button" :aria-label="t('common.next')" :disabled="page >= totalPages" @click="handleNextPage">
           <ChevronRight :size="16" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
     </div>
   </div>

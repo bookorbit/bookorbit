@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, Save } from '@lucide/vue'
@@ -396,11 +397,11 @@ const visibleRows = computed(() => {
       <div class="flex items-center gap-2">
         <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.providers.availableSources') }}</span>
       </div>
-      <button type="submit" class="settings-btn-primary h-8 px-3" :disabled="saving || !draftReady">
+      <Button size="sm" type="submit" class="px-3" :disabled="saving || !draftReady">
         <Loader2 v-if="saving" :size="14" class="animate-spin" />
         <Save v-else :size="14" />
         <span>{{ t('settings.metadata.providers.saveChanges') }}</span>
-      </button>
+      </Button>
     </div>
 
     <div v-if="draft" class="divide-y divide-border">
@@ -459,16 +460,18 @@ const visibleRows = computed(() => {
           </div>
 
           <div class="flex w-full flex-wrap items-center justify-between gap-2 md:justify-end">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               v-if="isTestable(row.key)"
               type="button"
-              class="settings-btn-outline h-7 px-2.5 text-[11px]"
+              class="text-[11px]"
               :disabled="isTesting(row.key)"
               @click="testProvider(row.key)"
             >
               <Loader2 v-if="isTesting(row.key)" :size="11" class="animate-spin" />
               <span>{{ isTesting(row.key) ? t('settings.metadata.providers.testing') : t('settings.metadata.providers.test') }}</span>
-            </button>
+            </Button>
             <span v-else />
             <span class="text-[11px] text-muted-foreground md:hidden">{{ t('settings.metadata.providers.enabled') }}</span>
             <button

@@ -14,7 +14,36 @@ import {
   isSecureProtocol,
   applyConditionalHsts,
   registerConditionalHsts,
+  isStaticAssetPath,
+  shouldServeSpaFallback,
 } from './bootstrap.utils';
+
+describe('SPA fallback routing', () => {
+  it.each([
+    '/assets/index-BMAlyH9T.js',
+    '/assets/index-D5CelejF.css',
+    '/sw.js',
+    '/manifest.webmanifest',
+    '/favicon.ico',
+    '/pwa-192x192.png',
+    '/assets/foliate/reader.js?v=2',
+  ])('treats %s as a static asset so a missing file 404s instead of returning index.html', (url) => {
+    expect(isStaticAssetPath(url)).toBe(true);
+    expect(shouldServeSpaFallback(url)).toBe(false);
+  });
+
+  it.each(['/', '/dashboard', '/book/123/files', '/library/12', '/settings/admin/audit-log', '/authors/42', '/read/1/2', '/collections?sort=name'])(
+    'serves the SPA shell for client route %s',
+    (url) => {
+      expect(shouldServeSpaFallback(url)).toBe(true);
+    },
+  );
+
+  it('ignores the query string and hash when deciding', () => {
+    expect(shouldServeSpaFallback('/assets/app-abc123.js?import&t=1')).toBe(false);
+    expect(shouldServeSpaFallback('/dashboard?tab=recent#top')).toBe(true);
+  });
+});
 
 describe('parseBooleanEnv', () => {
   it('returns fallback when value is undefined', () => {

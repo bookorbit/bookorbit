@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Loader2, RotateCcw, Save, Settings, Trash2 } from '@lucide/vue'
@@ -100,52 +101,36 @@ function handleResetToDefault() {
         <p class="settings-hint">{{ t('settings.metadata.fieldRules.global.hint') }}</p>
       </div>
       <div class="hidden md:flex items-center gap-2 flex-wrap">
-        <button
-          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-destructive hover:border-destructive/50 hover:bg-destructive/5 transition-colors disabled:opacity-40"
-          :disabled="saving || !draft"
-          @click="handleClearAll"
-        >
+        <Button type="button" variant="destructive-outline" size="sm" :disabled="saving || !draft" @click="handleClearAll">
           <Trash2 :size="13" />
           <span>{{ t('settings.metadata.fieldRules.clearAllProviders') }}</span>
-        </button>
-        <button
-          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors disabled:opacity-40"
-          :disabled="saving"
-          @click="handleResetToDefault"
-        >
+        </Button>
+        <Button type="button" variant="outline" size="sm" :disabled="saving" @click="handleResetToDefault">
           <RotateCcw :size="13" />
           <span>{{ t('settings.metadata.fieldRules.resetToDefault') }}</span>
-        </button>
-        <button class="settings-btn-primary h-8 px-3" :disabled="saving || !draft || !isGenreMaxCountValid" @click="save">
+        </Button>
+        <Button size="sm" class="px-3" :disabled="saving || !draft || !isGenreMaxCountValid" @click="save" type="button">
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
           <span>{{ t('settings.metadata.fieldRules.global.saveDefaults') }}</span>
-        </button>
+        </Button>
       </div>
     </div>
     <div class="md:hidden sticky top-11 z-10 mb-0 px-3 py-2 border-b border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75">
       <div class="flex items-center gap-2 flex-wrap">
-        <button
-          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-destructive hover:border-destructive/50 hover:bg-destructive/5 transition-colors disabled:opacity-40"
-          :disabled="saving || !draft"
-          @click="handleClearAll"
-        >
+        <Button type="button" variant="destructive-outline" size="sm" :disabled="saving || !draft" @click="handleClearAll">
           <Trash2 :size="13" />
           <span>{{ t('settings.metadata.fieldRules.clearAll') }}</span>
-        </button>
-        <button
-          class="settings-btn h-8 px-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors disabled:opacity-40"
-          :disabled="saving"
-          @click="handleResetToDefault"
-        >
+        </Button>
+        <Button type="button" variant="outline" size="sm" :disabled="saving" @click="handleResetToDefault">
           <RotateCcw :size="13" />
           <span>{{ t('settings.metadata.fieldRules.reset') }}</span>
-        </button>
-        <button class="settings-btn-primary h-8 px-3 justify-center ml-auto" :disabled="saving || !draft || !isGenreMaxCountValid" @click="save">
+        </Button>
+        <Button size="sm" class="px-3 ml-auto" :disabled="saving || !draft || !isGenreMaxCountValid" @click="save" type="button">
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
           <span>{{ t('settings.metadata.fieldRules.global.saveDefaults') }}</span>
-        </button>
+        </Button>
       </div>
     </div>
 

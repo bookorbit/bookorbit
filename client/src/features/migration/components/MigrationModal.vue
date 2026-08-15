@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/i18n/formatters'
@@ -1327,12 +1328,9 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
         <!-- Mobile top bar -->
         <div class="md:hidden flex items-center px-4 h-14 border-b border-border shrink-0">
           <span class="flex-1 text-sm font-semibold text-foreground font-serif text-center">{{ currentStepTitle }}</span>
-          <button
-            class="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            @click="handleClose"
-          >
+          <Button variant="ghost" size="icon-sm" @click="handleClose">
             <X :size="16" />
-          </button>
+          </Button>
         </div>
 
         <!-- Body: sidebar + content -->
@@ -1341,12 +1339,9 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
           <nav class="hidden md:flex flex-col w-52 shrink-0 bg-muted/40 border-r border-border">
             <div class="px-4 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
               <span class="font-semibold text-foreground font-serif truncate">{{ t('migration.sidebarTitle') }}</span>
-              <button
-                class="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 ml-1"
-                @click="handleClose"
-              >
+              <Button variant="ghost" size="icon-sm" class="shrink-0" @click="handleClose">
                 <X :size="14" />
-              </button>
+              </Button>
             </div>
 
             <div class="flex-1 overflow-y-auto py-3 px-2">
@@ -1448,15 +1443,17 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           :placeholder="source ? t('migration.source.fields.passwordSaved') : t('migration.source.fields.passwordNotSet')"
                           :disabled="hasActiveRun"
                         />
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           type="button"
-                          class="absolute inset-y-0 right-0 flex items-center px-2.5 text-muted-foreground hover:text-foreground"
+                          class="absolute inset-y-0 right-0"
                           tabindex="-1"
                           @click="onTogglePassword"
                         >
                           <EyeOff v-if="showPassword" class="size-4" />
                           <Eye v-else class="size-4" />
-                        </button>
+                        </Button>
                       </div>
                     </label>
                     <label class="block">
@@ -1524,14 +1521,14 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                   </div>
 
                   <div class="flex flex-wrap gap-2">
-                    <button class="settings-btn-outline" :disabled="busy.testingSource || hasActiveRun" @click="onTestSource">
+                    <Button variant="outline" size="sm" :disabled="busy.testingSource || hasActiveRun" @click="onTestSource">
                       <Loader2 v-if="busy.testingSource" class="size-3.5 animate-spin" />
                       {{ t('migration.source.testConnection') }}
-                    </button>
-                    <button class="settings-btn-primary" :disabled="busy.savingSource || hasActiveRun" @click="onSaveAndValidate">
+                    </Button>
+                    <Button size="sm" :disabled="busy.savingSource || hasActiveRun" @click="onSaveAndValidate">
                       <Loader2 v-if="busy.savingSource" class="size-3.5 animate-spin" />
                       {{ t('migration.source.saveAndValidate') }}
-                    </button>
+                    </Button>
                   </div>
 
                   <div
@@ -1564,15 +1561,17 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                 <div v-else-if="currentStep === 1" class="space-y-5">
                   <div class="flex items-center gap-2">
                     <p class="text-xs text-muted-foreground">{{ t('migration.mappings.suggestionsAutoLoad') }}</p>
-                    <button
+                    <Button
+                      variant="link"
+                      size="sm"
                       v-if="source"
-                      class="text-xs text-primary underline-offset-2 hover:underline disabled:opacity-50"
+                      class="h-auto p-0"
                       :disabled="busy.loadingSuggestions || busy.loadingTargetUsers || hasActiveRun"
                       @click="onReloadSuggestions"
                     >
                       <Loader2 v-if="busy.loadingSuggestions || busy.loadingTargetUsers" class="size-3 animate-spin inline" />
                       {{ t('migration.mappings.refresh') }}
-                    </button>
+                    </Button>
                   </div>
 
                   <div class="overflow-x-auto rounded border border-border">
@@ -1606,9 +1605,9 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                   <div class="space-y-2">
                     <div class="flex items-center justify-between">
                       <p class="settings-hint">{{ t('migration.mappings.pathPrefixMappings') }}</p>
-                      <button class="settings-btn-outline" :disabled="hasActiveRun" @click="addPathMapping">
+                      <Button variant="outline" size="sm" :disabled="hasActiveRun" @click="addPathMapping">
                         {{ t('migration.mappings.addMapping') }}
-                      </button>
+                      </Button>
                     </div>
                     <p class="text-xs text-muted-foreground">
                       {{ t('migration.mappings.pathMappingsExplanation') }}
@@ -1630,9 +1629,9 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           {{ folder.libraryName }} - {{ folder.path }}
                         </option>
                       </select>
-                      <button class="settings-btn-outline" :disabled="hasActiveRun" @click="removePathMapping(index)">
+                      <Button variant="outline" size="sm" :disabled="hasActiveRun" @click="removePathMapping(index)">
                         {{ t('migration.mappings.remove') }}
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -1654,18 +1653,18 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                     </p>
                   </div>
 
-                  <button class="settings-btn-primary" :disabled="busy.savingProfile || source == null || hasActiveRun" @click="onSaveMappings">
+                  <Button size="sm" :disabled="busy.savingProfile || source == null || hasActiveRun" @click="onSaveMappings">
                     <Loader2 v-if="busy.savingProfile" class="size-3.5 animate-spin" />
                     {{ t('migration.mappings.saveMappings') }}
-                  </button>
+                  </Button>
                 </div>
 
                 <!-- Step 2: Dry Run -->
                 <div v-else-if="currentStep === 2" class="space-y-5">
-                  <button class="settings-btn-primary" :disabled="busy.dryRun || profile == null || hasActiveRun" @click="onRunDryRun">
+                  <Button size="sm" :disabled="busy.dryRun || profile == null || hasActiveRun" @click="onRunDryRun">
                     <Loader2 v-if="busy.dryRun" class="size-3.5 animate-spin" />
                     {{ t('migration.dryRun.run') }}
-                  </button>
+                  </Button>
 
                   <div v-if="plan" class="rounded border border-border bg-muted/30 p-3 space-y-2 text-sm">
                     <p>
@@ -1713,7 +1712,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                                 :value="sourceId"
                                 :checked="duplicateResolutions.get(dup.targetBookId) === sourceId"
                                 class="accent-primary"
-                                @change="() => handleDuplicateSelection(dup.targetBookId, sourceId)"
+                                @change="handleDuplicateSelection(dup.targetBookId, sourceId)"
                               />
                               <div class="min-w-0">
                                 <p class="truncate">{{ sourceBookLabel(dup, sourceId) }}</p>
@@ -1734,14 +1733,14 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           </label>
                         </div>
                       </div>
-                      <button
-                        class="settings-btn-primary"
+                      <Button
+                        size="sm"
                         :disabled="busy.resolvingDuplicates || duplicateResolutions.size < duplicateMatches.length"
                         @click="onResolveDuplicates"
                       >
                         <Loader2 v-if="busy.resolvingDuplicates" class="size-3.5 animate-spin" />
                         {{ t('migration.duplicates.resolveButton', { count: duplicateMatches.length }) }}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -1785,31 +1784,32 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                   <div class="flex flex-wrap gap-2">
                     <template v-if="confirmingMigrationStart">
                       <span class="text-xs text-amber-600 self-center">{{ t('migration.run.confirmPrompt') }}</span>
-                      <button class="settings-btn-primary" :disabled="busy.startingRun" @click="onStartMigration">
+                      <Button size="sm" :disabled="busy.startingRun" @click="onStartMigration">
                         <Loader2 v-if="busy.startingRun" class="size-3.5 animate-spin" />
                         {{ t('migration.run.confirmStart') }}
-                      </button>
-                      <button class="settings-btn-outline" @click="onCancelMigrationStart">{{ t('common.cancel') }}</button>
+                      </Button>
+                      <Button variant="outline" size="sm" @click="onCancelMigrationStart">{{ t('common.cancel') }}</Button>
                     </template>
                     <template v-else>
-                      <button class="settings-btn-primary" :disabled="busy.startingRun || !preflight.ready" @click="onStartMigration">
+                      <Button size="sm" :disabled="busy.startingRun || !preflight.ready" @click="onStartMigration">
                         <Loader2 v-if="busy.startingRun" class="size-3.5 animate-spin" />
                         {{ t('migration.run.startMigration') }}
-                      </button>
+                      </Button>
                     </template>
-                    <button
+                    <Button
+                      variant="destructive-outline"
+                      size="sm"
                       v-if="run?.state === 'running'"
-                      class="settings-btn-outline text-red-600"
                       :disabled="busy.cancellingRun"
                       @click="onCancelRun"
                     >
                       <Loader2 v-if="busy.cancellingRun" class="size-3.5 animate-spin" />
                       {{ t('migration.run.cancelRun') }}
-                    </button>
-                    <button class="settings-btn-outline" :disabled="busy.loadingProgress || run == null" @click="refreshRunProgress">
+                    </Button>
+                    <Button variant="outline" size="sm" :disabled="busy.loadingProgress || run == null" @click="refreshRunProgress">
                       <Loader2 v-if="busy.loadingProgress" class="size-3.5 animate-spin" />
                       {{ t('migration.run.refreshStatus') }}
-                    </button>
+                    </Button>
                   </div>
 
                   <div
@@ -1817,7 +1817,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                     class="rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-700"
                   >
                     <span>{{ t('migration.run.pollingStopped') }}</span>
-                    <button class="underline font-medium" @click="onRetryPolling">{{ t('migration.run.retry') }}</button>
+                    <Button variant="link" size="sm" class="h-auto p-0" @click="onRetryPolling">{{ t('migration.run.retry') }}</Button>
                   </div>
 
                   <div v-if="run" class="rounded border border-border bg-muted/30 px-4 py-3.5 flex items-center gap-3 text-xs">
@@ -1831,9 +1831,9 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                             : ''
                       }}
                     </span>
-                    <button v-if="run.state !== 'running'" class="text-xs text-primary underline-offset-2 hover:underline ml-auto" @click="goNext">
+                    <Button variant="link" size="sm" v-if="run.state !== 'running'" class="ml-auto h-auto p-0" @click="goNext">
                       {{ t('migration.footer.viewReport') }}
-                    </button>
+                    </Button>
                   </div>
 
                   <div v-if="migrationProgress" class="space-y-1.5">
@@ -1867,16 +1867,16 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                         </p>
                       </div>
                       <div class="flex flex-wrap gap-2">
-                        <button class="settings-btn-outline" :disabled="busy.loadingReport" @click="onRefreshReport">
+                        <Button variant="outline" size="sm" :disabled="busy.loadingReport" @click="onRefreshReport">
                           <Loader2 v-if="busy.loadingReport" class="size-3.5 animate-spin" />
                           {{ runReport ? t('migration.report.reloadReport') : t('migration.report.loadFullReport') }}
-                        </button>
-                        <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportJson">
+                        </Button>
+                        <Button variant="outline" size="sm" :disabled="busy.exporting" @click="onExportJson">
                           {{ t('migration.report.exportJson') }}
-                        </button>
-                        <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportCsv">
+                        </Button>
+                        <Button variant="outline" size="sm" :disabled="busy.exporting" @click="onExportCsv">
                           {{ t('migration.report.exportCsv') }}
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -1885,10 +1885,10 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                         <p class="font-medium">{{ t('migration.report.migrationFailed') }}</p>
                         <p>{{ run.errorMessage }}</p>
                       </div>
-                      <button v-if="run.state === 'failed'" class="settings-btn-outline text-xs" :disabled="busy.retryingRun" @click="onRetryRun">
+                      <Button variant="outline" size="sm" v-if="run.state === 'failed'" :disabled="busy.retryingRun" @click="onRetryRun">
                         <Loader2 v-if="busy.retryingRun" class="size-3.5 animate-spin" />
                         {{ t('migration.report.retryFromLastStage') }}
-                      </button>
+                      </Button>
                     </div>
 
                     <template v-if="runReport || runProgress">
@@ -2054,45 +2054,29 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
             <div class="shrink-0 border-t border-border px-5 md:px-6 py-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <button
-                    class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    @click="onBackOrCancel"
-                  >
+                  <Button variant="outline" size="sm" @click="onBackOrCancel">
                     <X v-if="currentStep === 0" :size="14" />
                     <ChevronLeft v-else :size="14" />
                     {{ currentStep === 0 ? t('common.cancel') : t('common.back') }}
-                  </button>
-                  <button
-                    v-if="canResetSetup"
-                    class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-                    :disabled="resettingSource"
-                    @click="onResetSetup"
-                  >
+                  </Button>
+                  <Button variant="outline" size="sm" v-if="canResetSetup" :disabled="resettingSource" @click="onResetSetup">
                     <Loader2 v-if="resettingSource" class="size-3.5 animate-spin" />
                     <RotateCcw v-else :size="14" />
                     {{ t('migration.footer.resetSetup') }}
-                  </button>
+                  </Button>
                 </div>
 
                 <span class="text-xs text-muted-foreground hidden md:block">{{
                   t('migration.footer.stepOf', { current: currentStep + 1, total: 5 })
                 }}</span>
 
-                <button
-                  v-if="currentStep < 4"
-                  class="flex items-center gap-1.5 px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-                  @click="goNext"
-                >
+                <Button size="sm" v-if="currentStep < 4" @click="goNext">
                   {{ continueLabel }}
                   <ChevronRight :size="14" />
-                </button>
-                <button
-                  v-else
-                  class="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  @click="goToSetup"
-                >
+                </Button>
+                <Button variant="outline" size="sm" v-else @click="goToSetup">
                   {{ t('migration.footer.backToSetup') }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

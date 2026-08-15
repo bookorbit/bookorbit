@@ -45,6 +45,10 @@ function mountPanel(preferences = makePreferences()) {
   })
 }
 
+function saveButtons(wrapper: ReturnType<typeof mountPanel>) {
+  return wrapper.findAll('button').filter((button) => button.text().trim() === 'Save Defaults')
+}
+
 describe('GlobalPreferencePanel', () => {
   it('saves a maximum genre count', async () => {
     const wrapper = mountPanel()
@@ -53,7 +57,7 @@ describe('GlobalPreferencePanel', () => {
     expect(input.classes()).toContain('w-24')
     expect(input.classes()).not.toContain('w-full')
     await input.setValue('3')
-    await wrapper.findAll('button.settings-btn-primary')[0]!.trigger('click')
+    await saveButtons(wrapper)[0]!.trigger('click')
 
     const saved = wrapper.emitted('save')?.[0]?.[0] as MetadataFetchPreferences
     expect(saved.options?.genres.maxCount).toBe(3)
@@ -63,7 +67,7 @@ describe('GlobalPreferencePanel', () => {
     const wrapper = mountPanel(makePreferences(3))
 
     await wrapper.get('#genre-max-count').setValue('')
-    await wrapper.findAll('button.settings-btn-primary')[0]!.trigger('click')
+    await saveButtons(wrapper)[0]!.trigger('click')
 
     const saved = wrapper.emitted('save')?.[0]?.[0] as MetadataFetchPreferences
     expect(saved.options?.genres.maxCount).toBeNull()
@@ -76,7 +80,7 @@ describe('GlobalPreferencePanel', () => {
 
     expect(wrapper.get('#genre-max-count').attributes('aria-invalid')).toBe('true')
     expect(wrapper.get('#genre-max-count-error').text()).toContain('1 to 50')
-    expect(wrapper.findAll('button.settings-btn-primary').every((button) => button.attributes('disabled') !== undefined)).toBe(true)
+    expect(saveButtons(wrapper).every((button) => button.attributes('disabled') !== undefined)).toBe(true)
   })
 
   it('exposes genre and provider ID toggles as switches', () => {

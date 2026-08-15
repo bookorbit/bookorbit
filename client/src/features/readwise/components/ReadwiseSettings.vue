@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2 } from '@lucide/vue'
@@ -110,13 +111,9 @@ function toggleTokenVisible() {
             class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             :class="{ 'input-secret': !tokenVisible }"
           />
-          <button
-            type="button"
-            class="px-3 py-2 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-            @click="toggleTokenVisible"
-          >
+          <Button variant="outline" size="sm" type="button" @click="toggleTokenVisible">
             {{ tokenVisible ? 'Hide' : 'Show' }}
-          </button>
+          </Button>
         </div>
         <p class="text-xs text-muted-foreground">
           Find your token at
@@ -127,15 +124,10 @@ function toggleTokenVisible() {
       </div>
 
       <div class="flex items-center gap-2">
-        <button
-          type="button"
-          :disabled="validating"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          @click="handleValidateToken"
-        >
+        <Button variant="outline" size="sm" type="button" :disabled="validating" @click="handleValidateToken">
           <Loader2 v-if="validating" class="size-3 animate-spin" />
           Test
-        </button>
+        </Button>
         <span
           v-if="validationResult !== null"
           class="flex items-center gap-1 text-xs"
@@ -156,16 +148,11 @@ function toggleTokenVisible() {
       </div>
 
       <div class="flex items-center justify-end pt-2 border-t border-border">
-        <button
-          type="button"
-          :disabled="saving"
-          class="flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          @click="handleSave"
-        >
+        <Button size="sm" type="button" :disabled="saving" @click="handleSave">
           <Loader2 v-if="saving" class="size-3.5 animate-spin" />
           <Save v-else class="size-3.5" />
           Save
-        </button>
+        </Button>
       </div>
     </div>
   </div>

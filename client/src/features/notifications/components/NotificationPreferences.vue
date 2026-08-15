@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -128,8 +129,8 @@ async function handleSave() {
     </p>
   </div>
 
-  <div class="mt-5 space-y-8 md:mt-0">
-    <section v-for="group in NOTIFICATION_CATEGORY_GROUPS" :key="group.id" :aria-labelledby="`notification-group-${group.id}`" class="space-y-3">
+  <div class="space-y-4" :class="{ 'mt-5 md:mt-0': !props.embedded }">
+    <section v-for="group in NOTIFICATION_CATEGORY_GROUPS" :key="group.id" :aria-labelledby="`notification-group-${group.id}`" class="space-y-2">
       <div class="flex items-baseline justify-between gap-3">
         <h2 :id="`notification-group-${group.id}`" class="settings-group-label mb-0">
           {{ t(`notifications.preferences.groups.${group.id}`) }}
@@ -158,8 +159,8 @@ async function handleSave() {
       </div>
     </section>
 
-    <section aria-labelledby="notification-group-app" class="space-y-3">
-      <h2 id="notification-group-app" class="settings-group-label mb-0">{{ t('notifications.preferences.groups.app') }}</h2>
+    <section aria-labelledby="notification-group-app" class="space-y-2">
+      <h2 id="notification-group-app" class="settings-group-label">{{ t('notifications.preferences.groups.app') }}</h2>
 
       <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
         <div class="flex items-center justify-between gap-4 px-4 py-4 md:px-5 md:py-5">
@@ -187,13 +188,13 @@ async function handleSave() {
   >
     <p role="status" class="settings-hint mt-0">{{ t('notifications.preferences.unsavedChanges') }}</p>
     <div class="flex shrink-0 items-center gap-2">
-      <button type="button" class="settings-btn-outline" :disabled="saving" @click="discardChanges">
+      <Button variant="outline" size="sm" type="button" :disabled="saving" @click="discardChanges">
         {{ t('settings.account.feedback.discard') }}
-      </button>
-      <button type="button" class="settings-btn-primary" :disabled="saving" @click="handleSave">
+      </Button>
+      <Button size="sm" type="button" :disabled="saving" @click="handleSave">
         <Save :size="14" aria-hidden="true" />
         {{ saving ? t('notifications.preferences.saving') : t('common.save') }}
-      </button>
+      </Button>
     </div>
   </div>
 </template>

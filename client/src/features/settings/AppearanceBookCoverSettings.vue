@@ -173,7 +173,7 @@ onMounted(async () => {
     <p class="settings-group-label">
       {{ t('settings.appearance.bookCovers.title') }}
     </p>
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border mb-4 shadow-xs">
+    <div class="settings-card mb-4">
       <div class="settings-row">
         <div>
           <label for="default-cover-search-provider" class="settings-label">

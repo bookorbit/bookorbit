@@ -32,7 +32,7 @@ describe('resolveRouteTitle', () => {
   })
 
   it('resolves the account activity admin tab title', () => {
-    const route = router.resolve('/settings/admin?tab=account-activity')
+    const route = router.resolve('/settings/admin/account-activity')
 
     expect(resolveRouteTitle(route as unknown as RouteLocationNormalizedLoaded)).toBe('Account Activity · BookOrbit')
   })

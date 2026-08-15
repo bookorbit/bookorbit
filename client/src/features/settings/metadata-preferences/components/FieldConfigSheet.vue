@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X, ChevronUp, ChevronDown } from '@lucide/vue'
@@ -54,6 +55,10 @@ function moveDown(key: MetadataProviderKey) {
   emit('change', { ...props.preference, providers })
 }
 
+function handleClose() {
+  emit('close')
+}
+
 // Assigned providers in order first, then unassigned
 const sortedStatuses = computed(() => {
   const assigned = props.preference.providers.map((k) => props.statuses.find((s) => s.key === k)).filter(Boolean) as ProviderStatus[]
@@ -65,16 +70,16 @@ const sortedStatuses = computed(() => {
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-50 flex flex-col justify-end">
-      <div class="absolute inset-0 bg-black/50" @click="$emit('close')" />
+      <div class="absolute inset-0 bg-black/50" @click="handleClose" />
       <div class="relative bg-card border-t border-border rounded-t-2xl max-h-[85vh] flex flex-col z-10">
         <div class="flex items-center justify-between px-4 py-3.5 border-b border-border shrink-0">
           <div>
             <p class="text-sm font-semibold text-foreground">{{ t(`settings.metadata.fields.${field}`) }}</p>
             <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.metadata.fieldRules.sheet.subtitle') }}</p>
           </div>
-          <button class="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors" @click="$emit('close')">
+          <Button variant="ghost" size="icon-sm" @click="handleClose">
             <X :size="16" />
-          </button>
+          </Button>
         </div>
 
         <div class="overflow-y-auto flex-1 px-4 py-4 space-y-5">
@@ -121,20 +126,22 @@ const sortedStatuses = computed(() => {
                   <span class="text-xs tabular-nums text-muted-foreground w-4 text-center">
                     {{ preference.providers.indexOf(status.key as MetadataProviderKey) + 1 }}
                   </span>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     :disabled="preference.providers.indexOf(status.key as MetadataProviderKey) === 0"
-                    class="h-7 w-7 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30 transition-colors"
                     @click="moveUp(status.key as MetadataProviderKey)"
                   >
                     <ChevronUp :size="15" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     :disabled="preference.providers.indexOf(status.key as MetadataProviderKey) === preference.providers.length - 1"
-                    class="h-7 w-7 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30 transition-colors"
                     @click="moveDown(status.key as MetadataProviderKey)"
                   >
                     <ChevronDown :size="15" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -154,12 +161,9 @@ const sortedStatuses = computed(() => {
         </div>
 
         <div class="px-4 pb-6 pt-2 shrink-0">
-          <button
-            class="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-            @click="$emit('close')"
-          >
+          <Button size="sm" class="w-full" @click="handleClose">
             {{ t('settings.metadata.fieldRules.sheet.done') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Archive, ArchiveRestore, ChevronDown, GripVertical, LayoutList, Loader2, Plus, Save, Search, Trash2 } from '@lucide/vue'
@@ -228,14 +229,10 @@ onMounted(() => {
         <LibraryToggleGroup v-model="createForm.enabledLibraryIds" :libraries="libraries" />
 
         <div class="rounded-md border border-dashed border-border bg-muted/20 p-3">
-          <button
-            type="button"
-            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-            @click="toggleCreatePreview"
-          >
+          <Button variant="ghost" size="sm" type="button" @click="toggleCreatePreview">
             <ChevronDown class="h-3.5 w-3.5 transition-transform" :class="showCreatePreview ? 'rotate-180' : ''" />
             {{ t('settings.metadata.customFields.previewToggle') }}
-          </button>
+          </Button>
           <div v-if="showCreatePreview" class="mt-3 max-w-xs">
             <span class="text-xs font-medium text-muted-foreground">{{
               createForm.label.trim() || t('settings.metadata.customFields.untitledField')
@@ -245,11 +242,11 @@ onMounted(() => {
         </div>
 
         <div class="flex justify-end">
-          <button class="settings-btn-primary" :disabled="!canCreate" @click="handleCreate">
+          <Button size="sm" :disabled="!canCreate" @click="handleCreate" type="button">
             <Loader2 v-if="creating" :size="14" class="animate-spin" />
             <Plus v-else :size="14" />
             {{ t('settings.metadata.customFields.addField') }}
-          </button>
+          </Button>
         </div>
       </div>
     </section>
@@ -358,20 +355,16 @@ onMounted(() => {
                   {{ usageLabel(field) }}
                 </span>
                 <div class="flex items-center gap-2">
-                  <button class="settings-btn-outline" :disabled="!canSave(field)" @click="handleSave(field)">
+                  <Button variant="outline" size="sm" :disabled="!canSave(field)" @click="handleSave(field)" type="button">
                     <Loader2 v-if="savingId === field.id" :size="14" class="animate-spin" />
                     <Save v-else :size="14" />
                     {{ t('common.save') }}
-                  </button>
-                  <button
-                    class="settings-btn-outline text-destructive hover:border-destructive/40 hover:bg-destructive/5"
-                    :disabled="archivingId === field.id"
-                    @click="handleArchive(field)"
-                  >
+                  </Button>
+                  <Button variant="destructive" size="sm" :disabled="archivingId === field.id" @click="handleArchive(field)" type="button">
                     <Loader2 v-if="archivingId === field.id" :size="14" class="animate-spin" />
                     <Archive v-else :size="14" />
                     {{ t('settings.metadata.customFields.archive') }}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -425,19 +418,15 @@ onMounted(() => {
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <button class="settings-btn-outline" :disabled="restoringId === field.id" @click="handleRestore(field)">
+            <Button variant="outline" size="sm" :disabled="restoringId === field.id" @click="handleRestore(field)" type="button">
               <Loader2 v-if="restoringId === field.id" :size="14" class="animate-spin" />
               <ArchiveRestore v-else :size="14" />
               {{ t('settings.metadata.customFields.restore') }}
-            </button>
-            <button
-              class="settings-btn-outline text-destructive hover:border-destructive/40 hover:bg-destructive/5"
-              :disabled="restoringId === field.id"
-              @click="openDeleteConfirm(field)"
-            >
+            </Button>
+            <Button variant="destructive" size="sm" :disabled="restoringId === field.id" @click="openDeleteConfirm(field)" type="button">
               <Trash2 :size="14" />
               {{ t('settings.metadata.customFields.deleteForever') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -477,16 +466,12 @@ onMounted(() => {
             />
           </label>
           <div class="flex justify-end gap-2">
-            <button class="settings-btn-outline" @click="cancelDeleteConfirm">{{ t('common.cancel') }}</button>
-            <button
-              class="settings-btn-outline text-destructive hover:border-destructive/40 hover:bg-destructive/5 disabled:opacity-50"
-              :disabled="!canConfirmDelete"
-              @click="confirmDeletePermanently"
-            >
+            <Button variant="outline" size="sm" @click="cancelDeleteConfirm" type="button">{{ t('common.cancel') }}</Button>
+            <Button variant="destructive" size="sm" :disabled="!canConfirmDelete" @click="confirmDeletePermanently" type="button">
               <Loader2 v-if="deletingPermanentlyId !== null" :size="14" class="animate-spin" />
               <Trash2 v-else :size="14" />
               {{ t('settings.metadata.customFields.deleteForever') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

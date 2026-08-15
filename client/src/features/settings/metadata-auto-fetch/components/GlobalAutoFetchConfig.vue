@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Save } from '@lucide/vue'
@@ -104,6 +105,9 @@ async function handleTrigger() {
     triggering.value = false
   }
 }
+function toggleConditions() {
+  conditionsOpen.value = !conditionsOpen.value
+}
 </script>
 
 <template>
@@ -137,7 +141,7 @@ async function handleTrigger() {
     </div>
 
     <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
-      <button class="w-full flex items-center justify-between gap-2 text-left" @click="conditionsOpen = !conditionsOpen">
+      <button class="w-full flex items-center justify-between gap-2 text-left" @click="toggleConditions">
         <p class="settings-label">
           {{ t('settings.metadata.autoFetch.conditions.title') }}
         </p>
@@ -155,26 +159,26 @@ async function handleTrigger() {
 
     <div class="md:hidden sticky bottom-2 z-10 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
       <div class="flex items-center gap-2 flex-wrap">
-        <button :disabled="saving" class="settings-btn-primary h-9 px-3 justify-center" @click="handleSave">
+        <Button size="sm" :disabled="saving" class="px-3" @click="handleSave" type="button">
           <Save class="size-3.5" />
           {{ saving ? t('settings.metadata.autoFetch.saving') : t('common.save') }}
-        </button>
-        <button :disabled="triggering" class="settings-btn-outline h-9 px-3" @click="handleTrigger">
+        </Button>
+        <Button variant="outline" size="sm" :disabled="triggering" class="h-9 px-3" @click="handleTrigger" type="button">
           {{ triggering ? t('settings.metadata.autoFetch.running') : t('settings.metadata.autoFetch.runNow') }}
-        </button>
+        </Button>
         <span v-if="statusLabel" class="text-xs text-muted-foreground">{{ statusLabel }}</span>
       </div>
     </div>
 
     <div class="hidden md:flex items-center gap-3 px-5 py-4 bg-card">
-      <button :disabled="saving" class="settings-btn-primary" @click="handleSave">
+      <Button size="sm" :disabled="saving" @click="handleSave" type="button">
         <Save class="size-3.5" />
         {{ saving ? t('settings.metadata.autoFetch.saving') : t('common.save') }}
-      </button>
+      </Button>
       <div class="w-px h-4 bg-border shrink-0" />
-      <button :disabled="triggering" class="settings-btn-outline" @click="handleTrigger">
+      <Button variant="outline" size="sm" :disabled="triggering" @click="handleTrigger" type="button">
         {{ triggering ? t('settings.metadata.autoFetch.running') : t('settings.metadata.autoFetch.runForEligible') }}
-      </button>
+      </Button>
       <span v-if="statusLabel" class="text-xs text-muted-foreground">{{ statusLabel }}</span>
     </div>
   </div>

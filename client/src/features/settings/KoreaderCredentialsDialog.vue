@@ -119,9 +119,11 @@ function handleSubmit(): void {
                   password.length > 0 && !passwordValid ? 'koreader-credentials-password-error' : 'koreader-credentials-password-hint'
                 "
               />
-              <button
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 type="button"
-                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="absolute right-2 top-1/2 -translate-y-1/2"
                 :aria-label="
                   showPassword
                     ? t('settings.reader.koreader.changeCredentials.hidePassword')
@@ -131,7 +133,7 @@ function handleSubmit(): void {
               >
                 <EyeOff v-if="showPassword" :size="16" aria-hidden="true" />
                 <Eye v-else :size="16" aria-hidden="true" />
-              </button>
+              </Button>
             </div>
             <p id="koreader-credentials-password-hint" class="mt-1.5 text-xs text-muted-foreground">
               {{ t('settings.reader.koreader.changeCredentials.passwordHint') }}

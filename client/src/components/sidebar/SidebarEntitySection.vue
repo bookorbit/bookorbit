@@ -266,7 +266,7 @@ function onGripBlur(id: number) {
         <RouterLink
           v-if="showSeeAll && !isFiltering"
           :to="{ name: indexRouteName }"
-          class="mt-0.5 flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-medium text-muted-foreground outline-hidden transition-colors duration-150 hover:bg-(--shell-accent-wash) hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          class="mt-0.5 flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-normal text-muted-foreground outline-hidden transition-colors duration-150 hover:bg-(--shell-accent-wash) hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           @click="handleNavigate"
         >
           <span class="min-w-0 truncate">{{ seeAllLabel }}</span>

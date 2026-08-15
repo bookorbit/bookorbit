@@ -43,19 +43,39 @@ describe('loggerConfig', () => {
     const config = await loadLoggerConfig('development');
     const pinoHttp = config.pinoHttp!;
 
-    expect(pinoHttp.customSuccessMessage?.({ method: 'GET', url: '/api/books' } as never, { statusCode: 201 } as never, 7.2)).toBe(
+    expect(pinoHttp.customSuccessMessage?.({ method: 'GET', url: '/api/books' } as never, { headersSent: true, statusCode: 201 } as never, 7.2)).toBe(
       '[HTTP] GET /api/books 201 +7ms',
     );
 
-    expect(pinoHttp.customErrorMessage?.({ method: 'POST', url: '/api/books' } as never, { statusCode: 500 } as never, new Error('boom'))).toBe(
-      '[HTTP] POST /api/books 500 - boom',
-    );
+    expect(
+      pinoHttp.customErrorMessage?.(
+        { method: 'POST', url: '/api/books' } as never,
+        { headersSent: true, statusCode: 500 } as never,
+        new Error('boom'),
+      ),
+    ).toBe('[HTTP] POST /api/books 500 - boom');
 
-    expect(pinoHttp.customLogLevel?.({} as never, { statusCode: 200 } as never)).toBe('debug');
-    expect(pinoHttp.customLogLevel?.({} as never, { statusCode: 404 } as never)).toBe('warn');
-    expect(pinoHttp.customLogLevel?.({} as never, { statusCode: 503 } as never)).toBe('error');
-    expect(pinoHttp.customLogLevel?.({} as never, { statusCode: 200 } as never, new Error('fail'))).toBe('error');
+    expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 200 } as never)).toBe('debug');
+    expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 404 } as never)).toBe('warn');
+    expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 503 } as never)).toBe('error');
+    expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 200 } as never, new Error('fail'))).toBe('error');
     expect(pinoHttp.customProps).toBeUndefined();
+  });
+
+  it('reports a request whose response never reached the client as aborted, not 200', async () => {
+    const config = await loadLoggerConfig('development');
+    const pinoHttp = config.pinoHttp!;
+
+    // Node initialises `statusCode` to 200, so an aborted request carries a 200 it never sent.
+    const neverSent = { headersSent: false, statusCode: 200 } as never;
+
+    expect(pinoHttp.customSuccessMessage?.({ method: 'GET', url: '/api/v1/smart-scopes' } as never, neverSent, 15)).toBe(
+      '[HTTP] GET /api/v1/smart-scopes aborted +15ms',
+    );
+    expect(pinoHttp.customErrorMessage?.({ method: 'GET', url: '/api/v1/smart-scopes' } as never, neverSent, new Error('socket hang up'))).toBe(
+      '[HTTP] GET /api/v1/smart-scopes aborted - socket hang up',
+    );
+    expect(pinoHttp.customLogLevel?.({} as never, neverSent)).toBe('warn');
   });
 
   it('filters framework context logs while keeping regular logs', async () => {

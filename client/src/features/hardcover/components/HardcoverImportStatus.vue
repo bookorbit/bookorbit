@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertCircle, CheckCircle2, Download, FileSearch, Loader2, Table2, XCircle } from '@lucide/vue'
@@ -113,26 +114,15 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
       </div>
 
       <div class="flex shrink-0 flex-wrap justify-end gap-2">
-        <button
-          v-if="preview"
-          type="button"
-          class="flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/80"
-          :disabled="previewing || applying"
-          @click="handleClear"
-        >
+        <Button variant="outline" size="sm" v-if="preview" type="button" :disabled="previewing || applying" @click="handleClear">
           <XCircle class="size-3.5" />
           {{ t('hardcover.import.clear') }}
-        </button>
-        <button
-          type="button"
-          :disabled="previewButtonDisabled"
-          class="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-          @click="handlePreview"
-        >
+        </Button>
+        <Button size="sm" type="button" :disabled="previewButtonDisabled" @click="handlePreview">
           <Loader2 v-if="previewing" class="size-3.5 animate-spin" />
           <FileSearch v-else class="size-3.5" />
           {{ t('hardcover.import.preview') }}
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -159,24 +149,15 @@ async function applyRows(hardcoverUserBookIds?: number[]): Promise<void> {
           </label>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
-            @click="handleOpenReview"
-          >
+          <Button variant="outline" size="sm" type="button" @click="handleOpenReview">
             <Table2 class="size-3.5" />
             {{ t('hardcover.import.reviewMatches') }}
-          </button>
-          <button
-            type="button"
-            :disabled="!canImportReady"
-            class="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-            @click="handleImportReady"
-          >
+          </Button>
+          <Button size="sm" type="button" :disabled="!canImportReady" @click="handleImportReady">
             <Loader2 v-if="applying" class="size-3.5 animate-spin" />
             <Download v-else class="size-3.5" />
             {{ t('hardcover.import.importReady') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display
 import { Check } from '@lucide/vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
+import SettingsResetAction from './SettingsResetAction.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -94,25 +95,7 @@ function setFixedLayoutSpreadNone() {
   <div
     class="[&_.settings-hint]:overflow-hidden [&_.settings-hint]:text-ellipsis [&_.settings-hint]:whitespace-nowrap md:[&_.settings-hint]:overflow-visible md:[&_.settings-hint]:whitespace-normal"
   >
-    <SettingsPageHeader v-if="!props.embedded" :title="t('settings.reader.ebook.title')" :subtitle="t('settings.reader.ebook.subtitle')">
-      <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
-        {{ t('settings.reader.resetToDefaults') }}
-      </button>
-    </SettingsPageHeader>
-    <template v-else>
-      <div
-        class="md:hidden sticky top-11 z-10 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
-      >
-        <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
-          {{ t('settings.reader.resetToDefaults') }}
-        </button>
-      </div>
-      <div class="hidden md:flex justify-end mb-4">
-        <button class="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2" @click="reset()">
-          {{ t('settings.reader.resetToDefaults') }}
-        </button>
-      </div>
-    </template>
+    <SettingsPageHeader v-if="!props.embedded" :title="t('settings.reader.ebook.title')" :subtitle="t('settings.reader.ebook.subtitle')" />
 
     <!-- Formatting source -->
     <div class="mb-6">
@@ -143,7 +126,7 @@ function setFixedLayoutSpreadNone() {
       <p class="settings-group-label">
         {{ t('settings.reader.ebook.layout') }}
       </p>
-      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div class="settings-card">
         <!-- Flow -->
         <div class="settings-row">
           <div>
@@ -340,7 +323,7 @@ function setFixedLayoutSpreadNone() {
       <p class="settings-group-label">
         {{ t('settings.reader.ebook.typography') }}
       </p>
-      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div class="settings-card">
         <!-- Font family -->
         <div class="settings-row">
           <div>
@@ -465,7 +448,7 @@ function setFixedLayoutSpreadNone() {
       <p class="settings-group-label">
         {{ t('settings.reader.ebook.advanced') }}
       </p>
-      <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div class="settings-card">
         <!-- Max inline size -->
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">
@@ -519,5 +502,7 @@ function setFixedLayoutSpreadNone() {
         </div>
       </div>
     </div>
+
+    <SettingsResetAction @reset="reset" />
   </div>
 </template>

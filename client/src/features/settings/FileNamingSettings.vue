@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BookOpen, Check, CircleHelp, File, FolderOpen, Info, Loader2, RotateCcw } from '@lucide/vue'
+import { BookOpen, Check, CircleHelp, File, FolderOpen, Loader2, RotateCcw } from '@lucide/vue'
 import {
   DEFAULT_DOWNLOAD_PATTERN,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
@@ -111,27 +112,23 @@ function libraryPlaceholder(library: Library): string {
       </p>
     </div>
 
-    <section class="space-y-3">
-      <h2 class="settings-group-label mb-0">{{ t('settings.reader.fileNaming.globalDefaults') }}</h2>
+    <section aria-labelledby="file-naming-global-defaults-heading" class="space-y-2">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+          <h2 id="file-naming-global-defaults-heading" class="settings-group-label mb-0">
+            {{ t('settings.reader.fileNaming.globalDefaults') }}
+          </h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.reader.fileNaming.patternHelpIntro', { titleToken: '{title}', authorsToken: '{authors}' }) }}
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" type="button" class="shrink-0 self-start sm:self-auto" @click="openHelp">
+          <BookOpen :size="14" aria-hidden="true" />
+          {{ t('settings.reader.fileNaming.browseTokensAndExamples') }}
+        </Button>
+      </div>
 
       <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
-        <div class="flex flex-col gap-3 bg-primary/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between md:px-5 md:py-5">
-          <div class="flex max-w-3xl items-start gap-2.5">
-            <Info :size="16" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-            <p class="text-sm text-muted-foreground">
-              {{ t('settings.reader.fileNaming.patternHelpIntro', { titleToken: '{title}', authorsToken: '{authors}' }) }}
-            </p>
-          </div>
-          <button
-            type="button"
-            class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:self-auto"
-            @click="openHelp"
-          >
-            <BookOpen :size="14" aria-hidden="true" />
-            {{ t('settings.reader.fileNaming.browseTokensAndExamples') }}
-          </button>
-        </div>
-
         <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5 md:py-5">
           <div class="min-w-0 max-w-2xl">
             <p class="settings-label">{{ t('settings.reader.fileNaming.crossPlatform') }}</p>
@@ -196,19 +193,14 @@ function libraryPlaceholder(library: Library): string {
       </div>
     </section>
 
-    <section class="space-y-3">
+    <section class="space-y-2">
       <div class="flex items-center gap-1.5">
         <h2 class="settings-group-label mb-0">{{ t('settings.reader.fileNaming.libraryOverrides') }}</h2>
         <Tooltip>
           <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              :aria-label="t('settings.reader.fileNaming.patternHelp')"
-              @click="openHelp"
-            >
+            <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.fileNaming.patternHelp')" @click="openHelp">
               <CircleHelp :size="14" aria-hidden="true" />
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>{{ t('settings.reader.fileNaming.patternHelp') }}</TooltipContent>
         </Tooltip>
@@ -256,29 +248,33 @@ function libraryPlaceholder(library: Library): string {
             />
             <Tooltip>
               <TooltipTrigger as-child>
-                <button
+                <Button
+                  variant="outline"
+                  size="icon-sm"
                   type="button"
-                  class="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                  class="shrink-0"
                   :disabled="savingLibraryId === lib.id || !isLibraryDirty(lib)"
                   :aria-label="t('settings.reader.fileNaming.saveLibraryPattern', { name: lib.name })"
                   @click="saveLibraryPattern(lib)"
                 >
                   <Loader2 v-if="savingLibraryId === lib.id" :size="14" class="animate-spin" aria-hidden="true" />
                   <Check v-else :size="14" aria-hidden="true" />
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent>{{ t('settings.reader.fileNaming.saveLibraryPattern', { name: lib.name }) }}</TooltipContent>
             </Tooltip>
             <Tooltip v-if="lib.fileNamingPattern">
               <TooltipTrigger as-child>
-                <button
+                <Button
+                  variant="destructive-ghost"
+                  size="icon-sm"
                   type="button"
-                  class="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/5 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  class="shrink-0"
                   :aria-label="t('settings.reader.fileNaming.resetLibraryPattern', { name: lib.name })"
                   @click="clearLibraryPattern(lib)"
                 >
                   <RotateCcw :size="14" aria-hidden="true" />
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent>{{ t('settings.reader.fileNaming.resetToDefault') }}</TooltipContent>
             </Tooltip>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Library } from '@bookorbit/types'
@@ -45,13 +46,13 @@ function toggleAll() {
         <span class="text-muted-foreground tabular-nums">{{
           t('settings.metadata.customFields.countOf', { selected: selectedCount, total: libraries.length })
         }}</span>
-        <button type="button" class="text-primary hover:underline disabled:opacity-40" :disabled="allSelected" @click="selectAll">
+        <Button variant="link" size="sm" type="button" class="h-auto p-0" :disabled="allSelected" @click="selectAll">
           {{ t('settings.metadata.customFields.selectAll') }}
-        </button>
+        </Button>
         <span class="text-border">|</span>
-        <button type="button" class="text-primary hover:underline disabled:opacity-40" :disabled="selectedCount === 0" @click="clearAll">
+        <Button variant="link" size="sm" type="button" class="h-auto p-0" :disabled="selectedCount === 0" @click="clearAll">
           {{ t('settings.metadata.customFields.clear') }}
-        </button>
+        </Button>
       </div>
     </div>
     <p v-if="libraries.length === 0" class="text-xs text-muted-foreground italic">{{ t('settings.metadata.customFields.noLibraries') }}</p>

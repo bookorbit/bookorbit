@@ -79,7 +79,7 @@ describe('MetadataGenreBlocklistSettings', () => {
 
     const input = wrapper.get<HTMLInputElement>('#genre-blocklist-entry')
     await input.setValue(' Adult ')
-    await wrapper.get('button.settings-btn-primary').trigger('click')
+    await wrapper.get('button[data-slot="button"]').trigger('click')
     await nextTick()
 
     expect(input.element.value).toBe('')
@@ -105,7 +105,7 @@ describe('MetadataGenreBlocklistSettings', () => {
     await wrapper.get('#genre-blocklist-entry').setValue('audiobook')
 
     expect(wrapper.text()).toContain('This genre is already blocked.')
-    expect(wrapper.get('button.settings-btn-primary').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[data-slot="button"]').attributes('disabled')).toBeDefined()
     expect(apiMock).toHaveBeenCalledTimes(1)
   })
 

@@ -147,10 +147,10 @@ function loadGroupByMediaPreference(): boolean {
     if (stored === 'true') return true
     if (stored === 'false') return false
   } catch {
-    return false
+    return true
   }
 
-  return false
+  return true
 }
 
 function saveGroupByMediaPreference(value: boolean) {

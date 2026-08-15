@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -43,6 +44,11 @@ const fonts = computed(() => props.store.fonts.value)
 const families = computed(() => props.store.families.value)
 
 const isDragging = ref(false)
+const uploadSurfaceClass = computed(() => {
+  if (props.readonly) return 'cursor-not-allowed border-border bg-card opacity-50 shadow-xs'
+  if (isDragging.value) return 'cursor-pointer border-primary bg-primary/5 shadow-xs'
+  return 'cursor-pointer border-border bg-card shadow-xs hover:border-muted-foreground/40 hover:bg-muted/30'
+})
 const uploadErrors = ref<string[]>([])
 const expandedFamilies = ref<Set<string>>(new Set())
 const editingFamilyName = ref<string | null>(null)
@@ -232,10 +238,8 @@ function dismissError(index: number) {
       <p class="settings-group-label">{{ t('settings.reader.fonts.uploadFonts') }}</p>
       <label
         class="relative flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors"
-        :class="[
-          readonly ? 'border-border opacity-50 cursor-not-allowed' : 'cursor-pointer',
-          !readonly && (isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30'),
-        ]"
+        :class="uploadSurfaceClass"
+        data-testid="font-upload-surface"
         @dragover="handleDragOver"
         @dragleave="handleDragLeave"
         @drop="handleDrop"
@@ -276,9 +280,9 @@ function dismissError(index: number) {
           class="flex items-start justify-between gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive"
         >
           <span>{{ err }}</span>
-          <button class="mt-0.5 shrink-0 hover:opacity-70" @click="dismissError(i)">
+          <Button variant="destructive-ghost" size="icon-sm" class="mt-0.5 shrink-0" @click="dismissError(i)">
             <X :size="12" />
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -290,13 +294,18 @@ function dismissError(index: number) {
         <span class="text-xs text-muted-foreground">{{ t('settings.reader.fonts.fontsUsed', { count: fonts.length, max: store.maxFonts }) }}</span>
       </div>
 
-      <div v-if="store.loading.value" class="flex items-center justify-center py-10 text-muted-foreground">
+      <div
+        v-if="store.loading.value"
+        class="flex items-center justify-center rounded-lg border border-border bg-card py-10 text-muted-foreground shadow-xs"
+        data-testid="font-loading-surface"
+      >
         <span class="text-sm">{{ t('common.loading') }}</span>
       </div>
 
       <div
         v-else-if="families.length === 0"
-        class="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-12 text-center"
+        class="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card px-6 py-12 text-center shadow-xs"
+        data-testid="font-empty-surface"
       >
         <div class="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Type :size="22" />
@@ -307,7 +316,7 @@ function dismissError(index: number) {
         </div>
       </div>
 
-      <div v-else class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+      <div v-else class="settings-card" data-testid="font-list-surface">
         <div v-for="family in families" :key="family.name" class="bg-card">
           <!-- Family header row -->
           <div class="flex items-center gap-3 px-4 py-3">
@@ -335,30 +344,33 @@ function dismissError(index: number) {
             <span class="shrink-0 text-xs text-muted-foreground">{{ t('settings.reader.fonts.fileCount', { count: family.variants.length }) }}</span>
 
             <div class="flex items-center gap-1 shrink-0">
-              <button
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 v-if="editingFamilyName !== family.name && !readonly"
-                class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 :title="t('settings.reader.fonts.renameFamily')"
                 @click.stop="startEditFamily(family.name)"
               >
                 <Pencil :size="13" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="icon-sm"
                 v-if="editingFamilyName === family.name"
-                class="flex h-7 w-7 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary/10"
                 :title="t('common.save')"
                 @click.stop="saveEditFamily"
               >
                 <Check :size="13" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive-ghost"
+                size="icon-sm"
                 v-if="!readonly"
-                class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                 :title="t('settings.reader.fonts.deleteFamily')"
                 @click.stop="deleteFamily(family.name)"
               >
                 <Trash2 :size="13" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -404,38 +416,30 @@ function dismissError(index: number) {
               </div>
 
               <div class="flex items-center gap-1 shrink-0">
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   v-if="editingVariantId !== variant.id && !readonly"
-                  class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   :title="t('settings.reader.fonts.editVariant')"
                   @click="startEditVariant(variant)"
                 >
                   <Pencil :size="12" />
-                </button>
-                <button
-                  v-if="editingVariantId === variant.id"
-                  class="flex h-6 w-6 items-center justify-center rounded text-primary transition-colors hover:bg-primary/10"
-                  :title="t('common.save')"
-                  @click="saveEditVariant"
-                >
+                </Button>
+                <Button variant="secondary" size="icon-sm" v-if="editingVariantId === variant.id" :title="t('common.save')" @click="saveEditVariant">
                   <Check :size="12" />
-                </button>
-                <button
-                  v-if="editingVariantId === variant.id"
-                  class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted"
-                  :title="t('common.cancel')"
-                  @click="cancelEdits"
-                >
+                </Button>
+                <Button variant="ghost" size="icon-sm" v-if="editingVariantId === variant.id" :title="t('common.cancel')" @click="cancelEdits">
                   <X :size="12" />
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="destructive-ghost"
+                  size="icon-sm"
                   v-if="editingVariantId !== variant.id && !readonly"
-                  class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   :title="t('settings.reader.fonts.deleteVariant')"
                   @click="deleteVariant(variant)"
                 >
                   <Trash2 :size="12" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>

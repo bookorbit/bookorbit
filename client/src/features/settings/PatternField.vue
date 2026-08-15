@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CircleHelp, Loader2, Save } from '@lucide/vue'
@@ -46,14 +47,9 @@ function handleHelp() {
         <label :for="fieldId" class="settings-label">{{ label }}</label>
         <Tooltip>
           <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              :aria-label="t('settings.reader.fileNaming.patternHelp')"
-              @click="handleHelp"
-            >
+            <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.fileNaming.patternHelp')" @click="handleHelp">
               <CircleHelp :size="14" aria-hidden="true" />
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent>{{ t('settings.reader.fileNaming.patternHelp') }}</TooltipContent>
         </Tooltip>
@@ -81,11 +77,11 @@ function handleHelp() {
     <PatternPreview :value="preview" :label="label" />
 
     <div class="flex justify-end">
-      <button type="button" class="settings-btn-primary" :disabled="loading || saving || !dirty || !!error" @click="handleSave">
+      <Button size="sm" type="button" :disabled="loading || saving || !dirty || !!error" @click="handleSave">
         <Loader2 v-if="saving" :size="14" class="animate-spin" aria-hidden="true" />
         <Save v-else :size="14" aria-hidden="true" />
         {{ t('common.save') }}
-      </button>
+      </Button>
     </div>
   </div>
 </template>

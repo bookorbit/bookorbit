@@ -116,6 +116,47 @@ describe('MagicLinksSettings', () => {
     expect(createButton?.attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('No shared accounts found')
     expect(wrapper.text()).not.toContain('Create magic link')
+    expect(wrapper.get('[data-testid="magic-links-empty-surface"]').classes()).toContain('settings-empty-state')
+  })
+
+  it('contains active and inactive tables on the standard card surface', async () => {
+    tokens.value = [
+      {
+        id: 1,
+        rawToken: 'active-token',
+        label: 'Active',
+        username: 'active',
+        createdByUsername: 'admin',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        expiresAt: null,
+        revokedAt: null,
+        isActive: true,
+        useCount: 0,
+        lastUsedAt: null,
+      },
+      {
+        id: 2,
+        rawToken: 'inactive-token',
+        label: 'Inactive',
+        username: 'inactive',
+        createdByUsername: 'admin',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        expiresAt: null,
+        revokedAt: '2026-01-02T00:00:00.000Z',
+        isActive: false,
+        useCount: 1,
+        lastUsedAt: null,
+      },
+    ]
+
+    const wrapper = mountComponent({ withHeader: false })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="magic-links-active-table-surface"]').classes()).toContain('bg-card')
+    expect(wrapper.get('[data-testid="magic-links-inactive-table-surface"]').classes()).toContain('bg-card')
+    const inactiveLabel = wrapper.findAll('.settings-group-label').find((label) => label.text() === 'Inactive links')
+    expect(inactiveLabel).toBeDefined()
+    expect(inactiveLabel?.classes()).not.toContain('mb-0')
   })
 
   it('does not render the embedded Create link action unless the parent opts in', async () => {

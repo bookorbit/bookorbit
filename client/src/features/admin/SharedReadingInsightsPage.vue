@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -52,7 +53,7 @@ onMounted(insights.initialize)
 watch(() => props.userId, insights.initialize)
 
 function handleBack() {
-  router.push({ name: 'settings-admin', query: { tab: 'account-activity' } })
+  router.push({ name: 'settings-admin-account-activity' })
 }
 
 function handlePeriodChange() {
@@ -88,10 +89,10 @@ function trendWidth(readingSeconds: number): string {
 <template>
   <section class="space-y-4">
     <div class="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start lg:grid-cols-[auto_minmax(0,1fr)_12rem]">
-      <button type="button" class="settings-btn-outline h-9 justify-self-start sm:mt-0.5" @click="handleBack">
+      <Button variant="outline" size="sm" type="button" class="justify-self-start sm:mt-0.5" @click="handleBack">
         <ArrowLeft :size="15" aria-hidden="true" />
         {{ t('common.back') }}
-      </button>
+      </Button>
 
       <div class="min-w-0">
         <h1 class="truncate text-xl font-semibold text-foreground">{{ insights.account.value?.name ?? t('adminFeature.sharedInsights.title') }}</h1>

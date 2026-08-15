@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RefreshCw, Save, RotateCcw } from '@lucide/vue'
@@ -129,23 +130,24 @@ function handleResetClick() {
         </p>
       </div>
       <div class="hidden md:flex items-center gap-2 shrink-0">
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
-          class="settings-btn-outline"
           :class="resetConfirming ? '!border-destructive !text-destructive hover:!bg-destructive/10' : ''"
           @click="handleResetClick"
         >
           <RotateCcw class="size-3.5" />
           {{ resetConfirming ? t('settings.admin.scoreWeights.areYouSure') : t('settings.admin.scoreWeights.resetToDefaultsButton') }}
-        </button>
-        <button type="button" class="settings-btn-outline" :disabled="recalculating" @click="recalculateAll">
+        </Button>
+        <Button variant="outline" size="sm" type="button" :disabled="recalculating" @click="recalculateAll">
           <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
           {{ t('settings.admin.scoreWeights.recalculateAll') }}
-        </button>
-        <button type="button" class="settings-btn-primary" :disabled="saving" @click="saveWeights">
+        </Button>
+        <Button size="sm" type="button" :disabled="saving" @click="saveWeights">
           <Save class="size-3.5" />
           {{ t('common.save') }}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -153,23 +155,24 @@ function handleResetClick() {
     class="md:hidden sticky top-11 z-10 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
   >
     <div class="flex items-center gap-2 flex-wrap">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
-        class="settings-btn-outline"
         :class="resetConfirming ? '!border-destructive !text-destructive hover:!bg-destructive/10' : ''"
         @click="handleResetClick"
       >
         <RotateCcw class="size-3.5" />
         {{ resetConfirming ? t('settings.admin.scoreWeights.confirmReset') : t('settings.admin.scoreWeights.reset') }}
-      </button>
-      <button type="button" class="settings-btn-outline" :disabled="recalculating" @click="recalculateAll">
+      </Button>
+      <Button variant="outline" size="sm" type="button" :disabled="recalculating" @click="recalculateAll">
         <RefreshCw class="size-3.5" :class="{ 'animate-spin': recalculating }" />
         {{ t('settings.admin.scoreWeights.recalculate') }}
-      </button>
-      <button type="button" class="settings-btn-primary flex-1 justify-center" :disabled="saving" @click="saveWeights">
+      </Button>
+      <Button size="sm" type="button" class="flex-1" :disabled="saving" @click="saveWeights">
         <Save class="size-3.5" />
         {{ t('common.save') }}
-      </button>
+      </Button>
     </div>
   </div>
 

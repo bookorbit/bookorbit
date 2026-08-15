@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/i18n/formatters'
@@ -1362,15 +1363,10 @@ function formatSourceCountLabel(key: string) {
                     "
                     :disabled="hasActiveRun"
                   />
-                  <button
-                    type="button"
-                    class="absolute inset-y-0 right-0 flex items-center px-2.5 text-muted-foreground hover:text-foreground"
-                    tabindex="-1"
-                    @click="onTogglePassword"
-                  >
+                  <Button variant="ghost" size="icon-sm" type="button" class="absolute inset-y-0 right-0" tabindex="-1" @click="onTogglePassword">
                     <EyeOff v-if="showPassword" class="size-4" />
                     <Eye v-else class="size-4" />
-                  </button>
+                  </Button>
                 </div>
               </label>
               <label class="block">
@@ -1420,14 +1416,14 @@ function formatSourceCountLabel(key: string) {
             </div>
 
             <div class="flex flex-wrap gap-2">
-              <button class="settings-btn-outline" :disabled="busy.testingSource || hasActiveRun" @click="onTestSource">
+              <Button variant="outline" size="sm" :disabled="busy.testingSource || hasActiveRun" @click="onTestSource" type="button">
                 <Loader2 v-if="busy.testingSource" class="size-3.5 animate-spin" />
                 {{ t('settings.admin.migration.testConnection') }}
-              </button>
-              <button class="settings-btn-primary" :disabled="busy.savingSource || hasActiveRun" @click="onSaveAndValidate">
+              </Button>
+              <Button size="sm" :disabled="busy.savingSource || hasActiveRun" @click="onSaveAndValidate" type="button">
                 <Loader2 v-if="busy.savingSource" class="size-3.5 animate-spin" />
                 {{ t('settings.admin.migration.saveAndValidate') }}
-              </button>
+              </Button>
             </div>
 
             <div
@@ -1458,15 +1454,17 @@ function formatSourceCountLabel(key: string) {
           <div v-else-if="currentStep === 1" class="space-y-5">
             <div class="flex items-center gap-2">
               <p class="text-xs text-muted-foreground">{{ t('settings.admin.migration.suggestionsAutoLoad') }}</p>
-              <button
+              <Button
+                variant="link"
+                size="sm"
                 v-if="source"
-                class="text-xs text-primary underline-offset-2 hover:underline disabled:opacity-50"
+                class="h-auto p-0"
                 :disabled="busy.loadingSuggestions || busy.loadingTargetUsers || hasActiveRun"
                 @click="onReloadSuggestions"
               >
                 <Loader2 v-if="busy.loadingSuggestions || busy.loadingTargetUsers" class="size-3 animate-spin inline" />
                 {{ t('settings.admin.migration.refresh') }}
-              </button>
+              </Button>
             </div>
 
             <div class="overflow-x-auto rounded border border-border">
@@ -1500,9 +1498,9 @@ function formatSourceCountLabel(key: string) {
             <div class="space-y-2">
               <div class="flex items-center justify-between">
                 <p class="settings-hint">{{ t('settings.admin.migration.pathPrefixMappings') }}</p>
-                <button class="settings-btn-outline" :disabled="hasActiveRun" @click="addPathMapping">
+                <Button variant="outline" size="sm" :disabled="hasActiveRun" @click="addPathMapping" type="button">
                   {{ t('settings.admin.migration.addMapping') }}
-                </button>
+                </Button>
               </div>
               <p class="text-xs text-muted-foreground">
                 {{ t('settings.admin.migration.pathMappingsHelp1') }} <code class="font-mono">/books/Large</code>
@@ -1529,9 +1527,9 @@ function formatSourceCountLabel(key: string) {
                   </option>
                 </select>
 
-                <button class="settings-btn-outline" :disabled="hasActiveRun" @click="removePathMapping(index)">
+                <Button variant="destructive-outline" size="sm" :disabled="hasActiveRun" @click="removePathMapping(index)" type="button">
                   {{ t('settings.admin.migration.remove') }}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -1553,18 +1551,18 @@ function formatSourceCountLabel(key: string) {
               </p>
             </div>
 
-            <button class="settings-btn-primary" :disabled="busy.savingProfile || source == null || hasActiveRun" @click="onSaveMappings">
+            <Button size="sm" :disabled="busy.savingProfile || source == null || hasActiveRun" @click="onSaveMappings" type="button">
               <Loader2 v-if="busy.savingProfile" class="size-3.5 animate-spin" />
               {{ t('settings.admin.migration.saveMappings') }}
-            </button>
+            </Button>
           </div>
 
           <!-- Step 2: Dry Run -->
           <div v-else-if="currentStep === 2" class="space-y-5">
-            <button class="settings-btn-primary" :disabled="busy.dryRun || profile == null || hasActiveRun" @click="onRunDryRun">
+            <Button size="sm" :disabled="busy.dryRun || profile == null || hasActiveRun" @click="onRunDryRun" type="button">
               <Loader2 v-if="busy.dryRun" class="size-3.5 animate-spin" />
               {{ t('settings.admin.migration.runDryRun') }}
-            </button>
+            </Button>
 
             <div v-if="plan" class="rounded border border-border bg-muted/30 p-3 space-y-2 text-sm">
               <p>
@@ -1609,7 +1607,7 @@ function formatSourceCountLabel(key: string) {
                             :value="sourceId"
                             :checked="duplicateResolutions.get(dup.targetBookId) === sourceId"
                             class="accent-primary"
-                            @change="() => handleDuplicateSelection(dup.targetBookId, sourceId)"
+                            @change="handleDuplicateSelection(dup.targetBookId, sourceId)"
                           />
                           <div class="min-w-0">
                             <p class="truncate">{{ sourceBookLabel(dup, sourceId) }}</p>
@@ -1631,14 +1629,15 @@ function formatSourceCountLabel(key: string) {
                     </div>
                   </div>
                 </div>
-                <button
-                  class="settings-btn-primary"
+                <Button
+                  size="sm"
                   :disabled="busy.resolvingDuplicates || duplicateResolutions.size < duplicateMatches.length"
                   @click="onResolveDuplicates"
+                  type="button"
                 >
                   <Loader2 v-if="busy.resolvingDuplicates" class="size-3.5 animate-spin" />
                   {{ t('settings.admin.migration.resolveDuplicatesButton', { count: duplicateMatches.length }) }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -1687,26 +1686,33 @@ function formatSourceCountLabel(key: string) {
             <div class="flex flex-wrap gap-2">
               <template v-if="confirmingMigrationStart">
                 <span class="text-xs text-amber-600 self-center">{{ t('settings.admin.migration.startConfirmPrompt') }}</span>
-                <button class="settings-btn-primary" :disabled="busy.startingRun" @click="onStartMigration">
+                <Button size="sm" :disabled="busy.startingRun" @click="onStartMigration" type="button">
                   <Loader2 v-if="busy.startingRun" class="size-3.5 animate-spin" />
                   {{ t('settings.admin.migration.confirmStart') }}
-                </button>
-                <button class="settings-btn-outline" @click="onCancelMigrationStart">{{ t('common.cancel') }}</button>
+                </Button>
+                <Button variant="outline" size="sm" @click="onCancelMigrationStart" type="button">{{ t('common.cancel') }}</Button>
               </template>
               <template v-else>
-                <button class="settings-btn-primary" :disabled="busy.startingRun || !preflight.ready" @click="onStartMigration">
+                <Button size="sm" :disabled="busy.startingRun || !preflight.ready" @click="onStartMigration" type="button">
                   <Loader2 v-if="busy.startingRun" class="size-3.5 animate-spin" />
                   {{ t('settings.admin.migration.startMigration') }}
-                </button>
+                </Button>
               </template>
-              <button v-if="run?.state === 'running'" class="settings-btn-outline text-red-600" :disabled="busy.cancellingRun" @click="onCancelRun">
+              <Button
+                variant="destructive"
+                size="sm"
+                v-if="run?.state === 'running'"
+                :disabled="busy.cancellingRun"
+                @click="onCancelRun"
+                type="button"
+              >
                 <Loader2 v-if="busy.cancellingRun" class="size-3.5 animate-spin" />
                 {{ t('settings.admin.migration.cancelRun') }}
-              </button>
-              <button class="settings-btn-outline" :disabled="busy.loadingProgress || run == null" @click="refreshRunProgress">
+              </Button>
+              <Button variant="outline" size="sm" :disabled="busy.loadingProgress || run == null" @click="refreshRunProgress" type="button">
                 <Loader2 v-if="busy.loadingProgress" class="size-3.5 animate-spin" />
                 {{ t('settings.admin.migration.refreshStatus') }}
-              </button>
+              </Button>
             </div>
 
             <div
@@ -1714,7 +1720,7 @@ function formatSourceCountLabel(key: string) {
               class="rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 flex items-center gap-2 text-xs text-amber-700"
             >
               <span>{{ t('settings.admin.migration.statusPollingStopped') }}</span>
-              <button class="underline font-medium" @click="onRetryPolling">{{ t('settings.admin.migration.retry') }}</button>
+              <Button variant="link" size="sm" class="h-auto p-0" @click="onRetryPolling">{{ t('settings.admin.migration.retry') }}</Button>
             </div>
 
             <div v-if="run" class="rounded border border-border bg-muted/30 px-4 py-3.5 flex items-center gap-3 text-xs">
@@ -1728,9 +1734,9 @@ function formatSourceCountLabel(key: string) {
                       : ''
                 }}
               </span>
-              <button v-if="run.state !== 'running'" class="text-xs text-primary underline-offset-2 hover:underline ml-auto" @click="goNext">
+              <Button variant="link" size="sm" v-if="run.state !== 'running'" class="h-auto p-0 ml-auto" @click="goNext">
                 {{ t('settings.admin.migration.viewReport') }}
-              </button>
+              </Button>
             </div>
 
             <div v-if="migrationProgress" class="space-y-1.5">
@@ -1765,16 +1771,16 @@ function formatSourceCountLabel(key: string) {
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <button class="settings-btn-outline" :disabled="busy.loadingReport" @click="onRefreshReport">
+                  <Button variant="outline" size="sm" :disabled="busy.loadingReport" @click="onRefreshReport" type="button">
                     <Loader2 v-if="busy.loadingReport" class="size-3.5 animate-spin" />
                     {{ runReport ? t('settings.admin.migration.reloadReport') : t('settings.admin.migration.loadFullReport') }}
-                  </button>
-                  <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportJson">
+                  </Button>
+                  <Button variant="outline" size="sm" :disabled="busy.exporting" @click="onExportJson" type="button">
                     {{ t('settings.admin.migration.exportJson') }}
-                  </button>
-                  <button class="settings-btn-outline" :disabled="busy.exporting" @click="onExportCsv">
+                  </Button>
+                  <Button variant="outline" size="sm" :disabled="busy.exporting" @click="onExportCsv" type="button">
                     {{ t('settings.admin.migration.exportCsv') }}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -1784,10 +1790,10 @@ function formatSourceCountLabel(key: string) {
                   <p class="font-medium">{{ t('settings.admin.migration.migrationFailed') }}</p>
                   <p>{{ run.errorMessage }}</p>
                 </div>
-                <button v-if="run.state === 'failed'" class="settings-btn-outline text-xs" :disabled="busy.retryingRun" @click="onRetryRun">
+                <Button variant="outline" size="sm" v-if="run.state === 'failed'" :disabled="busy.retryingRun" @click="onRetryRun" type="button">
                   <Loader2 v-if="busy.retryingRun" class="size-3.5 animate-spin" />
                   {{ t('settings.admin.migration.retryFromLastStage') }}
-                </button>
+                </Button>
               </div>
 
               <!-- Stats grid — available from runProgress or full report -->
@@ -1957,10 +1963,10 @@ function formatSourceCountLabel(key: string) {
 
         <!-- Card footer -->
         <div class="px-6 py-4 border-t border-border bg-muted/30 flex items-center justify-between">
-          <button v-if="currentStep > 0" class="settings-btn-outline" @click="goPrev">{{ t('common.back') }}</button>
+          <Button v-if="currentStep > 0" type="button" variant="outline" size="sm" @click="goPrev">{{ t('common.back') }}</Button>
           <div v-else />
-          <button v-if="currentStep < 4" class="settings-btn-primary" @click="goNext">{{ continueLabel }}</button>
-          <button v-else class="settings-btn-outline" @click="goToSetup">{{ t('settings.admin.migration.backToSetup') }}</button>
+          <Button size="sm" v-if="currentStep < 4" @click="goNext" type="button">{{ continueLabel }}</Button>
+          <Button variant="outline" size="sm" v-else @click="goToSetup" type="button">{{ t('settings.admin.migration.backToSetup') }}</Button>
         </div>
       </div>
     </div>

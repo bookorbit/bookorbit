@@ -68,7 +68,7 @@ async function toggleFamily(familyName: string, shown: boolean) {
 
     <p class="mb-3 text-xs text-muted-foreground">{{ t('settings.reader.fonts.serverFontsHint') }}</p>
 
-    <div class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div class="settings-card">
       <div v-for="family in families" :key="family.cssFamilyName" class="flex items-center gap-3 bg-card px-4 py-3">
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium" :style="{ fontFamily: `'${family.cssFamilyName}', sans-serif` }">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Save } from '@lucide/vue'
@@ -189,13 +190,20 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
     conditions: JSON.parse(JSON.stringify(config.conditions)),
   }
 }
+function toggleCard() {
+  cardOpen.value = !cardOpen.value
+}
+
+function toggleConditions() {
+  conditionsOpen.value = !conditionsOpen.value
+}
 </script>
 
 <template>
   <div class="settings-card">
     <button
       class="w-full flex flex-col gap-2 md:flex-row md:items-center md:justify-between px-4 py-3.5 md:px-5 md:py-4 bg-card text-left"
-      @click="cardOpen = !cardOpen"
+      @click="toggleCard"
     >
       <div>
         <p class="settings-label">{{ props.library.name }}</p>
@@ -226,7 +234,7 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
       </div>
 
       <div v-else class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
-        <button class="w-full flex items-center justify-between gap-2 text-left" @click="conditionsOpen = !conditionsOpen">
+        <button class="w-full flex items-center justify-between gap-2 text-left" @click="toggleConditions">
           <p class="settings-label">
             {{ t('settings.metadata.autoFetch.conditions.title') }}
           </p>
@@ -240,25 +248,25 @@ function cloneConfigOnly(config: BookMetadataFetchConfig): BookMetadataFetchConf
       </div>
 
       <div class="hidden md:flex items-center gap-2 md:gap-3 flex-wrap px-4 py-3.5 md:px-5 md:py-4 bg-card">
-        <button v-if="!inheriting" :disabled="saving" class="settings-btn-primary" @click="handleSave">
+        <Button size="sm" v-if="!inheriting" :disabled="saving" @click="handleSave" type="button">
           <Save class="size-3.5" />
           {{ saving ? t('settings.metadata.autoFetch.saving') : t('settings.metadata.autoFetch.library.saveOverride') }}
-        </button>
-        <button :disabled="triggering" class="settings-btn-outline" @click="handleTrigger">
+        </Button>
+        <Button variant="outline" size="sm" :disabled="triggering" @click="handleTrigger" type="button">
           {{ triggering ? t('settings.metadata.autoFetch.running') : t('settings.metadata.autoFetch.runNow') }}
-        </button>
+        </Button>
         <span v-if="statusLabel" class="text-xs text-muted-foreground">{{ statusLabel }}</span>
       </div>
 
       <div class="md:hidden sticky bottom-2 z-10 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
         <div class="flex items-center gap-2 flex-wrap">
-          <button v-if="!inheriting" :disabled="saving" class="settings-btn-primary h-9 px-3 justify-center" @click="handleSave">
+          <Button size="sm" v-if="!inheriting" :disabled="saving" class="px-3" @click="handleSave" type="button">
             <Save class="size-3.5" />
             {{ saving ? t('settings.metadata.autoFetch.saving') : t('settings.metadata.autoFetch.library.saveOverride') }}
-          </button>
-          <button :disabled="triggering" class="settings-btn-outline h-9 px-3" @click="handleTrigger">
+          </Button>
+          <Button variant="outline" size="sm" :disabled="triggering" class="h-9 px-3" @click="handleTrigger" type="button">
             {{ triggering ? t('settings.metadata.autoFetch.running') : t('settings.metadata.autoFetch.runNow') }}
-          </button>
+          </Button>
           <span v-if="statusLabel" class="text-xs text-muted-foreground">{{ statusLabel }}</span>
         </div>
       </div>

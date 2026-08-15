@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
@@ -270,11 +271,38 @@ async function handleSubmit() {
     loading.value = false
   }
 }
+function selectSection(tab: 'general' | 'access' | 'restrictions') {
+  currentTab.value = tab
+}
+
+function enableRestrictions() {
+  restrictionsEnabled.value = true
+}
+
+function disableRestrictions() {
+  restrictionsEnabled.value = false
+}
+
+function handleClose() {
+  emit('close')
+}
+
+function applyStandardPermissions() {
+  applyPreset('standard')
+}
+
+function applyAdminPermissions() {
+  applyPreset('admin')
+}
+
+function clearPermissions() {
+  applyPreset('clear')
+}
 </script>
 
 <template>
   <div class="fixed inset-0 z-[60] flex" @click.self="emit('close')">
-    <div class="fixed inset-0 bg-black/40" @click="emit('close')" />
+    <div class="fixed inset-0 bg-black/40" @click="handleClose" />
     <div class="relative ml-auto flex h-full w-full max-w-md flex-col bg-card shadow-xl">
       <div class="flex items-center justify-between px-6 pt-5 pb-4">
         <div class="flex items-center gap-3">
@@ -298,9 +326,9 @@ async function handleSubmit() {
             <span class="text-xs text-muted-foreground">{{ active ? t('adminFeature.userForm.active') : t('adminFeature.userForm.suspended') }}</span>
           </div>
         </div>
-        <button @click="emit('close')" class="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon-sm" @click="handleClose">
           <X :size="16" />
-        </button>
+        </Button>
       </div>
 
       <div class="px-6 border-b border-border flex gap-6">
@@ -310,7 +338,7 @@ async function handleSubmit() {
           :key="tab"
           class="pb-3 text-sm font-medium border-b-2 transition-colors capitalize"
           :class="currentTab === tab ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-          @click="currentTab = tab"
+          @click="selectSection(tab)"
         >
           {{ t(`adminFeature.userForm.tabs.${tab}`) }}
         </button>
@@ -385,17 +413,17 @@ async function handleSubmit() {
             <div class="flex items-center justify-between">
               <label class="settings-label">{{ t('adminFeature.userForm.permissions') }}</label>
               <div class="flex items-center gap-2">
-                <button type="button" @click="applyPreset('standard')" class="text-xs text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" type="button" @click="applyStandardPermissions">
                   {{ t('adminFeature.userForm.presetStandard') }}
-                </button>
+                </Button>
                 <span class="text-border">•</span>
-                <button type="button" @click="applyPreset('admin')" class="text-xs text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" type="button" @click="applyAdminPermissions">
                   {{ t('adminFeature.userForm.presetAdmin') }}
-                </button>
+                </Button>
                 <span class="text-border">•</span>
-                <button type="button" @click="applyPreset('clear')" class="text-xs text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" type="button" @click="clearPermissions">
                   {{ t('adminFeature.userForm.presetClearAll') }}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -432,25 +460,16 @@ async function handleSubmit() {
                 <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.noRestrictions') }}</p>
                 <p class="text-xs text-muted-foreground">{{ t('adminFeature.userForm.noRestrictionsHint') }}</p>
               </div>
-              <button
-                type="button"
-                @click="restrictionsEnabled = true"
-                class="text-xs font-medium text-primary hover:text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-md transition-colors"
-              >
+              <Button variant="secondary" size="sm" type="button" @click="enableRestrictions">
                 {{ t('adminFeature.userForm.addRestrictions') }}
-              </button>
+              </Button>
             </div>
             <div v-else class="space-y-5">
               <div class="flex items-center justify-between">
                 <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.contentRestrictions') }}</p>
-                <button
-                  type="button"
-                  v-if="!hasRestrictions"
-                  @click="restrictionsEnabled = false"
-                  class="text-xs text-muted-foreground hover:text-foreground"
-                >
+                <Button variant="destructive-ghost" size="sm" type="button" v-if="!hasRestrictions" @click="disableRestrictions">
                   {{ t('adminFeature.userForm.remove') }}
-                </button>
+                </Button>
               </div>
 
               <div class="space-y-1.5">
@@ -505,21 +524,12 @@ async function handleSubmit() {
       </form>
 
       <div class="border-t border-border px-6 py-4 flex gap-3 justify-end mt-auto bg-card">
-        <button
-          @click="emit('close')"
-          type="button"
-          class="rounded-md border border-border px-4 py-2 settings-label hover:bg-muted transition-colors"
-        >
+        <Button variant="outline" size="sm" @click="handleClose" type="button">
           {{ t('common.cancel') }}
-        </button>
-        <button
-          @click="handleSubmit"
-          type="button"
-          :disabled="loading"
-          class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
+        </Button>
+        <Button size="sm" @click="handleSubmit" type="button" :disabled="loading">
           {{ loading ? t('adminFeature.userForm.saving') : t('common.save') }}
-        </button>
+        </Button>
       </div>
     </div>
   </div>

@@ -237,7 +237,7 @@ describe('SendBookDialog', () => {
 
   it('emits close when the header close button is clicked', async () => {
     const wrapper = mountDialog()
-    await wrapper.find('button.text-muted-foreground').trigger('click')
+    await wrapper.find('button[aria-label="Close"]').trigger('click')
     expect(wrapper.emitted('update:open')).toEqual([[false]])
   })
 })

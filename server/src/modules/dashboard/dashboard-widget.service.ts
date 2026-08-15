@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import type {
   CurrentlyReadingWidgetData,
+  DashboardWidgetBatchResponse,
+  DashboardWidgetBatchResult,
   DiversityScoreWidgetData,
   HighlightOfTheDayWidgetData,
   LibraryOverviewWidgetData,
@@ -13,11 +15,14 @@ import type {
   ReadingRhythmWidgetData,
   ReadingStreakWidgetData,
   UserSettings,
+  WidgetType,
   YearProjectionWidgetData,
 } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { StatsCache } from '../../common/cache/stats-cache';
+import { mapWithConcurrency } from '../../common/utils/batch.utils';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { LibraryService } from '../library/library.service';
 import {
   buildDaysSeries,
@@ -36,9 +41,12 @@ import { DashboardWidgetRepository } from './dashboard-widget.repository';
 const DASHBOARD_LIVE_TTL_MS = 120_000;
 const DASHBOARD_STALE_TTL_MS = 300_000;
 const DASHBOARD_CACHE_MAX_ENTRIES = 200;
+// Matches the scroller batch: enough to overlap query latency without flooding the connection pool.
+const WIDGET_QUERY_CONCURRENCY = 3;
 
 @Injectable()
 export class DashboardWidgetService {
+  private readonly logger = new Logger(DashboardWidgetService.name);
   private readonly liveCache = new StatsCache({ ttlMs: DASHBOARD_LIVE_TTL_MS, maxEntries: DASHBOARD_CACHE_MAX_ENTRIES });
   private readonly staleCache = new StatsCache({ ttlMs: DASHBOARD_STALE_TTL_MS, maxEntries: DASHBOARD_CACHE_MAX_ENTRIES });
 
@@ -215,5 +223,54 @@ export class DashboardWidgetService {
       const rhythm = computeRhythm(days);
       return { days, ...rhythm };
     });
+  }
+
+  private readonly widgetLoaders: Record<WidgetType, (user: RequestUser) => Promise<DashboardWidgetBatchResult['data']>> = {
+    'reading-goal': (user) => this.getReadingGoal(user),
+    'currently-reading': (user) => this.getCurrentlyReading(user),
+    'reading-streak': (user) => this.getReadingStreak(user),
+    'library-overview': (user) => this.getLibraryOverview(user),
+    'highlight-of-the-day': (user) => this.getHighlightOfTheDay(user),
+    'monthly-challenge': (user) => this.getMonthlyChallenge(user),
+    'year-projection': (user) => this.getYearProjection(user),
+    'neglected-gems': (user) => this.getNeglectedGems(user),
+    'reading-dna': (user) => this.getReadingDna(user),
+    'long-wait': (user) => this.getLongWait(user),
+    'diversity-score': (user) => this.getDiversityScore(user),
+    'reading-rhythm': (user) => this.getReadingRhythm(user),
+  };
+
+  /**
+   * Resolves a whole dashboard's widgets over one request.
+   *
+   * Twelve separate widget calls plus the shelves and the sidebar put a page load well past the six
+   * connections a browser will open to one origin, and every widget fetches once on mount with no
+   * retry, so a request lost in that crowd leaves a tile stuck on "Failed to load" for the life of
+   * the page. Failures are reported per widget rather than failing the batch.
+   */
+  async getWidgets(types: readonly WidgetType[], user: RequestUser): Promise<DashboardWidgetBatchResponse> {
+    const startedAt = Date.now();
+    this.logger.debug(`[dashboard.widget_batch] [start] userId=${user.id} widgetCount=${types.length} - widget batch started`);
+
+    const items = await mapWithConcurrency(types, WIDGET_QUERY_CONCURRENCY, async (type): Promise<DashboardWidgetBatchResult> => {
+      const widgetStartedAt = Date.now();
+      try {
+        return { type, data: await this.widgetLoaders[type](user), failed: false };
+      } catch (error) {
+        const errorClass = error instanceof Error ? error.constructor.name : typeof error;
+        const message = sanitizeLogValue(error instanceof Error ? error.message : error);
+        this.logger.warn(
+          `[dashboard.widget_query] [fail] userId=${user.id} type=${type} durationMs=${Date.now() - widgetStartedAt} errorClass=${errorClass} error="${message}" - widget query failed`,
+        );
+        return { type, data: null, failed: true };
+      }
+    });
+
+    const failedCount = items.filter((item) => item.failed).length;
+    this.logger.debug(
+      `[dashboard.widget_batch] [end] userId=${user.id} durationMs=${Date.now() - startedAt} widgetCount=${items.length} failedCount=${failedCount} - widget batch completed`,
+    );
+
+    return { items };
   }
 }

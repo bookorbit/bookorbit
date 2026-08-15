@@ -16,8 +16,6 @@ const { isDemoRestrictedAccount } = usePermissions()
 <template>
   <div>
     <SettingsPageHeader v-if="!embedded" :title="t('settings.admin.serverFonts.title')" :subtitle="t('settings.admin.serverFonts.subtitle')" />
-    <p v-else class="mb-5 text-sm text-muted-foreground">{{ t('settings.admin.serverFonts.subtitle') }}</p>
-
     <FontLibraryPanel :store="store" :readonly="isDemoRestrictedAccount" />
   </div>
 </template>

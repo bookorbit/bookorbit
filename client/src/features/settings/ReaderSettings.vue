@@ -54,66 +54,64 @@ async function setStorageMode(sync: boolean) {
     <SettingsPageHeader v-if="!props.embedded" :title="t('settings.reader.general.title')" :subtitle="t('settings.reader.general.subtitle')" />
 
     <!-- Preference storage -->
-    <div class="mt-5 mb-2">
-      <p class="settings-group-label">{{ t('settings.reader.general.storageLabel') }}</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <!-- This device only -->
+    <p class="settings-group-label">{{ t('settings.reader.general.storageLabel') }}</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- This device only -->
+      <div
+        class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-lg border-2 cursor-pointer transition-colors"
+        :class="!syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'"
+        @click="setStorageMode(false)"
+      >
         <div
-          class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-lg border-2 cursor-pointer transition-colors"
-          :class="!syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'"
-          @click="setStorageMode(false)"
+          class="mt-0.5 flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors"
+          :class="!syncEnabled ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'"
         >
-          <div
-            class="mt-0.5 flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors"
-            :class="!syncEnabled ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'"
-          >
-            <Monitor :size="16" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="settings-label">{{ t('settings.reader.general.deviceOnly') }}</span>
-              <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
-                {{ t('settings.reader.general.active') }}
-              </span>
-            </div>
-            <span class="block text-xs text-muted-foreground leading-relaxed">
-              {{ t('settings.reader.general.deviceOnlyHint') }}
-            </span>
-          </div>
+          <Monitor :size="16" />
         </div>
-
-        <!-- My account -->
-        <div
-          class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-lg border-2 transition-colors"
-          :class="[
-            isDemoRestrictedAccount ? 'border-border bg-card opacity-50 cursor-not-allowed' : 'cursor-pointer',
-            !isDemoRestrictedAccount && (syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'),
-          ]"
-          @click="setStorageMode(true)"
-        >
-          <div
-            class="mt-0.5 flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors"
-            :class="syncEnabled ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'"
-          >
-            <Cloud :size="16" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="settings-label">{{ t('settings.reader.general.myAccount') }}</span>
-              <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
-                {{ t('settings.reader.general.active') }}
-              </span>
-              <span
-                v-if="isDemoRestrictedAccount"
-                class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-              >
-                {{ t('settings.reader.general.notAvailable') }}
-              </span>
-            </div>
-            <span class="block text-xs text-muted-foreground leading-relaxed">
-              {{ t('settings.reader.general.myAccountHint') }}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="settings-label">{{ t('settings.reader.general.deviceOnly') }}</span>
+            <span v-if="!syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+              {{ t('settings.reader.general.active') }}
             </span>
           </div>
+          <span class="block text-xs text-muted-foreground leading-relaxed">
+            {{ t('settings.reader.general.deviceOnlyHint') }}
+          </span>
+        </div>
+      </div>
+
+      <!-- My account -->
+      <div
+        class="flex items-start gap-4 px-4 py-3.5 md:px-5 md:py-4 rounded-lg border-2 transition-colors"
+        :class="[
+          isDemoRestrictedAccount ? 'border-border bg-card opacity-50 cursor-not-allowed' : 'cursor-pointer',
+          !isDemoRestrictedAccount && (syncEnabled ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-muted-foreground/30'),
+        ]"
+        @click="setStorageMode(true)"
+      >
+        <div
+          class="mt-0.5 flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors"
+          :class="syncEnabled ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'"
+        >
+          <Cloud :size="16" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="settings-label">{{ t('settings.reader.general.myAccount') }}</span>
+            <span v-if="syncEnabled" class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+              {{ t('settings.reader.general.active') }}
+            </span>
+            <span
+              v-if="isDemoRestrictedAccount"
+              class="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+            >
+              {{ t('settings.reader.general.notAvailable') }}
+            </span>
+          </div>
+          <span class="block text-xs text-muted-foreground leading-relaxed">
+            {{ t('settings.reader.general.myAccountHint') }}
+          </span>
         </div>
       </div>
     </div>

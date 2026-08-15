@@ -53,6 +53,7 @@ describe('ServerFontVisibility', () => {
       const { wrapper } = mountSection()
       await flushPromises()
 
+      expect(wrapper.classes()).toContain('mt-8')
       expect(wrapper.text()).toContain('Server fonts (shared by admin)')
       expect(wrapper.text()).toContain('come from your server administrator')
     })
