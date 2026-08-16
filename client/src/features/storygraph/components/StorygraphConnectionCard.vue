@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -159,27 +160,24 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
             class="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             :class="{ 'input-secret': !cookiesVisible }"
           />
-          <button
-            type="button"
-            class="px-3 py-2 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
-            @click="toggleCookiesVisible"
-          >
+          <Button variant="outline" size="sm" type="button" @click="toggleCookiesVisible">
             {{ cookiesVisible ? 'Hide' : 'Show' }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
 
     <div class="flex items-center gap-2">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
         :disabled="validating || !sessionCookieInput.trim() || !rememberTokenInput.trim()"
-        class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         @click="handleValidateCookies"
       >
         <Loader2 v-if="validating" class="size-3 animate-spin" />
         Validate cookies
-      </button>
+      </Button>
       <span
         v-if="validationResult !== null"
         class="flex items-center gap-1 text-xs"
@@ -251,27 +249,16 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
     </div>
 
     <div class="flex items-center justify-between pt-2 border-t border-border gap-2">
-      <button
-        v-if="settings?.cookiesConfigured"
-        type="button"
-        :disabled="saving"
-        class="flex items-center gap-1.5 text-xs text-destructive hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
-        @click="handleDisconnect"
-      >
+      <Button variant="destructive-ghost" size="sm" v-if="settings?.cookiesConfigured" type="button" :disabled="saving" @click="handleDisconnect">
         <Unlink class="size-3.5" />
         Disconnect
-      </button>
+      </Button>
       <div class="flex-1" />
-      <button
-        type="button"
-        :disabled="saving"
-        class="flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        @click="handleSave"
-      >
+      <Button size="sm" type="button" :disabled="saving" @click="handleSave">
         <Loader2 v-if="saving" class="size-3.5 animate-spin" />
         <Save v-else class="size-3.5" />
         Save
-      </button>
+      </Button>
     </div>
   </div>
 </template>

@@ -26,7 +26,7 @@ function handleGlobalUpdated(updated: BookMetadataFetchConfig) {
 </script>
 
 <template>
-  <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
+  <div v-if="loading" class="settings-loading-state">{{ t('common.loading') }}</div>
 
   <template v-else>
     <p class="settings-group-label">{{ t('settings.metadata.autoFetch.globalSettings') }}</p>

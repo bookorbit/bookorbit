@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Monitor, Moon, Sun } from '@lucide/vue'
@@ -162,13 +163,9 @@ function handleBrightnessInput(event: Event) {
               </p>
               <div class="flex items-center gap-2">
                 <span class="settings-value md:hidden">{{ themeStore.brightness }}%</span>
-                <button
-                  v-if="themeStore.brightness > 0"
-                  class="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  @click="resetBrightness"
-                >
+                <Button v-if="themeStore.brightness > 0" variant="ghost" size="sm" @click="resetBrightness">
                   {{ t('settings.appearance.theme.surfaceBrightness.reset') }}
-                </button>
+                </Button>
               </div>
             </div>
             <p class="settings-hint">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { ChevronDown, ChevronUp, CheckCircle2, AlertCircle, ExternalLink, HelpCircle, Loader2, RefreshCw, Link2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -172,7 +173,7 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
     <div v-else-if="loadError" class="flex items-center gap-2 text-xs text-destructive py-2">
       <AlertCircle class="size-3.5 shrink-0" />
       Failed to load books.
-      <button type="button" class="underline underline-offset-2" @click="handleRetryLoadBooks">Retry</button>
+      <Button variant="link" size="sm" type="button" class="h-auto p-0" @click="handleRetryLoadBooks">Retry</Button>
     </div>
 
     <div v-else-if="books.length === 0" class="text-xs text-muted-foreground py-2">No books currently being read.</div>
@@ -213,40 +214,31 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
               placeholder="Paste a StoryGraph URL or book ID"
               class="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
-            <button
-              type="button"
-              :disabled="linking[book.bookId]"
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              @click="handleLink(book)"
-            >
+            <Button size="sm" type="button" :disabled="linking[book.bookId]" @click="handleLink(book)">
               <Loader2 v-if="linking[book.bookId]" class="size-3 animate-spin" />
               <Link2 v-else class="size-3" />
               Link
-            </button>
+            </Button>
           </div>
 
-          <button
-            type="button"
-            :disabled="rematching[book.bookId]"
-            class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            @click="handleRematch(book)"
-          >
+          <Button variant="outline" size="sm" type="button" :disabled="rematching[book.bookId]" @click="handleRematch(book)">
             <Loader2 v-if="rematching[book.bookId]" class="size-3 animate-spin" />
             <RefreshCw v-else class="size-3" />
             Try auto-match
-          </button>
+          </Button>
 
           <div v-if="book.storygraphBookId">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               v-if="!editionsByBookId[book.bookId]"
               type="button"
               :disabled="loadingEditions[book.bookId]"
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               @click="loadEditions(book)"
             >
               <Loader2 v-if="loadingEditions[book.bookId]" class="size-3 animate-spin" />
               View editions
-            </button>
+            </Button>
 
             <div v-else class="space-y-1.5">
               <p v-if="editionsByBookId[book.bookId]!.length === 0" class="text-xs text-muted-foreground">No editions found.</p>
@@ -290,14 +282,15 @@ async function handleSetEdition(book: StorygraphLinkedBook, edition: StorygraphE
                   >
                     <ExternalLink class="size-3.5" />
                   </a>
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     :disabled="settingEdition[book.bookId] || edition.id === book.storygraphBookId"
-                    class="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     @click="handleSetEdition(book, edition)"
                   >
                     {{ edition.id === book.storygraphBookId ? 'Current' : 'Use this' }}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

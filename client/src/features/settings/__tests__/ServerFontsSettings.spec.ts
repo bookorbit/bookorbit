@@ -34,8 +34,8 @@ function makeComposable(initialFonts = [] as Parameters<typeof makeFontStore>[1]
   return store
 }
 
-function mountPage() {
-  return mount(ServerFontsSettings, { attachTo: document.body })
+function mountPage(props: { embedded?: boolean } = {}) {
+  return mount(ServerFontsSettings, { props, attachTo: document.body })
 }
 
 describe('ServerFontsSettings', () => {
@@ -86,6 +86,16 @@ describe('ServerFontsSettings', () => {
 
       expect(wrapper.text()).toContain('No server fonts yet')
       expect(wrapper.text()).toContain("Fonts you add here appear in every user's reader.")
+      expect(wrapper.get('[data-testid="font-upload-surface"]').classes()).toContain('bg-card')
+      expect(wrapper.get('[data-testid="font-empty-surface"]').classes()).toContain('bg-card')
+    })
+
+    it('does not repeat the page subtitle when embedded in the settings shell', async () => {
+      makeComposable()
+      const wrapper = mountPage({ embedded: true })
+      await flushPromises()
+
+      expect(wrapper.text()).not.toContain('Upload fonts that every user can pick in the eBook reader')
     })
   })
 
@@ -99,6 +109,7 @@ describe('ServerFontsSettings', () => {
       expect(wrapper.text()).toContain('Atkinson Hyperlegible')
       expect(wrapper.text()).toContain('2 files')
       expect(wrapper.text()).toContain('1 file')
+      expect(wrapper.get('[data-testid="font-list-surface"]').classes()).toContain('settings-card')
     })
 
     it('previews each family under a server-scoped CSS family name', async () => {

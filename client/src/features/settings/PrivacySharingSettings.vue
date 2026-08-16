@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Eye, EyeOff, ListChecks, ShieldCheck } from '@lucide/vue'
@@ -85,16 +86,16 @@ function durationLabel(seconds: number): string {
       <p class="text-sm text-destructive">
         {{ t(`settings.privacySharing.errors.${sharing.error.value}`) }}
       </p>
-      <button type="button" class="settings-btn-outline" @click="handleRetry">{{ t('common.retry') }}</button>
+      <Button variant="outline" size="sm" type="button" @click="handleRetry">{{ t('common.retry') }}</Button>
     </div>
-    <p v-else-if="sharing.loading.value" role="status" class="text-sm text-muted-foreground">{{ t('common.loading') }}</p>
+    <p v-else-if="sharing.loading.value" role="status" class="settings-loading-state">{{ t('common.loading') }}</p>
 
     <template v-else-if="sharing.loaded.value">
-      <p v-if="sharing.error.value" role="alert" class="text-sm text-destructive">
+      <p v-if="sharing.error.value" role="alert" class="settings-error-state">
         {{ t(`settings.privacySharing.errors.${sharing.error.value}`) }}
       </p>
 
-      <div class="space-y-3">
+      <div class="space-y-2">
         <div>
           <h2 id="privacy-sharing-heading" class="settings-group-label mb-0">{{ t('settings.privacySharing.title') }}</h2>
           <p class="settings-hint">{{ t('settings.privacySharing.subtitle') }}</p>
@@ -141,9 +142,9 @@ function durationLabel(seconds: number): string {
             <h3 id="privacy-preview-heading" class="text-sm font-semibold text-foreground">{{ t('settings.privacySharing.preview.title') }}</h3>
             <p class="settings-hint">{{ t('settings.privacySharing.preview.description') }}</p>
           </div>
-          <button type="button" class="settings-btn-outline shrink-0 justify-center" :disabled="sharing.previewLoading.value" @click="handlePreview">
+          <Button variant="outline" size="sm" type="button" :disabled="sharing.previewLoading.value" @click="handlePreview">
             {{ sharing.previewLoading.value ? t('common.loading') : t('settings.privacySharing.preview.action') }}
-          </button>
+          </Button>
         </div>
         <dl v-if="sharing.previewSummary.value" class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div class="rounded-md border border-border/60 bg-muted/40 p-3">
@@ -193,22 +194,24 @@ function durationLabel(seconds: number): string {
           :aria-label="t('settings.privacySharing.history.paginationLabel')"
           class="mt-4 flex items-center justify-end gap-2 border-t border-border pt-4"
         >
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            class="settings-btn-outline"
             :disabled="sharing.historyLoading.value || sharing.history.value.page <= 1"
             @click="handlePreviousHistoryPage"
           >
             {{ t('common.previous') }}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            class="settings-btn-outline"
             :disabled="sharing.historyLoading.value || sharing.history.value.page >= historyPages"
             @click="handleNextHistoryPage"
           >
             {{ t('common.next') }}
-          </button>
+          </Button>
         </nav>
       </section>
     </template>
@@ -243,10 +246,10 @@ function durationLabel(seconds: number): string {
         </div>
 
         <SheetFooter class="flex-row justify-end border-t border-border">
-          <button type="button" class="settings-btn-outline justify-center" @click="cancelChange">{{ t('common.cancel') }}</button>
-          <button type="button" class="settings-btn-primary justify-center" :disabled="sharing.saving.value" @click="confirmChange">
+          <Button variant="outline" size="sm" type="button" @click="cancelChange">{{ t('common.cancel') }}</Button>
+          <Button size="sm" type="button" :disabled="sharing.saving.value" @click="confirmChange">
             {{ sharing.saving.value ? t('common.loading') : t('common.confirm') }}
-          </button>
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

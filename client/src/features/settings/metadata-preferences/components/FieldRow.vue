@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, RotateCcw, Settings2 } from '@lucide/vue'
@@ -34,6 +35,14 @@ function update(patch: Partial<FieldPreference>) {
 
 function onSheetChange(pref: FieldPreference) {
   emit('change', props.field, pref)
+}
+
+function openSheet() {
+  sheetOpen.value = true
+}
+
+function revertPreference() {
+  emit('revert', props.field)
 }
 </script>
 
@@ -86,14 +95,10 @@ function onSheetChange(pref: FieldPreference) {
           {{ t('settings.metadata.fieldRules.field.empty') }}
         </span>
       </div>
-      <button
-        :disabled="saving"
-        class="shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-background text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-40"
-        @click="sheetOpen = true"
-      >
+      <Button variant="outline" size="sm" :disabled="saving" class="shrink-0" @click="openSheet">
         <Settings2 :size="13" />
         {{ t('settings.metadata.fieldRules.field.config') }}
-      </button>
+      </Button>
     </div>
 
     <!-- Merge strategy + badges + revert (desktop) -->
@@ -113,13 +118,9 @@ function onSheetChange(pref: FieldPreference) {
               <Badge variant="secondary" class="h-4.5 px-1.5 text-[9px] font-bold uppercase tracking-tight">
                 {{ t('settings.metadata.fieldRules.field.custom') }}
               </Badge>
-              <button
-                :disabled="saving"
-                class="flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors disabled:opacity-40"
-                @click="$emit('revert', field)"
-              >
+              <Button variant="destructive-ghost" size="icon-sm" :disabled="saving" @click="revertPreference">
                 <RotateCcw :size="11" />
-              </button>
+              </Button>
             </div>
           </TooltipTrigger>
           <TooltipContent>{{ t('settings.metadata.fieldRules.field.resetToDefault') }}</TooltipContent>

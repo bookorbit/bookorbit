@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { useI18n } from 'vue-i18n'
 import { ClipboardCopy } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -27,14 +28,9 @@ async function handleCopy() {
     <span class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-foreground">{{ value }}</span>
     <Tooltip>
       <TooltipTrigger as-child>
-        <button
-          type="button"
-          class="shrink-0 rounded-sm text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :aria-label="t('settings.reader.fileNaming.copyPreview', { label })"
-          @click="handleCopy"
-        >
+        <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.fileNaming.copyPreview', { label })" @click="handleCopy">
           <ClipboardCopy :size="14" aria-hidden="true" />
-        </button>
+        </Button>
       </TooltipTrigger>
       <TooltipContent>{{ t('settings.reader.fileNaming.copyPreview', { label }) }}</TooltipContent>
     </Tooltip>

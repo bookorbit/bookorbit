@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ClipboardCopy } from '@lucide/vue'
@@ -263,15 +264,16 @@ async function copyPattern(pattern: string) {
                   <code class="whitespace-nowrap font-mono text-xs text-muted-foreground">{{ ex.pattern }}</code>
                 </div>
               </div>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
-                class="settings-btn-outline"
                 :aria-label="t('settings.reader.fileNaming.copyExample', { label: ex.label })"
                 @click="copyPattern(ex.pattern)"
               >
                 <ClipboardCopy :size="12" aria-hidden="true" />
                 {{ t('settings.reader.fileNaming.copy') }}
-              </button>
+              </Button>
             </div>
             <dl class="space-y-1">
               <div v-for="c in ex.cases" :key="c.label" class="flex items-baseline gap-2">

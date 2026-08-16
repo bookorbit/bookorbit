@@ -14,7 +14,6 @@ import {
   Trophy,
   MoreVertical,
   BadgeQuestionMark,
-  Star,
   ExternalLink,
   Sparkles,
   Languages,
@@ -74,8 +73,6 @@ const themeStore = useThemeStore()
 const localeStore = useLocaleStore()
 const currentLanguageLabel = computed(() => LOCALE_LABELS[localeStore.locale])
 const documentationUrl = 'https://bookorbit.app/what-is-bookorbit'
-const githubRepositoryUrl = 'https://github.com/bookorbit/bookorbit'
-const githubStarPopoverOpen = ref(false)
 
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
 
@@ -248,14 +245,6 @@ function clearSearch() {
 function closeMobileSearch() {
   mobileSearchOpen.value = false
   clearSearch()
-}
-
-function handleGithubStarPopoverOpenChange(open: boolean) {
-  githubStarPopoverOpen.value = open
-}
-
-function closeGithubStarPopover() {
-  githubStarPopoverOpen.value = false
 }
 
 function navigateToResult(result: GlobalSearchResult) {
@@ -608,7 +597,7 @@ function formatBadgeStyle(fmt: string) {
       </div>
 
       <!-- Right -->
-      <div class="ml-auto flex items-center gap-3">
+      <div class="ml-auto flex items-center gap-2">
         <!-- Mobile: search icon -->
         <Tooltip>
           <TooltipTrigger as-child>
@@ -706,8 +695,10 @@ function formatBadgeStyle(fmt: string) {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <Separator orientation="vertical" class="hidden h-4 md:block" />
+
         <!-- Group 1: Content (Notifications, Statistics, Achievements, Upload) -->
-        <div class="hidden md:flex items-center gap-2.5">
+        <div class="hidden md:flex items-center gap-1.5">
           <NotificationSheet v-if="canAccessNotifications" :icon-radius-class="iconRadiusClass" />
 
           <Tooltip>
@@ -744,9 +735,9 @@ function formatBadgeStyle(fmt: string) {
           </Tooltip>
         </div>
 
-        <!-- Group 2: Preferences (Help, GitHub, Appearance, Language, Settings) -->
-        <Separator orientation="vertical" class="mx-1 hidden h-4 md:block" />
-        <div class="hidden md:flex items-center gap-2.5">
+        <!-- Group 2: Preferences (Help, Appearance, Language, Settings) -->
+        <Separator orientation="vertical" class="hidden h-4 md:block" />
+        <div class="hidden md:flex items-center gap-1.5">
           <Tooltip>
             <DropdownMenu>
               <TooltipTrigger as-child>
@@ -777,42 +768,6 @@ function formatBadgeStyle(fmt: string) {
               </DropdownMenuContent>
             </DropdownMenu>
             <TooltipContent>{{ t('components.appHeader.help') }}</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <Popover :open="githubStarPopoverOpen" @update:open="handleGithubStarPopoverOpenChange">
-              <TooltipTrigger as-child>
-                <PopoverTrigger as-child>
-                  <Button data-tour="github-star-cta" variant="ghost" size="icon" :class="controlClass">
-                    <Star :size="15" />
-                  </Button>
-                </PopoverTrigger>
-              </TooltipTrigger>
-              <PopoverContent side="bottom" align="end" class="relative w-80 p-4">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="absolute right-2 top-2 h-6 w-6 text-muted-foreground hover:text-foreground"
-                  :aria-label="t('common.close')"
-                  @click="closeGithubStarPopover"
-                >
-                  <X :size="13" />
-                </Button>
-                <div class="space-y-3 pr-5">
-                  <p class="text-[14px] font-medium text-foreground">{{ t('components.appHeader.githubStar.title') }}</p>
-                  <p class="text-[13px] leading-relaxed text-muted-foreground">
-                    {{ t('components.appHeader.githubStar.body') }}
-                  </p>
-                  <Button as-child class="w-full">
-                    <a :href="githubRepositoryUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5">
-                      <span>{{ t('components.appHeader.githubStar.cta') }}</span>
-                      <ExternalLink :size="14" />
-                    </a>
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-            <TooltipContent>{{ t('components.appHeader.starOnGithub') }}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -886,7 +841,7 @@ function formatBadgeStyle(fmt: string) {
         </div>
 
         <!-- Group 3: Identity (Avatar) -->
-        <Separator orientation="vertical" class="mx-1 hidden h-4 md:block" />
+        <Separator orientation="vertical" class="hidden h-4 md:block" />
         <DropdownMenu v-if="user">
           <DropdownMenuTrigger as-child>
             <button

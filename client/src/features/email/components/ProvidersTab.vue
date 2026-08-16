@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -184,20 +185,23 @@ watch(
   },
   { immediate: true },
 )
+function toggleHelp() {
+  helpOpen.value = !helpOpen.value
+}
+
+function cancelDelete() {
+  deleteConfirm.value = null
+}
 </script>
 
 <template>
   <div class="space-y-4">
     <div class="hidden md:flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.providers.heading') }}</p>
-      <button
-        v-if="canManageEmail && !showForm"
-        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        @click="openCreate()"
-      >
+      <Button size="sm" v-if="canManageEmail && !showForm" @click="openCreate">
         <Plus :size="12" />
         {{ t('email.providers.add') }}
-      </button>
+      </Button>
     </div>
     <div class="md:hidden flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.providers.heading') }}</p>
@@ -206,13 +210,10 @@ watch(
       v-if="canManageEmail && !showForm"
       class="md:hidden sticky top-11 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2"
     >
-      <button
-        class="w-full min-h-10 flex items-center justify-center gap-1.5 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        @click="openCreate()"
-      >
+      <Button size="sm" class="w-full min-h-10" @click="openCreate">
         <Plus :size="13" />
         {{ t('email.providers.add') }}
-      </button>
+      </Button>
     </div>
 
     <!-- Add/Edit form -->
@@ -314,44 +315,34 @@ watch(
       <div v-if="formError" class="text-xs text-destructive">{{ formError }}</div>
 
       <div class="hidden md:flex items-center gap-2">
-        <button
-          class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-          :disabled="saving"
-          @click="submitForm()"
-        >
+        <Button size="sm" :disabled="saving" @click="submitForm">
           {{ saving ? t('email.saving') : editingId ? t('email.update') : t('email.create') }}
-        </button>
-        <button
-          class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-          @click="cancelForm()"
-        >
+        </Button>
+        <Button variant="outline" size="sm" @click="cancelForm">
           {{ t('common.cancel') }}
-        </button>
+        </Button>
       </div>
       <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
         <div class="flex items-center gap-2">
-          <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="saving" @click="submitForm()">
+          <Button size="sm" class="flex-1 min-h-10" :disabled="saving" @click="submitForm" type="button">
             {{ saving ? t('email.saving') : editingId ? t('email.update') : t('email.create') }}
-          </button>
-          <button
-            class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="cancelForm()"
-          >
+          </Button>
+          <Button variant="outline" size="sm" class="min-h-10" @click="cancelForm">
             {{ t('common.cancel') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
 
     <!-- Empty state -->
-    <div v-if="providers.length === 0 && !showForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
+    <div v-if="providers.length === 0 && !showForm" class="settings-empty-state">
       <p class="text-sm text-muted-foreground">
         {{ canManageEmail ? t('email.providers.emptyManage') : t('email.providers.emptyReadonly') }}
       </p>
     </div>
 
     <!-- List -->
-    <div v-else-if="providers.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div v-else-if="providers.length > 0" class="settings-card">
       <div v-for="p in providers" :key="p.id" class="px-4 py-3 bg-card flex flex-col md:flex-row md:items-center gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -376,13 +367,14 @@ watch(
         <div class="flex items-center gap-1 shrink-0 self-end md:self-auto">
           <Tooltip v-if="isSuperuser">
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 :class="p.isSystemProvider ? 'text-amber-500' : 'text-muted-foreground hover:text-amber-500 hover:bg-muted'"
                 @click="setSystem(p)"
               >
                 <Server :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{
               p.isSystemProvider ? t('email.providers.removeSystemTooltip') : t('email.providers.setSystemTooltip')
@@ -390,65 +382,51 @@ watch(
           </Tooltip>
           <Tooltip v-if="canManageEmail">
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                :disabled="testing === p.id"
-                @click="test(p)"
-              >
+              <Button variant="ghost" size="icon-sm" :disabled="testing === p.id" @click="test(p)">
                 <Wifi :size="13" :class="testing === p.id ? 'animate-pulse' : ''" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('email.providers.testTooltip') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="p.userId === user?.id">
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 :class="p.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
                 @click="setDefault(p)"
               >
                 <Star :size="13" :class="p.isDefault ? 'fill-primary' : ''" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('email.setAsDefault') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="canManageEmail && (!p.isShared || p.userId !== null)">
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 :class="p.isShared ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'"
                 @click="toggleShare(p)"
               >
                 <Share2 :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('email.providers.toggleSharing') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="canManageEmail">
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                @click="openEdit(p)"
-              >
+              <Button variant="ghost" size="icon-sm" @click="openEdit(p)">
                 <Pencil :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('common.edit') }}</TooltipContent>
           </Tooltip>
           <Tooltip v-if="canManageEmail && p.userId !== null">
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
-                :class="
-                  p.isSystemProvider
-                    ? 'cursor-not-allowed text-muted-foreground opacity-50'
-                    : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
-                "
-                :disabled="p.isSystemProvider"
-                @click="requestRemove(p)"
-              >
+              <Button variant="destructive-ghost" size="icon-sm" :disabled="p.isSystemProvider" @click="requestRemove(p)">
                 <Trash2 :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>
               {{ p.isSystemProvider ? t('email.providers.removeSystemBeforeDelete') : t('common.delete') }}
@@ -459,7 +437,7 @@ watch(
     </div>
 
     <div class="border border-border rounded-lg bg-card/50">
-      <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="helpOpen = !helpOpen">
+      <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="toggleHelp">
         <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.providers.notesHeading') }}</p>
         <ChevronUp v-if="helpOpen" :size="14" class="text-muted-foreground" />
         <ChevronDown v-else :size="14" class="text-muted-foreground" />
@@ -478,23 +456,17 @@ watch(
     </div>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
-      <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
+      <button class="absolute inset-0 bg-black/45" @click="cancelDelete" />
       <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">{{ t('email.providers.deleteTitle') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('email.deleteConfirm', { name: deleteConfirm.name }) }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="deleteConfirm = null"
-          >
+          <Button variant="outline" size="sm" @click="cancelDelete">
             {{ t('common.cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-            @click="confirmRemove"
-          >
+          </Button>
+          <Button variant="destructive" size="sm" @click="confirmRemove">
             {{ t('common.delete') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RefreshCw } from '@lucide/vue'
@@ -23,16 +24,10 @@ const { visible, syncEnabled, canSyncNow, statusText, statusClass, disabled, syn
         @update:model-value="setSyncEnabled"
       />
       <span class="min-w-0 truncate text-sm" :class="statusClass">{{ statusText }}</span>
-      <button
-        v-if="canSyncNow"
-        type="button"
-        class="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/80 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-        :disabled="disabled"
-        @click="syncNow"
-      >
+      <Button variant="outline" size="sm" v-if="canSyncNow" type="button" :disabled="disabled" @click="syncNow">
         <RefreshCw class="size-3.5" />
         {{ t('hardcover.bookSync.syncNow') }}
-      </button>
+      </Button>
     </dd>
   </div>
 </template>

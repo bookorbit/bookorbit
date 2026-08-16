@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { KoreaderDeviceSweepInfo } from '@bookorbit/types'
@@ -132,13 +133,9 @@ async function resetDevice(deviceId: string) {
             <label for="koreader-account-pattern" class="settings-label">{{ t('settings.reader.koreader.fileNaming.defaultPattern') }}</label>
             <Tooltip>
               <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  class="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  :aria-label="t('settings.reader.koreader.fileNaming.accountHelp')"
-                >
+                <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.koreader.fileNaming.accountHelp')">
                   <CircleHelp :size="14" aria-hidden="true" />
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent class="max-w-72">{{ t('settings.reader.koreader.fileNaming.accountHelp') }}</TooltipContent>
             </Tooltip>
@@ -162,13 +159,14 @@ async function resetDevice(deviceId: string) {
         </div>
       </div>
       <div class="mt-4 flex justify-end">
-        <button
-          class="settings-btn-primary inline-flex items-center gap-2"
+        <Button
+          size="sm"
           :disabled="savingAccountDefault || !accountPatternDraft.trim() || !hasUnsavedAccountDefault"
           @click="saveAccountDefault"
+          type="button"
         >
           <Save :size="15" /> {{ t('common.save') }}
-        </button>
+        </Button>
       </div>
     </section>
 
@@ -206,13 +204,9 @@ async function resetDevice(deviceId: string) {
               }}</label>
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <button
-                    type="button"
-                    class="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    :aria-label="t('settings.reader.koreader.fileNaming.deviceDefaultHelp')"
-                  >
+                  <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.koreader.fileNaming.deviceDefaultHelp')">
                     <CircleHelp :size="14" aria-hidden="true" />
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent class="max-w-72">{{ t('settings.reader.koreader.fileNaming.deviceDefaultHelp') }}</TooltipContent>
               </Tooltip>
@@ -243,13 +237,9 @@ async function resetDevice(deviceId: string) {
               }}</label>
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <button
-                    type="button"
-                    class="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    :aria-label="t('settings.reader.koreader.fileNaming.seriesHelp')"
-                  >
+                  <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.koreader.fileNaming.seriesHelp')">
                     <CircleHelp :size="14" aria-hidden="true" />
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent class="max-w-72">{{ t('settings.reader.koreader.fileNaming.seriesHelp') }}</TooltipContent>
               </Tooltip>
@@ -278,13 +268,9 @@ async function resetDevice(deviceId: string) {
               }}</label>
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <button
-                    type="button"
-                    class="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    :aria-label="t('settings.reader.koreader.fileNaming.standaloneHelp')"
-                  >
+                  <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.koreader.fileNaming.standaloneHelp')">
                     <CircleHelp :size="14" aria-hidden="true" />
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent class="max-w-72">{{ t('settings.reader.koreader.fileNaming.standaloneHelp') }}</TooltipContent>
               </Tooltip>
@@ -309,20 +295,23 @@ async function resetDevice(deviceId: string) {
           </div>
 
           <div class="flex justify-end gap-2">
-            <button
-              class="settings-btn-secondary inline-flex items-center gap-2"
+            <Button
+              variant="outline"
+              size="sm"
               :disabled="saving[device.deviceId] || (!hasSavedOverride(device.deviceId) && !hasUnsavedChanges(device.deviceId))"
               @click="resetDevice(device.deviceId)"
+              type="button"
             >
               <RotateCcw :size="14" /> {{ t('settings.reader.koreader.fileNaming.useAccount') }}
-            </button>
-            <button
-              class="settings-btn-primary inline-flex items-center gap-2"
+            </Button>
+            <Button
+              size="sm"
               :disabled="saving[device.deviceId] || !hasUnsavedChanges(device.deviceId)"
               @click="saveDevice(device.deviceId)"
+              type="button"
             >
               <Save :size="14" /> {{ t('settings.reader.koreader.fileNaming.saveOverride') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

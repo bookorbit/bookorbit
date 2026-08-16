@@ -146,11 +146,39 @@ describe('UsersPage self-registration toggle', () => {
 })
 
 describe('UsersPage', () => {
-  it('opens the create drawer from the primary CTA', async () => {
+  it('visually separates account-level settings from the user list', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    for (const headingId of ['self-registration-heading', 'default-library-access-heading']) {
+      const section = wrapper.find(`section[aria-labelledby="${headingId}"]`)
+      expect(section.classes()).toContain('border-t')
+      expect(section.classes()).toContain('pt-6')
+    }
+  })
+
+  it('does not duplicate the shared settings page header', async () => {
     const wrapper = shallowMount(UsersPage)
     await flushPromises()
 
-    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create user'))
+    expect(wrapper.find('h2').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Manage user accounts and permission assignments.')
+  })
+
+  it('opens the create drawer from the primary CTA', async () => {
+    const wrapper = shallowMount(UsersPage, {
+      global: {
+        stubs: {
+          Button: { template: '<button><slot /></button>' },
+        },
+      },
+    })
+    await flushPromises()
+
+    const createButton = wrapper
+      .find('form')
+      .findAll('button')
+      .find((button) => button.text().includes('Create user'))
     expect(createButton).toBeDefined()
     expect(wrapper.find('user-form-drawer-stub').exists()).toBe(false)
 

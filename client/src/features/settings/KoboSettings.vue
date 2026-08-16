@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate } from '@/i18n/formatters'
@@ -6,7 +7,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { Plus, Trash2, Copy, Check, Pencil, X, Tablet, RefreshCw, History, Download, Upload, Bookmark, Info } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
-import SettingsPageHeader from './SettingsPageHeader.vue'
 import SettingsTabs from './components/SettingsTabs.vue'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useKoboDevices } from '@/features/kobo/composables/useKoboDevices'
@@ -690,15 +690,16 @@ async function saveSettings() {
     savingSettings.value = false
   }
 }
+function beginCreate() {
+  showCreateForm.value = true
+}
 </script>
 
 <template>
-  <SettingsPageHeader v-if="!props.embedded" :title="t('settings.reader.kobo.title')" :subtitle="t('settings.reader.kobo.subtitle')" />
-
-  <div v-if="loading" class="text-sm text-muted-foreground">
+  <div v-if="loading" class="settings-loading-state">
     {{ t('common.loading') }}
   </div>
-  <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
+  <div v-else-if="error" class="settings-error-state">{{ error }}</div>
   <template v-else>
     <SettingsTabs v-if="!props.embedded" :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
 
@@ -719,9 +720,9 @@ async function saveSettings() {
               </p>
             </div>
           </div>
-          <button @click="dismissToken()" class="text-muted-foreground hover:text-foreground transition-colors p-1 shrink-0">
+          <Button variant="ghost" size="icon-sm" @click="dismissToken" class="shrink-0">
             <X :size="18" />
-          </button>
+          </Button>
         </div>
 
         <div class="space-y-4">
@@ -732,13 +733,10 @@ async function saveSettings() {
             <div class="flex items-center gap-2 px-3 py-2.5 rounded-md border border-border bg-muted/30">
               <Tablet :size="14" class="text-muted-foreground shrink-0" />
               <span class="flex-1 text-sm text-foreground font-mono select-all truncate min-w-0">{{ newDeviceSyncUrl }}</span>
-              <button
-                class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors shrink-0"
-                @click="copyToken()"
-              >
+              <Button variant="outline" size="sm" class="shrink-0" @click="copyToken">
                 <Copy :size="12" />
                 {{ t('settings.reader.kobo.copy') }}
-              </button>
+              </Button>
             </div>
           </div>
           <div
@@ -768,14 +766,14 @@ async function saveSettings() {
 
       <!-- Devices -->
       <div class="mb-8">
-        <div class="flex items-center justify-between mb-3">
+        <div class="mb-2 flex items-center justify-between">
           <p class="settings-group-label mb-0">
             {{ t('settings.reader.kobo.registeredDevices') }}
           </p>
-          <button v-if="!showCreateForm" class="settings-btn-primary" @click="showCreateForm = true">
+          <Button size="sm" v-if="!showCreateForm" @click="beginCreate" type="button">
             <Plus :size="12" />
             {{ t('settings.reader.kobo.addDevice') }}
-          </button>
+          </Button>
         </div>
 
         <!-- Create form -->
@@ -794,12 +792,12 @@ async function saveSettings() {
             {{ createError }}
           </div>
           <div class="flex items-center gap-2 pt-1">
-            <button class="settings-btn-primary" :disabled="creating || !newDeviceName.trim()" @click="submitCreate()">
+            <Button size="sm" :disabled="creating || !newDeviceName.trim()" @click="submitCreate" type="button">
               {{ creating ? t('settings.reader.kobo.creating') : t('settings.reader.kobo.createDevice') }}
-            </button>
-            <button class="settings-btn-outline" @click="cancelCreate()">
+            </Button>
+            <Button variant="outline" size="sm" @click="cancelCreate" type="button">
               {{ t('common.cancel') }}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -825,12 +823,12 @@ async function saveSettings() {
                 @keydown.enter="submitRename(device)"
                 @keydown.esc="cancelRename()"
               />
-              <button class="settings-btn-primary" :disabled="renaming || !renameValue.trim()" @click="submitRename(device)">
+              <Button size="sm" :disabled="renaming || !renameValue.trim()" @click="submitRename(device)" type="button">
                 {{ t('common.save') }}
-              </button>
-              <button class="settings-btn-outline h-9 w-9 p-0 flex items-center justify-center" @click="cancelRename()">
+              </Button>
+              <Button variant="outline" size="icon-sm" class="flex" @click="cancelRename" type="button">
                 <X :size="14" />
-              </button>
+              </Button>
             </div>
             <div v-else class="flex items-center gap-3">
               <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
@@ -849,20 +847,12 @@ async function saveSettings() {
                 </p>
               </div>
               <div class="flex items-center gap-1">
-                <button
-                  class="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  @click="startRename(device)"
-                  :title="t('settings.reader.kobo.renameDevice')"
-                >
+                <Button variant="ghost" size="icon-sm" @click="startRename(device)" :title="t('settings.reader.kobo.renameDevice')">
                   <Pencil :size="14" />
-                </button>
-                <button
-                  class="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  @click="revoke(device)"
-                  :title="t('settings.reader.kobo.revokeAccess')"
-                >
+                </Button>
+                <Button variant="destructive-ghost" size="icon-sm" @click="revoke(device)" :title="t('settings.reader.kobo.revokeAccess')">
                   <Trash2 :size="14" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -889,7 +879,7 @@ async function saveSettings() {
 
     <!-- Sync history -->
     <div v-show="activeTab === 'activity' && !props.embedded" class="mb-8">
-      <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div class="mb-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
           <div class="flex min-w-0 items-center gap-2">
             <p class="settings-group-label mb-0">
@@ -928,14 +918,10 @@ async function saveSettings() {
               </span>
             </button>
           </div>
-          <button
-            class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="refreshingHistory || historyLoading"
-            @click="refreshHistory"
-          >
+          <Button variant="outline" size="sm" :disabled="refreshingHistory || historyLoading" @click="refreshHistory">
             <RefreshCw :size="12" :class="{ 'animate-spin': refreshingHistory || historyLoading }" />
             {{ t('settings.reader.kobo.activity.refresh') }}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1041,16 +1027,12 @@ async function saveSettings() {
 
             <!-- Load More -->
             <div v-if="syncHistory.length >= currentLimit && currentLimit < 100" class="mt-6 pl-10">
-              <button
-                class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 shadow-xs"
-                :disabled="loadingMore || historyLoading"
-                @click="loadMoreHistory"
-              >
+              <Button variant="outline" size="sm" :disabled="loadingMore || historyLoading" @click="loadMoreHistory">
                 <RefreshCw v-if="loadingMore || historyLoading" :size="12" class="animate-spin" />
                 <span>{{
                   loadingMore || historyLoading ? t('settings.reader.kobo.activity.loading') : t('settings.reader.kobo.activity.loadMore')
                 }}</span>
-              </button>
+              </Button>
             </div>
           </div>
         </template>
@@ -1178,9 +1160,9 @@ async function saveSettings() {
             {{ t('settings.reader.kobo.changesMustBeSaved') }}
           </div>
 
-          <button class="settings-btn-primary" :disabled="savingSettings" @click="saveSettings()">
+          <Button size="sm" :disabled="savingSettings" @click="saveSettings" type="button">
             {{ savingSettings ? t('settings.reader.kobo.saving') : t('settings.reader.kobo.saveSyncSettings') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

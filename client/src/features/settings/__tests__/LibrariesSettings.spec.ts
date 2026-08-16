@@ -45,10 +45,6 @@ vi.mock('vue-sonner', () => ({
   toast: { success: vi.fn<() => void>(), error: vi.fn<() => void>() },
 }))
 
-vi.mock('./SettingsPageHeader.vue', () => ({
-  default: { template: '<div />' },
-}))
-
 vi.mock('@/features/library/components/LibraryCreatorModal.vue', () => ({
   default: { template: '<div />' },
 }))
@@ -107,7 +103,7 @@ function makeRouter() {
     routes: [
       { path: '/', component: { template: '<div />' } },
       { path: '/library/:id', name: 'library', component: { template: '<div />' } },
-      { path: '/settings/appearance', name: 'settings-appearance', component: { template: '<div />' } },
+      { path: '/settings/appearance/theme', name: 'settings-appearance-theme', component: { template: '<div />' } },
     ],
   })
 }

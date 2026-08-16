@@ -71,6 +71,10 @@ function idleStatus(): BookMetadataFetchStatusEvent {
   return { queued: 0, processing: 0, failed: 0, latestFailureAt: null, paused: false, sessionTotal: 0, sessionDone: 0, currentItemName: null }
 }
 
+function buttonByText(wrapper: ReturnType<typeof mount>, text: string) {
+  return wrapper.findAll('button').find((button) => button.text().trim() === text)!
+}
+
 describe('GlobalAutoFetchConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -155,7 +159,7 @@ describe('GlobalAutoFetchConfig', () => {
     mockTriggerGlobal.mockResolvedValue({ queued: 2048 })
     const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
 
-    await wrapper.find('button.settings-btn-outline').trigger('click')
+    await buttonByText(wrapper, 'Run now').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.hidden.md\\:flex span').text()).toBe('Queued 2,048 books')
@@ -165,7 +169,7 @@ describe('GlobalAutoFetchConfig', () => {
     mockTriggerGlobal.mockResolvedValue({ queued: 0 })
     const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
 
-    await wrapper.find('button.settings-btn-outline').trigger('click')
+    await buttonByText(wrapper, 'Run now').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.hidden.md\\:flex span').text()).toBe('No eligible books found')
@@ -176,7 +180,7 @@ describe('GlobalAutoFetchConfig', () => {
     mockTriggerGlobal.mockResolvedValue({ queued: 50 })
     const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
 
-    await wrapper.find('button.settings-btn-outline').trigger('click')
+    await buttonByText(wrapper, 'Run now').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('.hidden.md\\:flex span').text()).toBe('Queued 50 books')
@@ -186,7 +190,7 @@ describe('GlobalAutoFetchConfig', () => {
     mockTriggerGlobal.mockResolvedValue({ queued: 10 })
     const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
 
-    await wrapper.find('button.settings-btn-outline').trigger('click')
+    await buttonByText(wrapper, 'Run now').trigger('click')
     await flushPromises()
 
     expect(mockInvalidate).toHaveBeenCalledTimes(1)
@@ -223,7 +227,7 @@ describe('GlobalAutoFetchConfig', () => {
     mockSaveGlobalConfig.mockResolvedValue(updated)
     const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
 
-    await wrapper.find('button.settings-btn-primary').trigger('click')
+    await buttonByText(wrapper, 'Save').trigger('click')
     await flushPromises()
 
     expect(mockSaveGlobalConfig).toHaveBeenCalledTimes(1)
@@ -235,7 +239,7 @@ describe('GlobalAutoFetchConfig', () => {
     mockSaveGlobalConfig.mockReturnValue(new Promise((r) => (resolvePromise = r)))
     const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
 
-    const btn = wrapper.find('button.settings-btn-primary')
+    const btn = buttonByText(wrapper, 'Save')
     await btn.trigger('click')
     await nextTick()
 
@@ -250,7 +254,7 @@ describe('GlobalAutoFetchConfig', () => {
     mockTriggerGlobal.mockReturnValue(new Promise((r) => (resolvePromise = r)))
     const wrapper = mount(GlobalAutoFetchConfig, { props: { config: makeConfig() } })
 
-    const btn = wrapper.find('button.settings-btn-outline')
+    const btn = buttonByText(wrapper, 'Run now')
     await btn.trigger('click')
     await nextTick()
 

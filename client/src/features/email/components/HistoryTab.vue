@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
@@ -78,19 +79,22 @@ function statusLabel(status: string): string {
   if (status === 'pending') return t('email.history.statusPending')
   return status
 }
+function cancelDelete() {
+  deleteConfirm.value = null
+}
 </script>
 
 <template>
   <div class="space-y-4">
     <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.history.heading') }}</p>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.loading') }}</div>
+    <div v-if="loading" class="settings-loading-state">{{ t('common.loading') }}</div>
 
-    <div v-else-if="logEntries.length === 0" class="border border-border rounded-lg px-5 py-8 bg-card text-center">
+    <div v-else-if="logEntries.length === 0" class="settings-empty-state">
       <p class="text-sm text-muted-foreground">{{ t('email.history.empty') }}</p>
     </div>
 
-    <div v-else class="border border-border rounded-lg overflow-hidden divide-y divide-border">
+    <div v-else class="settings-card">
       <div v-for="entry in logEntries" :key="entry.id" class="px-4 py-3 bg-card flex flex-col md:flex-row md:items-start gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap mb-0.5">
@@ -109,24 +113,17 @@ function statusLabel(status: string): string {
         <div class="flex items-center gap-1 shrink-0 self-end md:self-auto">
           <Tooltip v-if="entry.status === 'failed'">
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                :disabled="resending === entry.id"
-                @click="resend(entry)"
-              >
+              <Button variant="ghost" size="icon-sm" :disabled="resending === entry.id" @click="resend(entry)">
                 <RefreshCw :size="13" :class="resending === entry.id ? 'animate-spin' : ''" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('email.history.resend') }}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                @click="requestRemove(entry)"
-              >
+              <Button variant="destructive-ghost" size="icon-sm" @click="requestRemove(entry)">
                 <Trash2 :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('common.delete') }}</TooltipContent>
           </Tooltip>
@@ -134,32 +131,22 @@ function statusLabel(status: string): string {
       </div>
     </div>
 
-    <button
-      v-if="logEntries.length >= PAGE_SIZE * (page + 1)"
-      class="w-full py-2 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-      @click="loadMore()"
-    >
+    <Button v-if="logEntries.length >= PAGE_SIZE * (page + 1)" variant="outline" size="sm" class="w-full" @click="loadMore">
       {{ t('email.history.loadMore') }}
-    </button>
+    </Button>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
-      <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
+      <button class="absolute inset-0 bg-black/45" @click="cancelDelete" />
       <div class="relative w-full rounded-t-xl border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">{{ t('email.history.deleteTitle') }}</p>
         <p class="mt-1 text-sm text-muted-foreground line-clamp-2">{{ deleteConfirm.subject ?? t('email.history.noSubject') }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="deleteConfirm = null"
-          >
+          <Button variant="outline" size="sm" @click="cancelDelete">
             {{ t('common.cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-            @click="confirmRemove"
-          >
+          </Button>
+          <Button variant="destructive" size="sm" @click="confirmRemove">
             {{ t('common.delete') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

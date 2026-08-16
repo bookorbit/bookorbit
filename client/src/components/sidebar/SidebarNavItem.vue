@@ -33,10 +33,10 @@ const NAV_ICON_SIZE = 17
 
 // 32px row: 2px accent bar at the left inset, tinted fill and primary label when active.
 const buttonClass = [
-  'group/item h-8 w-full min-w-0 gap-2 rounded-md px-2 font-medium',
+  'group/item h-8 w-full min-w-0 gap-2 rounded-md px-2 font-normal',
   'before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-primary',
   'before:opacity-0 before:transition-opacity before:duration-150',
-  'data-[active=true]:bg-(--shell-accent-tint) data-[active=true]:font-semibold data-[active=true]:before:opacity-100',
+  'data-[active=true]:bg-(--shell-accent-tint) data-[active=true]:font-medium data-[active=true]:before:opacity-100',
 ].join(' ')
 
 // The grip sits out of flow, so a row only gives up right-edge space while one is rendered.

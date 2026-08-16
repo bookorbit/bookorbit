@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -117,7 +118,7 @@ function close() {
   <Teleport to="body">
     <Transition name="dialog-fade">
       <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]" @click="close()" />
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]" @click="close" />
 
         <div class="relative w-full max-w-md bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
           <!-- Header -->
@@ -129,9 +130,9 @@ function close() {
                 {{ t('email.send.bookCount', { count: selectionCount() }) }}
               </p>
             </div>
-            <button class="text-muted-foreground hover:text-foreground transition-colors" @click="close()">
+            <Button type="button" variant="ghost" size="icon-sm" :aria-label="t('common.close')" @click="close">
               <X :size="16" />
-            </button>
+            </Button>
           </div>
 
           <!-- Body -->
@@ -241,21 +242,14 @@ function close() {
 
           <!-- Footer -->
           <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
-            <button
-              class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-              @click="close()"
-            >
+            <Button type="button" variant="outline" size="sm" @click="close">
               {{ t('common.cancel') }}
-            </button>
-            <button
-              class="flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              :disabled="sending || !hasSelection"
-              @click="send()"
-            >
+            </Button>
+            <Button type="button" size="sm" :disabled="sending || !hasSelection" @click="send">
               <Loader2 v-if="sending" :size="12" class="animate-spin" />
               <Send v-else :size="12" />
               {{ sending ? t('email.send.sending') : t('email.send.send') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

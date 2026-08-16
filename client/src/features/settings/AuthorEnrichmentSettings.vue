@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RefreshCw, Save } from '@lucide/vue'
@@ -126,18 +127,18 @@ async function runAuthorBackfillAll() {
     class="md:hidden sticky top-11 z-10 -mx-4 mb-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
   >
     <div class="flex items-center gap-2 flex-wrap">
-      <button class="settings-btn-primary flex-1 justify-center" :disabled="saving" @click="saveConfig">
+      <Button size="sm" class="flex-1" :disabled="saving" @click="saveConfig" type="button">
         <Save class="size-3.5" />
         {{ saving ? t('settings.admin.authorEnrichment.saving') : t('common.save') }}
-      </button>
-      <button class="settings-btn-outline" :disabled="authorBackfillRunning" @click="runAuthorBackfill">
+      </Button>
+      <Button variant="outline" size="sm" :disabled="authorBackfillRunning" @click="runAuthorBackfill" type="button">
         <RefreshCw :size="13" :class="authorBackfillRunning ? 'animate-spin' : ''" />
         {{ authorBackfillRunning ? t('settings.admin.authorEnrichment.running') : t('settings.admin.authorEnrichment.runEligibleShort') }}
-      </button>
-      <button class="settings-btn-outline" :disabled="authorBackfillAllRunning" @click="runAuthorBackfillAll">
+      </Button>
+      <Button variant="outline" size="sm" :disabled="authorBackfillAllRunning" @click="runAuthorBackfillAll" type="button">
         <RefreshCw :size="13" :class="authorBackfillAllRunning ? 'animate-spin' : ''" />
         {{ authorBackfillAllRunning ? t('settings.admin.authorEnrichment.running') : t('settings.admin.authorEnrichment.runAllShort') }}
-      </button>
+      </Button>
     </div>
   </div>
   <div class="settings-card">
@@ -243,15 +244,15 @@ async function runAuthorBackfillAll() {
     </div>
 
     <div class="hidden md:flex items-center gap-3 px-5 py-4 bg-card">
-      <button class="settings-btn-primary" :disabled="saving" @click="saveConfig">
+      <Button size="sm" :disabled="saving" @click="saveConfig" type="button">
         <Save class="size-3.5" />
         {{ saving ? t('settings.admin.authorEnrichment.saving') : t('common.save') }}
-      </button>
+      </Button>
       <div class="w-px h-4 bg-border shrink-0" />
-      <button class="settings-btn-outline" :disabled="authorBackfillRunning" @click="runAuthorBackfill">
+      <Button variant="outline" size="sm" :disabled="authorBackfillRunning" @click="runAuthorBackfill" type="button">
         <RefreshCw :size="13" :class="authorBackfillRunning ? 'animate-spin' : ''" />
         {{ authorBackfillRunning ? t('settings.admin.authorEnrichment.running') : t('settings.admin.authorEnrichment.runForEligibleAuthors') }}
-      </button>
+      </Button>
       <span v-if="eligibleCount !== null" class="text-xs text-muted-foreground">
         {{
           countLoading
@@ -262,10 +263,10 @@ async function runAuthorBackfillAll() {
         }}
       </span>
       <div class="w-px h-4 bg-border shrink-0" />
-      <button class="settings-btn-outline" :disabled="authorBackfillAllRunning" @click="runAuthorBackfillAll">
+      <Button variant="outline" size="sm" :disabled="authorBackfillAllRunning" @click="runAuthorBackfillAll" type="button">
         <RefreshCw :size="13" :class="authorBackfillAllRunning ? 'animate-spin' : ''" />
         {{ authorBackfillAllRunning ? t('settings.admin.authorEnrichment.running') : t('settings.admin.authorEnrichment.runForAllAuthors') }}
-      </button>
+      </Button>
     </div>
   </div>
 </template>

@@ -1,87 +1,114 @@
-import type {
-  CurrentlyReadingWidgetData,
-  DiversityScoreWidgetData,
-  HighlightOfTheDayWidgetData,
-  LibraryOverviewWidgetData,
-  LongWaitWidgetData,
-  MonthlyChallengeWidgetData,
-  NeglectedGemsWidgetData,
-  ReadingDnaWidgetData,
-  ReadingGoalWidgetData,
-  ReadingRhythmWidgetData,
-  ReadingStreakWidgetData,
-  YearProjectionWidgetData,
+import {
+  DASHBOARD_WIDGET_BATCH_MAX,
+  WIDGET_TYPE,
+  type DashboardWidgetBatchRequest,
+  type DashboardWidgetBatchResponse,
+  type WidgetDataByType,
+  type WidgetType,
 } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
-export async function fetchReadingGoal(): Promise<ReadingGoalWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/reading-goal')
-  if (!res.ok) throw new Error('Failed to fetch reading goal')
-  return res.json()
+type PendingWidgetRequest = {
+  type: WidgetType
+  resolve: (data: never) => void
+  reject: (reason?: unknown) => void
 }
 
-export async function fetchCurrentlyReading(): Promise<CurrentlyReadingWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/currently-reading')
-  if (!res.ok) throw new Error('Failed to fetch currently reading')
-  return res.json()
+const pendingRequests: PendingWidgetRequest[] = []
+let batchScheduled = false
+
+function scheduleBatch(): void {
+  if (batchScheduled) return
+  batchScheduled = true
+  queueMicrotask(() => void flushBatch())
 }
 
-export async function fetchReadingStreak(): Promise<ReadingStreakWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/reading-streak')
-  if (!res.ok) throw new Error('Failed to fetch reading streak')
-  return res.json()
+async function flushBatch(): Promise<void> {
+  batchScheduled = false
+  const batch = pendingRequests.splice(0, DASHBOARD_WIDGET_BATCH_MAX)
+  if (batch.length === 0) return
+  if (pendingRequests.length > 0) scheduleBatch()
+
+  try {
+    const body: DashboardWidgetBatchRequest = { widgets: [...new Set(batch.map((request) => request.type))] }
+    const response = await api('/api/v1/dashboard/widgets/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) throw new Error('Dashboard widget batch failed')
+
+    const payload: DashboardWidgetBatchResponse = await response.json()
+    const resultsByType = new Map(payload.items.map((item) => [item.type, item]))
+    for (const request of batch) {
+      const result = resultsByType.get(request.type)
+      if (!result) request.reject(new Error(`Dashboard widget batch result missing: ${request.type}`))
+      else if (result.failed) request.reject(new Error(`Dashboard widget failed: ${request.type}`))
+      else request.resolve(result.data as never)
+    }
+  } catch (error) {
+    for (const request of batch) request.reject(error)
+  }
 }
 
-export async function fetchLibraryOverview(): Promise<LibraryOverviewWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/library-overview')
-  if (!res.ok) throw new Error('Failed to fetch library overview')
-  return res.json()
+/**
+ * Collects the widgets mounting on this tick into one request.
+ *
+ * Twelve widgets each fetching for themselves, alongside the shelves and the sidebar, put a
+ * dashboard load far past the six connections a browser opens to one origin. The queued requests
+ * are the ones that go missing, and a widget that loses its request has no way back.
+ */
+function requestWidget<T extends WidgetType>(type: T): Promise<WidgetDataByType[T]> {
+  return new Promise<WidgetDataByType[T]>((resolve, reject) => {
+    pendingRequests.push({ type, resolve: resolve as (data: never) => void, reject })
+    scheduleBatch()
+  })
 }
 
-export async function fetchHighlightOfTheDay(): Promise<HighlightOfTheDayWidgetData | null> {
-  const res = await api('/api/v1/dashboard/widgets/highlight-of-the-day')
-  if (!res.ok) throw new Error('Failed to fetch highlight of the day')
-  return res.json()
+export function fetchReadingGoal() {
+  return requestWidget(WIDGET_TYPE.READING_GOAL)
 }
 
-export async function fetchMonthlyChallenge(): Promise<MonthlyChallengeWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/monthly-challenge')
-  if (!res.ok) throw new Error('Failed to fetch monthly challenge')
-  return res.json()
+export function fetchCurrentlyReading() {
+  return requestWidget(WIDGET_TYPE.CURRENTLY_READING)
 }
 
-export async function fetchYearProjection(): Promise<YearProjectionWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/year-projection')
-  if (!res.ok) throw new Error('Failed to fetch year projection')
-  return res.json()
+export function fetchReadingStreak() {
+  return requestWidget(WIDGET_TYPE.READING_STREAK)
 }
 
-export async function fetchNeglectedGems(): Promise<NeglectedGemsWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/neglected-gems')
-  if (!res.ok) throw new Error('Failed to fetch neglected gems')
-  return res.json()
+export function fetchLibraryOverview() {
+  return requestWidget(WIDGET_TYPE.LIBRARY_OVERVIEW)
 }
 
-export async function fetchReadingDna(): Promise<ReadingDnaWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/reading-dna')
-  if (!res.ok) throw new Error('Failed to fetch reading DNA')
-  return res.json()
+export function fetchHighlightOfTheDay() {
+  return requestWidget(WIDGET_TYPE.HIGHLIGHT_OF_THE_DAY)
 }
 
-export async function fetchLongWait(): Promise<LongWaitWidgetData | null> {
-  const res = await api('/api/v1/dashboard/widgets/long-wait')
-  if (!res.ok) throw new Error('Failed to fetch long wait')
-  return res.json()
+export function fetchMonthlyChallenge() {
+  return requestWidget(WIDGET_TYPE.MONTHLY_CHALLENGE)
 }
 
-export async function fetchDiversityScore(): Promise<DiversityScoreWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/diversity-score')
-  if (!res.ok) throw new Error('Failed to fetch diversity score')
-  return res.json()
+export function fetchYearProjection() {
+  return requestWidget(WIDGET_TYPE.YEAR_PROJECTION)
 }
 
-export async function fetchReadingRhythm(): Promise<ReadingRhythmWidgetData> {
-  const res = await api('/api/v1/dashboard/widgets/reading-rhythm')
-  if (!res.ok) throw new Error('Failed to fetch reading rhythm')
-  return res.json()
+export function fetchNeglectedGems() {
+  return requestWidget(WIDGET_TYPE.NEGLECTED_GEMS)
+}
+
+export function fetchReadingDna() {
+  return requestWidget(WIDGET_TYPE.READING_DNA)
+}
+
+export function fetchLongWait() {
+  return requestWidget(WIDGET_TYPE.LONG_WAIT)
+}
+
+export function fetchDiversityScore() {
+  return requestWidget(WIDGET_TYPE.DIVERSITY_SCORE)
+}
+
+export function fetchReadingRhythm() {
+  return requestWidget(WIDGET_TYPE.READING_RHYTHM)
 }

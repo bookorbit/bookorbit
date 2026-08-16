@@ -34,6 +34,7 @@ const sheetStubs = Object.fromEntries(
     { template: '<div><slot /></div>' },
   ]),
 )
+sheetStubs.Button = { template: '<button><slot /></button>' }
 
 function mountSettings() {
   return shallowMount(PrivacySharingSettings, { global: { stubs: sheetStubs } })

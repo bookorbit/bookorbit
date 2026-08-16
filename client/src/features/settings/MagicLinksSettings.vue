@@ -18,6 +18,8 @@ const props = withDefaults(defineProps<{ withHeader?: boolean; withEmbeddedCreat
   withEmbeddedCreateAction: false,
 })
 
+const TABLE_SURFACE_CLASS = 'hidden overflow-x-auto rounded-lg border border-border bg-card shadow-xs md:block'
+
 defineExpose({ openCreateForm })
 
 const { t } = useI18n()
@@ -164,10 +166,10 @@ function isExpired(expiresAt: string | null | undefined): boolean {
 <template>
   <template v-if="props.withHeader">
     <SettingsPageHeader class="hidden md:flex" :title="t('settings.magicLinks.title')" :subtitle="t('settings.magicLinks.subtitle')">
-      <button type="button" class="settings-btn-primary" :disabled="sharedUsers.length === 0" @click="openCreateForm">
+      <Button size="sm" type="button" :disabled="sharedUsers.length === 0" @click="openCreateForm">
         <Plus :size="14" aria-hidden="true" />
         {{ t('settings.magicLinks.createLink') }}
-      </button>
+      </Button>
     </SettingsPageHeader>
     <div class="md:hidden px-1">
       <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.magicLinks.title') }}</h1>
@@ -178,15 +180,19 @@ function isExpired(expiresAt: string | null | undefined): boolean {
       </p>
     </div>
     <div class="md:hidden sticky top-11 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mt-4 mb-3">
-      <button type="button" class="settings-btn-primary w-full min-h-10 justify-center" :disabled="sharedUsers.length === 0" @click="openCreateForm">
+      <Button size="sm" type="button" class="w-full min-h-10" :disabled="sharedUsers.length === 0" @click="openCreateForm">
         <Plus :size="14" aria-hidden="true" />
         {{ t('settings.magicLinks.createLink') }}
-      </button>
+      </Button>
     </div>
   </template>
 
-  <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
-  <p v-if="loading" role="status" class="text-sm text-muted-foreground">{{ t('common.loading') }}</p>
+  <p v-if="error" role="alert" class="settings-error-state">
+    {{ error }}
+  </p>
+  <p v-if="loading" role="status" class="settings-loading-state" data-testid="magic-links-loading-surface">
+    {{ t('common.loading') }}
+  </p>
 
   <DialogRoot :open="showCreateForm" @update:open="handleCreateOpenChange">
     <DialogPortal>
@@ -243,28 +249,22 @@ function isExpired(expiresAt: string | null | undefined): boolean {
   </DialogRoot>
 
   <!-- Active links -->
-  <div v-if="!loading && !error" class="space-y-3">
-    <div class="flex items-center justify-between mb-3">
+  <div v-if="!loading && !error" class="space-y-2">
+    <div class="flex items-center justify-between">
       <p class="settings-group-label mb-0">{{ t('settings.magicLinks.activeLinks') }}</p>
-      <button
-        v-if="props.withEmbeddedCreateAction"
-        type="button"
-        class="settings-btn-primary"
-        :disabled="sharedUsers.length === 0"
-        @click="openCreateForm"
-      >
+      <Button size="sm" v-if="props.withEmbeddedCreateAction" type="button" :disabled="sharedUsers.length === 0" @click="openCreateForm">
         <Plus :size="14" aria-hidden="true" />
         {{ t('settings.magicLinks.createLink') }}
-      </button>
+      </Button>
     </div>
 
-    <div v-if="sharedUsers.length === 0 && tokens.length === 0" class="rounded-lg border border-dashed border-border px-5 py-8 text-center">
+    <div v-if="sharedUsers.length === 0 && tokens.length === 0" class="settings-empty-state" data-testid="magic-links-empty-surface">
       <Info :size="32" class="mx-auto mb-3 text-muted-foreground" aria-hidden="true" />
       <p class="text-sm font-medium text-foreground">{{ t('settings.magicLinks.noSharedAccounts') }}</p>
       <p class="mt-1 text-sm text-muted-foreground">
         <i18n-t keypath="settings.magicLinks.noSharedAccountsHint" tag="span" scope="global">
           <template #usersPage>
-            <RouterLink to="/settings/admin?tab=users" class="font-medium text-primary hover:underline">{{
+            <RouterLink to="/settings/admin/users" class="font-medium text-primary hover:underline">{{
               t('settings.magicLinks.usersPage')
             }}</RouterLink>
           </template>
@@ -274,7 +274,7 @@ function isExpired(expiresAt: string | null | undefined): boolean {
 
     <template v-else>
       <template v-if="activeTokens.length > 0">
-        <div class="hidden overflow-x-auto rounded-lg border border-border shadow-xs md:block">
+        <div :class="TABLE_SURFACE_CLASS" data-testid="magic-links-active-table-surface">
           <table class="w-full min-w-[880px] table-fixed text-sm">
             <colgroup>
               <col class="w-[24%]" />
@@ -338,9 +338,10 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           type="button"
-                          class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           :aria-label="
                             token.isActive
                               ? t('settings.magicLinks.pauseAria', { label: token.label })
@@ -350,20 +351,21 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                         >
                           <Pause v-if="token.isActive" :size="14" aria-hidden="true" />
                           <Play v-else :size="14" aria-hidden="true" />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{{ token.isActive ? t('settings.magicLinks.pause') : t('settings.magicLinks.resume') }}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <button
+                        <Button
+                          variant="destructive-ghost"
+                          size="icon-sm"
                           type="button"
-                          class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           :aria-label="t('settings.magicLinks.revokeAria', { label: token.label })"
                           @click="requestRevoke(token.id)"
                         >
                           <Trash2 :size="14" aria-hidden="true" />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{{ t('settings.magicLinks.revoke') }}</TooltipContent>
                     </Tooltip>
@@ -408,9 +410,10 @@ function isExpired(expiresAt: string | null | undefined): boolean {
                 <Check v-if="copiedId === token.id" :size="14" aria-hidden="true" />
                 <Copy v-else :size="14" aria-hidden="true" />
               </button>
-              <button
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 type="button"
-                class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 :aria-label="
                   token.isActive
                     ? t('settings.magicLinks.pauseAria', { label: token.label })
@@ -420,27 +423,28 @@ function isExpired(expiresAt: string | null | undefined): boolean {
               >
                 <Pause v-if="token.isActive" :size="14" aria-hidden="true" />
                 <Play v-else :size="14" aria-hidden="true" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive-ghost"
+                size="icon-sm"
                 type="button"
-                class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 :aria-label="t('settings.magicLinks.revokeAria', { label: token.label })"
                 @click="requestRevoke(token.id)"
               >
                 <Trash2 :size="14" aria-hidden="true" />
-              </button>
+              </Button>
             </div>
           </article>
         </div>
       </template>
 
-      <div v-else-if="tokens.length === 0" class="rounded-lg border border-dashed border-border px-5 py-8 text-center">
+      <div v-else-if="tokens.length === 0" class="settings-empty-state" data-testid="magic-links-empty-surface">
         <Link :size="32" class="mx-auto mb-3 text-muted-foreground" aria-hidden="true" />
         <p class="text-sm font-medium text-foreground">{{ t('settings.magicLinks.emptyTitle') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.magicLinks.emptyHint', { action: t('settings.magicLinks.createLink') }) }}</p>
       </div>
 
-      <div v-else class="rounded-lg border border-dashed border-border px-5 py-6 text-center">
+      <div v-else class="settings-empty-state py-6" data-testid="magic-links-empty-surface">
         <Link :size="24" class="mx-auto mb-2 text-muted-foreground" aria-hidden="true" />
         <p class="text-sm font-medium text-foreground">{{ t('settings.magicLinks.noActiveTitle') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.magicLinks.noActiveHint') }}</p>
@@ -449,9 +453,9 @@ function isExpired(expiresAt: string | null | undefined): boolean {
   </div>
 
   <!-- Inactive tokens (revoked or expired) -->
-  <div v-if="!loading && inactiveTokens.length > 0" class="mt-6 space-y-3">
+  <div v-if="!loading && inactiveTokens.length > 0" class="mt-6 space-y-2">
     <p class="settings-group-label">{{ t('settings.magicLinks.inactiveLinks') }}</p>
-    <div class="hidden overflow-x-auto rounded-lg border border-border shadow-xs md:block">
+    <div :class="TABLE_SURFACE_CLASS" data-testid="magic-links-inactive-table-surface">
       <table class="w-full min-w-[720px] table-fixed text-sm">
         <colgroup>
           <col class="w-[28%]" />

@@ -2368,6 +2368,54 @@
         "maintenance": "Maintenance",
         "audit-log": "Audit Log"
       }
+    },
+    "nav": {
+      "title": "Settings",
+      "ariaLabel": "Settings sections",
+      "searchPlaceholder": "Search settings",
+      "clearSearch": "Clear search",
+      "noResults": "No settings match {query}.",
+      "shortcutHint": "Press Cmd K to jump to any setting",
+      "groups": {
+        "you": "You",
+        "library": "Library",
+        "devices": "Devices & sync",
+        "server": "Server"
+      },
+      "descriptions": {
+        "profile": "Your name, email, password, and active sessions.",
+        "appearanceTheme": "Theme, accent colour, background, and corner radius.",
+        "appearanceBookCovers": "Cover shadows, spine effects, and placeholder art.",
+        "appearanceIcons": "Choose the icon style used across the app.",
+        "appearanceLayout": "Default library view, density, and spacing.",
+        "appearanceBehavior": "How the library reacts as you browse and sort.",
+        "appearanceLanguage": "Interface language and regional formats.",
+        "readerEbook": "Fonts, spacing, and page behaviour for eBooks.",
+        "readerPdf": "Rendering, zoom, and page fit for PDFs.",
+        "readerComics": "Reading direction and page spreads for comics.",
+        "readerAudio": "Playback speed, skip intervals, and sleep timer.",
+        "readerFonts": "Fonts available while reading.",
+        "readerGeneral": "Defaults shared by every reading mode.",
+        "notifications": "What BookOrbit tells you about, and where.",
+        "privacy": "Reading insights, shared links, and activity visibility.",
+        "restrictions": "Age ratings and hidden content for this account.",
+        "libraries": "Scan paths, watched folders, and ingest rules.",
+        "fileNaming": "Folder and filename patterns for stored files.",
+        "maintenance": "Rescans, duplicates, orphans, and cache rebuilds.",
+        "kobo": "Sync endpoint, store proxy, and shelf mapping.",
+        "koreader": "Progress sync and document matching.",
+        "opds": "Catalog feeds for third-party reading apps.",
+        "email": "SMTP delivery and send-to-device addresses.",
+        "hardcover": "Sync reading status and reviews with Hardcover.",
+        "users": "Accounts, roles, permissions, and invitations.",
+        "accountActivity": "Per-user reading and session activity.",
+        "magicLinks": "Passwordless share and login links.",
+        "oidc": "Single sign-on provider, claims, and provisioning.",
+        "serverFonts": "Fonts installed for every reader on this server.",
+        "bookDock": "Quick actions shown on book pages.",
+        "auditLog": "Who changed what, and when."
+      },
+      "backToApp": "Back to library"
     }
   },
   "achievements": {
@@ -4779,6 +4827,8 @@
       "seeAllSmartScopes": "See all smart scopes ({count})",
       "seeAllCollections": "See all collections ({count})",
       "updateAvailable": "Update {version}",
+      "updateTooltip": "{version} update available",
+      "openUpdateRelease": "Open the {version} release on GitHub",
       "zones": {
         "browse": "Browse"
       },

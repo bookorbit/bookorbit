@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate } from '@/i18n/formatters'
@@ -20,7 +21,6 @@ import {
   Folder,
   CalendarClock,
 } from '@lucide/vue'
-import SettingsPageHeader from './SettingsPageHeader.vue'
 import { toast } from 'vue-sonner'
 import { api } from '@/lib/api'
 import type { Library as LibraryType, LibraryStats } from '@bookorbit/types'
@@ -41,7 +41,7 @@ const router = useRouter()
 const { hasPermission } = usePermissions()
 
 if (!hasPermission('manage_libraries')) {
-  router.replace({ name: 'settings-appearance' })
+  router.replace({ name: 'settings-appearance-theme' })
 }
 
 const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
@@ -270,33 +270,28 @@ function coverRefreshLabel(libraryId: number): string {
   if (p.status === 'completed') return t('settings.admin.libraries.coversRefreshed', { count: p.total })
   return ''
 }
+function cancelLibraryDelete() {
+  deletingLibrary.value = null
+}
+
+function cancelLibrarySync() {
+  confirmSyncLibrary.value = null
+}
 </script>
 
 <template>
-  <SettingsPageHeader :title="t('settings.admin.libraries.title')" :subtitle="t('settings.admin.libraries.subtitle')">
-    <div class="hidden items-center gap-2 md:flex">
-      <button class="settings-btn-outline" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
-        <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
-        {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
-      </button>
-      <button class="settings-btn-primary" @click="openCreate">
-        <Plus :size="14" />
-        {{ t('settings.admin.libraries.addLibrary') }}
-      </button>
-    </div>
-  </SettingsPageHeader>
   <div
-    class="md:hidden sticky top-0 z-20 mb-4 -mx-4 px-4 py-2 border-y border-border/70 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75"
+    class="sticky top-0 z-20 mb-4 -mx-4 border-y border-border/70 bg-card/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/75 md:static md:mx-0 md:flex md:justify-end md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
   >
-    <div class="grid grid-cols-2 gap-2">
-      <button class="settings-btn-outline w-full justify-center" :disabled="scanningAll || libraries.length === 0" @click="scanAll">
+    <div class="grid grid-cols-2 gap-2 md:flex md:items-center">
+      <Button variant="outline" size="sm" class="w-full md:w-auto" :disabled="scanningAll || libraries.length === 0" @click="scanAll" type="button">
         <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
         {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
-      </button>
-      <button class="settings-btn-primary w-full justify-center" @click="openCreate">
+      </Button>
+      <Button size="sm" class="w-full md:w-auto" @click="openCreate" type="button">
         <Plus :size="14" />
         {{ t('settings.admin.libraries.addLibrary') }}
-      </button>
+      </Button>
     </div>
   </div>
 
@@ -416,18 +411,16 @@ function coverRefreshLabel(libraryId: number): string {
 
             <!-- Actions -->
             <div class="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:flex md:shrink-0">
-              <button class="settings-btn-outline justify-center md:justify-start" :disabled="isScanning(lib.id)" @click="scan(lib)">
+              <Button variant="outline" size="sm" class="md:justify-start" :disabled="isScanning(lib.id)" @click="scan(lib)" type="button">
                 <RefreshCw :size="14" :class="isScanning(lib.id) ? 'animate-spin' : ''" />
                 {{ isScanning(lib.id) ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scan') }}
-              </button>
+              </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <button
-                    class="flex h-11 w-11 md:h-auto md:w-auto md:px-2 md:py-1.5 items-center justify-center rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                  >
+                  <Button variant="outline" size="icon-sm" class="md:w-auto size-11 md:size-8">
                     <MoreHorizontal :size="16" />
-                  </button>
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-52">
                   <DropdownMenuItem @click="openEdit(lib)">
@@ -502,7 +495,7 @@ function coverRefreshLabel(libraryId: number): string {
       </div>
 
       <!-- Empty state -->
-      <div v-if="libraries.length === 0" class="rounded-lg border border-dashed border-border bg-card/50 px-8 py-16 text-center shadow-xs">
+      <div v-if="libraries.length === 0" class="settings-empty-state px-8 py-16">
         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted mx-auto mb-4">
           <FolderOpen :size="22" class="text-muted-foreground" />
         </div>
@@ -512,10 +505,10 @@ function coverRefreshLabel(libraryId: number): string {
         <p class="text-sm text-muted-foreground mb-5">
           {{ t('settings.admin.libraries.emptyHint') }}
         </p>
-        <button class="settings-btn-primary" @click="openCreate">
+        <Button size="sm" @click="openCreate" type="button">
           <Plus :size="14" />
           {{ t('settings.admin.libraries.addFirstLibrary') }}
-        </button>
+        </Button>
       </div>
     </div>
   </TooltipProvider>
@@ -548,19 +541,12 @@ function coverRefreshLabel(libraryId: number): string {
         @keydown.escape="deletingLibrary = null"
       />
       <div class="flex justify-end gap-2">
-        <button
-          class="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground"
-          @click="deletingLibrary = null"
-        >
+        <Button variant="outline" size="sm" @click="cancelLibraryDelete">
           {{ t('common.cancel') }}
-        </button>
-        <button
-          class="px-4 py-2 text-sm font-medium rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-          :disabled="deleteConfirmName !== deletingLibrary.name || deleting"
-          @click="confirmDelete"
-        >
+        </Button>
+        <Button variant="destructive" size="sm" :disabled="deleteConfirmName !== deletingLibrary.name || deleting" @click="confirmDelete">
           {{ deleting ? t('settings.admin.libraries.deleting') : t('settings.admin.libraries.deleteLibraryButton') }}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -577,18 +563,12 @@ function coverRefreshLabel(libraryId: number): string {
         {{ t('settings.admin.libraries.syncConfirmBodySuffix') }}
       </p>
       <div class="flex justify-end gap-2">
-        <button
-          class="px-4 py-2 text-sm font-medium rounded-md border border-border hover:bg-muted transition-colors text-muted-foreground"
-          @click="confirmSyncLibrary = null"
-        >
+        <Button variant="outline" size="sm" @click="cancelLibrarySync">
           {{ t('common.cancel') }}
-        </button>
-        <button
-          class="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-          @click="confirmSyncFiles"
-        >
+        </Button>
+        <Button size="sm" @click="confirmSyncFiles">
           {{ t('settings.admin.libraries.syncFiles') }}
-        </button>
+        </Button>
       </div>
     </div>
   </div>

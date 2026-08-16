@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
@@ -226,7 +227,7 @@ function formatDate(iso: string | null | undefined): string {
     </p>
   </div>
 
-  <div class="mt-5 md:mt-0 space-y-6">
+  <div class="space-y-6" :class="{ 'mt-5 md:mt-0': !props.embedded }">
     <!-- Uploads -->
     <div v-if="isSuperuser">
       <p class="settings-group-label">
@@ -259,13 +260,15 @@ function formatDate(iso: string | null | undefined): string {
               />
               <span class="text-sm text-muted-foreground">MB</span>
             </div>
-            <button
-              class="settings-btn-outline"
+            <Button
+              variant="outline"
+              size="sm"
               :disabled="maxUploadSizeSaving || localMaxUploadSizeMb === maxUploadSizeMb"
               @click="saveMaxUploadSize"
+              type="button"
             >
               {{ t('settings.admin.maintenance.save') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -349,10 +352,12 @@ function formatDate(iso: string | null | undefined): string {
             </div>
           </div>
 
-          <button
+          <Button
             v-if="migrationCardState !== 'loading'"
+            type="button"
+            size="sm"
+            :variant="migrationCardState === 'none' ? 'default' : 'outline'"
             class="self-start md:w-auto md:shrink-0"
-            :class="migrationCardState === 'none' ? 'settings-btn-primary' : 'settings-btn-outline'"
             @click="goToMigration"
           >
             <template v-if="migrationCardState === 'none'">
@@ -361,7 +366,7 @@ function formatDate(iso: string | null | undefined): string {
             </template>
             <template v-else-if="migrationCardState === 'configured'">{{ t('settings.admin.maintenance.continueSetup') }}</template>
             <template v-else>{{ t('settings.admin.maintenance.viewDetails') }}</template>
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -399,10 +404,10 @@ function formatDate(iso: string | null | undefined): string {
               </p>
             </div>
           </div>
-          <button class="settings-btn-outline self-start md:w-auto md:shrink-0" :disabled="running" @click="rebuildEmbeddings">
+          <Button variant="outline" size="sm" class="self-start md:w-auto md:shrink-0" :disabled="running" @click="rebuildEmbeddings" type="button">
             <RefreshCw :size="13" :class="running ? 'animate-spin' : ''" />
             {{ running ? t('settings.admin.maintenance.running') : t('settings.admin.maintenance.run') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -443,14 +448,17 @@ function formatDate(iso: string | null | undefined): string {
             </div>
           </div>
 
-          <button
-            class="settings-btn-outline self-start md:w-auto md:shrink-0"
+          <Button
+            variant="outline"
+            size="sm"
+            class="self-start md:w-auto md:shrink-0"
             :disabled="achievementBackfillRunning"
             @click="runAchievementBackfill"
+            type="button"
           >
             <RefreshCw :size="13" :class="achievementBackfillRunning ? 'animate-spin' : ''" />
             {{ achievementBackfillRunning ? t('settings.admin.maintenance.running') : t('settings.admin.maintenance.runBackfill') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

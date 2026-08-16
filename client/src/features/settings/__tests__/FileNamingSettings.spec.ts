@@ -62,6 +62,15 @@ beforeEach(() => {
 })
 
 describe('FileNamingSettings', () => {
+  it('keeps the global defaults description close to its heading', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.classes()).toContain('space-y-8')
+    const section = wrapper.find('section[aria-labelledby="file-naming-global-defaults-heading"]')
+    expect(section.find('h2').text()).toBe('Global Defaults')
+    expect(section.find('h2 + p').classes()).toContain('mt-1')
+  })
+
   it('gives every pattern input a programmatic label', async () => {
     const wrapper = await mountPage()
 
@@ -84,7 +93,7 @@ describe('FileNamingSettings', () => {
     const wrapper = await mountPage()
 
     const field = wrapper.find('input#file-naming-file-as-book')
-    const saveButton = () => wrapper.findAll('button.settings-btn-primary')[0]
+    const saveButton = () => wrapper.findAll('button').find((button) => button.text().trim() === 'Save')
 
     expect(saveButton()?.attributes('disabled')).toBeDefined()
 
@@ -119,7 +128,7 @@ describe('FileNamingSettings', () => {
     )
   })
 
-  it('opens the pattern help sheet from the intro callout', async () => {
+  it('opens the pattern help sheet from the global defaults header', async () => {
     const wrapper = await mountPage()
 
     expect(wrapper.find('[data-testid="pattern-help-sheet"]').attributes('data-open')).toBe('false')

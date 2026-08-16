@@ -15,7 +15,7 @@ describe('buildSidebarVersionUi', () => {
     })
   })
 
-  it('enables the update pill when an update is available', () => {
+  it('enables the update release arrow when an update is available', () => {
     const ui = buildSidebarVersionUi('v1.2.3', true, 'v1.4.0')
 
     expect(ui.currentLabel).toBe('v1.2.3')
@@ -25,14 +25,14 @@ describe('buildSidebarVersionUi', () => {
     expect(ui.updateHref).toBe('https://github.com/bookorbit/bookorbit/releases/tag/v1.4.0')
   })
 
-  it('does not show the update pill when latestVersion is null', () => {
+  it('does not show the update release arrow when latestVersion is null', () => {
     const ui = buildSidebarVersionUi('v1.2.3', true, null)
 
     expect(ui.showUpdate).toBe(false)
     expect(ui.currentLabel).toBe('v1.2.3')
   })
 
-  it('does not show the update pill when latestVersion is blank after trimming', () => {
+  it('does not show the update release arrow when latestVersion is blank after trimming', () => {
     const ui = buildSidebarVersionUi('v1.2.3', true, '   ')
 
     expect(ui.showUpdate).toBe(false)
@@ -64,7 +64,7 @@ describe('buildSidebarVersionUi', () => {
     expect(ui.updateHref).toBe('https://github.com/bookorbit/bookorbit/releases/latest')
   })
 
-  it('links sha versions to commits and does not enable the update pill', () => {
+  it('links sha versions to commits and does not enable the update release arrow', () => {
     const ui = buildSidebarVersionUi('sha-abc1234', true, 'v1.2.4')
 
     expect(ui.currentLabel).toBe('sha-abc1234')
@@ -72,7 +72,7 @@ describe('buildSidebarVersionUi', () => {
     expect(ui.showUpdate).toBe(false)
   })
 
-  it('does not enable the update pill for local builds', () => {
+  it('does not enable the update release arrow for local builds', () => {
     const ui = buildSidebarVersionUi('Local build', true, 'v1.2.4')
 
     expect(ui.currentLabel).toBe('Local build')
@@ -93,14 +93,14 @@ describe('buildSidebarVersionUi', () => {
     expect(ui.currentHref).toBe('https://github.com/bookorbit/bookorbit/commit/1234567890ab')
   })
 
-  it('does not enable the update pill when updateAvailable is null', () => {
+  it('does not enable the update release arrow when updateAvailable is null', () => {
     const ui = buildSidebarVersionUi('v1.2.3', null, 'v1.3.0')
 
     expect(ui.currentLabel).toBe('v1.2.3')
     expect(ui.showUpdate).toBe(false)
   })
 
-  it('suppresses the update pill when the current version is blank', () => {
+  it('suppresses the update release arrow when the current version is blank', () => {
     const ui = buildSidebarVersionUi('   ', true, 'v1.3.0')
 
     expect(ui.currentLabel).toBe('')

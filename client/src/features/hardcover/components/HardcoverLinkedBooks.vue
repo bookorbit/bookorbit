@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, CheckCircle2, AlertCircle, HelpCircle, Loader2 } from '@lucide/vue'
@@ -116,7 +117,7 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
     <div v-else-if="loadError" role="alert" class="flex items-center gap-2 text-xs text-destructive py-2">
       <AlertCircle class="size-3.5 shrink-0" />
       {{ t('hardcover.linkedBooks.loadError') }}
-      <button type="button" class="underline underline-offset-2" @click="handleRetryLoadBooks">{{ t('hardcover.linkedBooks.retry') }}</button>
+      <Button variant="link" size="sm" type="button" class="h-auto p-0" @click="handleRetryLoadBooks">{{ t('hardcover.linkedBooks.retry') }}</Button>
     </div>
 
     <div v-else-if="books.length === 0" class="text-xs text-muted-foreground py-2">{{ t('hardcover.linkedBooks.empty') }}</div>
@@ -162,26 +163,22 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
             <div v-if="editionsLoadError[book.bookId]" role="alert" class="flex items-center gap-2 text-xs text-destructive">
               <AlertCircle class="size-3.5 shrink-0" />
               {{ t('hardcover.linkedBooks.editionsLoadError') }}
-              <button
-                type="button"
-                :disabled="loadingEditions[book.bookId]"
-                class="underline underline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                @click="loadEditions(book)"
-              >
+              <Button variant="link" size="sm" type="button" :disabled="loadingEditions[book.bookId]" class="h-auto p-0" @click="loadEditions(book)">
                 {{ t('hardcover.linkedBooks.retry') }}
-              </button>
+              </Button>
             </div>
 
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               v-else-if="!editionsByBookId[book.bookId]"
               type="button"
               :disabled="loadingEditions[book.bookId]"
-              class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               @click="loadEditions(book)"
             >
               <Loader2 v-if="loadingEditions[book.bookId]" class="size-3 animate-spin" />
               {{ t('hardcover.linkedBooks.viewEditions') }}
-            </button>
+            </Button>
 
             <div v-else class="space-y-1.5">
               <p v-if="editionsByBookId[book.bookId]!.length === 0" class="text-xs text-muted-foreground">
@@ -223,14 +220,16 @@ async function handleSetEdition(book: HardcoverLinkedBook, edition: HardcoverEdi
                     </p>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   type="button"
                   :disabled="settingEdition[book.bookId] || edition.id === book.hardcoverEditionId"
-                  class="shrink-0 px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  class="shrink-0"
                   @click="handleSetEdition(book, edition)"
                 >
                   {{ edition.id === book.hardcoverEditionId ? t('hardcover.linkedBooks.current') : t('hardcover.linkedBooks.useThis') }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

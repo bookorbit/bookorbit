@@ -43,6 +43,8 @@
   --success: oklch(0.52 0.14 148);
   --success-foreground: oklch(0.985 0 0);
 
+  --star-highlight: oklch(0.76 0.18 90);
+
   --border: oklch(0.878 var(--tint-c-surface) var(--tint-h));
   --input: oklch(0.878 var(--tint-c-surface) var(--tint-h));
   --ring: oklch(0.65 var(--tint-c-surface) var(--tint-h));
@@ -156,6 +158,8 @@
 
   --success: oklch(0.72 0.15 148);
   --success-foreground: oklch(0.145 0 0);
+
+  --star-highlight: oklch(0.84 0.17 95);
 
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);

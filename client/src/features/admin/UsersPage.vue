@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { KeyRound, LockOpen, MoreVertical, Pencil, Save, Search, ShieldAlert, ShieldCheck, Trash2, UserPlus } from '@lucide/vue'
@@ -227,20 +228,9 @@ async function saveDefaultLibraryAccess() {
 </script>
 
 <template>
-  <section aria-labelledby="users-heading" class="space-y-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="min-w-0">
-        <h2 id="users-heading" class="text-lg font-semibold text-foreground">{{ t('adminFeature.usersPage.usersTitle') }}</h2>
-        <p class="mt-1 text-sm text-muted-foreground">{{ t('adminFeature.usersPage.usersSubtitle') }}</p>
-      </div>
-      <button type="button" class="settings-btn-primary" @click="openCreate">
-        <UserPlus :size="14" aria-hidden="true" />
-        {{ t('adminFeature.usersPage.createUser') }}
-      </button>
-    </div>
-
+  <div class="space-y-4">
     <form
-      class="grid gap-2 rounded-lg border border-border bg-card p-2 md:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_minmax(9rem,auto)_minmax(10rem,auto)_auto_auto]"
+      class="grid gap-2 rounded-lg border border-border bg-card p-2 md:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_minmax(9rem,auto)_minmax(10rem,auto)_auto_auto_auto]"
       @submit.prevent="applyFilters"
     >
       <label class="relative block">
@@ -271,16 +261,20 @@ async function saveDefaultLibraryAccess() {
           <option value="createdAt:asc">{{ t('adminFeature.usersPage.filters.oldest') }}</option>
         </select>
       </label>
-      <button type="submit" class="settings-btn-primary h-9 justify-center">{{ t('adminFeature.usersPage.filters.apply') }}</button>
-      <button v-if="hasActiveFilters" type="button" class="settings-btn-outline h-9 justify-center" @click="clearFilters">
+      <Button size="sm" type="submit" class="h-9">{{ t('adminFeature.usersPage.filters.apply') }}</Button>
+      <Button variant="outline" size="sm" v-if="hasActiveFilters" type="button" class="h-9" @click="clearFilters">
         {{ t('adminFeature.usersPage.filters.clear') }}
-      </button>
+      </Button>
+      <Button size="sm" type="button" class="h-9 xl:ms-2" @click="openCreate">
+        <UserPlus :size="14" aria-hidden="true" />
+        {{ t('adminFeature.usersPage.createUser') }}
+      </Button>
     </form>
 
-    <p v-if="actionError" role="alert" class="text-sm text-destructive">{{ actionError }}</p>
-    <p v-if="error" role="alert" class="text-sm text-destructive">{{ t('adminFeature.usersPage.errors.load') }}</p>
-    <p v-else-if="loading" role="status" class="text-sm text-muted-foreground">{{ t('common.loading') }}</p>
-    <div v-else-if="users.length === 0" class="rounded-lg border border-dashed border-border px-4 py-8 text-center">
+    <p v-if="actionError" role="alert" class="settings-error-state">{{ actionError }}</p>
+    <p v-if="error" role="alert" class="settings-error-state">{{ t('adminFeature.usersPage.errors.load') }}</p>
+    <p v-else-if="loading" role="status" class="settings-loading-state">{{ t('common.loading') }}</p>
+    <div v-else-if="users.length === 0" class="settings-empty-state">
       <p class="text-sm font-medium text-foreground">{{ t('adminFeature.usersPage.empty.title') }}</p>
       <p class="mt-1 text-sm text-muted-foreground">
         {{ hasActiveFilters ? t('adminFeature.usersPage.empty.filtered') : t('adminFeature.usersPage.empty.description') }}
@@ -288,7 +282,7 @@ async function saveDefaultLibraryAccess() {
     </div>
 
     <template v-else>
-      <div class="hidden overflow-x-auto rounded-lg border border-border shadow-xs md:block">
+      <div class="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-xs md:block">
         <table class="w-full min-w-[820px] table-fixed text-sm">
           <colgroup>
             <col class="w-[26%]" />
@@ -350,56 +344,60 @@ async function saveDefaultLibraryAccess() {
                   <template v-if="canManage(user)">
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           type="button"
-                          class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           :aria-label="t('adminFeature.usersPage.editUserAria', { name: user.name })"
                           @click="openEdit(user)"
                         >
                           <Pencil :size="14" aria-hidden="true" />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{{ t('common.edit') }}</TooltipContent>
                     </Tooltip>
                     <Tooltip v-if="isLocked(user)">
                       <TooltipTrigger as-child>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           type="button"
-                          class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           :aria-label="t('adminFeature.usersPage.unlockAria', { name: user.name })"
                           @click="handleUnlock(user.id)"
                         >
                           <LockOpen :size="14" aria-hidden="true" />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{{ t('adminFeature.usersPage.unlockHint') }}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>
                         <span>
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
                             type="button"
                             :disabled="!isPasswordResettable(user)"
-                            class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                             :aria-label="t('adminFeature.usersPage.resetPasswordAria', { name: user.name })"
                             @click="handleResetPassword(user.id)"
                           >
                             <KeyRound :size="14" aria-hidden="true" />
-                          </button>
+                          </Button>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>{{ resetPasswordHint(user) }}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <button
+                        <Button
+                          variant="destructive-ghost"
+                          size="icon-sm"
                           type="button"
-                          class="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           :aria-label="t('adminFeature.usersPage.deleteUserAria', { name: user.name })"
                           @click="requestDeleteUser(user)"
                         >
                           <Trash2 :size="14" aria-hidden="true" />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent>{{ t('common.delete') }}</TooltipContent>
                     </Tooltip>
@@ -439,22 +437,14 @@ async function saveDefaultLibraryAccess() {
             </StatusPill>
           </div>
           <div v-if="canManage(user)" class="mt-3 flex items-center gap-2 border-t border-border pt-3">
-            <button
-              type="button"
-              class="rounded-md border border-border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              @click="openEdit(user)"
-            >
+            <Button variant="outline" size="sm" type="button" @click="openEdit(user)">
               {{ t('common.edit') }}
-            </button>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
-                <button
-                  type="button"
-                  class="rounded-md border border-border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  :aria-label="t('adminFeature.usersPage.moreActionsAria', { name: user.name })"
-                >
+                <Button variant="outline" size="icon-sm" type="button" :aria-label="t('adminFeature.usersPage.moreActionsAria', { name: user.name })">
                   <MoreVertical :size="16" aria-hidden="true" />
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-56">
                 <DropdownMenuItem v-if="isLocked(user)" @click="handleUnlock(user.id)">
@@ -487,13 +477,17 @@ async function saveDefaultLibraryAccess() {
           {{ t('adminFeature.usersPage.pagination.page', { page: formatNumber(page), totalPages: formatNumber(totalPages) }) }}
         </p>
         <div class="flex gap-2">
-          <button type="button" class="settings-btn-outline" :disabled="page <= 1" @click="previousPage">{{ t('common.previous') }}</button>
-          <button type="button" class="settings-btn-outline" :disabled="page >= totalPages" @click="nextPage">{{ t('common.next') }}</button>
+          <Button variant="outline" size="sm" type="button" :disabled="page <= 1" @click="previousPage">{{ t('common.previous') }}</Button>
+          <Button variant="outline" size="sm" type="button" :disabled="page >= totalPages" @click="nextPage">{{ t('common.next') }}</Button>
         </div>
       </nav>
     </template>
 
-    <section v-if="!loading && !error && canManageAppSettings" aria-labelledby="self-registration-heading" class="space-y-3 pt-6">
+    <section
+      v-if="!loading && !error && canManageAppSettings"
+      aria-labelledby="self-registration-heading"
+      class="space-y-2 border-t border-border/70 pt-6"
+    >
       <div>
         <h3 id="self-registration-heading" class="settings-group-label mb-1">
           {{ t('adminFeature.usersPage.selfRegistration.title') }}
@@ -527,7 +521,11 @@ async function saveDefaultLibraryAccess() {
       </div>
     </section>
 
-    <section v-if="!loading && !error && canManageUserDefaults" aria-labelledby="default-library-access-heading" class="space-y-3 pt-6">
+    <section
+      v-if="!loading && !error && canManageUserDefaults"
+      aria-labelledby="default-library-access-heading"
+      class="space-y-2 border-t border-border/70 pt-6"
+    >
       <div>
         <h3 id="default-library-access-heading" class="settings-group-label mb-1">
           {{ t('adminFeature.usersPage.defaultLibraryAccess.title') }}
@@ -537,9 +535,11 @@ async function saveDefaultLibraryAccess() {
       <div class="rounded-lg border border-border bg-card p-4 shadow-xs">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <p class="max-w-2xl text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.description') }}</p>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            class="settings-btn-outline justify-center md:justify-start"
+            class="md:justify-start"
             :disabled="savingDefaultLibraryAccess || !hasDefaultLibraryChanges"
             @click="saveDefaultLibraryAccess"
           >
@@ -549,7 +549,7 @@ async function saveDefaultLibraryAccess() {
                 ? t('adminFeature.usersPage.defaultLibraryAccess.saving')
                 : t('adminFeature.usersPage.defaultLibraryAccess.save')
             }}
-          </button>
+          </Button>
         </div>
         <div v-if="libraries.length > 0" class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <label
@@ -590,5 +590,5 @@ async function saveDefaultLibraryAccess() {
       @confirm="confirmDeleteUser"
       @cancel="cancelDeleteUser"
     />
-  </section>
+  </div>
 </template>

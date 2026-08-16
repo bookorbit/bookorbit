@@ -1,7 +1,7 @@
 export type SidebarVersionUi = {
   currentLabel: string
   currentHref: string | null
-  /** Drives the single update pill in the footer, replacing the old third wrapped link. */
+  /** Shows the external release arrow beside the current version. */
   showUpdate: boolean
   updateVersionLabel: string
   updateHref: string

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref, reactive, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -118,32 +119,28 @@ async function setDefault(r: EmailRecipient) {
 function deviceLabel(type: string | null): string {
   return DEVICE_TYPES.value.find((d) => d.value === type)?.label ?? type ?? ''
 }
+function cancelDelete() {
+  deleteConfirm.value = null
+}
 </script>
 
 <template>
   <div class="space-y-4">
     <div class="hidden md:flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.recipients.heading') }}</p>
-      <button
-        v-if="!showForm"
-        class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        @click="openCreate()"
-      >
+      <Button size="sm" v-if="!showForm" @click="openCreate">
         <Plus :size="12" />
         {{ t('email.recipients.add') }}
-      </button>
+      </Button>
     </div>
     <div class="md:hidden flex items-center justify-between">
       <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{{ t('email.recipients.heading') }}</p>
     </div>
-    <div v-if="!showForm" class="md:hidden sticky top-11 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mb-6">
-      <button
-        class="w-full min-h-10 flex items-center justify-center gap-1.5 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        @click="openCreate()"
-      >
+    <div v-if="!showForm" class="md:hidden sticky top-11 z-20 mb-6 rounded-lg border border-border/60 bg-card/95 px-3 py-2 backdrop-blur">
+      <Button size="sm" class="w-full min-h-10" @click="openCreate">
         <Plus :size="13" />
         {{ t('email.recipients.add') }}
-      </button>
+      </Button>
     </div>
 
     <!-- Form -->
@@ -207,42 +204,32 @@ function deviceLabel(type: string | null): string {
       <div v-if="formError" class="text-xs text-destructive">{{ formError }}</div>
 
       <div class="hidden md:flex items-center gap-2">
-        <button
-          class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-          :disabled="saving"
-          @click="submitForm()"
-        >
+        <Button size="sm" :disabled="saving" @click="submitForm">
           {{ saving ? t('email.saving') : editingId ? t('email.update') : t('email.create') }}
-        </button>
-        <button
-          class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-          @click="cancelForm()"
-        >
+        </Button>
+        <Button variant="outline" size="sm" @click="cancelForm">
           {{ t('common.cancel') }}
-        </button>
+        </Button>
       </div>
       <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
         <div class="flex items-center gap-2">
-          <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="saving" @click="submitForm()">
+          <Button size="sm" class="flex-1 min-h-10" :disabled="saving" @click="submitForm" type="button">
             {{ saving ? t('email.saving') : editingId ? t('email.update') : t('email.create') }}
-          </button>
-          <button
-            class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="cancelForm()"
-          >
+          </Button>
+          <Button variant="outline" size="sm" class="min-h-10" @click="cancelForm">
             {{ t('common.cancel') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
 
     <!-- Empty state -->
-    <div v-if="recipients.length === 0 && !showForm" class="border border-border rounded-lg px-5 py-8 bg-card text-center shadow-xs">
+    <div v-if="recipients.length === 0 && !showForm" class="settings-empty-state">
       <p class="text-sm text-muted-foreground">{{ t('email.recipients.empty') }}</p>
     </div>
 
     <!-- List -->
-    <div v-else-if="recipients.length > 0" class="border border-border rounded-lg overflow-hidden divide-y divide-border shadow-xs">
+    <div v-else-if="recipients.length > 0" class="settings-card">
       <div v-for="r in recipients" :key="r.id" class="px-4 py-3 bg-card flex flex-col md:flex-row md:items-center gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -263,35 +250,30 @@ function deviceLabel(type: string | null): string {
         <div class="flex items-center gap-1 shrink-0 self-end md:self-auto">
           <Tooltip>
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded transition-colors"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 :class="r.isDefault ? 'text-primary' : 'text-muted-foreground hover:text-primary hover:bg-muted'"
                 @click="setDefault(r)"
               >
                 <Star :size="13" :class="r.isDefault ? 'fill-primary' : ''" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('email.setAsDefault') }}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                @click="openEdit(r)"
-              >
+              <Button variant="ghost" size="icon-sm" @click="openEdit(r)">
                 <Pencil :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('common.edit') }}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                @click="requestRemove(r)"
-              >
+              <Button variant="destructive-ghost" size="icon-sm" @click="requestRemove(r)">
                 <Trash2 :size="13" />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('common.delete') }}</TooltipContent>
           </Tooltip>
@@ -300,23 +282,17 @@ function deviceLabel(type: string | null): string {
     </div>
 
     <div v-if="deleteConfirm" class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4" @click.self="deleteConfirm = null">
-      <button class="absolute inset-0 bg-black/45" @click="deleteConfirm = null" />
+      <button class="absolute inset-0 bg-black/45" @click="cancelDelete" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">{{ t('email.recipients.deleteTitle') }}</p>
         <p class="mt-1 text-sm text-muted-foreground">{{ t('email.deleteConfirm', { name: deleteConfirm.name }) }}</p>
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="deleteConfirm = null"
-          >
+          <Button variant="outline" size="sm" @click="cancelDelete">
             {{ t('common.cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-            @click="confirmRemove"
-          >
+          </Button>
+          <Button variant="destructive" size="sm" @click="confirmRemove">
             {{ t('common.delete') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

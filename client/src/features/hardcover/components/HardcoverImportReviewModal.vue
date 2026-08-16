@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CheckCircle2, ChevronLeft, ChevronRight, Download, Search, X, XCircle } from '@lucide/vue'
@@ -282,16 +283,11 @@ function normalizeSearch(value: string): string {
               {{ t('hardcover.review.subtitle', { total: preview.summary.totalHardcoverBooks, matched: preview.summary.matchedBooks }) }}
             </p>
           </div>
-          <button
-            ref="closeButtonRef"
-            type="button"
-            class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-            :disabled="applying"
-            :aria-label="t('hardcover.review.closeAriaLabel')"
-            @click="handleClose"
-          >
-            <X class="size-4" />
-          </button>
+          <Button as-child variant="ghost" size="icon-sm">
+            <button ref="closeButtonRef" type="button" :disabled="applying" :aria-label="t('hardcover.review.closeAriaLabel')" @click="handleClose">
+              <X class="size-4" />
+            </button>
+          </Button>
         </header>
 
         <div class="grid shrink-0 grid-cols-2 gap-2 border-b border-border px-4 py-3 sm:grid-cols-5 md:px-5">
@@ -365,33 +361,24 @@ function normalizeSearch(value: string): string {
               <span v-if="importProgressModel">{{ selectedProgressLabel }}.</span>
             </p>
             <div class="flex flex-wrap gap-2">
-              <button type="button" class="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" @click="handleSelectSafe">
+              <Button variant="outline" size="sm" type="button" @click="handleSelectSafe">
                 {{ t('hardcover.review.selectReady') }}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
-                class="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
                 :disabled="visibleImportableRows.length === 0 || allVisibleSelected"
                 @click="handleSelectVisible"
               >
                 {{ t('hardcover.review.selectPage') }}
-              </button>
-              <button
-                type="button"
-                class="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
-                :disabled="visibleImportableRows.length === 0"
-                @click="handleClearVisible"
-              >
+              </Button>
+              <Button variant="outline" size="sm" type="button" :disabled="visibleImportableRows.length === 0" @click="handleClearVisible">
                 {{ t('hardcover.review.clearPage') }}
-              </button>
-              <button
-                type="button"
-                class="rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-40"
-                :disabled="selectedCount === 0"
-                @click="handleClearSelection"
-              >
+              </Button>
+              <Button variant="outline" size="sm" type="button" :disabled="selectedCount === 0" @click="handleClearSelection">
                 {{ t('hardcover.review.clearSelection') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -451,49 +438,41 @@ function normalizeSearch(value: string): string {
 
         <footer class="flex shrink-0 flex-col gap-3 border-t border-border px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
           <div class="flex items-center gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="icon-sm"
               type="button"
-              class="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
               :disabled="!canGoPrevious"
               :aria-label="t('hardcover.review.previousPage')"
               @click="goPrevious"
             >
               <ChevronLeft class="size-4" />
-            </button>
+            </Button>
             <p class="text-xs text-muted-foreground">
               {{ t('hardcover.review.pageRange', { start: displayStart, end: displayEnd, total: filteredRows.length }) }}
             </p>
-            <button
+            <Button
+              variant="outline"
+              size="icon-sm"
               type="button"
-              class="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-40"
               :disabled="!canGoNext"
               :aria-label="t('hardcover.review.nextPage')"
               @click="goNext"
             >
               <ChevronRight class="size-4" />
-            </button>
+            </Button>
           </div>
 
           <div class="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              class="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted disabled:opacity-40"
-              :disabled="applying"
-              @click="handleClose"
-            >
+            <Button variant="outline" size="sm" type="button" :disabled="applying" @click="handleClose">
               <XCircle class="size-3.5" />
               {{ t('common.close') }}
-            </button>
-            <button
-              type="button"
-              class="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="selectedCount === 0 || applying"
-              @click="handleApply"
-            >
+            </Button>
+            <Button size="sm" type="button" :disabled="selectedCount === 0 || applying" @click="handleApply">
               <CheckCircle2 v-if="applying" class="size-3.5 animate-pulse" />
               <Download v-else class="size-3.5" />
               {{ t('hardcover.review.importSelected') }}
-            </button>
+            </Button>
           </div>
         </footer>
       </section>

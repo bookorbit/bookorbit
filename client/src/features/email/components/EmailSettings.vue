@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Permission } from '@bookorbit/types'
 import ProvidersTab from './ProvidersTab.vue'
-import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import SettingsTabs from '@/features/settings/components/SettingsTabs.vue'
 import { useRouteTab } from '@/features/settings/composables/useRouteTab'
 import RecipientsTab from './RecipientsTab.vue'
@@ -69,12 +68,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <SettingsPageHeader :title="t('email.title')" :subtitle="t('email.subtitle')" />
-
-  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">
+  <div v-if="loading" class="settings-loading-state">
     {{ t('common.loading') }}
   </div>
-  <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
+  <div v-else-if="error" class="settings-error-state">{{ error }}</div>
   <template v-else>
     <SettingsTabs :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
 

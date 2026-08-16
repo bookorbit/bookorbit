@@ -444,4 +444,35 @@ describe('DashboardWidgetService', () => {
       expect(widgetRepo.getLibraryOverview).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('getWidgets', () => {
+    it('resolves several widgets in one call', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getCompletedBooksThisYear.mockResolvedValue(4);
+      widgetRepo.getLibraryOverview.mockResolvedValue({ totalBooks: 100, formats: [] });
+
+      const response = await service.getWidgets(['reading-goal', 'library-overview'], makeUser());
+
+      expect(response.items).toHaveLength(2);
+      expect(response.items.map((item) => item.type)).toEqual(['reading-goal', 'library-overview']);
+      expect(response.items.every((item) => item.failed)).toBe(false);
+      expect(response.items[0]?.data).toMatchObject({ completedBooks: 4 });
+    });
+
+    it('isolates a failing widget so the rest of the dashboard still loads', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
+      widgetRepo.getCompletedBooksThisYear.mockRejectedValue(new Error('statement timeout'));
+      widgetRepo.getLibraryOverview.mockResolvedValue({ totalBooks: 100, formats: [] });
+
+      const response = await service.getWidgets(['reading-goal', 'library-overview'], makeUser());
+
+      const readingGoal = response.items.find((item) => item.type === 'reading-goal');
+      const libraryOverview = response.items.find((item) => item.type === 'library-overview');
+      expect(readingGoal).toMatchObject({ failed: true, data: null });
+      expect(libraryOverview?.failed).toBe(false);
+      expect(libraryOverview?.data).toBeTruthy();
+    });
+  });
 });

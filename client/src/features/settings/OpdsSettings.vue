@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { onMounted, ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Plus, Trash2, Copy, Rss, ChevronDown, ChevronUp } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
-import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/clipboard'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -205,20 +205,29 @@ watch(
   },
   { immediate: true },
 )
+function beginCreate() {
+  showCreateForm.value = true
+}
+
+function toggleHelp() {
+  helpOpen.value = !helpOpen.value
+}
+
+function cancelDelete() {
+  deleteConfirmUser.value = null
+}
 </script>
 
 <template>
-  <SettingsPageHeader :title="t('settings.reader.opds.title')" :subtitle="t('settings.reader.opds.subtitle')" />
-
-  <div v-if="loading" class="mt-5 md:mt-0 text-sm text-muted-foreground">
+  <div v-if="loading" class="settings-loading-state">
     {{ t('common.loading') }}
   </div>
-  <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
+  <div v-else-if="error" class="settings-error-state">{{ error }}</div>
   <template v-else>
     <!-- Server Toggle -->
     <div v-if="canManageSettings" class="mb-6">
       <p class="settings-group-label">{{ t('settings.reader.opds.server') }}</p>
-      <div class="border border-border rounded-lg overflow-hidden shadow-xs">
+      <div class="settings-card">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
             <p class="settings-label">
@@ -238,35 +247,28 @@ watch(
       <p class="settings-group-label">
         {{ t('settings.reader.opds.endpoint') }}
       </p>
-      <div class="border border-border rounded-lg overflow-hidden shadow-xs">
+      <div class="settings-card">
         <div class="flex flex-col md:flex-row md:items-center gap-2 px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <Rss :size="14" class="text-muted-foreground shrink-0" />
           <input :value="opdsUrl" readonly class="flex-1 text-sm bg-transparent text-foreground outline-none select-all min-w-0 truncate" />
-          <button
-            class="w-full md:w-auto flex items-center justify-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors shrink-0"
-            @click="copyUrl()"
-          >
+          <Button variant="outline" size="sm" class="w-full md:w-auto shrink-0" @click="copyUrl">
             <Copy :size="12" />
             {{ t('settings.reader.opds.copy') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
 
     <!-- OPDS Users -->
     <div v-if="opdsEnabled" class="mb-6">
-      <div class="hidden md:flex items-center justify-between mb-3">
+      <div class="hidden items-center justify-between mb-2 md:flex">
         <p class="settings-group-label mb-0">
           {{ t('settings.reader.opds.accounts') }}
         </p>
-        <button
-          v-if="!showCreateForm"
-          class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          @click="showCreateForm = true"
-        >
+        <Button size="sm" v-if="!showCreateForm" @click="beginCreate">
           <Plus :size="12" />
           {{ t('settings.reader.opds.add') }}
-        </button>
+        </Button>
       </div>
       <div class="md:hidden flex items-center justify-between mb-2">
         <p class="settings-group-label mb-0">
@@ -274,13 +276,10 @@ watch(
         </p>
       </div>
       <div v-if="!showCreateForm" class="md:hidden sticky top-0 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2 mb-3">
-        <button
-          class="w-full min-h-10 flex items-center justify-center gap-1.5 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          @click="showCreateForm = true"
-        >
+        <Button size="sm" class="w-full min-h-10" @click="beginCreate">
           <Plus :size="13" />
           {{ t('settings.reader.opds.addAccount') }}
-        </button>
+        </Button>
       </div>
 
       <!-- Create form -->
@@ -311,35 +310,21 @@ watch(
           {{ createError }}
         </div>
         <div class="hidden md:flex items-center gap-2 pt-1">
-          <button
-            class="px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-            :disabled="creating || !createUsername || !createPassword"
-            @click="createUser()"
-          >
+          <Button size="sm" :disabled="creating || !createUsername || !createPassword" @click="createUser">
             {{ creating ? t('settings.reader.opds.creating') : t('settings.reader.opds.create') }}
-          </button>
-          <button
-            class="px-4 py-2 text-xs font-medium rounded-md border border-border bg-background text-foreground hover:bg-muted transition-colors"
-            @click="cancelCreate()"
-          >
+          </Button>
+          <Button variant="outline" size="sm" @click="cancelCreate">
             {{ t('common.cancel') }}
-          </button>
+          </Button>
         </div>
         <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
           <div class="flex items-center gap-2">
-            <button
-              class="settings-btn-primary flex-1 min-h-10 justify-center"
-              :disabled="creating || !createUsername || !createPassword"
-              @click="createUser()"
-            >
+            <Button size="sm" class="flex-1 min-h-10" :disabled="creating || !createUsername || !createPassword" @click="createUser" type="button">
               {{ creating ? t('settings.reader.opds.creating') : t('settings.reader.opds.create') }}
-            </button>
-            <button
-              class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
-              @click="cancelCreate()"
-            >
+            </Button>
+            <Button variant="outline" size="sm" class="min-h-10" @click="cancelCreate">
               {{ t('common.cancel') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -368,23 +353,20 @@ watch(
                 {{ opt.label }}
               </option>
             </select>
-            <button
-              class="hidden md:flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              @click="requestDeleteUser(user)"
-            >
+            <Button variant="destructive-ghost" size="icon-sm" class="hidden md:flex" @click="requestDeleteUser(user)">
               <Trash2 :size="14" />
-            </button>
+            </Button>
           </div>
           <div class="md:hidden flex items-center gap-3 text-xs">
-            <button class="text-primary hover:underline" @click="toggleUserDetails(user.id)">
+            <Button variant="link" size="sm" class="h-auto p-0" @click="toggleUserDetails(user.id)">
               {{ userDetailsOpen(user.id) ? t('settings.reader.opds.hideDetails') : t('settings.reader.opds.showDetails') }}
-            </button>
-            <button class="text-muted-foreground hover:text-foreground" @click="copyValue(user.username, t('settings.reader.opds.usernameLabel'))">
+            </Button>
+            <Button variant="ghost" size="sm" @click="copyValue(user.username, t('settings.reader.opds.usernameLabel'))">
               {{ t('settings.reader.opds.copyUsername') }}
-            </button>
-            <button class="text-destructive hover:underline" @click="requestDeleteUser(user)">
+            </Button>
+            <Button variant="destructive-ghost" size="sm" @click="requestDeleteUser(user)">
               {{ t('common.delete') }}
-            </button>
+            </Button>
           </div>
           <div
             v-if="userDetailsOpen(user.id)"
@@ -402,7 +384,7 @@ watch(
     </div>
 
     <div v-if="opdsEnabled" class="border border-border rounded-lg bg-card/50 shadow-xs">
-      <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="helpOpen = !helpOpen">
+      <button class="w-full flex items-center justify-between gap-2 p-4 text-left" @click="toggleHelp">
         <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {{ t('settings.reader.opds.notes') }}
         </p>
@@ -419,7 +401,7 @@ watch(
       class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:px-4"
       @click.self="deleteConfirmUser = null"
     >
-      <button class="absolute inset-0 bg-black/45" @click="deleteConfirmUser = null" />
+      <button class="absolute inset-0 bg-black/45" @click="cancelDelete" />
       <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-md md:rounded-lg md:p-5">
         <p class="text-base font-semibold text-foreground">
           {{ t('settings.reader.opds.deleteConfirmTitle') }}
@@ -432,18 +414,12 @@ watch(
           }}
         </p>
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-            @click="deleteConfirmUser = null"
-          >
+          <Button variant="outline" size="sm" @click="cancelDelete">
             {{ t('common.cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-            @click="confirmDeleteUser"
-          >
+          </Button>
+          <Button variant="destructive" size="sm" @click="confirmDeleteUser">
             {{ t('common.delete') }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

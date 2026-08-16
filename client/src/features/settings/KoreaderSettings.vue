@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -37,7 +38,6 @@ import type {
   KoreaderUnmatchedBook,
   UpdateKoreaderCredentialsPayload,
 } from '@bookorbit/types'
-import SettingsPageHeader from './SettingsPageHeader.vue'
 import SettingsTabs from './components/SettingsTabs.vue'
 import KoreaderCredentialsDialog from './KoreaderCredentialsDialog.vue'
 import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
@@ -684,7 +684,6 @@ async function handleDownloadPlugin() {
 </script>
 
 <template>
-  <SettingsPageHeader v-if="!props.embedded" :title="t('settings.reader.koreader.title')" :subtitle="t('settings.reader.koreader.subtitle')" />
   <SettingsTabs v-if="!props.embedded" id-prefix="koreader" :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
 
   <div
@@ -692,7 +691,7 @@ async function handleDownloadPlugin() {
     v-show="activeTab === 'settings' || props.embedded"
     :aria-labelledby="props.embedded ? undefined : 'koreader-settings-tab'"
   >
-    <div v-if="loading" class="mt-5 md:mt-0 border border-border rounded-lg px-5 py-8 bg-card text-sm text-muted-foreground shadow-xs">
+    <div v-if="loading" class="rounded-lg border border-border bg-card px-5 py-8 text-sm text-muted-foreground shadow-xs">
       {{ t('settings.reader.koreader.loadingSettings') }}
     </div>
     <div v-else-if="error" class="border border-destructive/30 rounded-lg px-5 py-4 bg-card text-sm text-destructive shadow-xs">
@@ -710,10 +709,10 @@ async function handleDownloadPlugin() {
           <p class="text-xs text-muted-foreground mt-1 mb-4 max-w-sm mx-auto">
             {{ t('settings.reader.koreader.notConfiguredHint') }}
           </p>
-          <button class="settings-btn-primary mx-auto min-h-10 justify-center" @click="handleShowSetupForm">
+          <Button size="sm" class="mx-auto min-h-10" @click="handleShowSetupForm" type="button">
             <User :size="13" />
             {{ t('settings.reader.koreader.createCredentials') }}
-          </button>
+          </Button>
         </div>
 
         <div v-else class="border border-border rounded-lg p-4 md:p-5 bg-card space-y-4 shadow-xs">
@@ -744,9 +743,11 @@ async function handleDownloadPlugin() {
                 class="input-field w-full pr-10"
                 :class="{ 'input-secret': !showPassword }"
               />
-              <button
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 type="button"
-                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="absolute right-2 top-1/2 -translate-y-1/2"
                 :aria-label="
                   showPassword
                     ? t('settings.reader.koreader.changeCredentials.hidePassword')
@@ -756,28 +757,25 @@ async function handleDownloadPlugin() {
               >
                 <EyeOff v-if="showPassword" :size="14" aria-hidden="true" />
                 <Eye v-else :size="14" aria-hidden="true" />
-              </button>
+              </Button>
             </div>
           </div>
           <div class="hidden md:flex items-center gap-2 pt-1">
-            <button class="settings-btn-primary" :disabled="createDisabled" @click="handleCreate">
+            <Button size="sm" :disabled="createDisabled" @click="handleCreate" type="button">
               {{ creating ? t('settings.reader.koreader.creating') : t('settings.reader.koreader.create') }}
-            </button>
-            <button class="settings-btn-outline" @click="handleCancelSetup">
+            </Button>
+            <Button variant="outline" size="sm" @click="handleCancelSetup" type="button">
               {{ t('common.cancel') }}
-            </button>
+            </Button>
           </div>
           <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
             <div class="flex items-center gap-2">
-              <button class="settings-btn-primary flex-1 min-h-10 justify-center" :disabled="createDisabled" @click="handleCreate">
+              <Button size="sm" class="flex-1 min-h-10" :disabled="createDisabled" @click="handleCreate" type="button">
                 {{ creating ? t('settings.reader.koreader.creating') : t('settings.reader.koreader.create') }}
-              </button>
-              <button
-                class="rounded-md border border-border px-3 min-h-10 text-sm text-foreground hover:bg-muted transition-colors"
-                @click="handleCancelSetup"
-              >
+              </Button>
+              <Button variant="outline" size="sm" class="min-h-10" @click="handleCancelSetup">
                 {{ t('common.cancel') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -785,16 +783,16 @@ async function handleDownloadPlugin() {
 
       <template v-else>
         <div class="mb-8">
-          <div class="flex items-center justify-between mb-3">
+          <div class="mb-2 flex items-center justify-between">
             <p class="settings-group-label mb-0">
               {{ t('settings.reader.koreader.status') }}
             </p>
-            <button class="settings-btn-outline" @click="handleRefresh">
+            <Button variant="outline" size="sm" @click="handleRefresh" type="button">
               <RefreshCw :size="12" />
               {{ t('settings.reader.koreader.refresh') }}
-            </button>
+            </Button>
           </div>
-          <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
+          <div class="settings-card">
             <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
               <div class="min-w-0">
                 <p class="settings-label">
@@ -814,14 +812,10 @@ async function handleDownloadPlugin() {
                 <p class="settings-hint font-mono truncate">
                   {{ credentials?.username }}
                 </p>
-                <button
-                  type="button"
-                  class="mt-2 inline-flex items-center gap-1.5 rounded-md text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  @click="handleOpenChangeCredentials"
-                >
+                <Button variant="link" size="sm" type="button" class="h-auto p-0 mt-2" @click="handleOpenChangeCredentials">
                   <KeyRound :size="12" aria-hidden="true" />
                   {{ t('settings.reader.koreader.changeCredentials.action') }}
-                </button>
+                </Button>
               </div>
               <div>
                 <p class="settings-label">
@@ -871,7 +865,7 @@ async function handleDownloadPlugin() {
           <p class="settings-group-label">
             {{ t('settings.reader.koreader.setup') }}
           </p>
-          <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
+          <div class="settings-card">
             <div class="px-4 py-4 bg-card md:px-5">
               <div class="flex items-start gap-3">
                 <div class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -886,15 +880,18 @@ async function handleDownloadPlugin() {
               </div>
               <div class="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
                 <input id="koreader-sync-url" :value="syncUrl" readonly class="input-field flex-1 min-w-0 font-mono text-xs md:text-sm" />
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   id="koreader-sync-url-copy"
-                  class="settings-btn-outline w-full min-h-10 justify-center md:w-auto md:min-h-0"
+                  class="w-full min-h-10 md:w-auto md:min-h-0"
                   @click="handleCopySyncUrl"
+                  type="button"
                 >
                   <Check v-if="urlCopied" :size="12" />
                   <Copy v-else :size="12" />
                   {{ urlCopied ? t('settings.reader.koreader.copied') : t('settings.reader.koreader.copyUrl') }}
-                </button>
+                </Button>
               </div>
             </div>
             <div class="flex flex-col gap-3 px-4 py-4 bg-card md:flex-row md:items-center md:justify-between md:px-5">
@@ -923,10 +920,10 @@ async function handleDownloadPlugin() {
                   }}
                 </p>
               </div>
-              <button class="settings-btn-primary self-start md:self-auto" :disabled="downloadingPlugin" @click="handleDownloadPlugin">
+              <Button size="sm" class="self-start md:self-auto" :disabled="downloadingPlugin" @click="handleDownloadPlugin" type="button">
                 <Download :size="12" />
                 {{ downloadingPlugin ? t('settings.reader.koreader.preparing') : t('settings.reader.koreader.downloadPlugin') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -949,7 +946,7 @@ async function handleDownloadPlugin() {
               {{ t('settings.reader.koreader.noDevicesSyncedHint') }}
             </p>
           </div>
-          <div v-else class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
+          <div v-else class="settings-card">
             <div v-for="device in activeDevices" :key="device.deviceId" class="px-4 py-4 bg-card md:px-5">
               <div class="flex items-start gap-3">
                 <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
@@ -968,19 +965,21 @@ async function handleDownloadPlugin() {
                     </p>
                   </div>
                 </div>
-                <button
-                  class="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors shrink-0 disabled:opacity-60"
+                <Button
+                  variant="destructive-outline"
+                  size="sm"
+                  class="shrink-0"
                   :disabled="retiringDeviceId === device.deviceId"
                   @click="handleRetireDevice(device)"
                 >
                   <Archive :size="12" />
                   {{ retiringDeviceId === device.deviceId ? t('settings.reader.koreader.retiring') : t('settings.reader.koreader.retire') }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
 
-          <div v-if="retiredDevices.length > 0" class="mt-3 border border-border rounded-lg overflow-hidden shadow-xs">
+          <div v-if="retiredDevices.length > 0" class="settings-card mt-3">
             <button
               class="flex w-full items-center justify-between gap-3 px-4 py-3 bg-card text-left text-foreground hover:bg-muted transition-colors md:px-5"
               :aria-expanded="retiredDevicesOpen"
@@ -1009,21 +1008,14 @@ async function handleDownloadPlugin() {
                     </div>
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
-                    <button
-                      class="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-60"
-                      :disabled="retiringDeviceId === device.deviceId"
-                      @click="handleRestoreDevice(device)"
-                    >
+                    <Button variant="outline" size="sm" :disabled="retiringDeviceId === device.deviceId" @click="handleRestoreDevice(device)">
                       <ArchiveRestore :size="12" />
                       {{ retiringDeviceId === device.deviceId ? t('settings.reader.koreader.restoring') : t('settings.reader.koreader.restore') }}
-                    </button>
-                    <button
-                      class="flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-                      @click="handleOpenRemoveDevice(device)"
-                    >
+                    </Button>
+                    <Button variant="destructive-outline" size="sm" @click="handleOpenRemoveDevice(device)">
                       <Trash2 :size="12" />
                       {{ t('settings.reader.koreader.deleteSyncedData') }}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1035,7 +1027,7 @@ async function handleDownloadPlugin() {
           <p class="settings-group-label">
             {{ t('settings.reader.koreader.pluginActivity') }}
           </p>
-          <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
+          <div class="settings-card">
             <div v-if="!hasPluginActivity" class="px-4 py-5 bg-card text-sm text-muted-foreground md:px-5">
               {{ t('settings.reader.koreader.noPluginActivity') }}
             </div>
@@ -1158,27 +1150,28 @@ async function handleDownloadPlugin() {
         </div>
 
         <div class="mb-8">
-          <div class="flex items-center justify-between gap-3 mb-3">
+          <div class="mb-2 flex items-center justify-between gap-3">
             <p class="settings-group-label mb-0">
               {{ t('settings.reader.koreader.hashLinks.unmatchedTitle') }}
             </p>
             <div class="flex items-center gap-2">
-              <button
+              <Button
                 v-if="unmatchedBooks.length > 0"
-                class="flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                variant="destructive-outline"
+                size="sm"
                 :disabled="unmatchedLoading"
                 @click="handleOpenDismissAll"
               >
                 <Trash2 :size="12" />
                 {{ t('settings.reader.koreader.hashLinks.dismissAll') }}
-              </button>
-              <button class="settings-btn-outline" :disabled="unmatchedLoading" @click="handleRefreshUnmatched">
+              </Button>
+              <Button variant="outline" size="sm" :disabled="unmatchedLoading" @click="handleRefreshUnmatched" type="button">
                 <RefreshCw :size="12" />
                 {{ t('settings.reader.koreader.hashLinks.refresh') }}
-              </button>
+              </Button>
             </div>
           </div>
-          <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
+          <div class="settings-card">
             <div v-if="unmatchedLoading" class="px-4 py-5 bg-card text-sm text-muted-foreground md:px-5">
               {{ t('settings.reader.koreader.hashLinks.loadingUnmatched') }}
             </div>
@@ -1215,17 +1208,14 @@ async function handleDownloadPlugin() {
                     </div>
                   </div>
                   <div class="flex gap-2 self-start md:self-auto">
-                    <button class="settings-btn-primary" @click="handleOpenLink(book)">
+                    <Button size="sm" @click="handleOpenLink(book)" type="button">
                       <Link2 :size="12" />
                       {{ t('settings.reader.koreader.hashLinks.link') }}
-                    </button>
-                    <button
-                      class="flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-                      @click="handleOpenDismiss(book)"
-                    >
+                    </Button>
+                    <Button variant="destructive-outline" size="sm" @click="handleOpenDismiss(book)">
                       <Trash2 :size="12" />
                       {{ t('settings.reader.koreader.hashLinks.dismiss') }}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1243,10 +1233,10 @@ async function handleDownloadPlugin() {
                   }}
                 </p>
                 <div class="flex flex-wrap items-center gap-2">
-                  <button class="settings-btn-outline" :disabled="clampedUnmatchedPage <= 1" @click="handlePreviousUnmatchedPage">
+                  <Button variant="outline" size="sm" :disabled="clampedUnmatchedPage <= 1" @click="handlePreviousUnmatchedPage" type="button">
                     <ChevronLeft :size="12" />
                     {{ t('common.previous') }}
-                  </button>
+                  </Button>
                   <span class="min-w-20 text-center">
                     {{
                       t('settings.reader.koreader.hashLinks.pageOf', {
@@ -1255,10 +1245,16 @@ async function handleDownloadPlugin() {
                       })
                     }}
                   </span>
-                  <button class="settings-btn-outline" :disabled="clampedUnmatchedPage >= unmatchedTotalPages" @click="handleNextUnmatchedPage">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    :disabled="clampedUnmatchedPage >= unmatchedTotalPages"
+                    @click="handleNextUnmatchedPage"
+                  >
                     {{ t('common.next') }}
                     <ChevronRight :size="12" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             </template>
@@ -1266,16 +1262,16 @@ async function handleDownloadPlugin() {
         </div>
 
         <div class="mb-8">
-          <div class="flex items-center justify-between gap-3 mb-3">
+          <div class="mb-2 flex items-center justify-between gap-3">
             <p class="settings-group-label mb-0">
               {{ t('settings.reader.koreader.hashLinks.manualTitle') }}
             </p>
-            <button class="settings-btn-outline" :disabled="manualLinksLoading" @click="handleRefreshManualLinks">
+            <Button variant="outline" size="sm" :disabled="manualLinksLoading" @click="handleRefreshManualLinks" type="button">
               <RefreshCw :size="12" />
               {{ t('settings.reader.koreader.hashLinks.refresh') }}
-            </button>
+            </Button>
           </div>
-          <div class="border border-border rounded-lg overflow-hidden shadow-xs divide-y divide-border">
+          <div class="settings-card">
             <div v-if="manualLinksLoading" class="px-4 py-5 bg-card text-sm text-muted-foreground md:px-5">
               {{ t('settings.reader.koreader.hashLinks.loadingManual') }}
             </div>
@@ -1328,17 +1324,14 @@ async function handleDownloadPlugin() {
                     </div>
                   </div>
                   <div class="flex gap-2 self-start">
-                    <button class="settings-btn-outline" @click="handleOpenRelink(link)">
+                    <Button variant="outline" size="sm" @click="handleOpenRelink(link)" type="button">
                       <Link2 :size="12" />
                       {{ t('settings.reader.koreader.hashLinks.change') }}
-                    </button>
-                    <button
-                      class="flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-                      @click="handleOpenUnlink(link)"
-                    >
+                    </Button>
+                    <Button variant="destructive-outline" size="sm" @click="handleOpenUnlink(link)">
                       <Trash2 :size="12" />
                       {{ t('settings.reader.koreader.hashLinks.unlink') }}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1412,7 +1405,7 @@ async function handleDownloadPlugin() {
           <p class="settings-group-label">
             {{ t('settings.reader.koreader.dangerZone') }}
           </p>
-          <div class="border border-destructive/30 rounded-lg overflow-hidden shadow-xs">
+          <div class="overflow-hidden rounded-lg border border-destructive/30 bg-card shadow-xs">
             <div class="flex flex-col gap-3 px-4 py-4 bg-card md:flex-row md:items-center md:justify-between md:px-5">
               <div class="min-w-0">
                 <p class="settings-label">
@@ -1422,13 +1415,10 @@ async function handleDownloadPlugin() {
                   {{ t('settings.reader.koreader.deleteCredentialsHint') }}
                 </p>
               </div>
-              <button
-                class="self-start md:self-auto flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shrink-0"
-                @click="handleOpenDeleteConfirm"
-              >
+              <Button variant="destructive" size="sm" class="self-start md:self-auto shrink-0" @click="handleOpenDeleteConfirm">
                 <Trash2 :size="12" />
                 {{ t('common.delete') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1457,18 +1447,12 @@ async function handleDownloadPlugin() {
             {{ t('settings.reader.koreader.deleteConfirmBody') }}
           </p>
           <div class="mt-4 flex items-center justify-end gap-2">
-            <button
-              class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-              @click="handleCloseDeleteConfirm"
-            >
+            <Button variant="outline" size="sm" @click="handleCloseDeleteConfirm">
               {{ t('common.cancel') }}
-            </button>
-            <button
-              class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-              @click="handleDelete"
-            >
+            </Button>
+            <Button variant="destructive" size="sm" @click="handleDelete">
               {{ t('common.delete') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1499,23 +1483,16 @@ async function handleDownloadPlugin() {
             </p>
           </div>
           <div class="mt-4 flex items-center justify-end gap-2">
-            <button
-              class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-              @click="handleCloseUnlink"
-            >
+            <Button variant="outline" size="sm" @click="handleCloseUnlink">
               {{ t('common.cancel') }}
-            </button>
-            <button
-              class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
-              :disabled="unlinkingHash !== null"
-              @click="handleUnlinkManualLink"
-            >
+            </Button>
+            <Button variant="destructive" size="sm" :disabled="unlinkingHash !== null" @click="handleUnlinkManualLink">
               {{
                 unlinkingHash === unlinkConfirmLink.hash
                   ? t('settings.reader.koreader.hashLinks.unlinking')
                   : t('settings.reader.koreader.hashLinks.unlink')
               }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1538,23 +1515,16 @@ async function handleDownloadPlugin() {
             {{ t('settings.reader.koreader.deleteDeviceDataConfirmBody') }}
           </p>
           <div class="mt-4 flex items-center justify-end gap-2">
-            <button
-              class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-              @click="handleCloseRemoveDevice"
-            >
+            <Button variant="outline" size="sm" @click="handleCloseRemoveDevice">
               {{ t('common.cancel') }}
-            </button>
-            <button
-              class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
-              :disabled="removingDeviceId !== null"
-              @click="handleRemoveDevice"
-            >
+            </Button>
+            <Button variant="destructive" size="sm" :disabled="removingDeviceId !== null" @click="handleRemoveDevice">
               {{
                 removingDeviceId === removeDeviceConfirmTarget.deviceId
                   ? t('settings.reader.koreader.deletingSyncedData')
                   : t('settings.reader.koreader.deleteSyncedData')
               }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1582,23 +1552,16 @@ async function handleDownloadPlugin() {
             </p>
           </div>
           <div class="mt-4 flex items-center justify-end gap-2">
-            <button
-              class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-              @click="handleCloseDismiss"
-            >
+            <Button variant="outline" size="sm" @click="handleCloseDismiss">
               {{ t('common.cancel') }}
-            </button>
-            <button
-              class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
-              :disabled="dismissingHash !== null"
-              @click="handleDismissUnmatchedBook"
-            >
+            </Button>
+            <Button variant="destructive" size="sm" :disabled="dismissingHash !== null" @click="handleDismissUnmatchedBook">
               {{
                 dismissingHash === dismissConfirmBook.hash
                   ? t('settings.reader.koreader.hashLinks.dismissing')
                   : t('settings.reader.koreader.hashLinks.dismiss')
               }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1624,19 +1587,12 @@ async function handleDownloadPlugin() {
             </p>
           </div>
           <div class="mt-4 flex items-center justify-end gap-2">
-            <button
-              class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-              @click="handleCloseDismissAll"
-            >
+            <Button variant="outline" size="sm" @click="handleCloseDismissAll">
               {{ t('common.cancel') }}
-            </button>
-            <button
-              class="rounded-md bg-destructive px-3 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
-              :disabled="dismissingAll"
-              @click="handleDismissAllUnmatchedBooks"
-            >
+            </Button>
+            <Button variant="destructive" size="sm" :disabled="dismissingAll" @click="handleDismissAllUnmatchedBooks">
               {{ dismissingAll ? t('settings.reader.koreader.hashLinks.dismissing') : t('settings.reader.koreader.hashLinks.dismissAll') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1707,15 +1663,17 @@ async function handleDownloadPlugin() {
                   }}
                 </span>
               </button>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 v-if="linkSearchHasMore"
-                class="flex w-full items-center justify-center gap-2 px-3 py-3 text-sm font-medium text-foreground hover:bg-muted/70 disabled:opacity-60"
+                class="w-full"
                 :disabled="linkSearchLoadingMore"
                 @click="handleLoadMoreLinkSearch"
               >
                 <ChevronDown :size="14" />
                 {{ linkSearchLoadingMore ? t('settings.reader.koreader.hashLinks.loadingMore') : t('settings.reader.koreader.hashLinks.loadMore') }}
-              </button>
+              </Button>
             </template>
           </div>
           <div v-if="pendingLinkTarget" class="mt-4 rounded-md border border-border bg-muted/30 p-3">
@@ -1763,20 +1721,16 @@ async function handleDownloadPlugin() {
               </p>
             </div>
             <div class="mt-3 flex items-center justify-end gap-2">
-              <button
-                class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                :disabled="linkingBookId !== null"
-                @click="handleClearLinkTarget"
-              >
+              <Button variant="outline" size="sm" :disabled="linkingBookId !== null" @click="handleClearLinkTarget">
                 {{ t('settings.reader.koreader.hashLinks.chooseDifferent') }}
-              </button>
-              <button class="settings-btn-primary" :disabled="linkingBookId !== null" @click="handleConfirmLinkTarget">
+              </Button>
+              <Button size="sm" :disabled="linkingBookId !== null" @click="handleConfirmLinkTarget" type="button">
                 {{
                   linkingBookId === pendingLinkTarget.id
                     ? t('settings.reader.koreader.hashLinks.saving')
                     : t('settings.reader.koreader.hashLinks.confirmLink')
                 }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -22,6 +22,7 @@ import {
   registerConditionalHsts,
   registerEmptyBodyContentTypeParser,
   shouldInjectEmptyJsonBody,
+  shouldServeSpaFallback,
 } from './common/utils/bootstrap.utils';
 
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
@@ -99,6 +100,9 @@ async function bootstrap() {
       fastify.setNotFoundHandler(async (request, reply) => {
         if (request.url.startsWith('/api')) {
           return nestHandler(request, reply);
+        }
+        if (!shouldServeSpaFallback(request.url)) {
+          return reply.status(404).send({ statusCode: 404, message: 'Not Found', path: request.url });
         }
         return reply.sendFile('index.html');
       });

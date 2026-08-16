@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from '@/components/ui/button'
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -83,17 +84,13 @@ async function save() {
         </select>
       </div>
 
-      <button
-        class="hidden md:inline-flex px-4 py-2 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-        :disabled="saving"
-        @click="save()"
-      >
+      <Button size="sm" class="hidden md:inline-flex" :disabled="saving" @click="save">
         {{ saving ? t('email.saving') : t('email.preferences.save') }}
-      </button>
+      </Button>
       <div class="md:hidden sticky bottom-2 z-20 border border-border/60 bg-card/95 backdrop-blur rounded-lg px-3 py-2">
-        <button class="settings-btn-primary w-full min-h-10 justify-center" :disabled="saving" @click="save()">
+        <Button size="sm" class="w-full min-h-10" :disabled="saving" @click="save" type="button">
           {{ saving ? t('email.saving') : t('email.preferences.save') }}
-        </button>
+        </Button>
       </div>
     </div>
   </div>

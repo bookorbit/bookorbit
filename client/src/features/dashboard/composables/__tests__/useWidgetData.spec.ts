@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 
-import { useWidgetData } from '../useWidgetData'
+import { useWidgetData, WIDGET_RETRY_DELAYS_MS } from '../useWidgetData'
 
 const { recoveryListeners } = vi.hoisted(() => ({ recoveryListeners: new Set<() => void>() }))
 
@@ -33,11 +33,20 @@ function mountWidget<T>(fetcher: () => Promise<T>) {
 describe('useWidgetData', () => {
   beforeEach(() => {
     recoveryListeners.clear()
+    vi.useFakeTimers()
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.clearAllMocks()
   })
+
+  /** Drains the retry backoff so a permanently failing widget reaches its error state. */
+  async function runOutRetries(): Promise<void> {
+    for (let i = 0; i <= WIDGET_RETRY_DELAYS_MS.length; i++) {
+      await vi.runAllTimersAsync()
+    }
+  }
 
   it('loads on mount', async () => {
     const fetcher = vi.fn<() => Promise<{ streak: number }>>().mockResolvedValue({ streak: 7 })
@@ -48,24 +57,39 @@ describe('useWidgetData', () => {
     expect(widget.error.value).toBe(false)
   })
 
+  it('retries a request that did not come back before giving up', async () => {
+    const fetcher = vi.fn<() => Promise<{ streak: number }>>().mockRejectedValueOnce(new Error('NetworkError')).mockResolvedValue({ streak: 7 })
+    const { widget } = mountWidget(fetcher)
+    await runOutRetries()
+
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(widget.data.value).toEqual({ streak: 7 })
+    expect(widget.error.value).toBe(false)
+    expect(widget.loading.value).toBe(false)
+  })
+
   it('reports a failure without leaving the widget stuck loading', async () => {
     const fetcher = vi.fn<() => Promise<{ streak: number }>>().mockRejectedValue(new Error('Session expired'))
     const { widget } = mountWidget(fetcher)
-    await vi.waitFor(() => expect(widget.loading.value).toBe(false))
+    await runOutRetries()
 
+    expect(fetcher).toHaveBeenCalledTimes(WIDGET_RETRY_DELAYS_MS.length + 1)
+    expect(widget.loading.value).toBe(false)
     expect(widget.error.value).toBe(true)
     expect(widget.data.value).toBeNull()
   })
 
   it('reloads a failed widget once the session comes back', async () => {
-    const fetcher = vi.fn<() => Promise<{ streak: number }>>().mockRejectedValueOnce(new Error('Session expired')).mockResolvedValue({ streak: 7 })
+    const fetcher = vi.fn<() => Promise<{ streak: number }>>().mockRejectedValue(new Error('Session expired'))
     const { widget } = mountWidget(fetcher)
-    await vi.waitFor(() => expect(widget.error.value).toBe(true))
+    await runOutRetries()
+    expect(widget.error.value).toBe(true)
 
+    fetcher.mockResolvedValue({ streak: 7 })
     recoverSession()
-    await vi.waitFor(() => expect(widget.error.value).toBe(false))
+    await vi.runAllTimersAsync()
 
-    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(widget.error.value).toBe(false)
     expect(widget.data.value).toEqual({ streak: 7 })
   })
 
@@ -80,16 +104,18 @@ describe('useWidgetData', () => {
     expect(fetcher).toHaveBeenCalledTimes(1)
   })
 
-  it('stops listening when the widget goes away', async () => {
+  it('stops retrying and listening when the widget goes away', async () => {
     const fetcher = vi.fn<() => Promise<{ streak: number }>>().mockRejectedValue(new Error('Session expired'))
     const { wrapper, widget } = mountWidget(fetcher)
-    await vi.waitFor(() => expect(widget.error.value).toBe(true))
+    await runOutRetries()
+    expect(widget.error.value).toBe(true)
 
+    const callsBeforeUnmount = fetcher.mock.calls.length
     wrapper.unmount()
     recoverSession()
-    await Promise.resolve()
+    await vi.runAllTimersAsync()
 
-    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(fetcher).toHaveBeenCalledTimes(callsBeforeUnmount)
     expect(recoveryListeners.size).toBe(0)
   })
 })

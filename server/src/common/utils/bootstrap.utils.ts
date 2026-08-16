@@ -84,6 +84,27 @@ export function buildHelmetOptions(options: CspOptions = {}) {
   };
 }
 
+/**
+ * Decides whether an unmatched request should be answered with the SPA shell.
+ *
+ * Serving `index.html` for everything means a hashed bundle that no longer exists after an upgrade
+ * answers `200 OK` with an HTML body under a `.js` URL. A 200 is storable, so both the browser HTTP
+ * cache and the Workbox precache keep it, dynamic imports of that chunk fail, and the broken state
+ * survives reloads until the user clears site data. Anything that names a file gets a real 404.
+ *
+ * Every BookOrbit route parameter is numeric, so "has an extension" reliably separates asset
+ * requests from client-side routes such as `/book/123/files`.
+ */
+export function isStaticAssetPath(url: string): boolean {
+  const pathname = url.split('?')[0].split('#')[0];
+  const lastSegment = pathname.slice(pathname.lastIndexOf('/') + 1);
+  return lastSegment.includes('.');
+}
+
+export function shouldServeSpaFallback(url: string): boolean {
+  return !isStaticAssetPath(url);
+}
+
 export function shouldInjectEmptyJsonBody(method: string, headers: IncomingHttpHeaders): boolean {
   const contentType = getHeaderValue(headers['content-type'])?.toLowerCase();
   if (!BODY_METHODS.has(method.toUpperCase()) || !contentType?.startsWith('application/json')) {

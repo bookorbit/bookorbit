@@ -143,16 +143,16 @@ async function onMetadataModeChange(event: Event) {
     </p>
   </div>
 
-  <div v-if="loading" class="mt-5 md:mt-0 flex items-center justify-center py-8">
+  <div v-if="loading" class="settings-loading-state" :class="{ 'mt-5 md:mt-0': !props.embedded }">
     <Loader2 class="size-5 animate-spin text-muted-foreground" />
   </div>
 
-  <div v-else class="mt-5 md:mt-0 space-y-6">
-    <div>
-      <p class="settings-group-label">
+  <div v-else class="space-y-4" :class="{ 'mt-5 md:mt-0': !props.embedded }">
+    <section aria-labelledby="book-dock-folder-heading" class="space-y-2">
+      <h2 id="book-dock-folder-heading" class="settings-group-label">
         {{ t('settings.reader.bookDock.dropFolder') }}
-      </p>
-      <div class="mt-4 border border-border rounded-lg overflow-hidden shadow-xs">
+      </h2>
+      <div class="settings-card">
         <div class="px-4 py-3.5 bg-card md:px-5 md:py-4">
           <p class="settings-label">
             {{ t('settings.reader.bookDock.containerPath') }}
@@ -175,35 +175,37 @@ async function onMetadataModeChange(event: Event) {
           </p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <p class="settings-group-label">
-      {{ t('settings.reader.bookDock.metadata') }}
-    </p>
+    <section aria-labelledby="book-dock-metadata-heading" class="space-y-2">
+      <h2 id="book-dock-metadata-heading" class="settings-group-label">
+        {{ t('settings.reader.bookDock.metadata') }}
+      </h2>
 
-    <div class="settings-card">
-      <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
-        <div class="min-w-0">
-          <p class="settings-label">
-            {{ t('settings.reader.bookDock.autoFetch') }}
-          </p>
-          <p class="settings-hint">
-            {{ t('settings.reader.bookDock.autoFetchHint') }}
-          </p>
+      <div class="settings-card">
+        <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
+          <div class="min-w-0">
+            <p class="settings-label">
+              {{ t('settings.reader.bookDock.autoFetch') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.reader.bookDock.autoFetchHint') }}
+            </p>
+          </div>
+          <ToggleSwitch
+            :model-value="autoFetch"
+            :disabled="saving"
+            class="self-start md:self-auto md:ml-4"
+            @update:model-value="handleAutoFetchChange"
+          />
         </div>
-        <ToggleSwitch
-          :model-value="autoFetch"
-          :disabled="saving"
-          class="self-start md:self-auto md:ml-4"
-          @update:model-value="handleAutoFetchChange"
-        />
       </div>
-    </div>
+    </section>
 
-    <div class="mt-6 space-y-4">
-      <p class="settings-group-label">
+    <section aria-labelledby="book-dock-auto-finalize-heading" class="space-y-2">
+      <h2 id="book-dock-auto-finalize-heading" class="settings-group-label">
         {{ t('settings.reader.bookDock.autoFinalize') }}
-      </p>
+      </h2>
       <div class="settings-card">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
@@ -288,6 +290,6 @@ async function onMetadataModeChange(event: Event) {
           </label>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>

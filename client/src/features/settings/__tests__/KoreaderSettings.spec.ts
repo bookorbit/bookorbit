@@ -70,10 +70,6 @@ vi.mock('@/lib/clipboard', () => ({
   copyToClipboard: vi.fn<(text: string) => Promise<boolean>>().mockResolvedValue(true),
 }))
 
-vi.mock('../SettingsPageHeader.vue', () => ({
-  default: { template: '<div />' },
-}))
-
 vi.mock('../KoreaderFileNamingSettings.vue', () => ({
   default: { template: '<div data-testid="file-naming-settings" />' },
 }))

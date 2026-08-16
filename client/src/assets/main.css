@@ -374,7 +374,7 @@
     @apply text-sm text-muted-foreground mt-1;
   }
   .settings-group-label {
-    @apply text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3;
+    @apply text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2;
   }
   .settings-label {
     @apply text-sm font-medium text-foreground;
@@ -386,10 +386,19 @@
     @apply text-sm font-medium tabular-nums text-foreground;
   }
   .settings-card {
-    @apply overflow-hidden rounded-lg border border-border divide-y divide-border shadow-xs;
+    @apply overflow-hidden rounded-lg border border-border bg-card divide-y divide-border shadow-xs;
   }
   .settings-row {
     @apply flex flex-col gap-3 bg-card px-4 py-3.5 md:flex-row md:items-center md:justify-between md:px-5 md:py-4;
+  }
+  .settings-loading-state {
+    @apply flex items-center justify-center rounded-lg border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground shadow-xs;
+  }
+  .settings-empty-state {
+    @apply rounded-lg border border-dashed border-border bg-card px-5 py-8 text-center shadow-xs;
+  }
+  .settings-error-state {
+    @apply rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive;
   }
 
   /* ── Settings form controls ─────────────────────────────────
@@ -414,21 +423,6 @@
      module for why type="password" cannot be used here. */
   .input-secret {
     -webkit-text-security: disc;
-  }
-
-  /* ── Settings action buttons ─────────────────────────────────
-     Use these on <button> elements in settings panels (headers,
-     card rows, inline forms). Matches the Kobo "Add device" size.
-  ────────────────────────────────────────────────────────────── */
-  .settings-btn-primary {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium shrink-0
-           bg-primary text-primary-foreground hover:bg-primary/90
-           disabled:opacity-50 transition-colors;
-  }
-  .settings-btn-outline {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium shrink-0
-           border border-border bg-background text-foreground hover:bg-muted
-           disabled:opacity-50 transition-colors;
   }
 
   .no-scrollbar {

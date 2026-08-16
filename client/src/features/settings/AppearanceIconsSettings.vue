@@ -302,7 +302,7 @@ function usageSummary(usage: CustomIconUsage): string {
     <input ref="replaceInputRef" type="file" accept="image/svg+xml,.svg" class="hidden" @change="handleReplaceInput" />
     <IconUploadDialog v-if="canManageIcons" v-model:open="uploadOpen" @uploaded="handleUploaded" />
 
-    <section class="space-y-3">
+    <section class="space-y-2">
       <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Button v-if="canManageIcons" type="button" class="h-9 gap-2 self-start sm:self-auto" @click="openUpload">
           <UploadCloud :size="15" />
@@ -323,9 +323,9 @@ function usageSummary(usage: CustomIconUsage): string {
             :placeholder="t('settings.appearance.icons.searchPlaceholder')"
             class="w-full min-w-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
-          <button v-if="query" type="button" class="shrink-0 text-muted-foreground hover:text-foreground" @click="clearQuery">
+          <Button variant="ghost" size="icon-sm" v-if="query" type="button" class="shrink-0" @click="clearQuery">
             <X :size="13" />
-          </button>
+          </Button>
         </div>
 
         <div class="flex items-center gap-2">
@@ -453,13 +453,9 @@ function usageSummary(usage: CustomIconUsage): string {
                     </template>
                   </div>
 
-                  <button
-                    type="button"
-                    class="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    @click="collapseExpanded"
-                  >
+                  <Button variant="ghost" size="icon-sm" type="button" class="shrink-0" @click="collapseExpanded">
                     <X :size="15" />
-                  </button>
+                  </Button>
                 </div>
 
                 <div v-if="canManageIcons" class="mt-3 flex flex-wrap justify-end gap-2">
@@ -481,9 +477,9 @@ function usageSummary(usage: CustomIconUsage): string {
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="destructive-outline"
                       size="sm"
-                      class="h-8 gap-1.5 text-destructive hover:border-destructive/40 hover:bg-destructive/5"
+                      class="h-8"
                       :disabled="deletingSlug === expandedIcon.slug"
                       @click="removeIcon(expandedIcon)"
                     >

@@ -77,6 +77,19 @@ describe('BookDockSettings', () => {
     expect(apiMock.mock.calls.some(([url]) => url === '/api/v1/app-info' || url === '/api/v1/app-settings')).toBe(false)
   })
 
+  it('keeps panel headings close to their content while separating major sections', async () => {
+    const wrapper = await mountSettings()
+    const sections = wrapper.findAll('section[aria-labelledby^="book-dock-"]')
+
+    expect(wrapper.find('div.space-y-4').exists()).toBe(true)
+    expect(sections).toHaveLength(3)
+    for (const section of sections) {
+      expect(section.classes()).toContain('space-y-2')
+      expect(section.classes()).not.toContain('mt-6')
+      expect(section.get('.settings-group-label').classes()).not.toContain('mb-0')
+    }
+  })
+
   it('updates the complete typed settings document through the protected endpoint', async () => {
     const wrapper = await mountSettings()
 

@@ -7,14 +7,12 @@ const apiMock = vi.fn<(input: string) => Promise<{ ok: boolean; json: () => Prom
 
 vi.mock('@/lib/api', () => ({ api: (input: string) => apiMock(input) }))
 
-const tooltipStubs = {
-  Tooltip: { template: '<div><slot /></div>' },
-  TooltipTrigger: { template: '<div><slot /></div>' },
-  TooltipContent: { template: '<div><slot /></div>' },
+const componentStubs = {
+  Button: { props: ['variant'], template: '<button :data-variant="variant"><slot /></button>' },
 }
 
 function mountPage() {
-  return shallowMount(AccountActivityPage, { global: { stubs: tooltipStubs } })
+  return shallowMount(AccountActivityPage, { global: { stubs: componentStubs } })
 }
 
 describe('AccountActivityPage', () => {
@@ -66,18 +64,17 @@ describe('AccountActivityPage', () => {
     })
   })
 
-  it('explains the authentication-only privacy boundary and renders account activity', async () => {
+  it('renders account activity without duplicating the settings page header', async () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Account Activity')
-    expect(wrapper.find('button[aria-label="About account activity privacy"]').exists()).toBe(true)
+    expect(wrapper.find('h2').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Review account authentication activity without exposing reading history.')
     expect(wrapper.text()).toContain('Reader')
     expect(wrapper.text()).toContain('No recorded activity')
     expect(wrapper.text()).not.toContain('Details')
     const insightsButton = wrapper.find('button[aria-label="Open shared reading insights for Maya"]')
     expect(insightsButton.exists()).toBe(true)
-    expect(insightsButton.classes()).toContain('bg-primary/10')
     expect(wrapper.find('nav').exists()).toBe(false)
     expect(wrapper.find('table').classes()).toContain('table-fixed')
   })
