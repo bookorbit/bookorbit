@@ -32,17 +32,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import AccentPicker from '@/components/AccentPicker.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import ThemePicker from '@/components/ThemePicker.vue'
+import SurfaceBrightnessPicker from '@/components/SurfaceBrightnessPicker.vue'
 import SurfacePicker from '@/components/SurfacePicker.vue'
 import { useGlobalSearch, type GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
@@ -123,6 +121,7 @@ function navigateToSettings() {
   router.push({ name: 'settings-libraries' })
 }
 
+const appearanceSheetOpen = ref(false)
 const languageSheetOpen = ref(false)
 const languagePopoverOpen = ref(false)
 
@@ -139,6 +138,10 @@ async function selectLanguage(locale: Locale) {
 
 function openLanguageSheet() {
   languageSheetOpen.value = true
+}
+
+function openAppearanceSheet() {
+  appearanceSheetOpen.value = true
 }
 
 function navigateToWhatsNew() {
@@ -636,36 +639,10 @@ function formatBadgeStyle(fmt: string) {
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Palette :size="15" class="mr-2 text-muted-foreground" />
-                {{ t('components.appHeader.appearance') }}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent class="w-72 p-4">
-                <div class="space-y-4">
-                  <div class="space-y-1.5">
-                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.theme') }}</span>
-                    <ThemePicker />
-                  </div>
-                  <div class="space-y-1.5">
-                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.accent') }}</span>
-                    <AccentPicker />
-                  </div>
-                  <div class="space-y-1.5">
-                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.radius') }}</span>
-                    <RadiusPicker />
-                  </div>
-                  <div class="space-y-1.5">
-                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.surfaceOpacity') }}</span>
-                    <SurfacePicker />
-                  </div>
-                  <div class="space-y-1.5">
-                    <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.background') }}</span>
-                    <BackgroundPicker />
-                  </div>
-                </div>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <DropdownMenuItem @click="openAppearanceSheet">
+              <Palette :size="15" class="mr-2 text-muted-foreground" />
+              {{ t('components.appHeader.appearance') }}
+            </DropdownMenuItem>
 
             <DropdownMenuItem @click="openLanguageSheet">
               <Languages :size="15" class="mr-2 text-muted-foreground" />
@@ -798,6 +775,10 @@ function formatBadgeStyle(fmt: string) {
                     <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.surfaceOpacity') }}</span>
                     <SurfacePicker />
                   </div>
+                  <div v-if="themeStore.resolvedTheme === 'dark'" class="space-y-1.5">
+                    <span class="text-[13px] text-muted-foreground">{{ t('settings.appearance.theme.surfaceBrightness.label') }}</span>
+                    <SurfaceBrightnessPicker />
+                  </div>
                   <div class="space-y-1.5">
                     <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.background') }}</span>
                     <BackgroundPicker />
@@ -883,10 +864,52 @@ function formatBadgeStyle(fmt: string) {
 
   <BookUploadModal v-if="uploadOpen" @close="uploadOpen = false" @uploaded="uploadOpen = false" />
 
+  <Sheet v-model:open="appearanceSheetOpen">
+    <SheetContent side="bottom" class="h-[85dvh] rounded-t-xl p-0">
+      <SheetHeader class="shrink-0 border-b border-border px-4 py-3 text-start">
+        <SheetTitle class="text-base">{{ t('components.appHeader.appearance') }}</SheetTitle>
+        <SheetDescription class="sr-only">{{ t('components.appHeader.appearanceDescription') }}</SheetDescription>
+      </SheetHeader>
+      <div class="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <section class="space-y-2 rounded-lg border border-border bg-card p-3">
+          <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.theme') }}</h3>
+          <ThemePicker touch />
+        </section>
+
+        <section class="space-y-2 rounded-lg border border-border bg-card p-3">
+          <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.accent') }}</h3>
+          <AccentPicker touch />
+        </section>
+
+        <section class="space-y-2 rounded-lg border border-border bg-card p-3">
+          <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.radius') }}</h3>
+          <RadiusPicker touch />
+        </section>
+
+        <section class="space-y-3 rounded-lg border border-border bg-card p-3">
+          <div class="space-y-2">
+            <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.surfaceOpacity') }}</h3>
+            <SurfacePicker />
+          </div>
+          <div v-if="themeStore.resolvedTheme === 'dark'" class="space-y-2 border-t border-border pt-3">
+            <h3 class="text-xs font-medium text-foreground">{{ t('settings.appearance.theme.surfaceBrightness.label') }}</h3>
+            <SurfaceBrightnessPicker />
+          </div>
+        </section>
+
+        <section class="space-y-2 rounded-lg border border-border bg-card p-3">
+          <h3 class="text-xs font-medium text-foreground">{{ t('components.appHeader.background') }}</h3>
+          <BackgroundPicker touch />
+        </section>
+      </div>
+    </SheetContent>
+  </Sheet>
+
   <Sheet v-model:open="languageSheetOpen">
     <SheetContent side="bottom" class="h-[85dvh] rounded-t-xl px-2 pb-2">
       <SheetHeader class="pb-1">
         <SheetTitle>{{ t('settings.appearance.language.label') }}</SheetTitle>
+        <SheetDescription class="sr-only">{{ t('settings.appearance.language.description') }}</SheetDescription>
       </SheetHeader>
       <LanguagePicker :autofocus="false" class="min-h-0 flex-1" @select="selectLanguage" />
     </SheetContent>

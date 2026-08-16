@@ -3,7 +3,7 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
-import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import { authors, bookMetadata, bookSeries, collections, genres, narrators, tags } from '../../db/schema';
 
@@ -16,7 +16,6 @@ type MetadataTextColumn = typeof bookMetadata.publisher | typeof bookMetadata.la
 
 const DEFAULT_SEARCH_LIMIT = 15;
 const COLLECTION_SEARCH_LIMIT = 20;
-const LIKE_SPECIAL_CHARS = /[%_\\]/g;
 
 @Injectable()
 export class CatalogService {
@@ -104,7 +103,6 @@ export class CatalogService {
     const term = q.trim();
     if (!term) return null;
 
-    const escaped = term.replace(LIKE_SPECIAL_CHARS, '\\$&');
-    return `%${escaped}%`;
+    return buildSearchPattern(term);
   }
 }

@@ -26,7 +26,8 @@ vi.mock('drizzle-orm', () => {
   };
 });
 
-vi.mock('../../common/utils/accent-insensitive-search.utils', () => ({
+vi.mock('../../common/utils/accent-insensitive-search.utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../common/utils/accent-insensitive-search.utils')>()),
   accentInsensitiveIlike: vi.fn((left: unknown, pattern: string) => ({ type: 'accentInsensitiveIlike', left, pattern })),
 }));
 

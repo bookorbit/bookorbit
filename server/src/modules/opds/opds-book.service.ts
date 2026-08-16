@@ -3,7 +3,7 @@ import { SQL, and, count, eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
-import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import {
   authors,
@@ -87,8 +87,6 @@ const READ_STATUS_BUCKETS = {
 } as const;
 
 const ACTIVE_READ_STATUSES = [...READ_STATUS_BUCKETS.reading, ...READ_STATUS_BUCKETS.finished];
-
-const LIKE_SPECIAL_CHARS = /[%_\\]/g;
 
 export interface OpdsBookEntry {
   id: number;
@@ -397,7 +395,7 @@ export class OpdsBookService {
     const term = q.trim();
     if (!term) return undefined;
 
-    const pattern = `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`;
+    const pattern = buildSearchPattern(term);
     const existsAuthor = (() => {
       const sq = this.db
         .select({ one: sql`1` })
@@ -524,7 +522,7 @@ export class OpdsBookService {
     const where: SQL[] = [inArray(books.libraryId, accessibleIds)];
     const term = opts.q?.trim();
     if (term) {
-      where.push(accentInsensitiveIlike(authors.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
+      where.push(accentInsensitiveIlike(authors.name, buildSearchPattern(term)));
     }
 
     const rows = await this.db
@@ -558,7 +556,7 @@ export class OpdsBookService {
     const where: SQL[] = [inArray(books.libraryId, accessibleIds)];
     const term = opts.q?.trim();
     if (term) {
-      where.push(accentInsensitiveIlike(bookSeries.name, `%${term.replace(LIKE_SPECIAL_CHARS, '\\$&')}%`));
+      where.push(accentInsensitiveIlike(bookSeries.name, buildSearchPattern(term)));
     }
 
     const rows = await this.db

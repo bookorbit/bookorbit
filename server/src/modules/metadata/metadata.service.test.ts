@@ -1064,14 +1064,17 @@ describe('MetadataService', () => {
       throw new Error('unexpected table in insert');
     });
 
-    await service.replaceGenres(12, [' Fantasy ', 'Fantasy', '', 'X'.repeat(250)]);
+    // The non-breaking space and the doubled space collapse onto the plain 'Fantasy' entry;
+    // stored un-collapsed they would each become a separate row that no search can reach.
+    await service.replaceGenres(12, [' Fantasy ', 'Fantasy', 'Fantasy\u00A0', 'Epic  Fantasy', 'Epic\tFantasy', '', 'X'.repeat(250)]);
 
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(db.delete).toHaveBeenCalledWith(bookGenres);
-    expect(insertedGenres).toEqual(['Fantasy', 'X'.repeat(200)]);
+    expect(insertedGenres).toEqual(['Fantasy', 'Epic Fantasy', 'X'.repeat(200)]);
     expect(insertedBookGenres).toEqual([
       { bookId: 12, genreId: 77 },
       { bookId: 12, genreId: 78 },
+      { bookId: 12, genreId: 79 },
     ]);
   });
 
