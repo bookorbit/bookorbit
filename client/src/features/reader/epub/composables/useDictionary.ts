@@ -94,8 +94,146 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   chinese: 'zh',
 }
 
+const MAX_DEFINITIONS_PER_ENTRY = 5
+const MAX_LEMMA_DEPTH = 2
+const MAX_LEMMA_LOOKUPS = 3
+
+/**
+ * Words allowed before "of" in an inflection gloss such as "simple past and
+ * past participle of walk". Requiring every leading word to be grammatical is
+ * what keeps ordinary definitions ("Informal form of address used by...") from
+ * being mistaken for pointers.
+ */
+const GRAMMAR_TERMS = new Set([
+  'a',
+  'an',
+  'the',
+  'and',
+  'or',
+  'ablative',
+  'abbreviation',
+  'accusative',
+  'acronym',
+  'active',
+  'adjective',
+  'adverb',
+  'alternate',
+  'alternative',
+  'aorist',
+  'archaic',
+  'attributive',
+  'augmentative',
+  'capitalized',
+  'clipping',
+  'common',
+  'comparative',
+  'conditional',
+  'conjugation',
+  'construct',
+  'contraction',
+  'dated',
+  'dative',
+  'declension',
+  'definite',
+  'diminutive',
+  'dual',
+  'elative',
+  'essive',
+  'feminine',
+  'first-person',
+  'form',
+  'forms',
+  'future',
+  'genitive',
+  'gerund',
+  'illative',
+  'imperative',
+  'imperfect',
+  'imperfective',
+  'indefinite',
+  'indicative',
+  'infinitive',
+  'inflected',
+  'inflection',
+  'inflections',
+  'initialism',
+  'instrumental',
+  'letter-case',
+  'locative',
+  'lowercase',
+  'masculine',
+  'misspelling',
+  'neuter',
+  'nominative',
+  'nonstandard',
+  'noun',
+  'obsolete',
+  'participle',
+  'particle',
+  'partitive',
+  'passive',
+  'past',
+  'perfect',
+  'perfective',
+  'pluperfect',
+  'plural',
+  'positive',
+  'prepositional',
+  'present',
+  'preterite',
+  'second-person',
+  'simple',
+  'singular',
+  'spelling',
+  'substantive',
+  'superlative',
+  'supine',
+  'tense',
+  'third-person',
+  'uppercase',
+  'verb',
+  'verbal',
+  'vocative',
+])
+
+const FILLER_TERMS = new Set(['a', 'an', 'the', 'and', 'or'])
+
+const POINTER_PATTERN = /^(?:\([^)]*\)\s*)?([\p{L}\p{M}/ -]+?)\s+of\s+([\p{L}\p{M}][\p{L}\p{M}'’-]*)\s*[.:;,]?$/u
+
+interface SenseBlock {
+  partOfSpeech: string
+  definitions: DictionaryDefinition[]
+}
+
+type BlockFetcher = (word: string) => Promise<SenseBlock[]>
+
+/**
+ * Returns the lemma a definition merely points at, or null when the definition
+ * stands on its own. "plural of candelabra" tells the reader nothing, so the
+ * lookup follows it; "A candle holder." is an answer, so it does not.
+ */
+function pointerLemma(definition: string): string | null {
+  const match = POINTER_PATTERN.exec(definition.trim())
+  if (!match) return null
+
+  const modifiers = (match[1] ?? '')
+    .toLowerCase()
+    .split(/[\s/]+/)
+    .filter(Boolean)
+  if (modifiers.length === 0) return null
+  if (!modifiers.every((term) => GRAMMAR_TERMS.has(term))) return null
+  if (modifiers.every((term) => FILLER_TERMS.has(term))) return null
+
+  return (match[2] ?? '').toLowerCase()
+}
+
 function stripHtml(html: string): string {
-  return (new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '').trim()
+  const body = new DOMParser().parseFromString(html, 'text/html').body
+  // textContent includes the text inside script and style elements, and
+  // Wiktionary ships inline <style> blocks with some senses, so their CSS would
+  // otherwise be rendered as part of the definition.
+  for (const el of body.querySelectorAll('script, style')) el.remove()
+  return (body.textContent ?? '').replace(/\s+/g, ' ').trim()
 }
 
 function normalizeLang(lang: string): string {
@@ -138,7 +276,7 @@ function extractPhonetics(entry: Record<string, unknown>): { phonetic: string | 
   return { phonetic, audioUrl }
 }
 
-function parseMeanings(meanings: Array<Record<string, unknown>>): DictionaryEntry[] {
+function parseMeanings(meanings: Array<Record<string, unknown>>): SenseBlock[] {
   return meanings.map((m) => {
     const partOfSpeech = typeof m['partOfSpeech'] === 'string' ? m['partOfSpeech'] : ''
     const rawDefs = Array.isArray(m['definitions']) ? (m['definitions'] as Array<Record<string, unknown>>) : []
@@ -150,7 +288,39 @@ function parseMeanings(meanings: Array<Record<string, unknown>>): DictionaryEntr
   })
 }
 
-async function fetchFreeDictionary(word: string): Promise<DictionaryResult | null> {
+/**
+ * Collapses blocks that share a part of speech. Both providers split a word
+ * across several same-part-of-speech blocks (one per etymology), which would
+ * otherwise render as repeated "NOUN" headings and hide whether a pointer is
+ * the leading sense.
+ */
+function mergeBlocks(blocks: SenseBlock[]): SenseBlock[] {
+  const merged: SenseBlock[] = []
+  const byPartOfSpeech = new Map<string, SenseBlock>()
+
+  for (const block of blocks) {
+    if (block.definitions.length === 0) continue
+    const existing = byPartOfSpeech.get(block.partOfSpeech)
+    if (existing) {
+      existing.definitions.push(...block.definitions)
+      continue
+    }
+    const copy: SenseBlock = { partOfSpeech: block.partOfSpeech, definitions: [...block.definitions] }
+    byPartOfSpeech.set(block.partOfSpeech, copy)
+    merged.push(copy)
+  }
+
+  return merged
+}
+
+interface ProviderPayload {
+  word: string
+  phonetic: string | null
+  audioUrl: string | null
+  blocks: SenseBlock[]
+}
+
+async function fetchFreeDictionaryPayload(word: string): Promise<ProviderPayload | null> {
   const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`Free Dictionary API error: ${res.status}`)
@@ -161,61 +331,63 @@ async function fetchFreeDictionary(word: string): Promise<DictionaryResult | nul
   const entry = data[0] as Record<string, unknown>
   const { phonetic, audioUrl } = extractPhonetics(entry)
   const meanings = Array.isArray(entry['meanings']) ? (entry['meanings'] as Array<Record<string, unknown>>) : []
-  const entries = parseMeanings(meanings)
+  const blocks = mergeBlocks(parseMeanings(meanings))
 
-  if (entries.length === 0) return null
+  if (blocks.length === 0) return null
 
   return {
     word: typeof entry['word'] === 'string' ? entry['word'] : word,
     phonetic,
     audioUrl,
-    entries,
-    provider: 'free-dictionary',
+    blocks,
   }
 }
 
-function parseWiktionaryEntries(data: Record<string, unknown>): DictionaryEntry[] {
-  const entries: DictionaryEntry[] = []
+function parseWiktionaryBlocks(data: Record<string, unknown>, lang: string): SenseBlock[] {
+  const blocks: SenseBlock[] = []
 
-  for (const langEntries of Object.values(data)) {
-    if (!Array.isArray(langEntries)) continue
-    for (const entry of langEntries) {
-      if (!entry || typeof entry !== 'object') continue
-      const e = entry as Record<string, unknown>
-      const partOfSpeech = typeof e['partOfSpeech'] === 'string' ? e['partOfSpeech'] : ''
-      const rawDefs = Array.isArray(e['definitions']) ? (e['definitions'] as Array<Record<string, unknown>>) : []
-      const definitions: DictionaryDefinition[] = []
+  // Wiktionary keys its response by language and a single page carries every
+  // language that spells the word the same way, so only the requested section
+  // is ours. Reading them all mixed Latin and Faroese into English lookups.
+  const langEntries = data[lang]
+  if (!Array.isArray(langEntries)) return blocks
 
-      for (const d of rawDefs) {
-        const def = typeof d['definition'] === 'string' ? stripHtml(d['definition']) : ''
-        if (!def) continue
-        const rawExamples = Array.isArray(d['examples']) ? (d['examples'] as unknown[]) : []
-        let example: string | null = null
-        for (const ex of rawExamples) {
-          if (typeof ex === 'string') {
-            example = stripHtml(ex)
+  for (const entry of langEntries) {
+    if (!entry || typeof entry !== 'object') continue
+    const e = entry as Record<string, unknown>
+    const partOfSpeech = typeof e['partOfSpeech'] === 'string' ? e['partOfSpeech'] : ''
+    const rawDefs = Array.isArray(e['definitions']) ? (e['definitions'] as Array<Record<string, unknown>>) : []
+    const definitions: DictionaryDefinition[] = []
+
+    for (const d of rawDefs) {
+      const def = typeof d['definition'] === 'string' ? stripHtml(d['definition']) : ''
+      if (!def) continue
+      const rawExamples = Array.isArray(d['examples']) ? (d['examples'] as unknown[]) : []
+      let example: string | null = null
+      for (const ex of rawExamples) {
+        if (typeof ex === 'string') {
+          example = stripHtml(ex)
+          break
+        } else if (ex && typeof ex === 'object') {
+          const t = (ex as Record<string, unknown>)['text']
+          if (typeof t === 'string') {
+            example = stripHtml(t)
             break
-          } else if (ex && typeof ex === 'object') {
-            const t = (ex as Record<string, unknown>)['text']
-            if (typeof t === 'string') {
-              example = stripHtml(t)
-              break
-            }
           }
         }
-        definitions.push({ definition: def, example })
       }
+      definitions.push({ definition: def, example })
+    }
 
-      if (definitions.length > 0) {
-        entries.push({ partOfSpeech, definitions })
-      }
+    if (definitions.length > 0) {
+      blocks.push({ partOfSpeech, definitions })
     }
   }
 
-  return entries
+  return blocks
 }
 
-async function fetchWiktionary(word: string, lang: string): Promise<DictionaryResult | null> {
+async function fetchWiktionaryPayload(word: string, lang: string): Promise<ProviderPayload | null> {
   const res = await fetch(`https://${encodeURIComponent(lang)}.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`)
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`Wiktionary API error: ${res.status}`)
@@ -223,16 +395,61 @@ async function fetchWiktionary(word: string, lang: string): Promise<DictionaryRe
   const data: unknown = await res.json()
   if (!data || typeof data !== 'object') return null
 
-  const entries = parseWiktionaryEntries(data as Record<string, unknown>)
-  if (entries.length === 0) return null
+  const blocks = mergeBlocks(parseWiktionaryBlocks(data as Record<string, unknown>, lang))
+  if (blocks.length === 0) return null
 
-  return {
-    word,
-    phonetic: null,
-    audioUrl: null,
-    entries,
-    provider: 'wiktionary',
+  return { word, phonetic: null, audioUrl: null, blocks }
+}
+
+/**
+ * Walks inflection pointers breadth-first so a lookup that lands on a pure
+ * inflection ("candelabras" -> "candelabra" -> "candelabrum") still reaches a
+ * word that carries a real definition. Only a pointer in the leading sense of
+ * its block is followed: a pointer buried at sense 69 of "run" is trivia, not
+ * the answer the reader is missing.
+ */
+async function expandPointers(root: ProviderPayload, fetchBlocks: BlockFetcher): Promise<DictionaryEntry[]> {
+  const entries: DictionaryEntry[] = []
+  const visited = new Set<string>([root.word.toLowerCase()])
+  const queue: Array<{ word: string; blocks: SenseBlock[]; depth: number }> = [{ word: root.word, blocks: root.blocks, depth: 0 }]
+  let lookups = 0
+
+  while (queue.length > 0) {
+    const current = queue.shift()!
+
+    for (const block of current.blocks) {
+      entries.push({
+        partOfSpeech: block.partOfSpeech,
+        definitions: block.definitions.slice(0, MAX_DEFINITIONS_PER_ENTRY),
+        sourceWord: current.word,
+      })
+    }
+
+    if (current.depth >= MAX_LEMMA_DEPTH) continue
+
+    for (const block of current.blocks) {
+      if (lookups >= MAX_LEMMA_LOOKUPS) break
+
+      const leading = block.definitions[0]
+      if (!leading) continue
+      const lemma = pointerLemma(leading.definition)
+      if (!lemma || visited.has(lemma)) continue
+
+      visited.add(lemma)
+      lookups += 1
+
+      let blocks: SenseBlock[] = []
+      try {
+        blocks = mergeBlocks(await fetchBlocks(lemma))
+      } catch {
+        // A lemma that fails to resolve must never take the primary result down
+        continue
+      }
+      if (blocks.length > 0) queue.push({ word: lemma, blocks, depth: current.depth + 1 })
+    }
   }
+
+  return entries
 }
 
 export function useDictionary() {
@@ -241,17 +458,23 @@ export function useDictionary() {
     const trimmed = word.trim()
 
     if (normalizedLang === 'en') {
-      let result: DictionaryResult | null = null
+      let payload: ProviderPayload | null = null
       try {
-        result = await fetchFreeDictionary(trimmed)
+        payload = await fetchFreeDictionaryPayload(trimmed)
       } catch {
         // Fall back to Wiktionary on any Free Dictionary error
       }
-      if (result) return result
-      return fetchWiktionary(trimmed, normalizedLang)
+      if (payload) {
+        const entries = await expandPointers(payload, async (lemma) => (await fetchFreeDictionaryPayload(lemma))?.blocks ?? [])
+        return { word: payload.word, phonetic: payload.phonetic, audioUrl: payload.audioUrl, entries, provider: 'free-dictionary' }
+      }
     }
 
-    return fetchWiktionary(trimmed, normalizedLang)
+    const payload = await fetchWiktionaryPayload(trimmed, normalizedLang)
+    if (!payload) return null
+
+    const entries = await expandPointers(payload, async (lemma) => (await fetchWiktionaryPayload(lemma, normalizedLang))?.blocks ?? [])
+    return { word: payload.word, phonetic: payload.phonetic, audioUrl: payload.audioUrl, entries, provider: 'wiktionary' }
   }
 
   return { lookup }
