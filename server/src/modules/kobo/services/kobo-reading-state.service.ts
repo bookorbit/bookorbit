@@ -322,7 +322,7 @@ export class KoboReadingStateService {
     return { bookmark: merged, lastModifiedKobo: nowIso };
   }
 
-  /** Records which Location the bookmark reflects; deliberately keeps updatedAt untouched. */
+  /** Records which Location the bookmark reflects; deliberately keeps updatedAt and lastReadAt untouched. */
   private async stampProgressLocation(
     userId: number,
     fileId: number,
@@ -336,6 +336,7 @@ export class KoboReadingStateService {
         koboLocationValue: point.value,
         koboContentSourceProgressPercent: point.contentSourceProgressPercent,
         updatedAt: sql`"reading_progress"."updated_at"`,
+        lastReadAt: sql`"reading_progress"."last_read_at"`,
       })
       .where(and(eq(schema.readingProgress.userId, userId), eq(schema.readingProgress.bookFileId, fileId)));
   }
@@ -455,6 +456,7 @@ export class KoboReadingStateService {
         koboContentSourceProgressPercent,
         koreaderProgress: nextXpointer,
         updatedAt: sourceUpdatedAt,
+        lastReadAt: sourceUpdatedAt,
       })
       .onConflictDoUpdate({
         target: [schema.readingProgress.bookFileId, schema.readingProgress.userId],
@@ -469,6 +471,7 @@ export class KoboReadingStateService {
           koboContentSourceProgressPercent,
           ...(nextXpointer != null ? { koreaderProgress: nextXpointer } : {}),
           updatedAt: sourceUpdatedAt,
+          lastReadAt: sourceUpdatedAt,
         },
       });
   }

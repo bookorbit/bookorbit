@@ -157,6 +157,10 @@ describe('UserStateImporter', () => {
         bookFileId: 500,
         userId: 10,
         percentage: 100,
+        // Imported history must keep its own last-read time; defaulting to now would make every
+        // migrated book look like it was just read.
+        updatedAt: new Date('2026-01-03T00:00:00.000Z'),
+        lastReadAt: new Date('2026-01-03T00:00:00.000Z'),
       }),
     ]);
     expect(importRepo.batchUpsertAudiobookProgress).toHaveBeenCalledWith([

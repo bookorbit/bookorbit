@@ -83,8 +83,8 @@ export class DashboardWidgetRepository {
       coalesce(
         (
           case
-            when ${readingProgress.updatedAt} is not null
-              and (${audiobookProgress.updatedAt} is null or ${readingProgress.updatedAt} >= ${audiobookProgress.updatedAt})
+            when ${readingProgress.lastReadAt} is not null
+              and (${audiobookProgress.updatedAt} is null or ${readingProgress.lastReadAt} >= ${audiobookProgress.updatedAt})
               then ${readingProgress.percentage}
             else ${audiobookProgress.percentage}
           end
@@ -94,7 +94,7 @@ export class DashboardWidgetRepository {
         0
       )
     `;
-    const mergedLastReadAt = sql<Date | null>`coalesce(${readingProgress.updatedAt}, ${audiobookProgress.updatedAt})`;
+    const mergedLastReadAt = sql<Date | null>`coalesce(${readingProgress.lastReadAt}, ${audiobookProgress.updatedAt})`;
 
     const rows = await this.db
       .select({
@@ -120,7 +120,7 @@ export class DashboardWidgetRepository {
           ...cfClauses,
         ),
       )
-      .orderBy(desc(sql`coalesce(${readingProgress.updatedAt}, ${audiobookProgress.updatedAt}, ${userBookStatus.updatedAt})`))
+      .orderBy(desc(sql`coalesce(${readingProgress.lastReadAt}, ${audiobookProgress.updatedAt}, ${userBookStatus.updatedAt})`))
       .limit(CURRENTLY_READING_LIMIT);
 
     if (rows.length === 0) return { books: [] };

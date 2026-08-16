@@ -836,9 +836,9 @@ export class BookQueryBuilder {
   private upNextInSeriesSql(userId: number): SQL {
     const mergedProgress = sql`coalesce(
       case
-        when rp.updated_at is null then ab.percentage
+        when rp.last_read_at is null then ab.percentage
         when ab.updated_at is null then rp.percentage
-        when rp.updated_at >= ab.updated_at then rp.percentage
+        when rp.last_read_at >= ab.updated_at then rp.percentage
         else ab.percentage
       end,
       rp.percentage,
@@ -1126,7 +1126,7 @@ export class BookQueryBuilder {
           break;
         case 'lastReadAt':
           parts.push(
-            `(SELECT max(rp.updated_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${safeUserId}) ${D} NULLS LAST`,
+            `(SELECT max(rp.last_read_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${safeUserId}) ${D} NULLS LAST`,
           );
           break;
         case 'finishedAt':

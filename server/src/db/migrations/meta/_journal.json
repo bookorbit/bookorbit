@@ -470,6 +470,13 @@
       "when": 1786683893541,
       "tag": "0066_add_koreader_device_retirements",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1786840894954,
+      "tag": "0067_add_reading_progress_last_read_at",
+      "breakpoints": true
     }
   ]
 }

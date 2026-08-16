@@ -63,7 +63,7 @@ export class DashboardRepository {
           ...cfClauses,
         ),
       )
-      .orderBy(desc(readingProgress.updatedAt), desc(books.id))
+      .orderBy(desc(readingProgress.lastReadAt), desc(books.id))
       .limit(limit);
 
     return rows.map((row) => row.id);
@@ -134,9 +134,9 @@ export class DashboardRepository {
     const mergedProgress = sql<number>`
       coalesce(
         case
-          when ${readingProgress.updatedAt} is null then ${audiobookProgress.percentage}
+          when ${readingProgress.lastReadAt} is null then ${audiobookProgress.percentage}
           when ${audiobookProgress.updatedAt} is null then ${readingProgress.percentage}
-          when ${readingProgress.updatedAt} >= ${audiobookProgress.updatedAt} then ${readingProgress.percentage}
+          when ${readingProgress.lastReadAt} >= ${audiobookProgress.updatedAt} then ${readingProgress.percentage}
           else ${audiobookProgress.percentage}
         end,
         ${readingProgress.percentage},
@@ -144,11 +144,11 @@ export class DashboardRepository {
         0
       )
     `;
-    const mergedUpdatedAt = sql<Date | null>`
+    const mergedLastReadAt = sql<Date | null>`
       case
-        when ${readingProgress.updatedAt} is null then ${audiobookProgress.updatedAt}
-        when ${audiobookProgress.updatedAt} is null then ${readingProgress.updatedAt}
-        when ${readingProgress.updatedAt} >= ${audiobookProgress.updatedAt} then ${readingProgress.updatedAt}
+        when ${readingProgress.lastReadAt} is null then ${audiobookProgress.updatedAt}
+        when ${audiobookProgress.updatedAt} is null then ${readingProgress.lastReadAt}
+        when ${readingProgress.lastReadAt} >= ${audiobookProgress.updatedAt} then ${readingProgress.lastReadAt}
         else ${audiobookProgress.updatedAt}
       end
     `;
@@ -177,7 +177,7 @@ export class DashboardRepository {
             when ${completionPredicate}
               then greatest(
                 coalesce(${userBookStatus.updatedAt}, to_timestamp(0)),
-                coalesce(${mergedUpdatedAt}, to_timestamp(0))
+                coalesce(${mergedLastReadAt}, to_timestamp(0))
               )
             else null
           end as completion_updated_at
