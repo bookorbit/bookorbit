@@ -19,8 +19,8 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  NODE_VERSION: "24"
-  PNPM_VERSION: "10"
+  NODE_VERSION: "26"
+  PNPM_VERSION: "11"
 
 jobs:
   synchronize:

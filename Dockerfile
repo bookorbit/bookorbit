@@ -1,7 +1,7 @@
-ARG NODE_IMAGE=node:24.11-alpine@sha256:682368d8253e0c3364b803956085c456a612d738bd635926d73fa24db3ce53d7
+ARG NODE_IMAGE=node:26.7.0-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019
 
 FROM ${NODE_IMAGE} AS base
-RUN npm install -g pnpm@10.33.4
+RUN npm install -g pnpm@11.22.0
 
 # Stage 1: Build client
 FROM base AS client-builder
