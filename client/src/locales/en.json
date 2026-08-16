@@ -6269,6 +6269,7 @@
     "settings": {
       "title": "Settings",
       "ariaLabel": "Reader settings",
+      "close": "Close settings",
       "reset": "Reset to defaults",
       "modeLabel": "Color mode",
       "mode": {

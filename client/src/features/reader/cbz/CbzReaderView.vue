@@ -16,7 +16,7 @@ import type { CbxReaderSettings } from '@bookorbit/types'
 import { DEFAULT_WIDE_PAGE_RATIO_THRESHOLD, createCbzSpreadLayout } from './lib/spread-layout'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
+import ReaderSettingsSheet from '@/features/reader/shared/components/ReaderSettingsSheet.vue'
 import CbzSettingsPanel from './components/CbzSettingsPanel.vue'
 
 const TWO_PAGE_BREAKPOINT = 900
@@ -99,8 +99,9 @@ function onSettingsOpenChange(open: boolean) {
   showSettings.value = open
 }
 
-function openSettings() {
-  showSettings.value = true
+/** Mirrors PopoverTrigger on the wide path, so the icon means the same thing in both containers. */
+function toggleSettings() {
+  showSettings.value = !showSettings.value
 }
 
 function applySettings(s: CbxReaderSettings) {
@@ -768,29 +769,19 @@ onUnmounted(() => {
             :class="showSettings ? '!bg-muted !text-foreground' : ''"
             :title="t('reader.settings.title')"
             :aria-label="t('reader.settings.ariaLabel')"
-            @click="openSettings"
+            @click="toggleSettings"
           >
             <Settings :size="15" />
           </button>
-          <Sheet :open="showSettings" @update:open="onSettingsOpenChange">
-            <SheetContent
-              side="bottom"
-              hide-close
-              class="max-h-[85vh] gap-0 rounded-t-2xl border-border bg-card p-0"
-              :aria-label="t('reader.settings.ariaLabel')"
-            >
-              <div class="flex shrink-0 justify-center pt-2.5 pb-1">
-                <div class="h-1 w-9 rounded-full bg-border" />
-              </div>
-              <CbzSettingsPanel
-                :settings="panelSettings"
-                :can-reset="bookSettings.isCustomized.value"
-                :is-spread-active="isTwoPageEffective"
-                @update="applyPanelUpdate"
-                @reset="resetBookViewSettings"
-              />
-            </SheetContent>
-          </Sheet>
+          <ReaderSettingsSheet :open="showSettings" @update:open="onSettingsOpenChange">
+            <CbzSettingsPanel
+              :settings="panelSettings"
+              :can-reset="bookSettings.isCustomized.value"
+              :is-spread-active="isTwoPageEffective"
+              @update="applyPanelUpdate"
+              @reset="resetBookViewSettings"
+            />
+          </ReaderSettingsSheet>
         </template>
 
         <Popover v-else :open="showSettings" @update:open="onSettingsOpenChange">

@@ -16,8 +16,8 @@ import {
 } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import ReaderSettingsSheet from '@/features/reader/shared/components/ReaderSettingsSheet.vue'
 import { useFullscreen } from '../../shared/composables/useFullscreen'
 
 const { t } = useI18n()
@@ -52,8 +52,9 @@ function onSettingsOpenChange(open: boolean) {
   emit('update:settingsOpen', open)
 }
 
-function openSettings() {
-  emit('update:settingsOpen', true)
+/** Mirrors PopoverTrigger on the wide path, so the icon means the same thing in both containers. */
+function toggleSettings() {
+  emit('update:settingsOpen', !props.settingsOpen)
 }
 
 function getFooterModeIcon(mode: 0 | 1 | 2) {
@@ -175,23 +176,13 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
           :class="props.settingsOpen ? '!bg-muted !text-foreground' : ''"
           :title="t('reader.settings.title')"
           :aria-label="t('reader.settings.ariaLabel')"
-          @click="openSettings"
+          @click="toggleSettings"
         >
           <Settings :size="18" />
         </button>
-        <Sheet :open="props.settingsOpen" @update:open="onSettingsOpenChange">
-          <SheetContent
-            side="bottom"
-            hide-close
-            class="max-h-[85vh] gap-0 rounded-t-2xl border-border bg-card p-0"
-            :aria-label="t('reader.settings.ariaLabel')"
-          >
-            <div class="flex shrink-0 justify-center pt-2.5 pb-1">
-              <div class="h-1 w-9 rounded-full bg-border" />
-            </div>
-            <slot name="settingsPanel" />
-          </SheetContent>
-        </Sheet>
+        <ReaderSettingsSheet :open="props.settingsOpen" @update:open="onSettingsOpenChange">
+          <slot name="settingsPanel" />
+        </ReaderSettingsSheet>
       </template>
 
       <Popover v-else :open="props.settingsOpen" @update:open="onSettingsOpenChange">
