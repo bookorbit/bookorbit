@@ -16,7 +16,13 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 COPY packages/ ./packages/
 COPY client/ ./client/
-RUN pnpm --filter client run build-only
+# pnpm 11 defaults verifyDepsBeforeRun to "install", so running a script
+# re-installs first. Each stage installed its own filtered subset with a frozen
+# lockfile two steps up, and no stage carries the whole workspace, so that
+# re-install is both redundant and wrong: it resolves against a partial
+# workspace. In the server stage it is fatal, because client/ is absent and the
+# @embedpdf patches then look unused.
+RUN pnpm --config.verify-deps-before-run=false --filter client run build-only
 
 # Stage 2: Build server + create deploy bundle
 FROM base AS server-builder
@@ -31,7 +37,7 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 COPY packages/ ./packages/
 COPY server/ ./server/
-RUN pnpm --filter server run build
+RUN pnpm --config.verify-deps-before-run=false --filter server run build
 
 # pnpm deploy prunes to prod deps; dist/ is gitignored so copy it in after.
 RUN pnpm --config.allow-unused-patches=true --filter server deploy --prod --legacy /deploy
