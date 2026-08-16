@@ -207,9 +207,9 @@ describe('MigrationImportRepository', () => {
 
   it('groups target files by book id and supports empty input short-circuit', async () => {
     const where = vi.fn().mockResolvedValue([
-      { id: 11, bookId: 1, hash: 'h1', absolutePath: '/books/1.epub' },
-      { id: 12, bookId: 1, hash: null, absolutePath: '/books/1.m4b' },
-      { id: 21, bookId: 2, hash: 'h2', absolutePath: '/books/2.epub' },
+      { id: 12, bookId: 1, hash: null, absolutePath: '/books/1.m4b', format: 'm4b', sortOrder: 1, durationSeconds: 600 },
+      { id: 11, bookId: 1, hash: 'h1', absolutePath: '/books/1.epub', format: 'epub', sortOrder: 0, durationSeconds: null },
+      { id: 21, bookId: 2, hash: 'h2', absolutePath: '/books/2.epub', format: 'epub', sortOrder: null, durationSeconds: null },
     ]);
     const from = vi.fn().mockReturnValue({ where });
     const select = vi.fn().mockReturnValue({ from });
@@ -222,11 +222,11 @@ describe('MigrationImportRepository', () => {
         [
           1,
           [
-            { id: 11, hash: 'h1', absolutePath: '/books/1.epub' },
-            { id: 12, hash: null, absolutePath: '/books/1.m4b' },
+            { id: 11, hash: 'h1', absolutePath: '/books/1.epub', format: 'epub', sortOrder: 0, durationSeconds: null },
+            { id: 12, hash: null, absolutePath: '/books/1.m4b', format: 'm4b', sortOrder: 1, durationSeconds: 600 },
           ],
         ],
-        [[2, [{ id: 21, hash: 'h2', absolutePath: '/books/2.epub' }]]][0],
+        [[2, [{ id: 21, hash: 'h2', absolutePath: '/books/2.epub', format: 'epub', sortOrder: null, durationSeconds: null }]]][0],
       ]),
     );
   });
@@ -234,9 +234,13 @@ describe('MigrationImportRepository', () => {
   it('chunks target file lookups for large matched book sets', async () => {
     const where = vi
       .fn()
-      .mockResolvedValueOnce([{ id: 11, bookId: 1, hash: 'h1', absolutePath: '/books/1.epub', format: 'epub' }])
-      .mockResolvedValueOnce([{ id: 5011, bookId: 501, hash: 'h501', absolutePath: '/books/501.epub', format: 'epub' }])
-      .mockResolvedValueOnce([{ id: 10011, bookId: 1001, hash: 'h1001', absolutePath: '/books/1001.epub', format: 'epub' }]);
+      .mockResolvedValueOnce([{ id: 11, bookId: 1, hash: 'h1', absolutePath: '/books/1.epub', format: 'epub', sortOrder: 0, durationSeconds: null }])
+      .mockResolvedValueOnce([
+        { id: 5011, bookId: 501, hash: 'h501', absolutePath: '/books/501.epub', format: 'epub', sortOrder: 0, durationSeconds: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 10011, bookId: 1001, hash: 'h1001', absolutePath: '/books/1001.epub', format: 'epub', sortOrder: 0, durationSeconds: null },
+      ]);
     const from = vi.fn().mockReturnValue({ where });
     const select = vi.fn().mockReturnValue({ from });
     const repo = new MigrationImportRepository({ select } as never);
@@ -246,9 +250,13 @@ describe('MigrationImportRepository', () => {
     const result = await repo.fetchTargetBookFiles(bookIds);
 
     expect(where).toHaveBeenCalledTimes(3);
-    expect(result.get(1)).toEqual([{ id: 11, hash: 'h1', absolutePath: '/books/1.epub', format: 'epub' }]);
-    expect(result.get(501)).toEqual([{ id: 5011, hash: 'h501', absolutePath: '/books/501.epub', format: 'epub' }]);
-    expect(result.get(1001)).toEqual([{ id: 10011, hash: 'h1001', absolutePath: '/books/1001.epub', format: 'epub' }]);
+    expect(result.get(1)).toEqual([{ id: 11, hash: 'h1', absolutePath: '/books/1.epub', format: 'epub', sortOrder: 0, durationSeconds: null }]);
+    expect(result.get(501)).toEqual([
+      { id: 5011, hash: 'h501', absolutePath: '/books/501.epub', format: 'epub', sortOrder: 0, durationSeconds: null },
+    ]);
+    expect(result.get(1001)).toEqual([
+      { id: 10011, hash: 'h1001', absolutePath: '/books/1001.epub', format: 'epub', sortOrder: 0, durationSeconds: null },
+    ]);
   });
 
   it('returns library-id map for book ids and skips query for empty input', async () => {

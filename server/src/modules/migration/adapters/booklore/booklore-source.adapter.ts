@@ -408,6 +408,8 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     const currentHashCol = fileColumns ? firstColumn(fileColumns, ['current_hash', 'hash', 'file_hash', 'sha256']) : null;
     const initialHashCol = fileColumns ? firstColumn(fileColumns, ['initial_hash']) : null;
     const fileDurationSecondsCol = fileColumns ? firstColumn(fileColumns, ['duration_seconds', 'duration']) : null;
+    const fileFormatCol = fileColumns ? firstColumn(fileColumns, ['format', 'file_format', 'file_type', 'ebook_format']) : null;
+    const fileSortOrderCol = fileColumns ? firstColumn(fileColumns, ['sort_order', 'track_index', 'file_index', 'position']) : null;
     const fileIsBookCol = fileColumns ? firstColumn(fileColumns, ['is_book']) : null;
 
     const presentFields: string[] = (
@@ -469,6 +471,8 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
       sqlString('f', currentHashCol, 'currentHash'),
       sqlString('f', initialHashCol, 'initialHash'),
       sqlNumber('f', fileDurationSecondsCol, 'fileDurationSeconds'),
+      sqlString('f', fileFormatCol, 'fileFormat'),
+      sqlNumber('f', fileSortOrderCol, 'fileSortOrder'),
       libraryPathValueCol ? `CAST(lp.\`${libraryPathValueCol}\` AS CHAR) AS libraryRootPath` : 'NULL AS libraryRootPath',
     ];
 
@@ -490,6 +494,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
     }
     const whereSql = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
     const orderParts = [`b.\`${bookIdCol}\``];
+    if (fileSortOrderCol) orderParts.push(`f.\`${fileSortOrderCol}\``);
     if (fileIdCol) orderParts.push(`f.\`${fileIdCol}\``);
 
     const sqlText = `
@@ -562,6 +567,8 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
           fileName,
           fileSubPath,
           durationSeconds: fileDurationSeconds,
+          format: normalizeSourceFileFormat(asString(row.fileFormat), fileName, filePath),
+          sortOrder: asInteger(row.fileSortOrder) ?? next.files?.length ?? 0,
         });
       }
 
@@ -1237,6 +1244,17 @@ function normalizeJoinedPath(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return trimmed;
   return trimmed.replace(/\/{2,}/g, '/');
+}
+
+function normalizeSourceFileFormat(format: string | null, fileName: string | null, filePath: string | null): string | null {
+  const declared = format?.trim().toLowerCase().replace(/^\./, '');
+  if (declared) return declared;
+
+  for (const candidate of [fileName, filePath]) {
+    const match = candidate?.match(/\.([A-Za-z0-9]+)$/);
+    if (match) return match[1].toLowerCase();
+  }
+  return null;
 }
 
 function parseContributorNames(value: string | null): SourceContributor[] {

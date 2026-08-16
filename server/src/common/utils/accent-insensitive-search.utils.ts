@@ -2,7 +2,9 @@ import { SQL, SQLWrapper, sql } from 'drizzle-orm';
 
 import { normalizeMetadataText } from './metadata-text-normalize.utils';
 
-export function accentInsensitiveIlike(value: SQLWrapper, pattern: string): SQL {
+// The pattern may be a SQL fragment so set-based queries can match against a per-row
+// pattern column instead of a bound literal.
+export function accentInsensitiveIlike(value: SQLWrapper, pattern: string | SQLWrapper): SQL {
   return sql`public.bookorbit_unaccent(${value}) ILIKE public.bookorbit_unaccent(${pattern})`;
 }
 

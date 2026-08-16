@@ -1,5 +1,7 @@
 import * as schema from '../../../db/schema';
+import { isAudioFormat, isComicFormat } from '@bookorbit/types';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../../common/utils/metadata-text-normalize.utils';
+import type { SourceBookFile } from '../adapters/source-adapter.types';
 import { applyPathMappings } from '../planner/matching.service';
 import type { PlannerResult } from '../planner/planner.types';
 
@@ -30,10 +32,50 @@ export function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values.filter((value) => Number.isFinite(value)))];
 }
 
-export function buildSourceFileTargetMap(
-  planned: PlannerResult,
-  targetFilesByBookId: Map<number, Array<{ id: number; hash: string | null; absolutePath: string; format?: string | null }>>,
-): Map<string, number> {
+export type ProgressMediaKind = 'audio' | 'comic' | 'epub' | 'pdf' | 'ebook';
+
+export interface TargetBookFile {
+  id: number;
+  hash: string | null;
+  absolutePath: string;
+  format: string | null;
+  sortOrder: number | null;
+  durationSeconds: number | null;
+}
+
+export function normalizeFileFormat(format: string | null | undefined): string | null {
+  const normalized = format?.trim().toLowerCase().replace(/^\./, '');
+  return normalized || null;
+}
+
+export function progressMediaKind(format: string | null | undefined): ProgressMediaKind | null {
+  const normalized = normalizeFileFormat(format);
+  if (!normalized) return null;
+  if (isAudioFormat(normalized)) return 'audio';
+  if (isComicFormat(normalized)) return 'comic';
+  if (normalized === 'epub' || normalized === 'kepub') return 'epub';
+  if (normalized === 'pdf') return 'pdf';
+  return 'ebook';
+}
+
+export function sourceFileFormat(sourceFile: SourceBookFile): string | null {
+  const declared = normalizeFileFormat(sourceFile.format);
+  if (declared) return declared;
+
+  for (const candidate of [sourceFile.fileName, sourceFile.filePath, sourceFile.fileSubPath]) {
+    const match = candidate?.match(/\.([A-Za-z0-9]+)$/);
+    if (match) return normalizeFileFormat(match[1]);
+  }
+  return null;
+}
+
+export function areProgressFormatsCompatible(sourceFormat: string | null | undefined, targetFormat: string | null | undefined): boolean {
+  const sourceKind = progressMediaKind(sourceFormat);
+  const targetKind = progressMediaKind(targetFormat);
+  return sourceKind != null && sourceKind === targetKind;
+}
+
+export function buildSourceFileTargetMap(planned: PlannerResult, targetFilesByBookId: Map<number, TargetBookFile[]>): Map<string, number> {
   const sourceBooksById = new Map(planned.execution.sourceData.books.map((book) => [book.sourceBookId, book]));
   const out = new Map<string, number>();
 
@@ -43,28 +85,100 @@ export function buildSourceFileTargetMap(
     const targetFiles = targetFilesByBookId.get(match.targetBookId) ?? [];
     if (sourceFiles.length === 0 || targetFiles.length === 0) continue;
 
+    const orderedTargetFiles = [...targetFiles].sort(compareTargetFileOrder);
+    const usedTargetFileIds = new Set<number>();
+
     for (const sourceFile of sourceFiles) {
       if (out.has(sourceFile.sourceFileId)) continue;
 
+      const sourceFormat = sourceFileFormat(sourceFile);
+      // Hash and absolute-path equality identify the same file outright, so a target row with
+      // no recorded format must not be excluded from those two strategies. The weaker
+      // kind-based fallbacks below still require a known format on both sides.
+      const compatibleTargets = sourceFormat
+        ? orderedTargetFiles.filter(
+            (targetFile) => progressMediaKind(targetFile.format) === null || areProgressFormatsCompatible(sourceFormat, targetFile.format),
+          )
+        : orderedTargetFiles;
+
       if (sourceFile.fileHash) {
-        const byHash = targetFiles.filter((tf) => tf.hash === sourceFile.fileHash);
-        if (byHash.length === 1) {
+        const byHash = compatibleTargets.filter((tf) => tf.hash === sourceFile.fileHash);
+        if (byHash.length === 1 && !usedTargetFileIds.has(byHash[0].id)) {
           out.set(sourceFile.sourceFileId, byHash[0].id);
+          usedTargetFileIds.add(byHash[0].id);
           continue;
         }
       }
 
       const mappedPath = applyPathMappings(sourceFile.filePath, planned.plan.pathMappings);
       if (mappedPath) {
-        const byPath = targetFiles.filter((tf) => tf.absolutePath === mappedPath);
-        if (byPath.length === 1) {
+        const byPath = compatibleTargets.filter((tf) => tf.absolutePath === mappedPath);
+        if (byPath.length === 1 && !usedTargetFileIds.has(byPath[0].id)) {
           out.set(sourceFile.sourceFileId, byPath[0].id);
+          usedTargetFileIds.add(byPath[0].id);
+        }
+      }
+    }
+
+    const sourceFilesByKind = groupSourceFilesByProgressKind(sourceFiles);
+    for (const [kind, compatibleSourceFiles] of sourceFilesByKind) {
+      const compatibleTargetFiles = orderedTargetFiles.filter((targetFile) => progressMediaKind(targetFile.format) === kind);
+      if (compatibleSourceFiles.length === 1 && compatibleTargetFiles.length === 1) {
+        if (!out.has(compatibleSourceFiles[0].sourceFileId) && !usedTargetFileIds.has(compatibleTargetFiles[0].id)) {
+          out.set(compatibleSourceFiles[0].sourceFileId, compatibleTargetFiles[0].id);
+          usedTargetFileIds.add(compatibleTargetFiles[0].id);
+        }
+        continue;
+      }
+
+      if (
+        compatibleSourceFiles.length !== compatibleTargetFiles.length ||
+        !hasDeterministicSourceOrder(compatibleSourceFiles) ||
+        !hasDeterministicTargetOrder(compatibleTargetFiles)
+      ) {
+        continue;
+      }
+
+      const orderedSourceFiles = [...compatibleSourceFiles].sort(compareSourceFileOrder);
+      for (let index = 0; index < orderedSourceFiles.length; index += 1) {
+        const sourceFile = orderedSourceFiles[index];
+        if (!out.has(sourceFile.sourceFileId) && !usedTargetFileIds.has(compatibleTargetFiles[index].id)) {
+          out.set(sourceFile.sourceFileId, compatibleTargetFiles[index].id);
+          usedTargetFileIds.add(compatibleTargetFiles[index].id);
         }
       }
     }
   }
 
   return out;
+}
+
+function groupSourceFilesByProgressKind(sourceFiles: SourceBookFile[]): Map<ProgressMediaKind, SourceBookFile[]> {
+  const result = new Map<ProgressMediaKind, SourceBookFile[]>();
+  for (const sourceFile of sourceFiles) {
+    const kind = progressMediaKind(sourceFileFormat(sourceFile));
+    if (!kind) continue;
+    const files = result.get(kind) ?? [];
+    files.push(sourceFile);
+    result.set(kind, files);
+  }
+  return result;
+}
+
+function hasDeterministicSourceOrder(files: SourceBookFile[]): boolean {
+  return files.every((file) => Number.isFinite(file.sortOrder)) && new Set(files.map((file) => file.sortOrder)).size === files.length;
+}
+
+function hasDeterministicTargetOrder(files: TargetBookFile[]): boolean {
+  return files.every((file) => Number.isFinite(file.sortOrder)) && new Set(files.map((file) => file.sortOrder)).size === files.length;
+}
+
+function compareSourceFileOrder(a: SourceBookFile, b: SourceBookFile): number {
+  return (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.sourceFileId.localeCompare(b.sourceFileId);
+}
+
+function compareTargetFileOrder(a: TargetBookFile, b: TargetBookFile): number {
+  return (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.id - b.id;
 }
 
 export function buildMetadataPatch(sourceBook: {

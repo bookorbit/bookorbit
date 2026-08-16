@@ -160,7 +160,7 @@ function buildUniqueSourceName(
   ignoreId?: number,
 ): string {
   const trimmed = desiredName.trim();
-  const safeBase = trimmed.length > 0 ? trimmed : 'Booklore Import';
+  const safeBase = trimmed.length > 0 ? trimmed : 'Migration Source';
   const names = new Set(sources.filter((row) => row.type === sourceType && row.id !== ignoreId).map((row) => row.name.toLowerCase()));
 
   if (!names.has(safeBase.toLowerCase())) return safeBase;

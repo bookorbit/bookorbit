@@ -49,7 +49,8 @@ function printSuiteList() {
   console.log("- all [composite] - Run all suites sequentially");
   for (const suite of suites) {
     const dbMode = suite.prepareDedicatedDatabase ? "dedicated-db" : "default-db";
-    console.log(`- ${suite.id} [${dbMode}] - ${suite.description}`);
+    const requirements = [dbMode, ...(suite.requiresDocker ? ["docker"] : [])].join(", ");
+    console.log(`- ${suite.id} [${requirements}] - ${suite.description}`);
   }
 }
 
@@ -109,6 +110,10 @@ async function main() {
   mkdirSync(resultsDir, { recursive: true });
 
   const e2eDatabaseUrl = process.env.E2E_DATABASE_URL ?? DEFAULT_E2E_DATABASE_URL;
+  if (suites.some((suite) => suite.requiresDocker)) {
+    console.log("Verifying Docker availability...");
+    await runCommand("docker", ["version", "--format", "{{.Server.Version}}"]);
+  }
   if (!isCiEnvironment() && suites.some((suite) => suite.prepareDedicatedDatabase)) {
     console.log("Starting local PostgreSQL (dev compose)...");
     await runCommand("pnpm", ["run", "db:up"]);

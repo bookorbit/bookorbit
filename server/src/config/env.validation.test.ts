@@ -134,4 +134,13 @@ describe('validateEnv', () => {
       }),
     ).not.toThrow();
   });
+
+  it('accepts an absolute or empty migration import root', () => {
+    expect(() => validateEnv({ ...BASE_ENV, MIGRATION_IMPORT_ROOT: '/imports' })).not.toThrow();
+    expect(() => validateEnv({ ...BASE_ENV, MIGRATION_IMPORT_ROOT: '' })).not.toThrow();
+  });
+
+  it('rejects a relative migration import root', () => {
+    expect(() => validateEnv({ ...BASE_ENV, MIGRATION_IMPORT_ROOT: './imports' })).toThrow('MIGRATION_IMPORT_ROOT must be an absolute path');
+  });
 });

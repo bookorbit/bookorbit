@@ -225,7 +225,7 @@ export function validatePathMappings(
 export function createProfile(payload: {
   sourceId: number
   name: string
-  userMappings: Array<{ sourceUserId: string; targetUserId: number }>
+  userMappings: Array<{ sourceUserId: string; targetUserId: number | null }>
   pathMappings?: Array<{ sourcePrefix: string; targetPrefix: string }>
   scope?: Record<string, unknown>
 }) {

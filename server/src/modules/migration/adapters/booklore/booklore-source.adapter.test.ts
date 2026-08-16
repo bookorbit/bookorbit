@@ -444,6 +444,13 @@ describe('BookloreSourceAdapter validation and export', () => {
         tags: ['Space Opera'],
       }),
     );
+    expect(result.books[0]?.files).toEqual([
+      expect.objectContaining({
+        sourceFileId: 'file-1',
+        format: 'epub',
+        sortOrder: 0,
+      }),
+    ]);
     expect(result.books[0]?.authors?.map((author) => author.name)).toEqual(['Frank Herbert', 'Brian Herbert']);
     expect(result.readingSessions).toEqual([
       {

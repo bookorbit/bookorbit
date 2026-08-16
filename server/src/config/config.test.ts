@@ -25,6 +25,7 @@ function resetEnv(): void {
   delete process.env.FILE_WRITE_MAX_CONCURRENT_WRITES;
   delete process.env.EMAIL_ENCRYPTION_KEY;
   delete process.env.MIGRATION_ENCRYPTION_KEY;
+  delete process.env.MIGRATION_IMPORT_ROOT;
   delete process.env.OIDC_STATE_TTL_SECS;
   delete process.env.OIDC_DISCOVERY_CACHE_TTL_SECS;
   delete process.env.OIDC_JWKS_CACHE_TTL_SECS;
@@ -94,7 +95,19 @@ describe('config', () => {
       refreshRotationGraceMs: 30_000,
     });
     expect(emailConfig().encryptionKey).toBe('');
-    expect(migrationConfig().encryptionKey).toBe('');
+    expect(migrationConfig()).toEqual({ encryptionKey: '', importRoot: undefined });
+  });
+
+  it('resolves the configured migration import root', () => {
+    process.env.MIGRATION_IMPORT_ROOT = './imports/audiobookshelf';
+
+    expect(migrationConfig().importRoot).toBe(resolve('./imports/audiobookshelf'));
+  });
+
+  it('treats a blank migration import root as unset', () => {
+    process.env.MIGRATION_IMPORT_ROOT = '   ';
+
+    expect(migrationConfig().importRoot).toBeUndefined();
   });
 
   it('resolves storage path from APP_DATA_PATH', () => {

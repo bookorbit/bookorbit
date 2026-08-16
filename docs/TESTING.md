@@ -120,26 +120,28 @@ check that your env vars match the values in `server/.env.example`.
 
 ### Suite reference
 
-| Suite ID                     | Lane  | DB mode      | Timeout | Description                                                                                                           |
-| ---------------------------- | ----- | ------------ | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `guard-mechanics`            | smoke | default-db   | 30 min  | `@Public` / `@RequirePermission` guard wiring; uses its own minimal NestJS testing module, not the shared app harness |
-| `scanner-scenarios`          | full  | dedicated-db | 45 min  | File organization scenario matrix for the library scanner                                                             |
-| `scanner-file-operations`    | full  | dedicated-db | 60 min  | File add/remove/rename operations and scanner reconciliation                                                          |
-| `auth-session-security`      | full  | dedicated-db | 50 min  | Cookie flags, token rotation, concurrent sessions                                                                     |
-| `auth-recovery-oidc-logout`  | full  | dedicated-db | 50 min  | Password reset flow and OIDC logout                                                                                   |
-| `book-dock-ingest-finalize`  | full  | dedicated-db | 45 min  | Book Dock upload ingest and finalize flow                                                                             |
-| `metadata-write`             | full  | dedicated-db | 60 min  | Metadata write operations (field updates, bulk edits)                                                                 |
-| `metadata-lock`              | full  | dedicated-db | 60 min  | Metadata lock enforcement across operations                                                                           |
-| `migration-booklore`         | full  | dedicated-db | 70 min  | Booklore v1 to BookOrbit data migration                                                                               |
-| `authorization-matrix`       | full  | dedicated-db | 60 min  | Permission enforcement across all protected routes                                                                    |
-| `book-api-contract`          | full  | dedicated-db | 60 min  | Book API response shape and field contract                                                                            |
-| `app-settings-oidc-contract` | full  | dedicated-db | 60 min  | App settings and OIDC configuration contract                                                                          |
-| `library-admin-workflows`    | full  | dedicated-db | 60 min  | Library create/update/delete admin workflows                                                                          |
-| `reader-format-delivery`     | full  | dedicated-db | 60 min  | Book file serving and format delivery                                                                                 |
-| `opds-auth-catalog`          | full  | dedicated-db | 45 min  | OPDS feed authentication and catalog structure                                                                        |
-| `email-lifecycle`            | full  | dedicated-db | 45 min  | Email provider, template, and send lifecycle                                                                          |
-| `reader-state-isolation`     | full  | dedicated-db | 45 min  | Reading progress, bookmarks, and annotations isolated per user                                                        |
-| `users-admin-lifecycle`      | full  | dedicated-db | 50 min  | User create/update/delete admin lifecycle                                                                             |
+| Suite ID                          | Lane  | DB mode      | Timeout | Description                                                                                                           |
+| --------------------------------- | ----- | ------------ | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `guard-mechanics`                 | smoke | default-db   | 30 min  | `@Public` / `@RequirePermission` guard wiring; uses its own minimal NestJS testing module, not the shared app harness |
+| `scanner-scenarios`               | full  | dedicated-db | 45 min  | File organization scenario matrix for the library scanner                                                             |
+| `scanner-file-operations`         | full  | dedicated-db | 60 min  | File add/remove/rename operations and scanner reconciliation                                                          |
+| `auth-session-security`           | full  | dedicated-db | 50 min  | Cookie flags, token rotation, concurrent sessions                                                                     |
+| `auth-recovery-oidc-logout`       | full  | dedicated-db | 50 min  | Password reset flow and OIDC logout                                                                                   |
+| `book-dock-ingest-finalize`       | full  | dedicated-db | 45 min  | Book Dock upload ingest and finalize flow                                                                             |
+| `metadata-write`                  | full  | dedicated-db | 60 min  | Metadata write operations (field updates, bulk edits)                                                                 |
+| `metadata-lock`                   | full  | dedicated-db | 60 min  | Metadata lock enforcement across operations                                                                           |
+| `migration-booklore`              | full  | dedicated-db | 70 min  | Booklore v1 to BookOrbit data migration                                                                               |
+| `migration-audiobookshelf`        | full  | dedicated-db | 90 min  | Audiobookshelf live API and real-backup migration                                                                     |
+| `migration-calibre-web-automated` | full  | dedicated-db | 120 min | Calibre-Web Automated stopped-snapshot migration                                                                      |
+| `authorization-matrix`            | full  | dedicated-db | 60 min  | Permission enforcement across all protected routes                                                                    |
+| `book-api-contract`               | full  | dedicated-db | 60 min  | Book API response shape and field contract                                                                            |
+| `app-settings-oidc-contract`      | full  | dedicated-db | 60 min  | App settings and OIDC configuration contract                                                                          |
+| `library-admin-workflows`         | full  | dedicated-db | 60 min  | Library create/update/delete admin workflows                                                                          |
+| `reader-format-delivery`          | full  | dedicated-db | 60 min  | Book file serving and format delivery                                                                                 |
+| `opds-auth-catalog`               | full  | dedicated-db | 45 min  | OPDS feed authentication and catalog structure                                                                        |
+| `email-lifecycle`                 | full  | dedicated-db | 45 min  | Email provider, template, and send lifecycle                                                                          |
+| `reader-state-isolation`          | full  | dedicated-db | 45 min  | Reading progress, bookmarks, and annotations isolated per user                                                        |
+| `users-admin-lifecycle`           | full  | dedicated-db | 50 min  | User create/update/delete admin lifecycle                                                                             |
 
 JUnit XML output for each suite is written to `test-results/server/<suite-id>-e2e-junit.xml`.
 

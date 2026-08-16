@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 export class UserMappingDto {
   @IsString()
@@ -8,9 +8,10 @@ export class UserMappingDto {
   sourceUserId!: string;
 
   @Type(() => Number)
+  @ValidateIf((_object, value) => value !== null)
   @IsInt()
   @Min(1)
-  targetUserId!: number;
+  targetUserId!: number | null;
 }
 
 export class PathMappingDto {

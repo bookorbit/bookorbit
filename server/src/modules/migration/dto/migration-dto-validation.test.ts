@@ -28,9 +28,25 @@ describe('Migration DTO validation', () => {
       ).length,
     ).toBe(0);
 
+    expect(
+      (
+        await errorsFor(CreateMigrationProfileDto, {
+          sourceId: 5,
+          name: 'Audiobookshelf Import',
+          userMappings: [
+            { sourceUserId: 'mapped', targetUserId: 10 },
+            { sourceUserId: 'skipped', targetUserId: null },
+          ],
+        })
+      ).length,
+    ).toBe(0);
+
     expect((await errorsFor(CreateMigrationProfileDto, { sourceId: 0, name: '', userMappings: [] })).length).toBeGreaterThan(0);
     expect(
       (await errorsFor(CreateMigrationProfileDto, { sourceId: 2, name: 'ok', userMappings: [{ sourceUserId: '', targetUserId: 1 }] })).length,
+    ).toBeGreaterThan(0);
+    expect(
+      (await errorsFor(CreateMigrationProfileDto, { sourceId: 2, name: 'ok', userMappings: [{ sourceUserId: 'u1', targetUserId: 0 }] })).length,
     ).toBeGreaterThan(0);
   });
 

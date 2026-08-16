@@ -7,18 +7,20 @@ export interface PathMapping {
 
 export interface UserMapping {
   sourceUserId: string;
-  targetUserId: number;
+  targetUserId: number | null;
 }
 
-export type MatchStrategy = 'isbn' | 'file_hash' | 'path_mapping' | 'title_author';
+export type MatchStrategy = 'isbn' | 'asin' | 'file_hash' | 'path_mapping' | 'title_author';
 
 export type UnresolvedReasonCode =
   | 'insufficient_source_data'
   | 'no_isbn_match'
+  | 'no_asin_match'
   | 'no_file_hash_match'
   | 'no_file_path_match'
   | 'no_title_author_match'
   | 'ambiguous_isbn_match'
+  | 'ambiguous_asin_match'
   | 'ambiguous_file_hash_match'
   | 'ambiguous_file_path_match'
   | 'ambiguous_title_author_match'

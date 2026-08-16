@@ -14,7 +14,7 @@ import {
   type ReadingDailyStatsSegment,
 } from '../../../common/utils/reading-daily-stats.utils';
 import { resolveTimeZone } from '../../../common/utils/timezone.utils';
-import { uniqueNumbers } from './executor-utils';
+import { type TargetBookFile, uniqueNumbers } from './executor-utils';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -773,10 +773,8 @@ export class MigrationImportRepository {
     return { primaryFilesByBookId, audiobookPrimaryFilesByBookId };
   }
 
-  async fetchTargetBookFiles(
-    bookIds: number[],
-  ): Promise<Map<number, Array<{ id: number; hash: string | null; absolutePath: string; format: string | null }>>> {
-    const result = new Map<number, Array<{ id: number; hash: string | null; absolutePath: string; format: string | null }>>();
+  async fetchTargetBookFiles(bookIds: number[]): Promise<Map<number, TargetBookFile[]>> {
+    const result = new Map<number, TargetBookFile[]>();
     const targetBookIds = uniqueNumbers(bookIds);
     if (targetBookIds.length === 0) return result;
 
@@ -788,15 +786,28 @@ export class MigrationImportRepository {
           hash: schema.bookFiles.fileHash,
           absolutePath: schema.bookFiles.absolutePath,
           format: schema.bookFiles.format,
+          sortOrder: schema.bookFiles.sortOrder,
+          durationSeconds: schema.bookFiles.durationSeconds,
         })
         .from(schema.bookFiles)
         .where(inArray(schema.bookFiles.bookId, batch));
 
       for (const row of rows) {
         const files = result.get(row.bookId) ?? [];
-        files.push({ id: row.id, hash: row.hash, absolutePath: row.absolutePath, format: row.format });
+        files.push({
+          id: row.id,
+          hash: row.hash,
+          absolutePath: row.absolutePath,
+          format: row.format,
+          sortOrder: row.sortOrder,
+          durationSeconds: row.durationSeconds,
+        });
         result.set(row.bookId, files);
       }
+    }
+
+    for (const files of result.values()) {
+      files.sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.id - b.id);
     }
 
     return result;

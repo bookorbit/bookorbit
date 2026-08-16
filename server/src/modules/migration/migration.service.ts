@@ -218,18 +218,15 @@ export class MigrationService {
       throw new BadRequestException('Plan artifact profile does not match source.');
     }
     const profileMappings = Array.isArray(profile.userMappings) ? profile.userMappings : [];
-    if (profileMappings.length === 0) {
-      throw new BadRequestException('Save user mappings before starting migration.');
-    }
-
     const targetUserIds = profileMappings.map((m) => asInteger(asRecord(m).targetUserId)).filter((id): id is number => id !== null);
-    if (targetUserIds.length > 0) {
-      const existingUsers = await this.repo.listTargetUsersForMapping();
-      const existingIds = new Set(existingUsers.map((u) => u.id));
-      const missing = targetUserIds.filter((id) => !existingIds.has(id));
-      if (missing.length > 0) {
-        throw new BadRequestException(`Target users no longer exist: ${missing.join(', ')}. Update user mappings.`);
-      }
+    if (targetUserIds.length === 0) {
+      throw new BadRequestException('Map at least one source user to a target user before starting migration.');
+    }
+    const existingUsers = await this.repo.listTargetUsersForMapping();
+    const existingIds = new Set(existingUsers.map((u) => u.id));
+    const missing = targetUserIds.filter((id) => !existingIds.has(id));
+    if (missing.length > 0) {
+      throw new BadRequestException(`Target users no longer exist: ${missing.join(', ')}. Update user mappings.`);
     }
 
     const scope = asRecord(profile.scope);
@@ -430,7 +427,10 @@ function hydrateDuplicateSourceCandidates(planRaw: unknown, sourceData: SourceEx
       const match = asRecord(duplicateMatch);
       const sourceBookId = asString(match.sourceBookId);
       const strategy = asString(match.strategy);
-      if (sourceBookId && (strategy === 'isbn' || strategy === 'file_hash' || strategy === 'path_mapping' || strategy === 'title_author')) {
+      if (
+        sourceBookId &&
+        (strategy === 'isbn' || strategy === 'asin' || strategy === 'file_hash' || strategy === 'path_mapping' || strategy === 'title_author')
+      ) {
         strategyBySourceBookId.set(sourceBookId, strategy);
       }
     }
@@ -459,7 +459,7 @@ function hydrateDuplicateSourceCandidates(planRaw: unknown, sourceData: SourceEx
 }
 
 function toMatchStrategy(value: string | null): MatchStrategy | null {
-  if (value === 'isbn' || value === 'file_hash' || value === 'path_mapping' || value === 'title_author') return value;
+  if (value === 'isbn' || value === 'asin' || value === 'file_hash' || value === 'path_mapping' || value === 'title_author') return value;
   return null;
 }
 

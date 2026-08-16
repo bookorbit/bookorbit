@@ -135,6 +135,24 @@ describe('UserStateImporter audiobook progress import', () => {
       },
     };
 
+    const progressFiles = {
+      primaryFilesByBookId: new Map([
+        [101, 1001],
+        [102, 1002],
+      ]),
+      sourceFilesById: new Map(),
+      sourceFilesByBookId: new Map(),
+      sourceFileToTargetFile: new Map(),
+      targetFilesByBookId: new Map([
+        [101, [{ id: 1001, hash: null, absolutePath: '/audio.mp3', format: 'mp3', sortOrder: 0, durationSeconds: 300 }]],
+        [102, [{ id: 1002, hash: null, absolutePath: '/book.epub', format: 'epub', sortOrder: 0, durationSeconds: null }]],
+      ]),
+      targetFilesById: new Map([
+        [1001, { id: 1001, hash: null, absolutePath: '/audio.mp3', format: 'mp3', sortOrder: 0, durationSeconds: 300 }],
+        [1002, { id: 1002, hash: null, absolutePath: '/book.epub', format: 'epub', sortOrder: 0, durationSeconds: null }],
+      ]),
+    };
+
     await (importer as any).importAudiobookProgress(
       77,
       planned,
@@ -143,8 +161,7 @@ describe('UserStateImporter audiobook progress import', () => {
         ['source-audio', 101],
         ['source-ebook', 102],
       ]),
-      new Map([[101, 1001]]),
-      new Map(),
+      progressFiles,
       async () => {},
     );
 
@@ -199,13 +216,22 @@ describe('UserStateImporter audiobook progress import', () => {
       },
     };
 
+    const audioTargetFile = { id: 1001, hash: null, absolutePath: '/audio.mp3', format: 'mp3', sortOrder: 0, durationSeconds: 300 };
+    const progressFiles = {
+      primaryFilesByBookId: new Map([[101, 1001]]),
+      sourceFilesById: new Map(),
+      sourceFilesByBookId: new Map(),
+      sourceFileToTargetFile: new Map(),
+      targetFilesByBookId: new Map([[101, [audioTargetFile]]]),
+      targetFilesById: new Map([[1001, audioTargetFile]]),
+    };
+
     await (importer as any).importAudiobookProgress(
       88,
       planned,
       new Map([['u1', 10]]),
       new Map([['source-audio', 101]]),
-      new Map([[101, 1001]]),
-      new Map(),
+      progressFiles,
       async () => {},
     );
 

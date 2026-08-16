@@ -3,13 +3,20 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { SourceAdapter } from './source-adapter.types';
 import { BookloreSourceAdapter } from './booklore/booklore-source.adapter';
 import { GrimmorySourceAdapter } from './grimmory/grimmory-source.adapter';
+import { AudiobookshelfSourceAdapter } from './audiobookshelf/audiobookshelf-source.adapter';
+import { CalibreWebAutomatedSourceAdapter } from './calibre-web-automated/calibre-web-automated-source.adapter';
 
 @Injectable()
 export class SourceAdapterRegistry {
   private readonly adaptersByType: Map<string, SourceAdapter<any>>;
 
-  constructor(bookloreAdapter: BookloreSourceAdapter, grimmoryAdapter: GrimmorySourceAdapter) {
-    const adapters: SourceAdapter<any>[] = [bookloreAdapter, grimmoryAdapter];
+  constructor(
+    bookloreAdapter: BookloreSourceAdapter,
+    grimmoryAdapter: GrimmorySourceAdapter,
+    audiobookshelfAdapter: AudiobookshelfSourceAdapter,
+    calibreWebAutomatedAdapter: CalibreWebAutomatedSourceAdapter,
+  ) {
+    const adapters: SourceAdapter<any>[] = [bookloreAdapter, grimmoryAdapter, audiobookshelfAdapter, calibreWebAutomatedAdapter];
     this.adaptersByType = new Map(adapters.map((adapter) => [adapter.type, adapter]));
   }
 

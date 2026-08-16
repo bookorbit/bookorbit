@@ -48,11 +48,11 @@ describe('migration executor utils', () => {
       [
         11,
         [
-          { id: 101, hash: 'hash-1', absolutePath: '/target/hash.epub' },
-          { id: 102, hash: null, absolutePath: '/target/path.epub' },
-          { id: 201, hash: 'hash-ambiguous', absolutePath: '/target/other.epub' },
-          { id: 202, hash: 'hash-ambiguous', absolutePath: '/target/second.epub' },
-          { id: 103, hash: null, absolutePath: '/target/amb.epub' },
+          { id: 101, hash: 'hash-1', absolutePath: '/target/hash.epub', format: 'epub', sortOrder: 0, durationSeconds: null },
+          { id: 102, hash: null, absolutePath: '/target/path.epub', format: 'epub', sortOrder: 1, durationSeconds: null },
+          { id: 201, hash: 'hash-ambiguous', absolutePath: '/target/other.epub', format: 'epub', sortOrder: 2, durationSeconds: null },
+          { id: 202, hash: 'hash-ambiguous', absolutePath: '/target/second.epub', format: 'epub', sortOrder: 3, durationSeconds: null },
+          { id: 103, hash: null, absolutePath: '/target/amb.epub', format: 'epub', sortOrder: 4, durationSeconds: null },
         ],
       ],
     ]);
@@ -62,6 +62,60 @@ describe('migration executor utils', () => {
     expect(map.get('f-hash')).toBe(101);
     expect(map.get('f-path')).toBe(102);
     expect(map.get('f-ambiguous')).toBe(103);
+  });
+
+  it('uses compatible unique-file and deterministic ordinal fallbacks without unsafe track assignments', () => {
+    const planned = {
+      execution: {
+        sourceData: {
+          books: [
+            {
+              sourceBookId: 'single',
+              files: [{ sourceFileId: 'single-epub', fileHash: null, filePath: null, fileName: 'book.epub', format: 'epub', sortOrder: 0 }],
+            },
+            {
+              sourceBookId: 'ordered',
+              files: [
+                { sourceFileId: 'track-1', fileHash: null, filePath: null, fileName: '01.mp3', format: 'mp3', sortOrder: 0 },
+                { sourceFileId: 'track-2', fileHash: null, filePath: null, fileName: '02.mp3', format: 'mp3', sortOrder: 1 },
+              ],
+            },
+            {
+              sourceBookId: 'unsafe',
+              files: [
+                { sourceFileId: 'unsafe-1', fileHash: null, filePath: null, fileName: '01.mp3', format: 'mp3', sortOrder: 0 },
+                { sourceFileId: 'unsafe-2', fileHash: null, filePath: null, fileName: '02.mp3', format: 'mp3', sortOrder: 1 },
+              ],
+            },
+          ],
+        },
+        matchedBooks: [
+          { sourceBookId: 'single', targetBookId: 1 },
+          { sourceBookId: 'ordered', targetBookId: 2 },
+          { sourceBookId: 'unsafe', targetBookId: 3 },
+        ],
+      },
+      plan: { pathMappings: [] },
+    };
+    const targetFilesByBookId = new Map([
+      [1, [{ id: 11, hash: null, absolutePath: '/target/book.epub', format: 'epub', sortOrder: 0, durationSeconds: null }]],
+      [
+        2,
+        [
+          { id: 21, hash: null, absolutePath: '/target/01.mp3', format: 'mp3', sortOrder: 0, durationSeconds: 60 },
+          { id: 22, hash: null, absolutePath: '/target/02.mp3', format: 'mp3', sortOrder: 1, durationSeconds: 90 },
+        ],
+      ],
+      [3, [{ id: 31, hash: null, absolutePath: '/target/only.mp3', format: 'mp3', sortOrder: 0, durationSeconds: 150 }]],
+    ]);
+
+    const map = buildSourceFileTargetMap(planned as never, targetFilesByBookId);
+
+    expect(map.get('single-epub')).toBe(11);
+    expect(map.get('track-1')).toBe(21);
+    expect(map.get('track-2')).toBe(22);
+    expect(map.has('unsafe-1')).toBe(false);
+    expect(map.has('unsafe-2')).toBe(false);
   });
 
   it('sanitizes metadata patch values and honors presentFields', () => {
