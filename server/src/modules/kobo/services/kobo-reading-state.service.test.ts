@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 
 import { KoboReadingStateService } from './kobo-reading-state.service';
+import { createCapturingDb } from '../../../common/test-utils/capture-sql-db';
 import { ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
 
 function makeInsertChain() {
@@ -530,5 +531,26 @@ describe('KoboReadingStateService', () => {
 
     expect(bookAccessService.assertBookAccessible).not.toHaveBeenCalled();
     expect(db.query.koboReadingStates.findFirst).not.toHaveBeenCalled();
+  });
+
+  // Recording which Location a bookmark maps to is bookkeeping, not reading, so it must not
+  // count as a read event. lastReadAt advances by default, so this path has to opt out.
+  it('leaves both timestamps untouched when stamping a bookmark location', async () => {
+    const { db, queries } = createCapturingDb();
+    const service = makeService(db as never);
+
+    await (
+      service as unknown as {
+        stampProgressLocation: (
+          userId: number,
+          fileId: number,
+          point: { source: string; value: string; contentSourceProgressPercent: number | null },
+        ) => Promise<void>;
+      }
+    ).stampProgressLocation(7, 44, { source: 'OEBPS/ch1.xhtml', value: 'kobo.3.1', contentSourceProgressPercent: 12 });
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]!.sql).toContain('"updated_at" = "reading_progress"."updated_at"');
+    expect(queries[0]!.sql).toContain('"last_read_at" = "reading_progress"."last_read_at"');
   });
 });

@@ -165,7 +165,17 @@ export const readingProgress = pgTable(
     koboContentSourceProgressPercent: real('kobo_content_source_progress_percent'),
     // KOReader: XPointer progress string generated from the EPUB DOM
     koreaderProgress: text('koreader_progress'),
+    // Last time this row was written by the web reader or Kobo. The KOReader sync path
+    // deliberately freezes it so it stays a reliable "last local write" marker to compare
+    // against koreader_device_progress.updatedAt, so it is NOT a last-read timestamp.
     updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdateFn(() => new Date()),
+    // Last time the user actually read this file, from any client. Advances on every write
+    // unless a path opts out, because some writes (Kobo location stamping) are bookkeeping
+    // rather than reading. This is the column "last read" ordering must use.
+    lastReadAt: timestamp('last_read_at', { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdateFn(() => new Date()),
@@ -173,7 +183,7 @@ export const readingProgress = pgTable(
   (t) => [
     primaryKey({ columns: [t.bookFileId, t.userId] }),
     index('reading_progress_user_id_idx').on(t.userId),
-    index('reading_progress_user_updated_at_idx').on(t.userId, t.updatedAt),
+    index('reading_progress_user_last_read_at_idx').on(t.userId, t.lastReadAt),
     check('reading_progress_percentage_range_chk', sql`${t.percentage} >= 0 and ${t.percentage} <= 100`),
     check('reading_progress_page_number_nonnegative_chk', sql`${t.pageNumber} is null or ${t.pageNumber} >= 0`),
     check('reading_progress_position_seconds_nonnegative_chk', sql`${t.positionSeconds} is null or ${t.positionSeconds} >= 0`),

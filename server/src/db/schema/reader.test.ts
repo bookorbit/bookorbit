@@ -35,6 +35,19 @@ describe('reader schema', () => {
     expect(readingProgress.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date);
   });
 
+  it('tracks last read separately from the row update timestamp', () => {
+    const config = getTableConfig(readingProgress);
+    const indexNames = config.indexes.map((idx) => idx.config.name);
+
+    // Ordering by "last read" needs an always-advancing column: updated_at is deliberately
+    // frozen by the KOReader sync path so it can act as a "last local write" marker.
+    expect(readingProgress.lastReadAt.notNull).toBe(true);
+    expect(readingProgress.lastReadAt.hasDefault).toBe(true);
+    expect(readingProgress.lastReadAt.onUpdateFn?.()).toBeInstanceOf(Date);
+    expect(indexNames).toContain('reading_progress_user_last_read_at_idx');
+    expect(indexNames).not.toContain('reading_progress_user_updated_at_idx');
+  });
+
   it('stores reading sessions with idempotency and time indexes', () => {
     const config = getTableConfig(readingSessions);
     const uniqueIndexes = config.indexes.filter((idx) => idx.config.unique);

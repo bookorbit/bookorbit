@@ -75,6 +75,7 @@ type ReadingProgressUpsert = {
   pageNumber: number | null;
   positionSeconds: number | null;
   updatedAt: Date;
+  lastReadAt: Date;
 };
 
 type AudiobookProgressUpsert = {
@@ -294,6 +295,7 @@ export class UserStateImporter {
         typeof row.pageNumber === 'number' && Number.isFinite(row.pageNumber) && row.pageNumber >= 0 ? Math.trunc(row.pageNumber) : null;
       const cfi = row.cfi?.trim() ? row.cfi : null;
 
+      const sourceUpdatedAt = toDate(row.updatedAt) ?? new Date();
       batch.push({
         bookFileId: targetFileId,
         userId: targetUserId,
@@ -301,7 +303,8 @@ export class UserStateImporter {
         cfi,
         pageNumber,
         positionSeconds,
-        updatedAt: toDate(row.updatedAt) ?? new Date(),
+        updatedAt: sourceUpdatedAt,
+        lastReadAt: sourceUpdatedAt,
       });
       counters.imported += 1;
     }

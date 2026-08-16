@@ -93,7 +93,7 @@ export class BookSortBuilder {
       case 'lastReadAt':
         if (userId === undefined) throw new BadRequestException('lastReadAt sort requires an authenticated user');
         result.push(
-          sql`(SELECT max(rp.updated_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
+          sql`(SELECT max(rp.last_read_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = books.id AND rp.user_id = ${userId}) ${sql.raw(D)} NULLS LAST`,
         );
         break;
       case 'finishedAt':

@@ -160,6 +160,17 @@ describe('BookSortBuilder', () => {
     );
   });
 
+  // reading_progress.updated_at is frozen by the KOReader sync path, so ordering on it left
+  // KOReader-only readers with an effectively random "Last Read" order.
+  it('orders lastReadAt on last_read_at rather than the row update timestamp', () => {
+    const result = service.build([{ field: 'lastReadAt', dir: 'desc' }], 42);
+
+    const text = (result[0] as unknown as { text: string }).text;
+    expect(text).toContain('SELECT max(rp.last_read_at)');
+    expect(text).not.toContain('rp.updated_at');
+    expect(result[0]?.values[0]).toBe(42);
+  });
+
   it('throws for finishedAt sort without userId', () => {
     expect(() => service.build([{ field: 'finishedAt', dir: 'asc' }])).toThrow(
       new BadRequestException('finishedAt sort requires an authenticated user'),

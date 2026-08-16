@@ -319,7 +319,8 @@ describe('Jump buckets invariant (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =>
           const day = String(index + 1).padStart(2, '0');
           const lastReadAt = `2025-05-${day}`;
           seededById.get(file.bookId)!.lastReadAt = lastReadAt;
-          return { bookFileId: file.id, userId: admin.id, percentage: 50, updatedAt: new Date(`${lastReadAt}T12:00:00Z`) };
+          const readAt = new Date(`${lastReadAt}T12:00:00Z`);
+          return { bookFileId: file.id, userId: admin.id, percentage: 50, updatedAt: readAt, lastReadAt: readAt };
         }),
     );
   });

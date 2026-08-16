@@ -550,6 +550,7 @@ export class MigrationImportRepository {
             pageNumber: sql`excluded.page_number`,
             positionSeconds: sql`excluded.position_seconds`,
             updatedAt: sql`excluded.updated_at`,
+            lastReadAt: sql`excluded.last_read_at`,
           },
         });
     }

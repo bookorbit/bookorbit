@@ -325,7 +325,7 @@ function temporalSourceParts(field: SortField, userId: number, timeZone: string,
       case 'lastReadAt':
         return {
           prefixCte: sql`rail_last_read AS MATERIALIZED (
-            SELECT rail_bf.book_id, max(rail_rp.updated_at) AS value
+            SELECT rail_bf.book_id, max(rail_rp.last_read_at) AS value
             FROM ${readingProgress} rail_rp
             INNER JOIN ${bookFiles} rail_bf ON rail_bf.id = rail_rp.book_file_id
             WHERE rail_rp.user_id = ${userId}
@@ -364,7 +364,7 @@ function temporalSourceParts(field: SortField, userId: number, timeZone: string,
     case 'lastReadAt':
       return {
         prefixCte: sql`rail_last_read AS MATERIALIZED (
-          SELECT rail_bf.book_id, max(rail_rp.updated_at) AS value
+          SELECT rail_bf.book_id, max(rail_rp.last_read_at) AS value
           FROM ${readingProgress} rail_rp
           INNER JOIN ${bookFiles} rail_bf ON rail_bf.id = rail_rp.book_file_id
           WHERE rail_rp.user_id = ${userId}
@@ -688,11 +688,11 @@ export class BookRepository {
               .select({
                 bookFileId: readingProgress.bookFileId,
                 percentage: readingProgress.percentage,
-                updatedAt: readingProgress.updatedAt,
+                lastReadAt: readingProgress.lastReadAt,
               })
               .from(readingProgress)
               .where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, primaryFileIds)))
-          : Promise.resolve([] as { bookFileId: number; percentage: number; updatedAt: Date }[]),
+          : Promise.resolve([] as { bookFileId: number; percentage: number; lastReadAt: Date }[]),
         this.db
           .select({
             bookId: audiobookProgress.bookId,
@@ -714,7 +714,7 @@ export class BookRepository {
 
       const mergedPercentage =
         fileProgress && audioProgress
-          ? fileProgress.updatedAt >= audioProgress.updatedAt
+          ? fileProgress.lastReadAt >= audioProgress.updatedAt
             ? fileProgress.percentage
             : audioProgress.percentage
           : (fileProgress?.percentage ?? audioProgress?.percentage ?? null);
