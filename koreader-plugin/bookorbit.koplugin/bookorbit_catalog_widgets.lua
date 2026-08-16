@@ -60,6 +60,55 @@ local function lineHeight(face)
     return math.floor(1.3 * face.size + 0.5)
 end
 
+-- A device with a D-Pad but no touchscreen (Kindle 3/4 and friends) drives the
+-- catalog entirely through FocusManager, so every tappable widget has to be
+-- able to draw the cursor that says where the next Press will land. Touch
+-- devices never show it, so they never pay for the extra frame.
+local FOCUS_NAV = Device:hasDPad() and not Device:isTouchDevice()
+local FOCUS_BORDER = Screen:scaleBySize(3)
+
+--- Wraps a widget's root container in a frame that paints a focus box while the
+--- FocusManager has it selected. The box is an *inner* border, drawn within the
+--- frame's own bounds, so the widget measures the same focused or not: the
+--- dashboard and detail pages lay themselves out from fixed dimensions, and a
+--- cursor that changed a widget's size would reflow the page under it.
+function CatalogWidgets.focusable(child)
+    if not FOCUS_NAV then return child end
+    return FrameContainer:new{
+        margin = 0,
+        padding = 0,
+        bordersize = 0,
+        focusable = true,
+        focus_inner_border = true,
+        focus_border_size = FOCUS_BORDER,
+        child,
+    }
+end
+
+--- Whether the running device navigates by focus rather than by touch. Callers
+--- use it to skip focus bookkeeping that would be dead weight on a touchscreen.
+function CatalogWidgets.focusNavigation()
+    return FOCUS_NAV
+end
+
+--- Gives a stock KOReader menu row the same focus box as the widgets above.
+---
+--- Menu marks its focused row with a hairline underneath it. Upstream calls that
+--- line "really, really, really thin" and declines to thicken it because doing
+--- so shifts the row's text; on a list of rows that already have separators it
+--- is not a cursor a reader can find. An inner border is as visible as the boxes
+--- everywhere else in the catalog and changes no geometry, so it does not carry
+--- that cost. Applied to the item's own frame, which answers the Focus event
+--- before the row does and so replaces the underline rather than adding to it.
+function CatalogWidgets.focusableMenuItem(item)
+    if not FOCUS_NAV then return end
+    local frame = item and item[1]
+    if type(frame) ~= "table" or frame.focusable then return end
+    frame.focusable = true
+    frame.focus_inner_border = true
+    frame.focus_border_size = FOCUS_BORDER
+end
+
 -- Absolute paths to the plugin's own SVG icons, resolved once by the catalog
 -- (widgets cannot know the plugin directory). A missing entry falls back to
 -- the stock KOReader glyph named alongside it.
@@ -427,7 +476,7 @@ function MosaicItem:init()
         dimen = Geom:new{ w = self.dimen.w, h = self.dimen.h },
         content,
     }
-    self[1] = FrameContainer:new{
+    self[1] = CatalogWidgets.focusable(FrameContainer:new{
         width = self.dimen.w,
         height = self.dimen.h,
         margin = 0,
@@ -435,7 +484,7 @@ function MosaicItem:init()
         bordersize = 0,
         background = selectedBackground(selected),
         body,
-    }
+    })
 end
 
 function MosaicItem:onTapSelect()
@@ -587,7 +636,7 @@ function ListItem:init()
         dimen = Geom:new{ w = self.dimen.w, h = separator_h },
     })
 
-    self[1] = FrameContainer:new{
+    self[1] = CatalogWidgets.focusable(FrameContainer:new{
         width = self.dimen.w,
         height = self.dimen.h,
         margin = 0,
@@ -595,7 +644,7 @@ function ListItem:init()
         bordersize = 0,
         background = selectedBackground(selected),
         content,
-    }
+    })
 end
 
 function ListItem:onTapSelect()
@@ -1024,10 +1073,10 @@ function DashboardCoverCard:init()
         })
     end
 
-    self[1] = cardFrame(self.dimen.w, self.dimen.h, pad, CenterContainer:new{
+    self[1] = CatalogWidgets.focusable(cardFrame(self.dimen.w, self.dimen.h, pad, CenterContainer:new{
         dimen = Geom:new{ w = inner_w, h = inner_h },
         col,
-    })
+    }))
 end
 
 function DashboardCoverCard:onTapSelect()
@@ -1119,12 +1168,12 @@ function DashboardHeroCard:init()
     table.insert(right, VerticalSpan:new{ width = flex })
     table.insert(right, bottom)
 
-    self[1] = cardFrame(self.dimen.w, self.dimen.h, pad, HorizontalGroup:new{
+    self[1] = CatalogWidgets.focusable(cardFrame(self.dimen.w, self.dimen.h, pad, HorizontalGroup:new{
         align = "top",
         CatalogWidgets.buildDashboardCoverWidget(book, cover_w, cover_h, path, state, downloaded),
         HorizontalSpan:new{ width = gap },
         right,
-    })
+    }))
 end
 
 function DashboardHeroCard:onTapSelect()
@@ -1204,10 +1253,10 @@ function DashboardHighlightCard:init()
     local pad = Size.padding.default
     local inner_w = math.max(1, self.dimen.w - 2 * pad - 2 * CARD_BORDER)
     local inner_h = math.max(1, self.dimen.h - 2 * pad - 2 * CARD_BORDER)
-    self[1] = cardFrame(self.dimen.w, self.dimen.h, pad, LeftContainer:new{
+    self[1] = CatalogWidgets.focusable(cardFrame(self.dimen.w, self.dimen.h, pad, LeftContainer:new{
         dimen = Geom:new{ w = inner_w, h = inner_h },
         CatalogWidgets.buildDashboardHighlightContent(self.entry.highlight, inner_w),
-    })
+    }))
 end
 
 function DashboardHighlightCard:onTapSelect()
@@ -1245,11 +1294,11 @@ function DetailRelatedCard:init()
     local path, state = self.menu:thumbnailDisplay(book)
     local downloaded = self.menu:isOnDevice(book)
 
-    self[1] = cardFrame(self.dimen.w, self.dimen.h, pad, CenterContainer:new{
+    self[1] = CatalogWidgets.focusable(cardFrame(self.dimen.w, self.dimen.h, pad, CenterContainer:new{
         dimen = Geom:new{ w = inner_w, h = inner_h },
         CatalogWidgets.buildDashboardCoverWidget(
             book, inner_w, inner_h, path, state, downloaded, { no_border = true }),
-    })
+    }))
 end
 
 function DetailRelatedCard:onTapSelect()
@@ -1308,7 +1357,7 @@ function DetailTabButton:init()
         table.insert(col, VerticalSpan:new{ width = underline_h })
     end
 
-    self[1] = FrameContainer:new{
+    self[1] = CatalogWidgets.focusable(FrameContainer:new{
         width = w,
         height = h,
         margin = 0,
@@ -1316,7 +1365,7 @@ function DetailTabButton:init()
         bordersize = 0,
         background = Blitbuffer.COLOR_WHITE,
         col,
-    }
+    })
 end
 
 function DetailTabButton:onTapSelect()
@@ -1357,7 +1406,7 @@ function DetailRatingStar:init()
     }
 
     local text = self.entry.filled and "★" or "☆"
-    self[1] = CenterContainer:new{
+    self[1] = CatalogWidgets.focusable(CenterContainer:new{
         dimen = Geom:new{ w = self.dimen.w, h = self.dimen.h },
         TextBoxWidget:new{
             text = text,
@@ -1368,7 +1417,7 @@ function DetailRatingStar:init()
             face = Font:getFace("cfont", DETAIL_STAR_FONT_SIZE),
             height_overflow_show_ellipsis = true,
         },
-    }
+    })
 end
 
 function DetailRatingStar:onTapSelect()
@@ -1455,14 +1504,14 @@ function DashboardBrowseRow:init()
         })
     end
 
-    self[1] = VerticalGroup:new{
+    self[1] = CatalogWidgets.focusable(VerticalGroup:new{
         align = "left",
         row,
         LineWidget:new{
             background = Blitbuffer.COLOR_LIGHT_GRAY,
             dimen = Geom:new{ w = self.dimen.w, h = separator_h },
         },
-    }
+    })
 end
 
 function DashboardBrowseRow:onTapSelect()
@@ -1515,10 +1564,10 @@ function DashboardIconButton:init()
     icon_opts.width = icon_size
     icon_opts.height = icon_size
     icon_opts.dim = not self.enabled
-    self[1] = CenterContainer:new{
+    self[1] = CatalogWidgets.focusable(CenterContainer:new{
         dimen = Geom:new{ w = self.dimen.w, h = self.dimen.h },
         IconWidget:new(icon_opts),
-    }
+    })
 end
 
 function DashboardIconButton:onTapSelect()
