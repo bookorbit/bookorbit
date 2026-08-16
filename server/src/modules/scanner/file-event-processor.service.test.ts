@@ -6,14 +6,15 @@ import { Logger } from '@nestjs/common';
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
   readdir: vi.fn(),
-  realpath: vi.fn(),
 }));
+vi.mock('../../common/utils/path-identity.utils', () => ({ pathsReferToSameEntry: vi.fn() }));
 
-import { stat, readdir, realpath } from 'fs/promises';
+import { stat, readdir } from 'fs/promises';
+import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
-const mockRealpath = realpath as MockedFunction<typeof realpath>;
+const mockPathsReferToSameEntry = pathsReferToSameEntry as MockedFunction<typeof pathsReferToSameEntry>;
 
 const mockRepo: Mocked<
   Pick<
@@ -99,6 +100,7 @@ beforeEach(() => {
   mockRepo.findLibraryFolderPath.mockResolvedValue('/books');
   mockRepo.findPresentDuplicateBookFilesByHash.mockResolvedValue([]);
   mockRepo.replaceDuplicateBookWithMovedBook.mockResolvedValue(null);
+  mockPathsReferToSameEntry.mockResolvedValue(false);
   mockReaddir.mockResolvedValue([]);
   mockRepo.updateBookPrimaryFile.mockResolvedValue(undefined);
 });
@@ -681,7 +683,7 @@ describe('handleCreate — move detection', () => {
     const newPath = '/books/Author/book.epub';
     const fileStat = makeFileStat({ ino: 4001n, size: 70000 });
     mockStat.mockResolvedValue(fileStat);
-    mockRealpath.mockResolvedValue(newPath);
+    mockPathsReferToSameEntry.mockResolvedValue(true);
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue(null);
     mockRepo.findMissingBookByFolderPath.mockResolvedValue(null);
     mockRepo.findBookFileWithContextByIno.mockResolvedValue({

@@ -1,12 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { access, lstat, mkdir, readdir, realpath, rename as fsRename, rmdir } from 'fs/promises';
+import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
 import { basename, dirname, extname, isAbsolute, join, normalize, relative, sep } from 'path';
 
 import type { FileRenameResult } from '@bookorbit/types';
 import { isAudioFormat, NotificationType, resolveUploadPath, sanitizePathSegment } from '@bookorbit/types';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { NotificationService } from '../notification/notification.service';
 import type { BookFilePathUpdate, BookRenameData } from './file-rename.repository';
@@ -709,31 +710,17 @@ export class FileRenameService implements OnModuleDestroy {
     return null;
   }
 
-  private async pathsReferToSameEntry(firstPath: string, secondPath: string): Promise<boolean> {
-    try {
-      const [first, second, resolvedFirst, resolvedSecond] = await Promise.all([
-        lstat(firstPath),
-        lstat(secondPath),
-        realpath(firstPath),
-        realpath(secondPath),
-      ]);
-      return first.dev === second.dev && first.ino === second.ino && resolvedFirst === resolvedSecond;
-    } catch {
-      return false;
-    }
-  }
-
   private async pathsReferToSameSource(
     sourcePath: string,
     targetPath: string,
     libraryFolderPath: string,
     sanitizeForCrossPlatform: boolean,
   ): Promise<boolean> {
-    if (await this.pathsReferToSameEntry(sourcePath, targetPath)) return true;
+    if (await pathsReferToSameEntry(sourcePath, targetPath)) return true;
     if (!sanitizeForCrossPlatform) return false;
 
     const sanitizedSourcePath = this.buildSanitizedSourcePath(sourcePath, libraryFolderPath);
-    return sanitizedSourcePath !== null && (await this.pathsReferToSameEntry(sanitizedSourcePath, targetPath));
+    return sanitizedSourcePath !== null && (await pathsReferToSameEntry(sanitizedSourcePath, targetPath));
   }
 
   private async renamePath(sourcePath: string, targetPath: string, libraryFolderPath: string, sanitizeForCrossPlatform: boolean): Promise<string> {

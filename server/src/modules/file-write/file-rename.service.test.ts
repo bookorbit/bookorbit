@@ -1,34 +1,33 @@
 import { ConfigService } from '@nestjs/config';
 import { NotificationType } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
-import { access, lstat, mkdir, readdir, realpath, rename as fsRename, rmdir } from 'fs/promises';
+import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
+import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
   return {
     ...actual,
     access: vi.fn(),
-    lstat: vi.fn(),
     mkdir: vi.fn(),
     readdir: vi.fn(),
-    realpath: vi.fn(),
     rename: vi.fn(),
     rmdir: vi.fn(),
   };
 });
+vi.mock('../../common/utils/path-identity.utils', () => ({ pathsReferToSameEntry: vi.fn() }));
 
 import type { BookRenameData } from './file-rename.repository';
 import { FileRenameService } from './file-rename.service';
 import { bookOperationLockKey } from './file-lock.service';
 
 const mockAccess = access as MockedFunction<typeof access>;
-const mockLstat = lstat as MockedFunction<typeof lstat>;
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
-const mockRealpath = realpath as MockedFunction<typeof realpath>;
 const mockRename = fsRename as MockedFunction<typeof fsRename>;
 const mockRmdir = rmdir as MockedFunction<typeof rmdir>;
+const mockPathsReferToSameEntry = pathsReferToSameEntry as MockedFunction<typeof pathsReferToSameEntry>;
 
 type RenameDataOverrides = Partial<BookRenameData> & {
   file?: Partial<BookRenameData['file']>;
@@ -127,19 +126,16 @@ describe('FileRenameService', () => {
     vi.clearAllMocks();
     vi.useRealTimers();
     mockAccess.mockReset();
-    mockLstat.mockReset();
     mockMkdir.mockReset();
     mockReaddir.mockReset();
-    mockRealpath.mockReset();
     mockRename.mockReset();
     mockRmdir.mockReset();
     mockAccess.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }) as never);
-    mockLstat.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }) as never);
     mockMkdir.mockResolvedValue(undefined as never);
     mockReaddir.mockResolvedValue(['still-here'] as never);
-    mockRealpath.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }) as never);
     mockRename.mockResolvedValue(undefined as never);
     mockRmdir.mockResolvedValue(undefined as never);
+    mockPathsReferToSameEntry.mockImplementation((firstPath, secondPath) => Promise.resolve(firstPath === secondPath));
   });
 
   afterEach(() => {
@@ -759,8 +755,7 @@ describe('FileRenameService', () => {
       if (path.toString() === '/library/Frank Herbert/Dune.epub') return Promise.resolve(undefined);
       return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
     });
-    mockLstat.mockResolvedValue({ dev: 1, ino: 42 } as never);
-    mockRealpath.mockResolvedValue('/library/Frank Herbert/Dune.epub');
+    mockPathsReferToSameEntry.mockResolvedValue(true);
 
     const result = await service.performRename(5, 12);
 
@@ -787,9 +782,6 @@ describe('FileRenameService', () => {
       }),
     );
     mockAccess.mockResolvedValue(undefined as never);
-    mockLstat.mockResolvedValue({ dev: 1, ino: 42 } as never);
-    mockRealpath.mockImplementation((path: any) => Promise.resolve(path.toString()));
-
     const result = await service.performRename(5, 12);
 
     expect(result).toEqual(expect.objectContaining({ status: 'skipped', reason: 'target path already exists on disk' }));
@@ -813,8 +805,7 @@ describe('FileRenameService', () => {
       if (path.toString() === '/library/Frank Herbert/Dune') return Promise.resolve(undefined);
       return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
     });
-    mockLstat.mockResolvedValue({ dev: 1, ino: 42 } as never);
-    mockRealpath.mockResolvedValue('/library/Frank Herbert/Dune');
+    mockPathsReferToSameEntry.mockResolvedValue(true);
 
     const result = await service.performRename(5, 12);
 
@@ -875,14 +866,6 @@ describe('FileRenameService', () => {
     );
     mockAccess.mockImplementation((path: any) => {
       if (path.toString() === '/library/Bad_ Love.epub') return Promise.resolve(undefined);
-      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
-    });
-    mockLstat.mockImplementation((path: any) => {
-      if (path.toString() === '/library/Bad_ Love.epub') return Promise.resolve({ dev: 1, ino: 42 } as never);
-      return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
-    });
-    mockRealpath.mockImplementation((path: any) => {
-      if (path.toString() === '/library/Bad_ Love.epub') return Promise.resolve('/library/Bad_ Love.epub');
       return Promise.reject(Object.assign(new Error('missing'), { code: 'ENOENT' }));
     });
     mockRename.mockImplementation((source: any) => {

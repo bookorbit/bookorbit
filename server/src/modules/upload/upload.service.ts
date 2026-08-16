@@ -25,6 +25,7 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
 import { computeFileHash } from '../scanner/lib/hash';
+import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -73,7 +74,7 @@ export class UploadService {
     let shouldCleanupDestination = false;
 
     try {
-      const { absolutePath, bookFolderPath, relPath } = await this.resolveDestination(library, folder.path, tempPath, filename, format);
+      const { absolutePath, bookFolderPath } = await this.resolveDestination(library, folder.path, tempPath, filename, format);
       destinationPath = absolutePath;
 
       if (await this.destinationExists(absolutePath)) {
@@ -83,26 +84,31 @@ export class UploadService {
       shouldCleanupDestination = true;
       await this.storage.moveToPath(tempPath, absolutePath);
 
+      const persistedAbsolutePath = (await resolveExistingPathSpelling(absolutePath, folder.path)) ?? absolutePath;
+      const persistedBookFolderPath = bookFolderPath === absolutePath ? persistedAbsolutePath : dirname(persistedAbsolutePath);
+      const persistedRelPath = relative(folder.path, persistedAbsolutePath);
+      destinationPath = persistedAbsolutePath;
+
       const { bookId, created } = await this.processor.createBookRecord(
         libraryId,
         folder.id,
-        bookFolderPath,
-        absolutePath,
-        relPath,
+        persistedBookFolderPath,
+        persistedAbsolutePath,
+        persistedRelPath,
         format,
         sizeBytes,
       );
 
       if (created) {
-        this.processor.processNewBookImportAsync(bookId, libraryId, absolutePath, format);
+        this.processor.processNewBookImportAsync(bookId, libraryId, persistedAbsolutePath, format);
       } else {
-        this.processor.extractMetadataAsync(bookId, absolutePath, format);
+        this.processor.extractMetadataAsync(bookId, persistedAbsolutePath, format);
       }
 
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} userId=${user.id} folderId=${folder.id} bookId=${bookId} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - upload completed`,
       );
-      return { bookId, filename: basename(absolutePath), format, sizeBytes };
+      return { bookId, filename: basename(persistedAbsolutePath), format, sizeBytes };
     } catch (err) {
       const { errorClass, errorMessage } = this.parseError(err);
       this.logger.error(

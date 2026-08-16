@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { readdir, realpath, stat } from 'fs/promises';
+import { readdir, stat } from 'fs/promises';
 import type { BigIntStats } from 'fs';
 import { dirname, join, relative } from 'path';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 
 import { classifyFile, DEFAULT_FORMAT_PRIORITY } from './lib/classify';
 import { ScannerRepository } from './scanner.repository';
@@ -333,9 +334,8 @@ export class FileEventProcessorService {
       (s) => s.isFile(),
       () => false,
     );
-    if (oldFileStillExists && file.absolutePath.toLowerCase() === newAbsolutePath.toLowerCase()) {
-      const canonicalPath = await realpath(file.absolutePath).catch(() => null);
-      oldFileStillExists = canonicalPath !== newAbsolutePath;
+    if (oldFileStillExists && (await pathsReferToSameEntry(file.absolutePath, newAbsolutePath))) {
+      oldFileStillExists = false;
     }
     if (oldFileStillExists) {
       this.logger.log(

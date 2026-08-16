@@ -152,6 +152,23 @@ const structuralScenarios: StructuralScenario[] = [
     },
   },
   {
+    id: 'manual-case-only-author-folder-rename',
+    trigger: 'manual',
+    libraries: [{ key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' }],
+    entries: [file('lib-a/Bell Hooks/Book/book.epub')],
+    operations: [{ type: 'move', from: 'lib-a/Bell Hooks', to: 'lib-a/bell hooks' }],
+    expected: {
+      a: {
+        statusByFolder: { 'bell hooks/Book': 'present' },
+        absentFolders: ['Bell Hooks/Book'],
+        fileOwners: { 'bell hooks/Book/book.epub': 'bell hooks/Book' },
+        presentCount: 1,
+        missingCount: 0,
+      },
+    },
+    requiresCaseRename: true,
+  },
+  {
     id: 'manual-move-root-file-into-subfolder',
     trigger: 'manual',
     libraries: [{ key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' }],

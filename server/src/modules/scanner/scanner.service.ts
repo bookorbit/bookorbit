@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 
 import type {
   BookMissingEvent,
@@ -1821,7 +1822,8 @@ export class ScannerService implements OnApplicationBootstrap {
     const sourceBook = this.findBookEntryById(bookByFolderPath, sourceBookId);
     if (!sourceBook) return null;
     if (sourceBook.folderPath === candidate.folderPath) return sourceBook;
-    if (candidateFolderPaths.has(sourceBook.folderPath) || (await this.pathExists(sourceBook.folderPath))) return null;
+    if (candidateFolderPaths.has(sourceBook.folderPath) || (await this.pathExistsAsDistinctEntry(sourceBook.folderPath, candidate.folderPath)))
+      return null;
 
     await this.scannerRepo.updateBookFolderPath(sourceBook.id, candidate.folderPath);
 
@@ -1877,6 +1879,17 @@ export class ScannerService implements OnApplicationBootstrap {
     }
   }
 
+  private async pathExistsAsDistinctEntry(existingPath: string, candidatePath: string): Promise<boolean> {
+    if (!(await this.pathExists(existingPath))) return false;
+    return !(await pathsReferToSameEntry(existingPath, candidatePath));
+  }
+
+  private async fileExistsAsDistinctEntry(existingPath: string, candidatePath: string): Promise<boolean> {
+    const existingStat = await stat(existingPath).catch(() => null);
+    if (!existingStat?.isFile()) return false;
+    return !(await pathsReferToSameEntry(existingPath, candidatePath));
+  }
+
   private async filterBookIdsMissingOnDisk(bookIds: number[]): Promise<number[]> {
     if (bookIds.length === 0) return [];
 
@@ -1915,7 +1928,7 @@ export class ScannerService implements OnApplicationBootstrap {
     for (const file of contentFiles) {
       if (file.ino === 0n) continue;
       const byIno = await this.scannerRepo.findMissingBookFileWithContextByIno(file.ino);
-      if (!byIno || (await this.pathExists(byIno.file.absolutePath))) continue;
+      if (!byIno || (await this.pathExistsAsDistinctEntry(byIno.file.absolutePath, file.absolutePath))) continue;
       sourceBookId = byIno.file.bookId;
       sourceLibraryId = byIno.libraryId;
       break;
@@ -1926,8 +1939,7 @@ export class ScannerService implements OnApplicationBootstrap {
         if (file.ino === 0n) continue;
         const byIno = await this.scannerRepo.findBookFileWithContextByIno(file.ino);
         if (!byIno || byIno.file.absolutePath === file.absolutePath) continue;
-        const previousPathStat = await stat(byIno.file.absolutePath).catch(() => null);
-        if (previousPathStat?.isFile()) continue;
+        if (await this.fileExistsAsDistinctEntry(byIno.file.absolutePath, file.absolutePath)) continue;
         sourceBookId = byIno.file.bookId;
         sourceLibraryId = byIno.libraryId;
         break;
@@ -1946,7 +1958,11 @@ export class ScannerService implements OnApplicationBootstrap {
         }
 
         const byHash = await this.scannerRepo.findMissingBookFileWithContextByHash(fileHash);
-        if (byHash && byHash.file.sizeBytes === file.sizeBytes && !(await this.pathExists(byHash.file.absolutePath))) {
+        if (
+          byHash &&
+          byHash.file.sizeBytes === file.sizeBytes &&
+          !(await this.pathExistsAsDistinctEntry(byHash.file.absolutePath, file.absolutePath))
+        ) {
           sourceBookId = byHash.file.bookId;
           sourceLibraryId = byHash.libraryId;
           break;
@@ -1954,8 +1970,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
         const byHashAny = await this.scannerRepo.findBookFileWithContextByHash(fileHash);
         if (!byHashAny || byHashAny.file.absolutePath === file.absolutePath || byHashAny.file.sizeBytes !== file.sizeBytes) continue;
-        const previousPathStat = await stat(byHashAny.file.absolutePath).catch(() => null);
-        if (previousPathStat?.isFile()) continue;
+        if (await this.fileExistsAsDistinctEntry(byHashAny.file.absolutePath, file.absolutePath)) continue;
         sourceBookId = byHashAny.file.bookId;
         sourceLibraryId = byHashAny.libraryId;
         break;
@@ -2109,7 +2124,7 @@ export class ScannerService implements OnApplicationBootstrap {
     if (!byIno) return null;
 
     const oldAbsolutePath = byIno.absolutePath;
-    if (await this.pathExists(oldAbsolutePath)) return null;
+    if (await this.pathExistsAsDistinctEntry(oldAbsolutePath, fileStat.absolutePath)) return null;
     const sizeUnchanged = fileStat.sizeBytes === byIno.sizeBytes;
     const mtimeUnchanged = fileStat.mtime.getTime() === byIno.mtime?.getTime();
     await this.scannerRepo.updateBookFile(byIno.id, {
@@ -2168,7 +2183,7 @@ export class ScannerService implements OnApplicationBootstrap {
     ) {
       return null;
     }
-    if (await this.pathExists(globalByIno.file.absolutePath)) return null;
+    if (await this.pathExistsAsDistinctEntry(globalByIno.file.absolutePath, fileStat.absolutePath)) return null;
 
     const oldAbsolutePath = globalByIno.file.absolutePath;
     const sizeUnchanged = fileStat.sizeBytes === globalByIno.file.sizeBytes;
@@ -2246,7 +2261,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
     if (!isFirstScan) {
       const byHash = await this.scannerRepo.findBookFileByHash(fileHash, libraryFolderId);
-      if (byHash && byHash.sizeBytes === fileStat.sizeBytes && !(await this.pathExists(byHash.absolutePath))) {
+      if (byHash && byHash.sizeBytes === fileStat.sizeBytes && !(await this.pathExistsAsDistinctEntry(byHash.absolutePath, fileStat.absolutePath))) {
         const oldAbsolutePath = byHash.absolutePath;
         await this.scannerRepo.updateBookFile(byHash.id, {
           bookId,
@@ -2304,7 +2319,7 @@ export class ScannerService implements OnApplicationBootstrap {
         globalByHash.file.absolutePath !== fileStat.absolutePath &&
         globalByHash.file.sizeBytes === fileStat.sizeBytes &&
         (globalByHash.file.bookId === bookId || globalByHash.bookStatus === 'missing') &&
-        !(await this.pathExists(globalByHash.file.absolutePath))
+        !(await this.pathExistsAsDistinctEntry(globalByHash.file.absolutePath, fileStat.absolutePath))
       ) {
         const oldAbsolutePath = globalByHash.file.absolutePath;
         await this.scannerRepo.updateBookFile(globalByHash.file.id, {
