@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { parsePublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
+import { boundProviderId, type ProviderIdField } from '../../../common/utils/provider-id.utils';
 
 export interface ParsedOpf {
   title: string | null;
@@ -127,6 +128,20 @@ const PROVIDER_PREFIXES: Record<ProviderKey, readonly string[]> = {
   itunes: ['urn:itunes:', 'itunes:'],
 };
 
+const PROVIDER_ID_FIELD: Record<ProviderKey, ProviderIdField> = {
+  google: 'googleBooksId',
+  amazon: 'amazonId',
+  goodreads: 'goodreadsId',
+  hardcover: 'hardcoverId',
+  hardcoverEdition: 'hardcoverEditionId',
+  openlibrary: 'openLibraryId',
+  ranobedb: 'ranobedbId',
+  kobo: 'koboId',
+  lubimyczytac: 'lubimyczytacId',
+  aladin: 'aladinId',
+  itunes: 'itunesId',
+};
+
 function normalizeProviderId(provider: ProviderKey, raw: string): string | null {
   const value = raw.trim();
   if (!value) return null;
@@ -134,11 +149,19 @@ function normalizeProviderId(provider: ProviderKey, raw: string): string | null 
   const lower = value.toLowerCase();
   for (const prefix of PROVIDER_PREFIXES[provider]) {
     if (lower.startsWith(prefix)) {
-      return value.slice(prefix.length).trim() || null;
+      return bound(provider, value.slice(prefix.length).trim() || null);
     }
   }
 
-  return value;
+  return bound(provider, value);
+}
+
+// An OPF is untrusted input: a scheme attribute only claims what a value is. Anything that cannot
+// fit the column is not the identifier it claims to be, so it is dropped here rather than left to
+// fail the metadata write or reappear as a 400 the next time the user saves the book by hand.
+function bound(provider: ProviderKey, value: string | null): string | null {
+  if (value === null) return null;
+  return boundProviderId(PROVIDER_ID_FIELD[provider], value) ?? null;
 }
 
 // Calibre stores custom-column values in a `calibre:user_metadata` JSON blob keyed by column name,

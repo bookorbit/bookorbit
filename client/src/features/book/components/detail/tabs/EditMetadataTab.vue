@@ -264,7 +264,18 @@ watch(
   { immediate: true },
 )
 
-const combinedError = computed(() => lockError.value ?? error.value)
+// The server names the field it rejected ("amazonId must be shorter than..."), which is the only
+// text that tells the user what to fix. It is untranslated, so it is preferred over the generic
+// catalog message rather than replacing it.
+const saveErrorMessage = computed(() => {
+  const failure = error.value
+  if (!failure) return null
+  if (failure.detail) return failure.detail
+  if (failure.status !== null) return t('book.detail.editMetadata.saveFailedWithStatus', { status: failure.status })
+  return t('book.detail.editMetadata.saveFailed')
+})
+
+const combinedError = computed(() => lockError.value ?? saveErrorMessage.value)
 const hasLockedFields = computed(() => lockedFields.value.length > 0)
 const hasPendingChanges = computed(() => isDirty.value || locksDirty.value)
 const isSeriesLocked = computed(() => isLocked('seriesName') || isLocked('seriesIndex'))

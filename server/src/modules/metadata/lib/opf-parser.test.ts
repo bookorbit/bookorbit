@@ -450,6 +450,55 @@ describe('parseOpf', () => {
       expect(r.amazonId).toHaveLength(10);
     });
 
+    // Regression: an identifier wider than its column used to be handed on verbatim, which failed
+    // the metadata write with a Postgres 22001 and made the next manual save 400 on a field the
+    // user never touched. See issue #1015.
+    it('drops a scheme identifier that cannot fit its column instead of truncating it', () => {
+      const r = parseOpf(epub2Opf(`<dc:identifier opf:scheme="AMAZON">https://www.amazon.com/dp/0345415000</dc:identifier>`));
+      expect(r.amazonId).toBeNull();
+    });
+
+    it('drops an over-long identifier left by a urn: or Calibre prefix', () => {
+      expect(parseOpf(epub2Opf(`<dc:identifier>urn:amazon:${'A'.repeat(21)}</dc:identifier>`)).amazonId).toBeNull();
+      expect(parseOpf(epub2Opf(`<dc:identifier>asin:${'A'.repeat(21)}</dc:identifier>`)).amazonId).toBeNull();
+    });
+
+    it('keeps an identifier sitting exactly on the column bound', () => {
+      expect(parseOpf(epub2Opf(`<dc:identifier opf:scheme="AMAZON">${'A'.repeat(20)}</dc:identifier>`)).amazonId).toBe('A'.repeat(20));
+      expect(parseOpf(epub2Opf(`<dc:identifier opf:scheme="AMAZON">${'A'.repeat(21)}</dc:identifier>`)).amazonId).toBeNull();
+    });
+
+    it('applies each provider its own bound rather than one shared limit', () => {
+      const wide = 'B'.repeat(60);
+      const r = parseOpf(
+        epub2Opf(`
+        <dc:identifier opf:scheme="GOOGLE">${wide}</dc:identifier>
+        <dc:identifier opf:scheme="HARDCOVER">${wide}</dc:identifier>
+      `),
+      );
+      // google_books_id is varchar(50); hardcover_id is varchar(255).
+      expect(r.googleBooksId).toBeNull();
+      expect(r.hardcoverId).toBe(wide);
+    });
+
+    it('lets a shorter identifier win when the preferred one is dropped for length', () => {
+      const xml = epub2Opf(`
+        <dc:identifier opf:scheme="AMAZON">https://www.amazon.com/dp/0345415000</dc:identifier>
+        <dc:identifier>urn:amazon:0345415000</dc:identifier>
+      `);
+      expect(parseOpf(xml).amazonId).toBe('0345415000');
+    });
+
+    it('does not let an over-long value block the ISBN parsed from the same file', () => {
+      const xml = epub2Opf(`
+        <dc:identifier opf:scheme="ISBN">9781635766271</dc:identifier>
+        <dc:identifier opf:scheme="AMAZON">${'A'.repeat(64)}</dc:identifier>
+      `);
+      const r = parseOpf(xml);
+      expect(r.isbn13).toBe('9781635766271');
+      expect(r.amazonId).toBeNull();
+    });
+
     it('normalizes provider URN prefixes case-insensitively', () => {
       const xml = epub2Opf(`
         <dc:identifier>URN:GOOGLE:CaseSensitiveGoogleId</dc:identifier>
