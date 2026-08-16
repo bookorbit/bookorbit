@@ -981,12 +981,20 @@ describe('BookRepository', () => {
     expect(insertedBookmark).not.toHaveProperty('ContentSourceProgressPercent');
   });
 
-  it('advances Kobo reading state percent-only without a KoboSpan location, preserving the existing Location', async () => {
+  // Keeping the device Location while the percent moves ships a bookmark that contradicts
+  // itself, and the device resumes from Location: it opens at the stale spot and pushes that
+  // percent back. The reading-state pull path re-adds a Location whenever it can convert the cfi.
+  it('drops the stale device Location when percent-only progress advances past it', async () => {
     const insertChain = makeInsertChain();
     const existingState = {
       entitlementId: 'ent-1',
       createdAtKobo: '2026-06-01T00:00:00.000Z',
-      currentBookmark: { ProgressPercent: 40, Location: { Source: 'OEBPS/old.xhtml', Type: 'KoboSpan', Value: 'kobo.5.1' } },
+      currentBookmark: {
+        ProgressPercent: 40,
+        ContentSourceProgressPercent: 61,
+        ChapterProgress: 3,
+        Location: { Source: 'OEBPS/old.xhtml', Type: 'KoboSpan', Value: 'kobo.5.1' },
+      },
       statistics: null,
       statusInfo: null,
     };
@@ -1005,8 +1013,84 @@ describe('BookRepository', () => {
     expect(db.insert).toHaveBeenCalledTimes(1);
     const inserted = insertChain.values.mock.calls[0][0] as { currentBookmark: Record<string, unknown> };
     expect(inserted.currentBookmark.ProgressPercent).toBe(80);
-    expect(inserted.currentBookmark.Location).toEqual({ Source: 'OEBPS/old.xhtml', Type: 'KoboSpan', Value: 'kobo.5.1' });
+    expect(inserted.currentBookmark).not.toHaveProperty('Location');
+    expect(inserted.currentBookmark).not.toHaveProperty('ContentSourceProgressPercent');
+    expect(inserted.currentBookmark.ChapterProgress).toBe(3);
+    const updated = insertChain.onConflictDoUpdate.mock.calls[0][0] as { set: { currentBookmark: Record<string, unknown> } };
+    expect(updated.set.currentBookmark).not.toHaveProperty('Location');
     expect(db.execute).toHaveBeenCalled();
+  });
+
+  // A Kobo clock running ahead is stored verbatim from the device push. A hub write stamped at
+  // wall-clock time lands behind it, loses the device conflict check, and never reaches the reader.
+  it('stamps the reading state past device timestamps sitting in the future', async () => {
+    const insertChain = makeInsertChain();
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const existingState = {
+      entitlementId: 'ent-1',
+      createdAtKobo: '2026-06-01T00:00:00.000Z',
+      lastModifiedKobo: future,
+      priorityTimestamp: future,
+      currentBookmark: { ProgressPercent: 40, LastModified: future },
+      statistics: null,
+      statusInfo: { LastModified: future, Status: 'Reading' },
+    };
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
+        .mockReturnValueOnce(makeSelectChain('limit', [existingState])),
+      insert: vi.fn().mockReturnValue(insertChain),
+      execute: vi.fn().mockResolvedValue(undefined),
+    };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.syncKoboReadingStateFromProgress(5, 9, 80, null, null, null, null)).resolves.toBe(true);
+
+    const inserted = insertChain.values.mock.calls[0][0] as {
+      lastModifiedKobo: string;
+      priorityTimestamp: string;
+      currentBookmark: { LastModified: string };
+      statusInfo: { LastModified: string };
+    };
+    const futureMs = new Date(future).getTime();
+    expect(new Date(inserted.lastModifiedKobo).getTime()).toBeGreaterThan(futureMs);
+    expect(new Date(inserted.priorityTimestamp).getTime()).toBeGreaterThan(futureMs);
+    expect(new Date(inserted.currentBookmark.LastModified).getTime()).toBeGreaterThan(futureMs);
+    expect(new Date(inserted.statusInfo.LastModified).getTime()).toBeGreaterThan(futureMs);
+  });
+
+  it('stamps the reading state at wall-clock time when no stored timestamp is ahead of it', async () => {
+    const insertChain = makeInsertChain();
+    const before = Date.now();
+    const db = {
+      select: vi
+        .fn()
+        .mockReturnValueOnce(makeSelectChain('limit', [{ bookId: 10, primaryFileId: 9, format: 'epub', markAsFinishedPercentComplete: 98 }]))
+        .mockReturnValueOnce(
+          makeSelectChain('limit', [
+            {
+              entitlementId: 'ent-1',
+              createdAtKobo: '2026-06-01T00:00:00.000Z',
+              lastModifiedKobo: '2026-06-01T00:00:00.000Z',
+              priorityTimestamp: '2026-06-01T00:00:00.000Z',
+              currentBookmark: { ProgressPercent: 40, LastModified: '2026-06-01T00:00:00.000Z' },
+              statistics: null,
+              statusInfo: null,
+            },
+          ]),
+        ),
+      insert: vi.fn().mockReturnValue(insertChain),
+      execute: vi.fn().mockResolvedValue(undefined),
+    };
+    const repo = new BookRepository(db as never);
+
+    await repo.syncKoboReadingStateFromProgress(5, 9, 80, null, null, null, null);
+
+    const inserted = insertChain.values.mock.calls[0][0] as { lastModifiedKobo: string };
+    const stampedMs = new Date(inserted.lastModifiedKobo).getTime();
+    expect(stampedMs).toBeGreaterThanOrEqual(before);
+    expect(stampedMs).toBeLessThanOrEqual(Date.now());
   });
 
   it('skips the percent-only Kobo reading state write when the bookmark percent is current', async () => {

@@ -17,6 +17,7 @@ import type { BookRecommendation } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { advanceIsoTimestamp } from '../../common/utils/iso-timestamp.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -2089,17 +2090,18 @@ export class BookRepository {
     const normalizedKoboLocationType = this.normalizeKoboLocationPart(koboLocationType);
     const normalizedKoboLocationValue = this.normalizeKoboLocationPart(koboLocationValue);
     const normalizedKoboContentSourceProgressPercent = this.clampNullableProgressPercentage(koboContentSourceProgressPercent);
-    // Location values are optional: without them the bookmark advances percent-wise
-    // and the precise KoboSpan Location is computed server-side at delivery time.
+    // Location values are optional: without them the bookmark advances percent-only and the
+    // precise KoboSpan Location is computed server-side at delivery time.
     const hasLocation = Boolean(normalizedKoboLocationSource && normalizedKoboLocationType === 'KoboSpan' && normalizedKoboLocationValue);
 
     const now = new Date();
-    const nowIso = now.toISOString();
 
     const [existing] = await this.db
       .select({
         entitlementId: koboReadingStates.entitlementId,
         createdAtKobo: koboReadingStates.createdAtKobo,
+        lastModifiedKobo: koboReadingStates.lastModifiedKobo,
+        priorityTimestamp: koboReadingStates.priorityTimestamp,
         currentBookmark: koboReadingStates.currentBookmark,
         statistics: koboReadingStates.statistics,
         statusInfo: koboReadingStates.statusInfo,
@@ -2109,6 +2111,14 @@ export class BookRepository {
       .limit(1);
 
     const existingBookmark = this.asJsonObj(existing?.currentBookmark);
+    const existingStatusInfo = this.asJsonObj(existing?.statusInfo);
+    const nowIso = advanceIsoTimestamp(
+      now,
+      existing?.lastModifiedKobo,
+      existing?.priorityTimestamp,
+      typeof existingBookmark?.LastModified === 'string' ? existingBookmark.LastModified : null,
+      typeof existingStatusInfo?.LastModified === 'string' ? existingStatusInfo.LastModified : null,
+    );
     if (
       hasLocation &&
       this.isKoboBookmarkCurrent(
@@ -2130,23 +2140,29 @@ export class BookRepository {
       ...(existingBookmark ?? {}),
       LastModified: nowIso,
       ProgressPercent: clampedPercentage,
-      ...(hasLocation
-        ? {
-            Location: {
-              Source: normalizedKoboLocationSource,
-              Type: normalizedKoboLocationType,
-              Value: normalizedKoboLocationValue,
-            },
-          }
-        : {}),
     };
-    if (hasLocation && normalizedKoboContentSourceProgressPercent !== null) {
-      currentBookmark.ContentSourceProgressPercent = normalizedKoboContentSourceProgressPercent;
-    } else if (hasLocation) {
+    if (hasLocation) {
+      currentBookmark.Location = {
+        Source: normalizedKoboLocationSource,
+        Type: normalizedKoboLocationType,
+        Value: normalizedKoboLocationValue,
+      };
+      if (normalizedKoboContentSourceProgressPercent !== null) {
+        currentBookmark.ContentSourceProgressPercent = normalizedKoboContentSourceProgressPercent;
+      } else {
+        delete currentBookmark.ContentSourceProgressPercent;
+      }
+    } else {
+      // The hub position moved and no KoboSpan describes it. Keeping the previous Location
+      // would ship a bookmark whose position contradicts its own percent, and the device
+      // resumes from Location: it opens at the stale spot and pushes that percent back,
+      // undoing the hub progress. Percent-only is the honest degradation; the reading-state
+      // pull path fills the Location back in whenever it can convert the cfi.
+      delete currentBookmark.Location;
       delete currentBookmark.ContentSourceProgressPercent;
     }
     const statusInfo = {
-      ...(this.asJsonObj(existing?.statusInfo) ?? {}),
+      ...(existingStatusInfo ?? {}),
       LastModified: nowIso,
       Status: this.deriveKoboStatus(clampedPercentage, file.markAsFinishedPercentComplete),
     };

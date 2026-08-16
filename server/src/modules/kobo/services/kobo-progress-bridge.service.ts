@@ -34,7 +34,7 @@ export class KoboProgressBridgeService {
   async koboBookmarkToCanonical(userId: number, bookId: number, source: string, spanValue: string): Promise<CanonicalProgressPoint | null> {
     try {
       const kepub = await this.kepubContextService.resolveForBook(userId, bookId);
-      if (!kepub.ok) return null;
+      if (!kepub.ok) return this.logDegraded('bookmark_to_canonical', userId, bookId, kepub.reason);
 
       const outcome = await this.koboSpanConverter.koboBookmarkToPositions({
         bookFileId: kepub.file.id,
@@ -42,7 +42,9 @@ export class KoboProgressBridgeService {
         chapterFilename: source,
         spanId: spanValue,
       });
-      if (outcome.status === 'failed' || !outcome.cfi || !outcome.xpointer) return null;
+      if (outcome.status === 'failed' || !outcome.cfi || !outcome.xpointer) {
+        return this.logDegraded('bookmark_to_canonical', userId, bookId, outcome.reason ?? 'incomplete_outcome');
+      }
       return { cfi: outcome.cfi, xpointer: outcome.xpointer };
     } catch (error) {
       this.logWarn('bookmark_to_canonical', userId, bookId, error);
@@ -53,10 +55,12 @@ export class KoboProgressBridgeService {
   async cfiToKoboBookmark(userId: number, bookId: number, cfi: string): Promise<KoboBookmarkPoint | null> {
     try {
       const kepub = await this.kepubContextService.resolveForBook(userId, bookId);
-      if (!kepub.ok) return null;
+      if (!kepub.ok) return this.logDegraded('cfi_to_bookmark', userId, bookId, kepub.reason);
 
       const outcome = await this.koboSpanConverter.cfiPointToKoboBookmark({ bookFileId: kepub.file.id, ctx: kepub.ctx, cfi });
-      if (outcome.status === 'failed' || !outcome.spanId || !outcome.chapterFilename) return null;
+      if (outcome.status === 'failed' || !outcome.spanId || !outcome.chapterFilename) {
+        return this.logDegraded('cfi_to_bookmark', userId, bookId, outcome.reason ?? 'incomplete_outcome');
+      }
       return {
         source: outcome.chapterFilename,
         value: outcome.spanId,
@@ -66,6 +70,18 @@ export class KoboProgressBridgeService {
       this.logWarn('cfi_to_bookmark', userId, bookId, error);
       return null;
     }
+  }
+
+  /**
+   * A conversion that gives up is not an error, but it does mean the device receives a
+   * percent without a position, so it has to be visible: the resulting bookmark looks
+   * healthy on the device while resuming at the wrong place.
+   */
+  private logDegraded(operation: string, userId: number, bookId: number, reason: string): null {
+    this.logger.warn(
+      `[${EVENT}] [fail] op=${operation} userId=${userId} bookId=${bookId} reason=${sanitizeLogValue(reason)} - kobo position unavailable, progress degrades to percent`,
+    );
+    return null;
   }
 
   private logWarn(operation: string, userId: number, bookId: number, error: unknown): void {
