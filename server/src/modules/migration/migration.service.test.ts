@@ -1536,9 +1536,9 @@ describe('MigrationService', () => {
                   {
                     targetBookId: 10,
                     sourceBookIds: ['sb1', 'sb2'],
-                    strategies: ['isbn', 'title_author'],
+                    strategies: ['asin', 'title_author'],
                     matches: [
-                      { sourceBookId: 'sb1', targetBookId: 10, strategy: 'isbn' },
+                      { sourceBookId: 'sb1', targetBookId: 10, strategy: 'asin' },
                       { sourceBookId: 'sb2', targetBookId: 10, strategy: 'title_author' },
                     ],
                     reason: 'duplicate_target_match',
@@ -1568,7 +1568,7 @@ describe('MigrationService', () => {
       expect(dupes).toHaveLength(1);
       const candidates = dupes[0]?.sourceCandidates as Array<Record<string, unknown>>;
       expect(candidates).toHaveLength(2);
-      expect(candidates[0]).toMatchObject({ sourceBookId: 'sb1', title: 'Book One', author: 'Author A', strategy: 'isbn' });
+      expect(candidates[0]).toMatchObject({ sourceBookId: 'sb1', title: 'Book One', author: 'Author A', strategy: 'asin' });
       expect(candidates[1]).toMatchObject({ sourceBookId: 'sb2', title: 'Book Two', author: 'Author B', strategy: 'title_author' });
     });
 
@@ -1759,7 +1759,7 @@ describe('MigrationService', () => {
                   {
                     targetBookId: 10,
                     sourceBookIds: ['sb1', 'sb2'],
-                    strategies: ['isbn', 'file_hash'],
+                    strategies: ['asin', 'file_hash'],
                     reason: 'duplicate_target_match',
                   },
                 ],
@@ -1785,7 +1785,7 @@ describe('MigrationService', () => {
       const dupes = plan?.duplicateBookMatches as Array<Record<string, unknown>>;
       const candidates = dupes[0]?.sourceCandidates as Array<Record<string, unknown>>;
 
-      expect(candidates[0]?.strategy).toBe('isbn');
+      expect(candidates[0]?.strategy).toBe('asin');
       expect(candidates[1]?.strategy).toBe('file_hash');
     });
   });

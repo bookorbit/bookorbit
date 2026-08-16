@@ -107,7 +107,17 @@ export function sanitizeRunForApi(run: MigrationRun): ApiMigrationRun {
 
 function redactConnectionConfig(type: string, raw: unknown): unknown {
   const config = asRecord(raw);
-  if (type !== 'booklore') return config;
+  const normalizedType = type.trim().toLowerCase();
+  if (normalizedType === 'audiobookshelf') {
+    // Backup-mode configs carry no token; adding an empty one would make the returned shape
+    // diverge from what is persisted and parsed.
+    if (config.mode === 'backup') return config;
+    return {
+      ...config,
+      apiToken: typeof config.apiToken === 'string' && config.apiToken.length > 0 ? PASSWORD_REDACTED_SENTINEL : '',
+    };
+  }
+  if (normalizedType !== 'booklore' && normalizedType !== 'grimmory') return config;
 
   return {
     ...config,

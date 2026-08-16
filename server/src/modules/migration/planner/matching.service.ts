@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { inArray, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db';
@@ -9,9 +9,13 @@ import type { SourceBook } from '../adapters/source-adapter.types';
 import type { PathMapping, PlannedBookMatch, PlannedUnresolvedBook, UnresolvedReasonCode } from './planner.types';
 
 type Db = NodePgDatabase<typeof schema>;
-type MatchAttempt = 'isbn' | 'file_hash' | 'file_path' | 'title_author';
+type MatchAttempt = 'isbn' | 'asin' | 'file_hash' | 'file_path' | 'title_author';
 
 type LookupResult = { kind: 'found'; bookId: number } | { kind: 'ambiguous' } | { kind: 'none' };
+type TitleAuthorMatchLevel = 'exact' | 'approx';
+type TitleAuthorLookupRow = { match_key: string; book_id: number; match_level: TitleAuthorMatchLevel };
+
+const LOOKUP_CHUNK_SIZE = 500;
 
 function found(bookId: number): LookupResult {
   return { kind: 'found', bookId };
@@ -36,10 +40,10 @@ export class MatchingService {
     const unresolved: PlannedUnresolvedBook[] = [];
 
     const isbnIndex = await this.batchLookupIsbns(sourceBooks);
+    const asinIndex = await this.batchLookupAsins(sourceBooks);
     const hashIndex = await this.batchLookupFileHashes(sourceBooks);
-
-    const filePathCache = new Map<string, LookupResult>();
-    const titleAuthorCache = new Map<string, LookupResult>();
+    const filePathIndex = await this.batchLookupFilePaths(sourceBooks, pathMappings);
+    const titleAuthorIndex = await this.batchLookupTitleAuthors(sourceBooks);
 
     sourceBooksLoop: for (const sourceBook of sourceBooks) {
       const attempts: MatchAttempt[] = [];
@@ -54,6 +58,16 @@ export class MatchingService {
           continue;
         }
         if (result.kind === 'ambiguous') ambiguousStrategy = 'isbn';
+      }
+
+      if (sourceAsinCandidates(sourceBook).length > 0) {
+        attempts.push('asin');
+        const result = asinIndex.get(sourceBook.sourceBookId) ?? NONE;
+        if (result.kind === 'found') {
+          matches.push({ sourceBookId: sourceBook.sourceBookId, targetBookId: result.bookId, strategy: 'asin' });
+          continue;
+        }
+        if (result.kind === 'ambiguous') ambiguousStrategy ??= 'asin';
       }
 
       const sourceHashes = sourceFileHashes(sourceBook);
@@ -75,11 +89,7 @@ export class MatchingService {
       if (mappedPaths.length > 0) {
         attempts.push('file_path');
         for (const mappedPath of [...new Set(mappedPaths)]) {
-          let result = filePathCache.get(mappedPath);
-          if (!result) {
-            result = await this.lookupByFilePath(mappedPath);
-            filePathCache.set(mappedPath, result);
-          }
+          const result = filePathIndex.get(mappedPath) ?? NONE;
           if (result.kind === 'found') {
             matches.push({ sourceBookId: sourceBook.sourceBookId, targetBookId: result.bookId, strategy: 'path_mapping' });
             continue sourceBooksLoop;
@@ -93,11 +103,7 @@ export class MatchingService {
         attempts.push('title_author');
         const authorNames = getSourceAuthorNames(sourceBook);
         const cacheKey = buildTitleAuthorCacheKey(sourceBook.title, authorNames);
-        let result = titleAuthorCache.get(cacheKey);
-        if (!result) {
-          result = await this.lookupByTitleAuthor(sourceBook.title ?? '', authorNames);
-          titleAuthorCache.set(cacheKey, result);
-        }
+        const result = titleAuthorIndex.get(cacheKey) ?? NONE;
         if (result.kind === 'found') {
           matches.push({ sourceBookId: sourceBook.sourceBookId, targetBookId: result.bookId, strategy: 'title_author' });
           continue;
@@ -133,12 +139,11 @@ export class MatchingService {
     const results = new Map<string, LookupResult>();
     if (isbn13s.size === 0 && isbn10s.size === 0) return results;
 
-    const chunkSize = 500;
     const bookIdsByIsbn = new Map<string, number[]>();
 
     const allIsbns13 = [...isbn13s];
-    for (let i = 0; i < allIsbns13.length; i += chunkSize) {
-      const chunk = allIsbns13.slice(i, i + chunkSize);
+    for (let i = 0; i < allIsbns13.length; i += LOOKUP_CHUNK_SIZE) {
+      const chunk = allIsbns13.slice(i, i + LOOKUP_CHUNK_SIZE);
       const normalizedTargetIsbn13 = normalizedIsbnSql(schema.bookMetadata.isbn13);
       const rows = await this.db
         .select({ bookId: schema.bookMetadata.bookId, isbn13: normalizedTargetIsbn13 })
@@ -154,8 +159,8 @@ export class MatchingService {
     }
 
     const allIsbns10 = [...isbn10s];
-    for (let i = 0; i < allIsbns10.length; i += chunkSize) {
-      const chunk = allIsbns10.slice(i, i + chunkSize);
+    for (let i = 0; i < allIsbns10.length; i += LOOKUP_CHUNK_SIZE) {
+      const chunk = allIsbns10.slice(i, i + LOOKUP_CHUNK_SIZE);
       const normalizedTargetIsbn10 = normalizedIsbnSql(schema.bookMetadata.isbn10);
       const rows = await this.db
         .select({ bookId: schema.bookMetadata.bookId, isbn10: normalizedTargetIsbn10 })
@@ -192,6 +197,64 @@ export class MatchingService {
     return results;
   }
 
+  private async batchLookupAsins(sourceBooks: SourceBook[]): Promise<Map<string, LookupResult>> {
+    const asins = new Set<string>();
+    for (const book of sourceBooks) {
+      for (const asin of sourceAsinCandidates(book)) asins.add(asin);
+    }
+
+    const results = new Map<string, LookupResult>();
+    if (asins.size === 0) return results;
+
+    const bookIdsByAsin = new Map<string, Set<number>>();
+    const allAsins = [...asins];
+
+    for (let i = 0; i < allAsins.length; i += LOOKUP_CHUNK_SIZE) {
+      const chunk = allAsins.slice(i, i + LOOKUP_CHUNK_SIZE);
+      const normalizedTargetAmazonId = normalizedAsinSql(schema.bookMetadata.amazonId);
+      const normalizedTargetAudibleId = normalizedAsinSql(schema.bookMetadata.audibleId);
+      const rows = await this.db
+        .select({
+          bookId: schema.bookMetadata.bookId,
+          amazonId: normalizedTargetAmazonId,
+          audibleId: normalizedTargetAudibleId,
+        })
+        .from(schema.bookMetadata)
+        .where(or(inArray(normalizedTargetAmazonId, chunk), inArray(normalizedTargetAudibleId, chunk)));
+
+      for (const row of rows) {
+        const matchedAsins = new Set([normalizeAsin(row.amazonId), normalizeAsin(row.audibleId)]);
+        matchedAsins.delete(null);
+        for (const asin of matchedAsins) {
+          if (!asin || !asins.has(asin)) continue;
+          const bookIds = bookIdsByAsin.get(asin) ?? new Set<number>();
+          bookIds.add(row.bookId);
+          bookIdsByAsin.set(asin, bookIds);
+        }
+      }
+    }
+
+    for (const book of sourceBooks) {
+      const candidates = sourceAsinCandidates(book);
+      if (candidates.length === 0) continue;
+
+      const matchingBookIds = new Set<number>();
+      for (const asin of candidates) {
+        for (const bookId of bookIdsByAsin.get(asin) ?? []) matchingBookIds.add(bookId);
+      }
+
+      if (matchingBookIds.size === 1) {
+        results.set(book.sourceBookId, found([...matchingBookIds][0]));
+      } else if (matchingBookIds.size > 1) {
+        results.set(book.sourceBookId, AMBIGUOUS);
+      } else {
+        results.set(book.sourceBookId, NONE);
+      }
+    }
+
+    return results;
+  }
+
   private async batchLookupFileHashes(sourceBooks: SourceBook[]): Promise<Map<string, LookupResult>> {
     const hashes = new Set<string>();
     for (const book of sourceBooks) {
@@ -201,12 +264,11 @@ export class MatchingService {
     const results = new Map<string, LookupResult>();
     if (hashes.size === 0) return results;
 
-    const chunkSize = 500;
     const bookIdsByHash = new Map<string, number[]>();
     const allHashes = [...hashes];
 
-    for (let i = 0; i < allHashes.length; i += chunkSize) {
-      const chunk = allHashes.slice(i, i + chunkSize);
+    for (let i = 0; i < allHashes.length; i += LOOKUP_CHUNK_SIZE) {
+      const chunk = allHashes.slice(i, i + LOOKUP_CHUNK_SIZE);
       const rows = await this.db
         .select({ bookId: schema.bookFiles.bookId, hash: schema.bookFiles.fileHash })
         .from(schema.bookFiles)
@@ -233,60 +295,132 @@ export class MatchingService {
     return results;
   }
 
-  private async lookupByFilePath(filePath: string): Promise<LookupResult> {
-    const rows = await this.db
-      .select({ bookId: schema.bookFiles.bookId })
-      .from(schema.bookFiles)
-      .where(eq(schema.bookFiles.absolutePath, filePath))
-      .limit(2);
+  private async batchLookupFilePaths(sourceBooks: SourceBook[], pathMappings: PathMapping[]): Promise<Map<string, LookupResult>> {
+    const mappedPaths = new Set<string>();
+    for (const sourceBook of sourceBooks) {
+      for (const sourcePath of sourceFilePaths(sourceBook)) {
+        const mappedPath = applyPathMappings(sourcePath, pathMappings);
+        if (mappedPath) mappedPaths.add(mappedPath);
+      }
+    }
 
-    return toLookupResult(rows);
+    const bookIdsByPath = new Map<string, Set<number>>();
+    const allMappedPaths = [...mappedPaths];
+    for (let i = 0; i < allMappedPaths.length; i += LOOKUP_CHUNK_SIZE) {
+      const chunk = allMappedPaths.slice(i, i + LOOKUP_CHUNK_SIZE);
+      const rows = await this.db
+        .select({ bookId: schema.bookFiles.bookId, absolutePath: schema.bookFiles.absolutePath })
+        .from(schema.bookFiles)
+        .where(inArray(schema.bookFiles.absolutePath, chunk));
+      for (const row of rows) {
+        const bookIds = bookIdsByPath.get(row.absolutePath) ?? new Set<number>();
+        bookIds.add(row.bookId);
+        bookIdsByPath.set(row.absolutePath, bookIds);
+      }
+    }
+
+    const results = new Map<string, LookupResult>();
+    for (const [filePath, bookIds] of bookIdsByPath) {
+      results.set(filePath, toLookupResult([...bookIds].map((bookId) => ({ bookId }))));
+    }
+    return results;
   }
 
-  private async lookupByTitleAuthor(title: string, authors: string[]): Promise<LookupResult> {
-    const normalizedTitle = title.trim();
-    if (!normalizedTitle) return NONE;
-
-    const normalizedAuthors = [...new Set(authors.map((author) => normalizeAuthor(author)).filter((author): author is string => !!author))];
-    if (normalizedAuthors.length === 0) return NONE;
-
-    const normalizedAuthorsLower = normalizedAuthors.map((author) => author.toLowerCase());
-    const exactRows = await this.db
-      .selectDistinct({ bookId: schema.bookMetadata.bookId })
-      .from(schema.bookMetadata)
-      .innerJoin(schema.bookAuthors, eq(schema.bookAuthors.bookId, schema.bookMetadata.bookId))
-      .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
-      .where(
-        and(
-          sql`lower(${schema.bookMetadata.title}) = lower(${normalizedTitle})`,
-          inArray(sql<string>`lower(${schema.authors.name})`, normalizedAuthorsLower),
+  private async batchLookupTitleAuthors(sourceBooks: SourceBook[]): Promise<Map<string, LookupResult>> {
+    const candidates = new Map<string, { cacheKey: string; title: string; authors: string[] }>();
+    for (const sourceBook of sourceBooks) {
+      const title = sourceBook.title?.trim();
+      if (!title) continue;
+      const authors = [
+        ...new Set(
+          getSourceAuthorNames(sourceBook)
+            .map(normalizeAuthor)
+            .filter((author): author is string => author !== null),
         ),
-      )
-      .limit(2);
-    const exactResult = toLookupResult(exactRows);
-    if (exactResult.kind !== 'none') {
-      return exactResult;
+      ];
+      if (authors.length === 0) continue;
+      const cacheKey = buildTitleAuthorCacheKey(title, authors);
+      candidates.set(cacheKey, { cacheKey, title, authors });
     }
 
-    const approxClauses = normalizedAuthors.map((author) => accentInsensitiveIlike(schema.authors.name, `%${escapeLike(author)}%`));
-    const approxRows = await this.db
-      .selectDistinct({ bookId: schema.bookMetadata.bookId })
-      .from(schema.bookMetadata)
-      .innerJoin(schema.bookAuthors, eq(schema.bookAuthors.bookId, schema.bookMetadata.bookId))
-      .innerJoin(schema.authors, eq(schema.authors.id, schema.bookAuthors.authorId))
-      .where(
-        and(
-          sql`lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) = lower(public.bookorbit_unaccent(${normalizedTitle}))`,
-          or(...approxClauses)!,
+    const matchesByKey = new Map<string, { exact: Set<number>; approx: Set<number> }>();
+    const allCandidates = [...candidates.values()];
+    for (let i = 0; i < allCandidates.length; i += LOOKUP_CHUNK_SIZE) {
+      const chunk = allCandidates.slice(i, i + LOOKUP_CHUNK_SIZE);
+      const values = sql.join(
+        chunk.map(({ cacheKey, title, authors }) => {
+          const authorValues = sql.join(
+            authors.map((author) => sql`${author}::text`),
+            sql`, `,
+          );
+          const authorPatternValues = sql.join(
+            authors.map((author) => sql`${escapeLike(author)}::text`),
+            sql`, `,
+          );
+          return sql`(${cacheKey}::text, ${title}::text, array[${authorValues}]::text[], array[${authorPatternValues}]::text[])`;
+        }),
+        sql`, `,
+      );
+      const queryResult = await this.db.execute<TitleAuthorLookupRow>(sql`
+        with source_candidates(match_key, title, authors, author_patterns) as (
+          values ${values}
         ),
-      )
-      .limit(2);
-    const approxResult = toLookupResult(approxRows);
-    if (approxResult.kind !== 'none') {
-      return approxResult;
+        candidate_matches as (
+          select
+            source_candidates.match_key,
+            ${schema.bookMetadata.bookId} as book_id,
+            bool_or(
+              lower(${schema.bookMetadata.title}) = lower(source_candidates.title)
+              and lower(${schema.authors.name}) = lower(source_author.author)
+            ) as exact_match,
+            bool_or(
+              lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) =
+                lower(public.bookorbit_unaccent(source_candidates.title))
+              and ${accentInsensitiveIlike(schema.authors.name, sql`'%' || source_author.author_pattern || '%'`)}
+            ) as approx_match
+          from source_candidates
+          cross join lateral unnest(source_candidates.authors, source_candidates.author_patterns)
+            as source_author(author, author_pattern)
+          inner join ${schema.bookMetadata} on (
+            lower(${schema.bookMetadata.title}) = lower(source_candidates.title)
+            or lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) =
+              lower(public.bookorbit_unaccent(source_candidates.title))
+          )
+          inner join ${schema.bookAuthors} on ${schema.bookAuthors.bookId} = ${schema.bookMetadata.bookId}
+          inner join ${schema.authors} on ${schema.authors.id} = ${schema.bookAuthors.authorId}
+          group by source_candidates.match_key, ${schema.bookMetadata.bookId}
+        ),
+        ranked_matches as (
+          select
+            match_key,
+            book_id,
+            case when exact_match then 'exact' else 'approx' end as match_level,
+            row_number() over (
+              partition by match_key, case when exact_match then 'exact' else 'approx' end
+              order by book_id
+            ) as match_rank
+          from candidate_matches
+          where exact_match or approx_match
+        )
+        select match_key, book_id, match_level
+        from ranked_matches
+        where match_rank <= 2
+      `);
+
+      for (const row of queryResult.rows) {
+        const matches = matchesByKey.get(row.match_key) ?? { exact: new Set<number>(), approx: new Set<number>() };
+        matches[row.match_level].add(row.book_id);
+        matchesByKey.set(row.match_key, matches);
+      }
     }
 
-    return NONE;
+    const results = new Map<string, LookupResult>();
+    for (const { cacheKey } of candidates.values()) {
+      const matches = matchesByKey.get(cacheKey);
+      const bookIds = matches && matches.exact.size > 0 ? matches.exact : matches?.approx;
+      results.set(cacheKey, toLookupResult([...(bookIds ?? [])].map((bookId) => ({ bookId }))));
+    }
+    return results;
   }
 }
 
@@ -300,6 +434,7 @@ export function deriveUnresolvedReason(attempts: MatchAttempt[]): UnresolvedReas
   if (attempts.includes('title_author')) return 'no_title_author_match';
   if (attempts.includes('file_path')) return 'no_file_path_match';
   if (attempts.includes('file_hash')) return 'no_file_hash_match';
+  if (attempts.includes('asin')) return 'no_asin_match';
   if (attempts.includes('isbn')) return 'no_isbn_match';
   return 'insufficient_source_data';
 }
@@ -308,6 +443,8 @@ function deriveAmbiguousReason(strategy: MatchAttempt): UnresolvedReasonCode {
   switch (strategy) {
     case 'isbn':
       return 'ambiguous_isbn_match';
+    case 'asin':
+      return 'ambiguous_asin_match';
     case 'file_hash':
       return 'ambiguous_file_hash_match';
     case 'file_path':
@@ -337,6 +474,23 @@ function normalizeIsbn(value: string | null): string | null {
 
 function normalizedIsbnSql(column: typeof schema.bookMetadata.isbn10 | typeof schema.bookMetadata.isbn13) {
   return sql<string>`regexp_replace(upper(coalesce(${column}, '')), '[^0-9X]', '', 'g')`;
+}
+
+function normalizeAsin(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const normalized = value.trim().toUpperCase();
+  return /^[A-Z0-9]{10}$/.test(normalized) ? normalized : null;
+}
+
+function normalizedAsinSql(column: typeof schema.bookMetadata.amazonId | typeof schema.bookMetadata.audibleId) {
+  return sql<string>`upper(btrim(coalesce(${column}, '')))`;
+}
+
+function sourceAsinCandidates(sourceBook: SourceBook): string[] {
+  const candidates = [sourceBook.asin, sourceBook.amazonId, sourceBook.audibleId]
+    .map((value) => normalizeAsin(value))
+    .filter((value): value is string => value !== null);
+  return [...new Set(candidates)];
 }
 
 function sourceFileHashes(sourceBook: SourceBook): string[] {

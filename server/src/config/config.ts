@@ -48,6 +48,7 @@ export const emailConfig = registerAs('email', () => ({
 
 export const migrationConfig = registerAs('migration', () => ({
   encryptionKey: process.env.MIGRATION_ENCRYPTION_KEY ?? '',
+  importRoot: process.env.MIGRATION_IMPORT_ROOT?.trim() ? resolve(process.env.MIGRATION_IMPORT_ROOT) : undefined,
 }));
 
 export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({

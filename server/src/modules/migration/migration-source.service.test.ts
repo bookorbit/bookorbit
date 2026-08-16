@@ -251,6 +251,30 @@ describe('MigrationSourceService', () => {
     expect((result.connectionConfig as Record<string, unknown>).password).toBe('********');
   });
 
+  it('uses a source-neutral fallback when a trimmed source name is empty', async () => {
+    const createSource = vi.fn((values: Record<string, unknown>) => Promise.resolve({ ...buildSource({ id: 11 }), ...values }));
+    const { service } = createService({
+      listSources: vi.fn(() => Promise.resolve([])),
+      createSource,
+    });
+
+    await service.createSource(
+      {
+        type: 'booklore',
+        name: '   ',
+        connectionConfig: {
+          host: 'db.example.com',
+          user: 'admin',
+          password: 'new-password',
+          database: 'booklore',
+        },
+      },
+      2,
+    );
+
+    expect(createSource).toHaveBeenCalledWith(expect.objectContaining({ name: 'Migration Source' }));
+  });
+
   it('createSource rejects invalid adapter validation results', async () => {
     const { service, adapter } = createService({
       listSources: vi.fn(() => Promise.resolve([])),
@@ -342,6 +366,109 @@ describe('MigrationSourceService', () => {
     await expect(service.getSourcePathPrefixes(404)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('tests CWA with only its parsed snapshot paths and never accepts a request import root', async () => {
+    const { service, adapter } = createService();
+    adapter.validate.mockResolvedValue({
+      ok: true,
+      sourceType: 'calibre_web_automated',
+      sourceVersion: null,
+      warnings: ['Schema compatibility was verified against Calibre-Web Automated v4.0.6'],
+      counts: { books: 1 },
+      missingTables: [],
+    });
+
+    await service.testSource({
+      type: 'calibre_web_automated',
+      connectionConfig: {
+        mode: 'snapshot',
+        appDatabasePath: '/imports/cwa/app.db',
+        metadataDatabasePath: '/imports/cwa/metadata.db',
+        importRoot: '/request-controlled-root',
+      },
+    });
+
+    expect(adapter.validate).toHaveBeenCalledWith({
+      mode: 'snapshot',
+      appDatabasePath: '/imports/cwa/app.db',
+      metadataDatabasePath: '/imports/cwa/metadata.db',
+    });
+  });
+
+  it('round-trips saved CWA paths through edit, validation reporting, and logical path-prefix lookup', async () => {
+    const existingSource = buildSource({
+      id: 7,
+      type: 'calibre_web_automated',
+      connectionConfig: {
+        mode: 'snapshot',
+        appDatabasePath: '/imports/cwa/old-app.db',
+        metadataDatabasePath: '/imports/cwa/old-metadata.db',
+      },
+    });
+    const updateSource = vi.fn((id: number, values: Record<string, unknown>) => Promise.resolve({ ...existingSource, ...values, id }));
+    const updateSourceValidation = vi.fn(() => Promise.resolve(existingSource));
+    const { service, adapter, repo } = createService({
+      findSourceById: vi.fn(() => Promise.resolve(existingSource)),
+      listSources: vi.fn(() => Promise.resolve([existingSource])),
+      updateSource,
+      updateSourceValidation,
+    });
+    adapter.validate.mockResolvedValue({
+      ok: true,
+      sourceType: 'calibre_web_automated',
+      sourceVersion: null,
+      warnings: ['Schema compatibility was verified against Calibre-Web Automated v4.0.6'],
+      counts: { users: 1, books: 2, files: 3 },
+      missingTables: [],
+    });
+    adapter.fetchPathPrefixes.mockResolvedValue(['/logical/calibre-library']);
+
+    const saved = await service.createSource(
+      {
+        type: 'calibre_web_automated',
+        name: 'CWA Snapshot',
+        connectionConfig: {
+          mode: 'snapshot',
+          appDatabasePath: '/imports/cwa/app.db',
+          metadataDatabasePath: '/imports/cwa/metadata.db',
+        },
+      },
+      42,
+    );
+
+    expect(updateSource).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        type: 'calibre_web_automated',
+        connectionConfig: {
+          mode: 'snapshot',
+          appDatabasePath: '/imports/cwa/app.db',
+          metadataDatabasePath: '/imports/cwa/metadata.db',
+        },
+        capabilities: expect.objectContaining({ sourceVersion: null, counts: { users: 1, books: 2, files: 3 } }),
+      }),
+    );
+    expect(saved.connectionConfig).toEqual({
+      mode: 'snapshot',
+      appDatabasePath: '/imports/cwa/app.db',
+      metadataDatabasePath: '/imports/cwa/metadata.db',
+    });
+
+    await expect(service.validateSourceById(7)).resolves.toMatchObject({
+      sourceType: 'calibre_web_automated',
+      sourceVersion: null,
+      warnings: ['Schema compatibility was verified against Calibre-Web Automated v4.0.6'],
+    });
+    expect(updateSourceValidation).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        capabilities: expect.objectContaining({ sourceVersion: null, warnings: [expect.stringContaining('v4.0.6')] }),
+        lastValidatedAt: expect.any(Date),
+      }),
+    );
+    await expect(service.getSourcePathPrefixes(7)).resolves.toEqual({ prefixes: ['/logical/calibre-library'] });
+    expect(repo.purgeRunState).toHaveBeenCalledWith(7);
+  });
+
   describe('resolveConnectionConfig', () => {
     it('returns incoming config when no existing source', () => {
       const result = resolveConnectionConfig({ host: 'localhost', password: 'secret' }, null, noopEncryption);
@@ -358,6 +485,32 @@ describe('MigrationSourceService', () => {
       expect(result.password).toBe('real-pw');
       expect(result.apiKey).toBe('');
       expect(result.host).toBe('db.local');
+    });
+
+    it('preserves a saved Audiobookshelf API token sent back as the redaction sentinel', () => {
+      const existing = buildSource({
+        type: 'audiobookshelf',
+        connectionConfig: {
+          mode: 'api',
+          baseUrl: 'https://abs.example.com',
+          apiToken: 'real-api-token',
+          allowPrivateNetwork: false,
+        },
+      }) as never;
+
+      const result = resolveConnectionConfig(
+        {
+          mode: 'api',
+          baseUrl: 'https://abs.example.com',
+          apiToken: '********',
+          allowPrivateNetwork: true,
+        },
+        existing,
+        noopEncryption,
+      );
+
+      expect(result.apiToken).toBe('real-api-token');
+      expect(result.allowPrivateNetwork).toBe(true);
     });
   });
 });

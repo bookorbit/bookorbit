@@ -308,9 +308,9 @@ function formatDate(iso: string | null | undefined): string {
             <div class="min-w-0">
               <p class="settings-label">
                 <template v-if="migrationCardState === 'none' || migrationCardState === 'loading'">{{
-                  t('settings.admin.maintenance.importFromBooklore')
+                  t('settings.admin.maintenance.importLibraryData')
                 }}</template>
-                <template v-else-if="migrationCardState === 'configured'">{{ t('settings.admin.maintenance.bookloreImportConfigured') }}</template>
+                <template v-else-if="migrationCardState === 'configured'">{{ t('settings.admin.maintenance.migrationConfigured') }}</template>
                 <template v-else-if="migrationCardState === 'running'">{{ t('settings.admin.maintenance.migrationRunning') }}</template>
                 <template v-else-if="migrationCardState === 'completed'">{{ t('settings.admin.maintenance.migrationCompleted') }}</template>
                 <template v-else-if="migrationCardState === 'failed'">{{ t('settings.admin.maintenance.migrationFailed') }}</template>
@@ -320,7 +320,7 @@ function formatDate(iso: string | null | undefined): string {
                 class="settings-hint leading-relaxed max-w-sm mt-0.5 md:[display:block] overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
               >
                 <template v-if="migrationCardState === 'none' || migrationCardState === 'loading'">
-                  {{ t('settings.admin.maintenance.importDescription') }}
+                  {{ t('settings.admin.maintenance.migrationDescription') }}
                 </template>
                 <template v-else-if="migrationCardState === 'configured'">
                   {{

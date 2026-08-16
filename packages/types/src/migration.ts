@@ -2,11 +2,13 @@ export type MigrationRunState = "draft" | "preflight_failed" | "dry_run_ready" |
 
 export type UnresolvedReasonCode =
   | "no_isbn_match"
+  | "no_asin_match"
   | "no_file_hash_match"
   | "no_file_path_match"
   | "no_title_author_match"
   | "insufficient_source_data"
   | "ambiguous_isbn_match"
+  | "ambiguous_asin_match"
   | "ambiguous_file_hash_match"
   | "ambiguous_file_path_match"
   | "ambiguous_title_author_match"
@@ -36,7 +38,7 @@ export interface MigrationProfileApi {
   id: number;
   sourceId: number;
   name: string;
-  userMappings: Array<{ sourceUserId: string; targetUserId: number }>;
+  userMappings: Array<{ sourceUserId: string; targetUserId: number | null }>;
   pathMappings: Array<{ sourcePrefix: string; targetPrefix: string }>;
   scope: Record<string, unknown>;
   createdAt: string;

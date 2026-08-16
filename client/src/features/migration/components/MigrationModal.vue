@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/i18n/formatters'
-import { Eye, EyeOff, Loader2, X, ChevronLeft, ChevronRight, Check, AlertCircle, RotateCcw } from '@lucide/vue'
+import { Loader2, X, ChevronLeft, ChevronRight, Check, AlertCircle, RotateCcw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import SearchableUserSelect from './SearchableUserSelect.vue'
+import MigrationSourceFields from './MigrationSourceFields.vue'
 import { api } from '@/lib/api'
 import {
   cancelRun,
@@ -40,7 +41,13 @@ import {
 import { useMigrationPolling } from '@/features/migration/composables/useMigrationPolling'
 import { useMigrationProgress } from '@/features/migration/composables/useMigrationProgress'
 import { useMigrationSetupReset } from '@/features/migration/composables/useMigrationSetupReset'
-import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
+import {
+  buildMigrationSourceConnectionConfig,
+  createMigrationSourceDraft,
+  hydrateMigrationSourceDraft,
+  validateMigrationSourceDraft,
+  type MigrationSourceValidationError,
+} from '@/features/migration/lib/migration-source-config'
 
 interface StepDefinition {
   label: string
@@ -64,6 +71,7 @@ interface UserMappingDraft {
   sourceUserId: string
   username: string
   targetUserId: number | null
+  skip: boolean
 }
 
 interface PathMappingDraft {
@@ -95,19 +103,7 @@ const suggestionsLoadedAt = ref<string | null>(null)
 const userMappings = ref<UserMappingDraft[]>([])
 const pathMappings = ref<PathMappingDraft[]>([{ sourcePrefix: '', targetPrefix: '' }])
 
-const DEFAULT_SOURCE_DRAFT = {
-  type: 'booklore',
-  name: 'Booklore',
-  host: '',
-  port: 3306,
-  user: '',
-  password: '',
-  database: '',
-  ssl: false,
-  mediaRootPath: '',
-}
-
-const sourceDraft = reactive({ ...DEFAULT_SOURCE_DRAFT })
+const sourceDraft = reactive(createMigrationSourceDraft())
 
 const busy = reactive({
   testingSource: false,
@@ -247,6 +243,7 @@ watch(activeStepIndex, (newVal) => {
 
 watch(
   () => [
+    sourceDraft.type,
     sourceDraft.mediaRootPath,
     sourceDraft.host,
     sourceDraft.port,
@@ -254,6 +251,8 @@ watch(
     sourceDraft.password,
     sourceDraft.database,
     sourceDraft.ssl,
+    sourceDraft.cwaAppDatabasePath,
+    sourceDraft.cwaMetadataDatabasePath,
   ],
   () => {
     mediaPathTestState.value = 'idle'
@@ -290,7 +289,7 @@ const stepTitles = computed(() => [
   t('migration.steps.report.title'),
 ])
 const stepSubtitles = computed(() => [
-  t('migration.steps.source.subtitle'),
+  t('migration.steps.source.genericSubtitle'),
   t('migration.steps.mappings.subtitle'),
   t('migration.steps.dryRun.subtitle'),
   t('migration.steps.migration.subtitle'),
@@ -364,7 +363,8 @@ const duplicateTargetBookLabels = ref<Map<number, string>>(new Map())
 const duplicateGroupsRemaining = computed(() => duplicateMatches.value.filter((dup) => !duplicateResolutions.value.has(dup.targetBookId)).length)
 
 const STRATEGY_PRIORITY: Record<string, number> = {
-  isbn: 40,
+  isbn: 50,
+  asin: 40,
   file_hash: 30,
   path_mapping: 20,
   title_author: 10,
@@ -392,7 +392,7 @@ function sourceBookSecondary(dup: DuplicateBookMatch, sourceId: string): string 
   if (author) return t('migration.duplicates.byAuthor', { author, id: sourceId })
   const filePath = candidate?.filePath?.trim()
   if (filePath) return t('migration.duplicates.byFilePath', { filePath, id: sourceId })
-  return t('migration.duplicates.bookloreSourceId', { id: sourceId })
+  return t('migration.duplicates.sourceRecordId', { id: sourceId })
 }
 
 function recommendedSourceBookId(dup: DuplicateBookMatch): string | null {
@@ -669,23 +669,11 @@ function hydrateSourceDraft() {
     resetSourceDraft()
     return
   }
-  sourceDraft.type = currentSource.type || sourceDraft.type
-  sourceDraft.name = currentSource.name || sourceDraft.name
-  const cfg = asRecord(currentSource.connectionConfig)
-  sourceDraft.host = asString(cfg.host) ?? sourceDraft.host
-  sourceDraft.port = asNumber(cfg.port) ?? sourceDraft.port
-  sourceDraft.user = asString(cfg.user) ?? sourceDraft.user
-  sourceDraft.password = asString(cfg.password) ?? ''
-  sourceDraft.database = asString(cfg.database) ?? sourceDraft.database
-  sourceDraft.ssl = asBoolean(cfg.ssl) ?? sourceDraft.ssl
-  sourceDraft.mediaRootPath = asString(cfg.mediaRootPath) ?? ''
+  hydrateMigrationSourceDraft(sourceDraft, currentSource)
 }
 
 function resetSourceDraft() {
-  Object.assign(sourceDraft, {
-    ...DEFAULT_SOURCE_DRAFT,
-    type: supportedTypes.value[0] ?? DEFAULT_SOURCE_DRAFT.type,
-  })
+  Object.assign(sourceDraft, createMigrationSourceDraft(supportedTypes.value[0] ?? 'booklore'))
   mediaPathTestState.value = 'idle'
   mediaPathTestMessage.value = null
 }
@@ -705,6 +693,7 @@ function hydrateUserMappingsFromProfile() {
     sourceUserId: row.sourceUserId,
     username: row.sourceUserId,
     targetUserId: row.targetUserId,
+    skip: row.targetUserId === null,
   }))
 }
 
@@ -720,7 +709,10 @@ async function hydrateUserMappingsFromSuggestions(showSuccessToast: boolean) {
     userMappings.value = response.suggestions.map((row) => ({
       sourceUserId: row.sourceUserId,
       username: row.username,
-      targetUserId: savedMappings.get(row.sourceUserId) ?? row.suggestedTargetUserId ?? fallbackSingleTargetUserId,
+      targetUserId: savedMappings.has(row.sourceUserId)
+        ? (savedMappings.get(row.sourceUserId) ?? null)
+        : (row.suggestedTargetUserId ?? fallbackSingleTargetUserId),
+      skip: savedMappings.has(row.sourceUserId) && savedMappings.get(row.sourceUserId) === null,
     }))
     if (showSuccessToast) {
       if (userMappings.value.length === 0) toast.warning(t('migration.toast.noSourceUsers'))
@@ -734,19 +726,28 @@ async function hydrateUserMappingsFromSuggestions(showSuccessToast: boolean) {
 }
 
 function buildSourceConnectionConfig() {
-  return {
-    host: sourceDraft.host.trim(),
-    port: sourceDraft.port,
-    user: sourceDraft.user.trim(),
-    password: sourceDraft.password,
-    database: sourceDraft.database.trim(),
-    ssl: sourceDraft.ssl,
-    mediaRootPath: sourceDraft.mediaRootPath.trim(),
-  }
+  return buildMigrationSourceConnectionConfig(sourceDraft)
 }
 
 function hasValidSourceDraft() {
-  return !!sourceDraft.name.trim() && !!sourceDraft.host.trim() && !!sourceDraft.user.trim() && !!sourceDraft.database.trim()
+  return validateMigrationSourceDraft(sourceDraft) == null
+}
+
+function sourceDraftValidationMessage() {
+  const error = validateMigrationSourceDraft(sourceDraft)
+  const keyByError: Record<MigrationSourceValidationError, string> = {
+    nameRequired: 'migration.source.validation.nameRequired',
+    databaseFieldsRequired: 'migration.source.validation.databaseFieldsRequired',
+    apiFieldsRequired: 'migration.source.validation.apiFieldsRequired',
+    baseUrlInvalid: 'migration.source.validation.baseUrlInvalid',
+    backupPathRequired: 'migration.source.validation.backupPathRequired',
+    backupPathAbsolute: 'migration.source.validation.backupPathAbsolute',
+    cwaAppDatabasePathRequired: 'migration.source.validation.cwaAppDatabasePathRequired',
+    cwaAppDatabasePathAbsolute: 'migration.source.validation.cwaAppDatabasePathAbsolute',
+    cwaMetadataDatabasePathRequired: 'migration.source.validation.cwaMetadataDatabasePathRequired',
+    cwaMetadataDatabasePathAbsolute: 'migration.source.validation.cwaMetadataDatabasePathAbsolute',
+  }
+  return error ? t(keyByError[error]) : t('migration.toast.sourceFieldsRequired')
 }
 
 function extractWarningStrings(result: Record<string, unknown>): string[] {
@@ -759,7 +760,7 @@ function extractMediaPathWarnings(result: Record<string, unknown>): string[] {
 
 async function onTestSource() {
   if (!hasValidSourceDraft()) {
-    toast.error(t('migration.toast.sourceFieldsRequired'))
+    toast.error(sourceDraftValidationMessage())
     return
   }
   busy.testingSource = true
@@ -795,7 +796,7 @@ async function onTestMediaPath() {
     return
   }
   if (!hasValidSourceDraft()) {
-    toast.error(t('migration.toast.sourceFieldsRequired'))
+    toast.error(sourceDraftValidationMessage())
     return
   }
   const mediaRootPath = sourceDraft.mediaRootPath.trim()
@@ -849,7 +850,7 @@ async function onSaveAndValidate() {
     return
   }
   if (!hasValidSourceDraft()) {
-    toast.error(t('migration.toast.sourceFieldsRequired'))
+    toast.error(sourceDraftValidationMessage())
     return
   }
   busy.savingSource = true
@@ -914,9 +915,7 @@ function cleanedPathMappings() {
 }
 
 function cleanedUserMappings() {
-  return userMappings.value
-    .map((row) => ({ sourceUserId: row.sourceUserId, targetUserId: row.targetUserId }))
-    .filter((row): row is { sourceUserId: string; targetUserId: number } => !!row.targetUserId)
+  return userMappings.value.map((row) => ({ sourceUserId: row.sourceUserId, targetUserId: row.skip ? null : row.targetUserId }))
 }
 
 async function onSaveMappings() {
@@ -930,11 +929,11 @@ async function onSaveMappings() {
     return
   }
   const mappings = cleanedUserMappings()
-  if (mappings.length === 0) {
+  if (!mappings.some((row) => row.targetUserId !== null)) {
     toast.error(t('migration.toast.mapAtLeastOneUser'))
     return
   }
-  if (mappings.length !== userMappings.value.length) {
+  if (userMappings.value.some((row) => !row.skip && row.targetUserId === null)) {
     toast.error(t('migration.toast.mapEveryUser'))
     return
   }
@@ -1178,8 +1177,10 @@ function friendlyUnresolvedReason(reason: string | null): string {
   if (reason === 'no_file_path_match') return t('migration.unresolvedReason.noFilePathMatch')
   if (reason === 'no_file_hash_match') return t('migration.unresolvedReason.noFileHashMatch')
   if (reason === 'no_isbn_match') return t('migration.unresolvedReason.noIsbnMatch')
+  if (reason === 'no_asin_match') return t('migration.unresolvedReason.noAsinMatch')
   if (reason === 'insufficient_source_data') return t('migration.unresolvedReason.insufficientSourceData')
   if (reason === 'ambiguous_isbn_match') return t('migration.unresolvedReason.ambiguousIsbnMatch')
+  if (reason === 'ambiguous_asin_match') return t('migration.unresolvedReason.ambiguousAsinMatch')
   if (reason === 'ambiguous_file_hash_match') return t('migration.unresolvedReason.ambiguousFileHashMatch')
   if (reason === 'ambiguous_file_path_match') return t('migration.unresolvedReason.ambiguousFilePathMatch')
   if (reason === 'ambiguous_title_author_match') return t('migration.unresolvedReason.ambiguousTitleAuthorMatch')
@@ -1188,6 +1189,7 @@ function friendlyUnresolvedReason(reason: string | null): string {
 
 function friendlyMatchStrategy(strategy: string | null): string {
   if (strategy === 'isbn') return t('migration.matchStrategy.isbn')
+  if (strategy === 'asin') return t('migration.matchStrategy.asin')
   if (strategy === 'file_hash') return t('migration.matchStrategy.fileHash')
   if (strategy === 'path_mapping') return t('migration.matchStrategy.pathMapping')
   if (strategy === 'title_author') return t('migration.matchStrategy.titleAuthor')
@@ -1274,20 +1276,6 @@ function asString(value: unknown): string | null {
   return null
 }
 
-function asNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string') {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  return null
-}
-
-function asBoolean(value: unknown): boolean | null {
-  if (typeof value === 'boolean') return value
-  return null
-}
-
 function formatSourceCountLabel(key: string) {
   return key
     .replace(/([A-Z])/g, ' $1')
@@ -1338,7 +1326,7 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
           <!-- Sidebar (desktop only) -->
           <nav class="hidden md:flex flex-col w-52 shrink-0 bg-muted/40 border-r border-border">
             <div class="px-4 pt-5 pb-4 border-b border-border flex items-center justify-between shrink-0">
-              <span class="font-semibold text-foreground font-serif truncate">{{ t('migration.sidebarTitle') }}</span>
+              <span class="font-semibold text-foreground font-serif truncate">{{ t('migration.importTitle') }}</span>
               <Button variant="ghost" size="icon-sm" class="shrink-0" @click="handleClose">
                 <X :size="14" />
               </Button>
@@ -1396,120 +1384,18 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
               <template v-else>
                 <!-- Step 0: Source Connection -->
                 <div v-if="currentStep === 0" class="space-y-3">
-                  <div class="grid gap-2 md:grid-cols-2">
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.type') }}</span>
-                      <select v-model="sourceDraft.type" class="select-field mt-1 w-full" :disabled="hasActiveRun">
-                        <option v-for="type in supportedTypes" :key="type" :value="type">{{ type }}</option>
-                      </select>
-                    </label>
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.name') }}</span>
-                      <input
-                        v-model="sourceDraft.name"
-                        class="input-field mt-1 w-full"
-                        :placeholder="t('migration.sidebarTitle')"
-                        :disabled="hasActiveRun"
-                      />
-                    </label>
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.host') }}</span>
-                      <input v-model="sourceDraft.host" class="input-field mt-1 w-full" placeholder="127.0.0.1" :disabled="hasActiveRun" />
-                    </label>
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.port') }}</span>
-                      <input
-                        v-model.number="sourceDraft.port"
-                        class="input-field mt-1 w-full"
-                        type="number"
-                        min="1"
-                        max="65535"
-                        :disabled="hasActiveRun"
-                      />
-                    </label>
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.user') }}</span>
-                      <input v-model="sourceDraft.user" class="input-field mt-1 w-full" placeholder="booklore" :disabled="hasActiveRun" />
-                    </label>
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.password') }}</span>
-                      <div class="relative mt-1">
-                        <input
-                          v-model="sourceDraft.password"
-                          v-bind="SECRET_INPUT_ATTRS"
-                          class="input-field w-full pr-9"
-                          :class="{ 'input-secret': !showPassword }"
-                          type="text"
-                          :placeholder="source ? t('migration.source.fields.passwordSaved') : t('migration.source.fields.passwordNotSet')"
-                          :disabled="hasActiveRun"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          type="button"
-                          class="absolute inset-y-0 right-0"
-                          tabindex="-1"
-                          @click="onTogglePassword"
-                        >
-                          <EyeOff v-if="showPassword" class="size-4" />
-                          <Eye v-else class="size-4" />
-                        </Button>
-                      </div>
-                    </label>
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.database') }}</span>
-                      <input v-model="sourceDraft.database" class="input-field mt-1 w-full" placeholder="booklore" :disabled="hasActiveRun" />
-                    </label>
-                    <label class="block">
-                      <span class="settings-hint">{{ t('migration.source.fields.mediaRootPath') }}</span>
-                      <div class="mt-1 flex items-center gap-2">
-                        <input
-                          v-model="sourceDraft.mediaRootPath"
-                          class="input-field w-full"
-                          placeholder="/data/booklore/media"
-                          :disabled="hasActiveRun"
-                        />
-                        <button
-                          type="button"
-                          :disabled="busy.testingMediaPath || hasActiveRun"
-                          class="inline-flex h-9 items-center rounded-md border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
-                          :class="
-                            mediaPathTestState === 'pass'
-                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20'
-                              : mediaPathTestState === 'fail'
-                                ? 'border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20'
-                                : 'border-border bg-background text-foreground hover:bg-muted'
-                          "
-                          @click="onTestMediaPath"
-                        >
-                          <Loader2 v-if="busy.testingMediaPath" class="size-3.5 animate-spin" />
-                          <span v-else>
-                            {{
-                              mediaPathTestState === 'pass'
-                                ? t('migration.source.mediaPath.buttonOk')
-                                : mediaPathTestState === 'fail'
-                                  ? t('migration.source.mediaPath.buttonIssue')
-                                  : t('migration.source.mediaPath.buttonTest')
-                            }}
-                          </span>
-                        </button>
-                      </div>
-                      <p class="mt-1 text-xs" :class="mediaRootPathHint.className">{{ mediaRootPathHint.text }}</p>
-                      <p
-                        v-if="mediaPathTestMessage"
-                        class="mt-1 text-xs"
-                        :class="mediaPathTestState === 'pass' ? 'text-emerald-700' : 'text-amber-700'"
-                      >
-                        {{ mediaPathTestMessage }}
-                      </p>
-                    </label>
-                    <div class="flex items-center">
-                      <label class="flex h-9 cursor-pointer items-center gap-2">
-                        <input v-model="sourceDraft.ssl" type="checkbox" class="size-4 rounded border-border" :disabled="hasActiveRun" />
-                        <span class="settings-hint">{{ t('migration.source.fields.ssl') }}</span>
-                      </label>
-                    </div>
-                  </div>
+                  <MigrationSourceFields
+                    :draft="sourceDraft"
+                    :supported-types="supportedTypes"
+                    :disabled="hasActiveRun"
+                    :show-secret="showPassword"
+                    :testing-media-path="busy.testingMediaPath"
+                    :media-path-test-state="mediaPathTestState"
+                    :media-path-test-message="mediaPathTestMessage"
+                    :media-root-path-hint="mediaRootPathHint"
+                    @toggle-secret="onTogglePassword"
+                    @test-media-path="onTestMediaPath"
+                  />
 
                   <div v-if="sourceTypeCompatibility" class="rounded border border-border bg-muted/40 px-3.5 py-3 text-xs space-y-1">
                     <p class="font-medium text-foreground">{{ t('migration.source.compatibility.title') }}</p>
@@ -1589,7 +1475,18 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                             <p class="text-xs text-muted-foreground">{{ row.sourceUserId }}</p>
                           </td>
                           <td class="px-3 py-2">
-                            <SearchableUserSelect v-model="row.targetUserId" :users="targetUsers" :disabled="hasActiveRun" />
+                            <div class="space-y-2">
+                              <SearchableUserSelect v-model="row.targetUserId" :users="targetUsers" :disabled="hasActiveRun || row.skip" />
+                              <label class="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                                <input
+                                  v-model="row.skip"
+                                  type="checkbox"
+                                  class="size-4 rounded border-input accent-primary"
+                                  :disabled="hasActiveRun"
+                                />
+                                {{ t('migration.mappings.doNotImport') }}
+                              </label>
+                            </div>
                           </td>
                         </tr>
                         <tr v-if="userMappings.length === 0" class="border-t border-border">

@@ -34,7 +34,10 @@ export class MigrationProfileService {
 
     const targetUsers = await this.repo.listTargetUsersForMapping();
     const knownTargetUserIds = new Set(targetUsers.map((row) => row.id));
-    const requestedTargetUserIds = [...new Set(dto.userMappings.map((row) => row.targetUserId))];
+    const requestedTargetUserIds = [...new Set(dto.userMappings.map((row) => row.targetUserId).filter((id): id is number => id !== null))];
+    if (requestedTargetUserIds.length === 0) {
+      throw new BadRequestException('Map at least one source user to a target user');
+    }
     const unknownTargetUserIds = requestedTargetUserIds.filter((targetUserId) => !knownTargetUserIds.has(targetUserId));
     if (unknownTargetUserIds.length > 0) {
       throw new BadRequestException(`Invalid target user IDs in mapping: ${unknownTargetUserIds.join(', ')}`);

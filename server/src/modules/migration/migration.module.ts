@@ -17,6 +17,13 @@ import { SourceAdapterRegistry } from './adapters/source-adapter.registry';
 import { BookloreSourceAdapter } from './adapters/booklore/booklore-source.adapter';
 import { BookloreConnector } from './adapters/booklore/booklore-connector';
 import { GrimmorySourceAdapter } from './adapters/grimmory/grimmory-source.adapter';
+import { AudiobookshelfApiConnector } from './adapters/audiobookshelf/audiobookshelf-api.connector';
+import { AudiobookshelfBackupConnector } from './adapters/audiobookshelf/audiobookshelf-backup.connector';
+import { AudiobookshelfNormalizer } from './adapters/audiobookshelf/audiobookshelf-normalizer';
+import { AudiobookshelfSourceAdapter } from './adapters/audiobookshelf/audiobookshelf-source.adapter';
+import { CalibreWebAutomatedNormalizer } from './adapters/calibre-web-automated/calibre-web-automated-normalizer';
+import { CalibreWebAutomatedSnapshotConnector } from './adapters/calibre-web-automated/calibre-web-automated-snapshot.connector';
+import { CalibreWebAutomatedSourceAdapter } from './adapters/calibre-web-automated/calibre-web-automated-source.adapter';
 import { MatchingService } from './planner/matching.service';
 import { MigrationPlannerService } from './planner/planner.service';
 import { PathMappingValidationService } from './planner/path-mapping-validation.service';
@@ -48,6 +55,13 @@ import { MigrationReportingService } from './reporting/migration-reporting.servi
     BookloreConnector,
     BookloreSourceAdapter,
     GrimmorySourceAdapter,
+    AudiobookshelfApiConnector,
+    AudiobookshelfBackupConnector,
+    AudiobookshelfNormalizer,
+    AudiobookshelfSourceAdapter,
+    CalibreWebAutomatedSnapshotConnector,
+    CalibreWebAutomatedNormalizer,
+    CalibreWebAutomatedSourceAdapter,
     SourceAdapterRegistry,
     MatchingService,
     MigrationPlannerService,

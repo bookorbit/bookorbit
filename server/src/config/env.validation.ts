@@ -1,4 +1,5 @@
 import { parseIntoClientConfig } from 'pg-connection-string';
+import { isAbsolute } from 'node:path';
 import { z } from 'zod';
 
 const BOOLEAN_ENV_VALUES = ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'];
@@ -59,6 +60,12 @@ const envSchema = z.object({
   APP_URL: z.string().url().default('http://localhost:5173'),
   TRUST_PROXY: z.string().optional(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
+  MIGRATION_ENCRYPTION_KEY: z.string().optional(),
+  MIGRATION_IMPORT_ROOT: z
+    .string()
+    .transform((val) => val.trim())
+    .refine((val) => val === '' || isAbsolute(val), 'MIGRATION_IMPORT_ROOT must be an absolute path')
+    .optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
   OIDC_ALLOW_LOCAL_ISSUERS: booleanEnvFlag('OIDC_ALLOW_LOCAL_ISSUERS'),
   CSP_ALLOW_CLOUDFLARE_INSIGHTS: booleanEnvFlag('CSP_ALLOW_CLOUDFLARE_INSIGHTS'),

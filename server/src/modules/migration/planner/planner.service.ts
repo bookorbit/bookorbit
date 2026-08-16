@@ -17,7 +17,7 @@ import type {
   UserMapping,
 } from './planner.types';
 
-const MATCHING_PRIORITY = ['isbn', 'file_hash', 'path_mapping', 'title_author'] as const;
+const MATCHING_PRIORITY = ['isbn', 'asin', 'file_hash', 'path_mapping', 'title_author'] as const;
 
 @Injectable()
 export class MigrationPlannerService {
@@ -44,7 +44,11 @@ export class MigrationPlannerService {
     const { executableMatches, duplicateBookMatches } = splitDuplicateMatches(matches, sourceBooksById);
 
     const matchedBookIds = new Set(executableMatches.map((entry) => entry.sourceBookId));
-    const mappedUsers = new Map(userMappings.map((entry) => [entry.sourceUserId, entry.targetUserId]));
+    const mappedUsers = new Map(
+      userMappings
+        .filter((entry): entry is UserMapping & { targetUserId: number } => entry.targetUserId !== null)
+        .map((entry) => [entry.sourceUserId, entry.targetUserId]),
+    );
 
     const userPreview = buildUserPreview(sourceData, mappedUsers, matchedBookIds);
 
@@ -126,8 +130,10 @@ function parseUserMappings(raw: unknown): UserMapping[] {
     if (!item || typeof item !== 'object') continue;
 
     const sourceUserId = asString((item as Record<string, unknown>).sourceUserId ?? (item as Record<string, unknown>).source_user_id);
-    const targetUserId = asNumber((item as Record<string, unknown>).targetUserId ?? (item as Record<string, unknown>).target_user_id);
-    if (!sourceUserId || !targetUserId) continue;
+    const record = item as Record<string, unknown>;
+    const rawTargetUserId = 'targetUserId' in record ? record.targetUserId : record.target_user_id;
+    const targetUserId = asNumber(rawTargetUserId);
+    if (!sourceUserId || (rawTargetUserId !== null && !targetUserId)) continue;
 
     out.push({ sourceUserId, targetUserId });
   }

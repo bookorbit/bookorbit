@@ -117,6 +117,57 @@ describe('MigrationProfileService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('preserves explicitly skipped users and validates only mapped target IDs', async () => {
+    const createProfile = vi.fn((payload) =>
+      Promise.resolve({
+        id: 3,
+        version: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...payload,
+      }),
+    );
+    const { service } = createProfileService({ createProfile });
+
+    await service.createProfile(
+      {
+        sourceId: 1,
+        name: 'Profile',
+        userMappings: [
+          { sourceUserId: 'mapped-user', targetUserId: 10 },
+          { sourceUserId: 'skipped-user', targetUserId: null },
+        ],
+        pathMappings: [],
+      },
+      1,
+    );
+
+    expect(createProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userMappings: [
+          { sourceUserId: 'mapped-user', targetUserId: 10 },
+          { sourceUserId: 'skipped-user', targetUserId: null },
+        ],
+      }),
+    );
+  });
+
+  it('rejects a profile when every source user is skipped', async () => {
+    const { service } = createProfileService();
+
+    await expect(
+      service.createProfile(
+        {
+          sourceId: 1,
+          name: 'Profile',
+          userMappings: [{ sourceUserId: 'skipped-user', targetUserId: null }],
+          pathMappings: [],
+        },
+        1,
+      ),
+    ).rejects.toThrow('Map at least one source user to a target user');
+  });
+
   it('blocks profile creation when a live run is active', async () => {
     const { service } = createProfileService({
       listRuns: vi.fn(() => Promise.resolve([{ id: 77, state: 'running' }])),

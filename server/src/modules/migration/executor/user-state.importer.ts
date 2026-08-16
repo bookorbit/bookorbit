@@ -5,6 +5,7 @@ import { isAudioFormat, isComicFormat, type ReadStatus, type ReadStatusSource } 
 
 import type {
   SourceBook,
+  SourceBookFile,
   SourceBookmark,
   SourceReadingSession,
   SourceUserBookStatus,
@@ -20,6 +21,10 @@ import {
   clampPercent,
   emptyCounters,
   normalizeReadStatus,
+  progressMediaKind,
+  sourceFileFormat,
+  type ProgressMediaKind,
+  type TargetBookFile,
   toDate,
   truncateNullableText,
   truncateText,
@@ -100,6 +105,20 @@ type ReadingSessionUpsert = {
   endProgress: number | null;
 };
 
+type ProgressFileContext = {
+  primaryFilesByBookId: Map<number, number>;
+  sourceFilesById: Map<string, SourceBookFile>;
+  sourceFilesByBookId: Map<string, SourceBookFile[]>;
+  sourceFileToTargetFile: Map<string, number>;
+  targetFilesByBookId: Map<number, TargetBookFile[]>;
+  targetFilesById: Map<number, TargetBookFile>;
+};
+
+type ResolvedProgressFile = {
+  kind: ProgressMediaKind;
+  targetFile: TargetBookFile;
+};
+
 @Injectable()
 export class UserStateImporter {
   constructor(
@@ -108,34 +127,33 @@ export class UserStateImporter {
   ) {}
 
   async import(runId: number, planned: PlannerResult, ensureRunning: RunStateCheck): Promise<void> {
-    const sourceToTargetUser = new Map(planned.plan.userMappings.map((m) => [m.sourceUserId, m.targetUserId]));
+    const sourceToTargetUser = new Map(
+      planned.plan.userMappings
+        .filter((mapping) => mapping.targetUserId !== null)
+        .map((mapping) => [mapping.sourceUserId, mapping.targetUserId as number]),
+    );
     const sourceToTargetBook = new Map(planned.execution.matchedBooks.map((m) => [m.sourceBookId, m.targetBookId]));
     const targetBookIds = uniqueNumbers([...sourceToTargetBook.values()]);
 
-    const { primaryFilesByBookId, audiobookPrimaryFilesByBookId } = await this.importRepo.fetchTargetBookPrimaryFiles(targetBookIds);
+    const { primaryFilesByBookId } = await this.importRepo.fetchTargetBookPrimaryFiles(targetBookIds);
     const targetFilesByBookId = await this.importRepo.fetchTargetBookFiles(targetBookIds);
     const sourceFileToTargetFile = buildSourceFileTargetMap(planned, targetFilesByBookId);
+    const sourceFilesByBookId = new Map(planned.execution.sourceData.books.map((book) => [book.sourceBookId, book.files ?? []] as const));
+    const sourceFilesById = new Map([...sourceFilesByBookId.values()].flatMap((files) => files.map((file) => [file.sourceFileId, file] as const)));
+    const targetFilesById = new Map([...targetFilesByBookId.values()].flatMap((files) => files.map((file) => [file.id, file] as const)));
+    const progressFiles: ProgressFileContext = {
+      primaryFilesByBookId,
+      sourceFilesById,
+      sourceFilesByBookId,
+      sourceFileToTargetFile,
+      targetFilesByBookId,
+      targetFilesById,
+    };
 
     await this.importUserBookStatuses(runId, planned, sourceToTargetUser, sourceToTargetBook, ensureRunning);
     await this.importUserBookRatings(runId, planned, sourceToTargetUser, sourceToTargetBook, ensureRunning);
-    await this.importReadingProgress(
-      runId,
-      planned,
-      sourceToTargetUser,
-      sourceToTargetBook,
-      primaryFilesByBookId,
-      sourceFileToTargetFile,
-      ensureRunning,
-    );
-    await this.importAudiobookProgress(
-      runId,
-      planned,
-      sourceToTargetUser,
-      sourceToTargetBook,
-      audiobookPrimaryFilesByBookId,
-      sourceFileToTargetFile,
-      ensureRunning,
-    );
+    await this.importReadingProgress(runId, planned, sourceToTargetUser, sourceToTargetBook, progressFiles, ensureRunning);
+    await this.importAudiobookProgress(runId, planned, sourceToTargetUser, sourceToTargetBook, progressFiles, ensureRunning);
     await this.importReadingSessions(
       runId,
       planned,
@@ -255,8 +273,7 @@ export class UserStateImporter {
     planned: PlannerResult,
     userMap: Map<string, number>,
     bookMap: Map<string, number>,
-    primaryFilesByBookId: Map<number, number>,
-    sourceFileToTargetFile: Map<string, number>,
+    progressFiles: ProgressFileContext,
     ensureRunning: RunStateCheck,
   ): Promise<void> {
     const counters = emptyCounters();
@@ -268,6 +285,7 @@ export class UserStateImporter {
     const batch: ReadingProgressUpsert[] = [];
 
     for (const row of planned.execution.sourceData.userFileProgress) {
+      if (classifyProgressRow(row, bookMap, progressFiles) === 'audio') continue;
       await ensureRunning();
       counters.processed += 1;
 
@@ -278,8 +296,8 @@ export class UserStateImporter {
         continue;
       }
 
-      const targetFileId = (row.sourceFileId ? sourceFileToTargetFile.get(row.sourceFileId) : null) ?? primaryFilesByBookId.get(targetBookId);
-      if (!targetFileId) {
+      const resolvedFile = resolveProgressFile(row, targetBookId, progressFiles);
+      if (!resolvedFile || resolvedFile.kind === 'audio') {
         counters.unresolved += 1;
         continue;
       }
@@ -297,7 +315,7 @@ export class UserStateImporter {
 
       const sourceUpdatedAt = toDate(row.updatedAt) ?? new Date();
       batch.push({
-        bookFileId: targetFileId,
+        bookFileId: resolvedFile.targetFile.id,
         userId: targetUserId,
         percentage,
         cfi,
@@ -309,9 +327,18 @@ export class UserStateImporter {
       counters.imported += 1;
     }
     const dedupedBatch = dedupeByKey(batch, (item) => `${item.bookFileId}:${item.userId}`, preferReadingProgressRow);
+    const progressScope = buildProgressScope(planned, bookMap, progressFiles);
+    const fileIdsToClear = [...progressScope.entries()].flatMap(([bookId, kinds]) =>
+      (progressFiles.targetFilesByBookId.get(bookId) ?? [])
+        .filter((file) => {
+          const kind = progressMediaKind(file.format);
+          return kind != null && kinds.has(kind);
+        })
+        .map((file) => file.id),
+    );
 
     await this.importRepo.withTransaction(async (importRepo) => {
-      await importRepo.clearReadingProgress([...userMap.values()], [...primaryFilesByBookId.values(), ...sourceFileToTargetFile.values()]);
+      await importRepo.clearReadingProgress([...userMap.values()], fileIdsToClear);
       await importRepo.batchUpsertReadingProgress(dedupedBatch);
     });
     await this.repo.setRunMetric(runId, 'user_state', 'reading_progress', counters);
@@ -322,8 +349,7 @@ export class UserStateImporter {
     planned: PlannerResult,
     userMap: Map<string, number>,
     bookMap: Map<string, number>,
-    audiobookPrimaryFilesByBookId: Map<number, number>,
-    sourceFileToTargetFile: Map<string, number>,
+    progressFiles: ProgressFileContext,
     ensureRunning: RunStateCheck,
   ): Promise<void> {
     const counters = emptyCounters();
@@ -332,10 +358,9 @@ export class UserStateImporter {
       return;
     }
 
-    const sourceAudioRows = planned.execution.sourceData.userFileProgress.filter((row) => {
-      const targetBookId = bookMap.get(row.sourceBookId);
-      return targetBookId ? audiobookPrimaryFilesByBookId.has(targetBookId) : false;
-    });
+    const sourceAudioRows = planned.execution.sourceData.userFileProgress.filter(
+      (row) => classifyProgressRow(row, bookMap, progressFiles) === 'audio',
+    );
 
     const batch: AudiobookProgressUpsert[] = [];
 
@@ -350,9 +375,8 @@ export class UserStateImporter {
         continue;
       }
 
-      const targetFileId =
-        (row.sourceFileId ? sourceFileToTargetFile.get(row.sourceFileId) : null) ?? audiobookPrimaryFilesByBookId.get(targetBookId);
-      if (!targetFileId) {
+      const resolvedFile = resolveProgressFile(row, targetBookId, progressFiles);
+      if (!resolvedFile || resolvedFile.kind !== 'audio') {
         counters.unresolved += 1;
         continue;
       }
@@ -368,7 +392,7 @@ export class UserStateImporter {
         userId: targetUserId,
         bookId: targetBookId,
         percentage,
-        currentFileId: targetFileId,
+        currentFileId: resolvedFile.targetFile.id,
         positionSeconds,
         updatedAt: toDate(row.updatedAt) ?? new Date(),
       });
@@ -376,9 +400,11 @@ export class UserStateImporter {
     }
 
     const dedupedBatch = dedupeByKey(batch, (item) => `${item.userId}:${item.bookId}`, preferLatestByUpdatedAt);
+    const progressScope = buildProgressScope(planned, bookMap, progressFiles);
+    const audioBookIds = [...progressScope.entries()].filter(([, kinds]) => kinds.has('audio')).map(([bookId]) => bookId);
 
     await this.importRepo.withTransaction(async (importRepo) => {
-      await importRepo.clearAudiobookProgress([...userMap.values()], [...audiobookPrimaryFilesByBookId.keys()]);
+      await importRepo.clearAudiobookProgress([...userMap.values()], audioBookIds);
       await importRepo.batchUpsertAudiobookProgress(dedupedBatch);
     });
     await this.repo.setRunMetric(runId, 'user_state', 'audiobook_progress', counters);
@@ -621,9 +647,14 @@ export class UserStateImporter {
         await ensureCollection(shelf);
       }
 
-      const collectionBookBatch: Array<{ collectionId: number; bookId: number }> = [];
+      const collectionBookBatch: Array<{
+        collectionId: number;
+        bookId: number;
+        sourcePosition: number | null;
+        sourceOrder: number;
+      }> = [];
 
-      for (const row of planned.execution.sourceData.shelfBooks) {
+      for (const [sourceOrder, row] of planned.execution.sourceData.shelfBooks.entries()) {
         await ensureRunning();
         counters.processed += 1;
         const shelf = shelvesById.get(row.sourceShelfId);
@@ -648,14 +679,162 @@ export class UserStateImporter {
           continue;
         }
 
-        collectionBookBatch.push({ collectionId, bookId: targetBookId });
+        collectionBookBatch.push({
+          collectionId,
+          bookId: targetBookId,
+          sourcePosition: normalizeShelfPosition(row.position),
+          sourceOrder,
+        });
         counters.imported += 1;
       }
 
-      await importRepo.batchInsertCollectionBooks(collectionBookBatch);
+      collectionBookBatch.sort(compareCollectionBookOrder);
+      await importRepo.batchInsertCollectionBooks(collectionBookBatch.map(({ collectionId, bookId }) => ({ collectionId, bookId })));
     });
     await this.repo.setRunMetric(runId, 'user_state', 'collections', counters);
   }
+}
+
+function normalizeShelfPosition(value: number | null | undefined): number | null {
+  if (value == null || !Number.isSafeInteger(value) || value < 0) return null;
+  return value;
+}
+
+function compareCollectionBookOrder(
+  left: { collectionId: number; sourcePosition: number | null; sourceOrder: number },
+  right: { collectionId: number; sourcePosition: number | null; sourceOrder: number },
+): number {
+  if (left.collectionId !== right.collectionId) return left.collectionId - right.collectionId;
+  if (left.sourcePosition == null && right.sourcePosition != null) return 1;
+  if (left.sourcePosition != null && right.sourcePosition == null) return -1;
+  if (left.sourcePosition != null && right.sourcePosition != null && left.sourcePosition !== right.sourcePosition) {
+    return left.sourcePosition - right.sourcePosition;
+  }
+  return left.sourceOrder - right.sourceOrder;
+}
+
+function classifyProgressRow(row: SourceUserFileProgress, bookMap: Map<string, number>, progressFiles: ProgressFileContext): 'audio' | 'reading' {
+  return inferProgressKind(row, bookMap.get(row.sourceBookId), progressFiles) === 'audio' ? 'audio' : 'reading';
+}
+
+function inferProgressKind(
+  row: SourceUserFileProgress,
+  targetBookId: number | undefined,
+  progressFiles: ProgressFileContext,
+): ProgressMediaKind | null {
+  if (row.sourceFileId) {
+    const sourceFile = progressFiles.sourceFilesById.get(row.sourceFileId);
+    const sourceKind = sourceFile ? progressMediaKind(sourceFileFormat(sourceFile)) : null;
+    if (sourceKind) return sourceKind;
+
+    const mappedTargetFileId = progressFiles.sourceFileToTargetFile.get(row.sourceFileId);
+    const mappedTargetKind = mappedTargetFileId ? progressMediaKind(progressFiles.targetFilesById.get(mappedTargetFileId)?.format) : null;
+    if (mappedTargetKind) return mappedTargetKind;
+  }
+
+  const sourceKinds = new Set(
+    (progressFiles.sourceFilesByBookId.get(row.sourceBookId) ?? [])
+      .map((file) => progressMediaKind(sourceFileFormat(file)))
+      .filter((kind): kind is ProgressMediaKind => kind != null),
+  );
+  if (sourceKinds.size === 1) return [...sourceKinds][0];
+
+  const hasReadingLocator = Boolean(row.cfi?.trim() || row.href?.trim()) || (row.pageNumber != null && row.pageNumber > 0);
+  if (!hasReadingLocator && row.positionSeconds != null && Number.isFinite(row.positionSeconds) && row.positionSeconds > 0) {
+    return 'audio';
+  }
+  if (row.cfi?.trim() || row.href?.trim()) return 'epub';
+
+  if (targetBookId) {
+    const primaryFileId = progressFiles.primaryFilesByBookId.get(targetBookId);
+    const primaryKind = primaryFileId ? progressMediaKind(progressFiles.targetFilesById.get(primaryFileId)?.format) : null;
+    if (primaryKind) return primaryKind;
+  }
+
+  return null;
+}
+
+function resolveProgressFile(row: SourceUserFileProgress, targetBookId: number, progressFiles: ProgressFileContext): ResolvedProgressFile | null {
+  const sourceFile = row.sourceFileId ? progressFiles.sourceFilesById.get(row.sourceFileId) : undefined;
+  const sourceKind = sourceFile ? progressMediaKind(sourceFileFormat(sourceFile)) : null;
+
+  if (row.sourceFileId) {
+    // A row that names a specific source file must land on the file that file was mapped to.
+    // Falling back to the book's primary file would move a later audio track's local offset
+    // onto the wrong file.
+    const targetFileId = progressFiles.sourceFileToTargetFile.get(row.sourceFileId);
+    const targetFile = targetFileId ? progressFiles.targetFilesById.get(targetFileId) : undefined;
+    if (!targetFile) return null;
+    const targetKind = progressMediaKind(targetFile.format);
+    if (targetKind && sourceKind && targetKind !== sourceKind) return null;
+    // `book_files.format` is nullable, so trust the source kind rather than discarding a file
+    // that was matched by hash or by absolute path.
+    const kind = targetKind ?? sourceKind ?? inferProgressKind(row, targetBookId, progressFiles);
+    return kind ? { kind, targetFile } : null;
+  }
+
+  const inferredKind = inferProgressKind(row, targetBookId, progressFiles);
+  const targetFiles = progressFiles.targetFilesByBookId.get(targetBookId) ?? [];
+  const compatibleFiles = inferredKind ? targetFiles.filter((file) => progressMediaKind(file.format) === inferredKind) : [];
+  const primaryFileId = progressFiles.primaryFilesByBookId.get(targetBookId);
+  const primaryFile = primaryFileId ? progressFiles.targetFilesById.get(primaryFileId) : undefined;
+
+  let targetFile: TargetBookFile | undefined;
+  if (inferredKind === 'audio') {
+    targetFile = compatibleFiles[0];
+  } else if (inferredKind) {
+    targetFile =
+      primaryFile && progressMediaKind(primaryFile.format) === inferredKind
+        ? primaryFile
+        : compatibleFiles.length === 1
+          ? compatibleFiles[0]
+          : undefined;
+  } else {
+    targetFile = primaryFile;
+  }
+
+  const targetKind = progressMediaKind(targetFile?.format);
+  if (!targetFile || !targetKind || (inferredKind && inferredKind !== targetKind)) return null;
+  return { kind: inferredKind ?? targetKind, targetFile };
+}
+
+function buildProgressScope(
+  planned: PlannerResult,
+  bookMap: Map<string, number>,
+  progressFiles: ProgressFileContext,
+): Map<number, Set<ProgressMediaKind>> {
+  const result = new Map<number, Set<ProgressMediaKind>>();
+  const add = (bookId: number, kind: ProgressMediaKind | null) => {
+    if (!kind) return;
+    const kinds = result.get(bookId) ?? new Set<ProgressMediaKind>();
+    kinds.add(kind);
+    result.set(bookId, kinds);
+  };
+
+  for (const [sourceBookId, targetBookId] of bookMap) {
+    const sourceFiles = progressFiles.sourceFilesByBookId.get(sourceBookId) ?? [];
+    for (const sourceFile of sourceFiles) {
+      const sourceKind = progressMediaKind(sourceFileFormat(sourceFile));
+      if (sourceKind) {
+        add(targetBookId, sourceKind);
+        continue;
+      }
+      const targetFileId = progressFiles.sourceFileToTargetFile.get(sourceFile.sourceFileId);
+      add(targetBookId, targetFileId ? progressMediaKind(progressFiles.targetFilesById.get(targetFileId)?.format) : null);
+    }
+
+    if (!result.has(targetBookId)) {
+      const primaryFileId = progressFiles.primaryFilesByBookId.get(targetBookId);
+      add(targetBookId, primaryFileId ? progressMediaKind(progressFiles.targetFilesById.get(primaryFileId)?.format) : null);
+    }
+  }
+
+  for (const row of planned.execution.sourceData.userFileProgress) {
+    const targetBookId = bookMap.get(row.sourceBookId);
+    if (targetBookId) add(targetBookId, inferProgressKind(row, targetBookId, progressFiles));
+  }
+
+  return result;
 }
 
 const IMPORTED_COLLECTION_DESCRIPTION_PREFIX = 'Imported from Booklore migration shelf: ';

@@ -80,7 +80,7 @@ describe('secret input policy', () => {
         'features/hardcover/components/HardcoverConnectionCard.vue',
         'features/readwise/components/ReadwiseSettings.vue',
         'features/storygraph/components/StorygraphConnectionCard.vue',
-        'features/settings/MigrationSettings.vue',
+        'features/migration/components/MigrationSourceFields.vue',
         'features/settings/OpdsSettings.vue',
         'features/settings/KoreaderSettings.vue',
         'features/settings/OidcSettings.vue',

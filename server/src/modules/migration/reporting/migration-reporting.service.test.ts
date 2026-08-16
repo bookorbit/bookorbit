@@ -232,8 +232,8 @@ describe('MigrationReportingService', () => {
       plan: {},
       summary: {},
       details: {
-        matchedBooks: [{ sourceBookId: 's1', sourceTitle: 'T', sourceAuthor: 'A', targetBookId: 1, targetTitle: 'TT', strategy: 'isbn' }],
-        unresolvedBooks: [{ sourceBookId: 'sx', title: 'Unresolved Title', author: 'UA', reason: 'no_isbn_match' }],
+        matchedBooks: [{ sourceBookId: 's1', sourceTitle: 'T', sourceAuthor: 'A', targetBookId: 1, targetTitle: 'TT', strategy: 'asin' }],
+        unresolvedBooks: [{ sourceBookId: 'sx', title: 'Unresolved Title', author: 'UA', reason: 'no_asin_match' }],
         duplicateBookMatches: [
           {
             targetBookId: 2,
@@ -262,8 +262,10 @@ describe('MigrationReportingService', () => {
     expect(result.content).toContain('reading_progress');
     expect(result.content).toContain('matched_books');
     expect(result.content).toContain('s1');
+    expect(result.content).toContain('asin');
     expect(result.content).toContain('unresolved_books');
     expect(result.content).toContain('sx');
+    expect(result.content).toContain('no_asin_match');
     expect(result.content).toContain('duplicate_matches');
     expect(result.content).toContain('s2|s3');
     expect(result.content).toContain('user_preview');

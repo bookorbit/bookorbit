@@ -87,7 +87,55 @@ describe('sanitizeSourceForApi', () => {
     expect((result.connectionConfig as Record<string, unknown>).password).toBe('');
   });
 
-  it('does not redact password for non-booklore types', () => {
+  it('redacts Grimmory passwords consistently with Booklore', () => {
+    const result = sanitizeSourceForApi(makeSource({ type: 'grimmory', connectionConfig: { host: 'db', password: 'my-secret' } }));
+    expect((result.connectionConfig as Record<string, unknown>).password).toBe('********');
+  });
+
+  it('redacts Audiobookshelf API tokens without changing connection fields', () => {
+    const result = sanitizeSourceForApi(
+      makeSource({
+        type: 'audiobookshelf',
+        connectionConfig: { mode: 'api', baseUrl: 'https://abs.example.com', apiToken: 'token-value', allowPrivateNetwork: false },
+      }),
+    );
+    expect(result.connectionConfig).toEqual({
+      mode: 'api',
+      baseUrl: 'https://abs.example.com',
+      apiToken: '********',
+      allowPrivateNetwork: false,
+    });
+  });
+
+  it('leaves an Audiobookshelf backup config untouched instead of adding an empty token', () => {
+    const result = sanitizeSourceForApi(
+      makeSource({
+        type: 'audiobookshelf',
+        connectionConfig: { mode: 'backup', backupPath: '/imports/backup.audiobookshelf' },
+      }),
+    );
+    expect(result.connectionConfig).toEqual({ mode: 'backup', backupPath: '/imports/backup.audiobookshelf' });
+  });
+
+  it('round-trips the path-only Calibre-Web Automated config without adding secret fields', () => {
+    const result = sanitizeSourceForApi(
+      makeSource({
+        type: 'calibre_web_automated',
+        connectionConfig: {
+          mode: 'snapshot',
+          appDatabasePath: '/imports/cwa/app.db',
+          metadataDatabasePath: '/imports/cwa/metadata.db',
+        },
+      }),
+    );
+    expect(result.connectionConfig).toEqual({
+      mode: 'snapshot',
+      appDatabasePath: '/imports/cwa/app.db',
+      metadataDatabasePath: '/imports/cwa/metadata.db',
+    });
+  });
+
+  it('does not redact unrelated fields for other source types', () => {
     const result = sanitizeSourceForApi(makeSource({ type: 'calibre', connectionConfig: { token: 'abc123' } }));
     expect((result.connectionConfig as Record<string, unknown>).token).toBe('abc123');
   });
