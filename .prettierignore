@@ -1,0 +1,3 @@
+# pnpm writes this file in its own style. Formatting it rewrites the quoting of
+# every entry, turning a routine dependency bump into a ~19k line diff.
+pnpm-lock.yaml
