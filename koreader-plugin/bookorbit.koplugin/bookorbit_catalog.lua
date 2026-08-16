@@ -49,6 +49,7 @@ local CatalogDownload = require("bookorbit_catalog_download")
 local CatalogBulkDownload = require("bookorbit_catalog_bulk_download")
 local CatalogDashboard = require("bookorbit_catalog_dashboard")
 local CatalogDetail = require("bookorbit_catalog_detail")
+local CatalogFocus = require("bookorbit_catalog_focus")
 local CatalogThumbnails = require("bookorbit_catalog_thumbnails")
 
 local Screen = Device.screen
@@ -139,10 +140,28 @@ local BookOrbitTitleBar = TitleBar:extend{
     refresh_icon_enabled = true,
 }
 
+-- Drops any previously appended buttons from the OverlapGroup, so init can
+-- rebuild them without leaving a stale copy behind.
+function BookOrbitTitleBar:_clearExtraButtons()
+    for index = #self, 1, -1 do
+        if self[index] == self.search_button or self[index] == self.refresh_button then
+            table.remove(self, index)
+        end
+    end
+    self.search_button = nil
+    self.refresh_button = nil
+end
+
 function BookOrbitTitleBar:init()
     TitleBar.init(self)
-    if self._bookorbit_extra_buttons then return end
-    self._bookorbit_extra_buttons = true
+    -- These are appended after TitleBar has built its own children, so they only
+    -- survive as long as that child list does. TitleBar:setTitle re-inits the
+    -- whole bar when the title can shrink to fit - which this catalog asks for -
+    -- and clears the group on the way, taking the appended buttons with it.
+    -- Rebuilding them on every init is what keeps them on screen; skipping the
+    -- rebuild left the *fields* pointing at buttons that were no longer drawn,
+    -- so the D-Pad walked onto controls that were not there.
+    self:_clearExtraButtons()
 
     local icon_size = Screen:scaleBySize(DGENERIC_ICON_SIZE * (self.left_icon_size_ratio or 0.6))
     local button_padding = self.button_padding or 0
@@ -194,21 +213,24 @@ function BookOrbitTitleBar:init()
     OverlapGroup.init(self)
 end
 
+local TITLE_BAR_BUTTONS = { "left_button", "search_button", "refresh_button", "right_button" }
+-- The two this plugin appends itself, and so the two that can go missing.
+local TITLE_BAR_APPENDED = { search_button = true, refresh_button = true }
+
+function BookOrbitTitleBar:_drawnButtons()
+    return CatalogFocus.drawnTitleBarButtons(self, TITLE_BAR_BUTTONS, TITLE_BAR_APPENDED)
+end
+
 function BookOrbitTitleBar:generateHorizontalLayout()
-    local row = {}
-    if self.left_button then table.insert(row, self.left_button) end
-    if self.search_button then table.insert(row, self.search_button) end
-    if self.refresh_button then table.insert(row, self.refresh_button) end
-    if self.right_button then table.insert(row, self.right_button) end
+    local row = self:_drawnButtons()
     return #row > 0 and { row } or {}
 end
 
 function BookOrbitTitleBar:generateVerticalLayout()
     local layout = {}
-    if self.left_button then table.insert(layout, { self.left_button }) end
-    if self.search_button then table.insert(layout, { self.search_button }) end
-    if self.refresh_button then table.insert(layout, { self.refresh_button }) end
-    if self.right_button then table.insert(layout, { self.right_button }) end
+    for _, button in ipairs(self:_drawnButtons()) do
+        table.insert(layout, { button })
+    end
     return layout
 end
 
@@ -222,6 +244,7 @@ CatalogDownload.install(BookOrbitCatalog)
 CatalogBulkDownload.install(BookOrbitCatalog)
 CatalogDashboard.install(BookOrbitCatalog)
 CatalogDetail.install(BookOrbitCatalog)
+CatalogFocus.install(BookOrbitCatalog)
 CatalogThumbnails.install(BookOrbitCatalog)
 
 local Menu_recalculateDimen = Menu._recalculateDimen
@@ -231,6 +254,7 @@ local Menu_onNextPage = Menu.onNextPage
 local Menu_onPrevPage = Menu.onPrevPage
 local Menu_onFirstPage = Menu.onFirstPage
 local Menu_onLastPage = Menu.onLastPage
+local Menu_onClose = Menu.onClose
 
 function BookOrbitCatalog:init()
     self.client = BookOrbitApi.new(self.api)
@@ -739,6 +763,9 @@ function BookOrbitCatalog:switchTo(title, item_table, context, push)
             subtitle = self.current_context.subtitle,
             item_table = self.item_table,
             context = self.current_context,
+            -- Where the cursor was when this page was left, so returning to it
+            -- lands back on the row the reader was working in.
+            focus = self:captureFocus(),
         })
     end
     self:updateReturnPath()
@@ -1957,13 +1984,28 @@ function BookOrbitCatalog:updateItems(select_number, no_recalculate_dimen)
     elseif self:detailMode() then
         return self:updateDetailItems(select_number, no_recalculate_dimen)
     end
-    return Menu_updateItems(self, select_number, no_recalculate_dimen)
+    -- A plain Menu page does not go through prepareCustomUpdate, so drop the
+    -- remembered cursor here: coming back to the dashboard later must not
+    -- restore coordinates that belong to this list.
+    -- Menu builds its own layout and merges the title bar; the footer, and
+    -- putting the cursor back on it, are ours. saveCustomFocus also clears the
+    -- remembered page key, so returning to the dashboard later cannot restore
+    -- coordinates that belong to this list.
+    self:saveCustomFocus()
+    local result = Menu_updateItems(self, select_number, no_recalculate_dimen)
+    self:makeMenuItemsFocusable()
+    local footer_row = self:footerFocusRow()
+    if footer_row then table.insert(self.layout, footer_row) end
+    self:restoreCustomFocus()
+    self:refocusCurrentRow()
+    return result
 end
 
 function BookOrbitCatalog:prepareCustomUpdate(no_recalculate_dimen)
     local old_dimen = self.dimen and self.dimen:copy()
     local context = self.current_context or {}
     self:resetTitleBar(context.title or self.title, context.subtitle or "")
+    self:saveCustomFocus()
     self.layout = {}
     self.item_group:clear()
     self.page_info:resetLayout()
@@ -1975,7 +2017,11 @@ end
 
 function BookOrbitCatalog:finishCustomUpdate(old_dimen, select_number)
     self:updatePageInfo(select_number)
-    Menu.mergeTitleBarIntoLayout(self)
+    self:mergeTitleBarIntoLayout()
+    -- After the title bar, so the footer stays the last row the cursor reaches.
+    local footer_row = self:footerFocusRow()
+    if footer_row then table.insert(self.layout, footer_row) end
+    self:restoreCustomFocus()
     -- A view may narrow the e-ink refresh to the region it actually changed
     -- (the dashboard does for row page turns); everything else refreshes the
     -- whole menu as before.
@@ -2310,11 +2356,21 @@ function BookOrbitCatalog:onMenuHoldSelect(item)
     return self:onMenuSelect(item)
 end
 
+-- Back walks up the browsing stack on a device that cannot reach the footer's
+-- return arrow; see CatalogFocus:shouldReturnOnBack for why.
+function BookOrbitCatalog:onClose()
+    if self:shouldReturnOnBack() then
+        return self:onReturn()
+    end
+    return Menu_onClose(self)
+end
+
 function BookOrbitCatalog:onReturn()
     self:cancelThumbnailJobs()
     local previous = table.remove(self.stack)
     local dirty = false
     if previous then
+        self:restoreFocusOnNextUpdate(previous.focus)
         self.current_context = previous.context
         dirty = self.current_context.dirty == true
         self.current_context.dirty = nil

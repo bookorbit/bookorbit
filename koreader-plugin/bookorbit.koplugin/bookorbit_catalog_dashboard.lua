@@ -468,6 +468,10 @@ function CatalogDashboard:addDashboardHeader(text, controls, focus_controls)
     self:addDashboardInset(CatalogWidgets.buildDashboardSectionHeader(text, self.content_w, right))
     local focus_row = focus_controls or controls
     if focus_row and #focus_row > 0 then
+        -- Paging chevrons and the reroll are chrome for the shelf below them, so
+        -- a D-Pad cursor opening the page skips past to the books themselves
+        -- rather than starting on a chevron that is disabled on page one.
+        focus_row.is_chrome = true
         table.insert(self.layout, focus_row)
     end
 end
