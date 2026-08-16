@@ -4,7 +4,14 @@ import type * as schema from '../../../db/schema';
 import { MigrationRepository } from '../migration.repository';
 import { MigrationImportRepository } from './migration-import.repository';
 import type { PlannerResult } from '../planner/planner.types';
-import { type RunStateCheck, buildContributorValues, buildMetadataPatch, emptyCounters, getSourceContributors, truncateText } from './executor-utils';
+import {
+  type RunStateCheck,
+  buildContributorValues,
+  buildMetadataPatch,
+  emptyCounters,
+  getSourceContributors,
+  normalizeEntityName,
+} from './executor-utils';
 
 function isDomainAvailable(planned: PlannerResult, domain: keyof NonNullable<PlannerResult['execution']['sourceData']['availableDomains']>): boolean {
   return planned.execution.sourceData.availableDomains?.[domain] ?? true;
@@ -143,10 +150,9 @@ export class SharedOverlaysImporter {
       }
 
       for (const [index, contributor] of narrators.entries()) {
-        const values = {
-          name: truncateText(contributor.name, 500),
-          sortName: truncateText(contributor.sortName ?? contributor.name, 500),
-        };
+        const name = normalizeEntityName(contributor.name, 500);
+        if (!name) continue;
+        const values = { name, sortName: normalizeEntityName(contributor.sortName ?? contributor.name, 500) ?? name };
         allNarrators.set(values.name, values);
         bookAssignments.push({ bookId: match.targetBookId, narratorName: values.name, displayOrder: index });
       }
@@ -195,7 +201,8 @@ export class SharedOverlaysImporter {
       }
 
       for (const name of sourceBook.genres) {
-        const genreName = truncateText(name, 200);
+        const genreName = normalizeEntityName(name, 200);
+        if (!genreName) continue;
         allGenreNames.add(genreName);
         bookAssignments.push({ bookId: match.targetBookId, genreName });
       }
@@ -242,7 +249,8 @@ export class SharedOverlaysImporter {
       }
 
       for (const name of sourceBook.tags) {
-        const tagName = truncateText(name, 200);
+        const tagName = normalizeEntityName(name, 200);
+        if (!tagName) continue;
         allTagNames.add(tagName);
         bookAssignments.push({ bookId: match.targetBookId, tagName });
       }

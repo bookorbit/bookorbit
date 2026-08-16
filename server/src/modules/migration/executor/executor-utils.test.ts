@@ -7,6 +7,7 @@ import {
   emptyCounters,
   getSourceContributors,
   hasErrorCode,
+  normalizeEntityName,
   normalizeReadStatus,
   pruneUndefined,
   toDate,
@@ -144,6 +145,34 @@ describe('migration executor utils', () => {
       name: 'Name Value',
       sortName: 'Name Value',
       description: 'Bio',
+    });
+  });
+
+  describe('normalizeEntityName', () => {
+    // Search matches these names with ILIKE, and unaccent() does not touch whitespace, so an
+    // imported name that keeps a non-breaking space is invisible to every search for it.
+    it.each([
+      ['non-breaking space', 'Dan\u00A0Brown'],
+      ['doubled space', 'Dan  Brown'],
+      ['tab', 'Dan\tBrown'],
+      ['newline between parts', 'Dan\nBrown'],
+      ['leading and trailing whitespace', '  Dan Brown\t'],
+    ])('collapses %s', (_label, name) => {
+      expect(normalizeEntityName(name, 500)).toBe('Dan Brown');
+    });
+
+    it('returns null for names that are empty once normalized', () => {
+      expect(normalizeEntityName('   ', 500)).toBeNull();
+      expect(normalizeEntityName(null, 500)).toBeNull();
+      expect(normalizeEntityName(undefined, 500)).toBeNull();
+    });
+
+    it('truncates to the column limit', () => {
+      expect(normalizeEntityName('X'.repeat(250), 200)).toBe('X'.repeat(200));
+    });
+
+    it('does not leave a trailing space when the cut lands on one', () => {
+      expect(normalizeEntityName('abcd efgh', 5)).toBe('abcd');
     });
   });
 

@@ -166,7 +166,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'account/privacy',
             name: 'settings-account-privacy',
             component: () => import('@/features/settings/PrivacySharingSettings.vue'),
-            meta: { title: () => t('titles.account.privacy') },
+            meta: { maxWidth: 'max-w-4xl', title: () => t('titles.account.privacy') },
           },
           {
             path: 'account/notifications',
@@ -285,7 +285,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'metadata/providers',
             name: 'settings-metadata-providers',
             component: () => import('@/features/settings/metadata-preferences/MetadataPreferencesSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: () => t('titles.metadata.providers') },
+            meta: { maxWidth: 'max-w-4xl', title: () => t('titles.metadata.providers') },
           },
           {
             path: 'metadata/field-rules',

@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
-import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
 import { DB } from '../../db';
 import { refreshPrimaryAuthorSortNamesForAuthors, refreshPrimaryAuthorSortNamesForBooks } from '../../db/book-author-sort-key';
 import * as schema from '../../db/schema';
@@ -337,7 +337,7 @@ export class AuthorsRepository {
     }
     const query = params.q?.trim();
     if (query) {
-      clauses.push(accentInsensitiveIlike(authors.name, `%${escapeLikePattern(query)}%`));
+      clauses.push(accentInsensitiveIlike(authors.name, buildSearchPattern(query)));
     }
     if (params.hasPhoto !== undefined) {
       clauses.push(eq(authors.hasPhoto, params.hasPhoto));
@@ -352,8 +352,4 @@ export class AuthorsRepository {
   ) {
     return order === 'asc' ? asc(expression) : desc(expression);
   }
-}
-
-function escapeLikePattern(s: string): string {
-  return s.replace(/[\\%_]/g, '\\$&');
 }

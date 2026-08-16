@@ -138,11 +138,11 @@ export function buildContributorValues(contributor: {
   sortName?: string | null;
   description?: string | null;
 }): typeof schema.authors.$inferInsert {
-  const name = normalizeMetadataText(contributor.name) ?? '';
-  const sortName = normalizeMetadataText(contributor.sortName ?? contributor.name) ?? name;
+  const name = normalizeEntityName(contributor.name, 500) ?? '';
+  const sortName = normalizeEntityName(contributor.sortName ?? contributor.name, 500) ?? name;
   return pruneUndefined({
-    name: truncateText(name, 500),
-    sortName: truncateText(sortName, 500),
+    name,
+    sortName,
     description: contributor.description ?? undefined,
   });
 }
@@ -240,6 +240,13 @@ export function clampNonNegative(value: number | null): number {
 
 export function truncateText(value: string, maxLength: number): string {
   return value.length <= maxLength ? value : value.slice(0, maxLength);
+}
+
+// Entity names are matched by exact string in search, so an imported name has to land in the
+// same normalized form the rest of the app writes. Normalized twice because the truncation
+// between the two can strand a trailing space.
+export function normalizeEntityName(value: string | null | undefined, maxLength: number): string | null {
+  return normalizeMetadataText(normalizeMetadataText(value)?.slice(0, maxLength));
 }
 
 export function truncateNullableText(value: string | null | undefined, maxLength: number): string | null | undefined {

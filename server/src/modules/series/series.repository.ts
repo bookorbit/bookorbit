@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
-import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books, bookSeries, bookSeriesMemberships, userBookStatus } from '../../db/schema';
@@ -41,10 +41,6 @@ export class SeriesRepository {
     return inArray(books.libraryId, libraryIds);
   }
 
-  private escapeLikePattern(s: string): string {
-    return s.replace(/[\\%_]/g, '\\$&');
-  }
-
   private buildAuthorNameMatchCondition(pattern: string): SQL {
     return sql`${books.id} IN (
       SELECT ${bookAuthors.bookId} FROM ${bookAuthors}
@@ -71,13 +67,13 @@ export class SeriesRepository {
     const conditions: SQL[] = [libraryFilter, ...filterClauses];
 
     if (params.q) {
-      const qPattern = `%${this.escapeLikePattern(params.q)}%`;
+      const qPattern = buildSearchPattern(params.q);
       const authorNameMatch = this.buildAuthorNameMatchCondition(qPattern);
       conditions.push(sql`(${accentInsensitiveIlike(bookSeries.name, qPattern)} OR ${authorNameMatch})`);
     }
 
     if (params.author) {
-      const authorPattern = `%${this.escapeLikePattern(params.author)}%`;
+      const authorPattern = buildSearchPattern(params.author);
       conditions.push(this.buildAuthorNameMatchCondition(authorPattern));
     }
 

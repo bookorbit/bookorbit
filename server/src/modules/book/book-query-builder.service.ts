@@ -16,7 +16,7 @@ import type {
 import { DB } from '../../db';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
-import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import { BookSortBuilder, customMetadataValueColumn, type BookSortContext } from './book-sort-builder.service';
 import {
@@ -91,7 +91,7 @@ export class BookQueryBuilder {
   }
 
   buildQuickSearch(q: string): SQL {
-    const pattern = `%${q.replace(/[%_\\]/g, '\\$&')}%`;
+    const pattern = buildSearchPattern(q);
 
     const existsAuthor = (() => {
       const sq = this.db
@@ -1156,8 +1156,4 @@ export class BookQueryBuilder {
     parts.push('r.id ASC');
     return parts.join(', ');
   }
-}
-
-function escapeLikePattern(s: string): string {
-  return s.replace(/[\\%_]/g, '\\$&');
 }

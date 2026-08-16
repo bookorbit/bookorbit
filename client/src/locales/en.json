@@ -4754,6 +4754,7 @@
       "annotations": "Annotations",
       "uploadBooks": "Upload books",
       "appearance": "Appearance",
+      "appearanceDescription": "Choose theme, accent, corner radius, surface, and background options.",
       "theme": "Theme",
       "accent": "Accent",
       "radius": "Radius",
@@ -4774,7 +4775,8 @@
         "cta": "Star BookOrbit on GitHub"
       },
       "surfaceOpacity": "Surface opacity",
-      "surfaceOpacityValue": "{value}%"
+      "surfaceOpacityValue": "{value}%",
+      "surfaceBrightnessValue": "{value}%"
     },
     "sidebar": {
       "dashboard": "Dashboard",
@@ -4911,6 +4913,12 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
+    },
+    "radiusPicker": {
+      "sharp": "Sharp corners",
+      "default": "Default corners",
+      "rounded": "Rounded corners",
+      "pill": "Pill-shaped corners"
     },
     "languagePicker": {
       "searchPlaceholder": "Search languages",
@@ -6145,6 +6153,7 @@
   },
   "notifications": {
     "title": "Notifications",
+    "description": "Review and manage your notifications.",
     "markAllRead": "Mark all read",
     "clear": "Clear",
     "empty": "No notifications yet",

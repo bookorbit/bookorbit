@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Bell, BellOff, CheckCheck, Trash2 } from '@lucide/vue'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { useNotifications } from '../composables/useNotifications'
 import NotificationItemVue from './NotificationItem.vue'
@@ -63,7 +63,10 @@ function handleLoadMore() {
 
     <SheetContent side="right" class="w-[90vw] sm:max-w-md p-0 flex flex-col gap-0">
       <SheetHeader class="flex flex-row items-center justify-between border-b px-4 py-3 h-14 shrink-0 space-y-0">
-        <SheetTitle class="text-sm font-semibold text-foreground">{{ t('notifications.title') }}</SheetTitle>
+        <div>
+          <SheetTitle class="text-sm font-semibold text-foreground">{{ t('notifications.title') }}</SheetTitle>
+          <SheetDescription class="sr-only">{{ t('notifications.description') }}</SheetDescription>
+        </div>
         <div class="flex items-center gap-1 pr-8">
           <Button v-if="unreadCount > 0" variant="ghost" size="sm" class="h-7 gap-1.5 text-xs text-muted-foreground" @click="handleMarkAllRead">
             <CheckCheck :size="14" />
