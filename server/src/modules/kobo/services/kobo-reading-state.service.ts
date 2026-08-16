@@ -11,11 +11,46 @@ import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboProgressBridgeService } from './kobo-progress-bridge.service';
 import { KoboSettingsService } from './kobo-settings.service';
+import { advanceIsoTimestamp, maxIsoTimestamp } from '../../../common/utils/iso-timestamp.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type JsonObj = Record<string, unknown>;
 const PROGRESS_EPSILON = 0.0001;
+
+type KoboSectionResult = { Result: 'Success' | 'Ignored' };
+
+/** Acknowledgement envelope the device expects from `PUT /v1/library/{id}/state`. */
+export interface KoboStateUpdateResponse {
+  RequestResult: 'Success';
+  UpdateResults: {
+    EntitlementId: string;
+    CurrentBookmarkResult: KoboSectionResult;
+    StatisticsResult: KoboSectionResult;
+    StatusInfoResult: KoboSectionResult;
+  }[];
+}
+
+/**
+ * The device keeps a pushed reading state pending until the response acknowledges every
+ * section, and treats its own pending copy as authoritative meanwhile: it re-pushes on each
+ * sync and opens the book at its local bookmark no matter what the pull path delivered.
+ * Sections are reported wholesale rather than per merge outcome, so a bookmark the hub kept
+ * ownership of still clears on the device and loses to the newer state on the next pull.
+ */
+function buildStateUpdateResponse(entitlementId: string, result: 'Success' | 'Ignored'): KoboStateUpdateResponse {
+  return {
+    RequestResult: 'Success',
+    UpdateResults: [
+      {
+        EntitlementId: entitlementId,
+        CurrentBookmarkResult: { Result: result },
+        StatisticsResult: { Result: result },
+        StatusInfoResult: { Result: result },
+      },
+    ],
+  };
+}
 
 function mergeSubObject(incoming: JsonObj | null | undefined, existing: JsonObj | null | undefined): JsonObj | null {
   if (!incoming) return existing ?? null;
@@ -27,26 +62,6 @@ function mergeSubObject(incoming: JsonObj | null | undefined, existing: JsonObj 
   const bMs = new Date(b).getTime();
   if (!Number.isNaN(aMs) && !Number.isNaN(bMs)) return aMs >= bMs ? incoming : existing;
   return a >= b ? incoming : existing;
-}
-
-/**
- * Returns the chronologically latest of the given timestamps, preserving the original
- * string. The Kobo device resolves reading-state conflicts on the envelope LastModified/
- * PriorityTimestamp, so these must never regress below the bookmark they wrap: a device
- * re-push of its older state must not lower an envelope that already carries a newer
- * hub-refreshed bookmark, or the device keeps rejecting the hub progress forever.
- */
-function maxIsoTimestamp(...values: (string | null | undefined)[]): string | null {
-  let best: string | null = null;
-  let bestMs = Number.NEGATIVE_INFINITY;
-  for (const value of values) {
-    if (!value) continue;
-    const ms = new Date(value).getTime();
-    if (Number.isNaN(ms) || ms <= bestMs) continue;
-    bestMs = ms;
-    best = value;
-  }
-  return best;
 }
 
 @Injectable()
@@ -71,27 +86,14 @@ export class KoboReadingStateService {
     finishedThreshold: number,
     twoWayProgressSync: boolean,
     sourceDeviceId: number,
-  ) {
+  ): Promise<KoboStateUpdateResponse> {
     const now = new Date().toISOString();
 
     const book = await this.db.query.books.findFirst({
       where: eq(schema.books.id, bookId),
       columns: { id: true },
     });
-    if (!book) {
-      const entitlementId = String(bookId);
-      return {
-        RequestResult: 'Success',
-        UpdateResults: [
-          {
-            EntitlementId: entitlementId,
-            CurrentBookmarkResult: { Result: 'Ignored' },
-            StatisticsResult: { Result: 'Ignored' },
-            StatusInfoResult: { Result: 'Ignored' },
-          },
-        ],
-      };
-    }
+    if (!book) return buildStateUpdateResponse(String(bookId), 'Ignored');
 
     await this.bookAccessService.assertBookAccessible(userId, bookId);
 
@@ -205,7 +207,7 @@ export class KoboReadingStateService {
       });
     }
 
-    return this.getRawState(userId, bookId);
+    return buildStateUpdateResponse(entitlementId, 'Success');
   }
 
   private async autoUpdateReadStatus(
@@ -246,7 +248,13 @@ export class KoboReadingStateService {
 
     if (!row) return null;
 
-    const refreshed = await this.refreshBookmarkFromHub(userId, bookId, this.asJsonObj(row.currentBookmark)).catch(() => null);
+    const refreshed = await this.refreshBookmarkFromHub(userId, bookId, row).catch((error: unknown) => {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[kobo.reading_state_refresh] [fail] userId=${userId} bookId=${bookId} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - hub bookmark refresh failed, serving stored bookmark`,
+      );
+      return null;
+    });
 
     return {
       EntitlementId: (await this.bookIdentityService.ensureForBook(userId, bookId, await this.hasLibrarySnapshot(userId))).entitlementId,
@@ -268,8 +276,9 @@ export class KoboReadingStateService {
   private async refreshBookmarkFromHub(
     userId: number,
     bookId: number,
-    bookmark: JsonObj | null,
+    state: { currentBookmark: unknown; lastModifiedKobo: string | null; priorityTimestamp: string | null },
   ): Promise<{ bookmark: JsonObj; lastModifiedKobo: string } | null> {
+    const bookmark = this.asJsonObj(state.currentBookmark);
     const settings = await this.settingsService.getSettings(userId);
     if (!settings.twoWayProgressSync) return null;
 
@@ -303,7 +312,12 @@ export class KoboReadingStateService {
       return null;
     }
 
-    const nowIso = new Date().toISOString();
+    const nowIso = advanceIsoTimestamp(
+      new Date(),
+      state.lastModifiedKobo,
+      state.priorityTimestamp,
+      typeof bookmark?.LastModified === 'string' ? bookmark.LastModified : null,
+    );
     const merged: JsonObj = {
       ...(bookmark ?? {}),
       LastModified: nowIso,

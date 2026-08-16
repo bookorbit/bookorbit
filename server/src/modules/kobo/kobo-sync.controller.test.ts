@@ -10,6 +10,19 @@ function makeReply() {
   };
 }
 
+/** What the device requires back from a state push; anything else leaves the push pending on it. */
+const STATE_UPDATE_ACK = {
+  RequestResult: 'Success',
+  UpdateResults: [
+    {
+      EntitlementId: 'entitlement-77',
+      CurrentBookmarkResult: { Result: 'Success' },
+      StatisticsResult: { Result: 'Success' },
+      StatusInfoResult: { Result: 'Success' },
+    },
+  ],
+};
+
 describe('KoboSyncController', () => {
   const settingsService = {
     getSettings: vi.fn(),
@@ -611,7 +624,7 @@ describe('KoboSyncController', () => {
       kepubConversionLimitMb: 100,
       twoWayProgressSync: true,
     });
-    readingStateService.upsertState.mockResolvedValue({ RequestResult: 'Success' });
+    readingStateService.upsertState.mockResolvedValue(STATE_UPDATE_ACK);
     const reply = makeReply();
 
     await controller.updateReadingState(
@@ -644,7 +657,7 @@ describe('KoboSyncController', () => {
       }),
     );
     expect(historyService.countsForBook).toHaveBeenCalledWith(8, 77, { progressUpdates: 1, twoWayProgressSync: true });
-    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+    expect(reply.send).toHaveBeenCalledWith(STATE_UPDATE_ACK);
   });
 
   it('handles reading-state updates locally for mapped Kobo entitlement ids', async () => {
@@ -665,7 +678,7 @@ describe('KoboSyncController', () => {
       kepubConversionLimitMb: 100,
       twoWayProgressSync: true,
     });
-    readingStateService.upsertState.mockResolvedValue({ RequestResult: 'Success' });
+    readingStateService.upsertState.mockResolvedValue(STATE_UPDATE_ACK);
 
     await controller.updateReadingState(
       entitlementId,
@@ -679,7 +692,7 @@ describe('KoboSyncController', () => {
     expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(8, entitlementId);
     expect(readingStateService.upsertState).toHaveBeenCalledWith(8, 77, state, 1, 99, true, 77);
     expect(proxyService.forward).not.toHaveBeenCalled();
-    expect(reply.send).toHaveBeenCalledWith({ RequestResult: 'Success' });
+    expect(reply.send).toHaveBeenCalledWith(STATE_UPDATE_ACK);
   });
 
   it('proxies reading-state updates for unmapped Kobo Store entitlement ids', async () => {
