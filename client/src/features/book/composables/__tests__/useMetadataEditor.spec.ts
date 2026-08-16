@@ -409,15 +409,81 @@ describe('useMetadataEditor', () => {
     expect(isDirty.value).toBe(false)
   })
 
-  it('captures an error message when the save request fails', async () => {
+  // Regression: a rejected save used to surface as a bare "HTTP 400", so the only text naming the
+  // field the server refused was left in the response body. See issue #1015.
+  it('keeps the server validation detail when a save is rejected', async () => {
     const book = makeBook()
-    apiMock.mockResolvedValue({ ok: false, status: 400 })
+    apiMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        statusCode: 400,
+        message: ['amazonId must be shorter than or equal to 20 characters'],
+        error: 'Bad Request',
+      }),
+    })
 
     const { load, save, error } = useMetadataEditor()
     load(book)
     const result = await save(book.id, [])
 
     expect(result).toBeNull()
-    expect(error.value).toBe('HTTP 400')
+    expect(error.value).toEqual({ detail: 'amazonId must be shorter than or equal to 20 characters', status: 400 })
+  })
+
+  it('reports the status alone when the failure body carries no message', async () => {
+    const book = makeBook()
+    apiMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({ statusCode: 500 }) })
+
+    const { load, save, error } = useMetadataEditor()
+    load(book)
+
+    expect(await save(book.id, [])).toBeNull()
+    expect(error.value).toEqual({ detail: null, status: 500 })
+  })
+
+  it('reports neither detail nor status when the request never reached the server', async () => {
+    const book = makeBook()
+    apiMock.mockRejectedValue(new Error('Failed to fetch'))
+
+    const { load, save, error } = useMetadataEditor()
+    load(book)
+
+    expect(await save(book.id, [])).toBeNull()
+    expect(error.value).toEqual({ detail: null, status: null })
+  })
+
+  it('does not advance the snapshot when a save is rejected, so a retry resends the change', async () => {
+    const book = makeBook({ title: 'Original Title' })
+    apiMock.mockResolvedValue({ ok: false, status: 400, json: async () => ({ message: 'nope' }) })
+
+    const { form, load, save, isDirty } = useMetadataEditor()
+    load(book)
+    form.title = 'Changed Title'
+    await save(book.id, [])
+
+    expect(isDirty.value).toBe(true)
+
+    apiMock.mockResolvedValue({ ok: true, json: async () => ({ ...book, title: 'Changed Title' }) })
+    await save(book.id, [])
+
+    const [, retry] = apiMock.mock.calls[1] as [string, RequestInit]
+    expect(JSON.parse(String(retry.body)).metadata).toEqual({ title: 'Changed Title' })
+    expect(isDirty.value).toBe(false)
+  })
+
+  it('clears a previous failure once a save succeeds', async () => {
+    const book = makeBook()
+    apiMock.mockResolvedValue({ ok: false, status: 400, json: async () => ({ message: 'nope' }) })
+
+    const { load, save, error } = useMetadataEditor()
+    load(book)
+    await save(book.id, [])
+    expect(error.value).not.toBeNull()
+
+    apiMock.mockResolvedValue({ ok: true, json: async () => book })
+    await save(book.id, [])
+
+    expect(error.value).toBeNull()
   })
 })

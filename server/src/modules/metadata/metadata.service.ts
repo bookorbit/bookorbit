@@ -22,6 +22,7 @@ import {
   normalizeMetadataTextKeySql,
 } from '../../common/utils/metadata-text-normalize.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
+import { boundProviderId } from '../../common/utils/provider-id.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
@@ -137,8 +138,8 @@ export class MetadataService {
     if (!data) return;
 
     const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
-      audibleId: data.audibleId,
-      librofmId: data.librofmId,
+      audibleId: boundProviderId('audibleId', data.audibleId),
+      librofmId: boundProviderId('librofmId', data.librofmId),
       audioMetadata: {
         narrators: data.narrators,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -570,8 +571,8 @@ export class MetadataService {
       seriesIndex: data.seriesIndex,
       authors: data.authors.map((author) => author.name),
       genres: data.genres,
-      audibleId: data.audibleId,
-      librofmId: data.librofmId,
+      audibleId: boundProviderId('audibleId', data.audibleId),
+      librofmId: boundProviderId('librofmId', data.librofmId),
       audioMetadata: {
         durationSeconds: data.durationSeconds ?? null,
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
@@ -645,18 +646,21 @@ export class MetadataService {
       tags: data.tags,
       rating: normalizeImportedRating(data.rating),
       pageCount: data.pageCount,
-      googleBooksId: data.googleBooksId,
-      goodreadsId: data.goodreadsId,
-      amazonId: data.amazonId,
-      hardcoverId: data.hardcoverId,
-      hardcoverEditionId: data.hardcoverEditionId,
-      openLibraryId: data.openLibraryId,
-      ranobedbId: data.ranobedbId,
-      koboId: data.koboId,
-      comicvineId: data.comicvineId,
-      lubimyczytacId: data.lubimyczytacId,
-      aladinId: data.aladinId,
-      itunesId: data.itunesId,
+      // Every extractor feeds this path, so the column bound is enforced once here rather than
+      // trusted to each parser: an identifier that overflows would otherwise fail the write with
+      // a Postgres 22001 and take the rest of the book's metadata down with it.
+      googleBooksId: boundProviderId('googleBooksId', data.googleBooksId),
+      goodreadsId: boundProviderId('goodreadsId', data.goodreadsId),
+      amazonId: boundProviderId('amazonId', data.amazonId),
+      hardcoverId: boundProviderId('hardcoverId', data.hardcoverId),
+      hardcoverEditionId: boundProviderId('hardcoverEditionId', data.hardcoverEditionId),
+      openLibraryId: boundProviderId('openLibraryId', data.openLibraryId),
+      ranobedbId: boundProviderId('ranobedbId', data.ranobedbId),
+      koboId: boundProviderId('koboId', data.koboId),
+      comicvineId: boundProviderId('comicvineId', data.comicvineId),
+      lubimyczytacId: boundProviderId('lubimyczytacId', data.lubimyczytacId),
+      aladinId: boundProviderId('aladinId', data.aladinId),
+      itunesId: boundProviderId('itunesId', data.itunesId),
       comicMetadata: data.comicMetadata ?? undefined,
     });
 

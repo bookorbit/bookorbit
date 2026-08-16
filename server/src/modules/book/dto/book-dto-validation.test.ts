@@ -4,6 +4,8 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MetadataProviderKey } from '@bookorbit/types';
 
+import { PROVIDER_ID_MAX_LENGTHS } from '../../../common/utils/provider-id.utils';
+
 import { BulkBookIdsDto } from './bulk-book-ids.dto';
 import { BulkQuerySelectionDto } from './bulk-query-selection.dto';
 import { BulkSelectionDto } from './bulk-selection.dto';
@@ -217,6 +219,22 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { librofmId: '9781234567890' })).length).toBe(0);
     expect((await errorsFor(UpdateBookMetadataDto, { librofmId: null })).length).toBe(0);
     expect((await errorsFor(UpdateBookMetadataDto, { librofmId: 'a'.repeat(51) })).length).toBeGreaterThan(0);
+  });
+
+  it('enforces every provider id bound at exactly its declared length', async () => {
+    for (const [field, max] of Object.entries(PROVIDER_ID_MAX_LENGTHS)) {
+      expect({ field, errors: (await errorsFor(UpdateBookMetadataDto, { [field]: 'a'.repeat(max) })).length }).toEqual({ field, errors: 0 });
+      expect({ field, errors: (await errorsFor(UpdateBookMetadataDto, { [field]: 'a'.repeat(max + 1) })).length }).toEqual({ field, errors: 1 });
+    }
+  });
+
+  // The client renders these strings verbatim, because they carry the only description of what the
+  // server refused. A message that stops naming its field makes the save unfixable. See issue #1015.
+  it('names the rejected field and its limit in the validation message', async () => {
+    const [error] = await errorsFor(UpdateBookMetadataDto, { amazonId: 'https://www.amazon.com/dp/0345415000' });
+
+    expect(error?.property).toBe('amazonId');
+    expect(Object.values(error?.constraints ?? {}).join(' ')).toBe('amazonId must be shorter than or equal to 20 characters');
   });
 
   it('normalizes a zero page count to null and validates other page count values', async () => {

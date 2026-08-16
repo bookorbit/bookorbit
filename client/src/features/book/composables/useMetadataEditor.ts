@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
+import { readApiErrorDetail } from '@/lib/api-error'
 import {
   FORMAT_TO_GROUP,
   type BookCommunityRating,
@@ -110,9 +111,21 @@ function changedCustomMetadataPayload(
     .map((field) => ({ fieldId: field.fieldId, value: field.value }))
 }
 
+/**
+ * A failed save, kept structured rather than pre-rendered: `detail` is the server's own English
+ * description of what it rejected, which no catalog can translate, while everything else has to
+ * resolve to a translated message in the component.
+ */
+export type MetadataSaveFailure = {
+  /** Server-supplied description, or null when the response carried none. */
+  detail: string | null
+  /** HTTP status, or null when the request failed before producing a response. */
+  status: number | null
+}
+
 export function useMetadataEditor() {
   const saving = ref(false)
-  const error = ref<string | null>(null)
+  const error = ref<MetadataSaveFailure | null>(null)
 
   const form = reactive({
     title: null as string | null,
@@ -308,12 +321,15 @@ export function useMetadataEditor() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ metadata, lockedFields }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        error.value = { detail: await readApiErrorDetail(res), status: res.status }
+        return null
+      }
       const updated = normalizeSaveResult((await res.json()) as BookDetail | BookMetadataSaveResult)
       snapshot.value = submittedSnapshot
       return updated
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to save'
+    } catch {
+      error.value = { detail: null, status: null }
       return null
     } finally {
       saving.value = false

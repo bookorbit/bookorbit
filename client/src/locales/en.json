@@ -3908,6 +3908,8 @@
         "savedButWriteFailed": "Metadata saved, but file write failed",
         "savedWriteSkippedReason": "Metadata saved, file write skipped: {reason}",
         "savedWriteSkipped": "Metadata saved, file write skipped",
+        "saveFailed": "Could not save the changes",
+        "saveFailedWithStatus": "Could not save the changes (HTTP {status})",
         "loadFromFileFailed": "Failed to load metadata from file",
         "loadedFieldsFromFile": "{count, plural, =0 {Loaded no fields from file} one {Loaded one field from file} other {Loaded # fields from file}}",
         "noMetadataInFile": "No metadata found in file",

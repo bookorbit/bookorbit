@@ -2,6 +2,7 @@ import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matche
 import { Transform, Type } from 'class-transformer';
 import { MetadataProviderKey } from '@bookorbit/types';
 import { MAX_SERIES_TOTAL_BOOKS } from '../../../common/utils/series-total-books.utils';
+import { PROVIDER_ID_MAX_LENGTHS } from '../../../common/utils/provider-id.utils';
 import { CustomMetadataValueDto } from '../../custom-metadata/dto/custom-metadata-value.dto';
 
 export class AudiobookChapterDto {
@@ -65,21 +66,21 @@ export class UpdateBookMetadataDto {
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
-  @IsOptional() @IsString() @MaxLength(50) googleBooksId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) goodreadsId?: string | null;
-  @IsOptional() @IsString() @MaxLength(20) amazonId?: string | null;
-  @IsOptional() @IsString() @MaxLength(255) hardcoverId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) hardcoverEditionId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) openLibraryId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) itunesId?: string | null;
-  @IsOptional() @IsString() @MaxLength(20) audibleId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) librofmId?: string | null;
-  @IsOptional() @IsString() @MaxLength(255) koboId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.googleBooksId) googleBooksId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.goodreadsId) goodreadsId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.amazonId) amazonId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.hardcoverId) hardcoverId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.hardcoverEditionId) hardcoverEditionId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.openLibraryId) openLibraryId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.itunesId) itunesId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.audibleId) audibleId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.librofmId) librofmId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.koboId) koboId?: string | null;
   @IsOptional() @ValidateNested() @Type(() => AudioMetadataDto) audioMetadata?: AudioMetadataDto;
-  @IsOptional() @IsString() @MaxLength(50) comicvineId?: string | null;
-  @IsOptional() @IsString() @MaxLength(50) ranobedbId?: string | null;
-  @IsOptional() @IsString() @MaxLength(512) lubimyczytacId?: string | null;
-  @IsOptional() @IsString() @MaxLength(20) aladinId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.comicvineId) comicvineId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.ranobedbId) ranobedbId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.lubimyczytacId) lubimyczytacId?: string | null;
+  @IsOptional() @IsString() @MaxLength(PROVIDER_ID_MAX_LENGTHS.aladinId) aladinId?: string | null;
   @IsOptional() @ValidateNested() @Type(() => ComicMetadataDto) comicMetadata?: ComicMetadataDto;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CustomMetadataValueDto) customMetadata?: CustomMetadataValueDto[];
 }
