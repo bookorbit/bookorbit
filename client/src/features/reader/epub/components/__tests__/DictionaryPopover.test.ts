@@ -31,14 +31,31 @@ function makeResult(overrides: Partial<DictionaryResult> = {}): DictionaryResult
           { definition: 'An expression of greeting.', example: 'She said hello.' },
           { definition: 'A call to attract attention.', example: null },
         ],
+        sourceWord: 'hello',
       },
       {
         partOfSpeech: 'verb',
         definitions: [{ definition: 'To greet with hello.', example: null }],
+        sourceWord: 'hello',
       },
     ],
     provider: 'free-dictionary',
     ...overrides,
+  }
+}
+
+/** A result shaped like a resolved inflection chain: candelabras -> candelabra -> candelabrum. */
+function makeChainResult(): DictionaryResult {
+  return {
+    word: 'candelabras',
+    phonetic: null,
+    audioUrl: null,
+    entries: [
+      { partOfSpeech: 'Noun', definitions: [{ definition: 'plural of candelabra', example: null }], sourceWord: 'candelabras' },
+      { partOfSpeech: 'Noun', definitions: [{ definition: 'A single candelabrum.', example: null }], sourceWord: 'candelabra' },
+      { partOfSpeech: 'Noun', definitions: [{ definition: 'A candle holder with branches.', example: null }], sourceWord: 'candelabrum' },
+    ],
+    provider: 'wiktionary',
   }
 }
 
@@ -158,6 +175,52 @@ describe('DictionaryPopover', () => {
     expect(wrapper.text()).toContain('An expression of greeting.')
     expect(wrapper.text()).toContain('A call to attract attention.')
     expect(wrapper.text()).toContain('To greet with hello.')
+  })
+
+  // -------------------------------------------------------------------------
+  // Resolved inflection chains (issue #1020)
+  // -------------------------------------------------------------------------
+
+  it('renders senses borrowed from a resolved lemma under their own heading', async () => {
+    mockLookup.mockResolvedValue(makeChainResult())
+    const wrapper = await mountPopover({ word: 'candelabras' })
+    await flushPromises()
+
+    // The looked-up word is already named in the popover header, so only the
+    // borrowed groups need a heading of their own.
+    const headings = wrapper.findAll('p.font-semibold').map((p) => p.text())
+    expect(headings).toEqual(['candelabra', 'candelabrum'])
+    expect(wrapper.text()).toContain('A candle holder with branches.')
+  })
+
+  it('does not add a lemma heading when every sense belongs to the looked-up word', async () => {
+    mockLookup.mockResolvedValue(makeResult())
+    const wrapper = await mountPopover()
+    await flushPromises()
+
+    // Only the result header itself is emphasised; no per-group heading is added.
+    expect(wrapper.findAll('p.font-semibold')).toHaveLength(0)
+  })
+
+  it('keeps consecutive parts of speech for one word under a single heading', async () => {
+    mockLookup.mockResolvedValue({
+      word: 'leaves',
+      phonetic: null,
+      audioUrl: null,
+      entries: [
+        { partOfSpeech: 'Noun', definitions: [{ definition: 'plural of leaf', example: null }], sourceWord: 'leaves' },
+        { partOfSpeech: 'Verb', definitions: [{ definition: 'third-person singular of leave', example: null }], sourceWord: 'leaves' },
+        { partOfSpeech: 'Noun', definitions: [{ definition: 'A flattened plant organ.', example: null }], sourceWord: 'leaf' },
+      ],
+      provider: 'wiktionary',
+    })
+    const wrapper = await mountPopover({ word: 'leaves' })
+    await flushPromises()
+
+    // Both "leaves" blocks stay under the header with no repeated heading; only
+    // the borrowed "leaf" block is labelled.
+    expect(wrapper.findAll('p.font-semibold').map((p) => p.text())).toEqual(['leaf'])
+    expect(wrapper.findAll('p.uppercase').map((p) => p.text())).toEqual(['Noun', 'Verb', 'Noun'])
   })
 
   // -------------------------------------------------------------------------

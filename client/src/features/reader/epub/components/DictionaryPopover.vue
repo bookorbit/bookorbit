@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Volume2, RefreshCw } from '@lucide/vue'
-import type { DictionaryResult } from '@bookorbit/types'
+import type { DictionaryEntry, DictionaryResult } from '@bookorbit/types'
 import { useDictionary } from '../composables/useDictionary'
 
 const { t } = useI18n()
@@ -29,6 +29,32 @@ const popoverStyle = ref({
   top: '0px',
 })
 let resizeObserver: ResizeObserver | null = null
+
+interface SenseGroup {
+  word: string
+  isLemma: boolean
+  entries: DictionaryEntry[]
+}
+
+/**
+ * Keeps senses borrowed from a resolved lemma under their own heading, so a
+ * reader looking up "candelabras" can tell which meaning belongs to which form.
+ */
+const senseGroups = computed<SenseGroup[]>(() => {
+  const res = result.value
+  if (!res) return []
+
+  const groups: SenseGroup[] = []
+  for (const entry of res.entries) {
+    const current = groups[groups.length - 1]
+    if (current && current.word === entry.sourceWord) {
+      current.entries.push(entry)
+      continue
+    }
+    groups.push({ word: entry.sourceWord, isLemma: entry.sourceWord !== res.word, entries: [entry] })
+  }
+  return groups
+})
 
 const VIEWPORT_MARGIN = 8
 const FALLBACK_WIDTH = 288
@@ -158,13 +184,18 @@ watch([loading, result, notFound, hasError], async () => {
             </button>
           </div>
 
-          <div v-for="entry in result.entries" :key="entry.partOfSpeech" class="space-y-1">
-            <p class="text-[10px] font-medium uppercase tracking-wide text-primary">{{ entry.partOfSpeech }}</p>
-            <ul class="space-y-0.5">
-              <li v-for="(def, i) in entry.definitions" :key="i" class="text-xs text-foreground leading-relaxed">
-                {{ def.definition }}
-              </li>
-            </ul>
+          <div v-for="group in senseGroups" :key="group.word" class="space-y-1">
+            <p v-if="group.isLemma" class="text-xs font-semibold text-foreground pt-2 border-t border-border">
+              {{ group.word }}
+            </p>
+            <div v-for="entry in group.entries" :key="`${group.word}:${entry.partOfSpeech}`" class="space-y-1">
+              <p class="text-[10px] font-medium uppercase tracking-wide text-primary">{{ entry.partOfSpeech }}</p>
+              <ul class="space-y-0.5">
+                <li v-for="(def, i) in entry.definitions" :key="i" class="text-xs text-foreground leading-relaxed">
+                  {{ def.definition }}
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
