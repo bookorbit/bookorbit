@@ -1,6 +1,6 @@
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual('fs/promises');
-  return { ...actual, access: vi.fn(), stat: vi.fn() };
+  return { ...actual, access: vi.fn(), lstat: vi.fn(), readdir: vi.fn(), stat: vi.fn() };
 });
 
 vi.mock('../scanner/lib/hash', () => ({ computeFileHash: vi.fn() }));
@@ -10,7 +10,7 @@ vi.mock('../metadata/lib/cbz-metadata', () => ({ extractCbzMetadata: vi.fn(), ex
 vi.mock('../metadata/lib/mobi-parser', () => ({ parseMobiFile: vi.fn() }));
 vi.mock('../metadata/lib/pdf-parser', () => ({ parsePdfFile: vi.fn() }));
 
-import { access as fsAccess, stat } from 'fs/promises';
+import { access as fsAccess, lstat, readdir, stat } from 'fs/promises';
 import { BadRequestException, ConflictException, ForbiddenException, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata } from '../metadata/lib/cbz-metadata';
@@ -22,6 +22,8 @@ import { books } from '../../db/schema';
 import { UploadService } from './upload.service';
 
 const mockFsAccess = fsAccess as MockedFunction<typeof fsAccess>;
+const mockLstat = lstat as MockedFunction<typeof lstat>;
+const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockStat = stat as MockedFunction<typeof stat>;
 const mockExtractEpubMetadata = extractEpubMetadata as MockedFunction<typeof extractEpubMetadata>;
 const mockExtractCbzMetadata = extractCbzMetadata as MockedFunction<typeof extractCbzMetadata>;
@@ -133,6 +135,8 @@ describe('UploadService', () => {
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue(null);
     appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(false);
     mockFsAccess.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+    mockLstat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+    mockReaddir.mockResolvedValue([]);
     mockExtractEpubMetadata.mockResolvedValue(null);
 
     // addFileToBook defaults
@@ -199,6 +203,50 @@ describe('UploadService', () => {
       456,
     );
     expect(processor.processNewBookImportAsync).toHaveBeenCalledWith(99, 1, '/library/Frank Herbert/Dune.epub', 'epub');
+  });
+
+  it('stores the directory-entry spelling when an upload targets a case-insensitive parent path', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{authors:first}/{title}.{extension}' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'Dune',
+      subtitle: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      isbn13: null,
+      authors: [{ name: 'Bell Hooks' }],
+      tags: [],
+      description: null,
+      isbn10: null,
+    });
+    mockLstat.mockResolvedValue({} as never);
+    mockReaddir.mockImplementation((path) => {
+      const entriesByPath: Record<string, string[]> = {
+        '/': ['library'],
+        '/library': ['bell hooks'],
+        '/library/bell hooks': ['Dune.epub'],
+      };
+      return Promise.resolve(entriesByPath[String(path)] ?? []) as never;
+    });
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(mockReaddir.mock.calls.map((call) => call[0])).toEqual(['/library', '/library/bell hooks']);
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Bell Hooks/Dune.epub');
+    expect(processor.createBookRecord).toHaveBeenCalledWith(
+      1,
+      2,
+      '/library/bell hooks',
+      '/library/bell hooks/Dune.epub',
+      'bell hooks/Dune.epub',
+      'epub',
+      456,
+    );
+    expect(processor.processNewBookImportAsync).toHaveBeenCalledWith(99, 1, '/library/bell hooks/Dune.epub', 'epub');
   });
 
   it('only extracts metadata when an upload adds a file to an existing book', async () => {

@@ -34,6 +34,7 @@ import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { DB } from '../../db';
@@ -289,17 +290,18 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       }
 
       await this.storage.moveToPath(row.absolutePath, destPath);
+      const persistedDestPath = (await resolveExistingPathSpelling(destPath, folder.path)) ?? destPath;
 
       let bookId: number;
       try {
-        const { size } = await stat(destPath);
-        const bookFolderPath = library.organizationMode === 'book_per_file' ? destPath : dirname(destPath);
+        const { size } = await stat(persistedDestPath);
+        const bookFolderPath = library.organizationMode === 'book_per_file' ? persistedDestPath : dirname(persistedDestPath);
         ({ bookId } = await this.processor.createBookRecord(
           library.id,
           folder.id,
           bookFolderPath,
-          destPath,
-          destPath.substring(folder.path.length + 1),
+          persistedDestPath,
+          persistedDestPath.substring(folder.path.length + 1),
           format,
           size,
         ));
@@ -311,8 +313,9 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       await this.cleanupBookDockRecord(row);
       existingDestinations.set(this.destinationKey(library.id, destPath), bookId);
+      existingDestinations.set(this.destinationKey(library.id, persistedDestPath), bookId);
 
-      const newName = destPath.substring(folder.path.length + 1);
+      const newName = persistedDestPath.substring(folder.path.length + 1);
       return { fileId: row.id, fileName: row.fileName, newName, success: true, bookId };
     } catch (err) {
       const message = resolveFinalizeErrorMessage(err);

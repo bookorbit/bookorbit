@@ -1,17 +1,21 @@
 vi.mock('fs/promises', () => ({
   access: vi.fn(),
+  lstat: vi.fn(),
+  readdir: vi.fn(),
   readFile: vi.fn(),
   stat: vi.fn(),
   unlink: vi.fn(),
 }));
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { access, readFile, stat, unlink } from 'fs/promises';
+import { access, lstat, readdir, readFile, stat, unlink } from 'fs/promises';
 
 import type { BookDockMetadata } from '@bookorbit/types';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
 
 const mockAccess = vi.mocked(access);
+const mockLstat = vi.mocked(lstat);
+const mockReaddir = vi.mocked(readdir);
 const mockReadFile = vi.mocked(readFile);
 const mockStat = vi.mocked(stat);
 const mockUnlink = vi.mocked(unlink);
@@ -148,7 +152,11 @@ describe('BookDockFinalizeService', () => {
     mockReadFile.mockReset();
     mockStat.mockReset();
     mockUnlink.mockReset();
+    mockLstat.mockReset();
+    mockReaddir.mockReset();
     mockAccess.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+    mockLstat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+    mockReaddir.mockResolvedValue([]);
     mockReadFile.mockResolvedValue(Buffer.from('cover-bytes'));
     mockStat.mockResolvedValue({ size: 100 } as never);
     mockUnlink.mockResolvedValue(undefined);
