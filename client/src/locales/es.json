@@ -785,10 +785,13 @@
         "updatesGroup": "Actualizaciones",
         "importFromBooklore": "Importar desde Booklore",
         "bookloreImportConfigured": "Importación de libros configurada",
+        "importLibraryData": "Importar datos de la biblioteca",
+        "migrationConfigured": "Fuente de migración configurada",
         "migrationRunning": "Migración en ejecución",
         "migrationCompleted": "Migración completada",
         "migrationFailed": "La migración falló",
         "importDescription": "Importación única de libros, metadatos y progreso de lectura de una instalación anterior de Booklore.",
+        "migrationDescription": "Importación única de libros, metadatos y progreso de lectura desde otra aplicación de biblioteca.",
         "configuredDescription": "Fuente: {name}. Aún no se ha ejecutado la migración; continúe con la configuración para ejecutar la importación.",
         "runningDescription": "Etapa: {stage} - iniciada {started}",
         "completedDescription": "De {name} - completado {date}",
@@ -830,6 +833,7 @@
       "migration": {
         "title": "Migración",
         "subtitle": "Importación única de Booklore: conecte la fuente, asigne usuarios, realice un ensayo, inicie la migración y exporte un informe.",
+        "genericSubtitle": "Importación única de biblioteca: conecta una fuente, asigna usuarios, realiza una prueba, inicia la migración y exporte un informe.",
         "progress": "Progreso",
         "stepSourceConnection": "Conexión de origen",
         "stepUserPathMapping": "Mapeo de usuarios y rutas",
@@ -839,6 +843,7 @@
         "stepReport": "Informe",
         "stepReportTitle": "Informe de migración",
         "subtitleSource": "Configure la conexión de la base de datos a su instancia de Booklore de origen.",
+        "genericSubtitleSource": "Configura la conexión a tu aplicación de biblioteca de origen.",
         "subtitleMappings": "Asigne usuarios de origen a usuarios de destino y traduzca rutas de archivos.",
         "subtitleDryRun": "Obtenga una vista previa de lo que se importará antes de ejecutar la migración en vivo.",
         "subtitleRun": "Inicie la importación en vivo y supervise su progreso.",
@@ -923,13 +928,16 @@
         "reasonNoFilePathMatch": "La ruta del archivo no coincide con ningún libro de esta biblioteca.",
         "reasonNoFileHashMatch": "El hash del archivo no coincide con ningún libro de esta biblioteca",
         "reasonNoIsbnMatch": "ISBN no coincide con ningún libro de esta biblioteca",
+        "reasonNoAsinMatch": "ISBN no coincide con ningún libro de esta biblioteca",
         "reasonInsufficientSourceData": "No hay suficientes metadatos para intentar hacer coincidir",
         "reasonAmbiguousIsbnMatch": "Varios libros coincidieron con el mismo ISBN",
+        "reasonAmbiguousAsinMatch": "Varios libros coinciden con el mismo ISBN",
         "reasonAmbiguousFileHashMatch": "Varios libros coincidieron con el mismo hash de archivo",
         "reasonAmbiguousFilePathMatch": "Varios libros coincidieron con la misma ruta de archivo",
         "reasonAmbiguousTitleAuthorMatch": "Varios libros coincidían con el mismo título y autor",
         "reasonUnknown": "No se pudo determinar el motivo",
         "strategyIsbn": "Emparejado por ISBN",
+        "strategyAsin": "Emparejado por ISBN",
         "strategyFileHash": "Coincidencia por hash de archivo",
         "strategyPathMapping": "Coincidencia por ruta de archivo asignada",
         "strategyTitleAuthor": "Emparejado por título y autor",
@@ -965,6 +973,7 @@
         "refresh": "Actualizar",
         "sourceUser": "Usuario fuente",
         "targetUser": "Usuario objetivo",
+        "doNotImport": "No importar este usuario",
         "noSourceUsersLoaded": "Aún no se han cargado usuarios de origen.",
         "noActiveTargetUsers": "No se encontraron usuarios objetivo activos. Cree o vuelva a habilitar un usuario BookOrbit antes de realizar la asignación.",
         "pathPrefixMappings": "Asignaciones de prefijos de ruta",
@@ -2368,6 +2377,54 @@
         "maintenance": "Mantenimiento",
         "audit-log": "Registro de auditoría"
       }
+    },
+    "nav": {
+      "title": "Configuración",
+      "ariaLabel": "Configuración de secciones",
+      "searchPlaceholder": "Ajustes de búsqueda",
+      "clearSearch": "Borrar búsqueda",
+      "noResults": "No hay ajustes que coincidan con {query}.",
+      "shortcutHint": "Presiona Cmd K para saltar a cualquier ajuste",
+      "groups": {
+        "you": "Tú",
+        "library": "Biblioteca",
+        "devices": "Dispositivos y sincronización",
+        "server": "Servidor"
+      },
+      "descriptions": {
+        "profile": "Tu nombre, correo electrónico, contraseña y sesiones activas.",
+        "appearanceTheme": "Tema, color de acento, fondo y radio de esquina.",
+        "appearanceBookCovers": "Cubrir sombras, efectos de columna y arte de marcadores de posición.",
+        "appearanceIcons": "Elige el estilo de icono usado en toda la aplicación.",
+        "appearanceLayout": "Vista predeterminada de la biblioteca, densidad y espacio.",
+        "appearanceBehavior": "Cómo reacciona la biblioteca mientras navegas y ordenas.",
+        "appearanceLanguage": "Idioma de interfaz y formatos regionales.",
+        "readerEbook": "Fuentes, espaciado y comportamiento de páginas para eBooks.",
+        "readerPdf": "Renderización, zoom y página ajustada para PDFs.",
+        "readerComics": "Sentido de lectura y disposición de páginas dobles para cómics.",
+        "readerAudio": "Velocidad de reproducción, intervalos de salto y temporizador de apagado.",
+        "readerFonts": "Fuentes disponibles durante la lectura.",
+        "readerGeneral": "Valores predeterminados compartidos por todos los modos de lectura.",
+        "notifications": "Lo que BookkOrbit te dice sobre y dónde.",
+        "privacy": "Estadísticas de lectura, enlaces compartidos y visibilidad de la actividad.",
+        "restrictions": "Calificaciones de edad y contenido oculto para esta cuenta.",
+        "libraries": "Escanea rutas, carpetas vistas y reglas de ingerencia.",
+        "fileNaming": "Patrones de carpetas y nombres de archivo para los archivos almacenados.",
+        "maintenance": "Reescaneos, duplicados, elementos huérfanos y reconstrucciones de caché.",
+        "kobo": "Endpoint de sincronización, proxy de almacenamiento y mapeo de estanterías",
+        "koreader": "Progreso de sincronización y coincidencia de documentos.",
+        "opds": "Fuentes de catálogo para aplicaciones de lectura de terceros.",
+        "email": "Envío SMTP y direcciones de envío a dispositivo.",
+        "hardcover": "Sincronizar estado de lectura y reseñas con Hardcover.",
+        "users": "Cuentas, roles, permisos e invitaciones.",
+        "accountActivity": "Actividad de lectura y de sesión por usuario.",
+        "magicLinks": "Compartir contraseñas y enlaces de inicio de sesión.",
+        "oidc": "Proveedor de inicio de sesión único, reclamos y aprovisionamiento.",
+        "serverFonts": "Fuentes instaladas para cada lector en este servidor.",
+        "bookDock": "Acciones rápidas que se muestran en las páginas de los libros.",
+        "auditLog": "¿Quién cambió qué, y cuándo."
+      },
+      "backToApp": "Volver a la biblioteca"
     }
   },
   "achievements": {
@@ -3872,6 +3929,8 @@
         "savedButWriteFailed": "Metadatos guardados, pero falla la escritura del archivo",
         "savedWriteSkippedReason": "Metadatos guardados, escritura de archivo omitida: {reason}",
         "savedWriteSkipped": "Metadatos guardados, escritura de archivo omitida",
+        "saveFailed": "No se han podido guardar los cambios",
+        "saveFailedWithStatus": "No se han podido guardar los cambios (HTTP {status})",
         "loadFromFileFailed": "No se pudieron cargar los metadatos del archivo",
         "loadedFieldsFromFile": "{count, plural, =0 {No se cargaron campos del archivo} one {Cargó un campo del archivo} other {cargado # campos del archivo} many {cargado # campos del archivo}}",
         "noMetadataInFile": "No se encontraron metadatos en el archivo",
@@ -4718,6 +4777,7 @@
       "annotations": "Anotaciones",
       "uploadBooks": "Subir libros",
       "appearance": "Apariencia",
+      "appearanceDescription": "Elegir las opciones de tema, acento, radio de esquina, superficie y fondo.",
       "theme": "Tema",
       "accent": "acento",
       "radius": "Radio",
@@ -4738,7 +4798,8 @@
         "cta": "Estrella BookOrbit en GitHub"
       },
       "surfaceOpacity": "Opacidad de la superficie",
-      "surfaceOpacityValue": "{value}%"
+      "surfaceOpacityValue": "{value}%",
+      "surfaceBrightnessValue": "{value}%"
     },
     "sidebar": {
       "dashboard": "Panel de control",
@@ -4779,6 +4840,8 @@
       "seeAllSmartScopes": "Ver todos los alcances inteligentes ({count})",
       "seeAllCollections": "Ver todas las colecciones ({count})",
       "updateAvailable": "Actualizar {version}",
+      "updateTooltip": "Actualización {version} disponible",
+      "openUpdateRelease": "Abrir la versión {version} en GitHub",
       "zones": {
         "browse": "Explorar"
       },
@@ -4873,6 +4936,12 @@
       "light": "Luz",
       "dark": "oscuro",
       "system": "Sistema"
+    },
+    "radiusPicker": {
+      "sharp": "Esquinas afiladas",
+      "default": "Esquinas por defecto",
+      "rounded": "Esquinas redondeadas",
+      "pill": "Esquinas en forma de aleta"
     },
     "languagePicker": {
       "searchPlaceholder": "Buscar idiomas",
@@ -5826,6 +5895,7 @@
   },
   "migration": {
     "sidebarTitle": "Importación de libros",
+    "importTitle": "Importar biblioteca",
     "status": {
       "done": "Hecho",
       "saved": "Guardado",
@@ -5841,7 +5911,8 @@
       "source": {
         "short": "Conexión de origen",
         "title": "Conexión de origen",
-        "subtitle": "Configure la conexión de la base de datos a su instancia de Booklore de origen."
+        "subtitle": "Configure la conexión de la base de datos a su instancia de Booklore de origen.",
+        "genericSubtitle": "Configura la conexión a tu aplicación de biblioteca de origen."
       },
       "mappings": {
         "short": "Mapeo de usuarios y rutas",
@@ -5883,18 +5954,61 @@
       "testConnection": "Conexión de prueba",
       "saveAndValidate": "Guardar y validar",
       "validatedWithWarnings": "Fuente validada con advertencias.",
+      "types": {
+        "booklore": "Librería",
+        "grimmory": "Grimmory",
+        "audiobookshelf": "Audiobookshelf",
+        "calibreWebAutomated": "Calibre-web automatizado"
+      },
       "fields": {
         "type": "Tipo de fuente",
         "name": "Nombre de fuente",
+        "namePlaceholder": "Importar biblioteca",
         "host": "Host",
         "port": "Puerto",
         "user": "Usuario",
         "password": "Contraseña",
         "passwordSaved": "Guardado - dejar sin cambios",
         "passwordNotSet": "No se ha establecido ninguna contraseña",
+        "showSecret": "Mostrar secreto",
+        "hideSecret": "Ocultar secreto",
         "database": "Base de datos",
         "mediaRootPath": "Ruta raíz de medios",
-        "ssl": "Usar TLS/SSL"
+        "ssl": "Usar TLS/SSL",
+        "connectionMode": "Modo de conexión",
+        "apiMode": "Live API",
+        "backupMode": "Archivo de copia de seguridad",
+        "baseUrl": "URL de Audiobookshelf",
+        "apiToken": "Token de API",
+        "apiTokenPlaceholder": "Introduzca un token de API de administrador",
+        "secretSaved": "Guardado - dejar sin cambios",
+        "allowPrivateNetwork": "Permitir acceso a red privada",
+        "allowPrivateNetworkHint": "Activar esto sólo cuando Audiobookshelf esté alojado en una red local o privada de confianza.",
+        "backupPath": "Ruta de la copia de seguridad",
+        "backupPathHint": "Introduzca una ruta absoluta del servidor dentro del directorio de importación de migración configurado.",
+        "cwaAppDatabasePath": "Instantánea automatizada de app.db para Calibre-Web",
+        "cwaAppDatabasePathPlaceholder": "/imports/calibre-web-automated/app.db",
+        "cwaMetadataDatabasePath": "Instantánea calibre metadata.db",
+        "cwaMetadataDatabasePathPlaceholder": "/imports/calibre-web-automated/metadata.db"
+      },
+      "validation": {
+        "nameRequired": "El nombre de origen es obligatorio",
+        "databaseFieldsRequired": "Se requieren host, usuario, base de datos y nombre de fuente",
+        "apiFieldsRequired": "URL de Audiobookshelf, token API y nombre de origen son requeridos",
+        "baseUrlInvalid": "La URL de Audiobookshelf debe ser un origen HTTP o HTTPS limpio sin una ruta",
+        "backupPathRequired": "Se requiere la ruta del archivo de copia de seguridad y el nombre de origen",
+        "backupPathAbsolute": "La ruta del archivo de copia de seguridad debe ser una ruta absoluta",
+        "cwaAppDatabasePathRequired": "Se requiere la ruta de la instantánea automática de app.db para Calibre-Web.",
+        "cwaAppDatabasePathAbsolute": "La ruta de la instantánea automática de app.db de Calibre-Web debe ser absoluta.",
+        "cwaMetadataDatabasePathRequired": "Se requiere la ruta de la instantánea de metadata.db de Calibre.",
+        "cwaMetadataDatabasePathAbsolute": "La ruta de instantánea de Calibre metadata.db debe ser absoluta"
+      },
+      "cwa": {
+        "snapshotTitle": "Modo de instantánea detenido",
+        "stoppedWarning": "Detén el proceso automatizado de Calibre-Web antes de copiar ambas bases de datos. BookOrbit no puede verificar que las dos instantáneas se hayan copiado exactamente en el mismo instante.",
+        "importRootGuidance": "Ambos archivos snapshot deben ser rutas de servidor legibles debajo del directorio MIGRATION_IMPORT_ROOT.",
+        "logicalRootGuidance": "El mapeo de rutas de libros utiliza la raíz lógica de librería Calibre almacenada en app.db, no la carpeta host que contiene estas instantáneas de base de datos.",
+        "compatibilityNote": "El comportamiento del esquema se ha verificado con Calibre-Web Automated v4.0.6. Sus bases de datos no exponen una versión de lanzamiento de la aplicación que sea fiable."
       },
       "mediaPath": {
         "hintRequired": "Requerido para migrar portadas de libros.",
@@ -5921,6 +6035,7 @@
       "refresh": "Actualizar",
       "sourceUser": "Usuario fuente",
       "targetUser": "Usuario objetivo",
+      "doNotImport": "No importar este usuario",
       "noSourceUsersLoaded": "Aún no se han cargado usuarios de origen.",
       "noActiveTargetUsers": "No se encontraron usuarios objetivo activos. Cree o vuelva a habilitar un usuario BookOrbit antes de realizar la asignación.",
       "pathPrefixMappings": "Asignaciones de prefijos de ruta",
@@ -6038,8 +6153,10 @@
       "noFilePathMatch": "La ruta del archivo no coincide con ningún libro de esta biblioteca.",
       "noFileHashMatch": "El hash del archivo no coincide con ningún libro de esta biblioteca",
       "noIsbnMatch": "ISBN no coincide con ningún libro de esta biblioteca",
+      "noAsinMatch": "ISBN no coincide con ningún libro de esta biblioteca",
       "insufficientSourceData": "No hay suficientes metadatos para intentar hacer coincidir",
       "ambiguousIsbnMatch": "Varios libros coincidieron con el mismo ISBN",
+      "ambiguousAsinMatch": "Varios libros coinciden con el mismo ISBN",
       "ambiguousFileHashMatch": "Varios libros coincidieron con el mismo hash de archivo",
       "ambiguousFilePathMatch": "Varios libros coincidieron con la misma ruta de archivo",
       "ambiguousTitleAuthorMatch": "Varios libros coincidían con el mismo título y autor",
@@ -6047,6 +6164,7 @@
     },
     "matchStrategy": {
       "isbn": "Emparejado por ISBN",
+      "asin": "Emparejado por ISBN",
       "fileHash": "Coincidencia por hash de archivo",
       "pathMapping": "Coincidencia por ruta de archivo asignada",
       "titleAuthor": "Emparejado por título y autor",
@@ -6119,6 +6237,7 @@
   },
   "notifications": {
     "title": "Notificaciones",
+    "description": "Revisar y administrar tus notificaciones.",
     "markAllRead": "Marcar todo como leído",
     "clear": "Borrar",
     "empty": "Aún no hay notificaciones",
@@ -6232,6 +6351,7 @@
     "settings": {
       "title": "Configuración",
       "ariaLabel": "Configuración del lector",
+      "close": "Cerrar ajustes",
       "reset": "Restablecer valores predeterminados",
       "modeLabel": "Modo color",
       "mode": {

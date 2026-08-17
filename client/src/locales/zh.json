@@ -32,7 +32,7 @@
         },
         "summary": {
           "title": "分享摘要",
-          "description": "分享合计习惯而不使用书名、作者、系列片或写词。"
+          "description": "分享汇总后的使用习惯，但不包含书名、作者、系列或叙述者。"
         },
         "detailed": {
           "title": "分享详细的看法",
@@ -94,7 +94,7 @@
       "pageSubtitle": "控制主题、封面、布局以及书库的呈现方式。",
       "mobileSummary": "主题：{theme}・强调色：{accent}・背景：{background}",
       "themeMode": {
-        "light": "亮色的",
+        "light": "浅色",
         "dark": "深色",
         "system": "系统"
       },
@@ -638,7 +638,7 @@
         "created": "已创建",
         "status": "状态",
         "totalUses": "总使用量",
-        "actions": "行动"
+        "actions": "操作"
       },
       "createDialog": {
         "title": "创建魔法链接",
@@ -1217,8 +1217,8 @@
         "seriesName": "系列名称",
         "seriesIndex": "系列索引",
         "genres": "体裁",
-        "narrators": "神秘者",
-        "duration": "期限",
+        "narrators": "叙述者",
+        "duration": "阅读时长",
         "abridged": "桥接的"
       },
       "mergeStrategy": {
@@ -1350,7 +1350,7 @@
         "clearAllProviders": "清除所有提供商",
         "clearAll": "全部清除",
         "resetToDefault": "重置为默认值",
-        "reset": "Reset",
+        "reset": "重置",
         "dragProvidersHint": "将提供商从这里拖动到任何字段以添加它",
         "dragProviderHere": "将一个提供商拖到这里",
         "howItWorks": {
@@ -1708,7 +1708,7 @@
         "styleItalic": "斜体",
         "weightThin": "最小值",
         "weightExtraLight": "额外的光线",
-        "weightLight": "亮色的",
+        "weightLight": "浅色",
         "weightRegular": "常规的",
         "weightMedium": "中",
         "weightSemiBold": "半粗体",
@@ -1958,7 +1958,7 @@
             "bookDownload": "下载未完成",
             "progressUpdate": "读取位置未更新",
             "annotationsPull": "摘录未发送",
-            "annotationsPush": "未导入摘录"
+            "annotationsPush": "未导入高亮"
           },
           "chip": {
             "morePending": "更多待处理",
@@ -2144,7 +2144,7 @@
         "latestPluginSuffix": "- 最新插件版本 v {version}",
         "matchedBooks": "匹配的书",
         "readingEvents": "正在阅读事件",
-        "highlights": "高光",
+        "highlights": "高亮",
         "syncedTotals": "已同步总计",
         "trashedHighlights": "回收站突出显示",
         "pendingDeletes": "{count, plural, =0 {没有删除等待KOReader 插件确认的摘录内容。} one {# 删除了等待KOReader 插件确认的摘录内容。} other {# 删除了等待KOReader 插件确认的高亮内容。}}",
@@ -2595,7 +2595,7 @@
         "email": "电子邮件地址",
         "access": "访问权限",
         "status": "状态",
-        "actions": "行动"
+        "actions": "操作"
       },
       "adminBadge": "管理员",
       "permissionCount": "{count, plural, =0 {没有权限} one {一个权限} other {# 权限}}",
@@ -2786,7 +2786,7 @@
       "bulkTrash": "回收站",
       "bulkRestore": "恢复",
       "tabs": {
-        "highlights": "摘录",
+        "highlights": "高亮",
         "trash": "回收站"
       },
       "empty": {
@@ -3189,7 +3189,7 @@
     "header": {
       "never": "从不使用",
       "portraitAlt": "{name} 的头像",
-      "actions": "行动",
+      "actions": "操作",
       "editAuthor": "编辑作者",
       "mergeAuthors": "合并作者",
       "refreshing": "刷新中……",
@@ -3345,7 +3345,7 @@
     },
     "actions": {
       "read": "阅读",
-      "listen": "监听",
+      "listen": "听书",
       "peek": "快速预览",
       "quickView": "快速视图",
       "details": "详细信息",
@@ -3366,13 +3366,13 @@
     },
     "readStatus": {
       "unread": "未读",
-      "wantToRead": "想要阅读",
+      "wantToRead": "想读",
       "reading": "正在阅读",
-      "onHold": "按住时",
-      "rereading": "重新读取",
+      "onHold": "搁置",
+      "rereading": "重读",
       "read": "已读",
-      "skimmed": "Skimed",
-      "abandoned": "废弃的"
+      "skimmed": "略读",
+      "abandoned": "弃读"
     },
     "download": {
       "action": "下载",
@@ -3399,7 +3399,7 @@
         "publisher": "出版社",
         "fileSize": "文件大小",
         "readProgress": "读取进度",
-        "readStatus": "读取状态",
+        "readStatus": "阅读状态",
         "format": "格式",
         "lastReadAt": "最后读",
         "startedAt": "开始日期",
@@ -3443,7 +3443,7 @@
         "rating": "评分",
         "communityRating": "社区评分",
         "readProgress": "阅读进度",
-        "readStatus": "读取状态",
+        "readStatus": "阅读状态",
         "description": "描述",
         "isbn": "ISBN",
         "metadataScore": "元数据分数",
@@ -3586,7 +3586,7 @@
       "columns": {
         "cover": "封面",
         "read": "阅读",
-        "actions": "行动"
+        "actions": "操作"
       }
     },
     "shortcuts": {
@@ -3601,7 +3601,7 @@
         "jumpLastRow": "跳转到最后一行"
       },
       "actions": {
-        "title": "行动",
+        "title": "操作",
         "editCell": "编辑焦点单元",
         "cancelEditing": "取消编辑/关闭叠加",
         "toggleRowSelection": "切换行选择",
@@ -3674,7 +3674,7 @@
         "editMetadata": "编辑元数据",
         "files": "文件",
         "readingLog": "阅读日志",
-        "highlights": "摘录"
+        "highlights": "高亮"
       },
       "discover": {
         "moreInSeries": "更多在系列中",
@@ -3772,10 +3772,10 @@
         "narratedBy": "叙述者",
         "ratingLocked": "评分已锁定",
         "rateStar": "评分 {star} 星",
-        "listen": "监听",
+        "listen": "听书",
         "read": "阅读",
         "chooseFormat": "选择格式",
-        "audiobook": "音频簿",
+        "audiobook": "有声书",
         "primary": "主要的",
         "peek": "快速预览",
         "sendViaEmail": "通过电子邮件发送",
@@ -3797,16 +3797,16 @@
         "metadataScore": "元数据分数",
         "primaryFormat": "主要格式",
         "openIn": "使用 {provider} 打开",
-        "showLess": "显示更少的",
+        "showLess": "显示更少",
         "showMore": "显示更多",
         "publisher": "出版社",
         "published": "已发布",
         "language": "语言",
         "pages": "页 次",
-        "duration": "期限",
-        "edition": "编辑",
-        "abridged": "桥接的",
-        "unabridged": "未缩写",
+        "duration": "阅读时长",
+        "edition": "版本",
+        "abridged": "节选版",
+        "unabridged": "未删节版",
         "isbn": "ISBN",
         "fileSize": "文件大小",
         "library": "书库",
@@ -4184,8 +4184,8 @@
           "sourceManual": "手动模式",
           "colDate": "日期",
           "colDateMobile": "日期",
-          "colDuration": "期限",
-          "colDurationMobile": "期限",
+          "colDuration": "阅读时长",
+          "colDurationMobile": "阅读时长",
           "colProgressChange": "进度变化",
           "colProgressChangeMobile": "德尔塔",
           "colEndProgress": "结束进度",
@@ -4716,9 +4716,9 @@
       "uploadBooks": "上传书",
       "appearance": "外观",
       "theme": "主题",
-      "accent": "刻度",
-      "radius": "Radius",
-      "background": "二. 背景",
+      "accent": "强调色",
+      "radius": "圆角",
+      "background": "背景",
       "settings": "设置",
       "whatsNew": "新功能",
       "documentation": "文件",
@@ -4974,10 +4974,10 @@
         "readingStreak": "阅读连续记录",
         "currentlyReading": "正在阅读",
         "readingGoal": "正在阅读目标",
-        "readingDna": "正在读取 DNA",
+        "readingDna": "阅读 DNA",
         "monthlyChallenge": "每月挑战",
         "highlightOfTheDay": "每日摘录",
-        "neglectedGems": "被忽略的 Gems",
+        "neglectedGems": "被埋没的佳作",
         "readingRhythm": "阅读节奏",
         "diversityScore": "多样性得分",
         "libraryOverview": "书库概览",
@@ -4988,7 +4988,7 @@
         "recentlyAdded": "最近添加",
         "continueReading": "继续阅读",
         "continueListening": "继续收听中",
-        "wantToRead": "想要阅读",
+        "wantToRead": "想读",
         "upNextInSeries": "上一系列中的下一个",
         "random": "发现新鲜事",
         "smartScope": "智能瞄准镜"
@@ -5064,23 +5064,23 @@
         "complete": "已完成！"
       },
       "neglectedGems": {
-        "title": "被忽略的 Gems",
+        "title": "被埋没的佳作",
         "empty": "您所有的评分最高的书籍都已读完！",
         "rating": "{rating}/5 分",
         "daysWaiting": "已等待 {count} 天",
         "queued": "队列中",
         "addToQueue": "添加到队列",
-        "shuffle": "随机播放"
+        "shuffle": "随机"
       },
       "readingDna": {
-        "title": "正在读取 DNA",
+        "title": "阅读 DNA",
         "notEnoughData": "阅读至少5本书解锁你的阅读DNA",
         "basedOn": "{count, plural, =0 {基于没有书籍} one {基于# 本} other {基于# 本}}",
         "traits": {
-          "length": "长度",
-          "variety": "变量",
-          "rhythm": "节日",
-          "time": "时间",
+          "length": "时长",
+          "variety": "多样性",
+          "rhythm": "节奏",
+          "time": "时段",
           "speed": "速度"
         }
       },
@@ -6116,6 +6116,7 @@
   },
   "notifications": {
     "title": "通知",
+    "description": "查看和管理您的通知。",
     "markAllRead": "全部标记为已读",
     "clear": "清空",
     "empty": "还没有通知",
@@ -6229,6 +6230,7 @@
     "settings": {
       "title": "设置",
       "ariaLabel": "阅读器设置",
+      "close": "关闭设置",
       "reset": "恢复默认设置",
       "modeLabel": "配色模式",
       "mode": {
@@ -6303,7 +6305,7 @@
       "tabs": {
         "chapters": "章 次",
         "bookmarks": "书签",
-        "highlights": "高光",
+        "highlights": "高亮",
         "toc": "目录",
         "tocShort": "排行",
         "marksShort": "Marks",
@@ -6364,7 +6366,7 @@
       "groups": {
         "panels": "专家小组",
         "reading": "正在阅读",
-        "actions": "行动"
+        "actions": "操作"
       },
       "toggleToc": "切换内容表",
       "toggleSearch": "切换搜索",
@@ -6379,7 +6381,7 @@
     },
     "cbz": {
       "fitMode": "适合模式",
-      "background": "二. 背景",
+      "background": "背景",
       "scrollMode": "滚动模式",
       "scrollModeHint": "对网络玩具和垂直条纹使用“无差距”。",
       "readingDirection": "阅读方向",
@@ -6494,7 +6496,7 @@
       "filters": "筛选器",
       "clear": "清空",
       "noMatch": "没有匹配筛选器的系列文件。",
-      "empty": "您的资料库中没有找到系列片。",
+      "empty": "您的资料库中没有找到系列。",
       "sort": {
         "name": "名称",
         "bookCount": "书计数",
