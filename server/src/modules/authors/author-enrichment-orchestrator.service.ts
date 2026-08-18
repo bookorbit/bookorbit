@@ -2,11 +2,11 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, OnModuleIn
 import type { AuthorEnrichmentFailedPage } from '@bookorbit/types';
 import { NotificationType } from '@bookorbit/types';
 
-import { AppSettingsService } from '../app-settings/app-settings.service';
 import { NotificationService } from '../notification/notification.service';
 import { METADATA_AUTHORS_REPLACED, MetadataAuthorsReplacedEvent, MetadataEventsService } from '../metadata/metadata-events.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
+import { AuthorMetadataPreferencesService } from './author-metadata-preferences.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 import { AUTHOR_ENRICHMENT_REASONS, AuthorEnrichmentReason } from './author-enrichment-reasons';
@@ -35,8 +35,8 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   constructor(
     private readonly queueRepo: AuthorEnrichmentRepository,
     private readonly executor: AuthorEnrichmentExecutorService,
-    private readonly appSettings: AppSettingsService,
     private readonly enrichmentConfig: AuthorEnrichmentConfigService,
+    private readonly metadataPreferences: AuthorMetadataPreferencesService,
     private readonly metadataEvents: MetadataEventsService,
     private readonly session: AuthorEnrichmentSessionService,
     private readonly notificationService: NotificationService,
@@ -233,16 +233,9 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
       await this.emitStatusSnapshot();
     }
 
-    const [{ writeMode }, audnexusEnabled] = await Promise.all([
-      this.enrichmentConfig.getConfig(),
-      this.appSettings.isAuthorsProviderAudnexusEnabled(),
-    ]);
+    const preferences = await this.metadataPreferences.getPreferences();
 
-    const result = await this.executor.execute({
-      authorId,
-      writeMode,
-      audnexusEnabled,
-    });
+    const result = await this.executor.execute({ authorId, preferences });
 
     if (result.kind === 'done') {
       this.logger.debug(

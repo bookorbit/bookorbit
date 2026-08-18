@@ -19,13 +19,15 @@ describe('AuthorMetadataFetchService', () => {
 
   it('listProviders maps registry providers for client display', () => {
     registry.all.mockReturnValue([
-      { key: 'audnexus', label: 'Audnexus', identifiable: true },
-      { key: 'other', label: 'Other', identifiable: false },
+      { key: 'audnexus', label: 'Audnexus', identifiable: true, supportedFields: ['description', 'photo'] },
+      { key: 'other', label: 'Other', identifiable: false, supportedFields: [] },
     ]);
 
+    // supportedFields tells the settings UI which fields a provider may be
+    // assigned to at all.
     expect(service.listProviders()).toEqual([
-      { key: 'audnexus', label: 'Audnexus', identifiable: true },
-      { key: 'other', label: 'Other', identifiable: false },
+      { key: 'audnexus', label: 'Audnexus', identifiable: true, supportedFields: ['description', 'photo'] },
+      { key: 'other', label: 'Other', identifiable: false, supportedFields: [] },
     ]);
   });
 

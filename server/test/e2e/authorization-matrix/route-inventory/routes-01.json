@@ -814,5 +814,29 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "getMetadataPreferences",
+    "httpMethod": "GET",
+    "path": "/authors/metadata/preferences",
+    "permissions": ["Permission.ManageMetadataConfig"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/authors/authors.controller.ts",
+    "className": "AuthorsController",
+    "methodName": "setMetadataPreferences",
+    "httpMethod": "PUT",
+    "path": "/authors/metadata/preferences",
+    "permissions": ["Permission.ManageMetadataConfig"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

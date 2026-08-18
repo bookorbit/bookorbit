@@ -35,6 +35,7 @@ export class AuthorMetadataFetchService {
       key: provider.key,
       label: provider.label,
       identifiable: provider.identifiable,
+      supportedFields: [...provider.supportedFields],
     }));
   }
 
@@ -119,6 +120,26 @@ export class AuthorMetadataFetchService {
     }
 
     return { candidate: null, failure: lastFailure };
+  }
+
+  // Per-field preferences need a candidate from every listed provider, not the
+  // first one that answers, so each provider is resolved independently and
+  // failures are reported alongside whatever did succeed.
+  async collectByProvider(
+    params: AuthorMetadataSearchParams,
+    keys: AuthorMetadataProviderKey[],
+  ): Promise<{ candidates: Map<AuthorMetadataProviderKey, AuthorMetadataCandidate>; failures: AuthorMetadataFetchFailure[] }> {
+    const candidates = new Map<AuthorMetadataProviderKey, AuthorMetadataCandidate>();
+    const failures: AuthorMetadataFetchFailure[] = [];
+
+    for (const key of keys) {
+      if (!this.registry.find(key)) continue;
+      const result = await this.quickSearchDetailed(params, { keys: [key] });
+      if (result.candidate) candidates.set(key, result.candidate);
+      if (result.failure) failures.push(result.failure);
+    }
+
+    return { candidates, failures };
   }
 
   async lookupById(key: AuthorMetadataProviderKey, providerId: string, region?: string): Promise<AuthorMetadataCandidate | null> {
