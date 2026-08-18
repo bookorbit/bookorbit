@@ -37,7 +37,46 @@
         }
       },
       "fields": {
-        "books": "현재, 최근, 그리고 가장 많이 읽힌 도서 제목"
+        "frequency": "독서 빈도 및 활동 일수",
+        "completion": "책 집계 시작 및 완료됨",
+        "formats": "포맷 분포",
+        "genres": "광범위 장르 분포",
+        "trend": "독서 경향 집계",
+        "books": "현재, 최근, 그리고 가장 많이 읽힌 도서 제목",
+        "authors": "인기 작가",
+        "series": "인기 시리즈",
+        "narrators": "인기 내레이터"
+      },
+      "confirm": {
+        "shareTitle": "{level}를 활성화하시겠습니까?",
+        "shareDescription": "권한 있는 관리자가 다음 정보를 볼 수 있습니다.",
+        "stopTitle": "독서 인사이트 공유를 중단하시겠습니까?",
+        "stopDescription": "관리자 접근이 즉시 차단됩니다. 기존 접근 기록은 이력에 남아 있습니다.",
+        "recordedNotice": "각 관리자 프로필 보기 열람이 저장되어 접근 이력에 나타납니다."
+      },
+      "preview": {
+        "title": "공유 프로필 미리보기",
+        "description": "현재 권한 있는 관리자에게 제공되는 정보를 확인합니다.",
+        "action": "미리보기 불러오기",
+        "readingTime": "독서 시간",
+        "activeDays": "활동 일수",
+        "started": "독서 시작됨",
+        "completed": "독서 완료됨",
+        "topBooks": "인기 도서"
+      },
+      "history": {
+        "title": "프로필 접근 이력",
+        "description": "공유 독서 프로필에 대한 관리자의 최근 열람 기록입니다.",
+        "empty": "관리자의 공유 독서 프로필 열람 기록이 없습니다.",
+        "paginationLabel": "프로필 열람 이력 페이지"
+      },
+      "durationMinutes": "{count, plural, one {#분} other {#분}}",
+      "durationHours": "{count, plural, one {#시간} other {#시간}}",
+      "unknownTitle": "제목 없는 책",
+      "errors": {
+        "load": "공유 설정 불러오기 실패.",
+        "save": "공유 설정 업데이트 실패.",
+        "preview": "공유 프로필 미리보기 불러오기 실패."
       }
     },
     "appearance": {
@@ -48,17 +87,74 @@
         "loadError": "선택한 언어 불러오기 실패",
         "saveError": "언어 설정 저장 실패"
       },
+      "pageTitle": "디스플레이",
+      "pageSubtitle": "테마, 표지, 레이아웃 및 라이브러리 표시 방법을 제어합니다.",
+      "mobileSummary": "테마: {theme} • 강조: {accent} • 배경: {background}",
+      "themeMode": {
+        "light": "라이트",
+        "dark": "다크",
+        "system": "시스템"
+      },
       "theme": {
+        "title": "테마",
+        "colorScheme": {
+          "label": "색상 구성",
+          "hint": "라이트 또는 다크 인터페이스"
+        },
         "accents": {
+          "grey": "그레이",
+          "scarlet": "스칼렛",
+          "vermilion": "버밀리온",
+          "rose": "로즈",
+          "copper": "코퍼",
+          "orange": "오렌지",
+          "chartreuse": "샤르트뢰즈",
+          "marigold": "마리골드",
+          "wasabi": "와사비",
+          "amber": "앰버",
+          "malachite": "말라카이트",
+          "yellow": "노랑",
+          "viridian": "비리디언",
+          "turquoise": "터쿼이즈",
+          "lime": "라임",
+          "green": "초록",
+          "acid-green": "애시드 그린",
+          "emerald": "에메랄드",
+          "teal": "틸",
+          "electric-blue": "일렉트릭 블루",
           "foam": "폼"
+        },
+        "libraryBackground": {
+          "pattern": {
+            "label": "배경 패턴",
+            "hint": "책 그리드 뒤에 표시되는 패턴"
+          }
         }
       },
       "storage": {
+        "title": "표시 설정을 저장할 곳을 지정합니다",
+        "active": "활성",
+        "notAvailable": "사용 불가",
         "device": {
+          "title": "이 기기만",
           "description": "브라우저에 설정을 저장합니다. 기기마다 다른 외관을 원할 때 추천."
+        },
+        "account": {
+          "title": "내 계정",
+          "description": "설정이 계정에 저장됩니다. 모든 기기에서 동일한 설정을 원할 경우 권장됩니다."
+        },
+        "toasts": {
+          "synced": "설정 내용이 동기화됩니다",
+          "local": "설정 내용이 이 기기에 한정됩니다"
+        },
+        "errors": {
+          "demoRestricted": "데모 제한 계정은 테마 저장 모드를 변경할 수 없습니다",
+          "update": "저장 모드 업데이트 실패",
+          "generic": "저장 모드 업데이트 중 오류가 발생했습니다"
         }
       },
       "bookCovers": {
+        "title": "책 표지",
         "coverSearch": {
           "label": "기본 커버 검색 공급자"
         },
