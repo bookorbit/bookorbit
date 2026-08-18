@@ -68,9 +68,11 @@ export function buildMetadataLockCandidates(
     openLibrary: {
       provider: MetadataProviderKey.OPEN_LIBRARY,
       providerId: `ol-${slug}`,
-      title: `${baseTitle} - open-library`,
+      // Same book as the Goodreads candidate above, as a second provider would report it:
+      // cross-provider agreement drops candidates that describe a different book.
+      title: `${baseTitle} - refreshed (Open Library edition)`,
       subtitle: 'Open Library subtitle',
-      authors: ['Open Library Author'],
+      authors: ['Refreshed Author'],
       description: 'Open Library fallback description',
       publisher: 'Open Library Publisher',
       publishedYear: 2023,

@@ -1,10 +1,21 @@
 import { MetadataCandidate } from '@bookorbit/types';
-import { distance } from 'fastest-levenshtein';
 
 import { candidateHasNormalizedIsbn, normalizeMetadataIsbn } from './isbn-match';
 import { MetadataSearchParams } from './providers/metadata-search-params';
+import { normalizeTitleText, scoreTitleMatch, shareSignificantToken } from './title-match';
 
 const DEFAULT_LIMIT = 5;
+
+export const ISBN_MATCH_SCORE = 100;
+export const AUTHOR_MATCH_SCORE = 3;
+export const AUTHOR_TOKEN_MATCH_SCORE = 1;
+
+/**
+ * The weakest title signal a candidate may rest on. Anything below this is a coincidence rather
+ * than a match: a shared word or two out of a longer title, or two unrelated titles that happen to
+ * be similar in length. Kept low enough that a typo'd title still resolves through the fuzzy path.
+ */
+export const MIN_RELEVANCE_SCORE = 3;
 
 const SKIP_TITLE_PATTERNS = [
   /^(summary|study guide|analysis|guide to|workbook|review of|summary of|chapter summary|chapter-by-chapter)\b/i,
@@ -16,7 +27,7 @@ const SKIP_TITLE_PATTERNS = [
  *
  * - If no title or author is available in params, returns candidates as-is (no basis for scoring).
  * - ISBN exact match always survives regardless of title/author score.
- * - Candidates scoring 0 are dropped (no meaningful signal).
+ * - Candidates below `MIN_RELEVANCE_SCORE` are dropped.
  * - Survivors are sorted descending by score and capped at `limit`.
  */
 export function filterAndRank(candidates: MetadataCandidate[], params: MetadataSearchParams, limit = DEFAULT_LIMIT): MetadataCandidate[] {
@@ -30,29 +41,29 @@ export function filterAndRank(candidates: MetadataCandidate[], params: MetadataS
       return !matchable || !SKIP_TITLE_PATTERNS.some((pattern) => pattern.test(matchable));
     })
     .map((c) => ({ candidate: c, score: scoreCandidate(c, params) }))
-    .filter(({ score }) => score > 0)
+    .filter(({ score }) => score >= MIN_RELEVANCE_SCORE)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(({ candidate }) => candidate);
 }
 
-function scoreCandidate(candidate: MetadataCandidate, params: MetadataSearchParams): number {
+export function scoreCandidate(candidate: MetadataCandidate, params: MetadataSearchParams): number {
   if (params.isbn) {
     const isbn = normalizeMetadataIsbn(params.isbn);
-    if (candidateHasNormalizedIsbn(candidate, isbn)) return 100;
+    if (candidateHasNormalizedIsbn(candidate, isbn)) return ISBN_MATCH_SCORE;
   }
 
   let score = 0;
 
   const matchable = matchableTitle(candidate);
   if (params.title && matchable) {
-    score += scoreTitle(normalize(params.title), normalize(matchable));
+    score += scoreTitleMatch(params.title, matchable);
   }
 
   // Author only boosts when there is already a positive title signal.
   // A matching author alone (e.g. a different book by the same author) is not enough to keep a result.
   if (score > 0 && params.author && candidate.authors?.length) {
-    score += scoreAuthor(normalize(params.author), candidate.authors.map(normalize));
+    score += scoreAuthor(params.author, candidate.authors);
   }
 
   return score;
@@ -63,50 +74,20 @@ function scoreCandidate(candidate: MetadataCandidate, params: MetadataSearchPara
  * disambiguating label (ComicVine's "<volume> #<issue> - <name>"), which is what a user's query
  * is shaped like; `title` alone can be just an issue name, or absent entirely.
  */
-function matchableTitle(candidate: MetadataCandidate): string | undefined {
+export function matchableTitle(candidate: MetadataCandidate): string | undefined {
   return candidate.displayTitle ?? candidate.title;
 }
 
-function scoreTitle(query: string, candidate: string): number {
-  if (candidate === query) return 10;
-  if (candidate.startsWith(query) || query.startsWith(candidate)) return 8;
-  if (candidate.includes(query) || query.includes(candidate)) return 7;
-
-  const queryTokens = tokenize(query);
-  const candidateTokens = new Set(tokenize(candidate));
-  const overlapRatio = queryTokens.length > 0 ? queryTokens.filter((w) => candidateTokens.has(w)).length / queryTokens.length : 0;
-  const tokenScore = overlapRatio * 6;
-
-  const sim = levenshteinSim(query, candidate);
-  const levenScore = sim >= 0.6 ? sim * 4 : 0;
-
-  return Math.max(tokenScore, levenScore);
-}
-
 function scoreAuthor(query: string, candidateAuthors: string[]): number {
-  const queryTokens = new Set(tokenize(query).filter((w) => w.length > 2));
-  for (const ca of candidateAuthors) {
-    if (ca.includes(query) || query.includes(ca)) return 3;
-    if (tokenize(ca).some((w) => queryTokens.has(w))) return 1;
+  const normalizedQuery = normalizeTitleText(query);
+  if (!normalizedQuery) return 0;
+
+  for (const candidateAuthor of candidateAuthors) {
+    const normalizedAuthor = normalizeTitleText(candidateAuthor);
+    if (!normalizedAuthor) continue;
+    if (normalizedAuthor.includes(normalizedQuery) || normalizedQuery.includes(normalizedAuthor)) return AUTHOR_MATCH_SCORE;
   }
-  return 0;
-}
-
-function levenshteinSim(a: string, b: string): number {
-  const maxLen = Math.max(a.length, b.length);
-  return maxLen === 0 ? 1 : 1 - distance(a, b) / maxLen;
-}
-
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function tokenize(s: string): string[] {
-  return s.split(' ').filter((w) => w.length > 1);
+  return shareSignificantToken([query], candidateAuthors) ? AUTHOR_TOKEN_MATCH_SCORE : 0;
 }
 
 function hasText(v: string | undefined): boolean {

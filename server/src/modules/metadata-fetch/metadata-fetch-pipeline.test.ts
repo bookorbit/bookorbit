@@ -35,11 +35,16 @@ function createPreferences(mutate?: (fields: Record<MetadataField, FieldPreferen
   return { fields };
 }
 
+// Candidates share a title by default so that fixtures exercising field-rule precedence describe
+// one book. Cross-provider agreement drops candidates that describe a different book, which is a
+// separate concern with its own tests.
+const SHARED_CANDIDATE_TITLE = 'Shared Candidate Book';
+
 function candidate(provider: MetadataProviderKey, providerId: string, data: Partial<MetadataCandidate> = {}): MetadataCandidate {
   return {
     provider,
     providerId,
-    title: data.title ?? `${provider}-${providerId}`,
+    title: data.title ?? SHARED_CANDIDATE_TITLE,
     ...data,
   };
 }
@@ -374,6 +379,165 @@ describe('MetadataFetchPipeline', () => {
     expect(resolved.description).toBe('Fetched Description');
     expect(sources.title).toBeUndefined();
     expect(sources.description).toBe(MetadataProviderKey.GOOGLE);
+  });
+
+  describe('cross-provider agreement', () => {
+    function primeAgreementPreferences() {
+      const prefs = createPreferences((fields) => {
+        fields.title = {
+          enabled: true,
+          providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+        fields.subtitle = {
+          enabled: true,
+          providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+        fields.authors = {
+          enabled: true,
+          providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+        fields.publisher = {
+          enabled: true,
+          providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+        fields.cover = {
+          enabled: true,
+          providers: [MetadataProviderKey.AMAZON, MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+        fields.pageCount = {
+          enabled: true,
+          providers: [MetadataProviderKey.AMAZON, MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+      });
+
+      preferencesService.getGlobal.mockResolvedValue(prefs);
+      resolver.resolve.mockReturnValue(prefs);
+      resolver.withForwardCompatibility.mockReturnValue(prefs);
+      registry.all.mockReturnValue([
+        { key: MetadataProviderKey.GOODREADS },
+        { key: MetadataProviderKey.GOOGLE },
+        { key: MetadataProviderKey.AMAZON },
+      ] as never);
+    }
+
+    it('never assembles one record out of candidates describing different books', async () => {
+      primeAgreementPreferences();
+      fetchService.search.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOODREADS, 'gr1', {
+            title: 'The Girl on the Train',
+            subtitle: 'A Novel of Suspense',
+            authors: ['Paula Hawkins'],
+            publisher: 'Riverhead Books',
+          }),
+          candidate(MetadataProviderKey.AMAZON, 'az1', {
+            title: 'The Hobbit Cookbook',
+            authors: ['Some Chef'],
+            coverUrl: 'https://example.com/wrong-cover.jpg',
+            pageCount: 120,
+          }),
+          candidate(MetadataProviderKey.GOOGLE, 'gg1', {
+            title: 'The Hobbit',
+            authors: ['J.R.R. Tolkien'],
+            publisher: 'George Allen & Unwin',
+            coverUrl: 'https://example.com/correct-cover.jpg',
+          }),
+        ),
+      );
+
+      const { resolved, sources, diagnostics } = await pipeline.runWithSources({ title: 'The Hobbit', author: 'J.R.R. Tolkien' }, {});
+
+      expect(resolved.title).toBe('The Hobbit');
+      expect(resolved.authors).toEqual(['J.R.R. Tolkien']);
+      expect(resolved.publisher).toBe('George Allen & Unwin');
+      expect(resolved.coverUrl).toBe('https://example.com/correct-cover.jpg');
+      expect(resolved.subtitle).toBeUndefined();
+      expect(resolved.pageCount).toBeUndefined();
+      expect(new Set(Object.values(sources))).toEqual(new Set([MetadataProviderKey.GOOGLE]));
+      expect(diagnostics.candidateProviders).toEqual([MetadataProviderKey.GOOGLE]);
+    });
+
+    it('reports no candidates when every provider matched a different book', async () => {
+      primeAgreementPreferences();
+      fetchService.search.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'The Girl on the Train', authors: ['Paula Hawkins'] }),
+          candidate(MetadataProviderKey.AMAZON, 'az1', { title: 'The Silence of the Lambs', authors: ['Thomas Harris'] }),
+        ),
+      );
+
+      const { resolved, diagnostics } = await pipeline.runWithSources({ title: 'The Hobbit', author: 'J.R.R. Tolkien' }, {});
+
+      // The most trusted provider anchors, so its own record still applies; the unrelated one does not.
+      expect(resolved.title).toBe('The Girl on the Train');
+      expect(diagnostics.candidateProviders).toEqual([MetadataProviderKey.GOODREADS]);
+      expect(diagnostics.candidateCount).toBe(1);
+    });
+
+    it('still fills a field from a lower-priority provider that agrees on the book', async () => {
+      primeAgreementPreferences();
+      fetchService.search.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'The Hobbit', authors: ['J.R.R. Tolkien'] }),
+          candidate(MetadataProviderKey.AMAZON, 'az1', {
+            title: 'The Hobbit: Or There and Back Again',
+            authors: ['J. R. R. Tolkien'],
+            coverUrl: 'https://example.com/cover.jpg',
+            pageCount: 310,
+          }),
+        ),
+      );
+
+      const { resolved, sources } = await pipeline.runWithSources({ title: 'The Hobbit', author: 'J.R.R. Tolkien' }, {});
+
+      expect(resolved.title).toBe('The Hobbit');
+      expect(resolved.coverUrl).toBe('https://example.com/cover.jpg');
+      expect(resolved.pageCount).toBe(310);
+      expect(sources.coverUrl).toBe(MetadataProviderKey.AMAZON);
+    });
+
+    it('does not store provider ids for candidates describing a different book', async () => {
+      const prefs = createPreferences((fields) => {
+        fields.title = {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.GOODREADS],
+          mergeStrategy: 'overwriteIfProvided',
+        };
+      });
+      prefs.options = { genres: { mode: 'firstProvider', blocklist: [], maxCount: null }, saveProviderIds: true };
+      preferencesService.getGlobal.mockResolvedValue(prefs);
+      resolver.resolve.mockReturnValue(prefs);
+      resolver.withForwardCompatibility.mockReturnValue(prefs);
+      registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.GOODREADS }] as never);
+      fetchService.search.mockReturnValue(
+        of(
+          candidate(MetadataProviderKey.GOOGLE, 'gg1', { title: 'The Hobbit', authors: ['J.R.R. Tolkien'] }),
+          candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'The Girl on the Train', authors: ['Paula Hawkins'] }),
+        ),
+      );
+
+      const { providerIds } = await pipeline.runWithSources({ title: 'The Hobbit', author: 'J.R.R. Tolkien' }, {});
+
+      expect(providerIds[MetadataProviderKey.GOOGLE]).toBe('gg1');
+      expect(providerIds[MetadataProviderKey.GOODREADS]).toBeUndefined();
+    });
+
+    it('leaves a single provider untouched, having nothing to disagree with', async () => {
+      primeAgreementPreferences();
+      fetchService.search.mockReturnValue(
+        of(candidate(MetadataProviderKey.GOODREADS, 'gr1', { title: 'A Loosely Matching Title', authors: ['Someone'] })),
+      );
+
+      const { resolved } = await pipeline.runWithSources({ title: 'The Hobbit', author: 'J.R.R. Tolkien' }, {});
+
+      expect(resolved.title).toBe('A Loosely Matching Title');
+    });
   });
 
   it('falls back to the next provider in order when the first provider does not provide the requested field', async () => {
