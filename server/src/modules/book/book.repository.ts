@@ -44,6 +44,8 @@ import {
   koboReadingStates,
   koboSnapshotBooks,
   koboSyncSettings,
+  koreaderDeviceProgress,
+  koreaderProgressResets,
   libraries,
   narrators,
   audiobookProgress,
@@ -58,6 +60,7 @@ type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 type MetadataUpdateExecutor = Pick<Db, 'delete' | 'insert' | 'select' | 'update'>;
 type MetadataReadExecutor = Pick<Db, 'select'>;
 type JsonObj = Record<string, unknown>;
+type BookRepositoryTx = Parameters<Parameters<NodePgDatabase<typeof schema>['transaction']>[0]>[0];
 
 type CollapsedRawRow = {
   id: number;
@@ -2101,6 +2104,11 @@ export class BookRepository {
           updatedAt: now,
         },
       });
+
+    // Reading in BookOrbit is fresher intent than the reset that came before it, and it is
+    // the way out for a device that never pulls and would otherwise have every push held
+    // back indefinitely.
+    await this.db.delete(koreaderProgressResets).where(and(eq(koreaderProgressResets.userId, userId), eq(koreaderProgressResets.bookFileId, fileId)));
   }
 
   async syncKoboReadingStateFromProgress(
@@ -2250,16 +2258,115 @@ export class BookRepository {
   }
 
   async clearFileProgress(userId: number, fileId: number): Promise<void> {
-    await this.db.delete(readingProgress).where(and(eq(readingProgress.userId, userId), eq(readingProgress.bookFileId, fileId)));
-    await this.db.delete(audiobookProgress).where(and(eq(audiobookProgress.userId, userId), eq(audiobookProgress.currentFileId, fileId)));
+    const [file] = await this.db
+      .select({ bookId: bookFiles.bookId, primaryFileId: books.primaryFileId })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(eq(bookFiles.id, fileId))
+      .limit(1);
+
+    await this.db.transaction(async (tx) => {
+      await tx.delete(readingProgress).where(and(eq(readingProgress.userId, userId), eq(readingProgress.bookFileId, fileId)));
+      await tx.delete(audiobookProgress).where(and(eq(audiobookProgress.userId, userId), eq(audiobookProgress.currentFileId, fileId)));
+      await this.clearExternalDeviceProgress(tx, userId, [fileId]);
+      // Kobo tracks the book through its primary file, so clearing a secondary file leaves
+      // the device's bookmark alone.
+      if (file && file.primaryFileId === fileId) await this.resetKoboReadingState(tx, userId, file.bookId);
+    });
   }
 
   async clearBookProgress(userId: number, bookId: number): Promise<void> {
-    const fileIds = this.db.select({ id: bookFiles.id }).from(bookFiles).where(eq(bookFiles.bookId, bookId));
     await this.db.transaction(async (tx) => {
+      const files = await tx.select({ id: bookFiles.id }).from(bookFiles).where(eq(bookFiles.bookId, bookId));
+      const fileIds = files.map((file) => file.id);
       await tx.delete(readingProgress).where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, fileIds)));
       await tx.delete(audiobookProgress).where(and(eq(audiobookProgress.userId, userId), eq(audiobookProgress.bookId, bookId)));
+      await this.clearExternalDeviceProgress(tx, userId, fileIds);
+      await this.resetKoboReadingState(tx, userId, bookId);
     });
+  }
+
+  /**
+   * Drops the KOReader per-device positions for these files and records the reset, so the
+   * cleared position survives contact with a device. Deleting the shared row alone is not
+   * enough: the sync path would keep serving the device row it left behind, and a device
+   * that has not been told about the reset would push its own position straight back.
+   *
+   * Reading statistics are deliberately untouched. Clearing a position says nothing about
+   * the time already spent in the book; only the full reading-state reset discards that.
+   */
+  private async clearExternalDeviceProgress(tx: BookRepositoryTx, userId: number, fileIds: number[]): Promise<void> {
+    if (fileIds.length === 0) return;
+    await tx
+      .delete(koreaderDeviceProgress)
+      .where(
+        and(
+          eq(koreaderDeviceProgress.userId, userId),
+          inArray(koreaderDeviceProgress.bookFileId, fileIds),
+          eq(koreaderDeviceProgress.orphaned, false),
+        ),
+      );
+    // Deleted rather than upserted so a repeat reset cascades away the per-device convergence
+    // rows: every device has to take the new reset, including ones that took the last one.
+    await tx
+      .delete(koreaderProgressResets)
+      .where(and(eq(koreaderProgressResets.userId, userId), inArray(koreaderProgressResets.bookFileId, fileIds)));
+    await tx.insert(koreaderProgressResets).values(fileIds.map((bookFileId) => ({ userId, bookFileId })));
+  }
+
+  /**
+   * Winds the Kobo bookmark back to the start of the book, matching what the full reading
+   * state reset does. Without this a Kobo device resumes from its own bookmark and reports
+   * that position back, undoing the reset the same way KOReader does.
+   */
+  private async resetKoboReadingState(tx: BookRepositoryTx, userId: number, bookId: number): Promise<void> {
+    const [existing] = await tx
+      .select({
+        lastModifiedKobo: koboReadingStates.lastModifiedKobo,
+        priorityTimestamp: koboReadingStates.priorityTimestamp,
+        currentBookmark: koboReadingStates.currentBookmark,
+        statistics: koboReadingStates.statistics,
+        statusInfo: koboReadingStates.statusInfo,
+      })
+      .from(koboReadingStates)
+      .where(and(eq(koboReadingStates.userId, userId), eq(koboReadingStates.bookId, bookId)))
+      .limit(1);
+    if (!existing) return;
+
+    const now = new Date();
+    const existingBookmark = this.asJsonObj(existing.currentBookmark);
+    const existingStatusInfo = this.asJsonObj(existing.statusInfo);
+    const nowIso = advanceIsoTimestamp(
+      now,
+      existing.lastModifiedKobo,
+      existing.priorityTimestamp,
+      typeof existingBookmark?.LastModified === 'string' ? existingBookmark.LastModified : null,
+      typeof existingStatusInfo?.LastModified === 'string' ? existingStatusInfo.LastModified : null,
+    );
+
+    await tx
+      .update(koboReadingStates)
+      .set({
+        lastModifiedKobo: nowIso,
+        priorityTimestamp: nowIso,
+        currentBookmark: { LastModified: nowIso, ProgressPercent: 0 },
+        statistics: { ...(this.asJsonObj(existing.statistics) ?? {}), LastModified: nowIso },
+        statusInfo: { ...(existingStatusInfo ?? {}), LastModified: nowIso, Status: 'ReadyToRead', TimesStartedReading: 0 },
+        updatedAt: now,
+      })
+      .where(and(eq(koboReadingStates.userId, userId), eq(koboReadingStates.bookId, bookId)));
+
+    await tx.execute(sql`
+      UPDATE ${koboSnapshotBooks} AS sb
+      SET synced = false,
+          is_new = false
+      FROM ${koboLibrarySnapshots} AS snap
+      WHERE snap.id = sb.snapshot_id
+        AND snap.user_id = ${userId}
+        AND sb.book_id = ${bookId}
+        AND sb.pending_delete = false
+        AND sb.removed_by_device = false
+    `);
   }
 
   async findAudioProgress(userId: number, bookId: number) {

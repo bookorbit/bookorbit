@@ -352,3 +352,69 @@ export const koreaderBookmarkLinks = pgTable(
 
 export type KoreaderBookmarkLink = typeof koreaderBookmarkLinks.$inferSelect;
 export type NewKoreaderBookmarkLink = typeof koreaderBookmarkLinks.$inferInsert;
+
+/**
+ * A deliberate server-side progress reset, recorded as a fact rather than as the absence of
+ * a reading_progress row. KOReader reads a missing position as "unknown" and answers by
+ * pushing its own sidecar back, so a reset that is only a deletion is undone the next time
+ * the book is opened on a device.
+ *
+ * A marker is live until it is retired, and serving it retires nothing: both clients can
+ * classify a reset as a backward sync and drop it without saying so, so being handed the
+ * position is no evidence the reader ever saw it. What retires a marker is a device that took
+ * the reset and then read on, or a web reader write, which is the way out for a device that
+ * never pulls.
+ *
+ * It has to be retired on that signal, and not merely held. The kosync pull carries no device
+ * identity, so a marker kept alive past its purpose is answered to every device, and one that
+ * already took the reset would be asked to jump back to the start on every sync.
+ *
+ * While a marker is live a KOReader push still records its per-device row, so nothing the
+ * device reports is lost, but it does not move shared progress.
+ */
+export const koreaderProgressResets = pgTable(
+  'koreader_progress_resets',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookFileId: integer('book_file_id')
+      .notNull()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    resetAt: timestamp('reset_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.bookFileId] }), index('koreader_progress_resets_book_file_id_idx').on(t.bookFileId)],
+);
+
+export type KoreaderProgressReset = typeof koreaderProgressResets.$inferSelect;
+export type NewKoreaderProgressReset = typeof koreaderProgressResets.$inferInsert;
+
+/**
+ * Which devices have taken a given reset. The kosync pull carries no device identity, so a
+ * reset cannot be handed out per device, but the push does carry one and the hold is decided
+ * there. That asymmetry is what lets this be per-device without a plugin change: a device is
+ * held until its own push shows it at the start, and one device converging says nothing about
+ * the others.
+ *
+ * Rows hang off the marker and cascade with it, so re-arming a reset holds every device again.
+ */
+export const koreaderProgressResetDevices = pgTable(
+  'koreader_progress_reset_devices',
+  {
+    userId: integer('user_id').notNull(),
+    bookFileId: integer('book_file_id').notNull(),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    convergedAt: timestamp('converged_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.bookFileId, t.deviceId] }),
+    foreignKey({
+      columns: [t.userId, t.bookFileId],
+      foreignColumns: [koreaderProgressResets.userId, koreaderProgressResets.bookFileId],
+      name: 'koreader_progress_reset_devices_reset_fk',
+    }).onDelete('cascade'),
+  ],
+);
+
+export type KoreaderProgressResetDevice = typeof koreaderProgressResetDevices.$inferSelect;
+export type NewKoreaderProgressResetDevice = typeof koreaderProgressResetDevices.$inferInsert;

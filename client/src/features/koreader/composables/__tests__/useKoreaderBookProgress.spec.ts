@@ -27,6 +27,7 @@ function makeBookProgress(overrides: Partial<KoreaderBookSyncInfo> = {}): Koread
       },
     ],
     fileModifiedSinceLastSync: false,
+    heldByReset: [],
     ...overrides,
   }
 }
@@ -115,5 +116,28 @@ describe('useKoreaderBookProgress', () => {
 
     expect(bookProgress.value).toBeNull()
     expect(loading.value).toBe(false)
+  })
+
+  it('posts the device id when releasing a reset hold and refreshes the book', async () => {
+    apiMock.mockResolvedValue(makeResponse(makeBookProgress()))
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { releaseResetHold } = useKoreaderBookProgress()
+
+    await expect(releaseResetHold(42, 'device-1')).resolves.toBe(true)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/koreader/books/42/reset-hold/release',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ deviceId: 'device-1' }) }),
+    )
+    // The hold disappears from the book page only if the refreshed state is pulled back in.
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/koreader/books/42/progress')
+  })
+
+  it('reports a failed release rather than pretending the hold is gone', async () => {
+    apiMock.mockResolvedValue(makeResponse(null, { ok: false, status: 404 }))
+    const { useKoreaderBookProgress } = await import('../useKoreaderBookProgress')
+    const { releaseResetHold } = useKoreaderBookProgress()
+
+    await expect(releaseResetHold(42, 'device-1')).resolves.toBe(false)
   })
 })

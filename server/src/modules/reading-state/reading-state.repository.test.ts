@@ -4,6 +4,7 @@ import {
   audiobookProgress,
   koreaderDeviceProgress,
   koreaderPageStats,
+  koreaderProgressResets,
   koboReadingStates,
   readingProgress,
   readingSessions,
@@ -38,9 +39,12 @@ function makeHarness(selectResults: unknown[]) {
   const statusValues = vi.fn(() => ({ onConflictDoUpdate: statusConflict }));
   const dailyConflict = vi.fn().mockResolvedValue(undefined);
   const dailyValues = vi.fn(() => ({ onConflictDoUpdate: dailyConflict }));
+  const resetConflict = vi.fn().mockResolvedValue(undefined);
+  const resetValues = vi.fn(() => ({ onConflictDoUpdate: resetConflict }));
   const insert = vi.fn((table: unknown) => {
     if (table === userBookStatus) return { values: statusValues };
     if (table === userReadingDailyStats) return { values: dailyValues };
+    if (table === koreaderProgressResets) return { values: resetValues };
     throw new Error('Unexpected table in insert');
   });
 
@@ -62,6 +66,7 @@ function makeHarness(selectResults: unknown[]) {
     statusConflict,
     dailyValues,
     dailyConflict,
+    resetValues,
     update,
     updateSet,
   };
@@ -83,17 +88,20 @@ describe('ReadingStateRepository', () => {
       durationSeconds: 1800,
       progressDelta: 6,
     };
-    const { repo, transaction, tx, deleteFn, statusValues, statusConflict, dailyValues, dailyConflict, update, updateSet } = makeHarness([
-      [{ libraryId: 3 }],
-      [deletedSession],
-      [],
-      [{ total: 2 }],
-      [{ total: 1 }],
-      [{ total: 3 }],
-      [{ total: 4 }],
-      [{ id: 88 }],
-      [remainingSession],
-    ]);
+    const { repo, transaction, tx, deleteFn, statusValues, statusConflict, dailyValues, dailyConflict, resetValues, update, updateSet } = makeHarness(
+      [
+        [{ libraryId: 3 }],
+        [deletedSession],
+        [],
+        [{ total: 2 }],
+        [{ total: 1 }],
+        [{ total: 3 }],
+        [{ total: 4 }],
+        [{ id: 88 }],
+        [{ id: 501 }, { id: 502 }],
+        [remainingSession],
+      ],
+    );
 
     const result = await repo.resetBookReadingState(7, 42, 'UTC');
 
@@ -103,6 +111,12 @@ describe('ReadingStateRepository', () => {
     expect(deleteFn).toHaveBeenCalledWith(koreaderDeviceProgress);
     expect(deleteFn).toHaveBeenCalledWith(koreaderPageStats);
     expect(deleteFn).toHaveBeenCalledWith(readingSessions);
+    // The wipe has to leave a reset behind for each file, or a KOReader device reopening the
+    // book reads the missing position as unknown and pushes its own straight back.
+    expect(resetValues).toHaveBeenCalledWith([
+      { userId: 7, bookFileId: 501 },
+      { userId: 7, bookFileId: 502 },
+    ]);
     expect(deleteFn).toHaveBeenCalledWith(userReadingDailyStats);
     expect(statusValues).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -7,4 +7,5 @@ export * from './koreader-link.dto';
 export * from './koreader-package.dto';
 export * from './koreader-plugin.dto';
 export * from './koreader-progress.dto';
+export * from './koreader-reset-hold.dto';
 export * from './koreader-user.dto';
