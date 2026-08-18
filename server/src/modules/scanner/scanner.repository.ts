@@ -55,8 +55,9 @@ export class ScannerRepository {
   // ── Library Folders ────────────────────────────────────────────────────────
 
   async findLibraryFolders(libraryId: number) {
-    // Manual folders have no on-disk path; walking or pruning them would mark
-    // every manually-added book as missing.
+    // Manual folders have no on-disk path, so the scan walk must never enter
+    // them; markBooksAsMissing carries its own origin guard as an independent
+    // second layer.
     return this.db
       .select()
       .from(libraryFolders)

@@ -2,6 +2,7 @@ import { eq, inArray } from 'drizzle-orm';
 
 import { createFixtureTree, file } from './e2e/scanner/scanner-fixture-builder';
 import {
+  assertNoIntegrityViolations,
   closeScannerE2EContext,
   createScannerE2EContext,
   seedLibrary,
@@ -53,6 +54,8 @@ describe('scanner with manual books present', () => {
   });
 
   afterAll(async () => {
+    // Surface any dangling rows the scans introduced before cleanup can hide them.
+    await assertNoIntegrityViolations(ctx.db);
     if (seededLibraryIds.length > 0) {
       await ctx.db.delete(libraries).where(inArray(libraries.id, seededLibraryIds));
     }
@@ -74,13 +77,7 @@ describe('scanner with manual books present', () => {
       expect(secondJob.status).toBe('completed');
 
       const [after] = await ctx.db.select().from(books).where(eq(books.id, manualBook.id));
-      expect(after).toMatchObject({
-        status: 'present',
-        originType: 'manual',
-        libraryFolderId: manualBook.libraryFolderId,
-        folderPath: manualBook.folderPath,
-      });
-      expect(after.updatedAt.getTime()).toBe(manualBook.updatedAt.getTime());
+      expect(after).toEqual(manualBook);
     },
     SCAN_TIMEOUT_MS * 2,
   );
@@ -95,17 +92,17 @@ describe('scanner with manual books present', () => {
 
       await triggerAndWaitForLibraryScan(ctx, libraryId, SCAN_TIMEOUT_MS);
 
-      const fileBacked = await ctx.db
+      const libraryBooks = await ctx.db
         .select({ status: books.status, originType: books.originType })
         .from(books)
         .where(eq(books.libraryId, libraryId));
-      expect(fileBacked).toEqual(
+      expect(libraryBooks).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ status: 'present', originType: 'file_system' }),
           expect.objectContaining({ status: 'present', originType: 'manual' }),
         ]),
       );
-      expect(fileBacked).toHaveLength(2);
+      expect(libraryBooks).toHaveLength(2);
     },
     SCAN_TIMEOUT_MS * 2,
   );
