@@ -1,4 +1,4 @@
-import { AuthorMetadataCandidate, AuthorMetadataProviderKey } from '@bookorbit/types';
+import { AuthorMetadataCandidate, AuthorMetadataField, AuthorMetadataProviderKey } from '@bookorbit/types';
 
 export type AuthorMetadataSearchParams = {
   name: string;
@@ -10,6 +10,9 @@ export interface AuthorMetadataProvider {
   readonly key: AuthorMetadataProviderKey;
   readonly label: string;
   readonly identifiable: boolean;
+  /** Fields this provider can actually return. Assigning it to any other field
+   *  would be inert, so preferences and the settings UI both filter on this. */
+  readonly supportedFields: readonly AuthorMetadataField[];
   search(params: AuthorMetadataSearchParams): Promise<AuthorMetadataCandidate[]>;
 }
 

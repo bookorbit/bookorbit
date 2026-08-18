@@ -1,8 +1,8 @@
-import { AuthorAutoEnrichmentWriteMode } from '@bookorbit/types';
 import { NotificationType } from '@bookorbit/types';
 
 import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
+import { AuthorMetadataPreferenceResolver } from './metadata/author-metadata-preference-resolver';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
 
 describe('AuthorEnrichmentOrchestratorService', () => {
@@ -27,8 +27,8 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     execute: vi.fn(),
   };
 
-  const appSettings = {
-    isAuthorsProviderAudnexusEnabled: vi.fn(),
+  const metadataPreferences = {
+    getPreferences: vi.fn(),
   };
 
   const enrichmentConfig = {
@@ -87,11 +87,10 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       imageUpdated: false,
     });
 
-    appSettings.isAuthorsProviderAudnexusEnabled.mockResolvedValue(true);
+    metadataPreferences.getPreferences.mockResolvedValue(new AuthorMetadataPreferenceResolver().getDefaultPreferences());
     enrichmentConfig.getConfig.mockResolvedValue({
       enabled: true,
       triggerOnImport: true,
-      writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
       conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
     });
     enrichmentConfig.isPaused.mockResolvedValue(false);
@@ -101,8 +100,8 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     service = new AuthorEnrichmentOrchestratorService(
       queueRepo as never,
       executor as never,
-      appSettings as never,
       enrichmentConfig as never,
+      metadataPreferences as never,
       metadataEvents as never,
       session,
       notificationService as never,
@@ -114,7 +113,6 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     enrichmentConfig.getConfig.mockResolvedValue({
       enabled: false,
       triggerOnImport: true,
-      writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
       conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
     });
 
@@ -131,8 +129,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     expect(queueRepo.markProcessing).toHaveBeenCalledWith(22);
     expect(executor.execute).toHaveBeenCalledWith({
       authorId: 22,
-      writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
-      audnexusEnabled: true,
+      preferences: expect.objectContaining({ fields: expect.any(Object) }),
     });
     expect(queueRepo.markDone).toHaveBeenCalledWith(22, false);
     expect(queueRepo.markFailed).not.toHaveBeenCalled();

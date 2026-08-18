@@ -2,7 +2,6 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { ConfigService, type ConfigType } from '@nestjs/config';
 
 import {
-  AuthorAutoEnrichmentWriteMode,
   type DefaultLibraryAccessConfig,
   DEFAULT_DOWNLOAD_PATTERN,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
@@ -136,18 +135,6 @@ export class AppSettingsService {
     ]);
 
     return this.getBookDockSettings();
-  }
-
-  async getAuthorsAutoEnrichmentWriteMode(): Promise<AuthorAutoEnrichmentWriteMode> {
-    const row = await this.repo.findByKey(APP_SETTING_KEYS.AUTHORS_AUTO_ENRICHMENT_WRITE_MODE);
-    const mode = row?.value?.trim();
-    if (mode === AuthorAutoEnrichmentWriteMode.ALWAYS_REFETCH) return mode;
-    return AuthorAutoEnrichmentWriteMode.MISSING_ONLY;
-  }
-
-  async isAuthorsProviderAudnexusEnabled(): Promise<boolean> {
-    const row = await this.repo.findByKey(APP_SETTING_KEYS.AUTHORS_PROVIDER_AUDNEXUS_ENABLED);
-    return parseBooleanSetting(row?.value, true);
   }
 
   async getOidcConfig(): Promise<OidcFullConfig> {

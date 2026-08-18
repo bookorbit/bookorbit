@@ -157,6 +157,15 @@ function makeAuthor(overrides: Partial<AuthorDetail> = {}): AuthorDetail {
     imageUrl: null,
     bookCount: 2,
     lastAddedAt: '2026-01-01T00:00:00.000Z',
+    birthDate: null,
+    birthYear: null,
+    deathDate: null,
+    deathYear: null,
+    website: null,
+    genres: [],
+    influences: [],
+    metadataProvider: null,
+    metadataProviderId: null,
     ...overrides,
   }
 }

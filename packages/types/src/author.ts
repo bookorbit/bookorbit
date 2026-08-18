@@ -1,4 +1,5 @@
 import type { BooksPage } from "./book";
+import type { MergeStrategy } from "./metadata-preferences";
 
 export type AuthorSummary = {
   id: number;
@@ -12,6 +13,15 @@ export type AuthorSummary = {
 
 export type AuthorDetail = AuthorSummary & {
   description: string | null;
+  birthDate: string | null;
+  birthYear: number | null;
+  deathDate: string | null;
+  deathYear: number | null;
+  website: string | null;
+  genres: string[];
+  influences: string[];
+  metadataProvider: AuthorMetadataProviderKey | null;
+  metadataProviderId: string | null;
 };
 
 export type AuthorsPage = {
@@ -31,6 +41,7 @@ export type MergeAuthorsResult = {
 
 export const AuthorMetadataProviderKey = {
   AUDNEXUS: "audnexus",
+  GOODREADS: "goodreads",
 } as const;
 
 export type AuthorMetadataProviderKey = (typeof AuthorMetadataProviderKey)[keyof typeof AuthorMetadataProviderKey];
@@ -42,12 +53,20 @@ export type AuthorMetadataCandidate = {
   description?: string;
   imageUrl?: string;
   sourceUrl?: string;
+  birthDate?: string;
+  birthYear?: number;
+  deathDate?: string;
+  deathYear?: number;
+  website?: string;
+  genres?: string[];
+  influences?: string[];
 };
 
 export type AuthorMetadataProviderInfo = {
   key: AuthorMetadataProviderKey;
   label: string;
   identifiable: boolean;
+  supportedFields: AuthorMetadataField[];
 };
 
 export type AuthorEnrichmentStatus = {
@@ -83,6 +102,8 @@ export type AuthorEnrichmentFailedPage = {
   limit: number;
 };
 
+// Retained only so the app_settings migration can read pre-per-field values.
+// Overwrite behaviour now lives on each field's mergeStrategy.
 export const AuthorAutoEnrichmentWriteMode = {
   MISSING_ONLY: "missing_only",
   ALWAYS_REFETCH: "always_refetch",
@@ -99,6 +120,40 @@ export type AuthorEnrichmentConditions = {
 export type AuthorAutoEnrichmentConfig = {
   enabled: boolean;
   triggerOnImport: boolean;
-  writeMode: AuthorAutoEnrichmentWriteMode;
   conditions: AuthorEnrichmentConditions;
+};
+
+export type AuthorMetadataField = "description" | "photo" | "birthDate" | "deathDate" | "website" | "genres" | "influences";
+
+export const ALL_AUTHOR_METADATA_FIELDS: AuthorMetadataField[] = [
+  "description",
+  "photo",
+  "birthDate",
+  "deathDate",
+  "website",
+  "genres",
+  "influences",
+];
+
+// What each provider can actually return. Audnexus exposes only asin, name,
+// description and image, so listing it against any other field would be inert.
+export const AUTHOR_PROVIDER_SUPPORTED_FIELDS: Record<AuthorMetadataProviderKey, AuthorMetadataField[]> = {
+  [AuthorMetadataProviderKey.AUDNEXUS]: ["description", "photo"],
+  [AuthorMetadataProviderKey.GOODREADS]: [...ALL_AUTHOR_METADATA_FIELDS],
+};
+
+export function providerSupportsAuthorField(provider: AuthorMetadataProviderKey, field: AuthorMetadataField): boolean {
+  return AUTHOR_PROVIDER_SUPPORTED_FIELDS[provider]?.includes(field) ?? false;
+}
+
+export type AuthorFieldPreference = {
+  enabled: boolean;
+  providers: AuthorMetadataProviderKey[];
+  mergeStrategy: MergeStrategy;
+};
+
+// Authors are global rows shared across every library, so unlike book metadata
+// these preferences have no per-library override layer.
+export type AuthorMetadataPreferences = {
+  fields: Record<AuthorMetadataField, AuthorFieldPreference>;
 };

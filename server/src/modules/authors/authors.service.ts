@@ -17,13 +17,13 @@ import { normalizeMetadataText } from '../../common/utils/metadata-text-normaliz
 import type { RequestUser } from '../../common/types/request-user';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
-import { AppSettingsService } from '../app-settings/app-settings.service';
+import { AuthorMetadataPreferencesService } from './author-metadata-preferences.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { AuthorImageStorageError, AuthorImageStorageService } from './author-image-storage.service';
 import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
-import { AuthorsRepository } from './authors.repository';
+import { AuthorDetailRow, AuthorsRepository } from './authors.repository';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
@@ -44,7 +44,7 @@ export class AuthorsService {
     private readonly authorsRepo: AuthorsRepository,
     private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
-    private readonly appSettings: AppSettingsService,
+    private readonly metadataPreferences: AuthorMetadataPreferencesService,
     private readonly authorMetadataFetchService: AuthorMetadataFetchService,
     private readonly authorImageStorage: AuthorImageStorageService,
     private readonly enrichmentExecutor: AuthorEnrichmentExecutorService,
@@ -95,7 +95,7 @@ export class AuthorsService {
     const libraryIds = await this.resolveLibraryIds(user);
     const row = await this.authorsRepo.findById(authorId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
     if (!row) throw new NotFoundException('Author not found');
-    return this.withAuthorImageUrl(this.mapAuthorSummary(row) as AuthorDetail, 'full');
+    return this.withAuthorImageUrl(this.mapAuthorDetail(row), 'full');
   }
 
   async findBooks(user: RequestUser, authorId: number, dto: ListAuthorBooksDto): Promise<BooksPage> {
@@ -550,6 +550,22 @@ export class AuthorsService {
     return user.isSuperuser;
   }
 
+  private mapAuthorDetail(row: AuthorDetailRow): AuthorDetail {
+    return {
+      ...this.mapAuthorSummary(row),
+      description: row.description,
+      birthDate: row.birthDate,
+      birthYear: row.birthYear,
+      deathDate: row.deathDate,
+      deathYear: row.deathYear,
+      website: row.website,
+      genres: row.genres ?? [],
+      influences: row.influences ?? [],
+      metadataProvider: (row.metadataProvider as AuthorDetail['metadataProvider']) ?? null,
+      metadataProviderId: row.metadataProviderId,
+    };
+  }
+
   private mapAuthorSummary(row: {
     id: number;
     name: string;
@@ -592,12 +608,8 @@ export class AuthorsService {
   private async refreshEnrichmentInternal(
     authorId: number,
   ): Promise<{ descriptionUpdated: boolean; imageUpdated: boolean; provider: string | null }> {
-    const writeMode = await this.appSettings.getAuthorsAutoEnrichmentWriteMode();
-    const result = await this.enrichmentExecutor.execute({
-      authorId,
-      writeMode,
-      audnexusEnabled: true,
-    });
+    const preferences = await this.metadataPreferences.getPreferences();
+    const result = await this.enrichmentExecutor.execute({ authorId, preferences });
 
     if (result.kind === 'skipped' && result.reason === 'author_not_found') {
       throw new NotFoundException('Author not found');

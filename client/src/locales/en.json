@@ -1122,10 +1122,6 @@
         "runAllShort": "Run all",
         "enableTitle": "Enable auto author enrichment",
         "enableHint": "Automatically fetch author biographies and profile photos when books are added or updated.",
-        "updateStrategyTitle": "Update strategy",
-        "updateStrategyHint": "What to do when an author already has a biography or photo.",
-        "writeModeMissingOnly": "Only fill missing data (recommended)",
-        "writeModeAlwaysRefetch": "Always refresh existing data",
         "triggerOnImportTitle": "Trigger on import",
         "triggerOnImportHint": "Queue authors for enrichment when books are first added to a library.",
         "eligibilityTitle": "Eligibility conditions",
@@ -1143,7 +1139,25 @@
         "saveFailed": "Failed to save author enrichment settings",
         "noEligibleAuthors": "No eligible authors found",
         "noAuthorsToEnrich": "No authors to enrich",
-        "queueFailed": "Failed to queue author backfill"
+        "queueFailed": "Failed to queue author backfill",
+        "fields": {
+          "description": "Biography",
+          "photo": "Photo",
+          "birthDate": "Born",
+          "deathDate": "Died",
+          "website": "Website",
+          "genres": "Genres",
+          "influences": "Influences"
+        },
+        "metadataPreferences": {
+          "title": "Field sources",
+          "hint": "Set the order each field is filled from. The first provider with a value wins.",
+          "noProviders": "No provider available",
+          "saved": "Field sources saved",
+          "saveFailed": "Could not save field sources",
+          "limitedProviders": "{providers} supplies only biographies and photos.",
+          "addProvider": "Add {provider} as a source"
+        }
       },
       "scoreWeights": {
         "groupLabel": "Score Weights",
@@ -3257,7 +3271,12 @@
       "noBiography": "No biography available. Use the menu to refresh metadata.",
       "previewFrom": "Preview from {provider}. Save metadata to persist it.",
       "booksLabel": "Books",
-      "lastAdded": "Last Added"
+      "lastAdded": "Last Added",
+      "born": "Born",
+      "died": "Died",
+      "website": "Website",
+      "genres": "Genres",
+      "influences": "Influences"
     },
     "list": {
       "title": "Authors",

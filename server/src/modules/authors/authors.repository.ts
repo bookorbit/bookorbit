@@ -27,6 +27,29 @@ type AuthorBookIdRow = {
   id: number;
 };
 
+export type AuthorDetailRow = AuthorSummaryRow & {
+  birthDate: string | null;
+  birthYear: number | null;
+  deathDate: string | null;
+  deathYear: number | null;
+  website: string | null;
+  genres: string[] | null;
+  influences: string[] | null;
+  metadataProvider: string | null;
+  metadataProviderId: string | null;
+};
+
+export type AuthorEnrichmentRow = AuthorSummaryRow & {
+  hasPhoto: boolean;
+  birthDate: string | null;
+  birthYear: number | null;
+  deathDate: string | null;
+  deathYear: number | null;
+  website: string | null;
+  genres: string[] | null;
+  influences: string[] | null;
+};
+
 @Injectable()
 export class AuthorsRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
@@ -127,7 +150,7 @@ export class AuthorsRepository {
     return Number(row?.total ?? 0);
   }
 
-  async findById(authorId: number, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<AuthorSummaryRow | null> {
+  async findById(authorId: number, libraryIds: number[], contentFilters?: ContentFilterRules): Promise<AuthorDetailRow | null> {
     if (libraryIds.length === 0) return null;
 
     const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
@@ -138,6 +161,15 @@ export class AuthorsRepository {
         name: authors.name,
         sortName: authors.sortName,
         description: authors.description,
+        birthDate: authors.birthDate,
+        birthYear: authors.birthYear,
+        deathDate: authors.deathDate,
+        deathYear: authors.deathYear,
+        website: authors.website,
+        genres: authors.genres,
+        influences: authors.influences,
+        metadataProvider: authors.metadataProvider,
+        metadataProviderId: authors.metadataProviderId,
         bookCount: sql<number>`count(distinct ${books.id})::int`,
         lastAddedAt: max(books.addedAt),
       })
@@ -145,19 +177,41 @@ export class AuthorsRepository {
       .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
       .innerJoin(books, eq(books.id, bookAuthors.bookId))
       .where(and(eq(authors.id, authorId), inArray(books.libraryId, libraryIds), ...filterClauses))
-      .groupBy(authors.id, authors.name, authors.sortName, authors.description)
+      .groupBy(
+        authors.id,
+        authors.name,
+        authors.sortName,
+        authors.description,
+        authors.birthDate,
+        authors.birthYear,
+        authors.deathDate,
+        authors.deathYear,
+        authors.website,
+        authors.genres,
+        authors.influences,
+        authors.metadataProvider,
+        authors.metadataProviderId,
+      )
       .limit(1);
 
     return row ?? null;
   }
 
-  async findByIdForEnrichment(authorId: number): Promise<AuthorSummaryRow | null> {
+  async findByIdForEnrichment(authorId: number): Promise<AuthorEnrichmentRow | null> {
     const [row] = await this.db
       .select({
         id: authors.id,
         name: authors.name,
         sortName: authors.sortName,
         description: authors.description,
+        hasPhoto: authors.hasPhoto,
+        birthDate: authors.birthDate,
+        birthYear: authors.birthYear,
+        deathDate: authors.deathDate,
+        deathYear: authors.deathYear,
+        website: authors.website,
+        genres: authors.genres,
+        influences: authors.influences,
         bookCount: sql<number>`count(distinct ${books.id})::int`,
         lastAddedAt: max(books.addedAt),
       })
@@ -165,7 +219,20 @@ export class AuthorsRepository {
       .leftJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
       .leftJoin(books, eq(books.id, bookAuthors.bookId))
       .where(eq(authors.id, authorId))
-      .groupBy(authors.id, authors.name, authors.sortName, authors.description)
+      .groupBy(
+        authors.id,
+        authors.name,
+        authors.sortName,
+        authors.description,
+        authors.hasPhoto,
+        authors.birthDate,
+        authors.birthYear,
+        authors.deathDate,
+        authors.deathYear,
+        authors.website,
+        authors.genres,
+        authors.influences,
+      )
       .limit(1);
     return row ?? null;
   }
@@ -215,6 +282,15 @@ export class AuthorsRepository {
       sortName: string | null;
       description: string | null;
       hasPhoto: boolean;
+      birthDate: string | null;
+      birthYear: number | null;
+      deathDate: string | null;
+      deathYear: number | null;
+      website: string | null;
+      genres: string[] | null;
+      influences: string[] | null;
+      metadataProvider: string | null;
+      metadataProviderId: string | null;
       lastEnrichedAt: Date | null;
     }>,
   ) {

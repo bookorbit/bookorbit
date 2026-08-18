@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
+import { AuthorMetadataPreferenceResolver } from './metadata/author-metadata-preference-resolver';
 import { AuthorsService } from './authors.service';
 
 function reqUser(id = 7, superuser = false) {
@@ -89,8 +90,8 @@ describe('AuthorsService', () => {
     backfillLinkedAuthors: vi.fn(),
   };
 
-  const appSettings = {
-    getAuthorsAutoEnrichmentWriteMode: vi.fn(),
+  const metadataPreferences = {
+    getPreferences: vi.fn(),
   };
   const metadataScoreService = {
     calculateAndSaveMany: vi.fn(),
@@ -104,7 +105,7 @@ describe('AuthorsService', () => {
       authorsRepo as any,
       bookReadService as any,
       libraryService as any,
-      appSettings as any,
+      metadataPreferences as any,
       authorMetadataFetchService as any,
       authorImageStorage as any,
       enrichmentExecutor as any,
@@ -117,7 +118,7 @@ describe('AuthorsService', () => {
     authorImageStorage.getImageUrlIfExists.mockResolvedValue(null);
     enrichmentOrchestrator.schedule.mockResolvedValue(1);
     enrichmentOrchestrator.backfillLinkedAuthors.mockResolvedValue(8);
-    appSettings.getAuthorsAutoEnrichmentWriteMode.mockResolvedValue('missing_only');
+    metadataPreferences.getPreferences.mockResolvedValue(new AuthorMetadataPreferenceResolver().getDefaultPreferences());
     metadataScoreService.calculateAndSaveMany.mockResolvedValue(undefined);
   });
 
@@ -246,8 +247,7 @@ describe('AuthorsService', () => {
 
     expect(enrichmentExecutor.execute).toHaveBeenCalledWith({
       authorId: 20,
-      writeMode: 'missing_only',
-      audnexusEnabled: true,
+      preferences: expect.objectContaining({ fields: expect.any(Object) }),
     });
     expect(result.description).toBe('Provider description');
   });
@@ -274,8 +274,7 @@ describe('AuthorsService', () => {
 
     expect(enrichmentExecutor.execute).toHaveBeenCalledWith({
       authorId: 21,
-      writeMode: 'missing_only',
-      audnexusEnabled: true,
+      preferences: expect.objectContaining({ fields: expect.any(Object) }),
     });
   });
 
