@@ -484,6 +484,20 @@
       "when": 1786843782210,
       "tag": "0068_normalize_entity_name_whitespace",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1787013292541,
+      "tag": "0069_physical_books_origin",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1787018681007,
+      "tag": "0070_validate_origin_constraints",
+      "breakpoints": true
     }
   ]
 }

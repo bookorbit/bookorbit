@@ -55,7 +55,13 @@ export class ScannerRepository {
   // ── Library Folders ────────────────────────────────────────────────────────
 
   async findLibraryFolders(libraryId: number) {
-    return this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
+    // Manual folders have no on-disk path, so the scan walk must never enter
+    // them; markBooksAsMissing carries its own origin guard as an independent
+    // second layer.
+    return this.db
+      .select()
+      .from(libraryFolders)
+      .where(and(eq(libraryFolders.libraryId, libraryId), eq(libraryFolders.kind, 'file_system')));
   }
 
   async findLibrarySettings(libraryId: number) {
@@ -186,7 +192,12 @@ export class ScannerRepository {
 
   async markBooksAsMissing(ids: number[]) {
     if (ids.length === 0) return;
-    await this.db.update(books).set({ status: 'missing', updatedAt: new Date() }).where(inArray(books.id, ids));
+    // Missing means "file vanished from disk"; a manual-origin book has no file,
+    // so it can never be missing regardless of what the caller computed.
+    await this.db
+      .update(books)
+      .set({ status: 'missing', updatedAt: new Date() })
+      .where(and(inArray(books.id, ids), eq(books.originType, 'file_system')));
   }
 
   // ── Book Files ─────────────────────────────────────────────────────────────

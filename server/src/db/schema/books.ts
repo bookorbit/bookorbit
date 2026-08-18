@@ -17,6 +17,7 @@ export const books = pgTable(
     primaryAuthorSortName: varchar('primary_author_sort_name', { length: 500 }),
     folderPath: varchar('folder_path', { length: 4096 }).notNull(),
     status: varchar('status', { length: 20 }).notNull().default('present'),
+    originType: varchar('origin_type', { length: 20 }).notNull().default('file_system'),
     addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
@@ -44,6 +45,7 @@ export const books = pgTable(
       name: 'books_library_folder_library_fk',
     }),
     check('books_status_chk', sql`${t.status} in ('present', 'missing', 'processing')`),
+    check('books_origin_type_chk', sql`${t.originType} in ('file_system', 'manual')`),
   ],
 );
 
