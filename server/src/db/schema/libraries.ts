@@ -110,12 +110,14 @@ export const libraryFolders = pgTable(
       .notNull()
       .references(() => libraries.id, { onDelete: 'cascade' }),
     path: varchar('path', { length: 4096 }).notNull(),
+    kind: varchar('kind', { length: 20 }).notNull().default('file_system'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index('library_folders_library_id_idx').on(t.libraryId),
     uniqueIndex('library_folders_library_path_uidx').on(t.libraryId, t.path),
     unique('library_folders_id_library_id_unique').on(t.id, t.libraryId),
+    check('library_folders_kind_chk', sql`${t.kind} in ('file_system', 'manual')`),
   ],
 );
 
