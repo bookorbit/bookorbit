@@ -15,6 +15,15 @@ export const PROVIDER_LIMITS = {
   DEFAULT_SEARCH_RESULTS: 10,
 } as const;
 
+/**
+ * Soft budget for a provider search that spans many calls. Reaching it aborts the work still in
+ * flight, so the margin under the hard provider timeout only has to cover assembling the results
+ * that already arrived.
+ */
+export const PROVIDER_BUDGETS_MS = {
+  COMICVINE_SEARCH: PROVIDER_TIMEOUT_MS.SCRAPE - 1_500,
+} as const;
+
 export const PROVIDER_DELAYS_MS = {
   AMAZON_BETWEEN_REQUESTS: 800,
   GOODREADS_BETWEEN_REQUESTS: 600,

@@ -1,5 +1,12 @@
 import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, Permission, ProviderThrottleRuntimeSnapshot } from '@bookorbit/types';
+import {
+  METADATA_PROVIDER_STATUS_EVENT,
+  MetadataCandidate,
+  MetadataProviderInfo,
+  MetadataProviderKey,
+  Permission,
+  ProviderThrottleRuntimeSnapshot,
+} from '@bookorbit/types';
 import { map, Observable } from 'rxjs';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,7 +14,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { LookupMetadataDto } from './dto/lookup-metadata.dto';
 import { MetadataSearchDto } from './dto/metadata-search.dto';
-import { MetadataFetchService } from './metadata-fetch.service';
+import { MetadataFetchService, MetadataSearchEvent } from './metadata-fetch.service';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { ProviderRegistry } from './provider-registry';
 import { MetadataSearchParams } from './providers/metadata-search-params';
@@ -21,6 +28,16 @@ function normalizeSearchTitle(title: string | undefined): string | undefined {
   if (!title) return title;
   // Normalize comic issue tags (e.g. "#007" -> "#7") before provider search.
   return title.trim().replace(/#0*(\d+)/g, '#$1');
+}
+
+/**
+ * The search box is prefilled with the book's own title, so an unchanged one carries no intent and
+ * stored series context should still lead. Anything else is the user asking for something specific.
+ */
+function isExplicitQuery(searchTitle: string | undefined, storedTitle: string | null | undefined): boolean {
+  if (!searchTitle?.trim()) return false;
+  const stored = normalizeSearchTitle(storedTitle ?? undefined);
+  return searchTitle.trim().toLowerCase() !== (stored ?? '').trim().toLowerCase();
 }
 
 function isAudiobookProvider(providerKey: MetadataProviderKey): boolean {
@@ -79,12 +96,14 @@ export class MetadataFetchController {
       Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE] || existingProviderIds[MetadataProviderKey.LIBROFM]);
     const isAudiobook = dto.isAudiobook ?? inferredIsAudiobook;
 
+    const searchTitle = normalizeSearchTitle(dto.title);
     const params: MetadataSearchParams = {
-      title: normalizeSearchTitle(dto.title),
+      title: searchTitle,
       author: dto.author,
       isbn: dto.isbn,
       seriesName: storedContext?.seriesName ?? undefined,
       seriesIndex: storedContext?.seriesIndex ?? undefined,
+      titleIsExplicitQuery: isExplicitQuery(searchTitle, storedContext?.title),
       existingProviderIds,
       isAudiobook,
       includeAudiobookProviders: isAudiobook || providerKeys.some(isAudiobookProvider),
@@ -96,7 +115,11 @@ export class MetadataFetchController {
     return this.metadataFetchService
       .search(params, providerKeys)
       .pipe(
-        map((candidate: MetadataCandidate) => ({ data: applyGenreFetchOptionsToCandidate(candidate, blockedGenreTokens, genreOptions?.maxCount) })),
+        map((event: MetadataSearchEvent) =>
+          event.kind === 'candidate'
+            ? { data: applyGenreFetchOptionsToCandidate(event.candidate, blockedGenreTokens, genreOptions?.maxCount) }
+            : { type: METADATA_PROVIDER_STATUS_EVENT, data: event.status },
+        ),
       );
   }
 

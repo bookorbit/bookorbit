@@ -194,6 +194,7 @@ async function handleDiscard() {
 const {
   filteredResults,
   providerCounts,
+  interruptedProviders,
   isStreaming,
   hasSearched,
   providers,
@@ -644,6 +645,7 @@ onMounted(() => {
             :selected-providers="selectedProviders"
             :is-streaming="isStreaming"
             :has-searched="hasSearched"
+            :interrupted-providers="interruptedProviders"
             @search="handleSearchSubmit"
             @toggle-provider="toggleProvider"
             @clear-filter="clearProviderFilter"

@@ -9,6 +9,9 @@ export interface MetadataSearchParams {
   // pairing cannot be recovered from it.
   seriesName?: string;
   seriesIndex?: number;
+  // True when `title` is a query the caller typed rather than the book's own stored title. Stored
+  // series context may then fill in what the query omits, but must not override what it states.
+  titleIsExplicitQuery?: boolean;
   existingProviderIds?: Partial<Record<MetadataProviderKey, string>>;
   // Pins a Hardcover refresh to a previously chosen edition instead of re-deriving one by ISBN.
   hardcoverEditionId?: string;

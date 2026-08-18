@@ -132,7 +132,7 @@ export class MetadataFetchPipeline {
       ? { ...params, includeAudiobookProviders: true }
       : params;
     const candidates = providerSelection.activeProviders.length
-      ? await firstValueFrom(this.fetchService.search(searchParams, providerSelection.activeProviders).pipe(toArray()), {
+      ? await firstValueFrom(this.fetchService.searchCandidates(searchParams, providerSelection.activeProviders).pipe(toArray()), {
           defaultValue: [] as MetadataCandidate[],
         })
       : [];

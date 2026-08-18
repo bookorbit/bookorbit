@@ -4058,6 +4058,12 @@
           "notInFieldRulesText": "{providers}. Included in manual search with All enabled, but not used by automatic metadata fetch.",
           "noResults": "No results found",
           "noResultsHint": "Try adjusting the title or author",
+          "searchInterrupted": "The search did not finish",
+          "searchIncomplete": "Some results may be missing",
+          "providerTimedOut": "{provider} took too long to respond.",
+          "providerThrottled": "{provider} has hit its rate limit. Wait a moment and try again.",
+          "providerFailed": "{provider} could not be reached.",
+          "searchInterruptedHint": "Try again, or narrow the search scope.",
           "searchPrompt": "Search above, then click a result to start comparing metadata."
         },
         "writeAndRename": "Write to File & Rename",

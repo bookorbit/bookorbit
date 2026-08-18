@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope } from 'vue'
-import { MetadataProviderKey, type MetadataCandidate, type MetadataProviderInfo } from '@bookorbit/types'
+import {
+  METADATA_PROVIDER_STATUS_EVENT,
+  MetadataProviderKey,
+  type MetadataCandidate,
+  type MetadataProviderInfo,
+  type MetadataProviderSearchOutcome,
+} from '@bookorbit/types'
 import { useMetadataSearch } from '../useMetadataSearch'
 
 const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>())
@@ -40,6 +46,10 @@ describe('useMetadataSearch', () => {
 
   function event(data: unknown): string {
     return `data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`
+  }
+
+  function statusEvent(providerKey: MetadataProviderKey, outcome: MetadataProviderSearchOutcome): string {
+    return `event: ${METADATA_PROVIDER_STATUS_EVENT}\ndata: ${JSON.stringify({ provider: providerKey, outcome })}\n\n`
   }
 
   function deferred<T>() {
@@ -132,6 +142,66 @@ describe('useMetadataSearch', () => {
         signal: expect.any(AbortSignal),
       },
     )
+  })
+
+  it('records a provider that stopped early instead of counting it as a result', async () => {
+    apiMock.mockResolvedValue(streamResponse([statusEvent(MetadataProviderKey.COMICVINE, 'timeout')]))
+
+    const scope = effectScope()
+    const state = scope.run(() => useMetadataSearch())!
+    await state.search({ title: 'Amazing Spider-Man' })
+    scope.stop()
+
+    expect(state.filteredResults.value).toEqual([])
+    expect(state.providerCounts[MetadataProviderKey.COMICVINE]).toBeUndefined()
+    expect(state.interruptedProviders.value).toEqual([{ provider: MetadataProviderKey.COMICVINE, outcome: 'timeout' }])
+  })
+
+  it('reports a provider that stopped early alongside the results others returned', async () => {
+    const google = candidate(MetadataProviderKey.GOOGLE, 'g1')
+    apiMock.mockResolvedValue(streamResponse([event(google), statusEvent(MetadataProviderKey.COMICVINE, 'throttled')]))
+
+    const scope = effectScope()
+    const state = scope.run(() => useMetadataSearch())!
+    await state.search({ title: 'Dune' })
+    scope.stop()
+
+    expect(state.filteredResults.value).toEqual([google])
+    expect(state.interruptedProviders.value).toEqual([{ provider: MetadataProviderKey.COMICVINE, outcome: 'throttled' }])
+  })
+
+  it('clears an earlier interruption when a new search starts', async () => {
+    apiMock.mockResolvedValueOnce(streamResponse([statusEvent(MetadataProviderKey.COMICVINE, 'failed')]))
+    const scope = effectScope()
+    const state = scope.run(() => useMetadataSearch())!
+    await state.search({ title: 'Amazing Spider-Man' })
+    expect(state.interruptedProviders.value).toHaveLength(1)
+
+    apiMock.mockResolvedValueOnce(streamResponse([event(candidate(MetadataProviderKey.COMICVINE, 'c1'))]))
+    await state.search({ title: 'Amazing Spider-Man' })
+    scope.stop()
+
+    expect(state.interruptedProviders.value).toEqual([])
+  })
+
+  it('hides an interruption from a provider the user has filtered out', async () => {
+    apiMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [provider(MetadataProviderKey.GOOGLE), provider(MetadataProviderKey.COMICVINE)],
+    })
+    const scope = effectScope()
+    const state = scope.run(() => useMetadataSearch())!
+    await state.loadProviders()
+
+    apiMock.mockResolvedValueOnce(streamResponse([statusEvent(MetadataProviderKey.COMICVINE, 'timeout')]))
+    await state.search({ title: 'Dune' })
+    expect(state.interruptedProviders.value).toHaveLength(1)
+
+    state.toggleProvider(MetadataProviderKey.COMICVINE)
+    scope.stop()
+
+    expect(state.selectedProviders.value).toEqual([MetadataProviderKey.GOOGLE])
+    expect(state.interruptedProviders.value).toEqual([])
   })
 
   it('streams metadata candidates and counts providers', async () => {

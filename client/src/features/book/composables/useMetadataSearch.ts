@@ -1,6 +1,13 @@
 import { computed, onUnmounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
+import { METADATA_PROVIDER_STATUS_EVENT } from '@bookorbit/types'
+import type {
+  MetadataCandidate,
+  MetadataProviderInfo,
+  MetadataProviderKey,
+  MetadataProviderSearchOutcome,
+  MetadataProviderSearchStatus,
+} from '@bookorbit/types'
 
 export interface SearchParams {
   title?: string
@@ -13,6 +20,8 @@ export interface SearchParams {
 export function useMetadataSearch() {
   const results = ref<MetadataCandidate[]>([])
   const providerCounts = reactive<Partial<Record<MetadataProviderKey, number>>>({})
+  // Providers that stopped early. Without this an interrupted search looks like an empty one.
+  const providerStatuses = reactive<Partial<Record<MetadataProviderKey, MetadataProviderSearchOutcome>>>({})
   const isStreaming = ref(false)
   const hasSearched = ref(false)
   const providers = ref<MetadataProviderInfo[]>([])
@@ -41,6 +50,7 @@ export function useMetadataSearch() {
     cancel()
     results.value = []
     for (const k of Object.keys(providerCounts)) delete providerCounts[k as MetadataProviderKey]
+    for (const k of Object.keys(providerStatuses)) delete providerStatuses[k as MetadataProviderKey]
     hasSearched.value = true
     isStreaming.value = true
     const controller = new AbortController()
@@ -73,10 +83,21 @@ export function useMetadataSearch() {
         const events = buffer.split('\n\n')
         buffer = events.pop() ?? ''
         for (const event of events) {
-          const line = event.split('\n').find((l) => l.startsWith('data:'))
-          if (!line) continue
+          const lines = event.split('\n')
+          const dataLine = lines.find((l) => l.startsWith('data:'))
+          if (!dataLine) continue
+          const eventName = lines
+            .find((l) => l.startsWith('event:'))
+            ?.slice(6)
+            .trim()
           try {
-            const candidate = JSON.parse(line.slice(5).trim()) as MetadataCandidate
+            const payload = JSON.parse(dataLine.slice(5).trim())
+            if (eventName === METADATA_PROVIDER_STATUS_EVENT) {
+              const status = payload as MetadataProviderSearchStatus
+              providerStatuses[status.provider] = status.outcome
+              continue
+            }
+            const candidate = payload as MetadataCandidate
             results.value.push(candidate)
             providerCounts[candidate.provider] = (providerCounts[candidate.provider] ?? 0) + 1
           } catch {
@@ -155,9 +176,17 @@ export function useMetadataSearch() {
     selectAllProviders()
   }
 
+  const interruptedProviders = computed(() =>
+    (Object.entries(providerStatuses) as [MetadataProviderKey, MetadataProviderSearchOutcome][])
+      .filter(([key]) => !selectedProviders.value.length || selectedProviders.value.includes(key))
+      .map(([provider, outcome]) => ({ provider, outcome })),
+  )
+
   return {
     filteredResults,
     providerCounts,
+    providerStatuses,
+    interruptedProviders,
     isStreaming,
     hasSearched,
     providers,

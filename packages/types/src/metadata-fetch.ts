@@ -100,6 +100,20 @@ export interface MetadataProviderInfo {
   selectedByFieldRules?: boolean;
 }
 
+/**
+ * SSE event name carrying a MetadataProviderSearchStatus. Candidates keep the default event, so a
+ * client that only reads candidates is unaffected by a provider reporting how it stopped.
+ */
+export const METADATA_PROVIDER_STATUS_EVENT = "provider-status";
+
+/** Why a provider stopped before finishing, so an interrupted search is not read as an empty one. */
+export type MetadataProviderSearchOutcome = "timeout" | "throttled" | "failed";
+
+export interface MetadataProviderSearchStatus {
+  provider: MetadataProviderKey;
+  outcome: MetadataProviderSearchOutcome;
+}
+
 export type MetadataFetchEmptyReason = "no_active_providers" | "providers_throttled" | "no_candidates" | "no_resolved_fields";
 
 export interface MetadataFetchDiagnostics {

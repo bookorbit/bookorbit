@@ -51,6 +51,7 @@ const currentSource = computed<MetadataSource>(() => ({
 const {
   filteredResults,
   providerCounts,
+  interruptedProviders,
   isStreaming,
   hasSearched,
   providers,
@@ -166,6 +167,7 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             :selected-providers="selectedProviders"
             :is-streaming="isStreaming"
             :has-searched="hasSearched"
+            :interrupted-providers="interruptedProviders"
             @search="handleSearch"
             @toggle-provider="handleToggleProvider"
             @clear-filter="handleClearProviderFilter"

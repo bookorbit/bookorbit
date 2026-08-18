@@ -134,8 +134,8 @@ describe('ComicVineProvider', () => {
 
       const results = await provider.search({ title: 'Batman #1' });
 
-      expect(client.searchVolumes).toHaveBeenCalledWith('Batman', 'test-key');
-      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '1', 'test-key');
+      expect(client.searchVolumes).toHaveBeenCalledWith('Batman', 'test-key', expect.any(AbortSignal));
+      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '1', 'test-key', expect.any(AbortSignal));
       expect(results).toHaveLength(1);
     });
 
@@ -145,8 +145,8 @@ describe('ComicVineProvider', () => {
 
       const results = await provider.search({ title: 'The Origin', seriesName: 'Batman', seriesIndex: 12.5 });
 
-      expect(client.searchVolumes).toHaveBeenCalledWith('Batman', 'test-key');
-      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '12.5', 'test-key');
+      expect(client.searchVolumes).toHaveBeenCalledWith('Batman', 'test-key', expect.any(AbortSignal));
+      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '12.5', 'test-key', expect.any(AbortSignal));
       expect(client.searchIssues).not.toHaveBeenCalled();
       expect(results).toHaveLength(1);
     });
@@ -157,8 +157,41 @@ describe('ComicVineProvider', () => {
 
       await provider.search({ title: 'Superman #3', seriesName: 'Batman', seriesIndex: 12.5 });
 
-      expect(client.searchVolumes).toHaveBeenCalledWith('Superman', 'test-key');
-      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '3', 'test-key');
+      expect(client.searchVolumes).toHaveBeenCalledWith('Superman', 'test-key', expect.any(AbortSignal));
+      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '3', 'test-key', expect.any(AbortSignal));
+    });
+
+    it('lets a typed series override the stored one while keeping the stored issue number', async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue([mockVolume]);
+      vi.mocked(client.searchIssuesInVolume).mockResolvedValue([mockIssue]);
+
+      await provider.search({ title: 'Daredevil', seriesName: 'Amazing Spider-Man', seriesIndex: 67, titleIsExplicitQuery: true });
+
+      expect(client.searchVolumes).toHaveBeenCalledWith('Daredevil', 'test-key', expect.any(AbortSignal));
+      expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '67', 'test-key', expect.any(AbortSignal));
+    });
+
+    it("keeps the stored series when the title is the book's own, not something typed", async () => {
+      vi.mocked(client.searchVolumes).mockResolvedValue([mockVolume]);
+      vi.mocked(client.searchIssuesInVolume).mockResolvedValue([mockIssue]);
+
+      await provider.search({
+        title: 'The Amazing Spider-Man (2022) Volume 06 Issue 067',
+        seriesName: 'Amazing Spider-Man',
+        seriesIndex: 67,
+        titleIsExplicitQuery: false,
+      });
+
+      expect(client.searchVolumes).toHaveBeenCalledWith('Amazing Spider-Man', 'test-key', expect.any(AbortSignal));
+    });
+
+    it('falls through to the general search for a typed query when no issue number is stored', async () => {
+      vi.mocked(client.searchIssues).mockResolvedValue([mockIssue]);
+
+      await provider.search({ title: 'Daredevil', seriesName: 'Amazing Spider-Man', titleIsExplicitQuery: true });
+
+      expect(client.searchVolumes).not.toHaveBeenCalled();
+      expect(client.searchIssues).toHaveBeenCalledWith('Daredevil', 'test-key', expect.any(AbortSignal));
     });
 
     it('uses the general search when the stored series has no issue number', async () => {
@@ -167,7 +200,7 @@ describe('ComicVineProvider', () => {
       await provider.search({ title: 'The Origin', seriesName: 'Batman' });
 
       expect(client.searchVolumes).not.toHaveBeenCalled();
-      expect(client.searchIssues).toHaveBeenCalledWith('The Origin', 'test-key');
+      expect(client.searchIssues).toHaveBeenCalledWith('The Origin', 'test-key', expect.any(AbortSignal));
     });
 
     it('tries volumes sorted by start_year descending', async () => {
@@ -178,7 +211,7 @@ describe('ComicVineProvider', () => {
 
       await provider.search({ title: 'Batman #1' });
 
-      expect(client.searchIssuesInVolume).toHaveBeenNthCalledWith(1, newer.id, '1', 'test-key');
+      expect(client.searchIssuesInVolume).toHaveBeenNthCalledWith(1, newer.id, '1', 'test-key', expect.any(AbortSignal));
     });
 
     it('returns empty array when no volumes are found', async () => {
@@ -223,7 +256,7 @@ describe('ComicVineProvider', () => {
 
       await provider.search({ title: 'Batman #1' });
 
-      expect(client.getIssueById).toHaveBeenCalledWith(String(issueNoCredits.id), 'test-key');
+      expect(client.getIssueById).toHaveBeenCalledWith(String(issueNoCredits.id), 'test-key', expect.any(AbortSignal));
     });
 
     it('skips detail fetch when issue already has credits', async () => {
@@ -264,7 +297,7 @@ describe('ComicVineProvider', () => {
 
       await provider.search({ title: 'Batman' });
 
-      expect(client.searchIssues).toHaveBeenCalledWith('Batman', 'test-key');
+      expect(client.searchIssues).toHaveBeenCalledWith('Batman', 'test-key', expect.any(AbortSignal));
       expect(client.searchVolumes).not.toHaveBeenCalled();
     });
 

@@ -6,41 +6,70 @@ import { ProviderThrottleTracker } from '../../provider-throttle.tracker';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { PROVIDER_LIMITS } from '../provider-constants';
-import { normalizeMaxCandidates } from '../provider-utils';
+import { PROVIDER_BUDGETS_MS, PROVIDER_LIMITS } from '../provider-constants';
+import { createSearchDeadline, normalizeMaxCandidates, SearchDeadline } from '../provider-utils';
 import { ComicVineClient } from './comicvine.client';
 import { mapIssueToCandidate } from './comicvine.mapper';
-import { ComicVineIssue } from './comicvine.types';
+import { normalizeIssueNumber, rankVolumes } from './comicvine.matching';
+import { ComicVineIssue, ComicVineVolume } from './comicvine.types';
 
 const ISSUE_PATTERN = /^(.*?)\s*#(\d[\d.]*)(.*)$/;
+
+// Every ComicVine call costs a rate-limiter slot, and the volume issue list is slow enough that
+// probing candidates one at a time exhausts the provider budget before reaching the right run.
+// Probing a wave at a time keeps recall across all VOLUME_PROBE_LIMIT candidates affordable.
+const VOLUME_PROBE_LIMIT = 8;
+const VOLUME_PROBE_BATCH = 3;
 
 interface ParsedIssueTitle {
   seriesName: string;
   issueNumber: string;
 }
 
+interface VolumeIssueMatch {
+  issue: ComicVineIssue;
+  volume?: ComicVineVolume;
+}
+
 function parseIssueTitle(title: string): ParsedIssueTitle | null {
   const match = ISSUE_PATTERN.exec(title.trim());
   if (!match) return null;
   const seriesName = match[1].trim();
-  const issueNumber = match[2].trim();
+  const issueNumber = normalizeIssueNumber(match[2]);
   if (!seriesName || !issueNumber) return null;
   return { seriesName, issueNumber };
 }
 
+function storedIssueNumber(params: MetadataSearchParams): string | null {
+  const issueNumber = params.seriesIndex;
+  if (issueNumber === undefined || !Number.isFinite(issueNumber) || issueNumber < 0) return null;
+  return String(issueNumber);
+}
+
 /**
- * Prefer a "<series> #<issue>" title because that is the user typing an explicit target, and fall
- * back to the book's stored series. Comic titles hold the issue name alone, so without the fallback
+ * Prefer a "<series> #<issue>" title because that is the user naming an explicit target. Otherwise
+ * the stored series leads, since a comic title holds only the issue name and without that fallback
  * an already-matched comic would re-search through the far looser general issue search.
+ *
+ * A typed query that is not the book's own title overrides the stored series name even so, or
+ * searching a comic for a different series would silently return the series it is already filed
+ * under. The stored issue number still applies: it is the one thing a bare series query omits.
  */
 function resolveIssueQuery(params: MetadataSearchParams): ParsedIssueTitle | null {
   const fromTitle = params.title ? parseIssueTitle(params.title) : null;
   if (fromTitle) return fromTitle;
 
+  const issueNumber = storedIssueNumber(params);
+  const typedSeriesName = params.titleIsExplicitQuery ? params.title?.trim() : undefined;
+  if (typedSeriesName) return issueNumber ? { seriesName: typedSeriesName, issueNumber } : null;
+
   const seriesName = params.seriesName?.trim();
-  const issueNumber = params.seriesIndex;
-  if (!seriesName || issueNumber === undefined || !Number.isFinite(issueNumber) || issueNumber < 0) return null;
-  return { seriesName, issueNumber: String(issueNumber) };
+  if (!seriesName || !issueNumber) return null;
+  return { seriesName, issueNumber };
+}
+
+function isThrottleRejection(result: PromiseSettledResult<unknown>): boolean {
+  return result.status === 'rejected' && result.reason instanceof ProviderThrottleError;
 }
 
 function hasAnyCredits(issue: ComicVineIssue): boolean {
@@ -78,9 +107,18 @@ export class ComicVineProvider implements IdentifiableProvider {
     try {
       const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider, PROVIDER_LIMITS.COMICVINE_MAX_RESULTS);
       const parsed = resolveIssueQuery(params);
-      return parsed
-        ? await this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates, params.signal)
-        : await this.generalSearch(params.title, apiKey, maxCandidates, params.signal);
+      const deadline = createSearchDeadline(PROVIDER_BUDGETS_MS.COMICVINE_SEARCH, params.signal);
+
+      try {
+        const matches = parsed
+          ? await this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates, deadline)
+          : await this.generalSearch(params.title, apiKey, maxCandidates, deadline);
+
+        const enriched = await this.enrichWithinBudget(matches, apiKey, deadline);
+        return enriched.map(({ issue, volume }) => mapIssueToCandidate(issue, { volumeIssueCount: volume?.count_of_issues }));
+      } finally {
+        deadline.dispose();
+      }
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         this.recordThrottle();
@@ -117,46 +155,91 @@ export class ComicVineProvider implements IdentifiableProvider {
     issueNumber: string,
     apiKey: string,
     maxCandidates: number,
-    signal?: AbortSignal,
-  ): Promise<MetadataCandidate[]> {
-    const volumes = signal ? await this.client.searchVolumes(seriesName, apiKey, signal) : await this.client.searchVolumes(seriesName, apiKey);
+    deadline: SearchDeadline,
+  ): Promise<VolumeIssueMatch[]> {
+    const volumes = await this.client.searchVolumes(seriesName, apiKey, deadline.signal);
     if (volumes.length === 0) {
       this.logger.debug(`ComicVine: no volumes found for "${seriesName}"`);
       return [];
     }
 
-    const sorted = [...volumes].sort((a, b) => {
-      const yearA = a.start_year ? parseInt(a.start_year, 10) : 0;
-      const yearB = b.start_year ? parseInt(b.start_year, 10) : 0;
-      return yearB - yearA;
-    });
+    const ranked = rankVolumes(volumes, seriesName, issueNumber).slice(0, VOLUME_PROBE_LIMIT);
+    const matches: VolumeIssueMatch[] = [];
+    const seenIssueIds = new Set<number>();
 
-    for (const volume of sorted.slice(0, 8)) {
-      const issues = signal
-        ? await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey, signal)
-        : await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey);
-      if (issues.length > 0) {
-        const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey, signal)));
-        return enriched.map((issue) => mapIssueToCandidate(issue, { volumeIssueCount: volume.count_of_issues }));
+    for (let offset = 0; offset < ranked.length; offset += VOLUME_PROBE_BATCH) {
+      const wave = ranked.slice(offset, offset + VOLUME_PROBE_BATCH);
+      // Settled rather than all: one probe being throttled or cut off by the deadline must not
+      // discard the issues its siblings found.
+      const probed = await Promise.allSettled(wave.map((volume) => this.probeVolume(volume, issueNumber, apiKey, deadline.signal)));
+
+      for (const result of probed) {
+        if (result.status !== 'fulfilled') continue;
+        for (const issue of result.value.issues) {
+          if (seenIssueIds.has(issue.id)) continue;
+          seenIssueIds.add(issue.id);
+          matches.push({ issue, volume: result.value.volume });
+        }
+      }
+
+      if (probed.some(isThrottleRejection)) {
+        this.recordThrottle();
+        break;
+      }
+      if (matches.length > 0) break;
+      if (deadline.expired()) {
+        this.logger.debug(`ComicVine: budget spent after ${offset + wave.length} volume probes for "${seriesName}" #${issueNumber}`);
+        break;
       }
     }
 
-    this.logger.debug(`ComicVine: no issues found for "${seriesName}" #${issueNumber}`);
-    return [];
+    if (matches.length === 0) {
+      this.logger.debug(`ComicVine: no issues found for "${seriesName}" #${issueNumber}`);
+    }
+    return matches.slice(0, maxCandidates);
   }
 
-  private async generalSearch(query: string, apiKey: string, maxCandidates: number, signal?: AbortSignal): Promise<MetadataCandidate[]> {
-    const issues = signal ? await this.client.searchIssues(query, apiKey, signal) : await this.client.searchIssues(query, apiKey);
-    const enriched = await Promise.all(issues.slice(0, maxCandidates).map((issue) => this.enrichWithDetails(issue, apiKey, signal)));
-    return enriched.map((issue) => mapIssueToCandidate(issue));
+  private async probeVolume(
+    volume: ComicVineVolume,
+    issueNumber: string,
+    apiKey: string,
+    signal: AbortSignal,
+  ): Promise<{ volume: ComicVineVolume; issues: ComicVineIssue[] }> {
+    return { volume, issues: await this.client.searchIssuesInVolume(volume.id, issueNumber, apiKey, signal) };
   }
 
-  private async enrichWithDetails(issue: ComicVineIssue, apiKey: string, signal?: AbortSignal): Promise<ComicVineIssue> {
-    if (hasAnyCredits(issue)) return issue;
-    this.logger.debug(`ComicVine: issue ${issue.id} has no credits from list endpoint, fetching detail`);
-    const detailed = signal
-      ? await this.client.getIssueById(String(issue.id), apiKey, signal)
-      : await this.client.getIssueById(String(issue.id), apiKey);
-    return detailed ?? issue;
+  private async generalSearch(query: string, apiKey: string, maxCandidates: number, deadline: SearchDeadline): Promise<VolumeIssueMatch[]> {
+    const issues = await this.client.searchIssues(query, apiKey, deadline.signal);
+    return issues.slice(0, maxCandidates).map((issue) => ({ issue }));
+  }
+
+  /**
+   * Detail lookups only add credits, so they are worth a request each only while the budget holds.
+   * Sequential because the client serializes calls anyway, which lets the deadline actually stop
+   * the work rather than every lookup being queued up front. A lookup that fails or is cut off
+   * costs its candidate only the credits, never the candidate itself.
+   */
+  private async enrichWithinBudget(matches: VolumeIssueMatch[], apiKey: string, deadline: SearchDeadline): Promise<VolumeIssueMatch[]> {
+    const enriched: VolumeIssueMatch[] = [];
+    let stopped = false;
+
+    for (const match of matches) {
+      if (stopped || hasAnyCredits(match.issue) || deadline.expired()) {
+        enriched.push(match);
+        continue;
+      }
+
+      this.logger.debug(`ComicVine: issue ${match.issue.id} has no credits from list endpoint, fetching detail`);
+      try {
+        const detailed = await this.client.getIssueById(String(match.issue.id), apiKey, deadline.signal);
+        enriched.push(detailed ? { ...match, issue: detailed } : match);
+      } catch (err) {
+        enriched.push(match);
+        stopped = true;
+        if (err instanceof ProviderThrottleError) this.recordThrottle();
+      }
+    }
+
+    return enriched;
   }
 }
