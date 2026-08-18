@@ -117,7 +117,11 @@ function togglePersonalReview() {
 }
 
 const { weights: scoreWeights, fetchWeights } = useMetadataScoreWeights()
-const { bookProgress: koreaderBookProgress, fetchBookProgress: fetchKoreaderProgress } = useKoreaderBookProgress()
+const {
+  bookProgress: koreaderBookProgress,
+  fetchBookProgress: fetchKoreaderProgress,
+  releaseResetHold: releaseKoreaderResetHold,
+} = useKoreaderBookProgress()
 
 onMounted(() => {
   void fetchWeights()
@@ -865,6 +869,31 @@ function formatKoboDeviceNames(snapshots: BookKoboState['snapshots']): string {
   if (names.length === 1) return names.join('')
   if (names.length === 2) return names.join(' and ')
   return `${snapshots.length} devices`
+}
+
+const resetHeldDevices = computed(() => (canViewKoreader.value ? (koreaderBookProgress.value?.heldByReset ?? []) : []))
+const releasingDeviceIds = ref<string[]>([])
+const failedReleaseDeviceIds = ref<string[]>([])
+
+function isReleasingHold(deviceId: string): boolean {
+  return releasingDeviceIds.value.includes(deviceId)
+}
+
+function hasReleaseFailed(deviceId: string): boolean {
+  return failedReleaseDeviceIds.value.includes(deviceId)
+}
+
+async function handleReleaseResetHold(deviceId: string) {
+  if (isReleasingHold(deviceId)) return
+  releasingDeviceIds.value = [...releasingDeviceIds.value, deviceId]
+  failedReleaseDeviceIds.value = failedReleaseDeviceIds.value.filter((id) => id !== deviceId)
+  try {
+    const released = await releaseKoreaderResetHold(props.book.id, deviceId)
+    // A button that re-enables with the hold still showing reads as nothing having happened.
+    if (!released) failedReleaseDeviceIds.value = [...failedReleaseDeviceIds.value, deviceId]
+  } finally {
+    releasingDeviceIds.value = releasingDeviceIds.value.filter((id) => id !== deviceId)
+  }
 }
 
 const koboAnomaly = computed(() => {
@@ -1710,6 +1739,24 @@ watch(
             {{ t('book.detail.details.moreCount', { count: leftColumnProgressOverflow }) }}
           </p>
         </div>
+        <div v-for="held in resetHeldDevices" :key="held.deviceId" class="mt-2 flex items-start gap-1.5">
+          <TriangleAlert class="size-3 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+          <div class="min-w-0">
+            <p class="text-[11px] text-amber-500">
+              {{ t('book.detail.details.resetHoldNotice', { device: held.device, percent: formatPercent(held.percentage) }) }}
+            </p>
+            <button
+              class="mt-0.5 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isReleasingHold(held.deviceId)"
+              @click="handleReleaseResetHold(held.deviceId)"
+            >
+              {{ isReleasingHold(held.deviceId) ? t('book.detail.details.resetHoldReleasing') : t('book.detail.details.resetHoldRelease') }}
+            </button>
+            <p v-if="hasReleaseFailed(held.deviceId)" role="alert" class="text-[11px] text-destructive">
+              {{ t('book.detail.details.resetHoldReleaseFailed') }}
+            </p>
+          </div>
+        </div>
         <Tooltip v-if="koboAnomaly">
           <TooltipTrigger as-child>
             <div class="mt-2 flex items-center gap-1.5 cursor-help" tabindex="0">
@@ -2281,7 +2328,10 @@ watch(
       </dl>
 
       <!-- Mobile-only: reading progress from left column -->
-      <div v-if="leftColumnProgressVisible.length || koboAnomaly" class="md:hidden mt-6 pt-5 border-t border-border space-y-3">
+      <div
+        v-if="leftColumnProgressVisible.length || koboAnomaly || resetHeldDevices.length"
+        class="md:hidden mt-6 pt-5 border-t border-border space-y-3"
+      >
         <div v-if="leftColumnProgressVisible.length" class="space-y-2">
           <div v-for="row in leftColumnProgressVisible" :key="row.label" class="flex items-center gap-2 cursor-default">
             <span
@@ -2320,6 +2370,24 @@ watch(
           <p v-if="leftColumnProgressOverflow > 0" class="text-[11px] text-muted-foreground">
             {{ t('book.detail.details.moreCount', { count: leftColumnProgressOverflow }) }}
           </p>
+        </div>
+        <div v-for="held in resetHeldDevices" :key="held.deviceId" class="mt-2 flex items-start gap-1.5">
+          <TriangleAlert class="size-3 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+          <div class="min-w-0">
+            <p class="text-[11px] text-amber-500">
+              {{ t('book.detail.details.resetHoldNotice', { device: held.device, percent: formatPercent(held.percentage) }) }}
+            </p>
+            <button
+              class="mt-0.5 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isReleasingHold(held.deviceId)"
+              @click="handleReleaseResetHold(held.deviceId)"
+            >
+              {{ isReleasingHold(held.deviceId) ? t('book.detail.details.resetHoldReleasing') : t('book.detail.details.resetHoldRelease') }}
+            </button>
+            <p v-if="hasReleaseFailed(held.deviceId)" role="alert" class="text-[11px] text-destructive">
+              {{ t('book.detail.details.resetHoldReleaseFailed') }}
+            </p>
+          </div>
         </div>
         <Tooltip v-if="koboAnomaly">
           <TooltipTrigger as-child>

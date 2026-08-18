@@ -45,6 +45,49 @@ describe('KoreaderRepository', () => {
     repo = new KoreaderRepository(db as never);
   });
 
+  describe('progress resets', () => {
+    it('returns the reset timestamp when one is outstanding', async () => {
+      const resetAt = new Date('2026-02-02T12:00:00.000Z');
+      db.select.mockReturnValue(makeQueryChain([{ resetAt }]));
+
+      await expect(repo.getProgressReset(10, 7)).resolves.toEqual(resetAt);
+    });
+
+    it('returns null when no reset is outstanding', async () => {
+      db.select.mockReturnValue(makeQueryChain([]));
+
+      await expect(repo.getProgressReset(10, 7)).resolves.toBeNull();
+    });
+
+    it('records convergence per device rather than retiring the marker', async () => {
+      const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+      const values = vi.fn().mockReturnValue({ onConflictDoNothing });
+      db.insert.mockReturnValue({ values });
+
+      await repo.recordResetConvergence(10, 7, 'device-1');
+
+      // One device taking the reset says nothing about the others, so the marker stays.
+      expect(values).toHaveBeenCalledWith({ userId: 7, bookFileId: 10, deviceId: 'device-1' });
+      expect(db.delete).not.toHaveBeenCalled();
+    });
+
+    it('reads back the devices that have taken the reset', async () => {
+      db.select.mockReturnValue(makeQueryChain([{ deviceId: 'device-1' }, { deviceId: 'device-2' }]));
+
+      await expect(repo.getConvergedResetDeviceIds(10, 7)).resolves.toEqual(new Set(['device-1', 'device-2']));
+    });
+
+    it('retires a marker when the outcome is settled for every device', async () => {
+      const where = vi.fn().mockResolvedValue(undefined);
+      db.delete.mockReturnValue({ where });
+
+      await repo.clearProgressReset(10, 7);
+
+      expect(db.delete).toHaveBeenCalledTimes(1);
+      expect(where).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('resolveBookFileByHash', () => {
     it('short-circuits when accessible libraries are empty', async () => {
       await expect(repo.resolveBookFileByHash('hash', [])).resolves.toBeNull();

@@ -491,6 +491,20 @@
       "when": 1787023974136,
       "tag": "0069_add_author_metadata_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1787083687102,
+      "tag": "0070_add_koreader_progress_resets",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1787086030151,
+      "tag": "0071_add_koreader_progress_reset_devices",
+      "breakpoints": true
     }
   ]
 }

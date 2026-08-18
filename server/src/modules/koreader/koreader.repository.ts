@@ -650,6 +650,122 @@ export class KoreaderRepository {
     return byFile;
   }
 
+  /**
+   * The live reset marker for a file, or null when none is outstanding. A live marker means
+   * the user cleared this file's position server-side and no device has been told yet, so it
+   * outranks every stored position regardless of timestamps: a device that pushed after the
+   * reset carries a fresh push clock but a pre-reset position, and the two are
+   * indistinguishable on the wire.
+   */
+  async getProgressReset(bookFileId: number, userId: number) {
+    const [row] = await this.db
+      .select({ resetAt: schema.koreaderProgressResets.resetAt })
+      .from(schema.koreaderProgressResets)
+      .where(and(eq(schema.koreaderProgressResets.bookFileId, bookFileId), eq(schema.koreaderProgressResets.userId, userId)))
+      .limit(1);
+    return row?.resetAt ?? null;
+  }
+
+  async getProgressResetsForFiles(bookFileIds: number[], userId: number) {
+    const byFile = new Map<number, Date>();
+    for (const batch of chunk([...new Set(bookFileIds)], BATCH_QUERY_SIZE)) {
+      const rows = await this.db
+        .select({ bookFileId: schema.koreaderProgressResets.bookFileId, resetAt: schema.koreaderProgressResets.resetAt })
+        .from(schema.koreaderProgressResets)
+        .where(and(inArray(schema.koreaderProgressResets.bookFileId, batch), eq(schema.koreaderProgressResets.userId, userId)));
+      for (const row of rows) byFile.set(row.bookFileId, row.resetAt);
+    }
+    return byFile;
+  }
+
+  /**
+   * The file a book's KOReader progress hangs off, in the shape the shared-progress path needs.
+   * Resolved through the book's primary file, matching findBookFileIdByBookId: the book page
+   * reports one file's holds, so the release action has to act on that same file rather than
+   * whichever one a marker happens to be found on first.
+   */
+  async findProgressBookFileByBookId(bookId: number, accessibleLibraryIds: number[] | null) {
+    if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return null;
+    const [row] = await this.db
+      .select({
+        id: schema.bookFiles.id,
+        bookId: schema.bookFiles.bookId,
+        libraryId: schema.books.libraryId,
+        format: schema.bookFiles.format,
+      })
+      .from(schema.bookFiles)
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .where(
+        and(
+          eq(schema.books.id, bookId),
+          eq(schema.books.primaryFileId, schema.bookFiles.id),
+          // Scoped the same way every other entry point into this module is. A device progress
+          // row outlives the library grant that created it, so ownership of the row is not
+          // ownership of the book, and this path writes.
+          accessibleLibraryIds === null ? undefined : inArray(schema.books.libraryId, accessibleLibraryIds),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  async getDeviceProgressForDevice(bookFileId: number, userId: number, deviceId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.koreaderDeviceProgress)
+      .where(
+        and(
+          eq(schema.koreaderDeviceProgress.bookFileId, bookFileId),
+          eq(schema.koreaderDeviceProgress.userId, userId),
+          eq(schema.koreaderDeviceProgress.deviceId, deviceId),
+          eq(schema.koreaderDeviceProgress.orphaned, false),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** Device ids that have taken the outstanding reset for this file. */
+  async getConvergedResetDeviceIds(bookFileId: number, userId: number) {
+    const rows = await this.db
+      .select({ deviceId: schema.koreaderProgressResetDevices.deviceId })
+      .from(schema.koreaderProgressResetDevices)
+      .where(and(eq(schema.koreaderProgressResetDevices.bookFileId, bookFileId), eq(schema.koreaderProgressResetDevices.userId, userId)));
+    return new Set(rows.map((row) => row.deviceId));
+  }
+
+  async getConvergedResetDeviceIdsForFiles(bookFileIds: number[], userId: number) {
+    const byFile = new Map<number, Set<string>>();
+    for (const batch of chunk([...new Set(bookFileIds)], BATCH_QUERY_SIZE)) {
+      const rows = await this.db
+        .select({ bookFileId: schema.koreaderProgressResetDevices.bookFileId, deviceId: schema.koreaderProgressResetDevices.deviceId })
+        .from(schema.koreaderProgressResetDevices)
+        .where(and(inArray(schema.koreaderProgressResetDevices.bookFileId, batch), eq(schema.koreaderProgressResetDevices.userId, userId)));
+      for (const row of rows) {
+        const existing = byFile.get(row.bookFileId);
+        if (existing) existing.add(row.deviceId);
+        else byFile.set(row.bookFileId, new Set([row.deviceId]));
+      }
+    }
+    return byFile;
+  }
+
+  /**
+   * Records that a device has landed on the reset position. Deliberately per-device and not a
+   * retirement of the marker: another device may still be holding a pre-reset position, and it
+   * has to keep being held until it takes the reset itself.
+   */
+  async recordResetConvergence(bookFileId: number, userId: number, deviceId: string) {
+    await this.db.insert(schema.koreaderProgressResetDevices).values({ userId, bookFileId, deviceId }).onConflictDoNothing();
+  }
+
+  /** Retires a marker whose outcome is settled for every device, cascading the per-device rows. */
+  async clearProgressReset(bookFileId: number, userId: number) {
+    await this.db
+      .delete(schema.koreaderProgressResets)
+      .where(and(eq(schema.koreaderProgressResets.bookFileId, bookFileId), eq(schema.koreaderProgressResets.userId, userId)));
+  }
+
   async getDevicesList(userId: number) {
     const result = await this.db.execute<{
       device: string;

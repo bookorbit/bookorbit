@@ -3908,7 +3908,11 @@
         "koboNotSynced": "Not synced",
         "koboNotSyncedTooltip": "Queued for next Kobo sync.",
         "filesNotFound": "Files not found",
-        "filesNotFoundDescription": "The file(s) for this book can no longer be found on disk. Metadata is still available. Run a library scan to confirm, or remove the record."
+        "filesNotFoundDescription": "The file(s) for this book can no longer be found on disk. Metadata is still available. Run a library scan to confirm, or remove the record.",
+        "resetHoldNotice": "{device} still has the old position ({percent})",
+        "resetHoldRelease": "Use this device's position",
+        "resetHoldReleasing": "Releasing...",
+        "resetHoldReleaseFailed": "Could not use this position. Try again."
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {no fields} one {one field} other {# fields}}",
