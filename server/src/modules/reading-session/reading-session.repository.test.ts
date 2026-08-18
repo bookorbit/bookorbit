@@ -302,14 +302,22 @@ describe('ReadingSessionRepository - listByBook', () => {
     return self;
   }
 
-  function makeListDb(results: { rows?: unknown[]; count?: unknown[]; stats?: unknown[]; summary?: unknown[]; bySource?: unknown[] }) {
+  function makeListDb(results: {
+    rows?: unknown[];
+    count?: unknown[];
+    stats?: unknown[];
+    summary?: unknown[];
+    bySource?: unknown[];
+    latest?: unknown[];
+  }) {
     const select = vi
       .fn()
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.rows ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.count ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.stats ?? [])) })
       .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.summary ?? [])) })
-      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.bySource ?? [])) });
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.bySource ?? [])) })
+      .mockReturnValueOnce({ from: vi.fn().mockReturnValue(makeQueryChain(results.latest ?? [])) });
     return { db: { select }, select };
   }
 
@@ -348,13 +356,13 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.items[0]?.source).toBe('web');
   });
 
-  it('fires five select queries', async () => {
+  it('fires six select queries', async () => {
     const { db, select } = makeListDb({});
     const repo = new ReadingSessionRepository(db as never);
 
     await repo.listByBook(1, 2, 2, 25, 'startedAt', 'desc');
 
-    expect(select).toHaveBeenCalledTimes(5);
+    expect(select).toHaveBeenCalledTimes(6);
   });
 
   it('splits per-book daily summaries across local midnight', async () => {
@@ -474,6 +482,71 @@ describe('ReadingSessionRepository - listByBook', () => {
     const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
 
     expect(result.stats.bySource).toEqual([]);
+  });
+
+  it('exposes the latest recorded end progress on stats', async () => {
+    const { db } = makeListDb({ latest: [{ endProgress: 76.5 }] });
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
+
+    expect(result.stats.latestEndProgress).toBe(76.5);
+  });
+
+  it('reports a null latest end progress when no session recorded one', async () => {
+    const { db } = makeListDb({ latest: [] });
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
+
+    expect(result.stats.latestEndProgress).toBeNull();
+  });
+
+  it('keeps the latest end progress outside the date and format filters', async () => {
+    const { db } = makeListDb({ rows: [], count: [{ total: 0 }], summary: [], latest: [{ endProgress: 100 }] });
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc', '2026-01-01', '2026-01-31', 'EPUB');
+
+    expect(result.stats.progressSummary).toEqual([]);
+    expect(result.stats.latestEndProgress).toBe(100);
+  });
+});
+
+describe('ReadingSessionRepository - findLatestEndProgress', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function makeLatestHarness(rows: Array<{ endProgress: number | null }>) {
+    const limit = vi.fn().mockResolvedValue(rows);
+    const orderBy = vi.fn().mockReturnValue({ limit });
+    const where = vi.fn().mockReturnValue({ orderBy });
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const repo = new ReadingSessionRepository({ select } as never);
+    return { repo, orderBy, limit, where };
+  }
+
+  it('returns the end progress of the most recent session that recorded one', async () => {
+    const { repo, orderBy, limit } = makeLatestHarness([{ endProgress: 42.5 }]);
+
+    await expect(repo.findLatestEndProgress(1, 2)).resolves.toBe(42.5);
+    expect(orderBy).toHaveBeenCalledTimes(1);
+    expect(orderBy.mock.calls[0]).toHaveLength(2);
+    expect(limit).toHaveBeenCalledWith(1);
+  });
+
+  it('returns null when the book has no session with an end progress', async () => {
+    const { repo } = makeLatestHarness([]);
+
+    await expect(repo.findLatestEndProgress(1, 2)).resolves.toBeNull();
+  });
+
+  it('returns null when the most recent row carries a null end progress', async () => {
+    const { repo } = makeLatestHarness([{ endProgress: null }]);
+
+    await expect(repo.findLatestEndProgress(1, 2)).resolves.toBeNull();
   });
 });
 

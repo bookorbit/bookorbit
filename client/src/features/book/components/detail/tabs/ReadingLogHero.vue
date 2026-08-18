@@ -193,7 +193,7 @@ function handleFinishedCancel() {
   cancelDateEdit('finishedAt')
 }
 
-const currentProgress = ref(0)
+const readerProgress = ref(0)
 const progressLoaded = ref(false)
 
 async function loadProgress() {
@@ -218,15 +218,26 @@ async function loadProgress() {
       const data = (await audioRes.json()) as { percentage?: number } | null
       if (data && Number.isFinite(data.percentage)) max = Math.max(max, data.percentage!)
     }
-    currentProgress.value = Math.min(100, Math.max(0, max))
+    readerProgress.value = Math.min(100, Math.max(0, max))
   } catch {
-    currentProgress.value = 0
+    readerProgress.value = 0
   } finally {
     progressLoaded.value = true
   }
 }
 
 watch(() => props.book.id, loadProgress, { immediate: true })
+
+// The stored reading position only moves when a reader or a synced device writes it, so a
+// book whose progress was only ever logged by hand has none. Sessions are the other current
+// observation of how far the book got, combined the same way as the ebook and audio positions.
+const loggedProgress = computed(() => {
+  const value = props.stats?.latestEndProgress
+  if (value == null || !Number.isFinite(value)) return 0
+  return Math.min(100, Math.max(0, value))
+})
+
+const currentProgress = computed(() => Math.max(readerProgress.value, loggedProgress.value))
 
 const progressLabel = computed(() => {
   const value = currentProgress.value

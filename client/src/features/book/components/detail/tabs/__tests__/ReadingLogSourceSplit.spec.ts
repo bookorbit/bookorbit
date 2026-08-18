@@ -15,6 +15,7 @@ function makeStats(bySource: BookReadingSourceSlice[]) {
     paceProgressDelta: 0,
     paceDurationSeconds: 0,
     progressSummary: [],
+    latestEndProgress: null,
     bySource,
   }
 }
