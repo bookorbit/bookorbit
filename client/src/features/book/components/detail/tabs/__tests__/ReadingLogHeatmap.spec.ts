@@ -20,6 +20,7 @@ function makeStats(): BookReadingSessionStats {
     paceProgressDelta: 0,
     paceDurationSeconds: 0,
     progressSummary: [],
+    latestEndProgress: null,
     bySource: [],
   }
 }

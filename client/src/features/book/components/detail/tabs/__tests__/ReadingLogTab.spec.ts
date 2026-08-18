@@ -95,6 +95,7 @@ function makeListResponse(items = []) {
         paceProgressDelta: 0,
         paceDurationSeconds: 0,
         progressSummary: [],
+        latestEndProgress: null,
       },
     }),
   } as Response
