@@ -388,6 +388,35 @@ describe('extractAudioMetadata — cover', () => {
     expect(result.coverBytes).toBeNull();
   });
 
+  it('kills ffmpeg and drops the cover once stdout exceeds the size cap', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        streams: [{ codec_type: 'video', codec_name: 'mjpeg' }],
+      }),
+    );
+    const kill = vi.fn();
+    const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter; kill: Mock };
+    proc.stdout = new EventEmitter();
+    proc.kill = kill;
+    mockSpawn.mockReturnValue(proc);
+
+    const underCap = Buffer.alloc(6 * 1024 * 1024);
+    const overCap = Buffer.alloc(6 * 1024 * 1024); // total exceeds the 10MB cap
+    const afterAbort = Buffer.alloc(6 * 1024 * 1024);
+    setImmediate(() => {
+      proc.stdout.emit('data', underCap);
+      proc.stdout.emit('data', overCap);
+      proc.stdout.emit('data', afterAbort);
+      proc.emit('close', null);
+    });
+
+    const result = await extractAudioMetadata('/path/oversized-cover.m4b');
+
+    expect(result.coverBytes).toBeNull();
+    // one kill() call, not three - the abort guard must stop reacting to further chunks
+    expect(kill).toHaveBeenCalledTimes(1);
+  });
+
   it('returns null cover when ffmpeg spawn emits an error', async () => {
     makeExecFileSuccess(
       makeProbeOutput({
