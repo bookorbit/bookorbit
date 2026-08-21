@@ -122,9 +122,65 @@
           "emerald": "에메랄드",
           "teal": "틸",
           "electric-blue": "일렉트릭 블루",
-          "foam": "폼"
+          "cyan": "시안",
+          "jade": "제이드",
+          "ultramarine": "울트라마린",
+          "iris": "아이리스",
+          "purple": "퍼플",
+          "blue": "파랑",
+          "indigo": "인디고",
+          "violet": "바이올렛",
+          "amethyst": "아메지스트",
+          "fuchsia": "퓨시아",
+          "raspberry": "라즈베리",
+          "pink": "핑크",
+          "white": "화이트",
+          "rosewater": "로즈워터",
+          "salmon": "새먼",
+          "coral": "코랄",
+          "sand": "샌드",
+          "peach": "피치",
+          "pear": "페어",
+          "flax": "플랙스",
+          "sprout": "스프라우트",
+          "butter": "버터",
+          "aloe": "알로에",
+          "lemon": "레몬",
+          "foam": "폼",
+          "aqua": "아쿠아",
+          "celadon": "청자",
+          "sage": "세이지",
+          "pistachio": "피스타치오",
+          "mint": "민트",
+          "seafoam": "바다거품",
+          "baby-blue": "베이비 블루",
+          "powder": "파우더",
+          "sea-glass": "씨 글래스",
+          "bluebell": "블루벨",
+          "cornflower": "콘플라워",
+          "thistle": "엉겅퀴",
+          "periwinkle": "페리윙클",
+          "wisteria": "등나무",
+          "lavender": "라벤더",
+          "mauve": "모브",
+          "orchid": "오키드",
+          "rose-quartz": "장미수정",
+          "blush": "블러시"
+        },
+        "accentColor": {
+          "label": "강조 색상"
+        },
+        "cornerRadius": {
+          "label": "모서리 곡률",
+          "hint": "카드 및 UI 요소의 둥글기"
+        },
+        "surfaceBrightness": {
+          "label": "표면 밝기",
+          "hint": "다크 모드 표면 밝게 만들기",
+          "reset": "초기화"
         },
         "libraryBackground": {
+          "title": "라이브러리 배경",
           "pattern": {
             "label": "배경 패턴",
             "hint": "책 그리드 뒤에 표시되는 패턴"
@@ -165,6 +221,18 @@
           "fillCrop": {
             "hint": "가장자리 잘라내기"
           }
+        },
+        "overlays": {
+          "lockStatus": {
+            "hint": "메타데이터 잠금 아이콘은 오른쪽 상단에 있으며, 잠겨 있을 때는 주황색, 잠금 해제 시에는 녹색입니다"
+          }
+        }
+      },
+      "layout": {
+        "coverSize": "표지 크기",
+        "gridSpacing": "그리드 간격",
+        "gridLayout": {
+          "title": "라이브러리 그리드 배치"
         }
       }
     }

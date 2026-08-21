@@ -218,6 +218,12 @@
       },
       "bookCovers": {
         "title": "Naslovnice knjig",
+        "coverSearch": {
+          "label": "Privzeti ponudnik iskanja naslovnic",
+          "hint": "Izberite vir, ki je izbran, ko se odpre možnost Najdi naslovnico na spletu. Shranjeno v vaš račun, zato velja v vsaki napravi.",
+          "loadError": "Nalaganje privzetega ponudnika iskanja po naslovnicah ni uspelo",
+          "saveError": "Shranjevanje privzetega ponudnika iskanja po naslovnicah ni uspelo"
+        },
         "displayMode": {
           "title": "Način prikaza naslovnice",
           "hint": "Nadzoruje, kako se prave naslovnice prilegajo mestom za knjige, kadar se razmerja stranic razlikujejo",
@@ -464,7 +470,8 @@
         "book-covers": "Naslovnice knjig",
         "icons": "Ikone",
         "layout": "Postavitev",
-        "behavior": "Vedenje"
+        "behavior": "Vedenje",
+        "language": "Jezik"
       }
     },
     "account": {
@@ -775,10 +782,13 @@
         "updatesGroup": "Posodobitve",
         "importFromBooklore": "Uvozi iz Booklore",
         "bookloreImportConfigured": "Uvoz iz Booklore nastavljen",
+        "importLibraryData": "Uvoz podatkov knjižnice",
+        "migrationConfigured": "Konfiguriran vir migracije",
         "migrationRunning": "Selitev poteka",
         "migrationCompleted": "Selitev zaključena",
         "migrationFailed": "Selitev ni uspela",
         "importDescription": "Enkraten uvoz knjig, metapodatkov in napredka branja iz prejšnje namestitve Booklore.",
+        "migrationDescription": "Enkratni uvoz knjig, metapodatkov in napredka branja iz druge knjižnične aplikacije.",
         "configuredDescription": "Vir: {name}. Selitev še ni bila izvedena - nadaljujte z nastavitvijo za zagon uvoza.",
         "runningDescription": "Faza: {stage} - začeto {started}",
         "completedDescription": "Iz {name} - zaključeno {date}",
@@ -820,6 +830,7 @@
       "migration": {
         "title": "Selitev",
         "subtitle": "Enkraten uvoz iz Booklore: poveži vir, preslikaj uporabnike, izvedi poskusni zagon, začni selitev in izvozi poročilo.",
+        "genericSubtitle": "Enkratni uvoz knjižnice: povežite vir, preslikajte uporabnike, izvedite poskusni zagon, začnite selitev in izvozite poročilo.",
         "progress": "Napredek",
         "stepSourceConnection": "Povezava z virom",
         "stepUserPathMapping": "Preslikava uporabnikov in poti",
@@ -829,6 +840,7 @@
         "stepReport": "Poročilo",
         "stepReportTitle": "Poročilo o selitvi",
         "subtitleSource": "Nastavite povezavo s podatkovno bazo vaše izvorne namestitve Booklore.",
+        "genericSubtitleSource": "Konfigurirajte povezavo z aplikacijo izvorne knjižnice.",
         "subtitleMappings": "Preslikajte izvorne uporabnike v ciljne uporabnike in prevedite poti datotek.",
         "subtitleDryRun": "Predogled tega, kar bo uvoženo, preden zaženete dejansko selitev.",
         "subtitleRun": "Začnite dejanski uvoz in spremljajte njegov napredek.",
@@ -913,13 +925,16 @@
         "reasonNoFilePathMatch": "Pot do datoteke se ni ujemala z nobeno knjigo v tej knjižnici",
         "reasonNoFileHashMatch": "Zgoščena vrednost datoteke se ni ujemala z nobeno knjigo v tej knjižnici",
         "reasonNoIsbnMatch": "ISBN se ni ujemal z nobeno knjigo v tej knjižnici",
+        "reasonNoAsinMatch": "ASIN se ni ujemal z nobeno knjigo v tej knjižnici",
         "reasonInsufficientSourceData": "Premalo metapodatkov za poskus ujemanja",
         "reasonAmbiguousIsbnMatch": "Več knjig se je ujemalo z istim ISBN-jem",
+        "reasonAmbiguousAsinMatch": "Več knjig se je ujemalo z istim ASIN-om",
         "reasonAmbiguousFileHashMatch": "Več knjig se je ujemalo z isto zgoščeno vrednostjo datoteke",
         "reasonAmbiguousFilePathMatch": "Več knjig se je ujemalo z isto potjo do datoteke",
         "reasonAmbiguousTitleAuthorMatch": "Več knjig se je ujemalo z istim naslovom in avtorjem",
         "reasonUnknown": "Razloga ni bilo mogoče ugotoviti",
         "strategyIsbn": "Ujemanje po ISBN",
+        "strategyAsin": "Ujema se z ASIN",
         "strategyFileHash": "Ujemanje po zgoščeni vrednosti datoteke",
         "strategyPathMapping": "Ujemanje po preslikani poti do datoteke",
         "strategyTitleAuthor": "Ujemanje po naslovu in avtorju",
@@ -955,6 +970,7 @@
         "refresh": "Osveži",
         "sourceUser": "Uporabnik vira",
         "targetUser": "Ciljni uporabnik",
+        "doNotImport": "Ne uvozi tega uporabnika",
         "noSourceUsersLoaded": "Uporabniki vira še niso naloženi.",
         "noActiveTargetUsers": "Ni najdenih aktivnih ciljnih uporabnikov. Pred preslikavo ustvarite ali ponovno omogočite uporabnika BookOrbit.",
         "pathPrefixMappings": "Preslikave predpon poti",
@@ -1123,7 +1139,25 @@
         "saveFailed": "Shranjevanje nastavitev obogatitve avtorjev ni uspelo",
         "noEligibleAuthors": "Ni najdenih upravičenih avtorjev",
         "noAuthorsToEnrich": "Ni avtorjev za obogatitev",
-        "queueFailed": "Uvrščanje dopolnitve avtorjev v vrsto ni uspelo"
+        "queueFailed": "Uvrščanje dopolnitve avtorjev v vrsto ni uspelo",
+        "fields": {
+          "description": "Biografija",
+          "photo": "Fotografija",
+          "birthDate": "Rojen",
+          "deathDate": "Umrl/a",
+          "website": "Spletna stran",
+          "genres": "Žanri",
+          "influences": "Vplivi"
+        },
+        "metadataPreferences": {
+          "title": "Viri polj",
+          "hint": "Nastavite vrstni red izpolnjevanja posameznih polj. Zmaga prvi ponudnik z vrednostjo.",
+          "noProviders": "Ni ponudnika",
+          "saved": "Shranjeni viri polj",
+          "saveFailed": "Virov polj ni bilo mogoče shraniti",
+          "limitedProviders": "{providers} ponuja samo biografije in fotografije.",
+          "addProvider": "Dodaj {provider} kot vir"
+        }
       },
       "scoreWeights": {
         "groupLabel": "Uteži ocene",
@@ -1844,6 +1878,7 @@
         "tokenPublisher": "Založnik",
         "tokenIsbn": "ISBN-13",
         "tokenLanguage": "Jezik",
+        "tokenLibrary": "Ime knjižnice",
         "tokenOriginalFilename": "Izvirno ime datoteke (brez pripone)",
         "tokenExtension": "Končnica datoteke (brez pike)",
         "patternHelpIntro": "Vzorci uporabljajo žetone, kot sta {titleToken} in {authorsToken}, ter modifikatorje in neobvezne segmente.",
@@ -2077,6 +2112,23 @@
         "usernamePlaceholder": "npr. mojbralnik",
         "password": "Geslo",
         "passwordPlaceholder": "Najmanj 6 znakov",
+        "changeCredentials": {
+          "action": "Spremeni poverilnice",
+          "title": "Spremeni poverilnice KOReaderja",
+          "description": "Vsak račun BookOrbit ima en nabor poverilnic KOReader. Spremenite ga tukaj, ne da bi izbrisali sinhronizirane podatke.",
+          "newPassword": "Novo geslo",
+          "usernameInvalid": "Uporabniško ime mora imeti med 3 in 100 znakov.",
+          "passwordPlaceholder": "Pustite prazno, če želite ohraniti trenutno geslo",
+          "passwordHint": "Če želite ohraniti trenutno geslo, pustite to polje prazno.",
+          "passwordInvalid": "Geslo mora imeti med 6 in 128 znakov.",
+          "deviceNotice": "Naprave, ki uporabljajo prejšnjo prijavo, je treba ponovno povezati ali posodobiti z novo prenesenim paketom vtičnikov.",
+          "showPassword": "Prikaži novo geslo",
+          "hidePassword": "Skrij novo geslo",
+          "save": "Shrani poverilnice",
+          "saving": "Shranjevanje...",
+          "updated": "Poverilnice KOReaderja so bile posodobljene",
+          "updateFailed": "Posodobitev poverilnic KOReader ni uspela"
+        },
         "creating": "Ustvarjanje ...",
         "create": "Ustvari",
         "credentialsCreated": "Poverilnice za sinhronizacijo KOReader so ustvarjene",
@@ -2093,6 +2145,8 @@
         "credentialsCreatedLabel": "Poverilnice ustvarjene",
         "setup": "Namestitev",
         "pluginServerUrl": "URL strežnika vtičnika",
+        "syncUrl": "URL za sinhronizacijo KOReaderja",
+        "syncUrlHint": "Deluje z vtičnikom BookOrbit in vgrajeno sinhronizacijo napredka KOReaderja.",
         "copied": "Kopirano",
         "copyUrl": "Kopiraj URL",
         "preconfiguredPlugin": "Vnaprej nastavljen vtičnik BookOrbit",
@@ -2250,7 +2304,22 @@
         "deviceRemoved": "Naprava odstranjena",
         "removeDeviceFailed": "Odstranitev naprave ni uspela",
         "removeDeviceConfirmTitle": "Odstranim {device}?",
-        "removeDeviceConfirmBody": "To trajno izbriše sinhronizirani napredek te naprave, aktivnost branja in vse neujemajoče vnose knjig, ki jih druga naprava ne poroča več. Če se naprava kasneje spet sinhronizira, se bo znova pojavila kot nov vnos."
+        "removeDeviceConfirmBody": "To trajno izbriše sinhronizirani napredek te naprave, aktivnost branja in vse neujemajoče vnose knjig, ki jih druga naprava ne poroča več. Če se naprava kasneje spet sinhronizira, se bo znova pojavila kot nov vnos.",
+        "deleteDeviceDataConfirmTitle": "Želite izbrisati sinhronizirane podatke iz naprave {device}?",
+        "deleteDeviceDataConfirmBody": "S tem trajno izbrišete sinhroniziran napredek te naprave, dejavnost branja po straneh in vse vnose neujemajočih se knjig, ki jih druga naprava ne poroča več. Seje branja, ki so že zabeležene v vaši statistiki, se ohranijo. Če se naprava pozneje znova sinhronizira, se bo znova prikazala kot nov vnos.",
+        "devicesHint": "Z umikom naprave se ta skrije in ohranijo vsi sinhronizirani podatki. Brisanja sinhroniziranih podatkov ni mogoče razveljaviti.",
+        "retire": "Umakni",
+        "retiring": "Umikam...",
+        "restore": "Obnovi",
+        "restoring": "Obnavljanje...",
+        "deleteSyncedData": "Izbriši podatke",
+        "deletingSyncedData": "Brisanje...",
+        "deviceRetired": "Naprava umaknjena",
+        "deviceRestored": "Naprava obnovljena",
+        "retireDeviceFailed": "Umik naprave ni uspel",
+        "restoreDeviceFailed": "Obnovitev naprave ni uspela",
+        "retiredDevices": "{count, plural, one {# umaknjena naprava} two {# umaknjeni napravi} few {# umaknjene naprave} other {# umaknjenih naprav}}",
+        "retiredOnLabel": "Umaknjena"
       },
       "opds": {
         "title": "OPDS",
@@ -2318,6 +2387,54 @@
         "maintenance": "Vzdrževanje",
         "audit-log": "Dnevnik revizije"
       }
+    },
+    "nav": {
+      "title": "Nastavitve",
+      "ariaLabel": "Sekcije nastavitev",
+      "searchPlaceholder": "Nastavitve iskanja",
+      "clearSearch": "Počisti iskanje",
+      "noResults": "Nobena nastavitev ne ustreza {query}.",
+      "shortcutHint": "Pritisnite Cmd K za skok na katero koli nastavitev",
+      "groups": {
+        "you": "Vi",
+        "library": "Knjižnica",
+        "devices": "Naprave in sinhronizacija",
+        "server": "Strežnik"
+      },
+      "descriptions": {
+        "profile": "Vaše ime, e-pošta, geslo in aktivne seje.",
+        "appearanceTheme": "Tema, poudarjena barva, ozadje in polmer vogala.",
+        "appearanceBookCovers": "Pokrijte sence, učinke hrbtenice in umetnine nadomestnih besedil.",
+        "appearanceIcons": "Izberite slog ikon, ki se uporablja v celotni aplikaciji.",
+        "appearanceLayout": "Privzeti pogled knjižnice, gostota in razmik.",
+        "appearanceBehavior": "Kako se knjižnica odziva na brskanje in razvrščanje.",
+        "appearanceLanguage": "Jezik vmesnika in regionalne oblike zapisa.",
+        "readerEbook": "Pisave, razmiki in vedenje strani za e-knjige.",
+        "readerPdf": "Upodabljanje, povečava in prilagajanje strani za PDF-je.",
+        "readerComics": "Smer branja in razmiki strani za stripe.",
+        "readerAudio": "Hitrost predvajanja, intervali preskakovanja in časovnik spanja.",
+        "readerFonts": "Pisave, ki so na voljo med branjem.",
+        "readerGeneral": "Privzete nastavitve, ki jih deli vsak način branja.",
+        "notifications": "O čem vam BookOrbit pove in kje.",
+        "privacy": "Vpogledi v branje, deljene povezave in vidnost dejavnosti.",
+        "restrictions": "Starostne ocene in skrita vsebina za ta račun.",
+        "libraries": "Preglej poti, nadzorovane mape in vnesi pravila.",
+        "fileNaming": "Vzorci imen map in datotek za shranjene datoteke.",
+        "maintenance": "Ponovno pregledovanje, podvajanje, osirotele datoteke in obnova predpomnilnika.",
+        "kobo": "Sinhroniziraj končno točko, posredniško točko trgovine in preslikavo police.",
+        "koreader": "Sinhronizacija napredka in ujemanje dokumentov.",
+        "opds": "Katalogni viri za aplikacije za branje tretjih oseb.",
+        "email": "Naslovi za dostavo in pošiljanje na naprave prek SMTP.",
+        "hardcover": "Sinhronizirajte stanje branja in ocene s trdimi platnicami.",
+        "users": "Računi, vloge, dovoljenja in povabila.",
+        "accountActivity": "Branje in aktivnost seje na uporabnika.",
+        "magicLinks": "Povezave za deljenje in prijavo brez gesla.",
+        "oidc": "Ponudnik enotne prijave, zahtevki in omogočanje.",
+        "serverFonts": "Pisave, nameščene za vsak bralnik na tem strežniku.",
+        "bookDock": "Hitra dejanja, prikazana na straneh knjige.",
+        "auditLog": "Kdo je kaj spremenil in kdaj."
+      },
+      "backToApp": "Nazaj v knjižnico"
     }
   },
   "achievements": {
@@ -3154,7 +3271,12 @@
       "noBiography": "Biografija ni na voljo. Za osvežitev metapodatkov uporabite meni.",
       "previewFrom": "Predogled iz {provider}. Za trajno shranitev shranite metapodatke.",
       "booksLabel": "Knjige",
-      "lastAdded": "Nazadnje dodano"
+      "lastAdded": "Nazadnje dodano",
+      "born": "Rojen",
+      "died": "Umrl",
+      "website": "Spletna stran",
+      "genres": "Žanri",
+      "influences": "Vplivi"
     },
     "list": {
       "title": "Avtorji",
@@ -3356,7 +3478,8 @@
         "finishedAt": "Datum zaključka",
         "random": "Naključno",
         "language": "Jezik",
-        "metadataScore": "Ocena metapodatkov"
+        "metadataScore": "Ocena metapodatkov",
+        "collectionOrder": "Vrstni red dodajanja"
       },
       "customFieldsGroup": "Polja po meri",
       "customFieldFallback": "Polje po meri",
@@ -3785,7 +3908,11 @@
         "koboNotSynced": "Ni sinhronizirano",
         "koboNotSyncedTooltip": "V čakalni vrsti za naslednjo sinhronizacijo Kobo.",
         "filesNotFound": "Datotek ni mogoče najti",
-        "filesNotFoundDescription": "Datotek(e) za to knjigo ni več mogoče najti na disku. Metapodatki so še vedno na voljo. Zaženite pregled knjižnice za potrditev ali odstranite zapis."
+        "filesNotFoundDescription": "Datotek(e) za to knjigo ni več mogoče najti na disku. Metapodatki so še vedno na voljo. Zaženite pregled knjižnice za potrditev ali odstranite zapis.",
+        "resetHoldNotice": "{device} ima še vedno stari položaj ({percent})",
+        "resetHoldRelease": "Uporabite položaj te naprave",
+        "resetHoldReleasing": "Izdajam...",
+        "resetHoldReleaseFailed": "Tega položaja ni bilo mogoče uporabiti. Poskusite znova."
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {brez polj} one {eno polje} two {# polj} few {# polj} other {# polj}}",
@@ -3813,6 +3940,8 @@
         "savedButWriteFailed": "Metapodatki shranjeni, vendar zapisovanje datoteke ni uspelo",
         "savedWriteSkippedReason": "Metapodatki shranjeni, zapisovanje datoteke preskočeno: {reason}",
         "savedWriteSkipped": "Metapodatki shranjeni, zapisovanje datoteke preskočeno",
+        "saveFailed": "Sprememb ni bilo mogoče shraniti",
+        "saveFailedWithStatus": "Sprememb ni bilo mogoče shraniti (HTTP {status})",
         "loadFromFileFailed": "Nalaganje metapodatkov iz datoteke ni uspelo",
         "loadedFieldsFromFile": "{count, plural, =0 {Iz datoteke ni bilo naloženo nobeno polje} one {Iz datoteke naloženo eno polje} two {Iz datoteke naloženih # polj} few {Iz datoteke naloženih # polj} other {Iz datoteke naloženih # polj}}",
         "noMetadataInFile": "V datoteki ni bilo najdenih metapodatkov",
@@ -4522,6 +4651,70 @@
       "alreadyExistsSaveAs": "Že obstaja - shrani kot:",
       "renamePlaceholder": "npr. {name} (2)",
       "import": "Uvozi"
+    },
+    "layout": {
+      "pause": "Začasno zaustavi",
+      "resume": "Nadaljuj",
+      "pauseUpdateFailed": "Začasna ustavitev posodobitve ni uspela",
+      "clearSearch": "Počisti iskanje",
+      "filter": {
+        "all": "Vse",
+        "needsReview": "Potreben je pregled",
+        "pending": "V teku",
+        "ready": "Pripravljen",
+        "error": "Napaka"
+      },
+      "working": {
+        "label": "{count} deluje"
+      },
+      "row": {
+        "select": "Izberi {title}",
+        "setDestination": "Nastavi cilj",
+        "file": "Datoteka",
+        "match": "{percent}% ujemanje",
+        "noAuthor": "Še ni avtorja",
+        "proposedChanges": "Predlagane spremembe",
+        "noChanges": "Metapodatki še niso bili pridobljeni",
+        "editDetails": "Urejanje podrobnosti",
+        "noMatch": "Ni ujemanja",
+        "applied": "Uporabljeno",
+        "refetch": "Ponovno pridobivanje metapodatkov",
+        "clickToZoom": "Kliknite na naslovnico za povečavo",
+        "changedFields": "{count, plural, one {# polje} two {# polji} few {# polja} other {# polj}}",
+        "needMore": "Ali morate iskati ponudnike ali urejati druga polja?"
+      },
+      "selection": {
+        "fileToLibrary": "{count, plural, =0 {Dodajanje datoteke v knjižnico} one {Dodajanje # datoteke v knjižnico} two {Dodajanje # datoteki v knjižnico} few {Dodajanje # datoteke v knjižnico} other {Dodajanje # datotek v knjižnico}}",
+        "nSelected": "{count} izbranih",
+        "nReadyToFile": "{count} pripravljeno za vložitev"
+      },
+      "empty": {
+        "nothingToReview": "Nič ni treba pregledati. Vsaka pripravljena datoteka ima cilj in zanesljivo ujemanje.",
+        "dropHint": "Ali pa spustite datoteke kamor koli na tej strani."
+      },
+      "selectAllOnPage": "Izberi vse datoteke na tej strani",
+      "showingOf": "{shown} od {total}",
+      "keyboardHint": "J / K za premikanje · preslednica za izbiro · enter za razširitev",
+      "allOnPageSelected": "Vseh {count} na tej strani je izbranih.",
+      "selectAllMatching": "Izberi vse ujemajoče se {count}",
+      "allMatchingSelected": "Izbranih je vseh {count} ustreznih datotek",
+      "sort": {
+        "label": "Razvrsti po",
+        "attention": "Potrebuje pozornost",
+        "createdAt": "Nazadnje dodano",
+        "fileName": "Ime datoteke",
+        "fileSize": "Velikost",
+        "format": "Oblika",
+        "status": "Status"
+      },
+      "conflict": {
+        "duplicate": "Dvojnik",
+        "destination_conflict": "Izbrana pot",
+        "invalid_target": "Slaba tarča",
+        "access_denied": "Ni dostopa",
+        "invalid_format": "Napačna oblika",
+        "error": "Ne bi uspelo"
+      }
     }
   },
   "collection": {
@@ -4595,6 +4788,7 @@
       "annotations": "Opombe",
       "uploadBooks": "Naloži knjige",
       "appearance": "Videz",
+      "appearanceDescription": "Izberite temo, poudarek, polmer vogala, površino in možnosti ozadja.",
       "theme": "Tema",
       "accent": "Poudarek",
       "radius": "Zaobljenost",
@@ -4615,7 +4809,8 @@
         "cta": "Označi BookOrbit z zvezdico na GitHubu"
       },
       "surfaceOpacity": "Prekrivnost površine",
-      "surfaceOpacityValue": "{value}%"
+      "surfaceOpacityValue": "{value}%",
+      "surfaceBrightnessValue": "{value}%"
     },
     "sidebar": {
       "dashboard": "Nadzorna plošča",
@@ -4656,6 +4851,8 @@
       "seeAllSmartScopes": "Oglej si vse pametne obsege ({count})",
       "seeAllCollections": "Oglej si vse zbirke ({count})",
       "updateAvailable": "Posodobi na {version}",
+      "updateTooltip": "Posodobitev {version} je na voljo",
+      "openUpdateRelease": "Odprite izdajo {version} na GitHubu",
       "zones": {
         "browse": "Brskaj"
       },
@@ -4750,6 +4947,19 @@
       "light": "Svetla",
       "dark": "Temna",
       "system": "Sistem"
+    },
+    "radiusPicker": {
+      "sharp": "Ostri vogali",
+      "default": "Privzeti vogali",
+      "rounded": "Zaobljeni vogali",
+      "pill": "Vogali v obliki tablete"
+    },
+    "languagePicker": {
+      "searchPlaceholder": "Išči jezike",
+      "suggested": "Predlagano",
+      "all": "Vsi jeziki",
+      "results": "Rezultati",
+      "empty": "Noben jezik ne ustreza poizvedbi \"{query}\""
     },
     "userAvatar": {
       "profilePicture": "Profilna slika",
@@ -5569,6 +5779,7 @@
       "schedule": {
         "fileWatching": "Spremljanje datotek",
         "autoScanSchedule": "Urnik samodejnega pregledovanja",
+        "timezoneHint": "Razporedi se izvajajo v časovnem pasu strežnika.",
         "cronExpression": "Izraz cron",
         "cronInvalid": "Neveljaven izraz cron.",
         "cronFormat": "Format: minuta ura dan mesec dan v tednu",
@@ -5587,6 +5798,7 @@
         },
         "human": {
           "disabled": "Samodejno pregledovanje onemogočeno",
+          "invalid": "Vnesite veljaven urnik za ogled predogleda",
           "hourly": "Vsako uro",
           "every6Hours": "Vsakih 6 ur",
           "every12Hours": "Vsakih 12 ur",
@@ -5682,6 +5894,7 @@
   },
   "migration": {
     "sidebarTitle": "Uvoz iz Booklore",
+    "importTitle": "Uvoz iz knjižnice",
     "status": {
       "done": "Končano",
       "saved": "Shranjeno",
@@ -5697,7 +5910,8 @@
       "source": {
         "short": "Povezava z virom",
         "title": "Povezava z virom",
-        "subtitle": "Konfigurirajte povezavo z bazo podatkov vaše izvorne namestitve Booklore."
+        "subtitle": "Konfigurirajte povezavo z bazo podatkov vaše izvorne namestitve Booklore.",
+        "genericSubtitle": "Konfigurirajte povezavo z aplikacijo izvorne knjižnice."
       },
       "mappings": {
         "short": "Preslikava uporabnikov in poti",
@@ -5739,18 +5953,61 @@
       "testConnection": "Preizkusi povezavo",
       "saveAndValidate": "Shrani in preveri",
       "validatedWithWarnings": "Vir preverjen z opozorili",
+      "types": {
+        "booklore": "Booklore",
+        "grimmory": "Grimmory",
+        "audiobookshelf": "Audiobookshelf",
+        "calibreWebAutomated": "Calibre-Web Automated"
+      },
       "fields": {
         "type": "Vrsta vira",
         "name": "Ime vira",
+        "namePlaceholder": "Uvoz knjižnice",
         "host": "Gostitelj",
         "port": "Vrata",
         "user": "Uporabnik",
         "password": "Geslo",
         "passwordSaved": "Shranjeno - pustite nespremenjeno",
         "passwordNotSet": "Geslo ni nastavljeno",
+        "showSecret": "Prikaži skrivno kodo",
+        "hideSecret": "Skrij skrivno kodo",
         "database": "Zbirka podatkov",
         "mediaRootPath": "Korenska pot medijev",
-        "ssl": "Uporabi TLS/SSL"
+        "ssl": "Uporabi TLS/SSL",
+        "connectionMode": "Način povezave",
+        "apiMode": "API v živo",
+        "backupMode": "Datoteka varnostne kopije",
+        "baseUrl": "Audiobookshelf URL",
+        "apiToken": "API žeton",
+        "apiTokenPlaceholder": "Vnesite žeton skrbniškega API-ja",
+        "secretSaved": "Shranjeno - pusti nespremenjeno",
+        "allowPrivateNetwork": "Dovoli dostop do zasebnega omrežja",
+        "allowPrivateNetworkHint": "Omogočite to le, če je Audiobookshelf gostovan v zaupanja vrednem lokalnem ali zasebnem omrežju.",
+        "backupPath": "Pot do datoteke varnostne kopije",
+        "backupPathHint": "V nastavljeni imenik za uvoz migracije vnesite absolutno pot strežnika.",
+        "cwaAppDatabasePath": "Calibre-Web Automated posnetek datoteke app.db",
+        "cwaAppDatabasePathPlaceholder": "/imports/calibre-web-automated/app.db",
+        "cwaMetadataDatabasePath": "Posnetek datoteke metadata.db",
+        "cwaMetadataDatabasePathPlaceholder": "/imports/calibre-web-automated/metadata.db"
+      },
+      "validation": {
+        "nameRequired": "Ime vira je obvezno",
+        "databaseFieldsRequired": "Gostitelj, uporabnik, baza podatkov in ime vira so obvezni",
+        "apiFieldsRequired": "Audiobookshelf URL, API žeton in ime vira so obvezni",
+        "baseUrlInvalid": "Audiobookshelf URL mora biti čist izvor HTTP ali HTTPS brez poti",
+        "backupPathRequired": "Pot do datoteke varnostne kopije in ime vira sta obvezna",
+        "backupPathAbsolute": "Pot do datoteke varnostne kopije mora biti absolutna pot",
+        "cwaAppDatabasePathRequired": "Pot posnetka Calibre-Web Automated app.db je obvezna",
+        "cwaAppDatabasePathAbsolute": "Pot posnetka Calibre-Web Automated app.db mora biti absolutna",
+        "cwaMetadataDatabasePathRequired": "Pot posnetka datoteke Calibre metadata.db je obvezna",
+        "cwaMetadataDatabasePathAbsolute": "Pot posnetka datoteke Calibre metadata.db mora biti absolutna"
+      },
+      "cwa": {
+        "snapshotTitle": "Ustavljen način posnetka",
+        "stoppedWarning": "Pred kopiranjem obeh podatkovnih baz ustavite Calibre-Web Automated. BookOrbit ne more preveriti, ali sta bila posnetka kopirana v istem trenutku.",
+        "importRootGuidance": "Obe datoteki posnetkov morata biti berljivi strežniški poti pod konfiguriranim imenikom MIGRATION_IMPORT_ROOT.",
+        "logicalRootGuidance": "Preslikava poti knjige uporablja logični koren knjižnice Calibre, shranjen v app.db, ne pa mape gostitelja, ki vsebuje te posnetke baze podatkov.",
+        "compatibilityNote": "Obnašanje sheme je preverjeno s programsko opremo Calibre-Web Automated v4.0.6. Njene podatkovne baze ne razkrivajo zanesljive različice izdaje aplikacije."
       },
       "mediaPath": {
         "hintRequired": "Zahtevano za uvoz naslovnic knjig.",
@@ -5777,6 +6034,7 @@
       "refresh": "Osveži",
       "sourceUser": "Izvorni uporabnik",
       "targetUser": "Ciljni uporabnik",
+      "doNotImport": "Ne uvozi tega uporabnika",
       "noSourceUsersLoaded": "Izvorni uporabniki še niso naloženi.",
       "noActiveTargetUsers": "Ni najdenih aktivnih ciljnih uporabnikov. Pred preslikavo ustvarite ali ponovno omogočite uporabnika BookOrbit.",
       "pathPrefixMappings": "Preslikave predpon poti",
@@ -5894,8 +6152,10 @@
       "noFilePathMatch": "Pot datoteke se ni ujemala z nobeno knjigo v tej knjižnici",
       "noFileHashMatch": "Zgoščena vrednost datoteke se ni ujemala z nobeno knjigo v tej knjižnici",
       "noIsbnMatch": "ISBN se ni ujemal z nobeno knjigo v tej knjižnici",
+      "noAsinMatch": "ASIN se ni ujemal z nobeno knjigo v tej knjižnici",
       "insufficientSourceData": "Premalo metapodatkov za poskus ujemanja",
       "ambiguousIsbnMatch": "Več knjig se je ujemalo z istim ISBN-om",
+      "ambiguousAsinMatch": "Več knjig se je ujemalo z istim ASIN-om",
       "ambiguousFileHashMatch": "Več knjig se je ujemalo z isto zgoščeno vrednostjo datoteke",
       "ambiguousFilePathMatch": "Več knjig se je ujemalo z isto potjo datoteke",
       "ambiguousTitleAuthorMatch": "Več knjig se je ujemalo z istim naslovom in avtorjem",
@@ -5903,6 +6163,7 @@
     },
     "matchStrategy": {
       "isbn": "Ujemanje po ISBN",
+      "asin": "Ujema se z ASIN",
       "fileHash": "Ujemanje po zgoščeni vrednosti datoteke",
       "pathMapping": "Ujemanje po preslikani poti datoteke",
       "titleAuthor": "Ujemanje po naslovu in avtorju",
@@ -5975,6 +6236,7 @@
   },
   "notifications": {
     "title": "Obvestila",
+    "description": "Preglejte in upravljajte svoja obvestila.",
     "markAllRead": "Označi vse kot prebrano",
     "clear": "Počisti",
     "empty": "Trenutno ni obvestil",
@@ -6088,6 +6350,7 @@
     "settings": {
       "title": "Nastavitve",
       "ariaLabel": "Nastavitve bralnika",
+      "close": "Zapri nastavitve",
       "reset": "Ponastavi na privzeto",
       "modeLabel": "Barvni način",
       "mode": {
@@ -7103,7 +7366,8 @@
       "book-covers": "Naslovnice knjig",
       "icons": "Ikone",
       "layout": "Postavitev prikaza",
-      "behavior": "Obnašanje knjižnice"
+      "behavior": "Obnašanje knjižnice",
+      "language": "Jezik"
     },
     "reader": {
       "general": "Nastavitve bralnika",
