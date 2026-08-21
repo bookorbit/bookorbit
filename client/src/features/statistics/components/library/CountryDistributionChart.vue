@@ -165,8 +165,6 @@ const aggregatedItems = computed(() => {
 })
 
 const chartOption = computed(() => {
-  themeTrigger.value
-
   if (!isMapReady.value) return {}
 
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
