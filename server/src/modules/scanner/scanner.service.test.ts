@@ -2573,6 +2573,33 @@ describe('targeted book scan', () => {
     expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/AJ Carter/Book', libraryId: 1 }));
     expect(repo.createBookFile).toHaveBeenCalledWith(expect.objectContaining({ relPath: 'AJ Carter/Book/book.epub' }));
   });
+
+  it('does not create a second book when the scanned folder also has sidecar files', async () => {
+    const epub = makeFileStat({
+      absolutePath: '/library/Author/Book/book.epub',
+      relPath: 'Author/Book/book.epub',
+    });
+    const opf = makeFileStat({
+      absolutePath: '/library/Author/Book/book.opf',
+      relPath: 'Author/Book/book.opf',
+    });
+    mockBuildSingleCandidate.mockResolvedValue(makeCandidate('/library/Author/Book', [epub, opf]));
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book/book.epub', [epub, opf])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    const repo = makeRepo({
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookDirectory('/library/Author/Book', 1);
+
+    expect(repo.createBook).toHaveBeenCalledTimes(1);
+    expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/Author/Book' }));
+  });
 });
 
 // ── book_per_file mode — runScan ──────────────────────────────────────────────

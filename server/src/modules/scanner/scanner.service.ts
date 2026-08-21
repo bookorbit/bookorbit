@@ -821,8 +821,7 @@ export class ScannerService implements OnApplicationBootstrap {
           findBookCandidates(dirPath, settings.excludePatterns, walkLogger),
         ]);
         const nestedCandidates = walkResult.candidates.filter(
-          (candidate) =>
-            !(candidate.files.length === 1 && candidate.files[0].absolutePath === candidate.folderPath && dirname(candidate.folderPath) === dirPath),
+          (candidate) => !(candidate.files.some((file) => file.absolutePath === candidate.folderPath) && dirname(candidate.folderPath) === dirPath),
         );
         candidates = singleCandidate ? [singleCandidate, ...nestedCandidates] : nestedCandidates;
         skippedDirs = walkResult.skippedDirs;
