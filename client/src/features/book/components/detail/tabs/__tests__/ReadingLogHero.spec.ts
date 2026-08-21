@@ -127,6 +127,7 @@ function makeStats(overrides: Partial<BookReadingSessionStats> = {}): BookReadin
     paceProgressDelta: 0,
     paceDurationSeconds: 0,
     progressSummary: [],
+    latestEndProgress: null,
     bySource: [],
     ...overrides,
   }
@@ -393,6 +394,71 @@ describe('ReadingLogHero', () => {
     const noPaceWrapper = mountHero(makeBook(), makeStats({ paceProgressDelta: 0, paceDurationSeconds: 3600 }))
     await flushPromises()
     expect(noPaceWrapper.text()).not.toContain('to finish')
+  })
+
+  it('shows logged session progress for a book with no stored reading position', async () => {
+    mocks.api.mockResolvedValue(makeResponse([{ fileId: 1, percentage: 0 }]))
+    const wrapper = mountHero(makeBook(), makeStats({ latestEndProgress: 100 }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('100%')
+  })
+
+  it('keeps the stored reading position when it is further along than the logged sessions', async () => {
+    mocks.api.mockResolvedValue(makeResponse([{ fileId: 1, percentage: 70 }]))
+    const wrapper = mountHero(makeBook(), makeStats({ latestEndProgress: 40 }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('70%')
+  })
+
+  it('prefers logged session progress when it is further along than the stored position', async () => {
+    mocks.api.mockResolvedValue(makeResponse([{ fileId: 1, percentage: 12 }]))
+    const wrapper = mountHero(makeBook(), makeStats({ latestEndProgress: 65 }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('65%')
+  })
+
+  it('ignores absent and malformed logged session progress', async () => {
+    mocks.api.mockResolvedValue(makeResponse([{ fileId: 1, percentage: 30 }]))
+    const nullWrapper = mountHero(makeBook(), makeStats({ latestEndProgress: null }))
+    await flushPromises()
+    expect(nullWrapper.text()).toContain('30%')
+
+    const nanWrapper = mountHero(makeBook(), makeStats({ latestEndProgress: Number.NaN }))
+    await flushPromises()
+    expect(nanWrapper.text()).toContain('30%')
+  })
+
+  it('clamps logged session progress into the 0-100 range', async () => {
+    mocks.api.mockResolvedValue(makeResponse([{ fileId: 1, percentage: 0 }]))
+    const wrapper = mountHero(makeBook(), makeStats({ latestEndProgress: 140 }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('100%')
+  })
+
+  it('updates the ring when a new session arrives without refetching the reading position', async () => {
+    mocks.api.mockResolvedValue(makeResponse([{ fileId: 1, percentage: 0 }]))
+    const wrapper = mountHero(makeBook(), makeStats({ latestEndProgress: null }))
+    await flushPromises()
+    expect(wrapper.text()).toContain('0%')
+
+    const callsBefore = mocks.api.mock.calls.length
+    await wrapper.setProps({ stats: makeStats({ latestEndProgress: 55 }) })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('55%')
+    expect(mocks.api.mock.calls).toHaveLength(callsBefore)
+  })
+
+  it('drops the eta once logged sessions reach the end of the book', async () => {
+    mocks.api.mockResolvedValue(makeResponse([{ fileId: 1, percentage: 0 }]))
+    const wrapper = mountHero(makeBook(), makeStats({ latestEndProgress: 100, paceProgressDelta: 50, paceDurationSeconds: 3600 }))
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('to finish')
   })
 
   it('falls back to zero progress when progress loading fails', async () => {

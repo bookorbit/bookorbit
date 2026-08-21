@@ -30,6 +30,7 @@ import {
   DownloadPluginPackageDto,
   KoreaderDeviceParamDto,
   KoreaderSaveProgressDto,
+  ReleaseResetHoldDto,
   LinkKoreaderUnmatchedBookDto,
   TestConnectionDto,
   UpdateKoreaderDeviceDto,
@@ -213,6 +214,13 @@ export class KoreaderController {
   @Get('books/:bookId/progress')
   getBookProgress(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number) {
     return this.koreaderService.getBookProgress(user.id, bookId);
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Post('books/:bookId/reset-hold/release')
+  async releaseResetHold(@CurrentUser() user: RequestUser, @Param('bookId', ParseIntPipe) bookId: number, @Body() dto: ReleaseResetHoldDto) {
+    await this.koreaderService.releaseResetHold(user.id, bookId, dto.deviceId);
+    return { released: true };
   }
 
   @RequirePermission(Permission.KoreaderSync)

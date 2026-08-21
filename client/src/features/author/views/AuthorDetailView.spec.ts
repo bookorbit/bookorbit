@@ -3,6 +3,8 @@ import { defineComponent, ref, type Ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import type { AuthorDetail, BookCard } from '@bookorbit/types'
 import AuthorDetailView from './AuthorDetailView.vue'
+import { deleteAuthorImage, refreshAuthorMetadata, updateAuthor, uploadAuthorImage } from '../api/author'
+import { i18n } from '@/i18n'
 
 class MockIntersectionObserver {
   observe = vi.fn<(target: Element) => void>()
@@ -157,6 +159,15 @@ function makeAuthor(overrides: Partial<AuthorDetail> = {}): AuthorDetail {
     imageUrl: null,
     bookCount: 2,
     lastAddedAt: '2026-01-01T00:00:00.000Z',
+    birthDate: null,
+    birthYear: null,
+    deathDate: null,
+    deathYear: null,
+    website: null,
+    genres: [],
+    influences: [],
+    metadataProvider: null,
+    metadataProviderId: null,
     ...overrides,
   }
 }
@@ -175,6 +186,7 @@ async function mountView() {
         AuthorHeader: {
           name: 'AuthorHeader',
           props: ['author'],
+          emits: ['edit', 'merge', 'refresh', 'delete'],
           template: '<div data-test="author-header">{{ author.bookCount }}</div>',
         },
         AuthorConfirmDialog: {
@@ -227,6 +239,128 @@ describe('AuthorDetailView', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.clearAllMocks()
+  })
+
+  async function openEditPanel() {
+    const wrapper = await mountView()
+    await wrapper.getComponent({ name: 'AuthorHeader' }).vm.$emit('edit')
+    await flushPromises()
+    return wrapper
+  }
+
+  function editFields(wrapper: Awaited<ReturnType<typeof mountView>>) {
+    const textInputs = wrapper.findAll('input:not([type="file"])')
+    expect(textInputs).toHaveLength(2)
+    return {
+      name: textInputs[0],
+      sortName: textInputs[1],
+      description: wrapper.get('textarea'),
+    }
+  }
+
+  function findButtonByLabel(wrapper: Awaited<ReturnType<typeof mountView>>, key: string) {
+    const label = i18n.global.t(key)
+    const button = wrapper.findAll('button').find((candidate) => candidate.text().includes(label))
+    expect(button, `no button labelled "${label}"`).toBeDefined()
+    return button!
+  }
+
+  async function selectImageFile(wrapper: Awaited<ReturnType<typeof mountView>>) {
+    const input = wrapper.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', {
+      value: [new File(['image-bytes'], 'portrait.png', { type: 'image/png' })],
+      configurable: true,
+    })
+    await input.trigger('change')
+    await flushPromises()
+  }
+
+  it('keeps unsaved edit fields when an author image is uploaded', async () => {
+    vi.mocked(uploadAuthorImage).mockResolvedValue(makeAuthor({ imageUrl: '/api/v1/authors/7/image' }))
+
+    const wrapper = await openEditPanel()
+    const fields = editFields(wrapper)
+    await fields.name.setValue('Ursula K. Le Guin')
+    await fields.sortName.setValue('Le Guin, Ursula K.')
+    await fields.description.setValue('A biography typed but not saved yet.')
+
+    await selectImageFile(wrapper)
+
+    expect(vi.mocked(uploadAuthorImage)).toHaveBeenCalledTimes(1)
+    const after = editFields(wrapper)
+    expect((after.name.element as HTMLInputElement).value).toBe('Ursula K. Le Guin')
+    expect((after.sortName.element as HTMLInputElement).value).toBe('Le Guin, Ursula K.')
+    expect((after.description.element as HTMLTextAreaElement).value).toBe('A biography typed but not saved yet.')
+  })
+
+  it('keeps unsaved edit fields when the author image is removed', async () => {
+    mocks.author = ref(makeAuthor({ imageUrl: '/api/v1/authors/7/image' }))
+    vi.mocked(deleteAuthorImage).mockResolvedValue(makeAuthor({ imageUrl: null }))
+
+    const wrapper = await openEditPanel()
+    await editFields(wrapper).description.setValue('Still typing this.')
+
+    await findButtonByLabel(wrapper, 'author.detail.edit.removeImage').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(deleteAuthorImage)).toHaveBeenCalledTimes(1)
+    expect((editFields(wrapper).description.element as HTMLTextAreaElement).value).toBe('Still typing this.')
+  })
+
+  it('keeps unsaved edit fields when author metadata is refreshed', async () => {
+    vi.mocked(refreshAuthorMetadata).mockResolvedValue(makeAuthor({ description: 'Provider biography', imageUrl: '/api/v1/authors/7/image' }))
+
+    const wrapper = await openEditPanel()
+    await editFields(wrapper).description.setValue('Hand written biography.')
+
+    await wrapper.getComponent({ name: 'AuthorHeader' }).vm.$emit('refresh')
+    await flushPromises()
+
+    expect(vi.mocked(refreshAuthorMetadata)).toHaveBeenCalledTimes(1)
+    expect((editFields(wrapper).description.element as HTMLTextAreaElement).value).toBe('Hand written biography.')
+  })
+
+  it('adopts server values into an untouched edit form', async () => {
+    vi.mocked(uploadAuthorImage).mockResolvedValue(makeAuthor({ description: 'Server biography', imageUrl: '/api/v1/authors/7/image' }))
+
+    const wrapper = await openEditPanel()
+    expect((editFields(wrapper).description.element as HTMLTextAreaElement).value).toBe('')
+
+    await selectImageFile(wrapper)
+
+    expect((editFields(wrapper).description.element as HTMLTextAreaElement).value).toBe('Server biography')
+  })
+
+  it('reseeds the edit form when a different author is loaded, even with unsaved edits', async () => {
+    const wrapper = await openEditPanel()
+    await editFields(wrapper).description.setValue('Unsaved text for author 7.')
+
+    mocks.author.value = makeAuthor({ id: 8, name: 'Другой автор', description: 'Author 8 biography' })
+    await flushPromises()
+
+    const after = editFields(wrapper)
+    expect((after.name.element as HTMLInputElement).value).toBe('Другой автор')
+    expect((after.description.element as HTMLTextAreaElement).value).toBe('Author 8 biography')
+  })
+
+  it('stops treating the form as unsaved once the edits are saved', async () => {
+    vi.mocked(updateAuthor).mockImplementation(async (_id, payload) => makeAuthor({ ...payload }))
+    vi.mocked(refreshAuthorMetadata).mockResolvedValue(makeAuthor({ description: 'Provider biography' }))
+
+    const wrapper = await openEditPanel()
+    await editFields(wrapper).description.setValue('  Saved biography  ')
+
+    await findButtonByLabel(wrapper, 'common.save').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(updateAuthor)).toHaveBeenCalledWith(7, { name: 'Author', sortName: null, description: 'Saved biography' })
+
+    await wrapper.getComponent({ name: 'AuthorHeader' }).vm.$emit('refresh')
+    await flushPromises()
+    await wrapper.getComponent({ name: 'AuthorHeader' }).vm.$emit('edit')
+    await flushPromises()
+
+    expect((editFields(wrapper).description.element as HTMLTextAreaElement).value).toBe('Provider biography')
   })
 
   it('deletes a book from the author grid menu action', async () => {

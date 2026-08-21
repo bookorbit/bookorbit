@@ -21,6 +21,7 @@ import {
   koboSnapshotBooks,
   koreaderDeviceProgress,
   koreaderPageStats,
+  koreaderProgressResets,
   readingProgress,
   readingAttempts,
   readingSessions,
@@ -74,6 +75,10 @@ export class ReadingStateRepository {
 
       const now = new Date();
       const nowIso = now.toISOString();
+      // Materialised separately from the subquery above because the reset markers are
+      // inserted per file, and a wiped book still has to be able to tell a device that its
+      // position is gone rather than merely unknown.
+      const resetFileIds = (await tx.select({ id: bookFiles.id }).from(bookFiles).where(eq(bookFiles.bookId, bookId))).map((file) => file.id);
 
       await Promise.all([
         tx.delete(readingProgress).where(and(eq(readingProgress.userId, userId), inArray(readingProgress.bookFileId, fileIds))),
@@ -81,6 +86,12 @@ export class ReadingStateRepository {
         tx.delete(koreaderDeviceProgress).where(and(eq(koreaderDeviceProgress.userId, userId), inArray(koreaderDeviceProgress.bookFileId, fileIds))),
         tx.delete(koreaderPageStats).where(and(eq(koreaderPageStats.userId, userId), inArray(koreaderPageStats.bookFileId, fileIds))),
         tx.delete(readingSessions).where(and(eq(readingSessions.userId, userId), eq(readingSessions.bookId, bookId))),
+        resetFileIds.length > 0
+          ? tx
+              .delete(koreaderProgressResets)
+              .where(and(eq(koreaderProgressResets.userId, userId), inArray(koreaderProgressResets.bookFileId, resetFileIds)))
+              .then(() => tx.insert(koreaderProgressResets).values(resetFileIds.map((bookFileId) => ({ userId, bookFileId }))))
+          : Promise.resolve(),
         tx.delete(readingAttempts).where(and(eq(readingAttempts.userId, userId), eq(readingAttempts.bookId, bookId))),
         tx
           .insert(userBookStatus)

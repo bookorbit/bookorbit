@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AuthorMetadataCandidate, AuthorMetadataProviderKey } from '@bookorbit/types';
+import { AUTHOR_PROVIDER_SUPPORTED_FIELDS, AuthorMetadataCandidate, AuthorMetadataField, AuthorMetadataProviderKey } from '@bookorbit/types';
 
 import { AuthorMetadataProviderError, AuthorMetadataSearchParams, IdentifiableAuthorMetadataProvider } from '../author-metadata-provider';
 import { AudnexusAuthorResponse } from './audnexus.types';
@@ -13,6 +13,7 @@ export class AudnexusAuthorMetadataProvider implements IdentifiableAuthorMetadat
   readonly key = AuthorMetadataProviderKey.AUDNEXUS;
   readonly label = 'Audnexus';
   readonly identifiable = true as const;
+  readonly supportedFields: readonly AuthorMetadataField[] = AUTHOR_PROVIDER_SUPPORTED_FIELDS[AuthorMetadataProviderKey.AUDNEXUS];
 
   private readonly logger = new Logger(AudnexusAuthorMetadataProvider.name);
 

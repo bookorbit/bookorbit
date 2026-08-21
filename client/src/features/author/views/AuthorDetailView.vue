@@ -7,7 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpDown, ChevronDown, ChevronLeft, ImageMinus, LayoutGrid, List, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
-import type { AuthorSummary, BookCard } from '@bookorbit/types'
+import type { AuthorDetail, AuthorSummary, BookCard } from '@bookorbit/types'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
@@ -83,7 +83,14 @@ const authorImageInput = ref<HTMLInputElement | null>(null)
 const draftName = ref('')
 const draftSortName = ref('')
 const draftDescription = ref('')
+const seededDrafts = ref<{ name: string; sortName: string; description: string } | null>(null)
 const authorImageBusy = computed(() => uploadingImage.value || removingImage.value)
+
+const draftsDirty = computed(() => {
+  const seeded = seededDrafts.value
+  if (!seeded) return false
+  return draftName.value !== seeded.name || draftSortName.value !== seeded.sortName || draftDescription.value !== seeded.description
+})
 
 const mergeQuery = ref('')
 const mergeCandidates = ref<AuthorSummary[]>([])
@@ -139,12 +146,26 @@ function showRefreshResultToast(updated: { imageUrl?: string | null }) {
   toast.success(t('author.detail.toast.refreshed'))
 }
 
+function seedDrafts(value: AuthorDetail | null) {
+  const seeded = {
+    name: value?.name ?? '',
+    sortName: value?.sortName ?? '',
+    description: value?.description ?? '',
+  }
+  draftName.value = seeded.name
+  draftSortName.value = seeded.sortName
+  draftDescription.value = seeded.description
+  seededDrafts.value = seeded
+}
+
+// Image uploads, image removal and metadata refresh all replace the whole author
+// object, so re-seeding on every change would discard edits typed but not saved.
 watch(
   author,
-  (value) => {
-    draftName.value = value?.name ?? ''
-    draftSortName.value = value?.sortName ?? ''
-    draftDescription.value = value?.description ?? ''
+  (value, previous) => {
+    const sameAuthor = previous != null && value != null && previous.id === value.id
+    if (sameAuthor && draftsDirty.value) return
+    seedDrafts(value)
   },
   { immediate: true },
 )
@@ -211,6 +232,7 @@ async function saveAuthorEdits() {
       description: draftDescription.value.trim() || null,
     })
     author.value = updated
+    seedDrafts(updated)
     editOpen.value = false
     toast.success(t('author.detail.toast.updated'))
   } catch (error) {

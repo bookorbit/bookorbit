@@ -35,6 +35,28 @@ const initials = computed(() => {
   return `${parts[0]!.charAt(0)}${parts[1]!.charAt(0)}`.toUpperCase()
 })
 
+// Goodreads supplies a full date for most authors and only a year for older
+// ones, so fall back to the year rather than showing nothing.
+function lifeDateLabel(date: string | null, year: number | null): string | null {
+  if (date) {
+    const parsed = new Date(date)
+    // Birth and death are plain yyyy-MM-dd, which Date parses as UTC midnight.
+    // Formatting that in a timezone behind UTC would render the previous day,
+    // so read it back in UTC too.
+    if (!Number.isNaN(parsed.getTime())) {
+      return formatDate(parsed, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+    }
+  }
+  // A year is not a quantity: grouping would render 1929 as "1,929".
+  return year !== null ? formatNumber(year, { useGrouping: false }) : null
+}
+
+const bornLabel = computed(() => lifeDateLabel(props.author.birthDate, props.author.birthYear))
+const diedLabel = computed(() => lifeDateLabel(props.author.deathDate, props.author.deathYear))
+const genres = computed(() => props.author.genres ?? [])
+const influences = computed(() => props.author.influences ?? [])
+const hasFacts = computed(() => !!(bornLabel.value || diedLabel.value || props.author.website || genres.value.length))
+
 const resolvedBio = computed(() => {
   const local = props.author.description?.trim()
   if (local) return local
@@ -157,6 +179,33 @@ watch(resolvedBio, () => {
               {{ t('author.header.previewFrom', { provider: previewProviderLabel }) }}
             </p>
           </div>
+
+          <dl v-if="hasFacts" class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <div v-if="bornLabel" class="flex gap-1.5">
+              <dt class="text-muted-foreground">{{ t('author.header.born') }}</dt>
+              <dd class="text-foreground">{{ bornLabel }}</dd>
+            </div>
+            <div v-if="diedLabel" class="flex gap-1.5">
+              <dt class="text-muted-foreground">{{ t('author.header.died') }}</dt>
+              <dd class="text-foreground">{{ diedLabel }}</dd>
+            </div>
+            <div v-if="author.website" class="flex gap-1.5 min-w-0">
+              <dt class="text-muted-foreground">{{ t('author.header.website') }}</dt>
+              <dd class="min-w-0 truncate">
+                <a :href="author.website" target="_blank" rel="noopener noreferrer" class="text-foreground underline underline-offset-2">
+                  {{ author.website }}
+                </a>
+              </dd>
+            </div>
+            <div v-if="genres.length" class="flex gap-1.5 min-w-0">
+              <dt class="text-muted-foreground">{{ t('author.header.genres') }}</dt>
+              <dd class="min-w-0 text-foreground">{{ genres.join(', ') }}</dd>
+            </div>
+            <div v-if="influences.length" class="flex gap-1.5 min-w-0">
+              <dt class="text-muted-foreground">{{ t('author.header.influences') }}</dt>
+              <dd class="min-w-0 text-foreground">{{ influences.join(', ') }}</dd>
+            </div>
+          </dl>
 
           <div class="mt-4 flex gap-3">
             <div class="rounded-lg border border-border/70 bg-background/40 px-4 py-2.5">

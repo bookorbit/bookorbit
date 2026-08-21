@@ -28,6 +28,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { AuthorMetadataPreferencesService } from './author-metadata-preferences.service';
+import { UpdateAuthorMetadataPreferencesDto } from './dto/update-author-metadata-preferences.dto';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
@@ -54,6 +56,7 @@ export class AuthorsController {
     private readonly enrichmentOrchestrator: AuthorEnrichmentOrchestratorService,
     private readonly enrichmentConfig: AuthorEnrichmentConfigService,
     private readonly queueRepo: AuthorEnrichmentRepository,
+    private readonly metadataPreferences: AuthorMetadataPreferencesService,
   ) {}
 
   @Get()
@@ -121,6 +124,20 @@ export class AuthorsController {
   async setEnrichmentConfig(@Body() config: AuthorAutoEnrichmentConfigDto) {
     await this.enrichmentConfig.setConfig(config);
     return this.enrichmentConfig.getConfig();
+  }
+
+  @Get('metadata/preferences')
+  @RequirePermission(Permission.ManageMetadataConfig)
+  getMetadataPreferences() {
+    return this.metadataPreferences.getPreferences();
+  }
+
+  @Put('metadata/preferences')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(Permission.ManageMetadataConfig)
+  @Auditable({ action: AuditAction.AuthorEnrichmentConfigUpdate, description: 'Updated author metadata preferences' })
+  setMetadataPreferences(@Body() preferences: UpdateAuthorMetadataPreferencesDto) {
+    return this.metadataPreferences.setPreferences(preferences);
   }
 
   @Post('enrichment/preview-count')

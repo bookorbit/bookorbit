@@ -19,5 +19,16 @@ export function useKoreaderBookProgress() {
     }
   }
 
-  return { bookProgress, loading, fetchBookProgress }
+  async function releaseResetHold(bookId: number, deviceId: string): Promise<boolean> {
+    const res = await api(`/api/v1/koreader/books/${bookId}/reset-hold/release`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId }),
+    })
+    if (!res.ok) return false
+    await fetchBookProgress(bookId)
+    return true
+  }
+
+  return { bookProgress, loading, fetchBookProgress, releaseResetHold }
 }

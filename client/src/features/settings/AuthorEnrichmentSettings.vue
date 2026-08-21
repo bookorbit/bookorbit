@@ -8,13 +8,13 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import type { AuthorAutoEnrichmentConfig } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { useAuthorEligibleCountPreview } from './composables/useAuthorEligibleCountPreview'
+import AuthorMetadataPreferences from './components/AuthorMetadataPreferences.vue'
 
 const { t } = useI18n()
 
 const DEFAULT_CONFIG: AuthorAutoEnrichmentConfig = {
   enabled: false,
   triggerOnImport: true,
-  writeMode: 'missing_only',
   conditions: { neverEnriched: true, missingBio: false, missingPhoto: false },
 }
 
@@ -23,6 +23,7 @@ const config = ref<AuthorAutoEnrichmentConfig>({
   conditions: { ...DEFAULT_CONFIG.conditions },
 })
 const saving = ref(false)
+const metadataPreferencesRef = ref<InstanceType<typeof AuthorMetadataPreferences> | null>(null)
 const authorBackfillRunning = ref(false)
 const authorBackfillAllRunning = ref(false)
 
@@ -40,6 +41,7 @@ async function saveConfig() {
   if (saving.value) return
   saving.value = true
   try {
+    await metadataPreferencesRef.value?.save()
     const res = await api('/api/v1/authors/enrichment/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -77,11 +79,6 @@ function toggleCondition(key: keyof AuthorAutoEnrichmentConfig['conditions']) {
       [key]: !config.value.conditions[key],
     },
   }
-}
-
-function onWriteModeChange(event: Event) {
-  const mode = (event.target as HTMLSelectElement).value as AuthorAutoEnrichmentConfig['writeMode']
-  config.value = { ...config.value, writeMode: mode }
 }
 
 async function runAuthorBackfill() {
@@ -154,24 +151,7 @@ async function runAuthorBackfillAll() {
       <ToggleSwitch class="self-start" :model-value="config.enabled" :disabled="saving" @update:model-value="toggleEnabled" />
     </div>
 
-    <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">
-      <div>
-        <p class="settings-label">
-          {{ t('settings.admin.authorEnrichment.updateStrategyTitle') }}
-        </p>
-        <p class="settings-hint">
-          {{ t('settings.admin.authorEnrichment.updateStrategyHint') }}
-        </p>
-      </div>
-      <select class="select-field w-full md:w-64" :value="config.writeMode" :disabled="saving" @change="onWriteModeChange">
-        <option value="missing_only">
-          {{ t('settings.admin.authorEnrichment.writeModeMissingOnly') }}
-        </option>
-        <option value="always_refetch">
-          {{ t('settings.admin.authorEnrichment.writeModeAlwaysRefetch') }}
-        </option>
-      </select>
-    </div>
+    <AuthorMetadataPreferences ref="metadataPreferencesRef" />
 
     <template v-if="config.enabled">
       <div class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6 bg-card">

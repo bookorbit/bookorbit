@@ -144,33 +144,6 @@ describe('AppSettingsService', () => {
     });
   });
 
-  describe('author settings', () => {
-    it('getAuthorsAutoEnrichmentWriteMode defaults to missing_only', async () => {
-      repo.findByKey.mockResolvedValue(undefined);
-      expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('missing_only');
-    });
-
-    it('getAuthorsAutoEnrichmentWriteMode accepts always_refetch', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'authors_auto_enrichment_write_mode', value: 'always_refetch' } as never);
-      expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('always_refetch');
-    });
-
-    it('getAuthorsAutoEnrichmentWriteMode falls back to missing_only for unknown value', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'authors_auto_enrichment_write_mode', value: 'unknown' } as never);
-      expect(await service.getAuthorsAutoEnrichmentWriteMode()).toBe('missing_only');
-    });
-
-    it('isAuthorsProviderAudnexusEnabled defaults to true', async () => {
-      repo.findByKey.mockResolvedValue(undefined);
-      expect(await service.isAuthorsProviderAudnexusEnabled()).toBe(true);
-    });
-
-    it('isAuthorsProviderAudnexusEnabled returns false when stored', async () => {
-      repo.findByKey.mockResolvedValue({ key: 'authors_provider_audnexus_enabled', value: 'false' } as never);
-      expect(await service.isAuthorsProviderAudnexusEnabled()).toBe(false);
-    });
-  });
-
   describe('getOidcConfig', () => {
     it('returns default config when no row in db', async () => {
       repo.findByKey.mockResolvedValue(undefined);
