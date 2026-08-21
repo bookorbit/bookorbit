@@ -3395,4 +3395,22 @@ export class BookService {
     }
     return chapters;
   }
+
+  async mergeBooks(sourceBookIds: number[], targetBookId: number, user: RequestUser): Promise<{ merged: number; targetBookId: number }> {
+    if (!sourceBookIds.length) {
+      throw new BadRequestException('sourceBookIds must not be empty');
+    }
+
+    const uniqueSourceIds = [...new Set(sourceBookIds)];
+
+    await this.verifyBookAccess(targetBookId, user);
+    await Promise.all(uniqueSourceIds.map((bookId) => this.verifyBookAccess(bookId, user)));
+
+    const merged = await this.bookRepo.mergeBooks(uniqueSourceIds, targetBookId);
+
+    return {
+      merged,
+      targetBookId,
+    };
+  }
 }

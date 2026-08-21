@@ -3044,6 +3044,7 @@
       "BookBulkSetMetadataLock": "Set metadata locks",
       "BookBulkEditMetadata": "Edit book metadata",
       "BookBulkMoveLibrary": "Move books to another library",
+      "BookMerge": "Merge books",
       "BookReadingStateReset": "Reset reading state",
       "BookWriteAndRename": "Write metadata and rename file",
       "CollectionCreate": "Create collection",
@@ -4434,6 +4435,22 @@
       "toast": {
         "success": "Moved {count} books to {library}",
         "partial": "Moved {moved} books, {failed} failed"
+      }
+    },
+    "merge": {
+      "action": "Merge books",
+      "title": "{count, plural, one {Merge # book} other {Merge # books}}",
+      "description": "This will not change book locations! But merge them only in the database.",
+      "subtitle": "Select the book in which the others should be merged.",
+      "mergeBtn": "Merge Books",
+      "errors": {
+        "failed": "Failed to merge books",
+        "notarget": "No target book selected",
+        "not2books": "Select at least 2 books to merge",
+        "common": " An Error occurred while merging books. Please try again."
+      },
+      "toast": {
+        "success": "Merged {count} {count, plural, one {Merge # book} other {Merge # books}} into book ID:{target}"
       }
     }
   },

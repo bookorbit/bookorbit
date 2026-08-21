@@ -30,6 +30,8 @@ import SelectionActionBar from '@/components/SelectionActionBar.vue'
 import AddToCollectionSheet from '@/features/collection/components/AddToCollectionSheet.vue'
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
 import { useMoveToLibraryTarget } from '@/features/book/composables/useMoveToLibraryTarget'
+import MergeBooksSheet from '@/features/book/components/MergeBooksSheet.vue'
+import { useMergeBooksTarget } from '@/features/book/composables/useMergeBooksTarget'
 import BulkEditMetadataDialog from '@/features/book/components/BulkEditMetadataDialog.vue'
 import MetadataExportDialog from '@/features/book/components/MetadataExportDialog.vue'
 import EditCollectionDialog from '@/features/collection/components/EditCollectionDialog.vue'
@@ -265,6 +267,21 @@ function handleBooksMoved() {
   exitSelectionMode()
 }
 
+const {
+  open: mergeBooksOpen,
+  payload: mergePayload,
+  count: mergeCount,
+  openForSelection: openMergeForSelection,
+  setOpen: setMergeOpen,
+} = useMergeBooksTarget({
+  getSelectionPayload: () => ({ bookIds: [...selectedIds.value] }),
+  selectedCount,
+})
+
+function handleBooksMerged() {
+  exitSelectionMode()
+}
+
 const metadataExportOpen = ref(false)
 const visibleExportColumns = computed(() => {
   if (!tableRef.value) return []
@@ -438,6 +455,7 @@ defineOptions({ name: 'CollectionView' })
       @lock-metadata="handleBulkSetMetadataLock"
       @delete="handleDeleteSelected"
       @move-to-library="openMoveForSelection"
+      @merge-books="openMergeForSelection"
       @exit="exitSelectionMode"
     />
 
@@ -467,6 +485,14 @@ defineOptions({ name: 'CollectionView' })
       :selected-count="moveCount"
       @update:open="setMoveOpen"
       @moved="handleBooksMoved"
+    />
+
+    <MergeBooksSheet
+      :open="mergeBooksOpen"
+      :selection-payload="mergePayload"
+      :selected-count="mergeCount"
+      @update:open="setMergeOpen"
+      @merged="handleBooksMerged"
     />
     <BulkEditMetadataDialog
       :open="bulkEditOpen"

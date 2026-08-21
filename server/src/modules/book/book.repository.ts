@@ -2336,4 +2336,34 @@ export class BookRepository {
         AND sb.removed_by_device = false
     `);
   }
+
+  async mergeBooks(sourceBookIds: number[], targetBookId: number): Promise<number> {
+    if (!sourceBookIds.length) {
+      throw new BadRequestException('sourceBookIds must not be empty');
+    }
+
+    const uniqueSourceIds = [...new Set(sourceBookIds.filter((bookId) => bookId !== targetBookId))];
+
+    if (!uniqueSourceIds.length) {
+      throw new BadRequestException('At least one source book is required');
+    }
+
+    if (!targetBookId) {
+      throw new BadRequestException('Target book ID is required');
+    }
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(bookFiles)
+        .set({
+          bookId: targetBookId,
+          updatedAt: new Date(),
+        })
+        .where(inArray(bookFiles.bookId, uniqueSourceIds));
+
+      await tx.delete(books).where(inArray(books.id, uniqueSourceIds));
+    });
+
+    return uniqueSourceIds.length;
+  }
 }

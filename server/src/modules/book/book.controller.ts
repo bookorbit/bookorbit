@@ -48,6 +48,7 @@ import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
 import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
+import { MergeBooksDto } from './dto/merge-books.dto';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
@@ -731,6 +732,21 @@ export class BookController {
   async bulkEditMetadata(@Body() dto: BulkEditMetadataDto, @CurrentUser() user: RequestUser) {
     const ids = await this.bookService.resolveSelectionToIds(dto, user);
     return this.bookService.bulkEditMetadata(ids, dto.fields, user);
+  }
+
+  @Post('merge')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookMerge,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const body = req.body as { sourceBookIds?: number[]; targetBookId?: number };
+      const count = body?.sourceBookIds?.length ?? 0;
+      return `Merged ${count} books into book #${body?.targetBookId ?? 'unknown'}`;
+    },
+  })
+  async mergeBooks(@Body() dto: MergeBooksDto, @CurrentUser() user: RequestUser) {
+    return this.bookService.mergeBooks(dto.sourceBookIds, dto.targetBookId, user);
   }
 
   @Get(':id')

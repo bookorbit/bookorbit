@@ -12,6 +12,7 @@ import {
   Lock,
   Loader2,
   Mail,
+  Merge,
   MoreHorizontal,
   Pencil,
   RefreshCw,
@@ -86,6 +87,7 @@ const emit = defineEmits<{
   'set-field': [field: BulkEditableField, value: BulkEditableValue]
   'lock-metadata': [locked: boolean]
   'move-to-library': []
+  'merge-books': []
   delete: []
   exit: []
 }>()
@@ -108,7 +110,8 @@ const canBulkActions = computed(() => !isDemoRestrictedAccount.value)
 const canDownload = computed(() => hasPermission('library_download') && canBulkActions.value)
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
 const canMoveToLibrary = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
-const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value || canMoveToLibrary.value)
+const canMergeBooks = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
+const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value || canMoveToLibrary.value || canMergeBooks.value)
 const canShare = computed(() => hasPermission('email_send') || canDownload.value)
 const numericFieldSelected = computed(() => bulkField.value === 'publishedYear')
 const arrayFieldSelected = computed(() => (BULK_EDITABLE_ARRAY_FIELDS as readonly string[]).includes(bulkField.value))
@@ -185,6 +188,12 @@ function onReExtractCover() {
 function onMoveToLibrary() {
   if (props.count === 0) return
   emit('move-to-library')
+}
+
+function onMergeBooks() {
+  if (props.count === 0) return
+  if (props.count === 1) return
+  emit('merge-books')
 }
 
 function resetFieldEditor() {
@@ -455,6 +464,13 @@ watch(
                         <DropdownMenuItem data-testid="action-move-to-library" @click="onMoveToLibrary">
                           <FolderInput :size="14" />
                           <span>{{ t('book.move.action') }}</span>
+                        </DropdownMenuItem>
+                      </template>
+                      <template v-if="canMergeBooks">
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem data-testid="action-merge-books" @click="onMergeBooks">
+                          <Merge :size="14" />
+                          <span>{{ t('book.merge.action') }}</span>
                         </DropdownMenuItem>
                       </template>
                     </DropdownMenuContent>
