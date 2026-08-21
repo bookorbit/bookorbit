@@ -10,6 +10,10 @@ function makeReply() {
   };
 }
 
+function makeHeaders(entries: Record<string, string | string[] | undefined>): Record<string, string | string[] | undefined> {
+  return entries;
+}
+
 describe('KoboProxyService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -43,6 +47,9 @@ describe('KoboProxyService', () => {
         accept: 'application/json',
         host: 'localhost:3000',
         'x-kobo-deviceid': 'dev123',
+        'x-kobo-userkey': 'user-secret',
+        'x-kobo-synctoken': 'raw-kobo-token',
+        'content-length': '17',
       },
       body: { hello: 'world' },
     };
@@ -50,14 +57,24 @@ describe('KoboProxyService', () => {
 
     await service.forward(req as never, reply as never, 'device-1');
 
-    expect(fetchMock).toHaveBeenCalledWith('https://storeapi.kobo.com/v1/library/sync?since=1', {
-      method: 'POST',
-      headers: {
-        accept: 'application/json',
-        'x-kobo-deviceid': 'dev123',
-      },
-      body: '{"hello":"world"}',
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://storeapi.kobo.com/v1/library/sync?since=1',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          accept: 'application/json',
+          'x-kobo-deviceid': 'dev123',
+          'x-kobo-userkey': 'user-secret',
+          'x-kobo-synctoken': 'raw-kobo-token',
+        }),
+        body: '{"hello":"world"}',
+      }),
+    );
+    const sentHeaders = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+    expect(sentHeaders).not.toHaveProperty('host');
+    expect(sentHeaders).not.toHaveProperty('content-length');
+    // Raw Kobo tokens (no PX. prefix) reach Kobo verbatim, so the device's own cursor is forwarded.
+    expect(sentHeaders['x-kobo-synctoken']).toBe('raw-kobo-token');
     expect(reply.status).toHaveBeenCalledWith(200);
     expect(reply.header).toHaveBeenCalledWith('content-type', 'application/json');
     expect(reply.header).toHaveBeenCalledWith('x-custom', 'ok');
@@ -80,7 +97,7 @@ describe('KoboProxyService', () => {
       {
         method: 'GET',
         url: '/v1/affiliate',
-        headers: {},
+        headers: makeHeaders({}),
         body: { ignored: true },
       } as never,
       makeReply() as never,
@@ -104,7 +121,7 @@ describe('KoboProxyService', () => {
     const req = {
       method: 'PUT',
       url: `/api/v1/kobo/device-1/v1/library/${entitlementId}/state`,
-      headers: {
+      headers: makeHeaders({
         accept: 'application/json',
         authorization: 'Bearer kobo-oauth-token',
         'content-type': 'application/json',
@@ -112,25 +129,28 @@ describe('KoboProxyService', () => {
         'x-kobo-appversion': '4.45.23697',
         'x-kobo-deviceid': 'device-id',
         host: 'bookorbit.example.com',
-      },
+      }),
       body,
     };
     const reply = makeReply();
 
     await service.forward(req as never, reply as never, 'device-1');
 
-    expect(fetchMock).toHaveBeenCalledWith(`https://storeapi.kobo.com/v1/library/${entitlementId}/state`, {
-      method: 'PUT',
-      headers: {
-        accept: 'application/json',
-        authorization: 'Bearer kobo-oauth-token',
-        'content-type': 'application/json',
-        'user-agent': 'Kobo Touch',
-        'x-kobo-appversion': '4.45.23697',
-        'x-kobo-deviceid': 'device-id',
-      },
-      body: JSON.stringify(body),
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://storeapi.kobo.com/v1/library/${entitlementId}/state`,
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({
+          accept: 'application/json',
+          authorization: 'Bearer kobo-oauth-token',
+          'content-type': 'application/json',
+          'user-agent': 'Kobo Touch',
+          'x-kobo-appversion': '4.45.23697',
+          'x-kobo-deviceid': 'device-id',
+        }),
+        body: JSON.stringify(body),
+      }),
+    );
     expect(reply.status).toHaveBeenCalledWith(200);
     expect(reply.send).toHaveBeenCalledWith(Buffer.from('{"RequestResult":"Success"}'));
   });
@@ -144,7 +164,7 @@ describe('KoboProxyService', () => {
       {
         method: 'GET',
         url: '/api/v1/kobo/dev/v1/library/sync',
-        headers: {},
+        headers: makeHeaders({}),
       } as never,
       reply as never,
       'dev',
@@ -152,6 +172,75 @@ describe('KoboProxyService', () => {
 
     expect(reply.status).toHaveBeenCalledWith(502);
     expect(reply.send).toHaveBeenCalledWith({ message: 'Upstream Kobo API unavailable' });
+  });
+
+  describe('over-the-device-borrow flow', () => {
+    it('forwards the Kobo userkey and decodes the BookOrbit composite sync token before proxying a borrow', async () => {
+      const service = new KoboProxyService();
+      const upstream = {
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode('{"success":true}').buffer),
+      };
+      const fetchMock = vi.fn().mockResolvedValue(upstream);
+      vi.stubGlobal('fetch', fetchMock);
+
+      const composite = `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-9' })).toString('base64')}`;
+      const req = {
+        method: 'POST',
+        url: '/api/v1/kobo/dev/v1/library/borrow',
+        headers: makeHeaders({
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'x-kobo-userkey': 'device-user-key',
+          'x-kobo-deviceid': 'device-id',
+          'x-kobo-synctoken': composite,
+        }),
+        body: { BookId: '9780123456789' },
+      };
+      const reply = makeReply();
+
+      await service.forward(req as never, reply as never, 'dev');
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://storeapi.kobo.com/v1/library/borrow',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'x-kobo-userkey': 'device-user-key',
+            'x-kobo-synctoken': 'kobo-cursor-9',
+          }),
+          body: JSON.stringify({ BookId: '9780123456789' }),
+        }),
+      );
+    });
+
+    it('omits the sync token entirely when the device sent no Kobo cursor', async () => {
+      const service = new KoboProxyService();
+      const upstream = {
+        status: 200,
+        headers: new Headers(),
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+      };
+      const fetchMock = vi.fn().mockResolvedValue(upstream);
+      vi.stubGlobal('fetch', fetchMock);
+
+      const composite = `PX.${Buffer.from(JSON.stringify({ snapshotId: 4 })).toString('base64')}`;
+      const req = {
+        method: 'POST',
+        url: '/api/v1/kobo/dev/v1/library/borrow',
+        headers: makeHeaders({
+          'x-kobo-userkey': 'device-user-key',
+          'x-kobo-synctoken': composite,
+        }),
+        body: {},
+      };
+
+      await service.forward(req as never, makeReply() as never, 'dev');
+
+      const sentHeaders = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+      expect(sentHeaders).not.toHaveProperty('x-kobo-synctoken');
+      expect(sentHeaders['x-kobo-userkey']).toBe('device-user-key');
+    });
   });
 
   describe('request', () => {
@@ -168,7 +257,7 @@ describe('KoboProxyService', () => {
     const syncRequest = {
       method: 'GET',
       url: '/api/v1/kobo/dev/v1/library/sync?Filter=ALL',
-      headers: { authorization: 'Bearer kobo-jwt', 'x-kobo-synctoken': 'PX.composite' },
+      headers: makeHeaders({ authorization: 'Bearer kobo-jwt', 'x-kobo-synctoken': 'PX.composite', 'x-kobo-userkey': 'user-secret' }),
     };
 
     it('returns the upstream response with lowercased headers instead of piping it', async () => {
@@ -242,7 +331,7 @@ describe('KoboProxyService', () => {
     });
 
     it('throws for a path that introduces a scheme override', () => {
-      expect(() => (service as any).buildTargetUrl('https://storeapi.kobo.com@evil.com/path')).toThrow(BadRequestException);
+      expect(() => (service as any).buildTargetUrl('https://***@evil.com/path')).toThrow(BadRequestException);
     });
 
     it('throws for a javascript: scheme in the path', () => {

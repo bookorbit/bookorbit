@@ -1,26 +1,33 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import { decodeSyncToken } from './kobo-sync-token';
+
 const KOBO_API_BASE = 'https://storeapi.kobo.com';
 const KOBO_API_HOSTNAME = 'storeapi.kobo.com';
 
-const FORWARD_HEADERS = [
-  'accept',
-  'accept-language',
-  'authorization',
-  'content-type',
-  'user-agent',
-  'x-kobo-affiliatename',
-  'x-kobo-appversion',
-  'x-kobo-deviceid',
-  'x-kobo-devicemodel',
-  'x-kobo-deviceos',
-  'x-kobo-deviceosversion',
-  'x-kobo-platformid',
-  'x-kobo-synctokenversion',
-];
-
-const HOP_BY_HOP_HEADERS = ['transfer-encoding', 'connection', 'content-encoding', 'content-length'];
+// Headers that must never be forwarded. Connection-specific headers are defined by RFC 7230 as
+// scoped to a single hop and reset by every proxy, and `host` would otherwise point Kobo at the
+// BookOrbit host that the device just spoke to. Everything else the device sends (including
+// `x-kobo-userkey`, which authorizes most Kobo API calls, and `x-kobo-synctoken`, which carries
+// the upstream cursor) is forwarded, with two escape hatches callers can use:
+//   * `extraHeaders` overrides a forwarded value (the sync-token-aware entry points use this to
+//     hand Kobo its own cursor instead of the BookOrbit composite).
+//   * `omitHeaders` strips a forwarded header (used to drop our composite when we have no Kobo
+//     cursor to substitute).
+const DROP_HEADERS = new Set([
+  'host',
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailers',
+  'transfer-encoding',
+  'upgrade',
+  'content-length',
+  'content-encoding',
+]);
 
 export type KoboProxyResponse = {
   status: number;
@@ -30,7 +37,7 @@ export type KoboProxyResponse = {
 
 export type KoboProxyRequestOptions = {
   extraHeaders?: Record<string, string>;
-  /** Drops headers FORWARD_HEADERS would otherwise copy from the device request. */
+  /** Drops headers the device would otherwise copy. */
   omitHeaders?: string[];
   timeoutMs?: number;
 };
@@ -43,11 +50,15 @@ export class KoboProxyService {
   async request(req: FastifyRequest, deviceToken: string, options: KoboProxyRequestOptions = {}): Promise<KoboProxyResponse> {
     const targetUrl = this.resolveTargetUrl(req, deviceToken);
 
+    // Fastify lowercases header keys, but defensive: lowercase the lookup keys too.
+    const sourceHeaders = req.headers as Record<string, string | string[] | undefined>;
     const headers: Record<string, string> = {};
-    for (const key of FORWARD_HEADERS) {
-      const val = req.headers[key];
-      if (val) headers[key] = Array.isArray(val) ? val[0] : val;
+    for (const [key, value] of Object.entries(sourceHeaders)) {
+      if (value === undefined) continue;
+      if (DROP_HEADERS.has(key.toLowerCase())) continue;
+      headers[key.toLowerCase()] = Array.isArray(value) ? (value[0] ?? '') : value;
     }
+
     for (const key of options.omitHeaders ?? []) {
       delete headers[key.toLowerCase()];
     }
@@ -76,26 +87,48 @@ export class KoboProxyService {
     return { status: upstream.status, headers: responseHeaders, body: Buffer.from(await upstream.arrayBuffer()) };
   }
 
+  /**
+   * Relays a request to Kobo, dropping the connection-specific headers and replacing the device's
+   * BookOrbit composite sync token with the Kobo cursor it carries. Kobo's API does not understand
+   * `PX.<base64>` and treats it as a fresh cursor, so a borrow call that uses it lands Kobo in a
+   * state where the device has an entitlement BookOrbit never sees on this iteration.
+   */
+  async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string): Promise<void> {
+    const targetUrl = this.resolveTargetUrl(req, deviceToken);
+
+    const syncTokenHeader = this.readSyncTokenHeader(req);
+    const koboCursor = syncTokenHeader ? decodeSyncToken(syncTokenHeader).koboSyncToken : undefined;
+
+    try {
+      const response = await this.request(req, deviceToken, {
+        ...(syncTokenHeader !== undefined
+          ? koboCursor !== undefined
+            ? { extraHeaders: { 'x-kobo-synctoken': koboCursor } }
+            : { omitHeaders: ['x-kobo-synctoken'] }
+          : {}),
+      });
+      this.sendUpstream(reply, response);
+    } catch (err) {
+      this.logger.warn(`Proxy failed for ${targetUrl}: ${(err as Error).message}`);
+      reply.status(502).send({ message: 'Upstream Kobo API unavailable' });
+    }
+  }
+
   /** Relays an upstream response to the device, dropping the headers that must not be forwarded. */
   sendUpstream(reply: FastifyReply, response: KoboProxyResponse): void {
     reply.status(response.status);
     for (const [key, value] of Object.entries(response.headers)) {
-      if (!HOP_BY_HOP_HEADERS.includes(key)) {
+      if (!DROP_HEADERS.has(key)) {
         reply.header(key, value);
       }
     }
     reply.send(response.body);
   }
 
-  async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string) {
-    const targetUrl = this.resolveTargetUrl(req, deviceToken);
-
-    try {
-      this.sendUpstream(reply, await this.request(req, deviceToken));
-    } catch (err) {
-      this.logger.warn(`Proxy failed for ${targetUrl}: ${(err as Error).message}`);
-      reply.status(502).send({ message: 'Upstream Kobo API unavailable' });
-    }
+  private readSyncTokenHeader(req: FastifyRequest): string | undefined {
+    const raw = (req.headers as Record<string, string | string[] | undefined>)['x-kobo-synctoken'];
+    if (raw === undefined) return undefined;
+    return Array.isArray(raw) ? raw[0] : raw;
   }
 
   private resolveTargetUrl(req: FastifyRequest, deviceToken: string): string {
