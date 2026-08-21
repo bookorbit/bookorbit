@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 import { TARGET_CATALOGS, assertCrowdinTargetConfiguration } from './locale-configuration.mjs'
 import { findInvalidTargetMessages, flattenCatalog, validateCatalogs } from './locale-catalog-validation.mjs'
+import { collectSourceMessageKeys } from './locale-source-keys.mjs'
 
 const API = 'https://api.crowdin.com/api/v2'
 const SOURCE_PATH_SUFFIX = '/client/src/locales/en.json'
@@ -260,21 +261,17 @@ export function parseAllowedTranslationLosses(value = '') {
   return allowed
 }
 
+// Exports are built with skipUntranslatedStrings, so Crowdin drops a key entirely once it stops
+// carrying a translation. Retention therefore compares presence, never message content: a translation
+// that equals the English source, such as Spanish "Error" or a product name, is a real translation.
 export function findTranslationLosses({ locale, reference, current, exported, rejected = new Map() }) {
-  const legacyComplete = current.size === reference.size && [...reference.keys()].every((key) => current.has(key))
   const losses = []
 
-  for (const [key, currentMessage] of current) {
-    const referenceMessage = reference.get(key)
-    if (referenceMessage === undefined || (legacyComplete && currentMessage === referenceMessage)) continue
+  for (const key of current.keys()) {
+    if (!reference.has(key) || exported.has(key)) continue
 
-    const exportedMessage = exported.get(key)
-    if (exportedMessage === undefined) {
-      const rejection = rejected.get(key)
-      losses.push({ locale, key, reason: rejection ? `rejected by catalog validation - ${rejection[0]}` : 'missing from Crowdin export' })
-    } else if (currentMessage !== referenceMessage && exportedMessage === referenceMessage) {
-      losses.push({ locale, key, reason: 'replaced by English source text' })
-    }
+    const rejection = rejected.get(key)
+    losses.push({ locale, key, reason: rejection ? `rejected by catalog validation - ${rejection[0]}` : 'missing from Crowdin export' })
   }
 
   return losses
@@ -354,6 +351,7 @@ export async function syncCrowdinTranslations({
   allowedLosses = new Set(),
   targetCatalogs = TARGET_CATALOGS,
   assertTargetConfiguration = assertCrowdinTargetConfiguration,
+  collectMessageKeys = collectSourceMessageKeys,
   reportPath = process.env.CROWDIN_REJECTION_REPORT || '',
 }) {
   if (!token) throw new Error('CROWDIN_TOKEN is required')
@@ -388,14 +386,15 @@ export async function syncCrowdinTranslations({
   const catalogs = new Map([['en', referenceMessages]])
   for (const { locale, catalog } of downloaded) catalogs.set(locale, flattenCatalog(catalog))
 
-  const rejections = findInvalidTargetMessages({ catalogs })
+  const { slotCountKeys } = await collectMessageKeys()
+  const rejections = findInvalidTargetMessages({ catalogs, slotCountKeys })
   const rejectedLocales = new Set(rejections.map(({ locale }) => locale))
   for (const { locale, key } of rejections) catalogs.get(locale).delete(key)
   for (const entry of downloaded) {
     if (rejectedLocales.has(entry.locale)) entry.catalog = orderedSparseCatalog(reference, catalogs.get(entry.locale))
   }
 
-  const errors = validateCatalogs({ catalogs })
+  const errors = validateCatalogs({ catalogs, slotCountKeys })
   if (errors.length > 0) throw new Error(`Crowdin export validation failed:\n${errors.join('\n')}`)
   assertTranslationRetention({
     reference: referenceMessages,

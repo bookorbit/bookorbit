@@ -99,7 +99,7 @@ After an English source change reaches `main`:
 2. Translators update target strings in Crowdin.
 3. The scheduled or manually dispatched `Crowdin Translation Sync` workflow verifies that Crowdin's source keys match `en.json`.
 4. The workflow requests only translated strings, removes the empty values Crowdin emits for untranslated nested JSON entries, and validates the resulting sparse catalogs.
-5. Before writing, the workflow rejects exports that omit an existing translation or replace one with English source text.
+5. Before writing, the workflow rejects exports that omit an existing translation.
 6. Only after validation and retention checks pass, the workflow updates `l10n_main` and opens a pull request to `main`.
 7. CI verifies that the pull request changes only the twenty-four target catalogs and runs the normal client checks.
 8. A maintainer reviews and squash-merges the pull request.
@@ -109,7 +109,7 @@ Deleting that branch is required, not tidiness. It guarantees that every later e
 
 Translation pull requests retain the configured `i18n(client)` title and commit format. The `i18n` commit type produces a patch release and an Internationalization release-note section. `CROWDIN_PR_TOKEN` must contain a fine-grained GitHub token with repository contents and pull-request write access. A separate token is required because pull requests created with the workflow's default `GITHUB_TOKEN` do not trigger normal pull-request workflows.
 
-The retention check distinguishes the initial complete legacy catalogs from later sparse catalogs. In a complete legacy catalog, it protects values that differ from English and ignores copied English fallbacks. Once a catalog is sparse, every existing key is treated as an intentional translation, including technical terms that legitimately match English.
+The retention check compares presence, never message content. Exports request only translated strings, so Crowdin omits a key as soon as it stops carrying a translation, and every key already present in a target catalog must come back in the export. A translation that legitimately matches the English source, such as `Error` in Spanish or a product name left untranslated, is a real translation and never counts as a loss. Reading it as one would reject the routine corrections that translators make to short labels, abbreviations, and loanwords.
 
 An intentional removal requires a manual workflow dispatch with its exact `locale:message.key` value in `allowed_translation_losses`. Separate multiple acknowledgements with commas. Unknown, misspelled, duplicate, and unused acknowledgements fail the run, so this input cannot act as a broad bypass. Scheduled runs never acknowledge translation loss automatically.
 
