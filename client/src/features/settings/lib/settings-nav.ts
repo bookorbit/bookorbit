@@ -207,7 +207,7 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         descriptionKey: 'settings.nav.descriptions.notifications',
         icon: Bell,
         keywords: 'notify email digest alerts events',
-        isVisible: (context) => !context.isDemoRestricted,
+        isVisible: (context) => !context.isDemoRestricted && (context.isSuperuser || context.permissions.includes(Permission.NotificationAccess)),
       },
       {
         id: 'privacy',

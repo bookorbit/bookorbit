@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import { computed } from 'vue'
+import { Permission } from '@bookorbit/types'
 import SettingsSidebar from '../components/SettingsSidebar.vue'
 
 const permState = {
@@ -21,10 +22,10 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   }),
 }))
 
-function mountSidebar(opts?: { rail?: boolean; su?: boolean; perms?: string[] }) {
+function mountSidebar(opts?: { rail?: boolean; su?: boolean; perms?: string[]; demo?: boolean }) {
   permState.isSuperuser = opts?.su ?? false
   permState.permissions = opts?.perms ?? []
-  permState.demoRestricted = false
+  permState.demoRestricted = opts?.demo ?? false
   return mount(SettingsSidebar, {
     props: { isRail: opts?.rail ?? false },
     global: {
@@ -82,5 +83,18 @@ describe('SettingsSidebar', () => {
   it('only shows groups the user has access to', () => {
     expect(mountSidebar({ rail: true }).findAll('[data-testid="rail-group"]')).toHaveLength(1)
     expect(mountSidebar({ rail: true, perms: ['manage_libraries'] }).findAll('[data-testid="rail-group"]')).toHaveLength(2)
+  })
+
+  it('applies notification access rules in collapsed rail mode', () => {
+    const labels = (opts?: Parameters<typeof mountSidebar>[0]) =>
+      mountSidebar({ ...opts, rail: true })
+        .findAll('[data-testid="settings-sidebar-rail-item"]')
+        .map((node) => node.text())
+
+    expect(labels()).not.toContain('Notifications')
+    expect(labels({ perms: [Permission.NotificationAccess] })).toContain('Notifications')
+    expect(labels({ su: true })).toContain('Notifications')
+    expect(labels({ perms: [Permission.NotificationAccess], demo: true })).not.toContain('Notifications')
+    expect(labels({ su: true, demo: true })).not.toContain('Notifications')
   })
 })

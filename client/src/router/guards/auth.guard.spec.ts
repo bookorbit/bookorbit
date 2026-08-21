@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref, type Ref } from 'vue'
+import { Permission } from '@bookorbit/types'
 
 import { registerAuthGuard } from './auth.guard'
 
@@ -8,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   openChangePassword: vi.fn<(required: boolean) => void>(),
   user: null as unknown as Ref<{
     isDefaultPassword: boolean
+    isSuperuser: boolean
+    permissions: string[]
     provisioningMethod: string
     settings: { achievementPreferences: { enabled: boolean } }
   }>,
@@ -40,6 +43,8 @@ describe('registerAuthGuard', () => {
     mocks.openChangePassword.mockReset()
     mocks.user = ref({
       isDefaultPassword: false,
+      isSuperuser: false,
+      permissions: [],
       provisioningMethod: 'local',
       settings: { achievementPreferences: { enabled: false } },
     })
@@ -63,5 +68,58 @@ describe('registerAuthGuard', () => {
     if (!guard) throw new Error('Expected guard to be registered')
 
     await expect(guard({ name: 'achievements', path: '/achievements', fullPath: '/achievements', meta: {} })).resolves.toBe(true)
+  })
+
+  it('redirects a direct route visit when the required permission is missing', async () => {
+    if (!guard) throw new Error('Expected guard to be registered')
+
+    await expect(
+      guard({
+        name: 'settings-notifications',
+        path: '/settings/account/notifications',
+        fullPath: '/settings/account/notifications',
+        meta: {
+          requiredPermission: Permission.NotificationAccess,
+          forbiddenPermission: Permission.DemoRestricted,
+          permissionFallback: 'settings-account-profile',
+        },
+      }),
+    ).resolves.toEqual({ name: 'settings-account-profile' })
+  })
+
+  it('allows a direct route visit with notification access or superuser status', async () => {
+    if (!guard) throw new Error('Expected guard to be registered')
+    const route = {
+      name: 'settings-notifications',
+      path: '/settings/account/notifications',
+      fullPath: '/settings/account/notifications',
+      meta: { requiredPermission: Permission.NotificationAccess },
+    }
+
+    mocks.user.value.permissions = [Permission.NotificationAccess]
+    await expect(guard(route)).resolves.toBe(true)
+
+    mocks.user.value.permissions = []
+    mocks.user.value.isSuperuser = true
+    await expect(guard(route)).resolves.toBe(true)
+  })
+
+  it('redirects demo-restricted users even when notification access would otherwise allow the route', async () => {
+    if (!guard) throw new Error('Expected guard to be registered')
+    mocks.user.value.isSuperuser = true
+    mocks.user.value.permissions = [Permission.NotificationAccess, Permission.DemoRestricted]
+
+    await expect(
+      guard({
+        name: 'settings-notifications',
+        path: '/settings/account/notifications',
+        fullPath: '/settings/account/notifications',
+        meta: {
+          requiredPermission: Permission.NotificationAccess,
+          forbiddenPermission: Permission.DemoRestricted,
+          permissionFallback: 'settings-account-profile',
+        },
+      }),
+    ).resolves.toEqual({ name: 'settings-account-profile' })
   })
 })

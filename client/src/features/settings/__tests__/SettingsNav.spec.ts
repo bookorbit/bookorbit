@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import { computed } from 'vue'
+import { Permission } from '@bookorbit/types'
 import SettingsNav from '../components/SettingsNav.vue'
 
 const permState = {
@@ -76,12 +77,18 @@ describe('SettingsNav', () => {
       expect(labels).toContain('Restrictions')
     })
 
-    it('shows notifications for a normal account', () => {
-      expect(itemLabels(mountNav())).toContain('Notifications')
+    it('hides notifications without notification access', () => {
+      expect(itemLabels(mountNav())).not.toContain('Notifications')
     })
 
-    it('hides notifications for a demo restricted account', () => {
-      expect(itemLabels(mountNav({ demo: true }))).not.toContain('Notifications')
+    it('shows notifications with notification access or superuser status', () => {
+      expect(itemLabels(mountNav({ perms: [Permission.NotificationAccess] }))).toContain('Notifications')
+      expect(itemLabels(mountNav({ su: true }))).toContain('Notifications')
+    })
+
+    it('hides notifications for a demo-restricted account even when otherwise allowed', () => {
+      expect(itemLabels(mountNav({ perms: [Permission.NotificationAccess], demo: true }))).not.toContain('Notifications')
+      expect(itemLabels(mountNav({ su: true, demo: true }))).not.toContain('Notifications')
     })
   })
 
@@ -242,6 +249,8 @@ describe('SettingsNav', () => {
 
     it('never returns a page the user cannot open', async () => {
       expect(await search(mountNav(), 'users')).toEqual([])
+      expect(await search(mountNav(), 'notifications')).toEqual([])
+      expect(await search(mountNav({ perms: [Permission.NotificationAccess] }), 'notifications')).toContain('Notifications')
     })
 
     it('shows an empty state when nothing matches', async () => {

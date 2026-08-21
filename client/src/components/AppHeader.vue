@@ -53,7 +53,7 @@ import NotificationSheet from '@/features/notifications/components/NotificationS
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, type Locale } from '@bookorbit/types'
+import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, Permission, type Locale } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 import { useLocaleStore } from '@/stores/locale'
 import { getFormatColor } from '@/features/book/lib/format-colors'
@@ -108,7 +108,7 @@ function navigateToAchievements() {
 const canChangePassword = computed(
   () => !isDemoRestrictedAccount.value && user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared',
 )
-const canAccessNotifications = computed(() => hasPermission('notification_access') && !isDemoRestrictedAccount.value)
+const canAccessNotifications = computed(() => hasPermission(Permission.NotificationAccess) && !isDemoRestrictedAccount.value)
 const GLOBAL_SEARCH_ROW_HEIGHT = 84
 const GLOBAL_SEARCH_OVERSCAN = 4
 const GLOBAL_SEARCH_VIEWPORT_HEIGHT = 512

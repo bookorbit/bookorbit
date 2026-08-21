@@ -6,6 +6,7 @@ import {
   type RouteLocationNormalizedLoaded,
   type RouteRecordRaw,
 } from 'vue-router'
+import { Permission } from '@bookorbit/types'
 import { normalizeEmailTab } from '@/features/email/lib/email-tabs'
 import { normalizeMetadataTab, type MetadataTab } from '@/features/settings/lib/metadata-tabs'
 import { normalizeReaderTab, type ReaderTab } from '@/features/settings/lib/reader-tabs'
@@ -173,7 +174,12 @@ export const routes: RouteRecordRaw[] = [
             name: 'settings-notifications',
             component: () => import('@/features/notifications/components/NotificationPreferences.vue'),
             props: { embedded: true },
-            meta: { title: () => t('titles.account.notifications') },
+            meta: {
+              requiredPermission: Permission.NotificationAccess,
+              forbiddenPermission: Permission.DemoRestricted,
+              permissionFallback: 'settings-account-profile',
+              title: () => t('titles.account.notifications'),
+            },
           },
           {
             path: 'account/restrictions',

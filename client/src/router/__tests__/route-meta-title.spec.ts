@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteRecordRaw } from 'vue-router'
+import { Permission } from '@bookorbit/types'
 import { routes } from '@/router'
 
 type MissingRoute = {
@@ -45,6 +46,16 @@ describe('router title metadata', () => {
 })
 
 describe('router redirects', () => {
+  it('protects the notification settings route from direct navigation', () => {
+    const route = findRoute(routes, 'settings-notifications')
+
+    expect(route?.meta).toMatchObject({
+      requiredPermission: Permission.NotificationAccess,
+      forbiddenPermission: Permission.DemoRestricted,
+      permissionFallback: 'settings-account-profile',
+    })
+  })
+
   it('redirects the legacy Integrations tab URL to the Readwise page', () => {
     const route = findRoute(routes, 'settings-integrations')
     expect(route?.redirect).toBeTypeOf('function')

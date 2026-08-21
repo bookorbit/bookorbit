@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteRecordRaw } from 'vue-router'
 import { BookMarked, Highlighter, LibraryBig } from '@lucide/vue'
+import { Permission } from '@bookorbit/types'
 import { routes } from '@/router'
 import { SETTINGS_NAV, findSettingsNavItem, firstVisibleSettingsRoute, visibleSettingsNav, type SettingsNavContext } from '../lib/settings-nav'
 
@@ -56,9 +57,29 @@ describe('visibleSettingsNav', () => {
     expect(visibleSettingsNav(SUPERUSER).map((group) => group.id)).toEqual(['you', 'library', 'devices', 'server'])
   })
 
-  it('filters children as well as top level items', () => {
-    const you = visibleSettingsNav({ ...NOBODY, isDemoRestricted: true })[0]
+  it('hides notifications without notification access', () => {
+    const you = visibleSettingsNav(NOBODY)[0]
     expect(you?.items.map((item) => item.id)).not.toContain('notifications')
+  })
+
+  it('shows notifications with notification access or superuser status', () => {
+    const permitted = visibleSettingsNav({ ...NOBODY, permissions: [Permission.NotificationAccess] })[0]
+    const superuser = visibleSettingsNav(SUPERUSER)[0]
+
+    expect(permitted?.items.map((item) => item.id)).toContain('notifications')
+    expect(superuser?.items.map((item) => item.id)).toContain('notifications')
+  })
+
+  it('hides notifications from demo-restricted accounts even when otherwise allowed', () => {
+    const permittedDemo = visibleSettingsNav({
+      ...NOBODY,
+      permissions: [Permission.NotificationAccess],
+      isDemoRestricted: true,
+    })[0]
+    const superuserDemo = visibleSettingsNav({ ...SUPERUSER, isDemoRestricted: true })[0]
+
+    expect(permittedDemo?.items.map((item) => item.id)).not.toContain('notifications')
+    expect(superuserDemo?.items.map((item) => item.id)).not.toContain('notifications')
   })
 
   it('only exposes the metadata pages the permission allows', () => {

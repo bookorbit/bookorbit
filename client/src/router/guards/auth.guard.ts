@@ -3,6 +3,10 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { useSetupStatus } from '@/features/auth/composables/useSetupStatus'
 
+function permissionFallback(name: string | undefined) {
+  return name ? { name } : { path: '/' }
+}
+
 export function registerAuthGuard(router: Router): void {
   router.beforeEach(async (to) => {
     const { fetchSetupStatus, allowRegistration } = useSetupStatus()
@@ -39,6 +43,15 @@ export function registerAuthGuard(router: Router): void {
       useChangePasswordDialog().open(true)
       // Allow navigation to '/' but block everything else
       if (to.path !== '/') return { path: '/' }
+    }
+
+    const permissions = user.value.permissions ?? []
+    if (to.meta.forbiddenPermission && permissions.includes(to.meta.forbiddenPermission)) {
+      return permissionFallback(to.meta.permissionFallback)
+    }
+
+    if (to.meta.requiredPermission && !user.value.isSuperuser && !permissions.includes(to.meta.requiredPermission)) {
+      return permissionFallback(to.meta.permissionFallback)
     }
 
     if (to.name === 'achievements' && user.value.settings.achievementPreferences?.enabled === false) {
