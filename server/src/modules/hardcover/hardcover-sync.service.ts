@@ -18,6 +18,16 @@ import { BookService } from '../book/book.service';
 import { HARDCOVER_STATUS } from './hardcover.constants';
 import { HardcoverBookMatchService } from './hardcover-book-match.service';
 import { HardcoverClientService } from './hardcover-client.service';
+import {
+  attemptOwnedReadId,
+  type HardcoverReadCandidate,
+  type HardcoverReadTarget,
+  readTargetForAttempt,
+  readTargetForBook,
+  type ReadingAttemptForSync,
+  selectAdoptableReadId,
+  selectPrimaryAttempt,
+} from './hardcover-read-selection';
 import { type BookSyncData, HardcoverRepository } from './hardcover.repository';
 import { HardcoverSettingsService } from './hardcover-settings.service';
 import {
@@ -27,6 +37,9 @@ import {
 } from './hardcover-sync-policy';
 
 const LINKED_BOOKS_LIMIT = 200;
+
+// Bounds how many times a lost ownership race may force reselection before the sync mints a new read.
+const MAX_READ_ADOPTION_ROUNDS = 3;
 
 const STATUS_MAP: Partial<Record<ReadStatus, number>> = {
   want_to_read: HARDCOVER_STATUS.WANT_TO_READ,
@@ -108,6 +121,20 @@ type FindUserBookReadsResult = {
 
 export type HardcoverSyncBookResult = 'synced' | 'skipped' | 'failed';
 type HardcoverBookStateSnapshot = Awaited<ReturnType<HardcoverRepository['findBookState']>>;
+
+/** Drizzle hides the driver error - and with it the constraint name - behind `cause`. */
+function describeErrorCause(error: unknown): string {
+  let current: unknown = error instanceof Error ? error.cause : undefined;
+  const seen = new Set<unknown>();
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    const entry = current as { code?: unknown; constraint?: unknown; message?: unknown; cause?: unknown };
+    const parts = [entry.code, entry.constraint, entry.message].filter((part): part is string => typeof part === 'string' && part.length > 0);
+    if (parts.length > 0) return parts.join(' ');
+    current = entry.cause;
+  }
+  return '';
+}
 
 function toDateString(d: Date | null | undefined): string | null {
   if (!d) return null;
@@ -476,20 +503,34 @@ export class HardcoverSyncService {
       let hardcoverReadId: number | null = syncState?.hardcoverReadId ?? null;
       let progressSynced = true;
 
-      if (startDate || endDate || book.progress != null) {
-        if (book.progress != null && !match.editionPages) {
-          throw new Error('missing_edition_pages');
-        }
+      const localAttempts = typeof this.repo.findReadingAttempts === 'function' ? await this.repo.findReadingAttempts(userId, book.bookId) : [];
+      const primaryAttempt = selectPrimaryAttempt(localAttempts);
+      // Every read id already owned on this book, tombstones included, so no attempt adopts one that
+      // reading_attempts_external_uidx would refuse. Grows as this run claims further ids.
+      const reserved = new Set<number>(
+        typeof this.repo.findClaimedHardcoverReadIds === 'function' ? await this.repo.findClaimedHardcoverReadIds(userId, book.bookId) : [],
+      );
+      const historyAttempts = localAttempts.filter(
+        (attempt) => attempt.id !== primaryAttempt?.id && attempt.outcome !== 'skimmed' && attempt.outcome !== 'abandoned',
+      );
+      const syncsPrimaryRead = startDate !== null || endDate !== null || book.progress != null;
+      if (syncsPrimaryRead && book.progress != null && !match.editionPages) {
+        throw new Error('missing_edition_pages');
+      }
+      const reads = syncsPrimaryRead || historyAttempts.length > 0 ? await this.findUserBookReads(userId, token, userBookId) : [];
 
+      if (syncsPrimaryRead) {
         const progressPages = book.progress != null && match.editionPages ? Math.round((book.progress / 100) * match.editionPages) : undefined;
         progressSynced = book.progress == null || progressPages != null;
 
-        const reads = await this.findUserBookReads(userId, token, userBookId);
-        const targetReadId = this.resolveTargetReadId(hardcoverReadId, reads);
-
-        hardcoverReadId = await this.upsertUserBookRead(userId, token, {
+        hardcoverReadId = await this.syncAttemptRead(userId, token, {
           userBookId,
-          existingReadId: targetReadId,
+          attempt: primaryAttempt,
+          // The projection writes the primary attempt's dates onto the book, so the book-level dates
+          // this sync sends are the same dates the read must carry.
+          target: readTargetForBook(startDate, endDate),
+          reads,
+          reserved,
           startedAt: startDate,
           finishedAt: endDate,
           progressPages,
@@ -500,6 +541,7 @@ export class HardcoverSyncService {
           await this.updateAdditionalOpenReads(userId, token, {
             reads,
             primaryReadId: hardcoverReadId,
+            reservedReadIds: reserved,
             startedAt: startDate,
             finishedAt: endDate,
             progressPages,
@@ -512,26 +554,17 @@ export class HardcoverSyncService {
         }
       }
 
-      const localAttempts = typeof this.repo.findReadingAttempts === 'function' ? await this.repo.findReadingAttempts(userId, book.bookId) : [];
-      const primaryAttempt = [...localAttempts].reverse().find((attempt) => {
-        const attemptStarted = attempt.startedOn ?? null;
-        const attemptEnded = attempt.outcome === 'completed' ? (attempt.endedOn ?? null) : null;
-        return attemptStarted === startDate && attemptEnded === endDate;
-      });
-      if (hardcoverReadId != null && primaryAttempt) {
-        await this.repo.linkReadingAttempt(userId, primaryAttempt.id, hardcoverReadId);
-      }
-      for (const attempt of localAttempts) {
-        if (attempt.id === primaryAttempt?.id || attempt.outcome === 'skimmed' || attempt.outcome === 'abandoned') continue;
-        const existingReadId = attempt.externalProvider === 'hardcover' && attempt.externalId ? Number(attempt.externalId) : null;
-        const readId = await this.upsertUserBookRead(userId, token, {
+      for (const attempt of historyAttempts) {
+        await this.syncAttemptRead(userId, token, {
           userBookId,
-          existingReadId: Number.isInteger(existingReadId) ? existingReadId : null,
+          attempt,
+          target: readTargetForAttempt(attempt),
+          reads,
+          reserved,
           startedAt: attempt.startedOn,
           finishedAt: attempt.outcome === 'completed' ? attempt.endedOn : null,
           editionId: match.hardcoverEditionId ?? undefined,
         });
-        if (readId != null) await this.repo.linkReadingAttempt(userId, attempt.id, readId);
       }
 
       await this.repo.upsertBookState({
@@ -559,8 +592,10 @@ export class HardcoverSyncService {
     } catch (err) {
       const errorClass = err instanceof Error ? err.constructor.name : 'Error';
       const error = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      const cause = describeErrorCause(err);
+      const causeField = cause ? ` cause="${sanitizeLogValue(cause)}"` : '';
       this.logger.error(
-        `[hardcover.sync_book] [fail] userId=${userId} bookId=${book.bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}" - sync failed`,
+        `[hardcover.sync_book] [fail] userId=${userId} bookId=${book.bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${error}"${causeField} - sync failed`,
       );
       await this.repo.upsertBookState({
         userId,
@@ -675,19 +710,76 @@ export class HardcoverSyncService {
   }
 
   private async findUserBookReads(userId: number, token: string, userBookId: number): Promise<FindUserBookReadsResult['user_book_reads']> {
-    try {
-      const result = await this.client.query<FindUserBookReadsResult>(userId, token, FIND_USER_BOOK_READS_QUERY, { userBookId });
-      return result.user_book_reads ?? [];
-    } catch {
-      return [];
-    }
+    const result = await this.client.query<FindUserBookReadsResult>(userId, token, FIND_USER_BOOK_READS_QUERY, { userBookId });
+    return result.user_book_reads ?? [];
   }
 
-  private resolveTargetReadId(existingReadId: number | null, reads: FindUserBookReadsResult['user_book_reads']): number | null {
-    const openRead = reads.find((read) => !read.finished_at);
-    if (openRead) return openRead.id;
-    if (existingReadId) return existingReadId;
-    return reads[0]?.id ?? null;
+  /**
+   * Resolves the one Hardcover read that represents `attempt` and writes this sync's values to it.
+   *
+   * Ownership lives on reading_attempts.external_id, never on the book-level cache. An attempt that
+   * already owns a read keeps it; an unlinked attempt may only adopt a read nothing else owns, and
+   * claims it locally before the remote write so a lost race cannot edit another attempt's read.
+   * When nothing is adoptable the sync mints a fresh read rather than sharing an existing one.
+   */
+  private async syncAttemptRead(
+    userId: number,
+    token: string,
+    input: {
+      userBookId: number;
+      attempt: ReadingAttemptForSync | null | undefined;
+      target: HardcoverReadTarget;
+      reads: readonly HardcoverReadCandidate[];
+      reserved: Set<number>;
+      startedAt?: string | null;
+      finishedAt?: string | null;
+      progressPages?: number;
+      editionId?: number;
+    },
+  ): Promise<number | null> {
+    const attempt = input.attempt ?? null;
+    const write = (existingReadId: number | null): Promise<number | null> =>
+      this.upsertUserBookRead(userId, token, {
+        userBookId: input.userBookId,
+        existingReadId,
+        startedAt: input.startedAt,
+        finishedAt: input.finishedAt,
+        progressPages: input.progressPages,
+        editionId: input.editionId,
+      });
+
+    const owned = attempt ? attemptOwnedReadId(attempt) : null;
+    if (owned != null && attempt) {
+      input.reserved.add(owned);
+      const readId = await write(owned);
+      if (readId == null || readId === owned) return readId;
+      // Hardcover answered with a different read, so move the stamp rather than leave it stale.
+      input.reserved.add(readId);
+      if ((await this.repo.linkReadingAttempt(userId, attempt.id, readId)) === 'conflict') {
+        throw new Error('read_link_conflict');
+      }
+      return readId;
+    }
+
+    const excluded = new Set(input.reserved);
+    for (let round = 0; round < MAX_READ_ADOPTION_ROUNDS; round++) {
+      const candidate = selectAdoptableReadId(input.reads, input.target, excluded);
+      if (candidate == null) break;
+      if (attempt && (await this.repo.linkReadingAttempt(userId, attempt.id, candidate)) === 'conflict') {
+        excluded.add(candidate);
+        continue;
+      }
+      input.reserved.add(candidate);
+      return await write(candidate);
+    }
+
+    const created = await write(null);
+    if (created == null) return null;
+    input.reserved.add(created);
+    if (attempt && (await this.repo.linkReadingAttempt(userId, attempt.id, created)) === 'conflict') {
+      throw new Error('read_link_conflict');
+    }
+    return created;
   }
 
   private async updateAdditionalOpenReads(
@@ -696,13 +788,16 @@ export class HardcoverSyncService {
     input: {
       reads: FindUserBookReadsResult['user_book_reads'];
       primaryReadId: number;
+      reservedReadIds: ReadonlySet<number>;
       startedAt?: string | null;
       finishedAt?: string | null;
       progressPages: number;
       editionId?: number;
     },
   ): Promise<void> {
-    const siblingReadIds = input.reads.filter((read) => read.id !== input.primaryReadId && !read.finished_at).map((read) => read.id);
+    const siblingReadIds = input.reads
+      .filter((read) => read.id !== input.primaryReadId && !read.finished_at && !input.reservedReadIds.has(read.id))
+      .map((read) => read.id);
 
     if (siblingReadIds.length === 0) return;
 
