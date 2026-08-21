@@ -50,6 +50,120 @@ assert(BookOrbitState.isMatchFresh(book, state.global, now + MAX_AGE + 1) == fal
 assert(BookOrbitState.isMatchFresh(book, state.global, now - 60) == false,
     "a stamp in the device's future is treated as expired")
 
+-- A routine rematch to the same server book and file must preserve incremental
+-- state; a rematch is the common case and re-uploading on every one would undo
+-- the whole point of the cursors.
+local retained = newState({ libraryVersion = "lib-v1" })
+retained.books["same"] = {
+    bookId = 2,
+    fileId = 11,
+    file = "/books/same.epub",
+    statsWatermark = 900,
+    annWatermark = "2026-01-01 10:00:00",
+    annCount = 3,
+    sidecarMtime = 100,
+    annSignature = "ann-signature",
+    annExchangedAt = 200,
+    bmSignature = "bookmark-signature",
+    bmExchangedAt = 300,
+    progressPushedPct = 0.5,
+    ratingSyncedKnown = true,
+}
+retained:setMatched("same", 11, 2, "/books/same.epub", "lib-v1")
+local retained_book = retained:getBook("same")
+assert(retained_book.fileId == 11 and retained_book.bookId == 2, "an unchanged rematch keeps the server ids")
+assert(retained_book.statsWatermark == 900, "an unchanged rematch preserves the statistics watermark")
+assert(retained_book.annWatermark == "2026-01-01 10:00:00", "an unchanged rematch preserves the annotation watermark")
+assert(retained_book.annCount == 3, "an unchanged rematch preserves the annotation count")
+assert(retained_book.sidecarMtime == 100, "an unchanged rematch preserves the sidecar marker")
+assert(retained_book.annSignature == "ann-signature", "an unchanged rematch preserves the annotation signature")
+assert(retained_book.bmSignature == "bookmark-signature", "an unchanged rematch preserves the bookmark signature")
+assert(retained_book.progressPushedPct == 0.5, "an unchanged rematch preserves the progress marker")
+assert(retained_book.ratingSyncedKnown == true, "an unchanged rematch preserves state acknowledgments")
+
+-- A new server file must not inherit acknowledgments earned against the old
+-- row. Its local file path is the only safe part of the old record.
+local replaced = newState({ libraryVersion = "lib-v2" })
+replaced.books["moved"] = {
+    bookId = 1,
+    fileId = 11,
+    file = "/books/moved.epub",
+    statsWatermark = 900,
+    annWatermark = "2026-01-01 10:00:00",
+    annCount = 3,
+    sidecarMtime = 100,
+    annSignature = "ann-signature",
+    annExchangedAt = 200,
+    bmSignature = "bookmark-signature",
+    bmExchangedAt = 300,
+    progressPushedPct = 0.5,
+    ratingSyncedKnown = true,
+    reviewSyncedKnown = true,
+    statusSyncedModified = "2026-01-01 10:00:00",
+}
+replaced:setMatched("moved", 22, 2, nil, "lib-v2")
+local replaced_book = replaced:getBook("moved")
+assert(replaced_book.fileId == 22 and replaced_book.bookId == 2, "an identity change stores the new server ids")
+assert(replaced_book.file == "/books/moved.epub", "an identity change preserves the local file path")
+assert(replaced_book.statsWatermark == 0, "an identity change resets the statistics watermark")
+assert(replaced_book.annWatermark == "", "an identity change resets the annotation watermark")
+assert(replaced_book.annCount == 0, "an identity change resets the annotation count")
+assert(replaced_book.sidecarMtime == nil, "an identity change expires the sidecar marker")
+assert(replaced_book.annSignature == nil and replaced_book.annExchangedAt == nil,
+    "an identity change expires annotation exchange markers")
+assert(replaced_book.bmSignature == nil and replaced_book.bmExchangedAt == nil,
+    "an identity change expires bookmark exchange markers")
+assert(replaced_book.progressPushedPct == nil, "an identity change expires the progress marker")
+assert(replaced_book.ratingSyncedKnown == nil and replaced_book.reviewSyncedKnown == nil,
+    "an identity change expires rating and review acknowledgments")
+assert(replaced_book.statusSyncedModified == nil, "an identity change expires the status acknowledgment")
+
+-- A server-side folder merge re-parents a file row to another book without
+-- changing its id, taking the old book's highlights, status, rating and review
+-- with it. The file-scoped statistics survive that, but the book-scoped
+-- acknowledgments must not, so a changed book id alone is an identity change.
+local reparented = newState({ libraryVersion = "lib-v1" })
+reparented.books["merged"] = {
+    bookId = 1,
+    fileId = 11,
+    file = "/books/merged.epub",
+    statsWatermark = 900,
+    annWatermark = "2026-01-01 10:00:00",
+    annCount = 3,
+    annSignature = "ann-signature",
+    ratingSyncedKnown = true,
+    reviewSyncedKnown = true,
+    statusSyncedModified = "2026-01-01 10:00:00",
+}
+reparented:setMatched("merged", 11, 2, nil, "lib-v1")
+local reparented_book = reparented:getBook("merged")
+assert(reparented_book.fileId == 11 and reparented_book.bookId == 2, "a re-parented file stores the new book id")
+assert(reparented_book.file == "/books/merged.epub", "a re-parented file preserves the local file path")
+assert(reparented_book.annWatermark == "" and reparented_book.annCount == 0,
+    "a re-parented file resets the annotation cursors")
+assert(reparented_book.annSignature == nil, "a re-parented file expires the annotation signature")
+assert(reparented_book.ratingSyncedKnown == nil and reparented_book.reviewSyncedKnown == nil,
+    "a re-parented file expires rating and review acknowledgments")
+assert(reparented_book.statusSyncedModified == nil, "a re-parented file expires the status acknowledgment")
+assert(reparented_book.statsWatermark == 0,
+    "a re-parented file resets the statistics watermark too, because one record carries both scopes")
+
+-- A legacy matched record without a server file id has no safe cursor scope.
+local unscoped = newState({ libraryVersion = "lib-v1" })
+unscoped.books["legacy-cursor"] = {
+    file = "/books/legacy-cursor.epub",
+    statsWatermark = 700,
+    annWatermark = "2025-01-01 10:00:00",
+}
+unscoped:setMatched("legacy-cursor", 33, 3, nil, "lib-v1")
+assert(unscoped:getBook("legacy-cursor").statsWatermark == 0,
+    "a legacy unscoped statistics cursor is reset on its first match")
+assert(unscoped:getBook("legacy-cursor").annWatermark == "",
+    "a legacy unscoped annotation cursor is reset on its first match")
+
+replaced:setUnmatched("moved")
+assert(replaced:getBook("moved") == nil, "an unmatched response removes the complete matched record")
+
 -- State written before the stamp existed must recheck once, not be trusted.
 local legacy = newState({ libraryVersion = "lib-v1" })
 legacy.books["legacy1"] = { bookId = 3, fileId = 4, file = "/books/legacy.epub" }

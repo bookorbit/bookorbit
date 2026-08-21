@@ -1,5 +1,7 @@
+import { copyFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
-import { and, asc, eq, like } from 'drizzle-orm';
+import { join } from 'path';
+import { and, asc, eq, gte, like } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
 import {
@@ -44,6 +46,7 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
   let ctx!: ReaderStateIsolationE2EContext;
   let library!: CreatedLibrary;
   let epub!: LocatedBookFile;
+  let epubPath!: string;
   let fileHash!: string;
 
   function deviceHeaders(): Record<string, string> {
@@ -137,7 +140,7 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
   beforeAll(async () => {
     ctx = await createReaderStateIsolationE2EContext();
     library = await createLibraryWithFolder(ctx, { name: `koreader-page-stats-${randomUUID()}` });
-    const epubPath = await createEpubFixture(library.folderPath, 'page-stats-book.epub', {
+    epubPath = await createEpubFixture(library.folderPath, 'page-stats-book.epub', {
       title: `Page Stats Book ${randomUUID()}`,
       uid: `urn:uuid:${randomUUID()}`,
     });
@@ -260,5 +263,32 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     expect(pagesFor(grown[0]!.progressDelta)).toBeGreaterThanOrEqual(POWER_HOUR_PAGES);
 
     expect(await waitForAchievement(session!.userId, 'power_hour')).toBe(true);
+  });
+
+  // A file hash is not unique: identical bytes in two places are two book file rows. The resolver
+  // has to land on the same one every time, or a device's statistics split across both and the
+  // plugin sees its sync target move, which discards its local upload cursor.
+  it('resolves a hash shared by two book files to the same row on every upload', async () => {
+    const duplicatePath = join(library.folderPath, 'page-stats-book-copy.epub');
+    await copyFile(epubPath, duplicatePath);
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+
+    const sharing = await ctx.db
+      .select({ id: schema.bookFiles.id })
+      .from(schema.bookFiles)
+      .where(eq(schema.bookFiles.fileHash, fileHash))
+      .orderBy(asc(schema.bookFiles.id));
+    expect(sharing.length).toBeGreaterThan(1);
+    expect(sharing[0]!.id).toBe(epub.bookFileId);
+
+    const firstStart = BASE_EPOCH + 20_000_000;
+    await uploadPageStats([{ page: 1, startTime: firstStart, durationSeconds: 55, totalPages: TOTAL_PAGES }]);
+    await uploadPageStats([{ page: 2, startTime: firstStart + 60, durationSeconds: 55, totalPages: TOTAL_PAGES }]);
+
+    const targets = await ctx.db
+      .selectDistinct({ bookFileId: schema.koreaderPageStats.bookFileId })
+      .from(schema.koreaderPageStats)
+      .where(and(eq(schema.koreaderPageStats.deviceId, DEVICE_ID), gte(schema.koreaderPageStats.startTime, firstStart)));
+    expect(targets.map((row) => row.bookFileId)).toEqual([epub.bookFileId]);
   });
 });

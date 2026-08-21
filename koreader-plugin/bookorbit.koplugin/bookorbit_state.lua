@@ -82,13 +82,20 @@ function BookOrbitState:matchedFileMaps()
 end
 
 -- Every match-producing path funnels through here (lifecycle drain, open-book
--- match, sweep and the bulk manifest link), so this is the only place that can
--- stamp match freshness without leaving some path silently unfresh. The token
--- the match was verified against is stored alongside the time: without it a
--- single library change would force a request on every later book sync until
--- the user ran a full sweep.
+-- match, sweep and the bulk manifest link). A different server book or file is
+-- a fresh sync target even when the local digest is unchanged, so only its
+-- local path may survive that transition. Both ids are checked because the
+-- cursors below are split across them: reading statistics hang off the file
+-- row, while highlights, status, rating and review hang off the book row, and a
+-- folder merge re-parents a file to another book without changing its id. The
+-- token the match was verified against is stored alongside the time so one
+-- library change does not force a request on every later book sync until the
+-- user runs a full sweep.
 function BookOrbitState:setMatched(md5, book_file_id, book_id, file, verified_version)
-    local book = self.books[md5] or {}
+    local previous = self.books[md5]
+    local identity_changed = previous ~= nil
+        and (previous.fileId ~= book_file_id or previous.bookId ~= book_id)
+    local book = identity_changed and { file = file or previous.file } or (previous or {})
     book.fileId = book_file_id
     book.bookId = book_id
     book.file = file or book.file

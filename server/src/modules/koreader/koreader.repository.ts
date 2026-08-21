@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, notExists, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notExists, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { chunk } from '../../common/utils/batch.utils';
@@ -78,6 +78,10 @@ export class KoreaderRepository {
     await this.db.delete(schema.koreaderUsers).where(eq(schema.koreaderUsers.userId, userId));
   }
 
+  // A file hash is not unique: the same content in two places is two book file rows, and one
+  // historical hash can belong to several of them. The oldest row wins so a hash always resolves
+  // to the same target, both across requests and between this and resolveBookFilesByHashes. An
+  // unordered pick would move a device's sync target under it and strand data on the loser.
   async resolveBookFileByHash(hash: string, accessibleLibraryIds: number[] | null, userId?: number): Promise<ResolvedBookFileByHash | null> {
     if (accessibleLibraryIds !== null && accessibleLibraryIds.length === 0) return null;
 
@@ -88,6 +92,7 @@ export class KoreaderRepository {
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
       .where(and(eq(schema.bookFiles.fileHash, hash), libraryFilter))
+      .orderBy(asc(schema.bookFiles.id))
       .limit(1);
 
     if (byFileHash) return byFileHash;
@@ -98,6 +103,7 @@ export class KoreaderRepository {
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
       .where(and(eq(schema.bookFileHashHistory.fileHash, hash), libraryFilter))
+      .orderBy(asc(schema.bookFiles.id))
       .limit(1);
 
     if (byFileHashHistory) return byFileHashHistory;
@@ -138,7 +144,8 @@ export class KoreaderRepository {
       })
       .from(schema.bookFiles)
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
-      .where(and(inArray(schema.bookFiles.fileHash, hashes), libraryFilter));
+      .where(and(inArray(schema.bookFiles.fileHash, hashes), libraryFilter))
+      .orderBy(asc(schema.bookFiles.id));
 
     for (const row of direct) {
       if (row.hash && !result.has(row.hash)) {
@@ -160,7 +167,8 @@ export class KoreaderRepository {
       .from(schema.bookFileHashHistory)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.bookFileHashHistory.bookFileId))
       .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
-      .where(and(inArray(schema.bookFileHashHistory.fileHash, missing), libraryFilter));
+      .where(and(inArray(schema.bookFileHashHistory.fileHash, missing), libraryFilter))
+      .orderBy(asc(schema.bookFiles.id));
 
     for (const row of history) {
       if (!result.has(row.hash)) {

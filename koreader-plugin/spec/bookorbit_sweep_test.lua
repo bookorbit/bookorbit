@@ -167,6 +167,72 @@ do
         "a candidate-less matched book with no stamp is refreshed by the sweep")
 end
 
+-- A library recreation can replace a server file without an intervening
+-- unmatched response. The rematch must reset the old target's cursor before
+-- the statistics queue is built, then retain the new server acknowledgment.
+do
+    local state = {
+        books = {
+            aaa = {
+                bookId = 1,
+                fileId = 11,
+                file = "/books/a.epub",
+                statsWatermark = 1000,
+                annWatermark = "2026-01-01 10:00:00",
+                annCount = 2,
+                sidecarMtime = 100,
+                matchVerifiedAt = NOW - 2 * DAY,
+                matchVerifiedVersion = "v1",
+            },
+        },
+        global = { libraryVersion = "v1" },
+    }
+    local harness = SweepHarness.install{
+        books = { { md5 = "aaa", id = 1, title = "A", last_open = 100 } },
+        events = { [1] = { { page = 4, start_time = 500 } } },
+        library_version = "v2",
+        matches = { aaa = { bookId = 2, bookFileId = 22 } },
+        state = state,
+        sidecar = {
+            sidecarMtime = function() return 100 end,
+            extract = function()
+                return {
+                    annotations = { { datetime = "2025-01-01 10:00:00", text = "A highlight" } },
+                    annotations_count = 1,
+                    annotations_max_datetime = "2025-01-01 10:00:00",
+                    annotations_signature = "new-signature",
+                    bookmarks = {},
+                    bookmarks_signature = "empty-bookmarks",
+                }
+            end,
+        },
+        page_stats_response = function(books)
+            return {
+                results = { { hash = books[1].hash, watermark = books[1].events[1].startTime } },
+                unmatched = {},
+            }
+        end,
+    }
+    local Sweep = require("bookorbit_sweep")
+
+    startSweep(harness, Sweep)
+    harness.scheduler:drain()
+
+    assertEqual(#harness.calls.page_stats, 1, "a replacement server file receives historical reading data")
+    assertEqual(#harness.calls.page_stats[1][1].events, 1, "the historical event is included in the upload")
+    assertEqual(harness.calls.page_stats[1][1].events[1].startTime, 500, "the event predates the old target's watermark")
+    assertEqual(harness.state.books.aaa.fileId, 22, "the replacement server file id is stored")
+    assertEqual(harness.state.books.aaa.statsWatermark, 500, "the replacement target stores the acknowledged watermark")
+    assertEqual(#harness.calls.annotation_exchanges, 1, "a replacement server file forces an annotation exchange")
+    assertEqual(#harness.calls.annotation_exchanges[1].annotations, 1, "the replacement exchange carries the local annotation")
+    assertEqual(harness.state.books.aaa.sidecarMtime, 100, "the replacement target stores the newly delivered sidecar marker")
+
+    startSweep(harness, Sweep)
+    harness.scheduler:drain()
+    assertEqual(#harness.calls.page_stats, 1, "the acknowledged history is not uploaded again")
+    assertEqual(#harness.calls.annotation_exchanges, 1, "the acknowledged sidecar is not exchanged again")
+end
+
 -- Cancellation stops the run at its next yield: the step already scheduled
 -- runs, sees it is no longer the current generation and writes nothing.
 do
