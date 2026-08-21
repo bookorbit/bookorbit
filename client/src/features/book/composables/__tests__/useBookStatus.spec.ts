@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/api', () => ({ api: mocks.api }))
 
-import { useBookStatus } from '../useBookStatus'
+import { ReadStatusUpdateError, useBookStatus } from '../useBookStatus'
 
 describe('useBookStatus', () => {
   beforeEach(() => {
@@ -72,5 +72,19 @@ describe('useBookStatus', () => {
     ;(mocks.api as Mock).mockResolvedValue({ ok: false, status: 400 } as Response)
     const { setStatus } = useBookStatus()
     await expect(setStatus(2, 'read')).rejects.toThrow('HTTP 400')
+  })
+
+  it('preserves stable server error codes on failed updates', async () => {
+    ;(mocks.api as Mock).mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ errorCode: 'READING_DATES_INVALID_ORDER' }),
+    } as Response)
+    const { updateStatus } = useBookStatus()
+
+    const error = await updateStatus(2, { startedAt: '2026-02-02' }).catch((reason: unknown) => reason)
+
+    expect(error).toBeInstanceOf(ReadStatusUpdateError)
+    expect(error).toMatchObject({ message: 'HTTP 400', errorCode: 'READING_DATES_INVALID_ORDER' })
   })
 })

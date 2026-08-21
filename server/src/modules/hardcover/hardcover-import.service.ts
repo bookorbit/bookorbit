@@ -186,10 +186,18 @@ export class HardcoverImportService {
               });
             }
           }
+          // want_to_read cannot carry lifecycle dates, and an unfinished status cannot carry a finish
+          // date. The imported reads above already hold the real dates either way.
+          const clearsLifecycle = row.importedStatus === 'want_to_read';
+          const isActiveStatus = row.importedStatus === 'reading' || row.importedStatus === 'on_hold';
           await this.userBookStatusService.updateManual(user.id, row.localBookId, {
             status: row.importedStatus,
-            startedAt: toDate(row.importedStartedAt),
-            finishedAt: toDate(row.importedFinishedAt),
+            ...(clearsLifecycle
+              ? {}
+              : {
+                  startedAt: toDate(row.importedStartedAt),
+                  finishedAt: isActiveStatus ? null : toDate(row.importedFinishedAt),
+                }),
           });
 
           const progressImported = await this.applyProgressIfRequested(user.id, row, importProgress, startedAt);

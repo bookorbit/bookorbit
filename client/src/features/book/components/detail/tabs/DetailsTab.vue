@@ -532,8 +532,17 @@ function validateReadingDates(values: { startedAt: string; finishedAt: string })
   const { startedAt, finishedAt } = values
   if (startedAt && startedAt > todayDateInput.value) return t('book.detail.details.dateStartedFutureError')
   if (finishedAt && finishedAt > todayDateInput.value) return t('book.detail.details.dateFinishedFutureError')
-  if (startedAt && finishedAt && finishedAt < startedAt) return t('book.detail.details.dateFinishedBeforeStartedError')
+  if (startedAt && finishedAt && finishedAt < startedAt)
+    return t('book.detail.details.dateFinishedBeforeStartedErrorWithDate', { date: formatDisplayDate(startedAt) })
   return null
+}
+
+function readingDateSaveError(error: unknown): string {
+  const errorCode = typeof error === 'object' && error !== null && 'errorCode' in error ? (error as { errorCode?: unknown }).errorCode : null
+  if (errorCode === 'READING_DATE_STARTED_IN_FUTURE') return t('book.detail.details.dateStartedFutureError')
+  if (errorCode === 'READING_DATE_FINISHED_IN_FUTURE') return t('book.detail.details.dateFinishedFutureError')
+  if (errorCode === 'READING_DATES_INVALID_ORDER') return t('book.detail.details.dateFinishedBeforeStartedError')
+  return t('book.detail.details.saveReadingDatesError')
 }
 
 const isEditingAnyReadingDate = computed(() => activeReadingDateField.value !== null)
@@ -624,8 +633,8 @@ async function saveReadingDateField(field: 'startedAt' | 'finishedAt') {
     const updatedReadStatus = await updateStatus(props.book.id, patch)
     applyReadStatusUpdate(updatedReadStatus)
     activeReadingDateField.value = null
-  } catch {
-    readingDatesError.value = t('book.detail.details.saveReadingDatesError')
+  } catch (error) {
+    readingDatesError.value = readingDateSaveError(error)
   } finally {
     savingReadingDates.value = false
   }

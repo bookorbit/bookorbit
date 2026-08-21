@@ -76,9 +76,10 @@ export class UserBookStatusService {
         hasStartedAt ? (dateKeys?.startedOn ?? patch.startedAt?.toISOString().slice(0, 10) ?? null) : undefined,
         hasFinishedAt ? (dateKeys?.endedOn ?? patch.finishedAt?.toISOString().slice(0, 10) ?? null) : undefined,
         today,
+        { statusWasExplicit: hasStatus },
       );
       const previousStatus = existing?.status ?? null;
-      const statusChanged = hasStatus && updated.status !== previousStatus;
+      const statusChanged = updated.status !== (previousStatus ?? 'unread');
       if (statusChanged) {
         this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
           userId,

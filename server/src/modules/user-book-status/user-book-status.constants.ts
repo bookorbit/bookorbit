@@ -4,6 +4,13 @@ export const READ_STATUSES: readonly ReadStatus[] = ['unread', 'want_to_read', '
 
 export const READ_STATUS_SOURCES: readonly ReadStatusSource[] = ['auto', 'manual'];
 
+export const READING_DATE_ERROR_CODES = {
+  invalidOrder: 'READING_DATES_INVALID_ORDER',
+  startedInFuture: 'READING_DATE_STARTED_IN_FUTURE',
+  finishedInFuture: 'READING_DATE_FINISHED_IN_FUTURE',
+  statusConflict: 'READING_DATES_STATUS_CONFLICT',
+} as const;
+
 const READ_STATUS_SET = new Set<ReadStatus>(READ_STATUSES);
 const READ_STATUS_SOURCE_SET = new Set<ReadStatusSource>(READ_STATUS_SOURCES);
 

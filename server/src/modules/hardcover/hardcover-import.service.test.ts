@@ -512,6 +512,29 @@ describe('HardcoverImportService', () => {
     expect(mockRepo.upsertImportProgress).not.toHaveBeenCalled();
   });
 
+  it('imports a want-to-read row that still carries a start date', async () => {
+    mockClient.query.mockResolvedValue({
+      me: [
+        {
+          user_books: [
+            hardcoverBook({
+              status_id: 1,
+              user_book_status: { status: 'Want to Read' },
+              last_read_date: null,
+              user_book_reads: [{ id: 504, started_at: '2024-01-02', finished_at: null, progress: 0, progress_pages: null, progress_seconds: null }],
+            }),
+          ],
+        },
+      ],
+    });
+
+    const result = await makeService().applyImport(user as never);
+
+    expect(result.applied).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(mockUserBookStatusService.updateManual).toHaveBeenCalledWith(7, 42, { status: 'want_to_read' });
+  });
+
   it('imports Hardcover progress when requested and local progress is blank', async () => {
     const result = await makeService().applyImport(user as never, { hardcoverUserBookIds: [1000], importProgress: true });
 

@@ -189,6 +189,28 @@ describe('ReadingLogHero', () => {
     expect(wrapper.emitted('saved')?.[0]).toEqual([updated])
   })
 
+  it('allows a finish date to complete an unread book', async () => {
+    const updated = makeReadStatus({ status: 'read', startedAt: null, finishedAt: '2026-04-20' })
+    mocks.updateStatus.mockResolvedValue(updated)
+    const wrapper = mountHero(makeBook({ readStatus: makeReadStatus({ status: 'unread', startedAt: null, finishedAt: null }) }))
+    await flushPromises()
+
+    const finishButton = wrapper
+      .findAll('button')
+      .filter((button) => button.text() === 'Not set')
+      .at(-1)
+    expect(finishButton).toBeDefined()
+    await finishButton!.trigger('click')
+    await wrapper.find('input[type="date"]').setValue('2026-04-20')
+    await wrapper.find('input[type="date"]').trigger('blur')
+    await flushPromises()
+
+    expect(mocks.updateStatus).toHaveBeenCalledWith(10, { finishedAt: '2026-04-20' })
+    expect(wrapper.text()).toContain('Read')
+    expect(wrapper.text()).toContain('Apr 20, 2026')
+    expect(wrapper.emitted('saved')?.[0]).toEqual([updated])
+  })
+
   it('validates lifecycle dates before saving', async () => {
     const wrapper = mountHero()
     await flushPromises()
@@ -216,7 +238,7 @@ describe('ReadingLogHero', () => {
     await invalidWrapper.find('input[type="date"]').trigger('blur')
     await flushPromises()
 
-    expect(invalidWrapper.text()).toContain('Finish date must be on or after the start date.')
+    expect(invalidWrapper.text()).toContain('Finish date must be on or after the start date (Apr 1, 2026).')
 
     mocks.updateStatus.mockRejectedValue(new Error('save failed'))
     const failedWrapper = mountHero()
@@ -229,6 +251,20 @@ describe('ReadingLogHero', () => {
     await flushPromises()
 
     expect(failedWrapper.text()).toContain('Failed to save reading dates.')
+  })
+
+  it('maps stable server date errors to localized copy', async () => {
+    mocks.updateStatus.mockRejectedValue(Object.assign(new Error('rejected'), { errorCode: 'READING_DATE_STARTED_IN_FUTURE' }))
+    const wrapper = mountHero()
+    await flushPromises()
+
+    const startButton = wrapper.findAll('button').find((button) => button.text() === 'Apr 1, 2026')
+    await startButton!.trigger('click')
+    await wrapper.find('input[type="date"]').setValue('2026-04-02')
+    await wrapper.find('input[type="date"]').trigger('blur')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Start date cannot be in the future.')
   })
 
   it('closes lifecycle date editing when unchanged or canceled', async () => {

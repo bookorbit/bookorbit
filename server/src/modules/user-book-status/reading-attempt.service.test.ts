@@ -22,9 +22,36 @@ type Row = {
 function makeFakeRepo() {
   const rows: Row[] = [];
   let nextId = 1;
-  const projections: Array<{ status: ReadStatus }> = [];
+  const transactionContext = {};
+  const projections: Array<{
+    status: ReadStatus;
+    source: 'manual' | 'auto';
+    startedAt: Date | null;
+    finishedAt: Date | null;
+  }> = [];
+
+  function assertValidAttempt(candidate: Pick<Row, 'userId' | 'bookId' | 'startedOn' | 'endedOn' | 'outcome' | 'deletedAt'>, excludedId?: number) {
+    if (candidate.endedOn !== null && candidate.outcome === null) {
+      throw new Error('reading_attempts_closed_has_outcome_chk');
+    }
+    if (candidate.startedOn !== null && candidate.endedOn !== null && candidate.endedOn < candidate.startedOn) {
+      throw new Error('reading_attempts_end_after_start_chk');
+    }
+    if (candidate.outcome === null && candidate.deletedAt === null) {
+      const duplicateActive = rows.some(
+        (row) =>
+          row.id !== excludedId &&
+          row.userId === candidate.userId &&
+          row.bookId === candidate.bookId &&
+          row.outcome === null &&
+          row.deletedAt === null,
+      );
+      if (duplicateActive) throw new Error('reading_attempts_one_active_uidx');
+    }
+  }
+
   const repo = {
-    transaction: vi.fn((callback: (tx: object) => Promise<unknown>) => callback({})),
+    transaction: vi.fn((callback: (tx: object) => Promise<unknown>) => callback(transactionContext)),
     findActive: vi.fn((_tx: object, userId: number, bookId: number) =>
       Promise.resolve(rows.find((row) => row.userId === userId && row.bookId === bookId && row.outcome === null && row.deletedAt === null)),
     ),
@@ -52,6 +79,7 @@ function makeFakeRepo() {
           createdAt: now,
           updatedAt: now,
         };
+        assertValidAttempt(row);
         rows.push(row);
         return Promise.resolve(row);
       },
@@ -74,10 +102,11 @@ function makeFakeRepo() {
     update: vi.fn((_tx: object, userId: number, bookId: number, id: number, patch: Partial<Row>) => {
       const row = rows.find((item) => item.id === id && item.userId === userId && item.bookId === bookId && item.deletedAt === null);
       if (!row) return Promise.resolve(null);
+      assertValidAttempt({ ...row, ...patch }, row.id);
       Object.assign(row, patch, { updatedAt: new Date('2026-07-12T12:00:00.000Z') });
       return Promise.resolve(row);
     }),
-    project: vi.fn((_tx: object, _userId: number, _bookId: number, projection: { status: ReadStatus }) => {
+    project: vi.fn((_tx: object, _userId: number, _bookId: number, projection: (typeof projections)[number]) => {
       projections.push(projection);
       return Promise.resolve();
     }),
@@ -96,7 +125,7 @@ function makeFakeRepo() {
     }),
     list: vi.fn(() => Promise.resolve({ items: [], total: 0 })),
   };
-  return { repo, rows, projections };
+  return { repo, rows, projections, transactionContext };
 }
 
 describe('ReadingAttemptService', () => {
@@ -240,6 +269,198 @@ describe('ReadingAttemptService', () => {
     expect(second.status).toBe('read');
   });
 
+  describe('manual lifecycle dates without an explicit status', () => {
+    it.each(['unread', 'want_to_read'] as const)('opens a reading attempt when a start date is set from %s', async (status) => {
+      const result = await service.applyManualStatus(1, 10, status, '2026-01-10', undefined, '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-01-10', endedOn: null, outcome: null, origin: 'manual' });
+      expect(result).toMatchObject({ status: 'reading', startedAt: '2026-01-10', finishedAt: null });
+      expect(fake.projections.at(-1)).toMatchObject({ status: 'reading', startedAt: new Date('2026-01-10T00:00:00.000Z'), finishedAt: null });
+    });
+
+    it('creates a completed attempt when both dates are set on an unread book', async () => {
+      const result = await service.applyManualStatus(1, 10, 'unread', '2026-01-10', '2026-02-01', '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-01-10', endedOn: '2026-02-01', outcome: 'completed', origin: 'manual' });
+      expect(result).toMatchObject({ status: 'read', startedAt: '2026-01-10', finishedAt: '2026-02-01' });
+    });
+
+    it('creates a completed attempt with an unknown start when only a finish date is set', async () => {
+      const result = await service.applyManualStatus(1, 10, 'unread', undefined, '2026-02-01', '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.rows[0]).toMatchObject({ startedOn: null, endedOn: '2026-02-01', outcome: 'completed' });
+      expect(result).toMatchObject({ status: 'read', startedAt: null, finishedAt: '2026-02-01' });
+    });
+
+    it.each(['reading', 'rereading', 'on_hold'] as const)('completes an active %s attempt when a finish date is set', async (status) => {
+      if (status === 'rereading') {
+        await fake.repo.create(
+          {},
+          {
+            userId: 1,
+            bookId: 10,
+            startedOn: '2025-01-01',
+            endedOn: '2025-01-10',
+            outcome: 'completed',
+            origin: 'manual',
+          },
+        );
+      }
+      await fake.repo.createActive({}, { userId: 1, bookId: 10, startedOn: '2026-01-10', origin: 'manual' });
+
+      const result = await service.applyManualStatus(1, 10, status, undefined, '2026-02-01', '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows.at(-1)).toMatchObject({ startedOn: '2026-01-10', endedOn: '2026-02-01', outcome: 'completed' });
+      expect(result).toMatchObject({ status: 'read', startedAt: '2026-01-10', finishedAt: '2026-02-01' });
+      expect(fake.projections.at(-1)?.status).toBe('read');
+    });
+
+    it('clears a completed attempt finish date without reopening it', async () => {
+      await fake.repo.create(
+        {},
+        {
+          userId: 1,
+          bookId: 10,
+          startedOn: '2026-01-10',
+          endedOn: '2026-02-01',
+          outcome: 'completed',
+          origin: 'manual',
+        },
+      );
+
+      const result = await service.applyManualStatus(1, 10, 'read', undefined, null, '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows[0]).toMatchObject({ endedOn: null, outcome: 'completed' });
+      expect(result).toMatchObject({ status: 'read', startedAt: '2026-01-10', finishedAt: null });
+      expect(fake.rows.filter((row) => row.outcome === null)).toHaveLength(0);
+    });
+
+    it('edits the start date of the latest completed attempt without reopening it', async () => {
+      await fake.repo.create(
+        {},
+        {
+          userId: 1,
+          bookId: 10,
+          startedOn: '2026-01-10',
+          endedOn: '2026-02-01',
+          outcome: 'completed',
+          origin: 'manual',
+        },
+      );
+
+      const result = await service.applyManualStatus(1, 10, 'read', '2026-01-05', undefined, '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-01-05', endedOn: '2026-02-01', outcome: 'completed' });
+      expect(result).toMatchObject({ status: 'read', startedAt: '2026-01-05', finishedAt: '2026-02-01' });
+    });
+
+    it('treats clearing absent dates without an attempt as a no-op', async () => {
+      const result = await service.applyManualStatus(1, 10, 'unread', null, null, '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows).toHaveLength(0);
+      expect(fake.repo.create).not.toHaveBeenCalled();
+      expect(fake.repo.createActive).not.toHaveBeenCalled();
+      expect(fake.repo.update).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: 'unread', startedAt: null, finishedAt: null });
+    });
+
+    it('validates the resolved attempt before changing an existing date', async () => {
+      await fake.repo.create(
+        {},
+        {
+          userId: 1,
+          bookId: 10,
+          startedOn: '2026-01-10',
+          endedOn: '2026-02-01',
+          outcome: 'completed',
+          origin: 'manual',
+        },
+      );
+
+      await expect(
+        service.applyManualStatus(1, 10, 'read', '2026-02-02', undefined, '2026-07-12', { statusWasExplicit: false }),
+      ).rejects.toMatchObject({ response: { errorCode: 'READING_DATES_INVALID_ORDER' } });
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-01-10', endedOn: '2026-02-01', outcome: 'completed' });
+      expect(fake.repo.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an explicit active status combined with a finish date before writing', async () => {
+      await expect(service.applyManualStatus(1, 10, 'reading', '2026-01-10', '2026-02-01', '2026-07-12')).rejects.toMatchObject({
+        response: { errorCode: 'READING_DATES_STATUS_CONFLICT' },
+      });
+
+      expect(fake.rows).toHaveLength(0);
+    });
+
+    it('creates one completed attempt for an explicit read status with both dates', async () => {
+      const result = await service.applyManualStatus(1, 10, 'read', '2026-01-10', '2026-02-01', '2026-07-12');
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-01-10', endedOn: '2026-02-01', outcome: 'completed' });
+      expect(result).toMatchObject({ status: 'read', startedAt: '2026-01-10', finishedAt: '2026-02-01' });
+    });
+
+    it('completes an abandoned attempt when a finish date is set', async () => {
+      await fake.repo.create({}, { userId: 1, bookId: 10, startedOn: '2026-01-10', endedOn: '2026-01-20', outcome: 'abandoned', origin: 'manual' });
+
+      const result = await service.applyManualStatus(1, 10, 'abandoned', undefined, '2026-02-01', '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-01-10', endedOn: '2026-02-01', outcome: 'completed' });
+      expect(result).toMatchObject({ status: 'read', startedAt: '2026-01-10', finishedAt: '2026-02-01' });
+    });
+
+    it('mutates and projects in one repository transaction', async () => {
+      await service.applyManualStatus(1, 10, 'unread', '2026-01-10', '2026-02-01', '2026-07-12', {
+        statusWasExplicit: false,
+      });
+
+      expect(fake.repo.transaction).toHaveBeenCalledOnce();
+      expect(fake.repo.create).toHaveBeenCalledWith(fake.transactionContext, expect.any(Object));
+      expect(fake.repo.project).toHaveBeenCalledWith(fake.transactionContext, 1, 10, expect.objectContaining({ status: 'read' }));
+    });
+  });
+
+  describe('lifecycle-clearing projections', () => {
+    it.each(['unread', 'want_to_read'] as const)('keeps %s free of lifecycle dates it cannot own', async (status) => {
+      await service.applyManualStatus(1, 10, 'read', '2026-01-10', '2026-02-01', '2026-07-12');
+
+      const result = await service.applyManualStatus(1, 10, status, undefined, undefined, '2026-07-12');
+
+      expect(result).toMatchObject({ status, startedAt: null, finishedAt: null });
+      expect(fake.projections.at(-1)).toMatchObject({ status, startedAt: null, finishedAt: null });
+      expect(fake.rows[0]).toMatchObject({ startedOn: '2026-01-10', endedOn: '2026-02-01', outcome: 'completed' });
+    });
+
+    it('does not project a historical attempt onto a book the reader marked unread', async () => {
+      fake.repo.findStatus.mockResolvedValue({ status: 'unread' });
+
+      await service.createHistorical(1, 10, { startedOn: '2026-01-10', endedOn: '2026-02-01', outcome: 'completed' });
+
+      expect(fake.projections.at(-1)).toMatchObject({ status: 'unread', startedAt: null, finishedAt: null });
+    });
+  });
+
   it('edits the latest completed dates without creating another completion', async () => {
     await service.applyManualStatus(1, 10, 'read', '2026-01-01', '2026-01-10', '2026-07-12');
     const result = await service.applyManualStatus(1, 10, 'read', undefined, '2026-01-12', '2026-07-12');
@@ -346,12 +567,13 @@ describe('ReadingAttemptService', () => {
       expect(active.endedOn).toBe('2026-07-12');
     });
 
-    it('leaves an explicitly supplied end date untouched for upstream validation', async () => {
+    it('rejects an explicitly supplied end date before the active start date', async () => {
       const active = await fake.repo.createActive({}, { userId: 1, bookId: 10, startedOn: '2026-11-01', origin: 'kobo' });
 
-      await service.applyManualStatus(1, 10, 'read', undefined, '2026-07-12', '2026-07-12');
+      await expect(service.applyManualStatus(1, 10, 'read', undefined, '2026-07-12', '2026-07-12')).rejects.toBeInstanceOf(BadRequestException);
 
-      expect(active.endedOn).toBe('2026-07-12');
+      expect(active).toMatchObject({ startedOn: '2026-11-01', endedOn: null, outcome: null });
+      expect(fake.repo.update).not.toHaveBeenCalled();
     });
   });
 });

@@ -348,7 +348,7 @@ describe('DetailsTab - present state', () => {
     await finishedInput.setValue('2026-04-05')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Date Finished must be on or after Date Started.')
+    expect(wrapper.text()).toContain('Date Finished must be on or after Date Started (Apr 10, 2026).')
     const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Save')
     expect(saveButton?.exists()).toBe(true)
     await saveButton!.trigger('click')

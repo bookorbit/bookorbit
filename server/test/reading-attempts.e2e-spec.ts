@@ -627,4 +627,84 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
 
     expect(sync?.attemptsUpdatedAt ?? null).toBeNull();
   });
+
+  it('26. lets lifecycle dates create and complete attempts through the status API', async () => {
+    const startedOnly = await createBook();
+    const startResponse = await patchStatus(startedOnly.bookId, { startedAt: '2026-01-10' });
+    expect(startResponse.statusCode).toBe(200);
+    expect(startResponse.json()).toMatchObject({ status: 'reading', startedAt: '2026-01-10', finishedAt: null });
+    expect((await listAttempts(startedOnly.bookId)).items).toEqual([
+      expect.objectContaining({ startedOn: '2026-01-10', endedOn: null, outcome: null, origin: 'manual' }),
+    ]);
+
+    const bothDates = await createBook();
+    const bothResponse = await patchStatus(bothDates.bookId, { startedAt: '2026-02-01', finishedAt: '2026-02-10' });
+    expect(bothResponse.statusCode).toBe(200);
+    expect(bothResponse.json()).toMatchObject({ status: 'read', startedAt: '2026-02-01', finishedAt: '2026-02-10' });
+    expect((await listAttempts(bothDates.bookId)).items).toEqual([
+      expect.objectContaining({ startedOn: '2026-02-01', endedOn: '2026-02-10', outcome: 'completed', origin: 'manual' }),
+    ]);
+  });
+
+  it('27. closes active lifecycle states with a date-only finish patch', async () => {
+    for (const status of ['reading', 'rereading', 'on_hold'] as const) {
+      const book = await createBook();
+      if (status === 'rereading') {
+        await patchStatus(book.bookId, { status: 'read', startedAt: '2025-01-01', finishedAt: '2025-01-10' });
+      }
+      await patchStatus(book.bookId, { status, startedAt: '2026-03-01' });
+
+      const response = await patchStatus(book.bookId, { finishedAt: '2026-03-10' });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ status: 'read', startedAt: '2026-03-01', finishedAt: '2026-03-10' });
+      const history = await listAttempts(book.bookId);
+      expect(history.items[0]).toMatchObject({ startedOn: '2026-03-01', endedOn: '2026-03-10', outcome: 'completed' });
+      expect(history.items.filter((attempt) => attempt.outcome === null)).toHaveLength(0);
+    }
+  });
+
+  it('28. preserves completion when its finish date is cleared', async () => {
+    const book = await createBook();
+    await patchStatus(book.bookId, { status: 'read', startedAt: '2026-04-01', finishedAt: '2026-04-10' });
+
+    const response = await patchStatus(book.bookId, { finishedAt: null });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: 'read', startedAt: '2026-04-01', finishedAt: null });
+    expect((await listAttempts(book.bookId)).items).toEqual([
+      expect.objectContaining({ startedOn: '2026-04-01', endedOn: null, outcome: 'completed' }),
+    ]);
+  });
+
+  it('30. keeps a lifecycle-clearing status free of dates it cannot own', async () => {
+    const book = await createBook();
+    await patchStatus(book.bookId, { status: 'unread' });
+
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${book.bookId}/reading-attempts`,
+      headers: auth(ctx.adminToken),
+      payload: { startedOn: '2026-06-01', endedOn: '2026-06-10', outcome: 'completed' },
+    });
+    expect(created.statusCode).toBe(201);
+
+    const [projected] = await ctx.db
+      .select({ status: schema.userBookStatus.status, startedAt: schema.userBookStatus.startedAt, finishedAt: schema.userBookStatus.finishedAt })
+      .from(schema.userBookStatus)
+      .where(and(eq(schema.userBookStatus.userId, adminUserId), eq(schema.userBookStatus.bookId, book.bookId)))
+      .limit(1);
+
+    expect(projected).toMatchObject({ status: 'unread', startedAt: null, finishedAt: null });
+    expect((await listAttempts(book.bookId)).items[0]).toMatchObject({ startedOn: '2026-06-01', endedOn: '2026-06-10', outcome: 'completed' });
+  });
+
+  it('29. rejects conflicting lifecycle dates without reaching a database constraint', async () => {
+    const book = await createBook();
+    const response = await patchStatus(book.bookId, { status: 'reading', startedAt: '2026-05-01', finishedAt: '2026-05-10' });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ errorCode: 'READING_DATES_STATUS_CONFLICT' });
+    expect((await listAttempts(book.bookId)).total).toBe(0);
+  });
 });

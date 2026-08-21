@@ -3,6 +3,7 @@ import type { ReadStatus, ReadStatusSource } from '@bookorbit/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { UserBookStatusRow } from '../../db/schema';
+import { ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED } from '../achievement/achievement-events.service';
 import { UserBookStatusRepository } from './user-book-status.repository';
 import type { SessionBoundaries } from './user-book-status.repository';
 import { UserBookStatusService } from './user-book-status.service';
@@ -685,6 +686,62 @@ describe('kobo status projection', () => {
       await attemptService.setManual(1, 10, 'reading');
 
       expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'rereading');
+    });
+
+    it('emits achievements and projects to Kobo when a date-only patch changes status', async () => {
+      mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'unread' }));
+      mockAttempts.applyManualStatus.mockResolvedValue({
+        status: 'read',
+        source: 'manual',
+        startedAt: null,
+        finishedAt: '2026-05-01',
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      });
+
+      await attemptService.updateManual(1, 10, { finishedAt: new Date('2026-05-01T00:00:00.000Z') }, { endedOn: '2026-05-01' });
+
+      expect(mockAttempts.applyManualStatus).toHaveBeenCalledWith(1, 10, 'unread', undefined, '2026-05-01', expect.any(String), {
+        statusWasExplicit: false,
+      });
+      expect(mockAchievementEvents.emit).toHaveBeenCalledWith(ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, {
+        userId: 1,
+        bookId: 10,
+        newStatus: 'read',
+        previousStatus: 'unread',
+      });
+      expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'read');
+    });
+
+    it('does not emit or project when a date-only patch preserves status', async () => {
+      mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'read' }));
+      mockAttempts.applyManualStatus.mockResolvedValue({
+        status: 'read',
+        source: 'manual',
+        startedAt: '2026-04-01',
+        finishedAt: null,
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      });
+
+      await attemptService.updateManual(1, 10, { finishedAt: null });
+
+      expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
+      expect(mockKoboProjection.project).not.toHaveBeenCalled();
+    });
+
+    it('does not emit or project when clearing an absent date without an existing status row', async () => {
+      mockRepo.findOne.mockResolvedValue(null);
+      mockAttempts.applyManualStatus.mockResolvedValue({
+        status: 'unread',
+        source: 'manual',
+        startedAt: null,
+        finishedAt: null,
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      });
+
+      await attemptService.updateManual(1, 10, { startedAt: null });
+
+      expect(mockAchievementEvents.emit).not.toHaveBeenCalled();
+      expect(mockKoboProjection.project).not.toHaveBeenCalled();
     });
 
     it('groups bulk projections by the resulting status', async () => {

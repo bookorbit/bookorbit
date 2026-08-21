@@ -3214,12 +3214,17 @@ describe('BookService', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-05-20T12:00:00.000Z'));
 
-        await expect(service.setReadStatus(10, { startedAt: '2026-05-21' }, makeUser())).rejects.toThrow('startedAt cannot be in the future');
+        await expect(service.setReadStatus(10, { startedAt: '2026-05-21' }, makeUser())).rejects.toMatchObject({
+          response: {
+            message: 'startedAt cannot be in the future',
+            errorCode: 'READING_DATE_STARTED_IN_FUTURE',
+          },
+        });
         expect(userBookStatusService.updateManual).not.toHaveBeenCalled();
         vi.useRealTimers();
       });
 
-      it('rejects finishedAt that is earlier than startedAt across omitted field merges', async () => {
+      it('delegates date ordering against the resolved reading attempt', async () => {
         const { service, userBookStatusService } = makeService();
         vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
         userBookStatusService.findOne.mockResolvedValue({
@@ -3229,9 +3234,23 @@ describe('BookService', () => {
           finishedAt: '2026-01-10T00:00:00.000Z',
           updatedAt: '2026-01-10T00:00:00.000Z',
         });
+        userBookStatusService.updateManual.mockResolvedValue({
+          status: 'rereading',
+          source: 'manual',
+          startedAt: '2026-01-15',
+          finishedAt: null,
+          updatedAt: '2026-01-15T00:00:00.000Z',
+        });
 
-        await expect(service.setReadStatus(10, { startedAt: '2026-01-15' }, makeUser())).rejects.toThrow('finishedAt must be on or after startedAt');
-        expect(userBookStatusService.updateManual).not.toHaveBeenCalled();
+        await service.setReadStatus(10, { status: 'rereading', startedAt: '2026-01-15' }, makeUser());
+
+        expect(userBookStatusService.findOne).not.toHaveBeenCalled();
+        expect(userBookStatusService.updateManual).toHaveBeenCalledWith(
+          1,
+          10,
+          { status: 'rereading', startedAt: expect.any(Date) },
+          { startedOn: '2026-01-15' },
+        );
       });
 
       it('falls back to UTC when user timezone is invalid', async () => {

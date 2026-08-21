@@ -3900,6 +3900,7 @@
         "dateAddedFutureError": "Date Added cannot be in the future.",
         "dateFinishedFutureError": "Date Finished cannot be in the future.",
         "dateFinishedBeforeStartedError": "Date Finished must be on or after Date Started.",
+        "dateFinishedBeforeStartedErrorWithDate": "Date Finished must be on or after Date Started ({date}).",
         "saveReadingDatesError": "Failed to save reading dates.",
         "saveAddedDateError": "Failed to save date added.",
         "koboPendingDelete": "Pending delete from device",
@@ -4208,6 +4209,7 @@
             "startFuture": "Start date cannot be in the future.",
             "finishFuture": "Finish date cannot be in the future.",
             "finishBeforeStart": "Finish date must be on or after the start date.",
+            "finishBeforeStartWithDate": "Finish date must be on or after the start date ({date}).",
             "saveFailed": "Failed to save reading dates."
           },
           "eta": {

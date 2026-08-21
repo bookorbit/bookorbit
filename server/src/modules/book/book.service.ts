@@ -107,6 +107,7 @@ import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import type { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { buildBookDetailSupplementalFields } from './utils/build-book-detail-supplemental-fields';
 import type { SetStatusDto } from '../user-book-status/dto/set-status.dto';
+import { READING_DATE_ERROR_CODES } from '../user-book-status/user-book-status.constants';
 
 type SeriesCollapseQueryOptions = {
   seriesSelectionFilter: GroupRule | undefined;
@@ -2190,14 +2191,6 @@ export class BookService {
       patch.status = dto.status;
     }
 
-    const existing = await this.userBookStatusService.findOne(user.id, bookId);
-    const effectiveStarted = hasStartedAt ? (startedKey ?? null) : this.normalizeStoredStatusDateKey(existing?.startedAt ?? null, timeZone);
-    const effectiveFinished = hasFinishedAt ? (finishedKey ?? null) : this.normalizeStoredStatusDateKey(existing?.finishedAt ?? null, timeZone);
-
-    if (effectiveStarted && effectiveFinished && effectiveFinished < effectiveStarted) {
-      throw new BadRequestException('finishedAt must be on or after startedAt');
-    }
-
     const dateKeys = {
       ...(startedKey ? { startedOn: startedKey } : {}),
       ...(finishedKey ? { endedOn: finishedKey } : {}),
@@ -2230,7 +2223,10 @@ export class BookService {
     const dateKey = this.normalizeInputToDateKey(trimmed, field, timeZone);
     const todayKey = toDateKeyInTimeZone(new Date(), timeZone);
     if (dateKey > todayKey) {
-      throw new BadRequestException(`${field} cannot be in the future`);
+      throw new BadRequestException({
+        message: `${field} cannot be in the future`,
+        errorCode: field === 'startedAt' ? READING_DATE_ERROR_CODES.startedInFuture : READING_DATE_ERROR_CODES.finishedInFuture,
+      });
     }
     return {
       dateKey,

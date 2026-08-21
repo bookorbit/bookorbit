@@ -46,6 +46,16 @@ export type ReadStatusPatch = {
   finishedAt?: string | null
 }
 
+export class ReadStatusUpdateError extends Error {
+  constructor(
+    message: string,
+    readonly errorCode: string | null,
+  ) {
+    super(message)
+    this.name = 'ReadStatusUpdateError'
+  }
+}
+
 export function useBookStatus() {
   async function updateStatus(bookId: number, patch: ReadStatusPatch): Promise<UserBookStatus> {
     const res = await api(`/api/v1/books/${bookId}/status`, {
@@ -53,7 +63,16 @@ export function useBookStatus() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      let errorCode: string | null = null
+      try {
+        const body = (await res.json()) as { errorCode?: unknown }
+        if (typeof body.errorCode === 'string') errorCode = body.errorCode
+      } catch {
+        errorCode = null
+      }
+      throw new ReadStatusUpdateError(`HTTP ${res.status}`, errorCode)
+    }
     return (await res.json()) as UserBookStatus
   }
 

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import type {
   ReadingAttempt,
   ReadingAttemptListResponse,
@@ -10,6 +10,7 @@ import type {
 } from '@bookorbit/types';
 
 import { ReadingAttemptRepository } from './reading-attempt.repository';
+import { READING_DATE_ERROR_CODES } from './user-book-status.constants';
 
 function dateToUtcDate(value: string | null): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
@@ -31,6 +32,22 @@ function notBeforeStart(endedOn: string, startedOn: string | null): string {
   return startedOn && endedOn < startedOn ? startedOn : endedOn;
 }
 
+/**
+ * unread and want_to_read never carry lifecycle dates. The attempt keeps its own dates so the
+ * reading log still shows the history; the projection just stops claiming them for the book.
+ */
+function projectionDatesFor(
+  status: ReadStatus,
+  attempt: { startedOn: string | null; endedOn: string | null; outcome: ReadingAttemptOutcome | null } | null | undefined,
+): { startedOn: string | null; endedOn: string | null } {
+  if (!attempt || status === 'unread' || status === 'want_to_read') return { startedOn: null, endedOn: null };
+  return { startedOn: attempt.startedOn, endedOn: attempt.outcome === 'completed' ? attempt.endedOn : null };
+}
+
+type ManualStatusOptions = {
+  statusWasExplicit?: boolean;
+};
+
 @Injectable()
 export class ReadingAttemptService {
   constructor(private readonly repo: ReadingAttemptRepository) {}
@@ -42,85 +59,187 @@ export class ReadingAttemptService {
     startedOn: string | null | undefined,
     endedOn: string | null | undefined,
     today: string,
+    options: ManualStatusOptions = {},
   ): Promise<UserBookStatus> {
     return this.repo.transaction(async (tx) => {
       let active: Awaited<ReturnType<ReadingAttemptRepository['findActive']>> | null = await this.repo.findActive(tx, userId, bookId);
       let latest = active ?? (await this.repo.findLatest(tx, userId, bookId));
+      const hasStartedOn = startedOn !== undefined;
+      const hasEndedOn = endedOn !== undefined;
+      const hasDatePatch = hasStartedOn || hasEndedOn;
+      const statusWasExplicit = options.statusWasExplicit !== false;
+      let projectedStatus = status;
 
-      if (status === 'rereading' && !(await this.repo.hasCompleted(tx, userId, bookId))) {
-        await this.repo.create(tx, {
-          userId,
-          bookId,
-          startedOn: null,
-          endedOn: null,
-          outcome: 'completed',
-          origin: 'migration',
-        });
-      }
+      const requireUpdatedAttempt = async (
+        attemptId: number,
+        patch: Parameters<ReadingAttemptRepository['update']>[4],
+      ): Promise<NonNullable<Awaited<ReturnType<ReadingAttemptRepository['update']>>>> => {
+        const updated = await this.repo.update(tx, userId, bookId, attemptId, patch);
+        if (!updated) throw new InternalServerErrorException('Reading attempt disappeared during update');
+        return updated;
+      };
 
-      if (status === 'reading' || status === 'rereading' || status === 'on_hold') {
-        if (!active) {
-          active = await this.repo.createActive(tx, {
-            userId,
-            bookId,
-            startedOn: startedOn === undefined ? today : startedOn,
-            origin: 'manual',
-          });
-        } else if (startedOn !== undefined) {
-          active = await this.repo.update(tx, userId, bookId, active.id, { startedOn });
-        }
-        latest = active;
-      } else {
-        const outcome = outcomeForStatus(status);
-        if (outcome) {
-          if (active) {
-            const effectiveStartedOn = startedOn === undefined ? active.startedOn : startedOn;
-            latest = await this.repo.update(tx, userId, bookId, active.id, {
-              ...(startedOn !== undefined ? { startedOn } : {}),
-              endedOn: endedOn === undefined ? notBeforeStart(today, effectiveStartedOn) : endedOn,
-              outcome,
-            });
-            active = null;
-          } else if (latest?.outcome !== outcome) {
+      if (!statusWasExplicit && hasDatePatch) {
+        const target = active ?? latest;
+        if (!target) {
+          if (endedOn !== undefined && endedOn !== null) {
+            const resolvedStartedOn = startedOn ?? null;
+            this.validateDates(resolvedStartedOn, endedOn);
             latest = await this.repo.create(tx, {
               userId,
               bookId,
-              startedOn: startedOn ?? null,
-              endedOn: endedOn === undefined ? notBeforeStart(today, startedOn ?? null) : endedOn,
-              outcome,
+              startedOn: resolvedStartedOn,
+              endedOn,
+              outcome: 'completed',
               origin: 'manual',
             });
+            projectedStatus = 'read';
+          } else if (startedOn !== undefined && startedOn !== null) {
+            active = await this.repo.createActive(tx, {
+              userId,
+              bookId,
+              startedOn,
+              origin: 'manual',
+            });
+            latest = active;
           }
-        } else if (active) {
-          latest = await this.repo.update(tx, userId, bookId, active.id, {
-            endedOn: endedOn === undefined ? notBeforeStart(today, active.startedOn) : endedOn,
-            outcome: 'abandoned',
+        } else {
+          const resolvedStartedOn = hasStartedOn ? (startedOn ?? null) : target.startedOn;
+          const resolvedEndedOn = hasEndedOn ? (endedOn ?? null) : target.endedOn;
+          const completesAttempt = endedOn !== undefined && endedOn !== null;
+          this.validateDates(resolvedStartedOn, resolvedEndedOn);
+          const updated = await requireUpdatedAttempt(target.id, {
+            ...(hasStartedOn ? { startedOn: startedOn ?? null } : {}),
+            ...(hasEndedOn ? { endedOn: endedOn ?? null } : {}),
+            ...(completesAttempt ? { outcome: 'completed' as const } : {}),
           });
-          active = null;
+          if (active) {
+            if (completesAttempt) {
+              active = null;
+              latest = updated;
+              projectedStatus = 'read';
+            } else {
+              active = updated;
+              latest = updated;
+            }
+          } else {
+            latest = updated;
+            if (completesAttempt) projectedStatus = 'read';
+          }
+        }
+
+        if (active) {
+          const hasCompleted = await this.repo.hasCompleted(tx, userId, bookId);
+          projectedStatus = status === 'on_hold' ? 'on_hold' : hasCompleted ? 'rereading' : 'reading';
+        }
+      } else {
+        const isActiveStatus = status === 'reading' || status === 'rereading' || status === 'on_hold';
+        const clearsLifecycle = status === 'unread' || status === 'want_to_read';
+        if ((isActiveStatus && endedOn !== undefined && endedOn !== null) || (clearsLifecycle && (startedOn != null || endedOn != null))) {
+          throw new BadRequestException({
+            message: 'Reading dates conflict with the requested status',
+            errorCode: READING_DATE_ERROR_CODES.statusConflict,
+          });
+        }
+
+        if (status === 'rereading' && !(await this.repo.hasCompleted(tx, userId, bookId))) {
+          await this.repo.create(tx, {
+            userId,
+            bookId,
+            startedOn: null,
+            endedOn: null,
+            outcome: 'completed',
+            origin: 'migration',
+          });
+        }
+
+        if (isActiveStatus) {
+          if (!active) {
+            active = await this.repo.createActive(tx, {
+              userId,
+              bookId,
+              startedOn: startedOn === undefined ? today : startedOn,
+              origin: 'manual',
+            });
+          } else if (hasStartedOn) {
+            this.validateDates(startedOn ?? null, null);
+            active = await requireUpdatedAttempt(active.id, { startedOn: startedOn ?? null });
+          }
+          latest = active;
+        } else {
+          const outcome = outcomeForStatus(status);
+          if (outcome) {
+            if (active) {
+              const resolvedStartedOn = hasStartedOn ? (startedOn ?? null) : active.startedOn;
+              const resolvedEndedOn = hasEndedOn ? (endedOn ?? null) : notBeforeStart(today, resolvedStartedOn);
+              this.validateDates(resolvedStartedOn, resolvedEndedOn);
+              latest = await requireUpdatedAttempt(active.id, {
+                ...(hasStartedOn ? { startedOn: startedOn ?? null } : {}),
+                endedOn: resolvedEndedOn,
+                outcome,
+              });
+              active = null;
+            } else if (latest?.outcome !== outcome) {
+              const resolvedStartedOn = startedOn ?? null;
+              const resolvedEndedOn = hasEndedOn ? (endedOn ?? null) : notBeforeStart(today, resolvedStartedOn);
+              this.validateDates(resolvedStartedOn, resolvedEndedOn);
+              latest = await this.repo.create(tx, {
+                userId,
+                bookId,
+                startedOn: resolvedStartedOn,
+                endedOn: resolvedEndedOn,
+                outcome,
+                origin: 'manual',
+              });
+            } else if (latest && hasDatePatch) {
+              const resolvedStartedOn = hasStartedOn ? (startedOn ?? null) : latest.startedOn;
+              const resolvedEndedOn = hasEndedOn ? (endedOn ?? null) : latest.endedOn;
+              this.validateDates(resolvedStartedOn, resolvedEndedOn);
+              latest = await requireUpdatedAttempt(latest.id, {
+                ...(hasStartedOn ? { startedOn: startedOn ?? null } : {}),
+                ...(hasEndedOn ? { endedOn: endedOn ?? null } : {}),
+              });
+            }
+          } else if (active) {
+            const resolvedStartedOn = hasStartedOn ? (startedOn ?? null) : active.startedOn;
+            const resolvedEndedOn = hasEndedOn ? (endedOn ?? null) : notBeforeStart(today, resolvedStartedOn);
+            this.validateDates(resolvedStartedOn, resolvedEndedOn);
+            latest = await requireUpdatedAttempt(active.id, {
+              ...(hasStartedOn ? { startedOn: startedOn ?? null } : {}),
+              endedOn: resolvedEndedOn,
+              outcome: 'abandoned',
+            });
+            active = null;
+          } else if (latest && hasDatePatch) {
+            const resolvedStartedOn = hasStartedOn ? (startedOn ?? null) : latest.startedOn;
+            const resolvedEndedOn = hasEndedOn ? (endedOn ?? null) : latest.endedOn;
+            this.validateDates(resolvedStartedOn, resolvedEndedOn);
+            latest = await requireUpdatedAttempt(latest.id, {
+              ...(hasStartedOn ? { startedOn: startedOn ?? null } : {}),
+              ...(hasEndedOn ? { endedOn: endedOn ?? null } : {}),
+            });
+          }
+        }
+
+        if (active) {
+          const hasCompleted = await this.repo.hasCompleted(tx, userId, bookId);
+          projectedStatus = status === 'on_hold' ? 'on_hold' : hasCompleted ? 'rereading' : 'reading';
         }
       }
 
-      if (startedOn !== undefined || endedOn !== undefined) {
-        const target = active ?? latest;
-        if (target) {
-          latest = await this.repo.update(tx, userId, bookId, target.id, {
-            ...(startedOn !== undefined ? { startedOn } : {}),
-            ...(endedOn !== undefined ? { endedOn } : {}),
-          });
-        }
-      }
-
-      const completedBefore = await this.repo.hasCompleted(tx, userId, bookId);
-      const projectedStatus = active ? (status === 'on_hold' ? 'on_hold' : completedBefore ? 'rereading' : 'reading') : status;
       const projectionTarget = active ?? latest;
-      const startedAt = dateToUtcDate(projectionTarget?.startedOn ?? null);
-      const finishedAt = projectionTarget?.outcome === 'completed' ? dateToUtcDate(projectionTarget.endedOn) : null;
-      await this.repo.project(tx, userId, bookId, { status: projectedStatus, source: 'manual', startedAt, finishedAt });
+      const projected = projectionDatesFor(projectedStatus, projectionTarget);
+      await this.repo.project(tx, userId, bookId, {
+        status: projectedStatus,
+        source: 'manual',
+        startedAt: dateToUtcDate(projected.startedOn),
+        finishedAt: dateToUtcDate(projected.endedOn),
+      });
       return {
         status: projectedStatus,
         source: 'manual',
-        startedAt: projectionTarget?.startedOn ?? null,
-        finishedAt: projectionTarget?.outcome === 'completed' ? (projectionTarget.endedOn ?? null) : null,
+        startedAt: projected.startedOn,
+        finishedAt: projected.endedOn,
         updatedAt: new Date().toISOString(),
       };
     });
@@ -307,17 +426,23 @@ export class ReadingAttemptService {
       else if (latest?.outcome === 'completed') status = 'read';
       else if (latest?.outcome === 'skimmed') status = 'skimmed';
       else if (latest?.outcome === 'abandoned') status = 'abandoned';
+      const projected = projectionDatesFor(status, target);
       await this.repo.project(tx, userId, bookId, {
         status,
         source: 'manual',
-        startedAt: dateToUtcDate(target?.startedOn ?? null),
-        finishedAt: target?.outcome === 'completed' ? dateToUtcDate(target.endedOn) : null,
+        startedAt: dateToUtcDate(projected.startedOn),
+        finishedAt: dateToUtcDate(projected.endedOn),
       });
     });
   }
 
   private validateDates(startedOn: string | null, endedOn: string | null): void {
-    if (startedOn && endedOn && endedOn < startedOn) throw new BadRequestException('endedOn must be on or after startedOn');
+    if (startedOn && endedOn && endedOn < startedOn) {
+      throw new BadRequestException({
+        message: 'endedOn must be on or after startedOn',
+        errorCode: READING_DATE_ERROR_CODES.invalidOrder,
+      });
+    }
   }
 
   private toDto(row: {
