@@ -233,18 +233,6 @@ const chartOption = computed(() => {
     :loading="isLoading || !isMapReady"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <template #controls>
-      <select
-        v-model="statusFilter"
-        class="h-8 cursor-pointer rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        <option value="all">Todos</option>
-        <option value="READ">Lidos</option>
-        <option value="UNREAD">Não Lidos</option>
-        <option value="WANT_TO_READ">Quero Ler</option>
-      </select>
-    </template>
-
     <div ref="chartWrapper" style="height: 100%; width: 100%">
       <VChart v-if="isMapReady && chartOption.series" :option="chartOption" autoresize style="height: 100%" />
     </div>
