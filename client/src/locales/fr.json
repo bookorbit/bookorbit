@@ -218,6 +218,12 @@
       },
       "bookCovers": {
         "title": "Couvertures de livres",
+        "coverSearch": {
+          "label": "Fournisseur de couverture par défaut",
+          "hint": "Choisissez la source sélectionnée lorsque la recherche de couverture en ligne s'ouvre. Enregistrée sur votre compte, elle s'applique à tous les appareils.",
+          "loadError": "Impossible de charger le fournisseur de couverture par défaut",
+          "saveError": "Impossible d'enregistrer le fournisseur de couverture par défaut"
+        },
         "displayMode": {
           "title": "Mode d'affichage de la couverture",
           "hint": "Contrôle la manière dont les couvertures réelles s'insèrent dans les emplacements des livres lorsque les proportions diffèrent",
@@ -464,7 +470,8 @@
         "book-covers": "Couvertures de livres",
         "icons": "Icônes",
         "layout": "Disposition",
-        "behavior": "Comportement"
+        "behavior": "Comportement",
+        "language": "Langue"
       }
     },
     "account": {
@@ -775,10 +782,13 @@
         "updatesGroup": "Mises à jour",
         "importFromBooklore": "Importer depuis Booklore",
         "bookloreImportConfigured": "Importation de livres configurée",
+        "importLibraryData": "Importer les données de la bibliothèque",
+        "migrationConfigured": "Source de migration configurée",
         "migrationRunning": "Migration en cours",
         "migrationCompleted": "Migration terminée",
         "migrationFailed": "Échec de la migration",
         "importDescription": "Importation unique de livres, de métadonnées et de progrès de lecture à partir d'une installation précédente de Booklore.",
+        "migrationDescription": "Importation unique de livres, de métadonnées et de progrès de lecture depuis une autre application de bibliothèque.",
         "configuredDescription": "Source : {name}. Aucune migration n'a encore été effectuée : poursuivez l'installation pour exécuter l'importation.",
         "runningDescription": "Étape : {stage} - commencée {started}",
         "completedDescription": "De {name} à {date} terminé",
@@ -820,6 +830,7 @@
       "migration": {
         "title": "Migrations",
         "subtitle": "Importation unique de Booklore : connectez la source, cartographiez les utilisateurs, effectuez une exécution à sec, démarrez la migration et exportez un rapport.",
+        "genericSubtitle": "Importation unique de la bibliothèque : connecter une source, associer les utilisateurs, effectuer un test, lancer la migration et exporter un rapport.",
         "progress": "Progrès",
         "stepSourceConnection": "Connexion source",
         "stepUserPathMapping": "Cartographie des utilisateurs et des chemins",
@@ -829,6 +840,7 @@
         "stepReport": "Rapport",
         "stepReportTitle": "Rapport de migration",
         "subtitleSource": "Configurez la connexion à la base de données à votre instance Booklore source.",
+        "genericSubtitleSource": "Configurez la connexion à votre application de bibliothèque source.",
         "subtitleMappings": "Mappez les utilisateurs source avec les utilisateurs cibles et traduisez les chemins de fichiers.",
         "subtitleDryRun": "Prévisualisez ce qui sera importé avant d’exécuter la migration en direct.",
         "subtitleRun": "Démarrez l’importation en direct et suivez sa progression.",
@@ -913,13 +925,16 @@
         "reasonNoFilePathMatch": "Le chemin du fichier ne correspond à aucun livre de cette bibliothèque",
         "reasonNoFileHashMatch": "Le hachage du fichier ne correspond à aucun livre de cette bibliothèque",
         "reasonNoIsbnMatch": "ISBN ne correspond à aucun livre de cette bibliothèque",
+        "reasonNoAsinMatch": "L'ASIN ne correspond à aucun livre de cette bibliothèque",
         "reasonInsufficientSourceData": "Pas assez de métadonnées pour tenter une correspondance",
         "reasonAmbiguousIsbnMatch": "Plusieurs livres correspondent au même ISBN",
+        "reasonAmbiguousAsinMatch": "Plusieurs livres correspondent au même ASIN",
         "reasonAmbiguousFileHashMatch": "Plusieurs livres correspondaient au même hachage de fichier",
         "reasonAmbiguousFilePathMatch": "Plusieurs livres correspondaient au même chemin de fichier",
         "reasonAmbiguousTitleAuthorMatch": "Plusieurs livres correspondaient au même titre et au même auteur",
         "reasonUnknown": "Impossible de déterminer la raison",
         "strategyIsbn": "Correspondant à ISBN",
+        "strategyAsin": "Correspondance par ASIN",
         "strategyFileHash": "Correspondance par hachage de fichier",
         "strategyPathMapping": "Correspondant au chemin du fichier mappé",
         "strategyTitleAuthor": "Assorti par titre et auteur",
@@ -955,6 +970,7 @@
         "refresh": "Actualiser",
         "sourceUser": "Utilisateur source",
         "targetUser": "Utilisateur cible",
+        "doNotImport": "Ne pas importer cet utilisateur",
         "noSourceUsersLoaded": "Aucun utilisateur source n'a encore été chargé.",
         "noActiveTargetUsers": "Aucun utilisateur cible actif trouvé. Créez ou réactivez un utilisateur BookOrbit avant le mappage.",
         "pathPrefixMappings": "Mappages de préfixes de chemin",
@@ -1123,7 +1139,25 @@
         "saveFailed": "Échec de l'enregistrement des paramètres d'enrichissement de l'auteur",
         "noEligibleAuthors": "Aucun auteur éligible trouvé",
         "noAuthorsToEnrich": "Aucun auteur à enrichir",
-        "queueFailed": "Échec du remplissage de la file d'attente de l'auteur"
+        "queueFailed": "Échec du remplissage de la file d'attente de l'auteur",
+        "fields": {
+          "description": "Biographie",
+          "photo": "Photo",
+          "birthDate": "Naissance",
+          "deathDate": "Mort",
+          "website": "Site web",
+          "genres": "Genres",
+          "influences": "Influences"
+        },
+        "metadataPreferences": {
+          "title": "Sources de champ",
+          "hint": "Définissez l'ordre dans lequel chaque champ est renseigné. Le premier fournisseur dont la valeur est renseignée l'emporte.",
+          "noProviders": "Aucun fournisseur disponible",
+          "saved": "Sources de champ enregistrées",
+          "saveFailed": "Impossible d'enregistrer les sources de champ",
+          "limitedProviders": "{providers} fournit uniquement des biographies et des photos.",
+          "addProvider": "Ajouter {provider} comme source"
+        }
       },
       "scoreWeights": {
         "groupLabel": "Pondérations des scores",
@@ -1166,19 +1200,35 @@
         "opds": "OPDS",
         "kobo": "Kobo",
         "koreader": "KOReader",
+        "integrations": "Intégrations",
         "hardcover": "Hardcover",
         "admin": "Administrateur",
         "system": "Système",
         "account": "Compte"
       }
     },
+    "integrations": {
+      "title": "Intégrations",
+      "subtitle": "Connecter un service externe pour synchroniser vos données de lecture et de surlignage.",
+      "noPermission": "Vous n'avez pas la permission d'utiliser des intégrations.",
+      "tabs": {
+        "hardcover": "Hardcover",
+        "readwise": "Readwise",
+        "storygraph": "The StoryGraph"
+      },
+      "providerSubtitles": {
+        "readwise": "Envoyer automatiquement vos surlignages à Readwise.",
+        "storygraph": "Synchronise la progression et l'état de lecture vers The StoryGraph."
+      }
+    },
     "metadata": {
       "title": "Métadonnées",
+      "subtitle": "Configurer les fournisseurs de métadonnées, les règles de correspondance, l'automatisation et l'enrichissement de l'auteur",
       "noPermission": "Vous n'êtes pas autorisé à gérer les paramètres de métadonnées.",
       "fields": {
         "title": "Titre",
         "subtitle": "Sous-titre",
-        "description": "Descriptif",
+        "description": "Description",
         "cover": "Couverture",
         "authors": "Auteurs",
         "publisher": "Éditeur",
@@ -1353,12 +1403,18 @@
         "advanced": {
           "title": "Comportement de récupération avancé",
           "combineGenres": {
-            "label": "Combinez les genres de tous les fournisseurs sélectionnés",
-            "hint": "Collectez et dédupliquez les genres de chaque fournisseur attribué au champ Genres, plutôt que de vous arrêter au premier résultat."
+            "label": "Combiner les genres de tous les fournisseurs sélectionnés",
+            "hint": "Collecter et rassembler les genres de chaque fournisseur attribués au champ Genres plutôt que de s'arrêter au premier résultat."
+          },
+          "maxGenres": {
+            "label": "Maximum de genres par livre",
+            "hint": "Appliqué après les exclusions et la suppression des doublons. Laisser vide pour illimité. Ceci affectera les futures récupérations de métadonnées.",
+            "unlimited": "Illimité",
+            "error": "Entrez un nombre entier de 1 à {max} ou laissez le champ vide."
           },
           "storeProviderIds": {
             "label": "Stocker les identifiants des fournisseurs sur les livres",
-            "hint": "Lors de la récupération des métadonnées, enregistrez les identifiants de fournisseur renvoyés (ISBN, ASIN, Goodreads ID, etc.) dans l'enregistrement du livre pour des recherches futures plus précises."
+            "hint": "Lors de la récupération des métadonnées enregistrer les identifiants de fournisseurs correspondants (ISBN, ASIN, Goodreads ID, etc.) dans l'enregistrement du livre pour des recherches futures plus précises."
           }
         },
         "library": {
@@ -1822,6 +1878,7 @@
         "tokenPublisher": "Éditeur",
         "tokenIsbn": "ISBN-13",
         "tokenLanguage": "Langue",
+        "tokenLibrary": "Nom de la bibliothèque",
         "tokenOriginalFilename": "Nom de fichier d'origine (sans extension)",
         "tokenExtension": "Extension de fichier (sans point)",
         "patternHelpIntro": "Les modèles utilisent des jetons comme {titleToken} et {authorsToken}, ainsi que des modificateurs et des segments facultatifs.",
@@ -1866,6 +1923,7 @@
         "twoWaySyncHint": "Synchronisez la position de lecture entre BookOrbit et Kobo. Nécessite la livraison KEPUB pour des emplacements précis et une restauration de page fiable.",
         "syncHighlights": "Synchronisez les passages surlignés de BookOrbit avec Kobo",
         "syncHighlightsHint": "Envoyez les passages surlignés réalisés dans BookOrbit ou KOReader à votre Kobo. Les passages surlignés Kobo sont importées dans BookOrbit même lorsque cette option est désactivée. Les annotations liées synchronisent les modifications et les suppressions dans les deux sens. Nécessite la livraison KEPUB ; le livre sur Kobo doit être le KEPUB téléchargé depuis BookOrbit.",
+        "storeSync": "Inclure les titres du magasin Kobo",
         "convertKepub": "Convertir en KEPUB",
         "convertKepubHint": "Envoyez des EPUB éligibles en tant que KEPUB. Cela reste activé lorsque la synchronisation de la progression ou les passages surlignés de BookOrbit-to-Kobo sont activées. Lors de la prochaine synchronisation Kobo, les livres concernés sont à nouveau proposés en téléchargement KEPUB ; supprimez toute ancienne copie de EPUB si Kobo continue de l'ouvrir.",
         "forceHyphenation": "Forcer la césure",
@@ -2050,9 +2108,17 @@
         "createFormTitle": "Créer des informations d'identification de synchronisation KOReader",
         "createFormHint": "Ces informations d'identification authentifient vos appareils KOReader avec BookOrbit.",
         "username": "Nom d'utilisateur",
-        "usernamePlaceholder": "par ex. mon lecteur",
+        "usernamePlaceholder": "ex. monlecteur",
         "password": "Mot de passe",
         "passwordPlaceholder": "Minimum 6 caractères",
+        "changeCredentials": {
+          "action": "Modifier les identifiants",
+          "title": "Modifier les identifiants KOReader",
+          "description": "Chaque compte BookOrbit ne peut avoir qu'un identifiant KOReader associé. Modifiez-le ici sans supprimer les données synchronisées.",
+          "newPassword": "Nouveau mot de passe",
+          "usernameInvalid": "Le nom d'utilisateur doit contenir entre 3 et 100 caractères.",
+          "passwordPlaceholder": "Laisser vide pour conserver le mot de passe actuel"
+        },
         "creating": "Création...",
         "create": "Créer",
         "credentialsCreated": "KOReader identifiants de synchronisation créés",
@@ -2226,7 +2292,18 @@
         "deviceRemoved": "Appareil supprimé",
         "removeDeviceFailed": "Échec de la suppression de l'appareil",
         "removeDeviceConfirmTitle": "Supprimer {device} ?",
-        "removeDeviceConfirmBody": "Cela supprime définitivement la progression synchronisée de cet appareil, l'activité de lecture et toutes les entrées de livre sans correspondance qui ne sont plus signalées par un autre appareil. Si l'appareil se synchronise à nouveau plus tard, il réapparaîtra en tant que nouvelle entrée."
+        "removeDeviceConfirmBody": "Cela supprime définitivement la progression synchronisée de cet appareil, l'activité de lecture et toutes les entrées de livre sans correspondance qui ne sont plus signalées par un autre appareil. Si l'appareil se synchronise à nouveau plus tard, il réapparaîtra en tant que nouvelle entrée.",
+        "retire": "Retirer",
+        "retiring": "Retrait...",
+        "restore": "Restaurer",
+        "restoring": "Restauration...",
+        "deleteSyncedData": "Supprimer",
+        "deletingSyncedData": "Suppression...",
+        "deviceRetired": "Périphérique retiré",
+        "deviceRestored": "Périphérique restauré",
+        "retireDeviceFailed": "Échec au retrait du périphérique",
+        "restoreDeviceFailed": "Échec de restauration du périphérique",
+        "retiredOnLabel": "Retiré"
       },
       "opds": {
         "title": "OPDS",
@@ -2294,6 +2371,11 @@
         "maintenance": "Entretien",
         "audit-log": "Journal d'audit"
       }
+    },
+    "nav": {
+      "title": "Réglages",
+      "ariaLabel": "Sections de réglages",
+      "searchPlaceholder": "Réglages de recherche"
     }
   },
   "achievements": {
@@ -3694,10 +3776,10 @@
       "details": {
         "by": "par",
         "narratedBy": "raconté par",
-        "ratingLocked": "La note est verrouillée",
+        "ratingLocked": "Notation verrouillée",
         "rateStar": "Notez {star}",
-        "listen": "Ecoute",
-        "read": "Lu",
+        "listen": "Écouter",
+        "read": "Lire",
         "chooseFormat": "Choisir le format",
         "audiobook": "Livre audio",
         "primary": "Principal",
@@ -3942,9 +4024,9 @@
         "fieldsWritten": "{count, plural, =0 {pas de champs} one {un champ} other {# champs} many {# champs}}",
         "track": "Suivre {number}",
         "primary": "Principal",
-        "read": "Lu",
+        "read": "Lire",
         "play": "Jouer",
-        "peek": "Coup d'oeil",
+        "peek": "Aperçu",
         "download": "Télécharger",
         "moreActions": "Plus de propositions",
         "rename": "Renommer",
@@ -4226,9 +4308,9 @@
       },
       "read": {
         "play": "Jouer",
-        "read": "Lu",
+        "read": "Lire",
         "primary": "Principal",
-        "peekFormat": "Jetez un œil à {format}",
+        "peekFormat": "Aperçu de {format}",
         "chooseFormat": "Choisissez le format à lire ou à jouer",
         "fileFallback": "FICHIER"
       },
@@ -4700,15 +4782,15 @@
         "showJumpRails": "Afficher les rails de saut",
         "columnsHint": "Utilisez le panneau de visibilité des colonnes dans l'en-tête du tableau pour afficher ou masquer les colonnes.",
         "coverShape": "Forme de la couverture",
-        "circle": "Cercle",
+        "circle": "Rond",
         "square": "Carré"
       }
     },
     "iconPicker": {
-      "clearSelectionAria": "Effacer l'icône sélectionnée",
-      "searchLucide": "Rechercher des icônes Lucide...",
+      "clearSelectionAria": "Annuler la sélection",
+      "searchLucide": "Rechercher dans les icônes Lucide...",
       "searchCustom": "Rechercher des icônes personnalisées...",
-      "chooseIcon": "Choisissez une icône...",
+      "chooseIcon": "Choisir une icône...",
       "selectIcon": "Sélectionner l'icône",
       "customTab": "Personnalisé",
       "searching": "Recherche...",
@@ -4720,10 +4802,10 @@
     "entityNotFound": {
       "title": "{entity} introuvable",
       "description": "Ce {entity} n'existe pas ou a été supprimé.",
-      "goBack": "Retourner"
+      "goBack": "Précédent"
     },
     "themePicker": {
-      "light": "Lumière",
+      "light": "Clair",
       "dark": "Sombre",
       "system": "Système"
     },

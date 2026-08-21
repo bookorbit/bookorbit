@@ -779,10 +779,13 @@
         "achievementsGroup": "成就",
         "updatesGroup": "更新",
         "bookloreImportConfigured": "已配置 Booklore 导入",
+        "importLibraryData": "导入书库数据",
+        "migrationConfigured": "迁移源配置",
         "migrationRunning": "迁移正在运行",
         "migrationCompleted": "迁移完成",
         "migrationFailed": "迁移失败",
         "importDescription": "从旧版 Booklore 安装中一次性导入书籍、元数据和阅读进度。",
+        "migrationDescription": "从旧版 Booklore 安装中一次性导入书籍、元数据和阅读进度。",
         "configuredDescription": "数据源：{name}。尚未执行数据迁移，请完成剩余配置后再执行导入。",
         "runningDescription": "环节：{stage}，已于 {started} 启动",
         "completedDescription": "来自 {name}，已于 {date} 执行完成",
@@ -824,6 +827,7 @@
       "migration": {
         "title": "迁移",
         "subtitle": "一次性 Booklore 导入：连接数据源、映射用户、试运行、开始迁移并导出报告。",
+        "genericSubtitle": "一次性 Booklore 导入：连接数据源、映射用户、试运行、开始迁移并导出报告。",
         "progress": "进度",
         "stepSourceConnection": "源连接",
         "stepUserPathMapping": "用户和路径映射",
@@ -833,6 +837,7 @@
         "stepReport": "报告",
         "stepReportTitle": "迁移报告",
         "subtitleSource": "配置指向源 Booklore 实例的数据库连接。",
+        "genericSubtitleSource": "配置连接到您的源库应用。",
         "subtitleMappings": "将源用户映射到目标用户，并转换文件路径。",
         "subtitleDryRun": "在运行实时迁移之前预览导入的内容。",
         "subtitleRun": "开始实时导入并监测其进度。",
@@ -917,13 +922,16 @@
         "reasonNoFilePathMatch": "文件路径与此库中的任何书不匹配",
         "reasonNoFileHashMatch": "文件哈希与此库中的任何书不匹配",
         "reasonNoIsbnMatch": "ISBN 不匹配此库中的任何书",
+        "reasonNoAsinMatch": "ASIN在这个库中没有匹配任何书",
         "reasonInsufficientSourceData": "没有足够的元数据来尝试匹配",
         "reasonAmbiguousIsbnMatch": "多本书匹配相同的 ISBN",
+        "reasonAmbiguousAsinMatch": "匹配到相同ASIN的多本书",
         "reasonAmbiguousFileHashMatch": "多本书匹配相同的文件哈希值",
         "reasonAmbiguousFilePathMatch": "多本书匹配相同的文件路径",
         "reasonAmbiguousTitleAuthorMatch": "多本书匹配相同的标题和作者",
         "reasonUnknown": "无法确定原因",
         "strategyIsbn": "由 ISBN 匹配",
+        "strategyAsin": "按 ASIN 匹配",
         "strategyFileHash": "通过文件哈希匹配",
         "strategyPathMapping": "已映射文件路径匹配",
         "strategyTitleAuthor": "按标题和作者匹配",
@@ -959,6 +967,7 @@
         "refresh": "刷新",
         "sourceUser": "源用户",
         "targetUser": "目标用户",
+        "doNotImport": "不导入此用户",
         "noSourceUsersLoaded": "尚未加载源用户。",
         "noActiveTargetUsers": "未找到活跃的目标用户。请在映射前创建或重新启用 BookOrbit 用户。",
         "pathPrefixMappings": "路径前缀映射",
@@ -1127,7 +1136,25 @@
         "saveFailed": "保存作者信息自动补充设置失败",
         "noEligibleAuthors": "没有找到合格的作者",
         "noAuthorsToEnrich": "没有要补充信息的作者",
-        "queueFailed": "将作者加入回填队列失败"
+        "queueFailed": "将作者加入回填队列失败",
+        "fields": {
+          "description": "作者简介",
+          "photo": "照片",
+          "birthDate": "出生日期",
+          "deathDate": "去世日期",
+          "website": "网站",
+          "genres": "体裁",
+          "influences": "影响"
+        },
+        "metadataPreferences": {
+          "title": "字段来源",
+          "hint": "设置各字段的填充顺序。优先采用最先返回有效值的来源。",
+          "noProviders": "没有可用的提供商",
+          "saved": "保存的字段来源",
+          "saveFailed": "无法保存字段来源",
+          "limitedProviders": "{providers} 仅提供传记和照片。",
+          "addProvider": "添加 {provider}作为来源"
+        }
       },
       "scoreWeights": {
         "groupLabel": "得分权重",
@@ -1301,7 +1328,7 @@
         "badge": {
           "setupRequired": "需要设置",
           "throttled": "已经平移",
-          "ready": "准备好"
+          "ready": "已配置"
         },
         "fields": {
           "apiKey": "API 密钥",
@@ -1587,7 +1614,7 @@
         "lineHeightHint": "线之间的垂直间距",
         "justify": "对齐文本",
         "justifyHint": "将文本对齐到两个边距",
-        "hyphenation": "低温化",
+        "hyphenation": "连字符断字",
         "hyphenationHint": "用连字自动折叠长词",
         "advanced": "高级版",
         "maxContentWidth": "最大内容宽度",
@@ -1696,13 +1723,13 @@
         "deleteFamily": "删除品类",
         "editVariant": "编辑权重/样式",
         "deleteVariant": "删除变体",
-        "styleNormal": "普通的",
+        "styleNormal": "正常",
         "styleItalic": "斜体",
-        "weightThin": "最小值",
-        "weightExtraLight": "额外的光线",
-        "weightLight": "浅色",
-        "weightRegular": "常规的",
-        "weightMedium": "中",
+        "weightThin": "极细",
+        "weightExtraLight": "特细",
+        "weightLight": "细体",
+        "weightRegular": "常规",
+        "weightMedium": "中等",
         "weightSemiBold": "半粗体",
         "weightBold": "粗体",
         "weightExtraBold": "特粗",
@@ -1859,7 +1886,7 @@
         "subtitle": "配对您的 Kobo 设备以同步您的库。",
         "copy": "复制",
         "never": "从不使用",
-        "justNow": "马上开始",
+        "justNow": "刚刚",
         "minutesAgo": "{count}分钟前",
         "hoursAgo": "{count}小时前",
         "daysAgo": "{count}天前",
@@ -2061,7 +2088,7 @@
         "loadingSettings": "正在加载 KOReader 设置项…",
         "loadFailed": "加载 KOReader 设置失败",
         "never": "从不使用",
-        "justNow": "马上开始",
+        "justNow": "刚刚",
         "minutesAgo": "{count} 分钟前",
         "hoursAgo": "{count} 小时前",
         "daysAgo": "{count} 天前",
@@ -2354,9 +2381,57 @@
       "tabs": {
         "file-naming": "文件名称",
         "book-dock": "Book Dock",
-        "maintenance": "维护费",
-        "audit-log": "审核日志"
+        "maintenance": "维护",
+        "audit-log": "审计日志"
       }
+    },
+    "nav": {
+      "title": "设置",
+      "ariaLabel": "设置部分",
+      "searchPlaceholder": "搜索设置",
+      "clearSearch": "清空搜索内容",
+      "noResults": "没有设置匹配{query}",
+      "shortcutHint": "按 Cmd K 跳转到任何设置",
+      "groups": {
+        "you": "个人",
+        "library": "书库",
+        "devices": "设备与同步",
+        "server": "服务器"
+      },
+      "descriptions": {
+        "profile": "您的名称、电子邮件、密码和活动会话。",
+        "appearanceTheme": "主题、强调色、背景和圆角半径。",
+        "appearanceBookCovers": "封面阴影、书脊效果和占位图。",
+        "appearanceIcons": "选择应用内使用的图标样式。",
+        "appearanceLayout": "默认书库视图、密度和间距。",
+        "appearanceBehavior": "浏览和排序时书库的响应方式。",
+        "appearanceLanguage": "界面语言和地区格式。",
+        "readerEbook": "电子书的字体、间距和翻页行为。",
+        "readerPdf": "PDF 的渲染、缩放和页面适配。",
+        "readerComics": "漫画的阅读方向和对页显示。",
+        "readerAudio": "播放速度、跳转间隔和睡眠定时器。",
+        "readerFonts": "阅读时可用字体。",
+        "readerGeneral": "所有阅读模式共用的默认设置。",
+        "notifications": "控制 BookOrbit 向你发送什么通知，以及发送到哪里。",
+        "privacy": "阅读统计、分享链接和活动可见性。",
+        "restrictions": "此账户的内容年龄评级和已屏蔽内容。",
+        "libraries": "扫描路径、监听文件夹和导入规则。",
+        "fileNaming": "存储文件的文件夹和文件名命名规则。",
+        "maintenance": "重新扫描、重复文件、孤立文件及缓存重建。",
+        "kobo": "同步端点、存储代理和书架映射。",
+        "koreader": "进度同步和文档匹配。",
+        "opds": "供第三方阅读应用使用的目录订阅源。",
+        "email": "SMTP 投递和发送至设备地址。",
+        "hardcover": "与Hardcover同步阅读状态和评论。",
+        "users": "帐户、角色、权限和邀请。",
+        "accountActivity": "用户阅读和会话活动。",
+        "magicLinks": "无密码共享和登录链接。",
+        "oidc": "单一签字提供者、索偿和预留。",
+        "serverFonts": "在此服务器上为每个读者安装字体。",
+        "bookDock": "在书页上显示快速操作。",
+        "auditLog": "谁改变了什么，什么时候改变。"
+      },
+      "backToApp": "返回图书馆"
     }
   },
   "achievements": {
@@ -2800,17 +2875,17 @@
     }
   },
   "audit": {
-    "pageTitle": "审核日志",
+    "pageTitle": "审计日志",
     "pageSubtitle": "全系统执行的管理员重要动作记录。",
     "filters": "筛选器",
     "noActiveFilters": "没有活动的过滤器",
     "clear": "清空",
-    "empty": "没有找到审核日志",
+    "empty": "没有找到审计日志",
     "showMore": "显示更多",
     "showLess": "显示更少的",
     "details": "详细信息",
     "hideDetails": "隐藏详细信息",
-    "refresh": "刷新审核日志",
+    "refresh": "刷新审计日志",
     "loadError": "无法加载审计事件。",
     "removeFilter": "移除筛选：{value}",
     "allActions": "所有操作",
@@ -3193,7 +3268,12 @@
       "noBiography": "没有可用的传记。使用菜单刷新元数据。",
       "previewFrom": "来自 {provider} 的预览结果，保存元数据方可持久生效",
       "booksLabel": "书籍",
-      "lastAdded": "最后添加"
+      "lastAdded": "最后添加",
+      "born": "出生日期",
+      "died": "去世日期",
+      "website": "网站",
+      "genres": "体裁",
+      "influences": "影响"
     },
     "list": {
       "title": "作者",
@@ -3790,7 +3870,7 @@
         "publisher": "出版社",
         "published": "已发布",
         "language": "语言",
-        "pages": "页 次",
+        "pages": "页数",
         "duration": "阅读时长",
         "edition": "版本",
         "abridged": "节选版",
@@ -3853,6 +3933,8 @@
         "savedButWriteFailed": "元数据已保存，但文件写入失败",
         "savedWriteSkippedReason": "元数据已保存，已跳过文件写入：{reason}",
         "savedWriteSkipped": "元数据已保存，文件写入跳过",
+        "saveFailed": "无法保存更改。",
+        "saveFailedWithStatus": "无法保存更改（HTTP {status}）",
         "loadFromFileFailed": "从文件加载元数据失败",
         "loadedFieldsFromFile": "{count, plural, =0 {从文件中加载没有字段} one {从文件中加载一个字段} other {从文件中加载# 字段}}",
         "noMetadataInFile": "文件中未找到元数据",
@@ -4699,6 +4781,7 @@
       "annotations": "批注",
       "uploadBooks": "上传书",
       "appearance": "外观",
+      "appearanceDescription": "选择主题、强调色、圆角、表面和背景选项。",
       "theme": "主题",
       "accent": "强调色",
       "radius": "圆角",
@@ -4719,7 +4802,8 @@
         "cta": "GitHub 上的星座BookOrbit"
       },
       "surfaceOpacity": "表面不透明度",
-      "surfaceOpacityValue": "{value}%"
+      "surfaceOpacityValue": "{value}%",
+      "surfaceBrightnessValue": "{value}%"
     },
     "sidebar": {
       "dashboard": "控制面板",
@@ -4760,6 +4844,8 @@
       "seeAllSmartScopes": "查看全部智能书架（{count}）",
       "seeAllCollections": "查看全部合集（{count}）",
       "updateAvailable": "发现 {version} 版本可更新",
+      "updateTooltip": "{version} 版本更新可用",
+      "openUpdateRelease": "在 GitHub 上打开 {version} 版本发布页",
       "zones": {
         "browse": "浏览"
       },
@@ -4854,6 +4940,12 @@
       "light": "亮色的",
       "dark": "深色",
       "system": "系统"
+    },
+    "radiusPicker": {
+      "sharp": "尖角",
+      "default": "默认圆角",
+      "rounded": "圆角",
+      "pill": "胶囊型圆角"
     },
     "languagePicker": {
       "searchPlaceholder": "搜索语言",
@@ -5383,7 +5475,7 @@
         "syncNowCount": "立即同步（{count} 条）"
       },
       "lastSynced": {
-        "justNow": "马上开始",
+        "justNow": "刚刚",
         "minutesAgo": "{count} 分钟前完成同步",
         "hoursAgo": "{count, plural, =0 {# 小时前} one {# 小时前} other {# 小时前}}",
         "daysAgo": "{count, plural, =0 {#天前} one {#天前} other {#天前}}"
@@ -5795,6 +5887,7 @@
   },
   "migration": {
     "sidebarTitle": "书签导入",
+    "importTitle": "书库导入",
     "status": {
       "done": "完成",
       "saved": "已保存",
@@ -5810,7 +5903,8 @@
       "source": {
         "short": "源连接",
         "title": "源连接",
-        "subtitle": "配置指向源 Booklore 实例的数据库连接。"
+        "subtitle": "配置指向源 Booklore 实例的数据库连接。",
+        "genericSubtitle": "配置与源书库应用的连接。"
       },
       "mappings": {
         "short": "用户和路径映射",
@@ -5852,18 +5946,61 @@
       "testConnection": "测试连接",
       "saveAndValidate": "保存并验证",
       "validatedWithWarnings": "经警告验证的源",
+      "types": {
+        "booklore": "书架",
+        "grimmory": "Grimmory",
+        "audiobookshelf": "音频书架",
+        "calibreWebAutomated": "Calibre-Web 自动化"
+      },
       "fields": {
         "type": "源类型",
         "name": "源名称",
+        "namePlaceholder": "书库导入",
         "host": "主机",
         "port": "端口",
         "user": "用户",
         "password": "密码",
         "passwordSaved": "已保存，无需修改",
         "passwordNotSet": "未设置密码",
+        "showSecret": "显示密钥",
+        "hideSecret": "隐藏密钥",
         "database": "数据库",
         "mediaRootPath": "媒体根路径",
-        "ssl": "使用 TLS/SSL"
+        "ssl": "使用 TLS/SSL",
+        "connectionMode": "连接方式",
+        "apiMode": "Live API",
+        "backupMode": "备份档案",
+        "baseUrl": "音频书架URL",
+        "apiToken": "API令牌",
+        "apiTokenPlaceholder": "输入管理员 API 令牌",
+        "secretSaved": "已保存，无需修改",
+        "allowPrivateNetwork": "允许私有网络访问",
+        "allowPrivateNetworkHint": "仅当音频书架托管在信任的本地或私人网络时启用此功能。",
+        "backupPath": "备份文件路径",
+        "backupPathHint": "在已配置的迁移导入目录内，输入绝对服务器路径。",
+        "cwaAppDatabasePath": "Calibre-Web Automated 的 app.db 快照",
+        "cwaAppDatabasePathPlaceholder": "/imports/calibre-web-automated/app.db",
+        "cwaMetadataDatabasePath": "Calibre 的 metadata.db 快照",
+        "cwaMetadataDatabasePathPlaceholder": "/imports/calibre-web-automated/metadata.db"
+      },
+      "validation": {
+        "nameRequired": "源名称不能为空",
+        "databaseFieldsRequired": "主机、用户名、数据库和源名称均为必填",
+        "apiFieldsRequired": "音频书架URL、API令牌和源名称为必填",
+        "baseUrlInvalid": "Audiobookshelf URL 必须是纯 HTTP 或 HTTPS 源地址，不含路径。",
+        "backupPathRequired": "备份文件路径和源名称均为必填。",
+        "backupPathAbsolute": "备份文件路径必须是绝对路径。",
+        "cwaAppDatabasePathRequired": "Calibre-Web Automated 的 app.db 快照路径不能为空。",
+        "cwaAppDatabasePathAbsolute": "Calibre-Web Automated 的 app.db 快照路径必须是绝对路径。",
+        "cwaMetadataDatabasePathRequired": "Calibre 的 metadata.db 快照路径不能为空。",
+        "cwaMetadataDatabasePathAbsolute": "Calibre metadata.db的 snapshot 路径必须是绝对路径"
+      },
+      "cwa": {
+        "snapshotTitle": "停止快照模式",
+        "stoppedWarning": "在复制两个数据库之前停止校准网络自动化。BookOrbit无法验证两张快照是否在完全相同的瞬间复制过。",
+        "importRootGuidance": "两个快照文件都必须是可读的服务器路径在配置的MIGRATION_IMPORT_ROOT 目录下。",
+        "logicalRootGuidance": "书目路径映射使用存储在应用.db中的逻辑校准库根，而不是包含这些数据库快照的主机文件夹。",
+        "compatibilityNote": "Schema行为验证为 Calibre-Web 自动化v4.0.6。其数据库不会暴露可靠的应用程序发布版本。"
       },
       "mediaPath": {
         "hintRequired": "迁移书籍封面所需。",
@@ -5890,6 +6027,7 @@
       "refresh": "刷新",
       "sourceUser": "源用户",
       "targetUser": "目标用户",
+      "doNotImport": "不导入此用户",
       "noSourceUsersLoaded": "尚未加载源用户。",
       "noActiveTargetUsers": "未找到活跃的目标用户。在映射前创建或重新启用书签。",
       "pathPrefixMappings": "路径前缀映射",
@@ -6007,8 +6145,10 @@
       "noFilePathMatch": "文件路径与此库中的任何书不匹配",
       "noFileHashMatch": "文件哈希与此库中的任何书不匹配",
       "noIsbnMatch": "ISBN 不匹配此库中的任何书",
+      "noAsinMatch": "ASIN在这个库中没有匹配任何书",
       "insufficientSourceData": "没有足够的元数据来尝试匹配",
       "ambiguousIsbnMatch": "多本书匹配相同的 ISBN",
+      "ambiguousAsinMatch": "匹配到相同ASIN的多本书",
       "ambiguousFileHashMatch": "多本书匹配相同的文件哈希值",
       "ambiguousFilePathMatch": "多本书匹配相同的文件路径",
       "ambiguousTitleAuthorMatch": "多本书匹配相同的标题和作者",
@@ -6016,6 +6156,7 @@
     },
     "matchStrategy": {
       "isbn": "由 ISBN 匹配",
+      "asin": "按 ASIN 匹配",
       "fileHash": "通过文件哈希匹配",
       "pathMapping": "已映射文件路径匹配",
       "titleAuthor": "按标题和作者匹配",
@@ -6242,7 +6383,7 @@
       "columnsMore": "增加栏数",
       "columnGap": "列间距",
       "justifyText": "对齐文本",
-      "hyphenation": "低温化",
+      "hyphenation": "连字符断字",
       "themes": {
         "default": "默认主题",
         "gray": "灰度",
@@ -7256,8 +7397,8 @@
     "system": {
       "file-naming": "文件名称",
       "book-dock": "Book Dock",
-      "maintenance": "维护费",
-      "audit-log": "审核日志"
+      "maintenance": "维护",
+      "audit-log": "审计日志"
     },
     "account": {
       "profile": "账户",

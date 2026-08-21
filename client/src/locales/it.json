@@ -10,7 +10,7 @@
     "loading": "Caricamento...",
     "search": "Cerca",
     "back": "Indietro",
-    "next": "Avanti",
+    "next": "Prossimo",
     "previous": "Precedente",
     "retry": "Riprova",
     "yes": "Sì",
@@ -60,7 +60,7 @@
         "action": "Carica anteprima",
         "readingTime": "Tempo di lettura",
         "activeDays": "Giornate attive",
-        "started": "I libri sono iniziati",
+        "started": "Libri iniziati",
         "completed": "Libri completati",
         "topBooks": "I migliori libri"
       },
@@ -88,7 +88,7 @@
         "saveError": "Impossibile salvare la preferenza della lingua"
       },
       "pageTitle": "Visualizzazione",
-      "pageSubtitle": "Controlla temi, copertine, layout e come viene presentata la tua libreria.",
+      "pageSubtitle": "Controlla temi, copertine, disposizione e come viene presentata la tua libreria.",
       "mobileSummary": "Tema: {theme} • Accento: {accent} • Sfondo: {background}",
       "themeMode": {
         "light": "Luce",
@@ -220,7 +220,9 @@
         "title": "Copertine di libri",
         "coverSearch": {
           "label": "Motore di ricerca predefinito per le copertine",
-          "hint": "Scegli la fonte selezionata all'apertura di \"Trova copertina online\". Verrà salvata sul tuo account, in modo che sia valida su tutti i dispositivi."
+          "hint": "Scegli la fonte selezionata all'apertura di \"Trova copertina online\". Verrà salvata sul tuo account, in modo che sia valida su tutti i dispositivi.",
+          "loadError": "Impossibile caricare il provider predefinito per la ricerca delle copertine",
+          "saveError": "Impossibile salvare il provider predefinito per la ricerca delle copertine"
         },
         "displayMode": {
           "title": "Modalità di visualizzazione della copertina",
@@ -257,6 +259,22 @@
         "showSpineOnComics": {
           "label": "Mostra il dorso nei fumetti",
           "hint": "Applica l'effetto dorso e lucentezza alle copertine dei fumetti (cbz, cbr, cb7)"
+        },
+        "detailCoverTint": {
+          "title": "Colore della copertina",
+          "hint": "Sfuma il colore estratto dalla copertina dietro l’immagine e il titolo nella pagina dei dettagli del libro",
+          "off": {
+            "label": "Spento",
+            "hint": "Sfondo semplice"
+          },
+          "single": {
+            "label": "Un colore",
+            "hint": "Solo il colore dominante"
+          },
+          "duotone": {
+            "label": "Due colori",
+            "hint": "Aggiunge il colore principale della copertina, se è chiaramente riconoscibile"
+          }
         },
         "shadow": {
           "title": "Copri la forza dell'ombra",
@@ -1152,6 +1170,11 @@
         "account": "Conto"
       }
     },
+    "integrations": {
+      "tabs": {
+        "hardcover": "Hardcover"
+      }
+    },
     "metadata": {
       "title": "Metadati",
       "noPermission": "Non hai l'autorizzazione per gestire le impostazioni dei metadati.",
@@ -2026,6 +2049,14 @@
         "usernamePlaceholder": "ad es. miolettore",
         "password": "Parola d'ordine",
         "passwordPlaceholder": "Minimo 6 caratteri",
+        "changeCredentials": {
+          "newPassword": "Nuova password",
+          "passwordPlaceholder": "Lascia vuoto per mantenere la password attuale",
+          "passwordHint": "Lascialo vuoto per conservare la password attuale.",
+          "passwordInvalid": "La Password deve essere compresa tra 6 e 128 caratteri.",
+          "showPassword": "Mostra nuova password",
+          "hidePassword": "Nascondi nuova password"
+        },
         "creating": "Creazione...",
         "create": "Crea",
         "credentialsCreated": "KOReader credenziali di sincronizzazione create",
@@ -2265,6 +2296,14 @@
         "book-dock": "Book Dock",
         "maintenance": "Manutenzione",
         "audit-log": "Registro di controllo"
+      }
+    },
+    "nav": {
+      "descriptions": {
+        "profile": "Il tuo nome, email, password e sessioni attive.",
+        "appearanceBookCovers": "Ombre della copertina, effetti sul dorso e immagini segnaposto.",
+        "hardcover": "Sincronizza lo stato di lettura e le recensioni con Hardcover.",
+        "magicLinks": "Collegamenti di condivisione e login senza password."
       }
     }
   },
@@ -2954,7 +2993,8 @@
       "forgotPassword": "Password dimenticata?",
       "errors": {
         "invalidCredentials": "Nome utente o password non validi",
-        "tooManyAttempts": "Troppi tentativi di accesso. Attendi un minuto e riprova."
+        "tooManyAttempts": "Troppi tentativi di accesso. Attendi un minuto e riprova.",
+        "accountLocked": "La password è corretta, ma l’account è stato temporaneamente bloccato a causa di troppi tentativi di accesso non riusciti. Riprova tra {minutes, plural, one {# minuto} other {# minuti}}, oppure reimposta la password per sbloccarlo subito."
       }
     },
     "oidc": {
@@ -3249,6 +3289,9 @@
       "all": "TUTTI",
       "any": "QUALSIASI",
       "ofFollowingRules": "delle seguenti regole",
+      "fields": {
+        "cover": "Copertina"
+      },
       "anyProvider": "Qualsiasi fornitore",
       "communityRatingProvider": "Fornitore di valutazioni della comunità",
       "loadingLibraries": "Caricamento librerie...",
@@ -3779,7 +3822,7 @@
         "track": "Traccia {number}",
         "primary": "Principale",
         "read": "Letto",
-        "play": "Gioca",
+        "play": "Ascolta",
         "peek": "Sbircia",
         "download": "Scarica",
         "moreActions": "Più azioni",
@@ -4057,7 +4100,7 @@
         "rate": "Valuta {star} su 5"
       },
       "read": {
-        "play": "Gioca",
+        "play": "Ascolta",
         "read": "Letto",
         "primary": "Principale",
         "peekFormat": "Sbircia {format}",
@@ -4275,6 +4318,11 @@
       "alreadyExistsSaveAs": "Esiste già: salva come:",
       "renamePlaceholder": "ad es. {name} (2)",
       "import": "Importa"
+    },
+    "layout": {
+      "row": {
+        "clickToZoom": "Fai clic su una copertina per ingrandirla"
+      }
     }
   },
   "collection": {
@@ -4591,6 +4639,9 @@
       "tabs": {
         "widgets": "Widget",
         "shelves": "Scaffali"
+      },
+      "shelfNames": {
+        "random": "Scopri qualcosa di nuovo"
       },
       "reorderHintWidget": "Trascina per riordinare. Seleziona per mostrare o nascondere un widget.",
       "reorderHintShelf": "Trascina per riordinare. Attiva/disattiva per mostrare o nascondere uno scaffale.",
@@ -5076,6 +5127,43 @@
       },
       "column": {
         "progress": "Progresso"
+      }
+    },
+    "linkedBooks": {
+      "title": "Libri collegati",
+      "description": "Mostra i libri che stai leggendo. Dopo aver associato un libro a Hardcover, qui puoi scegliere un’edizione diversa (cartacea, ebook o audiolibro) per cambiare l’edizione con cui viene sincronizzato l’avanzamento della lettura.",
+      "loading": "Caricando i libri...",
+      "loadError": "Errore caricando i libri.",
+      "retry": "Ritenta",
+      "empty": "Nessun libro letto.",
+      "untitled": "Senza titolo",
+      "unknownAuthor": "Autore sconosciuto",
+      "matchMethod": {
+        "isbn": "ISBN",
+        "title": "Titolo",
+        "cached": "Memorizzato nella cache",
+        "manual": "Manuale",
+        "metadata_id": "Corrispondenza metadati"
+      },
+      "status": {
+        "error": "Errore: {error}",
+        "linked": "Collegato",
+        "linkedWithMethod": "Collegato ({method})",
+        "notLinked": "Non ancora collegato"
+      },
+      "unmatchedHint": "Questo libro non è ancora stato associato ad Hardcover. L’associazione avverrà automaticamente alla prossima sincronizzazione.",
+      "editionsLoadError": "Impossibile caricare le edizioni.",
+      "viewEditions": "Visualizza le edizioni",
+      "noEditionsFound": "Nessuna edizione trovata.",
+      "booksTruncated": "Visualizzazione dei primi {count} libri che stai leggendo.",
+      "editionsTruncated": "Visualizzazione delle prime {count} edizioni.",
+      "pages": "{count, plural, one {# pagina} other {# pagine}}",
+      "isbn": "ISBN {isbn}",
+      "current": "Attuale",
+      "useThis": "Usalo",
+      "toast": {
+        "switched": "Passaggio al formato {format} completato",
+        "switchFailed": "Impossibile cambiare edizione"
       }
     }
   },
@@ -5936,7 +6024,7 @@
       "noChapters": "Nessun capitolo disponibile.",
       "noBookmarks": "Nessun segnalibro ancora.",
       "noBookmarksHint": "Tocca l'icona del segnalibro in alto per salvare la tua posizione corrente.",
-      "playerSettings": "Impostazioni del giocatore",
+      "playerSettings": "Impostazioni del lettore",
       "skipBack": "Torna indietro",
       "skipForward": "Vai avanti"
     }

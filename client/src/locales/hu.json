@@ -1,6 +1,8 @@
 {
   "common": {
+    "resetSortAria": "Visszaállítás alap állapotra",
     "save": "Mentés",
+    "yes": "Igen",
     "no": "Nem"
   }
 }

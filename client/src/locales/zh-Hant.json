@@ -1,1 +1,30 @@
-{}
+{
+  "common": {
+    "resetSortAria": "恢复至默认排序",
+    "save": "儲存",
+    "cancel": "取消",
+    "delete": "刪除",
+    "edit": "編輯",
+    "close": "關閉",
+    "confirm": "確認",
+    "loading": "讀取中...",
+    "search": "搜尋",
+    "back": "返回上一步",
+    "next": "下一步",
+    "previous": "上一個",
+    "retry": "重試",
+    "yes": "確定",
+    "no": "否"
+  },
+  "settings": {
+    "privacySharing": {
+      "title": "私密与分享",
+      "current": "目前設定",
+      "levels": {
+        "private": {
+          "title": "不公開"
+        }
+      }
+    }
+  }
+}
