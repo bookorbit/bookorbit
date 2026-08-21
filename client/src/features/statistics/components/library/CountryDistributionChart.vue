@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onActivated, watch } from 'vue'
+import { computed, ref, onMounted, onActivated, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import * as echarts from 'echarts'
 import { Globe } from '@lucide/vue'
-import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
+import { breakpointsTailwind, useBreakpoints, useMutationObserver } from '@vueuse/core'
 import { api } from '@/lib/api'
 import { ECHARTS_COUNTRY_MAP } from '@/lib/country-map'
 
@@ -20,13 +20,76 @@ const isLoading = ref(true)
 const hasError = ref(false)
 const isMapReady = ref(false)
 
+// Estado do filtro
+const statusFilter = ref('all')
+
+const chartWrapper = ref<HTMLElement | null>(null)
+const themeTrigger = ref(0)
+const chartColors = ref({
+  primary: 'rgba(2, 132, 199, 1)',
+  primaryLight: 'rgba(2, 132, 199, 0.25)',
+  empty: 'rgba(243, 244, 246, 1)',
+  border: 'rgba(229, 231, 235, 1)',
+})
+
+useMutationObserver(
+  typeof document !== 'undefined' ? document.documentElement : null,
+  () => {
+    themeTrigger.value += 1
+    updateColors()
+  },
+  { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] },
+)
+
+function resolveEchartsColor(varNames: string[], alpha: number, fallback: string): string {
+  if (typeof document === 'undefined') return fallback
+
+  const target = chartWrapper.value || document.documentElement
+  const styles = getComputedStyle(target)
+
+  let val = ''
+  for (const v of varNames) {
+    val = styles.getPropertyValue(v).trim()
+    if (val) break
+  }
+
+  if (!val) return fallback
+
+  let cssColor = val
+  if (!val.includes('(') && val.includes(' ')) {
+    const formatted = val.replace(/(?:\s+|,+)/g, ', ')
+    cssColor = val.includes('%') ? `hsl(${formatted})` : `rgb(${formatted})`
+  }
+
+  const cvs = document.createElement('canvas')
+  cvs.width = 1
+  cvs.height = 1
+  const ctx = cvs.getContext('2d', { willReadFrequently: true })
+
+  if (!ctx) return cssColor
+
+  ctx.fillStyle = cssColor
+  ctx.fillRect(0, 0, 1, 1)
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+
+  if (a === 0 && cssColor !== 'transparent') return fallback
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function updateColors() {
+  chartColors.value.primary = resolveEchartsColor(['--chart-2', '--color-chart-2', '--primary'], 1, 'rgba(2, 132, 199, 1)')
+  chartColors.value.primaryLight = resolveEchartsColor(['--chart-2', '--color-chart-2', '--primary'], 0.25, 'rgba(2, 132, 199, 0.25)')
+  chartColors.value.empty = resolveEchartsColor(['--muted', '--color-muted', '--background'], 1, 'rgba(243, 244, 246, 1)')
+  chartColors.value.border = resolveEchartsColor(['--border', '--color-border'], 1, 'rgba(229, 231, 235, 1)')
+}
+
 async function fetchMap() {
   if (isMapReady.value) return
   try {
     const mapRes = await fetch('/maps/world.json', { cache: 'force-cache' })
     if (mapRes.ok) {
       const worldJson = await mapRes.json()
-      // Extrai dinamicamente o tipo do segundo argumento de registerMap
       echarts.registerMap('world', worldJson as Parameters<typeof echarts.registerMap>[1])
       isMapReady.value = true
     } else {
@@ -39,11 +102,13 @@ async function fetchMap() {
 
 async function fetchStats() {
   try {
-    const apiRes = await api('/api/v1/statistics/country-distribution?libraryIds=1', {
-      headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
+    let endpoint = '/api/v1/statistics/country-distribution?libraryIds=1'
+    if (statusFilter.value !== 'all') {
+      endpoint += `&readStatus=${statusFilter.value}`
+    }
+
+    const apiRes = await api(endpoint, {
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
     })
 
     if (apiRes.ok) {
@@ -63,21 +128,17 @@ async function loadData() {
   hasError.value = false
   await Promise.all([fetchMap(), fetchStats()])
   isLoading.value = false
+
+  await nextTick()
+  updateColors()
 }
 
-// Gatilhos de ciclo de vida nativos
 onMounted(loadData)
 onActivated(loadData)
 
-// Gatilho agressivo de navegação SPA: sempre que a rota mudar para esta tela, force o recarregamento.
-if (route) {
-  watch(
-    () => route.fullPath,
-    () => {
-      loadData()
-    },
-  )
-}
+watch([() => route?.fullPath, statusFilter], () => {
+  loadData()
+})
 
 const aggregatedItems = computed(() => {
   if (!rawItems.value.length) return []
@@ -86,27 +147,26 @@ const aggregatedItems = computed(() => {
     .filter((item) => {
       const countryVal = item.country
       const code = typeof countryVal === 'string' ? countryVal.trim() : ''
-      return code && code.toLowerCase() !== 'unknown'
+      const countVal = item.count ?? item.value
+      const value = typeof countVal === 'number' ? countVal : 0
+
+      return code && code.toLowerCase() !== 'unknown' && value > 0
     })
     .map((item) => {
       const countryVal = item.country
       const code = typeof countryVal === 'string' ? countryVal.trim().toUpperCase() : ''
-
       const echartsName = ECHARTS_COUNTRY_MAP[code] || code
       const localizedName = t(`countryCodes.${code}`, code)
-
       const countVal = item.count ?? item.value
       const value = typeof countVal === 'number' ? countVal : 0
 
-      return {
-        name: echartsName,
-        value,
-        localizedName,
-      }
+      return { name: echartsName, value, localizedName }
     })
 })
 
 const chartOption = computed(() => {
+  themeTrigger.value
+
   if (!isMapReady.value) return {}
 
   const maxVal = aggregatedItems.value.length ? Math.max(...aggregatedItems.value.map((d) => d.value), 5) : 5
@@ -123,7 +183,7 @@ const chartOption = computed(() => {
       },
     },
     visualMap: {
-      min: 0,
+      min: 1,
       max: maxVal,
       left: md.value ? 'left' : 'center',
       bottom: md.value ? 'bottom' : 0,
@@ -131,7 +191,7 @@ const chartOption = computed(() => {
       text: [t('common.high', 'High'), t('common.low', 'Low')],
       calculable: true,
       inRange: {
-        color: ['#e0f2fe', '#38bdf8', '#0284c7', '#0369a1'],
+        color: [chartColors.value.primaryLight, chartColors.value.primary],
       },
     },
     series: [
@@ -142,6 +202,10 @@ const chartOption = computed(() => {
         roam: true,
         zoom: 1.25,
         center: [15, 20],
+        itemStyle: {
+          areaColor: chartColors.value.empty,
+          borderColor: chartColors.value.border,
+        },
         emphasis: {
           label: {
             show: true,
@@ -152,7 +216,7 @@ const chartOption = computed(() => {
             },
           },
           itemStyle: {
-            areaColor: '#f43f5e',
+            areaColor: chartColors.value.primary,
           },
         },
         data: aggregatedItems.value,
@@ -171,6 +235,20 @@ const chartOption = computed(() => {
     :loading="isLoading || !isMapReady"
     :title="t('statistics.charts.countryDistribution.title')"
   >
-    <VChart v-if="isMapReady && chartOption.series" :option="chartOption" autoresize style="height: 100%" />
+    <template #controls>
+      <select
+        v-model="statusFilter"
+        class="h-8 cursor-pointer rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <option value="all">Todos</option>
+        <option value="READ">Lidos</option>
+        <option value="UNREAD">Não Lidos</option>
+        <option value="WANT_TO_READ">Quero Ler</option>
+      </select>
+    </template>
+
+    <div ref="chartWrapper" style="height: 100%; width: 100%">
+      <VChart v-if="isMapReady && chartOption.series" :option="chartOption" autoresize style="height: 100%" />
+    </div>
   </ChartCard>
 </template>
