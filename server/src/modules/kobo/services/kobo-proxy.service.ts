@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { decodeSyncToken } from './kobo-sync-token';
 
 const KOBO_API_BASE = 'https://storeapi.kobo.com';
@@ -22,7 +23,7 @@ const DROP_HEADERS = new Set([
   'proxy-authenticate',
   'proxy-authorization',
   'te',
-  'trailers',
+  'trailer',
   'transfer-encoding',
   'upgrade',
   'content-length',
@@ -42,6 +43,21 @@ export type KoboProxyRequestOptions = {
   timeoutMs?: number;
 };
 
+/**
+ * Reads the `Connection` header from a header bag, splits it on commas, lowercases each field
+ * name, and returns the result. RFC 7230 §6.1 says every field listed in `Connection` is
+ * hop-specific: a proxy must remove those fields before forwarding the message.
+ */
+function readConnectionFieldNames(headers: Record<string, string | string[] | undefined>): string[] {
+  const raw = headers['connection'];
+  if (raw === undefined) return [];
+  const values = Array.isArray(raw) ? raw : [raw];
+  return values
+    .flatMap((v) => v.split(','))
+    .map((name) => name.trim().toLowerCase())
+    .filter((name) => name.length > 0);
+}
+
 @Injectable()
 export class KoboProxyService {
   private readonly logger = new Logger(KoboProxyService.name);
@@ -52,11 +68,14 @@ export class KoboProxyService {
 
     // Fastify lowercases header keys, but defensive: lowercase the lookup keys too.
     const sourceHeaders = req.headers as Record<string, string | string[] | undefined>;
+    const connectionFields = new Set(readConnectionFieldNames(sourceHeaders));
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(sourceHeaders)) {
       if (value === undefined) continue;
-      if (DROP_HEADERS.has(key.toLowerCase())) continue;
-      headers[key.toLowerCase()] = Array.isArray(value) ? (value[0] ?? '') : value;
+      const lowerKey = key.toLowerCase();
+      if (DROP_HEADERS.has(lowerKey)) continue;
+      if (connectionFields.has(lowerKey)) continue;
+      headers[lowerKey] = Array.isArray(value) ? (value[0] ?? '') : value;
     }
 
     for (const key of options.omitHeaders ?? []) {
@@ -94,7 +113,11 @@ export class KoboProxyService {
    * state where the device has an entitlement BookOrbit never sees on this iteration.
    */
   async forward(req: FastifyRequest, reply: FastifyReply, deviceToken: string): Promise<void> {
+    const startedAt = Date.now();
     const targetUrl = this.resolveTargetUrl(req, deviceToken);
+    const deviceId = (req as unknown as { koboDevice?: { deviceId: number } }).koboDevice?.deviceId;
+
+    this.logger.debug(`[kobo.proxy] [start] deviceId=${deviceId ?? 'unknown'} - upstream Kobo relay started`);
 
     const syncTokenHeader = this.readSyncTokenHeader(req);
     const koboCursor = syncTokenHeader ? decodeSyncToken(syncTokenHeader).koboSyncToken : undefined;
@@ -108,8 +131,16 @@ export class KoboProxyService {
           : {}),
       });
       this.sendUpstream(reply, response);
-    } catch (err) {
-      this.logger.warn(`Proxy failed for ${targetUrl}: ${(err as Error).message}`);
+      this.logger.debug(
+        `[kobo.proxy] [end] deviceId=${deviceId ?? 'unknown'} durationMs=${Date.now() - startedAt} upstreamStatus=${response.status} - upstream Kobo relay completed`,
+      );
+    } catch (err: unknown) {
+      const errorClass = err instanceof Error ? err.name : 'UnknownError';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : 'unknown error');
+      const sanitizedUrl = sanitizeLogValue(targetUrl);
+      this.logger.warn(
+        `[kobo.proxy] [fail] deviceId=${deviceId ?? 'unknown'} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" targetUrl="${sanitizedUrl}" - upstream Kobo relay failed`,
+      );
       reply.status(502).send({ message: 'Upstream Kobo API unavailable' });
     }
   }
@@ -117,10 +148,12 @@ export class KoboProxyService {
   /** Relays an upstream response to the device, dropping the headers that must not be forwarded. */
   sendUpstream(reply: FastifyReply, response: KoboProxyResponse): void {
     reply.status(response.status);
+    const connectionFields = new Set(readConnectionFieldNames(response.headers));
     for (const [key, value] of Object.entries(response.headers)) {
-      if (!DROP_HEADERS.has(key)) {
-        reply.header(key, value);
-      }
+      const lowerKey = key.toLowerCase();
+      if (DROP_HEADERS.has(lowerKey)) continue;
+      if (connectionFields.has(lowerKey)) continue;
+      reply.header(lowerKey, value);
     }
     reply.send(response.body);
   }

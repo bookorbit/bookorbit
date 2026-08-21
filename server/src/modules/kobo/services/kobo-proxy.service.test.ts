@@ -243,6 +243,98 @@ describe('KoboProxyService', () => {
     });
   });
 
+  describe('hop-by-hop header handling', () => {
+    it('strips the singular Trailer header field on the way out', async () => {
+      const service = new KoboProxyService();
+      const upstream = {
+        status: 200,
+        headers: new Headers(),
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+      };
+      const fetchMock = vi.fn().mockResolvedValue(upstream);
+      vi.stubGlobal('fetch', fetchMock);
+
+      await service.forward(
+        {
+          method: 'GET',
+          url: '/api/v1/kobo/dev/v1/library/sync',
+          headers: makeHeaders({
+            trailer: 'x-internal-state',
+            'x-kobo-deviceid': 'device-id',
+          }),
+        } as never,
+        makeReply() as never,
+        'dev',
+      );
+
+      const sentHeaders = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+      expect(sentHeaders).not.toHaveProperty('trailer');
+      expect(sentHeaders['x-kobo-deviceid']).toBe('device-id');
+    });
+
+    it('drops header fields nominated by the device Connection header before forwarding', async () => {
+      const service = new KoboProxyService();
+      const upstream = {
+        status: 200,
+        headers: new Headers(),
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+      };
+      const fetchMock = vi.fn().mockResolvedValue(upstream);
+      vi.stubGlobal('fetch', fetchMock);
+
+      await service.forward(
+        {
+          method: 'GET',
+          url: '/api/v1/kobo/dev/v1/library/sync',
+          headers: makeHeaders({
+            connection: 'x-kobo-tracking, x-kobo-internal',
+            'x-kobo-tracking': 'should-be-stripped',
+            'x-kobo-internal': 'also-stripped',
+            'x-kobo-deviceid': 'device-id',
+          }),
+        } as never,
+        makeReply() as never,
+        'dev',
+      );
+
+      const sentHeaders = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+      expect(sentHeaders).not.toHaveProperty('x-kobo-tracking');
+      expect(sentHeaders).not.toHaveProperty('x-kobo-internal');
+      expect(sentHeaders['x-kobo-deviceid']).toBe('device-id');
+    });
+
+    it('drops header fields nominated by the upstream Connection header before relaying the response', async () => {
+      const service = new KoboProxyService();
+      const upstream = {
+        status: 200,
+        headers: new Headers({
+          connection: 'x-kobo-tracking, x-kobo-internal',
+          'x-kobo-tracking': 'should-be-stripped',
+          'x-kobo-internal': 'also-stripped',
+          'x-kobo-deviceid': 'device-id',
+        }),
+        arrayBuffer: vi.fn().mockResolvedValue(new TextEncoder().encode('{}').buffer),
+      };
+      const fetchMock = vi.fn().mockResolvedValue(upstream);
+      vi.stubGlobal('fetch', fetchMock);
+
+      const reply = makeReply();
+      await service.forward(
+        {
+          method: 'GET',
+          url: '/api/v1/kobo/dev/v1/library/sync',
+          headers: makeHeaders({}),
+        } as never,
+        reply as never,
+        'dev',
+      );
+
+      expect(reply.header).not.toHaveBeenCalledWith('x-kobo-tracking', expect.anything());
+      expect(reply.header).not.toHaveBeenCalledWith('x-kobo-internal', expect.anything());
+      expect(reply.header).toHaveBeenCalledWith('x-kobo-deviceid', 'device-id');
+    });
+  });
+
   describe('request', () => {
     function stubUpstream(headers: Record<string, string>, body = '[]') {
       const fetchMock = vi.fn().mockResolvedValue({
