@@ -211,11 +211,6 @@ describe('ICU message compilation', () => {
   })
 
   it('keeps reviewed technical terms in their software context', () => {
-    for (const catalog of [spanish, french, italian, polish]) {
-      expect(catalog.settings.oidc.form.slug).toBe('Slug')
-      expect(catalog.annotations.hub.exportMarkdown).toBe('Markdown')
-    }
-
     expect(spanish.settings.metadata.autoFetch.runNow).toBe('Ejecutar ahora')
     expect(french.settings.metadata.autoFetch.runNow).toBe('Exécuter maintenant')
     expect(italian.settings.metadata.autoFetch.runNow).toBe('Esegui ora')

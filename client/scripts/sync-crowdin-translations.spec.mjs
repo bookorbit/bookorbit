@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { assertCrowdinTargetConfiguration, validateCrowdinTargetConfiguration } from './locale-configuration.mjs'
 import { flattenCatalog, validateCatalogs } from './locale-catalog-validation.mjs'
 import { collectSourceMessageKeys } from './locale-source-keys.mjs'
+import { findProtectedTermDrift } from './locale-protected-terms.mjs'
 import {
   TARGET_CATALOGS,
   assertSafeDownloadUrl,
@@ -314,6 +315,7 @@ describe('Crowdin translation synchronization', () => {
       outputDirectory,
       targetCatalogs,
       assertTargetConfiguration: async () => {},
+      protectedTerms: [],
     })
 
     expect(maximumDownloads).toBe(4)
@@ -334,6 +336,7 @@ describe('Crowdin translation synchronization', () => {
         outputDirectory,
         targetCatalogs,
         assertTargetConfiguration: async () => {},
+        protectedTerms: [],
       }),
     ).rejects.toThrow('Crowdin source is not synchronized with en.json')
     expect(fetchImpl.mock.calls.some(([input]) => new URL(input).hostname === 'downloads.example.test')).toBe(false)
@@ -355,6 +358,7 @@ describe('Crowdin translation synchronization', () => {
       targetCatalogs,
       reportPath,
       assertTargetConfiguration: async () => {},
+      protectedTerms: [],
     })
 
     expect(rejections).toEqual([
@@ -386,6 +390,7 @@ describe('Crowdin translation synchronization', () => {
         outputDirectory,
         targetCatalogs,
         assertTargetConfiguration: async () => {},
+        protectedTerms: [],
       }),
     ).rejects.toThrow('rejected by catalog validation')
     await expect(access(outputDirectory)).rejects.toThrow()
@@ -406,6 +411,7 @@ describe('Crowdin translation synchronization', () => {
         outputDirectory,
         targetCatalogs,
         assertTargetConfiguration: async () => {},
+        protectedTerms: [],
       }),
     ).rejects.toThrow('missing from Crowdin export')
     await expect(access(outputDirectory)).rejects.toThrow()
@@ -426,8 +432,9 @@ describe('Crowdin translation synchronization', () => {
         outputDirectory,
         targetCatalogs,
         assertTargetConfiguration: async () => {},
+        protectedTerms: [],
       }),
-    ).resolves.toEqual({ rejections: [] })
+    ).resolves.toEqual({ rejections: [], corrections: [] })
     expect(JSON.parse(await readFile(path.join(outputDirectory, `${targetCatalogs[0].locale}.json`), 'utf8'))).toEqual({
       common: { save: 'Save' },
     })
@@ -454,6 +461,7 @@ describe('Crowdin translation synchronization', () => {
       outputDirectory,
       targetCatalogs,
       assertTargetConfiguration: async () => {},
+      protectedTerms: [],
       collectMessageKeys: async () => ({ keys: new Set([key]), slotCountKeys: new Set([key]) }),
     })
 
@@ -471,6 +479,82 @@ describe('Crowdin translation synchronization', () => {
       written.set(locale, flattenCatalog(JSON.parse(await readFile(path.join(outputDirectory, `${locale}.json`), 'utf8'))))
     }
     expect(validateCatalogs({ catalogs: written, slotCountKeys: new Set([key]) })).toEqual([])
+  })
+
+  it('reports a protected term only for the locales that were reviewed', () => {
+    const catalogs = new Map([
+      [
+        'en',
+        new Map([
+          ['settings.oidc.form.slug', 'Slug'],
+          ['annotations.hub.exportMarkdown', 'Markdown'],
+        ]),
+      ],
+      ['es', new Map([['settings.oidc.form.slug', 'Nombre corto de URL']])],
+      ['da', new Map([['settings.oidc.form.slug', 'Snegl']])],
+    ])
+
+    expect(findProtectedTermDrift({ catalogs })).toEqual([
+      { locale: 'es', key: 'settings.oidc.form.slug', message: 'Nombre corto de URL', source: 'Slug' },
+    ])
+  })
+
+  it('ignores a protected term a sparse catalog does not carry', () => {
+    const catalogs = new Map([
+      [
+        'en',
+        new Map([
+          ['settings.oidc.form.slug', 'Slug'],
+          ['annotations.hub.exportMarkdown', 'Markdown'],
+        ]),
+      ],
+      ['es', new Map()],
+    ])
+
+    expect(findProtectedTermDrift({ catalogs })).toEqual([])
+  })
+
+  it('fails loudly when a protected term leaves the English catalog', () => {
+    expect(() =>
+      findProtectedTermDrift({
+        catalogs: new Map([['en', new Map()]]),
+        terms: [{ key: 'settings.oidc.form.slug', locales: ['es'] }],
+      }),
+    ).toThrow('Protected term settings.oidc.form.slug is missing from the English catalog')
+  })
+
+  it('keeps every protected term present in the shipped English catalog', async () => {
+    const reference = flattenCatalog(JSON.parse(await readFile(path.join(process.cwd(), 'src/locales/en.json'), 'utf8')))
+
+    expect(findProtectedTermDrift({ catalogs: new Map([['en', reference]]) })).toEqual([])
+  })
+
+  it('restores a protected term Crowdin translated instead of failing the run', async () => {
+    const key = 'settings.oidc.form.slug'
+    const translated = { settings: { oidc: { form: { slug: 'Slug' } } } }
+    const referenceCatalog = { ...translated, annotations: { hub: { exportMarkdown: 'Markdown' } } }
+    const targetCatalogs = TARGET_CATALOGS.filter(({ locale }) => locale === 'es')
+    const currentCatalogs = new Map([['es', translated]])
+    const catalogDirectory = await createCatalogFixture(targetCatalogs, currentCatalogs, referenceCatalog)
+    const outputDirectory = path.join(catalogDirectory, 'output')
+    const reportPath = path.join(catalogDirectory, 'rejections.md')
+    const catalogs = new Map([[targetCatalogs[0].languageId, { settings: { oidc: { form: { slug: 'Nombre corto de URL' } } } }]])
+
+    const { rejections, corrections } = await syncCrowdinTranslations({
+      token: 'secret',
+      fetchImpl: createSynchronizationFetch({ identifiers: [key, 'annotations.hub.exportMarkdown'], catalogs }),
+      catalogDirectory,
+      outputDirectory,
+      targetCatalogs,
+      reportPath,
+      assertTargetConfiguration: async () => {},
+      collectMessageKeys: async () => ({ keys: new Set([key]), slotCountKeys: new Set() }),
+    })
+
+    expect(rejections).toEqual([])
+    expect(corrections).toEqual([{ locale: 'es', key, message: 'Nombre corto de URL', source: 'Slug' }])
+    expect(JSON.parse(await readFile(path.join(outputDirectory, 'es.json'), 'utf8'))).toEqual(translated)
+    expect(await readFile(reportPath, 'utf8')).toContain(`es: ${key} was "Nombre corto de URL"`)
   })
 
   it('scans the same sources locale validation scans', async () => {

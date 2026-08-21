@@ -4,6 +4,7 @@ import path from 'node:path'
 import { SUPPORTED_LOCALES } from './locale-configuration.mjs'
 import { flattenCatalog, validateCatalogs } from './locale-catalog-validation.mjs'
 import { collectSourceMessageKeys } from './locale-source-keys.mjs'
+import { findProtectedTermDrift } from './locale-protected-terms.mjs'
 
 const clientRoot = fileURLToPath(new URL('..', import.meta.url))
 const localesDirectory = path.join(clientRoot, 'src/locales')
@@ -25,6 +26,9 @@ if (!reference) throw new Error('English reference catalog is required')
 
 const { keys: referencedKeys, slotCountKeys } = await collectSourceMessageKeys()
 const errors = validateCatalogs({ catalogs, referencedKeys, slotCountKeys })
+for (const { locale, key, message } of findProtectedTermDrift({ catalogs })) {
+  errors.push(`${locale}: protected term ${key} must keep the English source text, found "${message}"`)
+}
 
 if (errors.length > 0) {
   throw new Error(`Locale validation failed:\n${errors.join('\n')}`)
