@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OidcErrorCode } from '@bookorbit/types';
 import type { OidcAutoProvision, OidcClaimMapping } from '@bookorbit/types';
 
 import { ensureSafeUrl, PrivateAddressException } from '../../common/utils/ssrf.utils';
@@ -114,9 +115,10 @@ export class OidcProviderService {
       parsed = await ensureSafeUrl(issuerUri, { allowLocal: allowPrivateOidcIssuers, allowPrivate: allowPrivateOidcIssuers });
     } catch (err) {
       if (err instanceof PrivateAddressException) {
-        throw new BadRequestException(
-          'Issuer URL resolves to a private or local address. To allow private network OIDC providers, set OIDC_ALLOW_LOCAL_ISSUERS=true.',
-        );
+        throw new BadRequestException({
+          message: 'Issuer URL resolves to a private or local address. To allow private network OIDC providers, set OIDC_ALLOW_LOCAL_ISSUERS=true.',
+          errorCode: OidcErrorCode.PRIVATE_ISSUER_ADDRESS,
+        });
       }
       throw err;
     }

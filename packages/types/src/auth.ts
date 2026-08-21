@@ -4,6 +4,7 @@ export enum LoginErrorCode {
 
 export enum OidcErrorCode {
   STATE_EXPIRED = "oidc_state_expired",
+  PRIVATE_ISSUER_ADDRESS = "oidc_private_issuer_address",
   TOKEN_EXCHANGE_FAILED = "oidc_token_exchange_failed",
   USER_NOT_PROVISIONED = "oidc_user_not_provisioned",
   USER_INACTIVE = "oidc_user_inactive",

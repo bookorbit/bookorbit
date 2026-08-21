@@ -731,6 +731,7 @@
       "test": {
         "connected": "Connected - {issuer}",
         "connectionFailed": "Connection failed",
+        "privateIssuerAddress": "The issuer URL resolves to a private or local network address, so the server refused to connect. Set OIDC_ALLOW_LOCAL_ISSUERS=true on the BookOrbit server to allow it.",
         "hide": "Hide",
         "details": "Details",
         "supported": "supported",

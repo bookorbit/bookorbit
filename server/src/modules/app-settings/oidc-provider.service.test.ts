@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OidcErrorCode } from '@bookorbit/types';
 
 vi.mock('../../common/utils/ssrf.utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../common/utils/ssrf.utils')>();
@@ -217,6 +218,7 @@ describe('OidcProviderService', () => {
       expect(err).toBeInstanceOf(BadRequestException);
       expect(err.getResponse()).toMatchObject({
         message: expect.stringContaining('OIDC_ALLOW_LOCAL_ISSUERS=true'),
+        errorCode: OidcErrorCode.PRIVATE_ISSUER_ADDRESS,
       });
     });
 

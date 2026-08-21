@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import { generatePkce } from '@/features/auth/composables/useOidc'
 import { toast } from 'vue-sonner'
-import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
+import { OidcErrorCode, Permission, PERMISSION_LABELS } from '@bookorbit/types'
 import { ArrowLeft, Plus, ShieldCheck, Trash2 } from '@lucide/vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -16,6 +16,10 @@ const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
 })
 
 const { t } = useI18n()
+
+const OIDC_TEST_ERROR_MESSAGE_KEYS: Record<string, string> = {
+  [OidcErrorCode.PRIVATE_ISSUER_ADDRESS]: 'settings.oidc.test.privateIssuerAddress',
+}
 
 interface ProviderSummary {
   id: number
@@ -281,7 +285,16 @@ async function testConnection() {
   try {
     const slug = editingSlug.value ?? form.slug ?? '_new'
     const res = await api(`/api/v1/app-settings/oidc/providers/${slug}/test?issuerUri=${encodeURIComponent(form.issuerUri)}`, { method: 'POST' })
-    testResult.value = await res.json()
+    const body = await res.json()
+    if (!res.ok) {
+      const messageKey = typeof body?.errorCode === 'string' ? OIDC_TEST_ERROR_MESSAGE_KEYS[body.errorCode] : undefined
+      testResult.value = {
+        success: false,
+        error: messageKey ? t(messageKey) : t('settings.oidc.test.connectionFailed'),
+      }
+      return
+    }
+    testResult.value = body
   } catch {
     testResult.value = {
       success: false,
