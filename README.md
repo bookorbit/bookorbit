@@ -97,6 +97,10 @@ Open `http://your-server-ip:3000` and complete setup using your `SETUP_BOOTSTRAP
 
 For the full installation guide including reverse proxy setup, file permissions on NAS, external databases, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation)**.
 
+Prefer not to run a server? One-click managed BookOrbit, with storage, backups and a free subdomain included. A share of every subscription goes back to BookOrbit.
+
+[![Deploy with Zenith](https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg)](https://zenith.hosting/host/bookorbit)
+
 ## KOReader Plugin
 
 The BookOrbit plugin for KOReader adds progress sync, two-way annotation sync, and a native catalog browser: navigate, search, and download books from your library without leaving the device.
