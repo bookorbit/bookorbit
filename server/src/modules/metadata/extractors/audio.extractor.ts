@@ -8,6 +8,14 @@ const execFile = promisify(execFileCallback);
 const FFPROBE_PATH = process.env.FFPROBE_PATH || 'ffprobe';
 const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
 
+// These subprocesses run against untrusted library files during scanning, so bound
+// both their runtime and their output. Mirrors the limits already applied in
+// file-write/formats/audio/audio-metadata-embedder.ts.
+const FFPROBE_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
+const FFPROBE_TIMEOUT_MS = 60_000;
+const FFMPEG_TIMEOUT_MS = 60_000;
+const FFMPEG_COVER_MAX_BYTES = 10 * 1024 * 1024;
+
 export interface AudioExtractResult {
   title: string | null;
   subtitle: string | null;
@@ -50,16 +58,11 @@ interface FfprobeOutput {
 
 export async function extractAudioMetadata(absolutePath: string): Promise<AudioExtractResult> {
   try {
-    const { stdout } = await execFile(FFPROBE_PATH, [
-      '-v',
-      'quiet',
-      '-print_format',
-      'json',
-      '-show_format',
-      '-show_chapters',
-      '-show_streams',
-      absolutePath,
-    ]);
+    const { stdout } = await execFile(
+      FFPROBE_PATH,
+      ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', '-show_streams', absolutePath],
+      { maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES, timeout: FFPROBE_TIMEOUT_MS },
+    );
 
     const data: FfprobeOutput = JSON.parse(stdout);
     const tags = normalizeTags(data.format?.tags ?? {});
@@ -140,7 +143,10 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
 
 export async function parseAudioDuration(absolutePath: string): Promise<number | null> {
   try {
-    const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', absolutePath]);
+    const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', absolutePath], {
+      maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES,
+      timeout: FFPROBE_TIMEOUT_MS,
+    });
     const data: FfprobeOutput = JSON.parse(stdout);
     return parseDurationSeconds(data.format?.duration);
   } catch {
@@ -154,13 +160,25 @@ async function extractCoverBytes(absolutePath: string, streams: FfprobeStream[])
 
   return new Promise<Buffer | null>((resolve) => {
     const chunks: Buffer[] = [];
+    let total = 0;
+    let aborted = false;
     const proc = spawn(FFMPEG_PATH, ['-y', '-i', absolutePath, '-map', '0:v', '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', 'pipe:1'], {
       stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: FFMPEG_TIMEOUT_MS,
     });
 
-    proc.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+    proc.stdout.on('data', (chunk: Buffer) => {
+      if (aborted) return;
+      total += chunk.length;
+      if (total > FFMPEG_COVER_MAX_BYTES) {
+        aborted = true;
+        proc.kill();
+        return;
+      }
+      chunks.push(chunk);
+    });
     proc.on('close', (code) => {
-      if (code === 0 && chunks.length > 0) {
+      if (!aborted && code === 0 && chunks.length > 0) {
         resolve(Buffer.concat(chunks));
       } else {
         resolve(null);
