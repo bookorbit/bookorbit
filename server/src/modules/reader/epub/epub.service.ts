@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { stat } from 'fs/promises';
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
@@ -35,6 +35,10 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 const MAX_CACHE = 50;
+// container.xml / OPF / NCX / nav are structural XML files that are a few KB in real
+// EPUBs. Cap them so a crafted archive cannot point one of these roles at a
+// decompression bomb and exhaust memory during parsing.
+const MAX_XML_ENTRY_BYTES = 10 * 1024 * 1024;
 const OPTIONAL_META_INF_FILES = [
   'META-INF/encryption.xml',
   'META-INF/com.apple.ibooks.display-options.xml',
@@ -52,6 +56,7 @@ interface CacheEntry {
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
+  removeNSPrefix: true,
   textNodeName: '#text',
 });
 
@@ -69,6 +74,26 @@ function getText(v: unknown): string | null {
     if (typeof text === 'number') return String(text);
   }
   return null;
+}
+
+/**
+ * Reads a zip entry fully into memory, aborting if it exceeds `maxBytes`.
+ * `entry.buffer()` inflates the whole entry with no ceiling, so structural XML
+ * entries are read through this instead.
+ */
+async function readEntryBounded(entry: unzipper.File, maxBytes: number): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  const stream = entry.stream();
+  for await (const chunk of stream as AsyncIterable<Buffer>) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      stream.destroy();
+      throw new UnprocessableEntityException(`EPUB entry exceeds maximum allowed size of ${maxBytes} bytes: ${entry.path}`);
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 function findInZip(files: unzipper.File[], path: string): unzipper.File | undefined {
@@ -166,7 +191,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
 
   const containerEntry = findInZip(zip.files, 'META-INF/container.xml');
   if (!containerEntry) throw new Error('Missing META-INF/container.xml');
-  const containerDoc = xmlParser.parse(await containerEntry.buffer()) as Record<string, unknown>;
+  const containerDoc = xmlParser.parse(await readEntryBounded(containerEntry, MAX_XML_ENTRY_BYTES)) as Record<string, unknown>;
 
   const container = containerDoc['container'] as Record<string, unknown>;
   const rootfiles = (container?.rootfiles as Record<string, unknown>)?.rootfile;
@@ -178,7 +203,7 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
 
   const opfEntry = findInZip(zip.files, opfPath);
   if (!opfEntry) throw new Error(`OPF not found: ${opfPath}`);
-  const opfDoc = xmlParser.parse(await opfEntry.buffer()) as Record<string, unknown>;
+  const opfDoc = xmlParser.parse(await readEntryBounded(opfEntry, MAX_XML_ENTRY_BYTES)) as Record<string, unknown>;
   const pkg = (opfDoc['package'] ?? opfDoc) as Record<string, unknown>;
   const manifestEl = pkg['manifest'] as Record<string, unknown> | undefined;
   const spineEl = pkg['spine'] as Record<string, unknown> | undefined;
@@ -207,12 +232,12 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
 
   const metadata: Record<string, unknown> = {};
   if (metadataEl) {
-    const title = getText(metadataEl['dc:title']);
-    const creator = getText(toArray(metadataEl['dc:creator'])[0]);
-    const language = getText(metadataEl['dc:language']);
-    const publisher = getText(metadataEl['dc:publisher']);
-    const description = getText(metadataEl['dc:description']);
-    const identifier = getText(toArray(metadataEl['dc:identifier'])[0]);
+    const title = getText(metadataEl['title']);
+    const creator = getText(toArray(metadataEl['creator'])[0]);
+    const language = getText(metadataEl['language']);
+    const publisher = getText(metadataEl['publisher']);
+    const description = getText(metadataEl['description']);
+    const identifier = getText(toArray(metadataEl['identifier'])[0]);
     if (title) metadata.title = title;
     if (creator) metadata.creator = creator;
     if (language) metadata.language = language;
@@ -234,13 +259,13 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
     try {
       const navEntry = findInZip(zip.files, navItem.href);
       if (navEntry) {
-        const navDoc = xmlParser.parse(await navEntry.buffer()) as Record<string, unknown>;
+        const navDoc = xmlParser.parse(await readEntryBounded(navEntry, MAX_XML_ENTRY_BYTES)) as Record<string, unknown>;
         const navDir = navItem.href.includes('/') ? navItem.href.slice(0, navItem.href.lastIndexOf('/') + 1) : rootPath;
         const html = (navDoc['html'] ?? navDoc) as Record<string, unknown>;
         const body = html['body'] as Record<string, unknown> | undefined;
         const navs = toArray(body?.nav as any);
         const tocNav = (navs.find((n: any) => {
-          const type = n['@_epub:type'] ?? n['@_type'];
+          const type = n['@_type'];
           return typeof type === 'string' && type.split(/\s+/).includes('toc');
         }) ?? navs[0]) as Record<string, unknown> | undefined;
         if (tocNav) {
@@ -248,7 +273,10 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
           if (ol) toc = { label: 'Table of Contents', children: parseNavOl(ol, navDir) };
         }
       }
-    } catch {
+    } catch (error) {
+      // An oversized entry is a rejected file, not a recoverable parse failure, so it must
+      // not silently degrade to the NCX.
+      if (error instanceof UnprocessableEntityException) throw error;
       // fall through to NCX
     }
   }
@@ -259,13 +287,14 @@ async function parseEpub(epubPath: string): Promise<EpubBookInfo> {
       try {
         const ncxEntry = findInZip(zip.files, ncxItem.href);
         if (ncxEntry) {
-          const ncxDoc = xmlParser.parse(await ncxEntry.buffer()) as Record<string, unknown>;
+          const ncxDoc = xmlParser.parse(await readEntryBounded(ncxEntry, MAX_XML_ENTRY_BYTES)) as Record<string, unknown>;
           const ncxDir = ncxItem.href.includes('/') ? ncxItem.href.slice(0, ncxItem.href.lastIndexOf('/') + 1) : rootPath;
           const ncx = (ncxDoc['ncx'] ?? ncxDoc) as Record<string, unknown>;
           const navMap = ncx['navMap'] as Record<string, unknown> | undefined;
           if (navMap) toc = { label: 'Table of Contents', children: parseNcxNavPoints(navMap, ncxDir) };
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof UnprocessableEntityException) throw error;
         // TOC unavailable
       }
     }

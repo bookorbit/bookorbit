@@ -20,6 +20,7 @@ const SPINE_CACHE_MAX = 24;
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
+  removeNSPrefix: true,
   textNodeName: '#text',
 });
 
