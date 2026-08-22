@@ -731,6 +731,7 @@
       "test": {
         "connected": "Conectado - {issuer}",
         "connectionFailed": "La conexión falló",
+        "privateIssuerAddress": "La URL del emisor apunta a una dirección de red privada o local, por lo que el servidor rechazó la conexión. Establece OIDC_ALLOW_LOCAL_ISSUERS=true en el servidor de BookOrbit para permitirlo.",
         "hide": "Ocultar",
         "details": "Detalles",
         "supported": "apoyado",
@@ -3899,6 +3900,7 @@
         "dateAddedFutureError": "La fecha añadida no puede ser futura.",
         "dateFinishedFutureError": "La fecha de finalización no puede ser futura.",
         "dateFinishedBeforeStartedError": "La fecha de finalización debe ser igual o posterior a la fecha de inicio.",
+        "dateFinishedBeforeStartedErrorWithDate": "La Fecha de finalización debe ser igual o posterior a la Fecha de inicio ({date}).",
         "saveReadingDatesError": "No se pudieron guardar las fechas de lectura.",
         "saveAddedDateError": "Error al guardar la fecha añadida.",
         "koboPendingDelete": "Pendiente de eliminar del dispositivo",
@@ -4058,6 +4060,12 @@
           "notInFieldRulesText": "{providers}. Incluido en la búsqueda manual con Todo habilitado, pero no utilizado por la recuperación automática de metadatos.",
           "noResults": "No se encontraron resultados",
           "noResultsHint": "Intenta ajustar el título o el autor.",
+          "searchInterrupted": "La búsqueda no terminó",
+          "searchIncomplete": "Es posible que falten algunos resultados",
+          "providerTimedOut": "{provider} tardó demasiado en responder.",
+          "providerThrottled": "{provider} ha alcanzado su límite de solicitudes. Espera un momento y vuelve a intentarlo.",
+          "providerFailed": "No se ha podido acceder a {provider}.",
+          "searchInterruptedHint": "Inténtelo de nuevo, o limite el ámbito de búsqueda.",
           "searchPrompt": "Busque arriba y luego haga clic en un resultado para comenzar a comparar metadatos."
         },
         "writeAndRename": "Escribir en archivo y cambiar nombre",
@@ -4201,6 +4209,7 @@
             "startFuture": "La fecha de inicio no puede ser en el futuro.",
             "finishFuture": "La fecha de finalización no puede ser en el futuro.",
             "finishBeforeStart": "La fecha de finalización debe ser igual o posterior a la fecha de inicio.",
+            "finishBeforeStartWithDate": "La fecha de finalización debe ser igual o posterior a la fecha de inicio ({date}).",
             "saveFailed": "No se pudieron guardar las fechas de lectura."
           },
           "eta": {
