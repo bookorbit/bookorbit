@@ -5,7 +5,9 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { Pencil, Trash2, Type, Upload, X, Check, ChevronDown, ChevronRight } from '@lucide/vue'
 import type { UserFont } from '@bookorbit/types'
+import { isVariableFont } from '@bookorbit/types'
 import type { FontScopeStore } from '@/features/reader/epub/composables/useCustomFonts'
+import { FONT_WEIGHT_LABEL_KEYS, familyVariants } from '@/features/reader/shared/lib/font-variants'
 import { formatBytes } from '@/lib/formatting'
 
 const props = withDefaults(
@@ -22,17 +24,26 @@ const props = withDefaults(
 
 const { t } = useI18n()
 
-const WEIGHT_LABELS = computed<Record<number, string>>(() => ({
-  100: t('settings.reader.fonts.weightThin'),
-  200: t('settings.reader.fonts.weightExtraLight'),
-  300: t('settings.reader.fonts.weightLight'),
-  400: t('settings.reader.fonts.weightRegular'),
-  500: t('settings.reader.fonts.weightMedium'),
-  600: t('settings.reader.fonts.weightSemiBold'),
-  700: t('settings.reader.fonts.weightBold'),
-  800: t('settings.reader.fonts.weightExtraBold'),
-  900: t('settings.reader.fonts.weightBlack'),
-}))
+const WEIGHT_LABELS = computed<Record<number, string>>(() =>
+  Object.fromEntries(Object.entries(FONT_WEIGHT_LABEL_KEYS).map(([weight, key]) => [weight, t(key)])),
+)
+
+/**
+ * How one uploaded file describes itself. A variable file spans a range rather than
+ * sitting at one weight, so it reports the span and how many styles it carries.
+ */
+function variantLabel(variant: UserFont): string {
+  if (isVariableFont(variant)) {
+    return t('settings.reader.fonts.variableRange', { min: variant.weightMin, max: variant.weightMax })
+  }
+
+  const weight = WEIGHT_LABELS.value[variant.weight] ?? String(variant.weight)
+  return variant.style === 'italic' ? t('settings.reader.fonts.weightItalicOf', { weight }) : weight
+}
+
+function variantStyleCount(variant: UserFont): number {
+  return isVariableFont(variant) ? familyVariants([variant]).length : 0
+}
 
 const isServerScope = computed(() => props.store.scope === 'server')
 
@@ -406,9 +417,9 @@ function dismissError(index: number) {
                   </div>
                 </template>
                 <template v-else>
-                  <span class="text-xs text-foreground">
-                    {{ WEIGHT_LABELS[variant.weight] ?? variant.weight }}
-                    {{ variant.style === 'italic' ? '· ' + t('settings.reader.fonts.styleItalic') : '' }}
+                  <span class="text-xs text-foreground">{{ variantLabel(variant) }}</span>
+                  <span v-if="variantStyleCount(variant) > 0" class="ml-2 text-xs text-muted-foreground">
+                    {{ t('settings.reader.fonts.variableStyles', { count: variantStyleCount(variant) }) }}
                   </span>
                   <span class="ml-2 text-xs text-muted-foreground uppercase">{{ variant.format }}</span>
                   <span class="ml-2 text-xs text-muted-foreground">{{ formatBytes(variant.fileSize) }}</span>

@@ -1,3 +1,5 @@
+import type { FontStyle } from "./font";
+
 export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
 
 export const EPUB_FONT_SIZE_MIN = 6;
@@ -56,6 +58,10 @@ export interface EpubReaderSettings {
   themeName: string; // matches one of the reader's built-in theme names
   isDark: boolean;
   fontFamily: string | null; // null = use the book's embedded font
+  // Base style for body text. The book's own bold and italic runs still resolve relative
+  // to this, so a bold base leaves emphasis rendered at the same weight.
+  fontWeight: number; // CSS font-weight: integer from 1-1000
+  fontStyle: FontStyle;
   fontSize: number; // EPUB_FONT_SIZE_MIN-EPUB_FONT_SIZE_MAX
   lineHeight: number; // 0.8-3.0
   maxColumnCount: number; // 1-10
@@ -114,6 +120,8 @@ export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
   themeName: "default",
   isDark: false,
   fontFamily: null,
+  fontWeight: 400,
+  fontStyle: "normal",
   fontSize: 16,
   lineHeight: 1.5,
   maxColumnCount: 2,

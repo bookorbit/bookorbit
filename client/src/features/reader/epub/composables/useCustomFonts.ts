@@ -1,7 +1,7 @@
 import { computed, getCurrentInstance, onUnmounted, ref, type ComputedRef, type Ref } from 'vue'
 import { api } from '@/lib/api'
 import type { UserFont, FontFormat, FontScope, FontUploadResult, ServerFontPreferences } from '@bookorbit/types'
-import { FONT_FORMAT_CSS_FORMAT, fontCssFamilyGroupName, fontScopeFromCssFamily, maxFontsForScope } from '@bookorbit/types'
+import { FONT_FORMAT_CSS_FORMAT, fontCssFamilyGroupName, fontScopeFromCssFamily, isVariableFont, maxFontsForScope } from '@bookorbit/types'
 
 const ACCEPTED_EXTENSIONS = '.ttf,.otf,.woff,.woff2'
 
@@ -285,16 +285,25 @@ export function useCustomFonts() {
   /** The server families this reader has kept. Drives every font picker. */
   const visibleServerFamilies = computed<FontFamily[]>(() => serverFamilies.value.filter((family) => !isServerFamilyHidden(family.name)))
 
-  function fontFaceRule({ scope, font }: ScopedFont): string {
+  function fontFaceRules({ scope, font }: ScopedFont): string {
     const cssFormat = FONT_FORMAT_CSS_FORMAT[font.format as FontFormat]
     const src = fontBlobUrls.get(blobKey(scope, font.id)) ?? `${ENDPOINTS[scope]}/${font.id}/file`
-    return `@font-face {
+    // A variable font declares the span of its weight axis, which is what tells the
+    // browser to interpolate a real face for every weight in it rather than synthesising
+    // one from the default instance.
+    const weight = isVariableFont(font) ? `${font.weightMin} ${font.weightMax}` : `${font.weight}`
+    const styles = new Set([font.style, ...(isVariableFont(font) ? (font.instances ?? []).map((instance) => instance.style) : [])])
+    return [...styles]
+      .map(
+        (style) => `@font-face {
   font-family: "${fontCssFamilyGroupName(font.familyName, scope)}";
   src: url("${src}") format("${cssFormat}");
-  font-weight: ${font.weight};
-  font-style: ${font.style};
+  font-weight: ${weight};
+  font-style: ${style};
   font-display: swap;
-}`
+}`,
+      )
+      .join('\n')
   }
 
   /**
@@ -308,12 +317,12 @@ export function useCustomFonts() {
    * neither overrides the other.
    */
   function generateFontFaceCSS(): string {
-    return allScopedFonts().map(fontFaceRule).join('\n')
+    return allScopedFonts().map(fontFaceRules).join('\n')
   }
 
   function generateScopeFontFaceCSS(scope: FontScope): string {
     return listFor(scope)
-      .value.map((font) => fontFaceRule({ scope, font }))
+      .value.map((font) => fontFaceRules({ scope, font }))
       .join('\n')
   }
 

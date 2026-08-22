@@ -1,5 +1,5 @@
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { FONT_WEIGHTS, type FontStyle } from '@bookorbit/types';
+import { CSS_FONT_WEIGHT_MAX, CSS_FONT_WEIGHT_MIN, type FontStyle } from '@bookorbit/types';
 
 export class UpdateFontDto {
   @IsOptional()
@@ -10,9 +10,8 @@ export class UpdateFontDto {
 
   @IsOptional()
   @IsInt()
-  @Min(100)
-  @Max(900)
-  @IsIn([...FONT_WEIGHTS])
+  @Min(CSS_FONT_WEIGHT_MIN)
+  @Max(CSS_FONT_WEIGHT_MAX)
   weight?: number;
 
   @IsOptional()

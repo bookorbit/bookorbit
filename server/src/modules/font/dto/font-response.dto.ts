@@ -4,7 +4,7 @@ import type { ServerFontRow, UserFontRow } from '../../../db/schema';
 /** The columns user and server font rows have in common, which is all the wire shape needs. */
 export type FontRowLike = Pick<
   UserFontRow & ServerFontRow,
-  'id' | 'familyName' | 'originalFileName' | 'format' | 'weight' | 'style' | 'fileSize' | 'createdAt'
+  'id' | 'familyName' | 'originalFileName' | 'format' | 'weight' | 'style' | 'weightMin' | 'weightMax' | 'instances' | 'fileSize' | 'createdAt'
 >;
 
 export function toFontResponse(row: FontRowLike): UserFont {
@@ -15,6 +15,9 @@ export function toFontResponse(row: FontRowLike): UserFont {
     format: row.format,
     weight: row.weight,
     style: row.style as 'normal' | 'italic',
+    weightMin: row.weightMin,
+    weightMax: row.weightMax,
+    instances: row.instances ?? null,
     fileSize: row.fileSize,
     createdAt: row.createdAt.toISOString(),
   };

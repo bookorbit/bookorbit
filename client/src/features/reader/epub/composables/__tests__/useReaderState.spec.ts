@@ -131,4 +131,52 @@ describe('useReaderState', () => {
     expect(css).toContain('text-align: start !important;')
     expect(css).toContain('hyphens: none;')
   })
+
+  describe('font style', () => {
+    it('leaves weight and slant out of the CSS while they sit at their defaults', () => {
+      const state = useReaderState()
+      state.setFontFamily('serif')
+
+      const css = state.generateCSS()
+
+      expect(css).not.toContain('font-weight:')
+      expect(css).not.toContain('font-style:')
+    })
+
+    it('applies a chosen weight and slant to the body', () => {
+      const state = useReaderState()
+      state.setFontFamily('serif')
+      state.setFontWeight(700)
+      state.setFontStyle('italic')
+
+      const css = state.generateCSS()
+
+      expect(css).toContain('font-weight: 700 !important;')
+      expect(css).toContain('font-style: italic !important;')
+    })
+
+    it("never pushes weight or slant onto descendants, which would flatten the book's emphasis", () => {
+      const state = useReaderState()
+      state.setFontFamily('serif')
+      state.setFontWeight(700)
+      state.setFontStyle('italic')
+
+      const descendantRule = state.generateCSS().match(/body \*\s*\{[^}]*\}/)?.[0] ?? ''
+
+      expect(descendantRule).toContain('font-family: inherit !important;')
+      expect(descendantRule).not.toContain('font-weight')
+      expect(descendantRule).not.toContain('font-style')
+    })
+
+    it("applies a style to the book's own font when no family is chosen", () => {
+      const state = useReaderState()
+      state.setFontWeight(300)
+
+      const css = state.generateCSS()
+
+      expect(css).toContain('font-weight: 300 !important;')
+      expect(css).not.toContain('font-family:')
+      expect(css).not.toContain('body *')
+    })
+  })
 })

@@ -3,7 +3,13 @@ import { vi } from 'vitest'
 import type { FontScope, UserFont } from '@bookorbit/types'
 import { fontCssFamilyGroupName, maxFontsForScope } from '@bookorbit/types'
 
-export function mockFont(id: number, familyName: string, weight = 400, style: 'normal' | 'italic' = 'normal'): UserFont {
+export function mockFont(
+  id: number,
+  familyName: string,
+  weight = 400,
+  style: 'normal' | 'italic' = 'normal',
+  variable?: Pick<UserFont, 'weightMin' | 'weightMax' | 'instances'>,
+): UserFont {
   return {
     id,
     familyName,
@@ -11,6 +17,9 @@ export function mockFont(id: number, familyName: string, weight = 400, style: 'n
     format: 'ttf',
     weight,
     style,
+    weightMin: variable?.weightMin ?? null,
+    weightMax: variable?.weightMax ?? null,
+    instances: variable?.instances ?? null,
     fileSize: 50000,
     createdAt: '2026-01-01T00:00:00.000Z',
   }

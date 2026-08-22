@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { EPUB_FONT_SIZE_MAX, EPUB_FONT_SIZE_MIN, type EpubReaderSettings } from '@bookorbit/types'
+import { EPUB_FONT_SIZE_MAX, EPUB_FONT_SIZE_MIN, EPUB_READER_DEFAULTS, type EpubReaderSettings, type FontStyle } from '@bookorbit/types'
 import { themes } from '../constants/themes'
 import type { Theme, ThemeMode } from '../constants/themes'
 import type { FoliateRenderer } from './useFoliate'
@@ -8,6 +8,8 @@ export interface ReaderState {
   fontSize: number
   lineHeight: number
   fontFamily: string | null
+  fontWeight: number
+  fontStyle: FontStyle
   maxColumnCount: number
   gap: number
   maxInlineSize: number
@@ -28,6 +30,8 @@ const defaults: ReaderState = {
   fontSize: 16,
   lineHeight: 1.5,
   fontFamily: null,
+  fontWeight: EPUB_READER_DEFAULTS.fontWeight,
+  fontStyle: EPUB_READER_DEFAULTS.fontStyle,
   maxColumnCount: 2,
   gap: 0.05,
   maxInlineSize: 720,
@@ -44,6 +48,8 @@ export function useReaderState() {
   const fontSize = ref(defaults.fontSize)
   const lineHeight = ref(defaults.lineHeight)
   const fontFamily = ref<string | null>(defaults.fontFamily)
+  const fontWeight = ref(defaults.fontWeight)
+  const fontStyle = ref<FontStyle>(defaults.fontStyle)
   const maxColumnCount = ref(defaults.maxColumnCount)
   const gap = ref(defaults.gap)
   const maxInlineSize = ref(defaults.maxInlineSize)
@@ -61,6 +67,8 @@ export function useReaderState() {
     fontSize: fontSize.value,
     lineHeight: lineHeight.value,
     fontFamily: fontFamily.value,
+    fontWeight: fontWeight.value,
+    fontStyle: fontStyle.value,
     maxColumnCount: maxColumnCount.value,
     gap: gap.value,
     maxInlineSize: maxInlineSize.value,
@@ -81,7 +89,7 @@ export function useReaderState() {
   })
 
   function generateCSS(): string {
-    const { lineHeight: lh, justify: j, hyphenate: h, fontSize: fs, fontFamily: ff } = state.value
+    const { lineHeight: lh, justify: j, hyphenate: h, fontSize: fs, fontFamily: ff, fontWeight: fw, fontStyle: fst } = state.value
     const mode = activeMode.value
     const theme = currentTheme.value
     const lightMode = theme.light
@@ -93,14 +101,28 @@ export function useReaderState() {
     // iOS in Dark Mode always matches prefers-color-scheme:dark and ignores the app setting.
     const forceBg = dark || lightMode.bg !== '#ffffff'
 
-    const fontFamilyRule = ff
+    // Weight and slant are set on body alone. Descendants inherit the family so bold and
+    // italic runs render from the chosen typeface, but keep their own weight and slant, so
+    // a bold or italic base style does not flatten the emphasis the book marked up.
+    // Both are emitted only when moved off the default, leaving untouched books as they were.
+    const bodyDeclarations = [
+      ff ? `font-family: ${ff} !important;` : '',
+      fw === defaults.fontWeight ? '' : `font-weight: ${fw} !important;`,
+      fst === defaults.fontStyle ? '' : `font-style: ${fst} !important;`,
+    ].filter(Boolean)
+
+    const inheritFamilyRule = ff
       ? `
-        body {
-            font-family: ${ff} !important;
-        }
         body * {
             font-family: inherit !important;
         }`
+      : ''
+
+    const bodyFontRule = bodyDeclarations.length
+      ? `
+        body {
+            ${bodyDeclarations.join('\n            ')}
+        }${inheritFamilyRule}`
       : ''
 
     const fontFaceBlock = fontFaceCSS.value
@@ -120,7 +142,7 @@ export function useReaderState() {
               color-scheme: ${dark ? 'dark' : 'light'};
               color: ${mode.fg};
               font-size: ${fs}px;
-          }${fontFamilyRule}
+          }${bodyFontRule}
           a:any-link {
               color: ${mode.link};
               text-decoration-color: light-dark(
@@ -223,6 +245,12 @@ export function useReaderState() {
   function setFontFamily(v: string | null) {
     fontFamily.value = v
   }
+  function setFontWeight(v: number) {
+    fontWeight.value = v
+  }
+  function setFontStyle(v: FontStyle) {
+    fontStyle.value = v
+  }
   function setMaxColumnCount(v: number) {
     maxColumnCount.value = Math.max(1, Math.min(10, v))
   }
@@ -263,6 +291,8 @@ export function useReaderState() {
     fontSize,
     lineHeight,
     fontFamily,
+    fontWeight,
+    fontStyle,
     maxColumnCount,
     gap,
     maxInlineSize,
@@ -281,6 +311,8 @@ export function useReaderState() {
     setFontSize,
     setLineHeight,
     setFontFamily,
+    setFontWeight,
+    setFontStyle,
     setMaxColumnCount,
     setGap,
     setMaxInlineSize,

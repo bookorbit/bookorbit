@@ -1,13 +1,19 @@
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { computed, ref } from 'vue'
+import type { UserFont } from '@bookorbit/types'
+import { fontCssFamilyGroupName } from '@bookorbit/types'
 import ReaderSettingsPanel from '../ReaderSettingsPanel.vue'
 import type { ReaderState } from '../../composables/useReaderState'
+import type { FontFamily, useCustomFonts } from '../../composables/useCustomFonts'
 
 function makeState(overrides: Partial<ReaderState> = {}): ReaderState {
   return {
     fontSize: 16,
     lineHeight: 1.5,
     fontFamily: null,
+    fontWeight: 400,
+    fontStyle: 'normal',
     maxColumnCount: 2,
     gap: 0.05,
     maxInlineSize: 720,
@@ -49,6 +55,59 @@ function buttonByAriaLabel(wrapper: VueWrapper, label: string) {
 
 function buttonByText(wrapper: VueWrapper, text: string) {
   return wrapper.findAll('button').find((button) => button.text() === text)
+}
+
+/** Resolves the style chips through the group their heading labels, a11y wiring included. */
+function styleChips(wrapper: VueWrapper) {
+  const group = wrapper.findAll('[role="group"]').find((candidate) => {
+    const labelId = candidate.attributes('aria-labelledby')
+    return labelId ? wrapper.find(`[id="${labelId}"]`).text() === 'Style' : false
+  })
+  return group ? group.findAll('button') : []
+}
+
+function styleChipLabels(wrapper: VueWrapper) {
+  return styleChips(wrapper).map((chip) => chip.text())
+}
+
+function styleChip(wrapper: VueWrapper, label: string) {
+  return styleChips(wrapper).find((chip) => chip.text() === label)
+}
+
+const userCss = (name: string) => fontCssFamilyGroupName(name, 'user')
+
+function makeFont(overrides: Partial<UserFont> = {}): UserFont {
+  return {
+    id: 1,
+    familyName: 'Test',
+    originalFileName: 'Test.ttf',
+    format: 'ttf',
+    weight: 400,
+    style: 'normal',
+    weightMin: null,
+    weightMax: null,
+    instances: null,
+    fileSize: 1000,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function makeFamily(name: string, variants: UserFont[]): FontFamily {
+  return { name, cssFamilyName: userCss(name), scope: 'user', variants }
+}
+
+/** The slice of useCustomFonts the panel actually reads. */
+function makeCustomFonts(families: FontFamily[]) {
+  return {
+    fonts: ref(families.flatMap((family) => family.variants)),
+    serverFonts: ref([] as UserFont[]),
+    families: computed(() => families),
+    visibleServerFamilies: computed(() => [] as FontFamily[]),
+    isFontFamilySelected: (name: string, current: string | null) => current === userCss(name),
+    getCssFamilyForDisplay: (name: string) => userCss(name),
+    generateFontFaceCSS: () => '',
+  } as unknown as ReturnType<typeof useCustomFonts>
 }
 
 describe('ReaderSettingsPanel', () => {
@@ -188,5 +247,73 @@ describe('ReaderSettingsPanel', () => {
 
     expect(wrapper.text()).not.toContain('Page spreads')
     expect(wrapper.text()).not.toContain('Single page')
+  })
+
+  describe('font style', () => {
+    it('offers the four system styles while a built-in stack is selected', () => {
+      const wrapper = mountPanel({ state: makeState({ fontFamily: 'serif' }) })
+
+      expect(styleChipLabels(wrapper)).toEqual(['Regular', 'Bold', 'Regular Italic', 'Bold Italic'])
+    })
+
+    it('emits the weight and slant of the chosen style', async () => {
+      const wrapper = mountPanel({ state: makeState({ fontFamily: 'serif' }) })
+
+      await styleChip(wrapper, 'Bold Italic')?.trigger('click')
+
+      expect(wrapper.emitted('update')?.[0]).toEqual([{ fontWeight: 700, fontStyle: 'italic' }])
+    })
+
+    it('marks the style in use as pressed', () => {
+      const wrapper = mountPanel({ state: makeState({ fontFamily: 'serif', fontWeight: 700, fontStyle: 'normal' }) })
+
+      expect(styleChip(wrapper, 'Bold')?.attributes('aria-pressed')).toBe('true')
+      expect(styleChip(wrapper, 'Regular')?.attributes('aria-pressed')).toBe('false')
+    })
+
+    it('names each style the way its designer did for a variable font', () => {
+      const customFonts = makeCustomFonts([
+        makeFamily('Inter', [
+          makeFont({
+            weightMin: 100,
+            weightMax: 900,
+            instances: [
+              { name: 'Thin', weight: 100, style: 'normal' },
+              { name: 'Book', weight: 400, style: 'normal' },
+              { name: 'Heavy', weight: 900, style: 'normal' },
+            ],
+          }),
+        ]),
+      ])
+      const wrapper = mountPanel({ state: makeState({ fontFamily: userCss('Inter') }), customFonts })
+
+      expect(styleChipLabels(wrapper)).toEqual(['Thin', 'Book', 'Heavy'])
+    })
+
+    it('hides the row for a family that offers a single style', () => {
+      const customFonts = makeCustomFonts([makeFamily('Solo', [makeFont()])])
+      const wrapper = mountPanel({ state: makeState({ fontFamily: userCss('Solo') }), customFonts })
+
+      expect(wrapper.text()).not.toContain('Style')
+      expect(styleChipLabels(wrapper)).toEqual([])
+    })
+
+    it('moves to the nearest style when the newly picked family lacks the current one', async () => {
+      const customFonts = makeCustomFonts([makeFamily('Sparse', [makeFont({ weight: 300 }), makeFont({ id: 2, weight: 500 })])])
+      const wrapper = mountPanel({ state: makeState({ fontFamily: 'serif', fontWeight: 700 }), customFonts })
+
+      await buttonByText(wrapper, 'Sparse')?.trigger('click')
+
+      expect(wrapper.emitted('update')?.[0]).toEqual([{ fontFamily: userCss('Sparse'), fontWeight: 500, fontStyle: 'normal' }])
+    })
+
+    it('leaves the style alone when the newly picked family offers it', async () => {
+      const customFonts = makeCustomFonts([makeFamily('Full', [makeFont({ weight: 400 }), makeFont({ id: 2, weight: 700 })])])
+      const wrapper = mountPanel({ state: makeState({ fontFamily: 'serif', fontWeight: 700 }), customFonts })
+
+      await buttonByText(wrapper, 'Full')?.trigger('click')
+
+      expect(wrapper.emitted('update')?.[0]).toEqual([{ fontFamily: userCss('Full') }])
+    })
   })
 })

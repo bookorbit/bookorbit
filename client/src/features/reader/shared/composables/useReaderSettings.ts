@@ -17,6 +17,7 @@ import {
   type ReaderSettings,
   READER_GROUP_DEFAULTS,
   getFormatGroup,
+  isCssFontWeight,
 } from '@bookorbit/types'
 
 // -- Shared localStorage helpers --
@@ -70,6 +71,12 @@ function sanitizeEpubPartialSettings(settings: unknown): Partial<EpubReaderSetti
   }
   if ((typeof settings.fontFamily === 'string' && settings.fontFamily.length > 0) || settings.fontFamily === null) {
     out.fontFamily = settings.fontFamily
+  }
+  if (isCssFontWeight(settings.fontWeight)) {
+    out.fontWeight = settings.fontWeight
+  }
+  if (settings.fontStyle === 'normal' || settings.fontStyle === 'italic') {
+    out.fontStyle = settings.fontStyle
   }
   if (isNumberInRange(settings.fontSize, EPUB_FONT_SIZE_MIN, EPUB_FONT_SIZE_MAX)) {
     out.fontSize = settings.fontSize

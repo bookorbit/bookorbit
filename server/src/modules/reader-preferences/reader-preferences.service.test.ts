@@ -219,6 +219,8 @@ describe('ReaderPreferencesService', () => {
       themeName: 'default',
       isDark: false,
       fontFamily: null,
+      fontWeight: 400,
+      fontStyle: 'normal' as const,
       fontSize: 16,
       lineHeight: 1.5,
       maxColumnCount: 2,
@@ -245,6 +247,41 @@ describe('ReaderPreferencesService', () => {
     it('rejects invalid footerDisplayMode values in epub defaults', async () => {
       await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, footerDisplayMode: 3 })).rejects.toThrow(BadRequestException);
       await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, footerDisplayMode: -1 })).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects a full epub default that omits the font style keys', async () => {
+      const missingFontStyle = Object.fromEntries(Object.entries(validEpubDefaults).filter(([key]) => key !== 'fontWeight' && key !== 'fontStyle'));
+
+      await expect(service.upsertDefault(1, 'epub', missingFontStyle)).rejects.toThrow(BadRequestException);
+    });
+
+    it('accepts a full epub default carrying a font weight and style', async () => {
+      await service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontWeight: 700, fontStyle: 'italic' });
+
+      expect(mockRepo.upsertDefault).toHaveBeenCalledWith(1, 'epub', expect.objectContaining({ fontWeight: 700, fontStyle: 'italic' }));
+    });
+
+    it.each([[1], [350], [1000]])('accepts the CSS font weight %s', async (weight) => {
+      await service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontWeight: weight });
+
+      expect(mockRepo.upsertDefault).toHaveBeenCalledWith(1, 'epub', expect.objectContaining({ fontWeight: weight }));
+    });
+
+    it.each([[0], [1001], [400.5]])('rejects the unsupported font weight %s', async (weight) => {
+      await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontWeight: weight })).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects an unsupported font style', async () => {
+      await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontStyle: 'oblique' })).rejects.toThrow(BadRequestException);
+    });
+
+    it('accepts partial epub per-book settings with a font weight and style', async () => {
+      const user = makeUser();
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+
+      await service.upsertPreference(user, 26, { fontWeight: 300, fontStyle: 'italic' });
+
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 26, { fontWeight: 300, fontStyle: 'italic' });
     });
 
     it('accepts partial epub per-book settings with footerDisplayMode', async () => {

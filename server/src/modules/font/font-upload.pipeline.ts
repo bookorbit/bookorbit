@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { FONT_FORMATS, MAX_FONT_FILE_SIZE, type FontFormat, type FontStyle } from '@bookorbit/types';
+import { FONT_FORMATS, MAX_FONT_FILE_SIZE, type FontFormat, type FontNamedInstance, type FontStyle } from '@bookorbit/types';
 
 import { familyNameFromFilename, type FontValidationService } from './font.validation.service';
 
@@ -15,6 +15,9 @@ export interface FontIdentity {
   familyName: string;
   weight: number;
   style: FontStyle;
+  weightMin: number | null;
+  weightMax: number | null;
+  instances: FontNamedInstance[] | null;
   /** Family name read from the font's own tables, or null when it had to be inferred. */
   suggestedFamilyName: string | null;
 }
@@ -53,6 +56,9 @@ export function resolveFontIdentity(validation: FontValidationService, buffer: B
     familyName: metadata.familyName ?? familyNameFromFilename(filename) ?? FALLBACK_FAMILY_NAME,
     weight: metadata.weight,
     style: metadata.style,
+    weightMin: metadata.weightMin,
+    weightMax: metadata.weightMax,
+    instances: metadata.instances,
     suggestedFamilyName: metadata.familyName,
   };
 }

@@ -13,6 +13,9 @@ const mockFonts: UserFont[] = [
     format: 'ttf',
     weight: 400,
     style: 'normal',
+    weightMin: null,
+    weightMax: null,
+    instances: null,
     fileSize: 50000,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
@@ -23,6 +26,9 @@ const mockFonts: UserFont[] = [
     format: 'ttf',
     weight: 700,
     style: 'normal',
+    weightMin: null,
+    weightMax: null,
+    instances: null,
     fileSize: 55000,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
@@ -33,6 +39,9 @@ const mockFonts: UserFont[] = [
     format: 'woff2',
     weight: 400,
     style: 'normal',
+    weightMin: null,
+    weightMax: null,
+    instances: null,
     fileSize: 30000,
     createdAt: '2026-01-02T00:00:00.000Z',
   },
@@ -416,6 +425,63 @@ describe('useCustomFonts', () => {
       expect(css).toContain('format("woff2")')
     })
 
+    it('declares a variable font as a weight range, so every weight renders from the axis', () => {
+      composable.fonts.value = [
+        {
+          id: 9,
+          familyName: 'Inter',
+          originalFileName: 'Inter-Variable.ttf',
+          format: 'ttf',
+          weight: 400,
+          style: 'normal',
+          weightMin: 100,
+          weightMax: 900,
+          instances: [{ name: 'Bold', weight: 700, style: 'normal' }],
+          fileSize: 60000,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]
+
+      const css = composable.generateFontFaceCSS()
+
+      expect(css).toContain('font-weight: 100 900;')
+      expect(css).toContain('font-style: normal;')
+    })
+
+    it('registers every style axis exposed by a variable font', () => {
+      composable.fonts.value = [
+        {
+          id: 9,
+          familyName: 'Recursive',
+          originalFileName: 'Recursive-Variable.ttf',
+          format: 'ttf',
+          weight: 400,
+          style: 'normal',
+          weightMin: 300,
+          weightMax: 1000,
+          instances: [
+            { name: 'Regular', weight: 400, style: 'normal' },
+            { name: 'Italic', weight: 400, style: 'italic' },
+          ],
+          fileSize: 60000,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]
+
+      const css = composable.generateFontFaceCSS()
+
+      expect(css.match(/@font-face/g)).toHaveLength(2)
+      expect(css).toContain('font-style: normal;')
+      expect(css).toContain('font-style: italic;')
+      expect(css.match(/font-weight: 300 1000;/g)).toHaveLength(2)
+    })
+
+    it('keeps a static font pinned to its single weight', () => {
+      composable.fonts.value = [mockFonts[1]!]
+
+      expect(composable.generateFontFaceCSS()).toContain('font-weight: 700;')
+    })
+
     it('falls back to API URL when blob cache is missing', () => {
       composable.fonts.value = [...mockFonts]
 
@@ -482,6 +548,9 @@ describe('useCustomFonts', () => {
         format: 'otf',
         weight: 400,
         style: 'normal',
+        weightMin: null,
+        weightMax: null,
+        instances: null,
         fileSize: 60000,
         createdAt: '2026-01-03T00:00:00.000Z',
       },
@@ -492,6 +561,9 @@ describe('useCustomFonts', () => {
         format: 'ttf',
         weight: 400,
         style: 'normal',
+        weightMin: null,
+        weightMax: null,
+        instances: null,
         fileSize: 51000,
         createdAt: '2026-01-03T00:00:00.000Z',
       },
@@ -807,6 +879,9 @@ describe('useCustomFonts', () => {
         format: 'otf',
         weight: 400,
         style: 'normal',
+        weightMin: null,
+        weightMax: null,
+        instances: null,
         fileSize: 60000,
         createdAt: '2026-01-03T00:00:00.000Z',
       },
@@ -817,6 +892,9 @@ describe('useCustomFonts', () => {
         format: 'otf',
         weight: 400,
         style: 'normal',
+        weightMin: null,
+        weightMax: null,
+        instances: null,
         fileSize: 61000,
         createdAt: '2026-01-03T00:00:00.000Z',
       },

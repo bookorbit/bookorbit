@@ -4,10 +4,12 @@ import {
   LANG_WINDOWS_EN_US,
   LANG_WINDOWS_JAPANESE,
   PLATFORM_WINDOWS,
+  buildFvarTable,
   buildNameTable,
   buildOs2Table,
   buildSfnt,
   buildWoff,
+  buildWoff2,
   macName,
   windowsName,
 } from './font-test-fixtures';
@@ -25,6 +27,8 @@ describe('parseFontMetadata', () => {
         subfamilyName: 'Bold',
         usWeightClass: 700,
         fsSelection: 32,
+        axes: [],
+        instances: [],
       });
     });
 
@@ -37,10 +41,10 @@ describe('parseFontMetadata', () => {
       expect(parseFontMetadata(font).familyName).toBe('Iosevka');
     });
 
-    it('rejects WOFF2, which needs a brotli decompressor', () => {
-      const font = Buffer.alloc(64);
+    it('rejects a truncated WOFF2 header', () => {
+      const font = Buffer.alloc(32);
       font.write('wOF2', 0, 4, 'latin1');
-      expect(() => parseFontMetadata(font)).toThrow(/WOFF2/);
+      expect(() => parseFontMetadata(font)).toThrow(/WOFF2 header is truncated/);
     });
 
     it('rejects an unrecognized signature', () => {
@@ -220,6 +224,8 @@ describe('parseFontMetadata', () => {
         subfamilyName: 'Italic',
         usWeightClass: 300,
         fsSelection: 1,
+        axes: [],
+        instances: [],
       });
     });
 
@@ -301,10 +307,173 @@ describe('parseFontMetadata', () => {
         subfamilyName: 'Bold',
         usWeightClass: 700,
         fsSelection: 32,
+        axes: [],
+        instances: [],
       });
       // A full parse of a font this size cost hundreds of megabytes and hundreds of ms.
       expect(heapGrowthMb).toBeLessThan(25);
       expect(elapsedMs).toBeLessThan(250);
+    });
+  });
+
+  describe('variation axes', () => {
+    const variableFont = (fvar: Buffer, names = [windowsName(1, 'Inter'), windowsName(256, 'Light'), windowsName(257, 'Bold')]) =>
+      buildSfnt([
+        { tag: 'name', data: buildNameTable(names) },
+        { tag: 'OS/2', data: buildOs2Table({ usWeightClass: 400 }) },
+        { tag: 'fvar', data: fvar },
+      ]);
+
+    it('reads the weight axis range', () => {
+      const font = variableFont(buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }]));
+
+      expect(parseFontMetadata(font).axes).toEqual([{ tag: 'wght', min: 100, default: 400, max: 900 }]);
+    });
+
+    it('reads every axis, not just weight', () => {
+      const font = variableFont(
+        buildFvarTable([
+          { tag: 'wght', min: 200, default: 400, max: 800 },
+          { tag: 'wdth', min: 75, default: 100, max: 125 },
+          { tag: 'slnt', min: -10, default: 0, max: 0 },
+        ]),
+      );
+
+      expect(parseFontMetadata(font).axes.map((axis) => axis.tag)).toEqual(['wght', 'wdth', 'slnt']);
+    });
+
+    it('resolves named instances against the name table', () => {
+      const font = variableFont(
+        buildFvarTable(
+          [{ tag: 'wght', min: 100, default: 400, max: 900 }],
+          [
+            { subfamilyNameID: 256, coordinates: [300] },
+            { subfamilyNameID: 257, coordinates: [700] },
+          ],
+        ),
+      );
+
+      expect(parseFontMetadata(font).instances).toEqual([
+        { name: 'Light', coordinates: { wght: 300 } },
+        { name: 'Bold', coordinates: { wght: 700 } },
+      ]);
+    });
+
+    it('reports an instance whose name id is missing rather than dropping it', () => {
+      const font = variableFont(buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [{ subfamilyNameID: 999, coordinates: [500] }]));
+
+      expect(parseFontMetadata(font).instances).toEqual([{ name: null, coordinates: { wght: 500 } }]);
+    });
+
+    it('reads instances that carry the optional PostScript name id', () => {
+      const font = variableFont(
+        buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [{ subfamilyNameID: 256, coordinates: [300], postScriptNameID: 300 }]),
+      );
+
+      expect(parseFontMetadata(font).instances).toEqual([{ name: 'Light', coordinates: { wght: 300 } }]);
+    });
+
+    it('reads coordinates across multiple axes', () => {
+      const font = variableFont(
+        buildFvarTable(
+          [
+            { tag: 'wght', min: 100, default: 400, max: 900 },
+            { tag: 'wdth', min: 75, default: 100, max: 125 },
+          ],
+          [{ subfamilyNameID: 257, coordinates: [700, 125] }],
+        ),
+      );
+
+      expect(parseFontMetadata(font).instances).toEqual([{ name: 'Bold', coordinates: { wght: 700, wdth: 125 } }]);
+    });
+
+    it('reports no axes for a static font', () => {
+      const font = buildSfnt([{ tag: 'name', data: buildNameTable([windowsName(1, 'Literata')]) }]);
+
+      expect(parseFontMetadata(font)).toMatchObject({ axes: [], instances: [] });
+    });
+
+    it.each([
+      ['an axis count of zero', buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [], { axisCount: 0 })],
+      ['an implausible axis count', buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [], { axisCount: 5000 })],
+      ['an axis size below the minimum', buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [], { axisSize: 8 })],
+      [
+        'an axis array running past the table',
+        buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [], { declaredAxesArrayOffset: 4096 }),
+      ],
+    ])('ignores a malformed fvar table declaring %s', (_label, fvar) => {
+      expect(parseFontMetadata(variableFont(fvar))).toMatchObject({ axes: [], instances: [], familyName: 'Inter' });
+    });
+
+    it('stops at the last instance the table can hold', () => {
+      const fvar = buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [{ subfamilyNameID: 256, coordinates: [300] }], {
+        instanceCount: 50,
+      });
+
+      expect(parseFontMetadata(variableFont(fvar)).instances).toHaveLength(1);
+    });
+
+    it('ignores instance records too short to hold a coordinate per axis', () => {
+      const fvar = buildFvarTable([{ tag: 'wght', min: 100, default: 400, max: 900 }], [{ subfamilyNameID: 256, coordinates: [300] }], {
+        instanceSize: 4,
+      });
+
+      expect(parseFontMetadata(variableFont(fvar))).toMatchObject({ axes: [{ tag: 'wght', min: 100, default: 400, max: 900 }], instances: [] });
+    });
+  });
+
+  describe('WOFF2', () => {
+    it('reads metadata out of the compressed stream', () => {
+      const font = buildWoff2([
+        { tag: 'name', data: buildNameTable([windowsName(1, 'Recursive'), windowsName(2, 'Italic')]) },
+        { tag: 'OS/2', data: buildOs2Table({ usWeightClass: 300, fsSelection: 1 }) },
+      ]);
+
+      expect(parseFontMetadata(font)).toMatchObject({
+        familyName: 'Recursive',
+        subfamilyName: 'Italic',
+        usWeightClass: 300,
+        fsSelection: 1,
+      });
+    });
+
+    it('reads fvar past a transformed glyf table, whose stored length differs from its own', () => {
+      const font = buildWoff2([
+        { tag: 'name', data: buildNameTable([windowsName(1, 'Recursive'), windowsName(256, 'SemiBold')]) },
+        { tag: 'glyf', data: Buffer.alloc(2048, 0x11), transformed: true },
+        { tag: 'fvar', data: buildFvarTable([{ tag: 'wght', min: 300, default: 400, max: 1000 }], [{ subfamilyNameID: 256, coordinates: [600] }]) },
+      ]);
+
+      expect(parseFontMetadata(font)).toMatchObject({
+        familyName: 'Recursive',
+        axes: [{ tag: 'wght', min: 300, default: 400, max: 1000 }],
+        instances: [{ name: 'SemiBold', coordinates: { wght: 600 } }],
+      });
+    });
+
+    it('refuses a font declaring an expansion beyond the limit', () => {
+      const font = buildWoff2([{ tag: 'name', data: buildNameTable([windowsName(1, 'Huge')]) }], { totalSfntSize: 64 * 1024 * 1024 });
+
+      expect(() => parseFontMetadata(font)).toThrow(/too large to expand/);
+    });
+
+    it('rejects a font collection, which carries more than one face', () => {
+      const font = buildWoff2([{ tag: 'name', data: buildNameTable([windowsName(1, 'Collection')]) }]);
+      font.write('ttcf', 4, 4, 'latin1');
+
+      expect(() => parseFontMetadata(font)).toThrow(/collections are not supported/);
+    });
+
+    it('rejects a truncated table directory', () => {
+      const font = buildWoff2([{ tag: 'name', data: buildNameTable([windowsName(1, 'Truncated')]) }], { numTables: 40 });
+
+      expect(() => parseFontMetadata(font)).toThrow(/WOFF2/);
+    });
+
+    it('skips the brotli stream entirely when no table of interest is present', () => {
+      const font = buildWoff2([{ tag: 'cmap', data: Buffer.alloc(64, 0x22) }]);
+
+      expect(parseFontMetadata(font)).toMatchObject({ familyName: null, axes: [], instances: [] });
     });
   });
 });

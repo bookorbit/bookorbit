@@ -1,13 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EpubReaderSettings } from '@bookorbit/types'
+import type { EpubReaderSettings, FontNamedInstance } from '@bookorbit/types'
 import { isCustomFontCssFamily } from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { themes } from '@/features/reader/epub/constants/themes'
 import { BUILTIN_READER_FONT_OPTIONS } from '@/features/reader/shared/constants/font-options'
 import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display'
+import {
+  FONT_WEIGHT_LABEL_KEYS,
+  builtInVariants,
+  closestVariant,
+  familyVariants,
+  isSameVariant,
+  variantKey,
+} from '@/features/reader/shared/lib/font-variants'
 import { Check } from '@lucide/vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
@@ -23,6 +31,7 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
+const fontStyleSelectId = `ebook-font-style-${useId()}`
 
 const { effective, load, update, reset } = useReaderDefaultSettings<EpubReaderSettings>('epub')
 
@@ -42,7 +51,59 @@ const serverFontOptions = computed(() =>
   })),
 )
 
+/** The styles a family offers, falling back to the system four for a built-in stack. */
+function variantsForFamily(cssFamilyName: string | null): FontNamedInstance[] {
+  if (!isCustomFontCssFamily(cssFamilyName)) return builtInVariants()
+
+  const family = [...customFonts.visibleServerFamilies.value, ...customFonts.families.value].find(
+    (candidate) => candidate.cssFamilyName === cssFamilyName,
+  )
+  const variants = familyVariants(family?.variants ?? [])
+  return variants.length > 0 ? variants : builtInVariants()
+}
+
+const fontStyleOptions = computed(() =>
+  variantsForFamily(effective.value.fontFamily).map((variant) => ({
+    value: variantKey(variant),
+    label: fontStyleLabel(variant),
+    variant,
+  })),
+)
+
+function fontStyleLabel(variant: FontNamedInstance): string {
+  const weightKey = FONT_WEIGHT_LABEL_KEYS[variant.weight]
+  const base = variant.name ?? (weightKey ? t(weightKey) : String(variant.weight))
+  if (variant.style !== 'italic' || /italic|oblique/i.test(base)) return base
+  return t('settings.reader.fonts.weightItalicOf', { weight: base })
+}
+
+const selectedFontStyle = computed(() => variantKey({ weight: effective.value.fontWeight, style: effective.value.fontStyle }))
+
+function selectFontStyle(event: Event) {
+  const chosen = fontStyleOptions.value.find((option) => option.value === (event.target as HTMLSelectElement).value)
+  if (chosen) update({ fontWeight: chosen.variant.weight, fontStyle: chosen.variant.style })
+}
+
+/**
+ * Switching family also moves the style when the new family lacks the current one, which
+ * would otherwise leave the style select showing a value it cannot offer.
+ */
+function selectFontFamily(event: Event) {
+  const fontFamily = (event.target as HTMLSelectElement).value || null
+  const variants = variantsForFamily(fontFamily)
+  const current = { weight: effective.value.fontWeight, style: effective.value.fontStyle }
+
+  if (variants.some((variant) => isSameVariant(variant, current))) {
+    update({ fontFamily })
+    return
+  }
+
+  const fallback = closestVariant(variants, current)
+  update(fallback ? { fontFamily, fontWeight: fallback.weight, fontStyle: fallback.style } : { fontFamily })
+}
+
 const previewStyleEl = ref<HTMLStyleElement | null>(null)
+const fontCatalogLoaded = ref(false)
 
 function injectPreviewStyles(css: string) {
   if (previewStyleEl.value) {
@@ -57,17 +118,24 @@ function injectPreviewStyles(css: string) {
   previewStyleEl.value = el
 }
 
+function reconcileSavedFont() {
+  if (!fontCatalogLoaded.value) return
+
+  const saved = effective.value.fontFamily
+  if (isCustomFontCssFamily(saved) && !customFonts.cssFamilyAvailable(saved)) {
+    const fallback = closestVariant(builtInVariants(), {
+      weight: effective.value.fontWeight,
+      style: effective.value.fontStyle,
+    })
+    update(fallback ? { fontFamily: null, fontWeight: fallback.weight, fontStyle: fallback.style } : { fontFamily: null })
+  }
+}
+
 watch(
   () => [customFonts.fonts.value, customFonts.serverFonts.value, customFonts.hiddenServerFamilies.value],
   () => {
     injectPreviewStyles(customFonts.generateFontFaceCSS())
-
-    // Reset a saved font that is no longer on offer: deleted by its owner, removed by an
-    // administrator, or a server font this reader has since hidden.
-    const saved = effective.value.fontFamily
-    if (isCustomFontCssFamily(saved) && !customFonts.cssFamilyAvailable(saved)) {
-      update({ fontFamily: null })
-    }
+    reconcileSavedFont()
   },
   { immediate: true },
 )
@@ -75,6 +143,8 @@ watch(
 onMounted(async () => {
   await load()
   await customFonts.fetchAllFonts()
+  fontCatalogLoaded.value = true
+  reconcileSavedFont()
 })
 
 onUnmounted(() => {
@@ -335,11 +405,7 @@ function setFixedLayoutSpreadNone() {
           <select
             class="text-xs border border-border rounded-md px-2 py-2 md:py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary self-start min-w-40"
             :value="effective.fontFamily ?? ''"
-            @change="
-              update({
-                fontFamily: ($event.target as HTMLSelectElement).value || null,
-              })
-            "
+            @change="selectFontFamily"
           >
             <optgroup :label="t('settings.reader.ebook.builtInFonts')">
               <option v-for="f in BUILTIN_READER_FONT_OPTIONS" :key="String(f.value)" :value="f.value ?? ''">
@@ -356,6 +422,26 @@ function setFixedLayoutSpreadNone() {
                 {{ f.label }}
               </option>
             </optgroup>
+          </select>
+        </div>
+
+        <!-- Font style -->
+        <div class="settings-row">
+          <div>
+            <label :for="fontStyleSelectId" class="settings-label">{{ t('settings.reader.ebook.fontStyle') }}</label>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.fontStyleHint') }}
+            </p>
+          </div>
+          <select
+            :id="fontStyleSelectId"
+            class="text-xs border border-border rounded-md px-2 py-2 md:py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary self-start min-w-40"
+            :value="selectedFontStyle"
+            @change="selectFontStyle"
+          >
+            <option v-for="option in fontStyleOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
           </select>
         </div>
 

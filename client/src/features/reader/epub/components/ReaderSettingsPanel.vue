@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { EPUB_FONT_SIZE_MAX, EPUB_FONT_SIZE_MIN } from '@bookorbit/types'
+import { EPUB_FONT_SIZE_MAX, EPUB_FONT_SIZE_MIN, isCustomFontCssFamily, type FontNamedInstance, type FontVariant } from '@bookorbit/types'
 import {
   BookOpen,
   ChevronDown,
@@ -20,6 +20,7 @@ import type { FontFamily, useCustomFonts } from '../composables/useCustomFonts'
 import { themes } from '../constants/themes'
 import { BUILTIN_READER_FONT_OPTIONS, type ReaderBuiltInFontOption } from '@/features/reader/shared/constants/font-options'
 import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display'
+import { FONT_WEIGHT_LABEL_KEYS, builtInVariants, closestVariant, familyVariants, isSameVariant } from '@/features/reader/shared/lib/font-variants'
 import ReaderRangeField from '@/features/reader/shared/components/ReaderRangeField.vue'
 import ReaderSegmentedControl from '@/features/reader/shared/components/ReaderSegmentedControl.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -44,6 +45,7 @@ const COLUMN_MAX = 10
 const contentRef = ref<HTMLElement | null>(null)
 const isScrolled = ref(false)
 
+const fontStyleLabelId = `reader-font-style-${useId()}`
 const justifyLabelId = `reader-justify-${useId()}`
 const hyphenationLabelId = `reader-hyphenation-${useId()}`
 
@@ -99,7 +101,7 @@ function increaseTextSize() {
 }
 
 function selectBuiltInFont(font: ReaderBuiltInFontOption) {
-  emit('update', { fontFamily: font.value })
+  emit('update', { fontFamily: font.value, ...variantUpdateFor(builtInVariants()) })
 }
 
 function setLineHeight(value: number) {
@@ -184,12 +186,65 @@ const hasCustomFontSections = computed(() => customFontSections.value.length > 0
 
 function selectCustomFont(family: FontFamily) {
   const cssFamilyName = props.customFonts?.getCssFamilyForDisplay(family.name, family.scope)
-  if (cssFamilyName) emit('update', { fontFamily: cssFamilyName })
+  if (cssFamilyName) emit('update', { fontFamily: cssFamilyName, ...variantUpdateFor(familyVariants(family.variants)) })
 }
 
 function isCustomFontSelected(family: FontFamily): boolean {
   if (!props.customFonts) return false
   return props.customFonts.isFontFamilySelected(family.name, props.state.fontFamily, family.scope)
+}
+
+const currentVariant = computed<FontVariant>(() => ({ weight: props.state.fontWeight, style: props.state.fontStyle }))
+
+/**
+ * The styles the selected family offers. Built-in stacks have no file list to read, so
+ * they fall back to the four a system font can always produce.
+ */
+const availableVariants = computed<FontNamedInstance[]>(() => {
+  const customFonts = props.customFonts
+  const selected = props.state.fontFamily
+  if (!customFonts || !isCustomFontCssFamily(selected)) return builtInVariants()
+
+  const family = [...customFonts.visibleServerFamilies.value, ...customFonts.families.value].find((candidate) => candidate.cssFamilyName === selected)
+  return family ? familyVariants(family.variants) : builtInVariants()
+})
+
+/** A single style is not a choice, so the row only appears once there is one to make. */
+const showVariantPicker = computed(() => availableVariants.value.length > 1)
+
+/** Renders each chip in the face it selects. Generic keywords must stay unquoted. */
+const variantPreviewFamily = computed(() => {
+  const selected = props.state.fontFamily
+  if (!selected) return undefined
+  return isCustomFontCssFamily(selected) ? `'${selected}', sans-serif` : selected
+})
+
+function isVariantSelected(variant: FontVariant): boolean {
+  return isSameVariant(variant, currentVariant.value)
+}
+
+function selectVariant(variant: FontVariant) {
+  emit('update', { fontWeight: variant.weight, fontStyle: variant.style })
+}
+
+/**
+ * Keeps the chosen style reachable when the family changes. A family that lacks the
+ * current style would otherwise leave the row with nothing selected, so the nearest
+ * style it does offer takes over.
+ */
+function variantUpdateFor(variants: FontVariant[]): Partial<ReaderState> {
+  if (variants.some((variant) => isSameVariant(variant, currentVariant.value))) return {}
+
+  const fallback = closestVariant(variants, currentVariant.value)
+  return fallback ? { fontWeight: fallback.weight, fontStyle: fallback.style } : {}
+}
+
+function variantLabel(variant: FontNamedInstance): string {
+  const weightKey = FONT_WEIGHT_LABEL_KEYS[variant.weight]
+  const base = variant.name ?? (weightKey ? t(weightKey) : String(variant.weight))
+  // A designer's own name usually says so already; only spell it out when it does not.
+  if (variant.style !== 'italic' || /italic|oblique/i.test(base)) return base
+  return t('reader.settings.fontStyleItalicOf', { style: base })
 }
 
 const groupLabelClass = 'mb-2 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'
@@ -326,6 +381,30 @@ const cardBaseClass =
                 @click="selectCustomFont(family)"
               >
                 {{ formatFontFamilyLabel(family.name) }}
+              </button>
+            </div>
+          </template>
+
+          <template v-if="showVariantPicker">
+            <p :id="fontStyleLabelId" class="mb-1.5 mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {{ t('reader.settings.fontStyle') }}
+            </p>
+            <div class="flex flex-wrap gap-2" role="group" :aria-labelledby="fontStyleLabelId">
+              <button
+                v-for="variant in availableVariants"
+                :key="`${variant.weight}:${variant.style}`"
+                type="button"
+                class="h-9 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+                :class="
+                  isVariantSelected(variant)
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-foreground hover:border-muted-foreground/40 hover:bg-muted'
+                "
+                :style="{ fontFamily: variantPreviewFamily, fontWeight: variant.weight, fontStyle: variant.style }"
+                :aria-pressed="isVariantSelected(variant)"
+                @click="selectVariant(variant)"
+              >
+                {{ variantLabel(variant) }}
               </button>
             </div>
           </template>

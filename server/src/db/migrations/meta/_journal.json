@@ -505,6 +505,20 @@
       "when": 1787086030151,
       "tag": "0071_add_koreader_progress_reset_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1787372069937,
+      "tag": "0072_add_variable_font_axes",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1787378660967,
+      "tag": "0073_widen_font_weights",
+      "breakpoints": true
     }
   ]
 }

@@ -43,7 +43,11 @@ export class FontService {
         throw new BadRequestException(`Maximum of ${MAX_FONTS_PER_USER} fonts per user reached`);
       }
 
-      const { familyName, weight, style, suggestedFamilyName } = resolveFontIdentity(this.validation, buffer, originalFilename);
+      const { familyName, weight, style, weightMin, weightMax, instances, suggestedFamilyName } = resolveFontIdentity(
+        this.validation,
+        buffer,
+        originalFilename,
+      );
 
       const storedFileName = await this.storage.save(user.id, format, buffer);
 
@@ -57,6 +61,9 @@ export class FontService {
           format,
           weight,
           style,
+          weightMin,
+          weightMax,
+          instances,
           fileSize: buffer.length,
           fileHash,
         });

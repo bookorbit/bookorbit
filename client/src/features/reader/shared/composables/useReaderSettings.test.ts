@@ -81,6 +81,15 @@ describe('useReaderSettings - load() with valid localStorage epub delta', () => 
     expect(s.bookDelta.value).toEqual({ fontSize: 6 })
   })
 
+  it('preserves variable-font weights across the full CSS range', async () => {
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ fontWeight: 350, fontStyle: 'italic' }))
+
+    const s = useReaderSettings(BOOK_FILE_ID, 'epub')
+    await s.load()
+
+    expect(s.bookDelta.value).toEqual({ fontWeight: 350, fontStyle: 'italic' })
+  })
+
   it('filters invalid EPUB spread settings from localStorage deltas', async () => {
     const raw = { fontSize: 20, fixedLayoutSpread: 'two-page' }
     localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify(raw))
@@ -94,6 +103,15 @@ describe('useReaderSettings - load() with valid localStorage epub delta', () => 
 })
 
 describe('useReaderSettings - load() with invalid localStorage value', () => {
+  it('removes a font weight outside the CSS range', async () => {
+    localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ fontWeight: 1001 }))
+
+    const s = useReaderSettings(BOOK_FILE_ID, 'epub')
+    await s.load()
+
+    expect(s.bookDelta.value).toBeNull()
+  })
+
   it('removes an EPUB font size below the supported minimum', async () => {
     localStorage.setItem(`reader:book:${BOOK_FILE_ID}`, JSON.stringify({ fontSize: 5 }))
 
