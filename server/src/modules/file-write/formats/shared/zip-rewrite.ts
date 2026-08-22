@@ -1,6 +1,8 @@
 import { createWriteStream } from 'fs';
 import type { Readable } from 'stream';
 import { ZipArchive, type Archiver } from 'archiver';
+import { destroyAndClose } from './destroy-and-close';
+import { removeFileIfPresent } from './remove-file-if-present';
 
 const ZLIB_COMPRESSION_LEVEL = 6;
 
@@ -40,7 +42,11 @@ export async function writeZipArchive(tmpPath: string, entries: Iterable<ZipRewr
     void archive.finalize();
     await Promise.race([closed, failure]);
   } catch (error) {
-    output.destroy();
+    // the writer may still hold tmpPath open, so stop it and wait for the handle to be
+    // released before unlinking, otherwise the delete fails on Windows and is swallowed
+    if (typeof archive.destroy === 'function') archive.destroy();
+    await destroyAndClose(output);
+    await removeFileIfPresent(tmpPath);
     throw error;
   }
 }
