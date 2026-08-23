@@ -55,6 +55,7 @@ const form = reactive({
   authors: '',
   description: '',
   publisher: '',
+  originCountry: '',
   publishedDate: '',
   publishedYear: '',
   language: '',
@@ -77,6 +78,7 @@ watch(
     form.authors = m.authors?.join(', ') ?? ''
     form.description = m.description ?? ''
     form.publisher = m.publisher ?? ''
+    form.originCountry = m.originCountry ?? ''
     form.publishedDate = m.publishedDate ?? ''
     form.publishedYear = m.publishedYear != null ? String(m.publishedYear) : ''
     form.language = m.language ?? ''
@@ -128,6 +130,7 @@ function buildMetadataPatchFromForm(): Partial<BookDockMetadata> {
       : undefined,
     description: form.description || undefined,
     publisher: form.publisher || undefined,
+    originCountry: form.originCountry || undefined,
     publishedDate: form.publishedDate || undefined,
     publishedYear: form.publishedYear ? ((n) => (isNaN(n) ? undefined : n))(parseInt(form.publishedYear, 10)) : undefined,
     language: form.language || undefined,
@@ -220,6 +223,7 @@ const currentSource = computed<MetadataSource>(() => ({
   publishedDate: form.publishedDate || null,
   publishedYear: form.publishedYear ? ((n) => (isNaN(n) ? null : n))(parseInt(form.publishedYear, 10)) : null,
   language: form.language || null,
+  originCountry: form.originCountry || null,
   pageCount: passthroughMetadata.value.pageCount ?? null,
   seriesName: form.seriesName || null,
   seriesIndex: form.seriesIndex ? ((n) => (isNaN(n) ? null : n))(parseFloat(form.seriesIndex)) : null,
@@ -297,6 +301,7 @@ async function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string 
   if ('subtitle' in p) form.subtitle = p.subtitle ?? ''
   if ('description' in p) form.description = p.description ?? ''
   if ('publisher' in p) form.publisher = p.publisher ?? ''
+  if ('originCountry' in p) form.originCountry = p.originCountry ?? ''
   if ('publishedDate' in p) form.publishedDate = p.publishedDate ?? ''
   if ('publishedYear' in p) form.publishedYear = p.publishedYear == null ? '' : String(p.publishedYear)
   if ('language' in p) form.language = p.language ?? ''

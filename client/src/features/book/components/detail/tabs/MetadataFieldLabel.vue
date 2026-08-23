@@ -36,10 +36,10 @@ function handleToggle() {
         :disabled="loading"
         @click="handleToggle"
       >
-        <Transition name="icon" mode="out-in">
-          <Loader2 v-if="loading" key="loading" class="size-3.5 animate-spin" />
-          <Lock v-else-if="locked" key="locked" class="size-3.5 text-primary" />
-          <LockOpen v-else key="unlocked" class="size-3.5" />
+        <Transition mode="out-in" name="icon">
+          <Loader2 class="size-3.5 animate-spin" key="loading" v-if="loading" />
+          <Lock class="size-3.5 text-primary" key="locked" v-else-if="locked" />
+          <LockOpen class="size-3.5" key="unlocked" v-else />
         </Transition>
       </button>
     </div>

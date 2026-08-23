@@ -33,6 +33,7 @@ export type DiffFieldKey =
   | 'authors'
   | 'description'
   | 'publisher'
+  | 'originCountry'
   | 'publishedDate'
   | 'publishedYear'
   | 'language'
@@ -81,6 +82,7 @@ export interface MetadataPatch {
   subtitle?: string | null
   description?: string | null
   publisher?: string | null
+  originCountry?: string | null
   publishedDate?: string | null
   publishedYear?: number | null
   language?: string | null
@@ -121,6 +123,7 @@ export const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
   { key: 'authors', label: 'Authors' },
   { key: 'description', label: 'Description' },
   { key: 'publisher', label: 'Publisher' },
+  { key: 'originCountry', label: 'Origin Country' },
   { key: 'publishedDate', label: 'Published' },
   { key: 'language', label: 'Language' },
   { key: 'pageCount', label: 'Page Count' },
@@ -272,7 +275,7 @@ export function useMetadataDiff(
     if (key === 'coverUrl') return 'cover'
     if (key === 'sourceUrl') return null
     if (key === 'publishedDate') return 'publishedYear'
-    return key
+    return key as BookMetadataLockField
   }
 
   function getBookValue(key: DiffFieldKey): string {
@@ -415,7 +418,7 @@ export function useMetadataDiff(
         pickedProvider: pickedFromActive ? pickedProvider : null,
         pickedDisplay: pickedFromActive ? pickedDisplay : '',
         isCover: false,
-        isLocked: lockedFieldSet.value.has(providerIdKey),
+        isLocked: lockedFieldSet.value.has(providerIdKey as BookMetadataLockField),
         isCopyable: true,
         providerValues: [],
       })

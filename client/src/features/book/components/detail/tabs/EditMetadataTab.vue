@@ -49,7 +49,18 @@ const emit = defineEmits<{
   fileRenamed: []
 }>()
 
-const { t } = useI18n()
+const { t, locale, tm } = useI18n()
+
+const sortedCountries = computed(() => {
+  const rawCountries = tm('countryCodes') as Record<string, string>
+  if (!rawCountries) return []
+
+  const collator = new Intl.Collator(locale.value, { sensitivity: 'base', usage: 'sort' })
+
+  return Object.entries(rawCountries)
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => collator.compare(a.name, b.name))
+})
 
 const DIRECT_PATCH_FIELDS = [
   'title',
@@ -58,6 +69,7 @@ const DIRECT_PATCH_FIELDS = [
   'authors',
   'genres',
   'publisher',
+  'originCountry',
   'language',
   'pageCount',
   'seriesName',
@@ -252,9 +264,6 @@ watch(
   { immediate: true },
 )
 
-// The server names the field it rejected ("amazonId must be shorter than..."), which is the only
-// text that tells the user what to fix. It is untranslated, so it is preferred over the generic
-// catalog message rather than replacing it.
 const saveErrorMessage = computed(() => {
   const failure = error.value
   if (!failure) return null
@@ -371,8 +380,6 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
     return 0
   }
 
-  // Providers do not report series length in this patch, so carry the current value across
-  // rather than letting an applied suggestion silently clear a total someone entered.
   const totalsByName = new Map(form.seriesMemberships.map((m) => [m.seriesName.trim().toLowerCase(), m.expectedBookCount ?? null]))
 
   setSeriesMemberships(
@@ -615,6 +622,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     authors: preview.authors,
     genres: preview.genres,
     publisher: preview.publisher,
+    originCountry: preview.originCountry,
     publishedDate: preview.publishedDate,
     publishedYear: preview.publishedYear,
     language: preview.language,
@@ -1152,7 +1160,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
           </MetadataFieldLabel>
         </div>
 
-        <!-- Language | Published Date | Year | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
+        <!-- Language | Country | Published Date | Year | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
         <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
           <MetadataFieldLabel
             class="col-span-2 sm:w-32 sm:shrink-0"
@@ -1169,6 +1177,25 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               :maxlength="10"
               :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
             />
+          </MetadataFieldLabel>
+          <MetadataFieldLabel
+            class="sm:w-48 sm:shrink-0"
+            :label="t('settings.metadata.fields.originCountry')"
+            field="originCountry"
+            :locked="isLocked('originCountry')"
+            :is-updating="isUpdatingLock"
+            @toggle="handleLockToggle"
+          >
+            <select
+              v-model="form.originCountry"
+              class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="isLocked('originCountry')"
+            >
+              <option :value="null">--</option>
+              <option v-for="country in sortedCountries" :key="country.code" :value="country.code">
+                {{ country.name }}
+              </option>
+            </select>
           </MetadataFieldLabel>
           <MetadataFieldLabel
             class="sm:w-40 sm:shrink-0"

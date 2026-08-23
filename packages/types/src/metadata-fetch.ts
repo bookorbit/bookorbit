@@ -69,6 +69,7 @@ export interface MetadataCandidate {
   authors?: string[];
   description?: string;
   publisher?: string;
+  originCountry?: string;
   publishedDate?: string;
   publishedYear?: number;
   language?: string;
@@ -146,6 +147,7 @@ export interface MetadataSource {
   subtitle: string | null;
   description: string | null;
   publisher: string | null;
+  originCountry: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;

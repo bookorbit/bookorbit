@@ -45,6 +45,7 @@ export const bookMetadata = pgTable(
     isbn10: varchar('isbn10', { length: 10 }),
     isbn13: varchar('isbn13', { length: 13 }),
     publisher: varchar('publisher', { length: 500 }),
+    originCountry: varchar('origin_country', { length: 2 }),
     publishedDate: date('published_date', { mode: 'string' }),
     publishedYear: integer('published_year'),
     language: varchar('language', { length: 100 }),

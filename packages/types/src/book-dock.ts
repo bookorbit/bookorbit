@@ -35,6 +35,7 @@ export interface BookDockMetadata {
   narrators?: string[];
   description?: string | null;
   publisher?: string | null;
+  originCountry?: string | null;
   publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;

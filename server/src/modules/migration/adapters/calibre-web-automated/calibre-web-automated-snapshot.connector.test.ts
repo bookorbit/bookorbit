@@ -162,7 +162,6 @@ describe('CalibreWebAutomatedSnapshotConnector', () => {
     const before = new Set((await readdir(tmpdir())).filter((name) => name.startsWith('bookorbit-cwa-migration-')));
     const pair = await createCompatiblePair(importRoot);
     withDatabase(pair.metadataDatabasePath, (database) => {
-      database.enableDefensive(false);
       database.exec(`
         PRAGMA writable_schema = ON;
         UPDATE sqlite_schema SET rootpage = 999999 WHERE name = 'books';

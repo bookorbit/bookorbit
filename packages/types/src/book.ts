@@ -7,8 +7,6 @@ import type { CustomMetadataBookValue } from "./custom-metadata";
 import type { CoverAspectRatio } from "./library";
 import { DEFAULT_FORMAT_PRIORITY } from "./library";
 
-// Derived rather than duplicated: these two lists describe the same set of formats,
-// and maintaining them separately let BOOK_FORMATS fall behind on azw and kepub.
 export const BOOK_FORMATS = DEFAULT_FORMAT_PRIORITY;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
@@ -117,7 +115,6 @@ export type BookSeriesMembership = {
   seriesName: string;
   seriesIndex: number | null;
   displayOrder: number;
-  /** Series-level, shared by every book in the series and by every user. */
   expectedBookCount: number | null;
 };
 
@@ -201,6 +198,7 @@ export type BookDetail = {
   isbn10: string | null;
   isbn13: string | null;
   publisher: string | null;
+  originCountry: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
@@ -245,6 +243,7 @@ export type BookMetadataRefreshPreviewFields = {
   authors?: string[];
   genres?: string[];
   publisher?: string | null;
+  originCountry?: string | null;
   publishedDate?: string | null;
   publishedYear?: number | null;
   language?: string | null;
@@ -343,7 +342,7 @@ export type SeriesBookRecommendation = {
 };
 
 export type CoverSearchResult = {
-  url: number | string; // ID for proxy or direct URL
+  url: number | string;
   previewUrl: string;
   sourceUrl: string;
   width: number;

@@ -14,7 +14,6 @@ import {
 export type EditableSeriesMembership = {
   seriesName: string
   seriesIndex: number | null
-  /** Series-level: saving it changes the total for every book in the series and every user. */
   expectedBookCount: number | null
 }
 
@@ -23,6 +22,7 @@ const ROOT_FIELDS = [
   'subtitle',
   'description',
   'publisher',
+  'originCountry',
   'publishedDate',
   'publishedYear',
   'language',
@@ -111,15 +111,8 @@ function changedCustomMetadataPayload(
     .map((field) => ({ fieldId: field.fieldId, value: field.value }))
 }
 
-/**
- * A failed save, kept structured rather than pre-rendered: `detail` is the server's own English
- * description of what it rejected, which no catalog can translate, while everything else has to
- * resolve to a translated message in the component.
- */
 export type MetadataSaveFailure = {
-  /** Server-supplied description, or null when the response carried none. */
   detail: string | null
-  /** HTTP status, or null when the request failed before producing a response. */
   status: number | null
 }
 
@@ -132,6 +125,7 @@ export function useMetadataEditor() {
     subtitle: null as string | null,
     description: null as string | null,
     publisher: null as string | null,
+    originCountry: null as string | null,
     publishedDate: null as string | null,
     publishedYear: null as number | null,
     language: null as string | null,
@@ -188,6 +182,7 @@ export function useMetadataEditor() {
     form.subtitle = book.subtitle
     form.description = book.description
     form.publisher = book.publisher
+    form.originCountry = book.originCountry ?? null
     form.publishedDate = book.publishedDate
     form.publishedYear = book.publishedYear
     form.language = book.language
