@@ -878,4 +878,35 @@ export class StatisticsRepository {
       .orderBy(desc(sql`count(*)`))
       .limit(50);
   }
+  async countryDistribution(
+    userId: number,
+    isSuperuser: boolean,
+    contentFilters?: ContentFilterRules | number[],
+    filterLibraryIds?: number[],
+    readStatus?: string,
+  ) {
+    const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
+    const { contentFilters: resolvedContentFilters, filterLibraryIds: resolvedFilterLibraryIds } = this.resolveOptionalFilters(
+      contentFilters,
+      filterLibraryIds,
+    );
+    const filter = this.libraryFilter(this.intersectLibraryIds(accessible, resolvedFilterLibraryIds));
+    const cfClauses = this.contentFilterClauses(isSuperuser, resolvedContentFilters);
+
+    // Filtro adicional recebido do Vue (statusFilter)
+    const statusClause = readStatus && readStatus !== 'all' ? eq(books.status, readStatus) : undefined;
+
+    const items = await this.db
+      .select({
+        country: bookMetadata.originCountry,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(books)
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(and(isNotNull(bookMetadata.originCountry), filter, statusClause, ...cfClauses))
+      .groupBy(bookMetadata.originCountry)
+      .orderBy(desc(sql<number>`count(*)`));
+
+    return { items };
+  }
 }

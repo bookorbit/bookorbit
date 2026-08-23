@@ -14,7 +14,9 @@
     "previous": "Previous",
     "retry": "Retry",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "high": "High",
+    "low": "Low"
   },
   "settings": {
     "privacySharing": {
@@ -6806,6 +6808,9 @@
       },
       "libraryMetadataCompleteness": {
         "title": "Library Metadata Completeness"
+      },
+      "countryDistribution": {
+        "title": "Country Distribution"
       },
       "metadataCompleteness": {
         "title": "Metadata Completeness"

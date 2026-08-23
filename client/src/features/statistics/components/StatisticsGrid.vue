@@ -28,6 +28,7 @@ const CHART_COMPONENTS: Record<StatisticsChartId, Component> = {
   'largest-books': defineAsyncComponent(() => import('./library/LargestBooksChart.vue')),
   'top-series': defineAsyncComponent(() => import('./library/TopSeriesChart.vue')),
   'publication-year-timeline': defineAsyncComponent(() => import('./library/PublicationYearTimelineChart.vue')),
+  'country-distribution': defineAsyncComponent(() => import('./library/CountryDistributionChart.vue')),
   'reading-heatmap': defineAsyncComponent(() => import('./user/ReadingHeatmapChart.vue')),
   'reading-source-distribution': defineAsyncComponent(() => import('./user/SourceDistributionChart.vue')),
   'peak-reading-hours': defineAsyncComponent(() => import('./user/PeakReadingHoursChart.vue')),
