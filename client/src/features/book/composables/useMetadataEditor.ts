@@ -182,7 +182,7 @@ export function useMetadataEditor() {
     form.subtitle = book.subtitle
     form.description = book.description
     form.publisher = book.publisher
-    form.originCountry = book.originCountry ?? null
+    form.originCountry = book.originCountry ? book.originCountry.toUpperCase() : null
     form.publishedDate = book.publishedDate
     form.publishedYear = book.publishedYear
     form.language = book.language

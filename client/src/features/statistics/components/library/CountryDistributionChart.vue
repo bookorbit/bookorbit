@@ -7,13 +7,15 @@ import * as echarts from 'echarts'
 import { Globe } from '@lucide/vue'
 import { breakpointsTailwind, useBreakpoints, useMutationObserver } from '@vueuse/core'
 import { api } from '@/lib/api'
-import { ECHARTS_COUNTRY_MAP } from '@/lib/country-map'
+import { ECHARTS_COUNTRY_MAP, normalizeCountryCode } from '@/lib/country-map'
+import { useStatisticsConfig } from '../../composables/useStatisticsConfig'
 
 import ChartCard from '../ChartCard.vue'
 
 const { t } = useI18n()
 const { md } = useBreakpoints(breakpointsTailwind)
 const route = useRoute()
+const { filters } = useStatisticsConfig()
 
 const rawItems = ref<Array<Record<string, unknown>>>([])
 const isLoading = ref(true)
@@ -102,10 +104,18 @@ async function fetchMap() {
 
 async function fetchStats() {
   try {
-    let endpoint = '/api/v1/statistics/country-distribution?libraryIds=1'
-    if (statusFilter.value !== 'all') {
-      endpoint += `&readStatus=${statusFilter.value}`
+    const params = new URLSearchParams()
+
+    if (filters.value?.libraryIds) {
+      filters.value.libraryIds.forEach((id: number) => params.append('libraryIds', String(id)))
     }
+
+    if (statusFilter.value !== 'all') {
+      params.append('readStatus', statusFilter.value)
+    }
+
+    const qs = params.toString()
+    const endpoint = `/api/v1/statistics/country-distribution${qs ? '?' + qs : ''}`
 
     const apiRes = await api(endpoint, {
       headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
@@ -136,32 +146,42 @@ async function loadData() {
 onMounted(loadData)
 onActivated(loadData)
 
-watch([() => route?.fullPath, statusFilter], () => {
-  loadData()
-})
+watch(
+  [() => route?.fullPath, statusFilter, filters],
+  () => {
+    loadData()
+  },
+  { deep: true },
+)
 
 const aggregatedItems = computed(() => {
   if (!rawItems.value.length) return []
 
-  return rawItems.value
-    .filter((item) => {
-      const countryVal = item.country
-      const code = typeof countryVal === 'string' ? countryVal.trim() : ''
-      const countVal = item.count ?? item.value
-      const value = typeof countVal === 'number' ? countVal : 0
+  const countsByCode = new Map<string, number>()
 
-      return code && code.toLowerCase() !== 'unknown' && value > 0
-    })
-    .map((item) => {
-      const countryVal = item.country
-      const code = typeof countryVal === 'string' ? countryVal.trim().toUpperCase() : ''
-      const echartsName = ECHARTS_COUNTRY_MAP[code] || code
-      const localizedName = t(`countryCodes.${code}`, code)
-      const countVal = item.count ?? item.value
-      const value = typeof countVal === 'number' ? countVal : 0
+  for (const item of rawItems.value) {
+    const countryVal = item.country
+    if (typeof countryVal !== 'string') continue
 
-      return { name: echartsName, value, localizedName }
-    })
+    const code = normalizeCountryCode(countryVal)
+    if (!code || code.toLowerCase() === 'unknown') continue
+
+    const countVal = item.count ?? item.value
+    const value = typeof countVal === 'number' ? countVal : 0
+
+    if (value > 0) {
+      countsByCode.set(code, (countsByCode.get(code) || 0) + value)
+    }
+  }
+
+  const result = []
+  for (const [code, value] of countsByCode.entries()) {
+    const echartsName = ECHARTS_COUNTRY_MAP[code] || code
+    const localizedName = t(`countryCodes.${code}`, code)
+    result.push({ name: echartsName, value, localizedName })
+  }
+
+  return result
 })
 
 const chartOption = computed(() => {

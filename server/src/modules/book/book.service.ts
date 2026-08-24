@@ -1690,7 +1690,7 @@ export class BookService {
     if (dto.subtitle !== undefined) scalarFields.subtitle = dto.subtitle ?? null;
     if (dto.description !== undefined) scalarFields.description = dto.description ?? null;
     if (dto.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(dto.publisher);
-    if (dto.originCountry !== undefined) scalarFields.originCountry = dto.originCountry ?? null;
+    if (dto.originCountry !== undefined) scalarFields.originCountry = normalizeMetadataText(dto.originCountry);
     if (dto.publishedDate !== undefined) {
       const publishedDate = this.normalizeUpdatePublishedDate(dto.publishedDate);
       scalarFields.publishedDate = publishedDate;
@@ -2698,6 +2698,7 @@ export class BookService {
         description: meta?.description,
         authors: authorRows.map((a) => a.name),
         publisher: meta?.publisher,
+        originCountry: meta?.originCountry,
         publishedYear: meta?.publishedYear,
         language: meta?.language,
         pageCount: meta?.pageCount,

@@ -533,6 +533,13 @@
       "when": 1787530767419,
       "tag": "0075_add_book_file_fixed_layout",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1787580690609,
+      "tag": "0076_add_origin_country",
+      "breakpoints": true
     }
   ]
 }
