@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { parseCustomRuleFieldId, parseCustomSortFieldId } from '@bookorbit/types';
+import { parseCustomRuleFieldId, parseCustomSortFieldId, parseSeriesIndex } from '@bookorbit/types';
 import type {
   CommunityRatingProvider,
   ContentFilterRules,
@@ -17,6 +17,7 @@ import { DB } from '../../db';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
+import { compareSeriesIndexSql, seriesIndexSortKey, seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
 import * as schema from '../../db/schema';
 import { BookSortBuilder, customMetadataValueColumn, type BookSortContext } from './book-sort-builder.service';
 import {
@@ -165,7 +166,7 @@ export class BookQueryBuilder {
       case 'publishedYear':
         return this.numericRuleToSql(bookMetadata.publishedYear, operator, value as number, valueTo as number | undefined);
       case 'seriesIndex':
-        return this.seriesIndexRuleToSql(operator, value as number, valueTo as number | undefined);
+        return this.seriesIndexRuleToSql(operator, value as string, valueTo as string | undefined);
       case 'pageCount':
         return this.numericRuleToSql(bookMetadata.pageCount, operator, value as number, valueTo as number | undefined);
       case 'rating':
@@ -424,7 +425,7 @@ export class BookQueryBuilder {
     }
   }
 
-  private seriesIndexRuleToSql(operator: string, value?: number, valueTo?: number): SQL {
+  private seriesIndexRuleToSql(operator: string, value?: string, valueTo?: string): SQL {
     const existsSeriesIndex = (whereClause?: SQL) => {
       const predicates: SQL[] = [eq(bookSeriesMemberships.bookId, books.id)];
       if (whereClause) predicates.push(whereClause);
@@ -437,34 +438,37 @@ export class BookQueryBuilder {
 
     switch (operator) {
       case 'eq':
-        this.assertNumber(value, operator, 'value');
-        return existsSeriesIndex(eq(bookSeriesMemberships.seriesIndex, value!));
+        return existsSeriesIndex(eq(bookSeriesMemberships.seriesIndex, this.requireSeriesIndex(value, operator, 'value')));
       case 'notEq':
-        this.assertNumber(value, operator, 'value');
-        return existsSeriesIndex(ne(bookSeriesMemberships.seriesIndex, value!));
+        return existsSeriesIndex(ne(bookSeriesMemberships.seriesIndex, this.requireSeriesIndex(value, operator, 'value')));
       case 'gt':
-        this.assertNumber(value, operator, 'value');
-        return existsSeriesIndex(gt(bookSeriesMemberships.seriesIndex, value!));
+        return existsSeriesIndex(compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '>', this.requireSeriesIndex(value, operator, 'value')));
       case 'gte':
-        this.assertNumber(value, operator, 'value');
-        return existsSeriesIndex(gte(bookSeriesMemberships.seriesIndex, value!));
+        return existsSeriesIndex(compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '>=', this.requireSeriesIndex(value, operator, 'value')));
       case 'lt':
-        this.assertNumber(value, operator, 'value');
-        return existsSeriesIndex(lt(bookSeriesMemberships.seriesIndex, value!));
+        return existsSeriesIndex(compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '<', this.requireSeriesIndex(value, operator, 'value')));
       case 'lte':
-        this.assertNumber(value, operator, 'value');
-        return existsSeriesIndex(lte(bookSeriesMemberships.seriesIndex, value!));
+        return existsSeriesIndex(compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '<=', this.requireSeriesIndex(value, operator, 'value')));
       case 'between':
-        this.assertNumber(value, operator, 'value');
-        this.assertNumber(valueTo, operator, 'valueTo');
-        return existsSeriesIndex(and(gte(bookSeriesMemberships.seriesIndex, value!), lte(bookSeriesMemberships.seriesIndex, valueTo!))!);
+        return existsSeriesIndex(
+          and(
+            compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '>=', this.requireSeriesIndex(value, operator, 'value')),
+            compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '<=', this.requireSeriesIndex(valueTo, operator, 'valueTo')),
+          )!,
+        );
       case 'isEmpty':
         return not(existsSeriesIndex(isNotNull(bookSeriesMemberships.seriesIndex)));
       case 'isNotEmpty':
         return existsSeriesIndex(isNotNull(bookSeriesMemberships.seriesIndex));
       default:
-        throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
+        throw new BadRequestException(`Invalid operator '${operator}' for series index field`);
     }
+  }
+
+  private requireSeriesIndex(value: unknown, operator: string, name: string): string {
+    const parsed = parseSeriesIndex(value);
+    if (parsed === null) throw new BadRequestException(`Operator '${operator}' requires a valid series index ${name}`);
+    return parsed;
   }
 
   private ratingRuleToSql(operator: string, value: number | undefined, valueTo: number | undefined, userId: number): SQL {
@@ -875,14 +879,16 @@ export class BookQueryBuilder {
           s.current_progress,
           lag(s.is_completed) over (
             partition by s.library_id, s.series_id
-            order by s.series_index asc, s.added_at asc, s.id asc
+            order by ${seriesIndexSortKey(sql.raw('s.series_index'))} asc,
+              s.series_index collate "C" asc, s.added_at asc, s.id asc
           ) as previous_is_completed
         from scoped s
       )
       select distinct on (o.library_id, o.series_id) o.id
       from ordered o
       where o.previous_is_completed = true and o.is_completed = false and o.current_progress = 0
-      order by o.library_id, o.series_id, o.series_index asc, o.added_at asc, o.id asc
+      order by o.library_id, o.series_id, ${seriesIndexSortKey(sql.raw('o.series_index'))} asc,
+        o.series_index collate "C" asc, o.added_at asc, o.id asc
     )`;
   }
 
@@ -1087,7 +1093,8 @@ export class BookQueryBuilder {
           parts.push(`sort_collection_position ${D} NULLS LAST`);
           break;
         case 'seriesIndex':
-          parts.push(`series_index ${D} NULLS LAST`);
+          parts.push(`${seriesIndexSortKeySql('series_index')} ${D} NULLS LAST`);
+          parts.push(`series_index COLLATE "C" ${D} NULLS LAST`);
           if (!sort.some((s) => s.field === 'series')) {
             parts.push(`sort_title ${D} NULLS LAST`);
           }

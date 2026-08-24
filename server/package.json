@@ -33,6 +33,7 @@
     "db:migrate:runtime": "node dist/scripts/migrate.js",
     "e2e:db:prepare": "tsx src/scripts/db-prepare-e2e.ts",
     "db:studio": "drizzle-kit studio",
+    "predb:seed": "pnpm --filter @bookorbit/types build",
     "db:seed": "tsx src/scripts/db-seed.ts",
     "whats-new:preview": "tsx src/scripts/whats-new-preview.ts",
     "whats-new:lint": "tsx src/scripts/whats-new-lint.ts",

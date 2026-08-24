@@ -1,4 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
+import { parseSeriesIndex } from '@bookorbit/types';
 import { parsePublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
 import { boundProviderId, type ProviderIdField } from '../../../common/utils/provider-id.utils';
 
@@ -15,7 +16,7 @@ export interface ParsedOpf {
   pageCount: number | null;
   rating: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   authors: { name: string; sortName: string | null }[];
   narrators: string[];
   genres: string[];
@@ -457,11 +458,10 @@ export function parseOpf(xml: string): ParsedOpf {
 
   // ── Series (Calibre EPUB2, then EPUB3) ────────────────────────────────────
   let seriesName: string | null = namedMeta('calibre:series');
-  let seriesIndex: number | null = null;
+  let seriesIndex: string | null = null;
   const rawSeriesIdx = namedMeta('calibre:series_index');
   if (rawSeriesIdx) {
-    const idx = parseFloat(rawSeriesIdx);
-    if (!isNaN(idx)) seriesIndex = idx;
+    seriesIndex = parseSeriesIndex(rawSeriesIdx);
   }
 
   if (!seriesName) {
@@ -474,7 +474,7 @@ export function parseOpf(xml: string): ParsedOpf {
         const id = mo['@_id'] as string | undefined;
         if (id) {
           const pos = getRefineValue(refineMap, id, 'group-position');
-          if (pos) seriesIndex = parseFloat(pos) || null;
+          if (pos) seriesIndex = parseSeriesIndex(pos);
         }
         break;
       }

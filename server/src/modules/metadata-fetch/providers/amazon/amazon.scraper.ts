@@ -17,7 +17,7 @@ export interface AmazonBookData {
   language?: string;
   pageCount?: number;
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: string;
   seriesTotalBooks?: number;
   coverUrl?: string;
   tags?: string[];
@@ -226,11 +226,9 @@ function seriesLabel($: CheerioAPI): string {
   return $('#rpi-attribute-book_details-series .rpi-attribute-label span').first().text();
 }
 
-function extractSeriesIndex($: CheerioAPI): number | undefined {
+function extractSeriesIndex($: CheerioAPI): string | undefined {
   const match = seriesLabel($).match(/book\s+(\d+(?:\.\d+)?)\s+of/i);
-  if (!match) return undefined;
-  const n = parseFloat(match[1]);
-  return Number.isNaN(n) ? undefined : n;
+  return match?.[1];
 }
 
 /**

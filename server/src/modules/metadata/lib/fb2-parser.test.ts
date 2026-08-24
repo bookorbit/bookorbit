@@ -133,12 +133,12 @@ describe('parseFb2File', () => {
       mockReadFile.mockResolvedValue(fb2Buffer('<sequence name="The Dark Tower" number="1"/>'));
       const r = await parseFb2File('/book.fb2');
       expect(r?.seriesName).toBe('The Dark Tower');
-      expect(r?.seriesIndex).toBe(1);
+      expect(r?.seriesIndex).toBe('1');
     });
 
     it('parses float series index', async () => {
-      mockReadFile.mockResolvedValue(fb2Buffer('<sequence name="Series" number="1.5"/>'));
-      expect((await parseFb2File('/book.fb2'))?.seriesIndex).toBe(1.5);
+      mockReadFile.mockResolvedValue(fb2Buffer('<sequence name="Series" number="5.10"/>'));
+      expect((await parseFb2File('/book.fb2'))?.seriesIndex).toBe('5.10');
     });
 
     it('returns null seriesName when no sequence element', async () => {

@@ -381,6 +381,7 @@ function removeStatusChip(index: number, status: string) {
 function valueInputType(field: RuleField, operator: RuleOperator): string {
   if (NO_VALUE_OPERATORS.includes(operator)) return 'none'
   if (isDateField(field)) return operator === 'withinLast' ? 'number' : 'date'
+  if (field === 'seriesIndex') return 'text'
   if (isNumericField(field)) return 'number'
   return 'text'
 }

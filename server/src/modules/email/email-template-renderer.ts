@@ -5,7 +5,7 @@ export interface TemplateContext {
   authors?: string | null;
   series?: string | null;
   seriesName?: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: string | null;
   format?: string | null;
   fileSize?: string | null;
   pageCount?: number | null;

@@ -25,8 +25,8 @@ import {
 } from '@lucide/vue'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'reka-ui'
 import { getFormatColor } from '@/features/book/lib/format-colors'
-import { providerIconPath, providerIconPathSafe } from '@/features/book/lib/provider-icons'
-import { libroFmAudiobookUrl, lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
+import { providerIconPathSafe } from '@/features/book/lib/provider-icons'
+import { createBookProviderLinks } from '@/features/book/lib/provider-links'
 import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -79,14 +79,6 @@ type CollectionMembership = {
   name: string
   syncToKobo: boolean
   memberCount?: number
-}
-
-type ProviderLink = {
-  key: string
-  label: string
-  url: string
-  iconUrl: string
-  fallback: string
 }
 
 type SeriesDisplayLink = {
@@ -655,120 +647,7 @@ const supplementalLoading = ref(false)
 const resettingFileIds = ref<number[]>([])
 const providerIconErrors = ref<Record<string, boolean>>({})
 
-const providerLinks = computed<ProviderLink[]>(() => {
-  const out: ProviderLink[] = []
-  const ids = props.book.providerIds
-  if (ids.google) {
-    out.push({
-      key: 'google',
-      label: 'Google Books',
-      url: `https://books.google.com/books?id=${ids.google}`,
-      iconUrl: providerIconPath('google'),
-      fallback: 'G',
-    })
-  }
-  if (ids.goodreads) {
-    out.push({
-      key: 'goodreads',
-      label: 'Goodreads',
-      url: `https://www.goodreads.com/book/show/${ids.goodreads}`,
-      iconUrl: providerIconPath('goodreads'),
-      fallback: 'GR',
-    })
-  }
-  if (ids.amazon) {
-    out.push({
-      key: 'amazon',
-      label: 'Amazon',
-      url: `https://www.amazon.com/dp/${ids.amazon}`,
-      iconUrl: providerIconPath('amazon'),
-      fallback: 'A',
-    })
-  }
-  if (ids.hardcover) {
-    out.push({
-      key: 'hardcover',
-      label: 'Hardcover',
-      url: `https://hardcover.app/books/${ids.hardcover}`,
-      iconUrl: providerIconPath('hardcover'),
-      fallback: 'H',
-    })
-  }
-  if (ids.openLibrary) {
-    const path = String(ids.openLibrary).startsWith('/works/') ? String(ids.openLibrary) : `/works/${ids.openLibrary}`
-    out.push({
-      key: 'openLibrary',
-      label: 'Open Library',
-      url: `https://openlibrary.org${path}`,
-      iconUrl: providerIconPath('openLibrary'),
-      fallback: 'OL',
-    })
-  }
-  if (ids.itunes) {
-    out.push({
-      key: 'itunes',
-      label: 'Apple Books',
-      url: `https://books.apple.com/book/id${ids.itunes}`,
-      iconUrl: providerIconPath('itunes'),
-      fallback: '',
-    })
-  }
-  if (ids.audible) {
-    out.push({
-      key: 'audible',
-      label: 'Audible',
-      url: `https://www.audible.com/pd/${ids.audible}`,
-      iconUrl: providerIconPath('audible'),
-      fallback: 'Au',
-    })
-  }
-  if (ids.librofm) {
-    out.push({
-      key: 'librofm',
-      label: 'Libro.fm',
-      url: libroFmAudiobookUrl(ids.librofm),
-      iconUrl: providerIconPath('librofm'),
-      fallback: 'Lf',
-    })
-  }
-  if (ids.kobo) {
-    out.push({
-      key: 'kobo',
-      label: 'Kobo',
-      url: `https://www.kobo.com/us/en/ebook/${encodeURIComponent(ids.kobo)}`,
-      iconUrl: providerIconPath('kobo'),
-      fallback: 'K',
-    })
-  }
-  if (ids.ranobedb) {
-    out.push({
-      key: 'ranobedb',
-      label: 'RanobeDB',
-      url: `https://ranobedb.org/book/${ids.ranobedb}`,
-      iconUrl: providerIconPath('ranobedb'),
-      fallback: 'RN',
-    })
-  }
-  if (ids.lubimyczytac) {
-    out.push({
-      key: 'lubimyczytac',
-      label: 'LubimyCzytac',
-      url: lubimyczytacBookUrl(ids.lubimyczytac),
-      iconUrl: providerIconPath('lubimyczytac'),
-      fallback: 'LC',
-    })
-  }
-  if (ids.aladin) {
-    out.push({
-      key: 'aladin',
-      label: 'Aladin',
-      url: `https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=${ids.aladin}`,
-      iconUrl: providerIconPath('aladin'),
-      fallback: '알',
-    })
-  }
-  return out
-})
+const providerLinks = computed(() => createBookProviderLinks(props.book.providerIds))
 
 const communityRatingBadges = computed(() => {
   const linkByKey = new Map(providerLinks.value.map((link) => [link.key, link]))
@@ -923,10 +802,9 @@ const koboAnomaly = computed(() => {
   return null
 })
 
-function formatSeriesLabel(seriesName: string, seriesIndex: number | null): string {
+function formatSeriesLabel(seriesName: string, seriesIndex: string | null): string {
   if (seriesIndex == null) return seriesName
-  const formattedIndex = seriesIndex % 1 === 0 ? Math.floor(seriesIndex) : seriesIndex
-  return `${seriesName} #${formattedIndex}`
+  return `${seriesName} #${seriesIndex}`
 }
 
 const seriesLinks = computed<SeriesDisplayLink[]>(() => {
@@ -2023,7 +1901,7 @@ watch(
           >
             <span class="flex size-7 items-center justify-center">
               <img
-                v-if="!providerIconErrors[link.key]"
+                v-if="link.iconUrl && !providerIconErrors[link.key]"
                 :src="link.iconUrl"
                 :alt="link.label"
                 class="size-4 rounded-[2px] object-contain"

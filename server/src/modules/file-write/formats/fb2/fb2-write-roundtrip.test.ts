@@ -75,7 +75,7 @@ describe('FB2 write then extract round-trip', () => {
       language: 'ru',
       pageCount: 412,
       seriesName: 'Pathway of the Chosen',
-      seriesIndex: 2,
+      seriesIndex: '2',
       isbn13: '9781729419007',
       isbn10: '1729419001',
       rating: 4.5,
@@ -108,7 +108,7 @@ describe('FB2 write then extract round-trip', () => {
     expect(parsed.language).toBe('ru');
     expect(parsed.pageCount).toBe(412);
     expect(parsed.seriesName).toBe('Pathway of the Chosen');
-    expect(parsed.seriesIndex).toBe(2);
+    expect(parsed.seriesIndex).toBe('2');
     expect(parsed.isbn13).toBe('9781729419007');
     expect(parsed.isbn10).toBe('1729419001');
     expect(parsed.rating).toBe(4.5);
@@ -126,8 +126,8 @@ describe('FB2 write then extract round-trip', () => {
   });
 
   it('round-trips a fractional series index', async () => {
-    const { parsed } = await writeAndRead({ seriesName: 'Series', seriesIndex: 2.5 });
-    expect(parsed.seriesIndex).toBe(2.5);
+    const { parsed } = await writeAndRead({ seriesName: 'Series', seriesIndex: '5.10' });
+    expect(parsed.seriesIndex).toBe('5.10');
   });
 
   it('round-trips cyrillic metadata in a windows-1251 file', async () => {
@@ -173,7 +173,7 @@ describe('FB2 write then extract round-trip', () => {
       publishedDate: '2010-05-06',
       publisher: 'Pub',
       seriesName: 'S',
-      seriesIndex: 1,
+      seriesIndex: '1',
       rating: 3,
       coverBytes: cover,
     };

@@ -1,5 +1,5 @@
 {
-  "id": "d0ac4352-cf39-493d-8de0-2a167414c955",
+  "id": "5632b98f-5fbc-433c-946e-d82d448c03ac",
   "prevId": "38a02a50-0217-4823-b7ef-8b980776ca92",
   "version": "7",
   "dialect": "postgresql",
@@ -4938,7 +4938,7 @@
         },
         "series_index": {
           "name": "series_index",
-          "type": "real",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false
         },
@@ -4996,9 +4996,15 @@
               "nulls": "last"
             },
             {
-              "expression": "series_index",
-              "isExpression": false,
+              "expression": "(CASE WHEN \"series_index\" IS NULL THEN NULL ELSE ARRAY[split_part(\"series_index\", '.', 1)::numeric, CASE WHEN strpos(\"series_index\", '.') = 0 THEN -1::numeric ELSE split_part(\"series_index\", '.', 2)::numeric END] END)",
               "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"series_index\" COLLATE \"C\"",
+              "asc": true,
+              "isExpression": true,
               "nulls": "last"
             },
             {
@@ -5067,6 +5073,10 @@
         "book_series_memberships_display_order_nonnegative_chk": {
           "name": "book_series_memberships_display_order_nonnegative_chk",
           "value": "\"book_series_memberships\".\"display_order\" >= 0"
+        },
+        "book_series_memberships_series_index_format_chk": {
+          "name": "book_series_memberships_series_index_format_chk",
+          "value": "\"book_series_memberships\".\"series_index\" is null or \"book_series_memberships\".\"series_index\" ~ '^[0-9]+([.][0-9]+)?$'"
         }
       },
       "isRLSEnabled": false
@@ -5737,12 +5747,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "origin_country": {
-          "name": "origin_country",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "published_date": {
           "name": "published_date",
           "type": "date",
@@ -5781,7 +5785,7 @@
         },
         "series_index": {
           "name": "series_index",
-          "type": "real",
+          "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false
         },
@@ -6063,9 +6067,42 @@
               "nulls": "last"
             },
             {
-              "expression": "series_index",
+              "expression": "(CASE WHEN \"series_index\" IS NULL THEN NULL ELSE ARRAY[split_part(\"series_index\", '.', 1)::numeric, CASE WHEN strpos(\"series_index\", '.') = 0 THEN -1::numeric ELSE split_part(\"series_index\", '.', 2)::numeric END] END)",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"series_index\" COLLATE \"C\"",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
               "isExpression": false,
               "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "bm_series_index_sort_idx": {
+          "name": "bm_series_index_sort_idx",
+          "columns": [
+            {
+              "expression": "(CASE WHEN \"series_index\" IS NULL THEN NULL ELSE ARRAY[split_part(\"series_index\", '.', 1)::numeric, CASE WHEN strpos(\"series_index\", '.') = 0 THEN -1::numeric ELSE split_part(\"series_index\", '.', 2)::numeric END] END)",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"series_index\" COLLATE \"C\"",
+              "asc": true,
+              "isExpression": true,
               "nulls": "last"
             },
             {
@@ -6227,9 +6264,15 @@
               "nulls": "last"
             },
             {
-              "expression": "series_index",
-              "isExpression": false,
+              "expression": "(CASE WHEN \"series_index\" IS NULL THEN NULL ELSE ARRAY[split_part(\"series_index\", '.', 1)::numeric, CASE WHEN strpos(\"series_index\", '.') = 0 THEN -1::numeric ELSE split_part(\"series_index\", '.', 2)::numeric END] END)",
               "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"series_index\" COLLATE \"C\"",
+              "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
@@ -6323,6 +6366,10 @@
         "book_metadata_page_count_nonnegative_chk": {
           "name": "book_metadata_page_count_nonnegative_chk",
           "value": "\"book_metadata\".\"page_count\" is null or \"book_metadata\".\"page_count\" >= 0"
+        },
+        "book_metadata_series_index_format_chk": {
+          "name": "book_metadata_series_index_format_chk",
+          "value": "\"book_metadata\".\"series_index\" is null or \"book_metadata\".\"series_index\" ~ '^[0-9]+([.][0-9]+)?$'"
         },
         "book_metadata_duration_seconds_nonnegative_chk": {
           "name": "book_metadata_duration_seconds_nonnegative_chk",

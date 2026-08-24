@@ -1097,7 +1097,7 @@ describe('BookDockFinalizeService', () => {
         language: 'en-US',
         pageCount: 300,
         seriesName: 'Saga',
-        seriesIndex: 2.5,
+        seriesIndex: '2.5',
         authors: ['Author A'],
         genres: ['Fantasy'],
       } as BookDockMetadata,
@@ -1117,7 +1117,7 @@ describe('BookDockFinalizeService', () => {
         language: 'en-US',
         pageCount: 300,
         seriesName: 'Saga',
-        seriesIndex: 2.5,
+        seriesIndex: '2.5',
       }),
     );
     expect(metadataService.replaceAuthors).toHaveBeenCalledWith(15, [{ name: 'Author A', sortName: null }]);
@@ -1217,8 +1217,8 @@ describe('BookDockFinalizeService', () => {
           durationSeconds: 1200,
           abridged: false,
           seriesMemberships: [
-            { seriesName: 'Dune', seriesIndex: 1 },
-            { seriesName: 'Dune Chronicles', seriesIndex: 1 },
+            { seriesName: 'Dune', seriesIndex: '1' },
+            { seriesName: 'Dune Chronicles', seriesIndex: '1' },
           ],
           communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
           googleBooksId: 'google-id',
@@ -1262,8 +1262,8 @@ describe('BookDockFinalizeService', () => {
       }),
     );
     expect(seriesMemberships.replaceForBook).toHaveBeenCalledWith(19, [
-      { seriesName: 'Dune', seriesIndex: 1 },
-      { seriesName: 'Dune Chronicles', seriesIndex: 1 },
+      { seriesName: 'Dune', seriesIndex: '1' },
+      { seriesName: 'Dune Chronicles', seriesIndex: '1' },
     ]);
     expect(bookReadService.replaceCommunityRatings).toHaveBeenCalledWith(19, [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }]);
     expect(metadataService.upsertComicMetadata).toHaveBeenCalledWith(19, { issueNumber: '1', pencillers: ['Artist'] });
@@ -1570,7 +1570,7 @@ describe('BookDockFinalizeService', () => {
     appSettings.getUploadPattern.mockResolvedValue(null);
     const rowWithMeta = makeRow({
       fileName: 'original.epub',
-      selectedMetadata: { title: 'Dune', seriesIndex: 2.5 } as BookDockMetadata,
+      selectedMetadata: { title: 'Dune', seriesIndex: '2.5' } as BookDockMetadata,
     });
 
     await expect((service as any).resolveDestination({ fileNamingPattern: '{title}-{seriesIndex}' }, '/library', rowWithMeta, 'epub')).resolves.toBe(

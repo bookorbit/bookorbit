@@ -31,6 +31,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
   private readonly logger = new Logger(BookDockIngestService.name);
   private bookDockPath: string;
   private readonly metadataQueue: BookDockWorkQueue;
+  private readonly forcedAutoFetchFileIds = new Set<number>();
 
   constructor(
     private readonly config: ConfigService,
@@ -111,6 +112,28 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     this.extractMetadataAsync(fileId, row.format, metadataQueuePriority(row));
   }
 
+  async refetchMetadata(fileId: number): Promise<boolean> {
+    const row = await this.repo.findById(fileId);
+    if (!row || (row.status !== 'ready' && row.status !== 'error')) return false;
+
+    const format = resolveSupportedFormat(row);
+    if (!format) return false;
+
+    this.forcedAutoFetchFileIds.add(fileId);
+    const updated = await this.repo.update(fileId, { status: 'pending', errorMessage: null });
+    if (!updated) {
+      this.forcedAutoFetchFileIds.delete(fileId);
+      return false;
+    }
+
+    const queued = this.extractMetadataAsync(fileId, format, metadataQueuePriority(row));
+    if (!queued) {
+      this.forcedAutoFetchFileIds.delete(fileId);
+      await this.repo.update(fileId, { status: row.status, errorMessage: row.errorMessage });
+    }
+    return queued;
+  }
+
   async ingestFromWatchedFolder(absolutePath: string): Promise<number | null> {
     const existing = await this.repo.findByAbsolutePath(absolutePath);
     if (existing) {
@@ -142,10 +165,10 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     return row.id;
   }
 
-  private extractMetadataAsync(fileId: number, format: string, priority?: BookDockWorkPriority): void {
-    if (!isSupportedFormat(format)) return;
+  private extractMetadataAsync(fileId: number, format: string, priority?: BookDockWorkPriority): boolean {
+    if (!isSupportedFormat(format)) return false;
     if (this.processingState.getCachedPaused()) this.metadataQueue.pause();
-    this.metadataQueue.enqueue(fileId, priority);
+    return this.metadataQueue.enqueue(fileId, priority);
   }
 
   pauseProcessing(): void {
@@ -195,19 +218,24 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       return;
     }
 
-    const row = await this.repo.findById(fileId);
-    if (!row || !PROCESSABLE_METADATA_STATUSES.has(row.status)) return;
+    const forceAutoFetch = this.forcedAutoFetchFileIds.has(fileId);
+    try {
+      const row = await this.repo.findById(fileId);
+      if (!row || !PROCESSABLE_METADATA_STATUSES.has(row.status)) return;
 
-    const format = resolveSupportedFormat(row);
-    if (!format) return;
+      const format = resolveSupportedFormat(row);
+      if (!format) return;
 
-    const coversDir = join(this.bookDockPath, 'covers');
-    await this.repo.update(fileId, { status: 'extracting' });
-    this.emitChange();
-    await this.metadataService.extractAndSave(fileId, row.absolutePath, format, coversDir);
-    await this.autoFetchMetadataAsync(fileId);
-    this.emitChange();
-    this.events.emit(BOOK_DOCK_FILE_INGESTED, fileId);
+      const coversDir = join(this.bookDockPath, 'covers');
+      await this.repo.update(fileId, { status: 'extracting' });
+      this.emitChange();
+      await this.metadataService.extractAndSave(fileId, row.absolutePath, format, coversDir);
+      await this.autoFetchMetadataAsync(fileId, forceAutoFetch);
+      this.emitChange();
+      this.events.emit(BOOK_DOCK_FILE_INGESTED, fileId);
+    } finally {
+      this.forcedAutoFetchFileIds.delete(fileId);
+    }
   }
 
   private logMetadataQueueFailure(fileId: number, err: unknown): void {
@@ -218,9 +246,11 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     );
   }
 
-  private async autoFetchMetadataAsync(fileId: number): Promise<void> {
-    const enabled = await this.appSettings.isBookDockAutoFetchEnabled();
-    if (!enabled) return;
+  private async autoFetchMetadataAsync(fileId: number, force = false): Promise<void> {
+    if (!force) {
+      const enabled = await this.appSettings.isBookDockAutoFetchEnabled();
+      if (!enabled) return;
+    }
 
     const row = await this.repo.findById(fileId);
     if (!row || row.status === 'error') return;
@@ -254,7 +284,14 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
               confidence: computeConfidence(row.embeddedMetadata ?? {}, fetched),
               fetchedMetadataSources,
             }
-          : { status: 'ready' as const };
+          : force
+            ? {
+                status: 'ready' as const,
+                fetchedMetadata: null,
+                confidence: null,
+                fetchedMetadataSources: null,
+              }
+            : { status: 'ready' as const };
       await this.repo.update(fileId, updates);
     } catch (err) {
       this.logger.warn(`Auto-fetch metadata failed for Book Dock file ${fileId}: ${err instanceof Error ? err.message : String(err)}`);

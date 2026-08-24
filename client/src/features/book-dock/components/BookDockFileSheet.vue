@@ -11,6 +11,8 @@ import {
   type MetadataSource,
   type MetadataProviderKey,
   type ProviderIds,
+  isValidSeriesIndex,
+  SERIES_INDEX_MAX_LENGTH,
 } from '@bookorbit/types'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
 import MetadataSearchPanel from '@/features/book/components/detail/tabs/MetadataSearchPanel.vue'
@@ -67,6 +69,12 @@ const form = reactive({
 })
 const selectedCoverUrl = ref('')
 const passthroughMetadata = ref<BookDockMetadata>({})
+const seriesIndexError = computed(() => form.seriesIndex !== '' && !isValidSeriesIndex(form.seriesIndex.trim()))
+
+function normalizedSeriesIndex(): string | null {
+  const value = form.seriesIndex.trim()
+  return value && isValidSeriesIndex(value) ? value : null
+}
 
 watch(
   () => props.file.id,
@@ -137,7 +145,7 @@ function buildMetadataPatchFromForm(): Partial<BookDockMetadata> {
     isbn13: form.isbn13 || undefined,
     isbn10: form.isbn10 || undefined,
     seriesName: form.seriesName || undefined,
-    seriesIndex: form.seriesIndex ? ((n) => (isNaN(n) ? undefined : n))(parseFloat(form.seriesIndex)) : undefined,
+    seriesIndex: normalizedSeriesIndex() ?? undefined,
     genres: form.genres
       ? form.genres
           .split(',')
@@ -150,6 +158,7 @@ function buildMetadataPatchFromForm(): Partial<BookDockMetadata> {
 
 function onFieldChange() {
   if (debounceTimer) clearTimeout(debounceTimer)
+  if (seriesIndexError.value) return
   debounceTimer = setTimeout(async () => {
     const updated = await saveMetadata(props.file.id, buildMetadataPatchFromForm())
     if (updated) emit('updated', updated)
@@ -226,7 +235,7 @@ const currentSource = computed<MetadataSource>(() => ({
   originCountry: form.originCountry || null,
   pageCount: passthroughMetadata.value.pageCount ?? null,
   seriesName: form.seriesName || null,
-  seriesIndex: form.seriesIndex ? ((n) => (isNaN(n) ? null : n))(parseFloat(form.seriesIndex)) : null,
+  seriesIndex: normalizedSeriesIndex(),
   isbn10: form.isbn10 || null,
   isbn13: form.isbn13 || null,
   authors: form.authors
@@ -550,9 +559,16 @@ onMounted(() => {
               <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.seriesIndex') }}</span>
               <input
                 v-model="form.seriesIndex"
+                type="text"
+                inputmode="decimal"
+                :maxlength="SERIES_INDEX_MAX_LENGTH"
+                :aria-invalid="seriesIndexError"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 @input="onFieldChange"
               />
+              <span v-if="seriesIndexError" class="mt-1 block text-xs text-destructive" role="alert">
+                {{ t('bookDock.invalidSeriesIndex') }}
+              </span>
             </label>
             <label class="sm:col-span-2">
               <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.genresCommaSeparated') }}</span>

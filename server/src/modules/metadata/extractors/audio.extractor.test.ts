@@ -431,7 +431,7 @@ describe('extractAudioMetadata — misc fields', () => {
             language: 'eng',
             genre: 'Science Fiction; Adventure',
             series: 'Dune',
-            'series-part': '1.5',
+            'series-part': '5.10',
             asin: 'B000R34YKC',
             librofm_isbn: '9781234567890',
           },
@@ -447,7 +447,7 @@ describe('extractAudioMetadata — misc fields', () => {
     expect(result.language).toBe('eng');
     expect(result.genres).toEqual(['Science Fiction', 'Adventure']);
     expect(result.seriesName).toBe('Dune');
-    expect(result.seriesIndex).toBe(1.5);
+    expect(result.seriesIndex).toBe('5.10');
     expect(result.audibleId).toBe('B000R34YKC');
     expect(result.librofmId).toBe('9781234567890');
   });
@@ -473,7 +473,7 @@ describe('extractAudioMetadata — misc fields', () => {
     const result = await extractAudioMetadata('/path/book.m4b');
 
     expect(result.seriesName).toBe('Dungeon Crawler Carl');
-    expect(result.seriesIndex).toBe(Number(rawIndex));
+    expect(result.seriesIndex).toBe(rawIndex);
   });
 
   it('reads MP4-native series tags when custom tags are absent', async () => {
@@ -482,7 +482,7 @@ describe('extractAudioMetadata — misc fields', () => {
     const result = await extractAudioMetadata('/path/book.m4b');
 
     expect(result.seriesName).toBe('The Murderbot Diaries');
-    expect(result.seriesIndex).toBe(2.5);
+    expect(result.seriesIndex).toBe('2.5');
   });
 
   it('prefers established custom series tags over MP4-native aliases', async () => {
@@ -502,7 +502,7 @@ describe('extractAudioMetadata — misc fields', () => {
     const result = await extractAudioMetadata('/path/book.m4b');
 
     expect(result.seriesName).toBe('Custom Series');
-    expect(result.seriesIndex).toBe(4.5);
+    expect(result.seriesIndex).toBe('4.5');
   });
 
   it('parses year from a plain year string', async () => {

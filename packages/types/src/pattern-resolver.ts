@@ -95,8 +95,9 @@ export function applyModifier(value: string, modifier: string, fieldName: string
     case "lower":
       return value.toLowerCase();
     case "fixed2": {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric.toFixed(2) : value;
+      if (!/^\d+(?:\.\d+)?$/.test(value)) return value;
+      const [whole, fraction] = value.split(".");
+      return `${whole}.${(fraction ?? "").padEnd(2, "0")}`;
     }
     default:
       return value;

@@ -1,0 +1,11 @@
+DROP INDEX "book_series_memberships_series_index_book_idx";--> statement-breakpoint
+DROP INDEX "bm_series_id_index_book_id_idx";--> statement-breakpoint
+DROP INDEX "bm_series_name_index_idx";--> statement-breakpoint
+ALTER TABLE "book_series_memberships" ALTER COLUMN "series_index" SET DATA TYPE varchar(20);--> statement-breakpoint
+ALTER TABLE "book_metadata" ALTER COLUMN "series_index" SET DATA TYPE varchar(20);--> statement-breakpoint
+CREATE INDEX "bm_series_index_sort_idx" ON "book_metadata" USING btree ((CASE WHEN "series_index" IS NULL THEN NULL ELSE ARRAY[split_part("series_index", '.', 1)::numeric, CASE WHEN strpos("series_index", '.') = 0 THEN -1::numeric ELSE split_part("series_index", '.', 2)::numeric END] END),"series_index" COLLATE "C","book_id");--> statement-breakpoint
+CREATE INDEX "book_series_memberships_series_index_book_idx" ON "book_series_memberships" USING btree ("series_id",(CASE WHEN "series_index" IS NULL THEN NULL ELSE ARRAY[split_part("series_index", '.', 1)::numeric, CASE WHEN strpos("series_index", '.') = 0 THEN -1::numeric ELSE split_part("series_index", '.', 2)::numeric END] END),"series_index" COLLATE "C","book_id");--> statement-breakpoint
+CREATE INDEX "bm_series_id_index_book_id_idx" ON "book_metadata" USING btree ("series_id",(CASE WHEN "series_index" IS NULL THEN NULL ELSE ARRAY[split_part("series_index", '.', 1)::numeric, CASE WHEN strpos("series_index", '.') = 0 THEN -1::numeric ELSE split_part("series_index", '.', 2)::numeric END] END),"series_index" COLLATE "C","book_id");--> statement-breakpoint
+CREATE INDEX "bm_series_name_index_idx" ON "book_metadata" USING btree ("series_name",(CASE WHEN "series_index" IS NULL THEN NULL ELSE ARRAY[split_part("series_index", '.', 1)::numeric, CASE WHEN strpos("series_index", '.') = 0 THEN -1::numeric ELSE split_part("series_index", '.', 2)::numeric END] END),"series_index" COLLATE "C");--> statement-breakpoint
+ALTER TABLE "book_series_memberships" ADD CONSTRAINT "book_series_memberships_series_index_format_chk" CHECK ("book_series_memberships"."series_index" is null or "book_series_memberships"."series_index" ~ '^[0-9]+([.][0-9]+)?$');--> statement-breakpoint
+ALTER TABLE "book_metadata" ADD CONSTRAINT "book_metadata_series_index_format_chk" CHECK ("book_metadata"."series_index" is null or "book_metadata"."series_index" ~ '^[0-9]+([.][0-9]+)?$');

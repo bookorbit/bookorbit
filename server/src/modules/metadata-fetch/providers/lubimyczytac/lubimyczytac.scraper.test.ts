@@ -131,7 +131,7 @@ describe('LubimyczytacScraper', () => {
       expect(data.publishedYear).toBe(2014);
       expect(data.isbn13).toBe('9788375780635');
       expect(data.seriesName).toBe('Wiedźmin');
-      expect(data.seriesIndex).toBe(1);
+      expect(data.seriesIndex).toBe('1');
       expect(data.genres).toEqual(['Fantasy', 'fantastyka']);
       expect(data.coverUrl).toBe('https://lubimyczytac.pl/upload/books/cover.jpg');
     });
@@ -153,7 +153,7 @@ describe('LubimyczytacScraper', () => {
       `;
       const data = parseLubimyczytacBookPage(html);
       expect(data.seriesName).toBe('Komisarz Tymon Hanter');
-      expect(data.seriesIndex).toBe(4);
+      expect(data.seriesIndex).toBe('4');
     });
 
     it('returns no title for an empty page', () => {
@@ -373,7 +373,17 @@ describe('LubimyczytacScraper', () => {
       `;
       const data = parseLubimyczytacBookPage(html);
       expect(data.seriesName).toBe('Wiedźmin');
-      expect(data.seriesIndex).toBe(2.5);
+      expect(data.seriesIndex).toBe('2.5');
+    });
+
+    it('preserves trailing zeros in a fractional series index', () => {
+      const html = `
+        <h1 class="book__title">Test</h1>
+        <span class="d-none d-sm-block mt-1">Cykl: <a href="/cykl/1/x">Wiedźmin (tom 5,10)</a></span>
+      `;
+      const data = parseLubimyczytacBookPage(html);
+      expect(data.seriesName).toBe('Wiedźmin');
+      expect(data.seriesIndex).toBe('5.10');
     });
 
     it('returns series name only when no volume number is present', () => {

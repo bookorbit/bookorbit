@@ -112,7 +112,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     authors: ['Author'],
     seriesId: 42,
     seriesName: 'The Series',
-    seriesIndex: 1,
+    seriesIndex: '1',
     files: [],
     publishedDate: null,
     publishedYear: null,
@@ -282,7 +282,7 @@ describe('SeriesDetailView', () => {
     mocks.loadBooks.mockResolvedValue(undefined)
     mocks.fetchSeriesBooks.mockReset()
     mocks.fetchSeriesBooks.mockResolvedValue({
-      items: [makeBook({ id: 7, seriesIndex: 1 })],
+      items: [makeBook({ id: 7, seriesIndex: '1' })],
       total: 1,
       page: 0,
       size: 8,
@@ -449,7 +449,7 @@ describe('SeriesDetailView', () => {
   })
 
   it('scales and centers square lead covers in the series header stack', async () => {
-    const lead = makeBook({ id: 7, seriesIndex: 1, hasCover: true })
+    const lead = makeBook({ id: 7, seriesIndex: '1', hasCover: true })
     mocks.fetchSeriesBooks.mockResolvedValueOnce({
       items: [lead],
       total: 1,
@@ -498,7 +498,7 @@ describe('SeriesDetailView', () => {
     await nextTick()
 
     resolveLeadPreview({
-      items: [makeBook({ id: 7, seriesIndex: 1, hasCover: true })],
+      items: [makeBook({ id: 7, seriesIndex: '1', hasCover: true })],
       total: 1,
       page: 0,
       size: 8,

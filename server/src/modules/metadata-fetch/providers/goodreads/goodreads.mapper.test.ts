@@ -59,7 +59,7 @@ describe('GoodreadsMapper', () => {
       coverUrl: 'https://images.gr-assets.com/books/123.jpg',
       sourceUrl: `https://www.goodreads.com/book/show/${bookId}`,
       seriesName: 'Great American Novels',
-      seriesIndex: 1,
+      seriesIndex: '1',
       communityRating: 4.02,
       communityRatingCount: 5_123_456,
     });
@@ -130,7 +130,7 @@ describe('GoodreadsMapper', () => {
     const result = mapGoodreadsApolloState(mockState, bookId);
 
     expect(result?.seriesName).toBe('Sword of Truth');
-    expect(result?.seriesIndex).toBe(11);
+    expect(result?.seriesIndex).toBe('11');
     expect(result?.seriesMemberships).toBeUndefined();
   });
 
@@ -271,7 +271,7 @@ describe('GoodreadsMapper', () => {
         coverUrl: 'https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1617768316i/68428.jpg',
         sourceUrl: 'https://www.goodreads.com/book/show/68428',
         seriesName: 'Mistborn',
-        seriesIndex: 1,
+        seriesIndex: '1',
         communityRating: 4.42,
         communityRatingCount: 987_654,
       });

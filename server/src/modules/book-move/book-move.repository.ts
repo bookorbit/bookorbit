@@ -50,7 +50,7 @@ export interface MoveBookData {
     isbn13: string | null;
     publishedYear: number | null;
     seriesName: string | null;
-    seriesIndex: number | null;
+    seriesIndex: string | null;
   };
   authors: string[];
   files: MoveBookFile[];

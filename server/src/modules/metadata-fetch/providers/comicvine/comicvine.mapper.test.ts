@@ -1,7 +1,7 @@
 import { MetadataProviderKey } from '@bookorbit/types';
 
 import { mapIssueToCandidate } from './comicvine.mapper';
-import type { ComicVineIssue } from './comicvine.types';
+import type { ComicVineIssue, ComicVineVolume } from './comicvine.types';
 
 function makeIssue(overrides: Partial<ComicVineIssue> = {}): ComicVineIssue {
   return {
@@ -20,6 +20,21 @@ function makeIssue(overrides: Partial<ComicVineIssue> = {}): ComicVineIssue {
     team_credits: [],
     story_arc_credits: [],
     location_credits: [],
+    ...overrides,
+  };
+}
+
+function makeVolume(overrides: Partial<ComicVineVolume> = {}): ComicVineVolume {
+  return {
+    id: 10,
+    name: 'Series Name',
+    start_year: '2024',
+    count_of_issues: 50,
+    description: null,
+    deck: null,
+    image: null,
+    publisher: { id: 20, name: 'Example Comics' },
+    site_detail_url: null,
     ...overrides,
   };
 }
@@ -57,7 +72,7 @@ describe('mapIssueToCandidate', () => {
         description: 'Fallback synopsis',
         publishedYear: 2024,
         seriesName: 'Series Name',
-        seriesIndex: 12.5,
+        seriesIndex: '12.5',
         coverUrl: 'https://example.com/cover.jpg',
         sourceUrl: 'https://comicvine.gamespot.com/issue',
       }),
@@ -89,7 +104,7 @@ describe('mapIssueToCandidate', () => {
 
   describe('series total books', () => {
     it('takes the issue count from the volume the caller searched', () => {
-      const candidate = mapIssueToCandidate(makeIssue(), { volumeIssueCount: 50 });
+      const candidate = mapIssueToCandidate(makeIssue(), { volume: makeVolume({ count_of_issues: 50 }) });
       expect(candidate.seriesTotalBooks).toBe(50);
     });
 
@@ -99,8 +114,35 @@ describe('mapIssueToCandidate', () => {
     });
 
     it('rejects an out-of-range issue count', () => {
-      expect(mapIssueToCandidate(makeIssue(), { volumeIssueCount: 0 }).seriesTotalBooks).toBeUndefined();
-      expect(mapIssueToCandidate(makeIssue(), { volumeIssueCount: 10_001 }).seriesTotalBooks).toBeUndefined();
+      expect(mapIssueToCandidate(makeIssue(), { volume: makeVolume({ count_of_issues: 0 }) }).seriesTotalBooks).toBeUndefined();
+      expect(mapIssueToCandidate(makeIssue(), { volume: makeVolume({ count_of_issues: 10_001 }) }).seriesTotalBooks).toBeUndefined();
+    });
+  });
+
+  describe('publisher', () => {
+    it('maps and trims the publisher from the linked volume', () => {
+      const candidate = mapIssueToCandidate(makeIssue(), { volume: makeVolume({ publisher: { id: 20, name: '  DC Comics  ' } }) });
+
+      expect(candidate.publisher).toBe('DC Comics');
+    });
+
+    it('stays undefined when the linked volume has no usable publisher', () => {
+      expect(mapIssueToCandidate(makeIssue(), { volume: makeVolume({ publisher: null }) }).publisher).toBeUndefined();
+      expect(mapIssueToCandidate(makeIssue(), { volume: makeVolume({ publisher: { id: 20, name: '   ' } }) }).publisher).toBeUndefined();
+      expect(
+        mapIssueToCandidate(makeIssue(), {
+          volume: makeVolume({ publisher: { id: 20, name: null as unknown as string } }),
+        }).publisher,
+      ).toBeUndefined();
+    });
+
+    it('rejects publisher and issue count from a volume belonging to another run', () => {
+      const candidate = mapIssueToCandidate(makeIssue(), {
+        volume: makeVolume({ id: 999, publisher: { id: 20, name: 'Wrong Publisher' }, count_of_issues: 99 }),
+      });
+
+      expect(candidate.publisher).toBeUndefined();
+      expect(candidate.seriesTotalBooks).toBeUndefined();
     });
   });
 

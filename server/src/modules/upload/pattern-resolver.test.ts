@@ -299,7 +299,7 @@ describe('replacePlaceholders', () => {
 describe('KOReader device pattern', () => {
   it('routes series and standalone books into separate folders', () => {
     const pattern = '<Series/{series}/|Standalone/{authors:first} - ><{seriesIndex:fixed2} - >{title}';
-    expect(resolveUploadPath(pattern, FULL, 'epub')).toBe('Series/Sprawl/1.00 - Neuromancer.epub');
+    expect(resolveUploadPath(pattern, FULL, 'epub')).toBe('Series/Sprawl/01.00 - Neuromancer.epub');
     expect(resolveUploadPath(pattern, { ...FULL, series: '', seriesIndex: '' }, 'epub')).toBe('Standalone/William Gibson - Neuromancer.epub');
   });
 

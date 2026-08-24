@@ -120,7 +120,7 @@ describe('parsePdfFile', () => {
       isbn10: '0123456789',
       isbn13: '9780123456789',
       seriesName: 'Series',
-      seriesIndex: 2,
+      seriesIndex: '2',
       rating: 4.5,
       pageCount: 999,
       googleBooksId: 'g1',

@@ -12,6 +12,7 @@ import { useBookDockSummary } from '@/features/book-dock/composables/useBookDock
 import { useBookDockStatistics } from '@/features/book-dock/composables/useBookDockStatistics'
 import { useBookDockUpload, SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT } from '@/features/book-dock/composables/useBookDockUpload'
 import { useBookDockConflicts } from '@/features/book-dock/composables/useBookDockConflicts'
+import { refetchBookDockMetadata } from '@/features/book-dock/api/book-dock.api'
 import BookDockActionCluster from '@/features/book-dock/components/BookDockActionCluster.vue'
 import BookDockFilterBar from '@/features/book-dock/components/BookDockFilterBar.vue'
 import BookDockFileListView from '@/features/book-dock/components/BookDockFileListView.vue'
@@ -188,12 +189,7 @@ async function handleRowDiscard(file: BookDockFile) {
 }
 
 async function handleRowRetry(file: BookDockFile) {
-  await api('/api/v1/book-dock/files/retry-fetch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileIds: [file.id] }),
-  })
-  refresh()
+  if (await refetchBookDockMetadata(file.id)) refresh()
 }
 
 function openDestinationForFile(file: BookDockFile) {

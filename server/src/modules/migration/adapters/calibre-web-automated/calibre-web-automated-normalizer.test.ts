@@ -128,7 +128,7 @@ describe('CalibreWebAutomatedNormalizer users and metadata', () => {
       publishedYear: 2024,
       language: 'eng',
       seriesName: 'Examples',
-      seriesIndex: 2.5,
+      seriesIndex: '2.5',
       rating: 6,
       description: 'Description',
       tags: ['Fiction'],

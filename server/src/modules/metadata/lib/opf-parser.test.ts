@@ -337,16 +337,16 @@ describe('parseOpf', () => {
       `);
       const r = parseOpf(xml);
       expect(r.seriesName).toBe('The Foundation Series');
-      expect(r.seriesIndex).toBe(1);
+      expect(r.seriesIndex).toBe('1');
     });
 
     it('parses fractional series index', () => {
       const xml = epub2Opf(`
         <meta name="calibre:series" content="Discworld"/>
-        <meta name="calibre:series_index" content="1.5"/>
+        <meta name="calibre:series_index" content="5.10"/>
       `);
       const r = parseOpf(xml);
-      expect(r.seriesIndex).toBe(1.5);
+      expect(r.seriesIndex).toBe('5.10');
     });
 
     it('parses EPUB3 belongs-to-collection series', () => {
@@ -357,7 +357,7 @@ describe('parseOpf', () => {
       `);
       const r = parseOpf(xml);
       expect(r.seriesName).toBe('Dune Chronicles');
-      expect(r.seriesIndex).toBe(1);
+      expect(r.seriesIndex).toBe('1');
     });
 
     it('Calibre series takes precedence over EPUB3 belongs-to-collection', () => {
@@ -377,7 +377,7 @@ describe('parseOpf', () => {
       `);
       const r = parseOpf(xml);
       expect(r.seriesName).toBe('Prequel Series');
-      expect(r.seriesIndex).toBe(0);
+      expect(r.seriesIndex).toBe('0');
     });
 
     it('returns null for series when not present', () => {

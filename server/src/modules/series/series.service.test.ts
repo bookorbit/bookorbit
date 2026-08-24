@@ -138,7 +138,7 @@ describe('SeriesService', () => {
         bookCount: 3,
         readCount: 1,
         authors: ['Frank Herbert'],
-        indices: [1, 2, 4],
+        indices: ['1', '2', '4'],
       });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [10, 11, 12], total: 3 });
       bookReadService.findCardsByBookIds.mockResolvedValue({
@@ -203,7 +203,7 @@ describe('SeriesService', () => {
     });
 
     it('preserves book order from repository', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: [1, 2] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: ['1', '2'] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [20, 10], total: 2 });
       bookReadService.findCardsByBookIds.mockResolvedValue({
         rows: [
@@ -305,7 +305,7 @@ describe('SeriesService', () => {
     it('returns empty state when series exists in another library', async () => {
       seriesRepo.findDetail
         .mockResolvedValueOnce(null) // first call with scoped library [2]
-        .mockResolvedValueOnce({ id: 42, name: 'Dune', bookCount: 5, readCount: 2, authors: ['Frank Herbert'], indices: [1, 2, 3, 4, 5] }); // second call with all libraries [1, 2]
+        .mockResolvedValueOnce({ id: 42, name: 'Dune', bookCount: 5, readCount: 2, authors: ['Frank Herbert'], indices: ['1', '2', '3', '4', '5'] }); // second call with all libraries [1, 2]
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
       const result = await service.findBooks(reqUser(), 42, { libraryId: 2 });
@@ -339,25 +339,25 @@ describe('SeriesService', () => {
     });
 
     it('returns empty gaps when all indices are non-integer', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [0.5, 1.5, 2.5] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: ['0.5', '1.5', '2.5'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('returns empty gaps when min index < 1', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [0, 5] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: ['0', '5'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('returns empty gaps when max index > 10000', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [1, 10001] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: ['1', '10001'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('handles duplicate indices', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 1, 3] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: ['1', '1', '3'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([2]);
     });
@@ -374,27 +374,27 @@ describe('SeriesService', () => {
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
     });
 
-    async function gapsFor(indices: number[], bookCount: number, expectedBookCount: number | null) {
+    async function gapsFor(indices: string[], bookCount: number, expectedBookCount: number | null) {
       seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount, readCount: 0, authors: [], indices, expectedBookCount });
       const result = await service.findBooks(reqUser(), 42, {});
       return result.seriesInfo.possibleGaps;
     }
 
     it('reports books past the highest owned index, which is the whole point of the total', async () => {
-      expect(await gapsFor([1, 2, 4], 3, 7)).toEqual([3, 5, 6, 7]);
+      expect(await gapsFor(['1', '2', '4'], 3, 7)).toEqual([3, 5, 6, 7]);
     });
 
     it('reports the books below the lowest owned index', async () => {
-      expect(await gapsFor([4], 1, 5)).toEqual([1, 2, 3, 5]);
+      expect(await gapsFor(['4'], 1, 5)).toEqual([1, 2, 3, 5]);
     });
 
     it('reports no gaps for a complete series', async () => {
-      expect(await gapsFor([1, 2, 3], 3, 3)).toEqual([]);
+      expect(await gapsFor(['1', '2', '3'], 3, 3)).toEqual([]);
     });
 
     it('still reports gaps for a single owned book, which the interior-only rule cannot', async () => {
-      expect(await gapsFor([2], 1, 3)).toEqual([1, 3]);
-      expect(await gapsFor([2], 1, null)).toEqual([]);
+      expect(await gapsFor(['2'], 1, 3)).toEqual([1, 3]);
+      expect(await gapsFor(['2'], 1, null)).toEqual([]);
     });
 
     it('exposes the expected count on the series payload', async () => {
@@ -404,7 +404,7 @@ describe('SeriesService', () => {
         bookCount: 1,
         readCount: 0,
         authors: [],
-        indices: [1],
+        indices: ['1'],
         expectedBookCount: 7,
       });
       const result = await service.findBooks(reqUser(), 42, {});
@@ -412,7 +412,15 @@ describe('SeriesService', () => {
     });
 
     it('reports null when no provider has supplied a total', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 1, readCount: 0, authors: [], indices: [1], expectedBookCount: null });
+      seriesRepo.findDetail.mockResolvedValue({
+        id: 42,
+        name: 'S',
+        bookCount: 1,
+        readCount: 0,
+        authors: [],
+        indices: ['1'],
+        expectedBookCount: null,
+      });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.expectedBookCount).toBeNull();
     });
@@ -420,34 +428,34 @@ describe('SeriesService', () => {
     describe('distrusting the total rather than naming a book missing wrongly', () => {
       it('falls back to interior gaps when a book has no series index', async () => {
         // Four books but only three numbered: the unnumbered one could be any of #4 to #7.
-        expect(await gapsFor([1, 2, 5], 4, 7)).toEqual([3, 4]);
+        expect(await gapsFor(['1', '2', '5'], 4, 7)).toEqual([3, 4]);
       });
 
       it('falls back to interior gaps when a book has a fractional index', async () => {
-        expect(await gapsFor([1, 2.5, 4], 3, 7)).toEqual([2, 3]);
+        expect(await gapsFor(['1', '2.5', '4'], 3, 7)).toEqual([2, 3]);
       });
 
       it('falls back when an owned book is numbered past the provider total', async () => {
-        expect(await gapsFor([1, 2, 9], 3, 7)).toEqual([3, 4, 5, 6, 7, 8]);
+        expect(await gapsFor(['1', '2', '9'], 3, 7)).toEqual([3, 4, 5, 6, 7, 8]);
       });
 
       it('ignores a total of zero or below', async () => {
-        expect(await gapsFor([1, 3], 2, 0)).toEqual([2]);
-        expect(await gapsFor([1, 3], 2, -5)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, 0)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, -5)).toEqual([2]);
       });
 
       it('ignores a total beyond the ceiling so gap enumeration stays bounded', async () => {
-        expect(await gapsFor([1, 3], 2, 10_001)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, 10_001)).toEqual([2]);
       });
 
       it('ignores a fractional total', async () => {
-        expect(await gapsFor([1, 3], 2, 4.5)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, 4.5)).toEqual([2]);
       });
     });
 
     it('counts duplicate editions of one entry as a single owned position', async () => {
       // Two files for #1 plus #3: bookCount 3 matches the three index rows, so the total is trusted.
-      expect(await gapsFor([1, 1, 3], 3, 4)).toEqual([2, 4]);
+      expect(await gapsFor(['1', '1', '3'], 3, 4)).toEqual([2, 4]);
     });
   });
 });

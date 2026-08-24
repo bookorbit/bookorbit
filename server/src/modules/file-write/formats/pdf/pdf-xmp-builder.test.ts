@@ -45,11 +45,11 @@ describe('buildXmp', () => {
   });
 
   it('writes series only when both seriesName and seriesIndex are selected and present', () => {
-    const withBoth = buildXmp({ seriesName: 'Dune', seriesIndex: 1 }, new Set(['seriesName', 'seriesIndex']));
+    const withBoth = buildXmp({ seriesName: 'Dune', seriesIndex: '5.10' }, new Set(['seriesName', 'seriesIndex']));
     expect(withBoth).toContain('<bookorbit:seriesName>Dune</bookorbit:seriesName>');
-    expect(withBoth).toContain('<bookorbit:seriesIndex>1</bookorbit:seriesIndex>');
+    expect(withBoth).toContain('<bookorbit:seriesIndex>5.10</bookorbit:seriesIndex>');
 
-    const missingMask = buildXmp({ seriesName: 'Dune', seriesIndex: 1 }, new Set(['seriesName']));
+    const missingMask = buildXmp({ seriesName: 'Dune', seriesIndex: '1' }, new Set(['seriesName']));
     expect(missingMask).not.toContain('bookorbit:seriesName');
     expect(missingMask).not.toContain('bookorbit:seriesIndex');
   });
@@ -69,7 +69,7 @@ describe('buildXmp', () => {
         genres: ['Science Fiction', 'Space Opera'],
         subtitle: 'Book One',
         seriesName: 'Dune',
-        seriesIndex: 1,
+        seriesIndex: '1',
         isbn13: '9780441172719',
         isbn10: '0441172717',
         pageCount: 412,

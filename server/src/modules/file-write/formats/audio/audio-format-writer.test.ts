@@ -55,7 +55,7 @@ describe('AudioFormatWriter', () => {
         genres: ['Science Fiction', 'Adventure'],
         language: 'eng',
         seriesName: 'Dune',
-        seriesIndex: 1,
+        seriesIndex: '1',
         audibleId: 'B000R34YKC',
         librofmId: '9781234567890',
         coverBytes,
@@ -230,7 +230,7 @@ describe('AudioFormatWriter', () => {
 
   it.each(['m4b', 'm4a'])('writes artwork-safe MP4 series aliases for %s', (format) => {
     const metadata = testing.buildAudioMetadataArgs(
-      { seriesName: 'The Murderbot Diaries', seriesIndex: 2.5 },
+      { seriesName: 'The Murderbot Diaries', seriesIndex: '2.5' },
       { dryRun: false, fieldMask: new Set(['seriesName', 'seriesIndex']) },
       format,
     );
@@ -260,7 +260,7 @@ describe('AudioFormatWriter', () => {
 
   it.each(['mp3', 'flac'])('does not write MP4 series aliases for %s', (format) => {
     const metadata = testing.buildAudioMetadataArgs(
-      { seriesName: 'The Murderbot Diaries', seriesIndex: 2 },
+      { seriesName: 'The Murderbot Diaries', seriesIndex: '2' },
       { dryRun: false, fieldMask: new Set(['seriesName', 'seriesIndex']) },
       format,
     );

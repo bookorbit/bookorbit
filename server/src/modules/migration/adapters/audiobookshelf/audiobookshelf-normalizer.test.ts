@@ -164,7 +164,7 @@ describe('AudiobookshelfNormalizer books and users', () => {
       durationSeconds: 150.5,
       abridged: true,
       seriesName: 'Harbor Cycle',
-      seriesIndex: 2.5,
+      seriesIndex: '2.5',
       genres: ['Fantasy', 'Adventure'],
       tags: ['Synthetic'],
     });

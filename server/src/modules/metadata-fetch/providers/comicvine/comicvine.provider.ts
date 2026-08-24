@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { ProviderThrottleTracker } from '../../provider-throttle.tracker';
@@ -31,6 +31,11 @@ interface VolumeIssueMatch {
   volume?: ComicVineVolume;
 }
 
+interface VolumeEnrichmentResult {
+  matches: VolumeIssueMatch[];
+  stopped: boolean;
+}
+
 function parseIssueTitle(title: string): ParsedIssueTitle | null {
   const match = ISSUE_PATTERN.exec(title.trim());
   if (!match) return null;
@@ -41,9 +46,7 @@ function parseIssueTitle(title: string): ParsedIssueTitle | null {
 }
 
 function storedIssueNumber(params: MetadataSearchParams): string | null {
-  const issueNumber = params.seriesIndex;
-  if (issueNumber === undefined || !Number.isFinite(issueNumber) || issueNumber < 0) return null;
-  return String(issueNumber);
+  return parseSeriesIndex(params.seriesIndex);
 }
 
 /**
@@ -82,6 +85,10 @@ function hasAnyCredits(issue: ComicVineIssue): boolean {
   );
 }
 
+function isValidVolumeId(volumeId: number): boolean {
+  return Number.isSafeInteger(volumeId) && volumeId > 0;
+}
+
 @Injectable()
 export class ComicVineProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.COMICVINE;
@@ -114,8 +121,11 @@ export class ComicVineProvider implements IdentifiableProvider {
           ? await this.structuredSearch(parsed.seriesName, parsed.issueNumber, apiKey, maxCandidates, deadline)
           : await this.generalSearch(params.title, apiKey, maxCandidates, deadline);
 
-        const enriched = await this.enrichWithinBudget(matches, apiKey, deadline);
-        return enriched.map(({ issue, volume }) => mapIssueToCandidate(issue, { volumeIssueCount: volume?.count_of_issues }));
+        const volumeEnrichment = await this.enrichVolumesWithinBudget(matches, apiKey, deadline);
+        const enriched = volumeEnrichment.stopped
+          ? volumeEnrichment.matches
+          : await this.enrichIssueDetailsWithinBudget(volumeEnrichment.matches, apiKey, deadline);
+        return enriched.map(({ issue, volume }) => mapIssueToCandidate(issue, { volume }));
       } finally {
         deadline.dispose();
       }
@@ -134,7 +144,21 @@ export class ComicVineProvider implements IdentifiableProvider {
 
     try {
       const issue = signal ? await this.client.getIssueById(providerId, apiKey, signal) : await this.client.getIssueById(providerId, apiKey);
-      return issue ? mapIssueToCandidate(issue) : null;
+      if (!issue) return null;
+      if (!isValidVolumeId(issue.volume.id)) return mapIssueToCandidate(issue);
+
+      try {
+        const volume = signal
+          ? await this.client.getVolumeById(issue.volume.id, apiKey, signal)
+          : await this.client.getVolumeById(issue.volume.id, apiKey);
+        return mapIssueToCandidate(issue, { volume: volume ?? undefined });
+      } catch (err) {
+        if (err instanceof ProviderThrottleError) {
+          this.recordThrottle();
+          return mapIssueToCandidate(issue);
+        }
+        throw err;
+      }
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
         this.recordThrottle();
@@ -213,13 +237,46 @@ export class ComicVineProvider implements IdentifiableProvider {
     return issues.slice(0, maxCandidates).map((issue) => ({ issue }));
   }
 
+  private async enrichVolumesWithinBudget(matches: VolumeIssueMatch[], apiKey: string, deadline: SearchDeadline): Promise<VolumeEnrichmentResult> {
+    const enriched: VolumeIssueMatch[] = [];
+    const volumes = new Map<number, ComicVineVolume | null>();
+    let stopped = false;
+
+    for (const match of matches) {
+      const volumeId = match.issue.volume.id;
+      if (stopped || match.volume || !isValidVolumeId(volumeId) || deadline.expired()) {
+        enriched.push(match);
+        continue;
+      }
+
+      if (volumes.has(volumeId)) {
+        enriched.push({ ...match, volume: volumes.get(volumeId) ?? undefined });
+        continue;
+      }
+
+      try {
+        const volume = await this.client.getVolumeById(volumeId, apiKey, deadline.signal);
+        const linkedVolume = volume?.id === volumeId ? volume : null;
+        volumes.set(volumeId, linkedVolume);
+        enriched.push({ ...match, volume: linkedVolume ?? undefined });
+      } catch (err) {
+        enriched.push(match);
+        stopped = true;
+        if (err instanceof ProviderThrottleError) this.recordThrottle();
+      }
+    }
+
+    return { matches: enriched, stopped };
+  }
+
   /**
-   * Detail lookups only add credits, so they are worth a request each only while the budget holds.
+   * Detail lookups only add credits, so they are worth a request each only after volume fields have
+   * been filled and while the budget holds.
    * Sequential because the client serializes calls anyway, which lets the deadline actually stop
    * the work rather than every lookup being queued up front. A lookup that fails or is cut off
    * costs its candidate only the credits, never the candidate itself.
    */
-  private async enrichWithinBudget(matches: VolumeIssueMatch[], apiKey: string, deadline: SearchDeadline): Promise<VolumeIssueMatch[]> {
+  private async enrichIssueDetailsWithinBudget(matches: VolumeIssueMatch[], apiKey: string, deadline: SearchDeadline): Promise<VolumeIssueMatch[]> {
     const enriched: VolumeIssueMatch[] = [];
     let stopped = false;
 

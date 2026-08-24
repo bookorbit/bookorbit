@@ -39,6 +39,31 @@ describe('SeriesMembershipEditor', () => {
     document.body.innerHTML = ''
   })
 
+  it('preserves a trailing zero while the series index is typed sequentially', async () => {
+    const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: null, expectedBookCount: null }])
+
+    for (const character of '5.10') {
+      const input = wrapper.get<HTMLInputElement>('input[aria-label="Position in series"]')
+      input.element.value += character
+      await input.trigger('input')
+      await nextTick()
+    }
+
+    const input = wrapper.get<HTMLInputElement>('input[aria-label="Position in series"]')
+    expect(input.element.value).toBe('5.10')
+    expect((wrapper.vm as { memberships: EditableSeriesMembership[] }).memberships[0]?.seriesIndex).toBe('5.10')
+  })
+
+  it('retains malformed text and exposes a validation error', async () => {
+    const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: null, expectedBookCount: null }])
+    const input = wrapper.get<HTMLInputElement>('input[aria-label="Position in series"]')
+
+    await input.setValue('1.2.3')
+
+    expect(input.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.get('[role="alert"]').text()).toContain('at most one decimal point')
+  })
+
   it('keeps the series name input focused while typing into an empty series row', async () => {
     const wrapper = mountHost()
     const input = wrapper.get<HTMLInputElement>('input[type="text"]')
@@ -75,13 +100,13 @@ describe('SeriesMembershipEditor', () => {
     }
 
     it('shows the stored series length', () => {
-      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: 1, expectedBookCount: 6 }])
+      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: 6 }])
 
       expect(totalInput(wrapper).element.value).toBe('6')
     })
 
     it('records a typed length as an integer', async () => {
-      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: 1, expectedBookCount: null }])
+      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: null }])
 
       await totalInput(wrapper).setValue('7')
 
@@ -89,7 +114,7 @@ describe('SeriesMembershipEditor', () => {
     })
 
     it('clears the length when the field is emptied', async () => {
-      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: 1, expectedBookCount: 6 }])
+      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: 6 }])
 
       await totalInput(wrapper).setValue('')
 
@@ -97,7 +122,7 @@ describe('SeriesMembershipEditor', () => {
     })
 
     it('treats an unparseable length as cleared rather than NaN', async () => {
-      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: 1, expectedBookCount: 6 }])
+      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: 6 }])
 
       await totalInput(wrapper).setValue('abc')
 
@@ -105,15 +130,15 @@ describe('SeriesMembershipEditor', () => {
     })
 
     it('labels the length field for assistive technology, since the row has no visible labels', () => {
-      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: 1, expectedBookCount: 6 }])
+      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: 6 }])
 
       expect(totalInput(wrapper).attributes('aria-label')).toBe('Books in series')
     })
 
     it('keeps each row length independent', async () => {
       const wrapper = mountHost([
-        { seriesName: 'Dune', seriesIndex: 1, expectedBookCount: 6 },
-        { seriesName: 'Legends', seriesIndex: 2, expectedBookCount: null },
+        { seriesName: 'Dune', seriesIndex: '1', expectedBookCount: 6 },
+        { seriesName: 'Legends', seriesIndex: '2', expectedBookCount: null },
       ])
 
       const totals = wrapper.findAll<HTMLInputElement>('input[type="number"][min="1"]')

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from '@lucide/vue'
+import { isValidSeriesIndex, SERIES_INDEX_MAX_LENGTH } from '@bookorbit/types'
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import type { EditableSeriesMembership } from '../../../composables/useMetadataEditor'
 
@@ -60,7 +61,11 @@ function updateSeriesName(index: number, value: string | null) {
 
 function updateSeriesIndex(index: number, event: Event) {
   const raw = (event.target as HTMLInputElement).value
-  updateMembership(index, { seriesIndex: raw === '' ? null : Number.parseFloat(raw) })
+  updateMembership(index, { seriesIndex: raw === '' ? null : raw })
+}
+
+function isSeriesIndexInvalid(value: string | null) {
+  return value !== null && !isValidSeriesIndex(value)
 }
 
 function updateExpectedBookCount(index: number, event: Event) {
@@ -128,13 +133,15 @@ function moveMembership(index: number, offset: -1 | 1) {
       <div class="flex flex-wrap items-center gap-2">
         <input
           :value="membership.seriesIndex ?? ''"
-          type="number"
-          step="0.1"
-          min="0"
+          type="text"
+          inputmode="decimal"
+          :maxlength="SERIES_INDEX_MAX_LENGTH"
           class="h-8 min-w-16 max-w-22 flex-1 rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          :class="isSeriesIndexInvalid(membership.seriesIndex) ? 'border-destructive' : ''"
           :disabled="disabled"
           placeholder="#"
           :aria-label="t('book.detail.seriesMembership.seriesIndexLabel')"
+          :aria-invalid="isSeriesIndexInvalid(membership.seriesIndex)"
           @input="updateSeriesIndex(index, $event)"
         />
         <input
@@ -179,6 +186,9 @@ function moveMembership(index: number, offset: -1 | 1) {
           </button>
         </div>
       </div>
+      <p v-if="isSeriesIndexInvalid(membership.seriesIndex)" class="w-full ps-10 text-xs text-destructive" role="alert">
+        {{ t('book.detail.seriesMembership.invalidSeriesIndex') }}
+      </p>
     </div>
   </div>
 </template>

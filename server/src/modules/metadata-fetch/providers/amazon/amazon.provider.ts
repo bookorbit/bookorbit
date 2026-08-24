@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
@@ -87,7 +87,7 @@ export class AmazonProvider implements IdentifiableProvider {
       language: data.language,
       pageCount: data.pageCount,
       seriesName: data.seriesName,
-      seriesIndex: data.seriesIndex,
+      seriesIndex: parseSeriesIndex(data.seriesIndex) ?? undefined,
       seriesTotalBooks: data.seriesTotalBooks,
       coverUrl: data.coverUrl,
       genres: data.tags?.length ? data.tags : undefined,

@@ -165,6 +165,8 @@ describe('Book DTO validation', () => {
           publishedDate: '1965-08-01',
           publishedYear: 1965,
           rating: 5,
+          seriesIndex: '5.10',
+          seriesMemberships: [{ seriesName: 'Dune', seriesIndex: '5.10' }],
           authors: ['Frank Herbert'],
           genres: ['Sci-Fi'],
           tags: ['classic'],
@@ -200,6 +202,12 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { authors: ['ok', 1] })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { language: 'a'.repeat(101) })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookMetadataDto, { isbn10: '12345678901' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesIndex: 5.1 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesIndex: '5.10' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesIndex: '1e2' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesIndex: '1.2.3' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesIndex: '1'.repeat(21) })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesMemberships: [{ seriesName: 'Dune', seriesIndex: 5.1 }] })).length).toBeGreaterThan(0);
   });
 
   it('requires an ISO date key when updating the added date', async () => {
@@ -262,7 +270,7 @@ describe('Book DTO validation', () => {
     // Single title patch
     expect((await errorsFor(UpdateBookMetadataDto, { title: 'New Title' })).length).toBe(0);
     // Single series patch
-    expect((await errorsFor(UpdateBookMetadataDto, { seriesName: 'My Series', seriesIndex: 1.5 })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { seriesName: 'My Series', seriesIndex: '1.5' })).length).toBe(0);
     // Series cleared to null
     expect((await errorsFor(UpdateBookMetadataDto, { seriesName: null, seriesIndex: null })).length).toBe(0);
     // Language valid 2-letter code
@@ -283,7 +291,7 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { tags: ['to-read'] })).length).toBe(0);
     // Empty payload (all fields optional)
     expect((await errorsFor(UpdateBookMetadataDto, {})).length).toBe(0);
-    // seriesIndex must be a number
+    // seriesIndex must be a numeric label
     expect((await errorsFor(UpdateBookMetadataDto, { seriesIndex: 'not-a-number' })).length).toBeGreaterThan(0);
   });
 

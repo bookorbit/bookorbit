@@ -1,4 +1,4 @@
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex as parseSeriesIndexLabel } from '@bookorbit/types';
 
 import {
   GoodreadsApolloBook,
@@ -98,7 +98,7 @@ function stripSeriesSuffix(title: string | undefined): string | undefined {
   return title?.replace(/\s*\([^,(]+,\s*#[\d.]+\)\s*$/, '').trim();
 }
 
-function parseSeriesFromTitle(title: string | undefined): { seriesName?: string; seriesIndex?: number } {
+function parseSeriesFromTitle(title: string | undefined): { seriesName?: string; seriesIndex?: string } {
   const match = title?.match(/\(([^,(]+),\s*#([\d.]+)\)\s*$/);
   if (!match) return {};
   return { seriesName: normalize(match[1]), seriesIndex: parseSeriesIndex(match[2]) };
@@ -203,8 +203,6 @@ function normalizeCommunityRatingCount(value: string | number | undefined): numb
   return Number.isInteger(n) && n >= 0 ? n : undefined;
 }
 
-function parseSeriesIndex(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const n = parseFloat(value);
-  return Number.isNaN(n) ? undefined : n;
+function parseSeriesIndex(value: string | undefined): string | undefined {
+  return parseSeriesIndexLabel(value) ?? undefined;
 }

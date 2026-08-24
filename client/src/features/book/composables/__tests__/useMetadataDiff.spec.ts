@@ -17,7 +17,7 @@ describe('useMetadataDiff', () => {
     language: 'en',
     pageCount: 300,
     seriesName: 'Original Series',
-    seriesIndex: 1,
+    seriesIndex: '1',
     isbn10: '1234567890',
     isbn13: '1234567890123',
     narrators: [],
@@ -340,10 +340,10 @@ describe('useMetadataDiff', () => {
       providerId: 'B002V1NSN2',
       title: 'Confessor',
       seriesName: 'Sword of Truth',
-      seriesIndex: 11,
+      seriesIndex: '11',
       seriesMemberships: [
-        { seriesName: 'Sword of Truth', seriesIndex: 11 },
-        { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+        { seriesName: 'Sword of Truth', seriesIndex: '11' },
+        { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
       ],
     }
     const candidates = ref([audibleCandidate])
@@ -356,8 +356,8 @@ describe('useMetadataDiff', () => {
     toggleField('seriesIndex')
 
     expect(buildPatch().formPatch.seriesMemberships).toEqual([
-      { seriesName: 'Sword of Truth', seriesIndex: 11 },
-      { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+      { seriesName: 'Sword of Truth', seriesIndex: '11' },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
     ])
   })
 
@@ -367,10 +367,10 @@ describe('useMetadataDiff', () => {
       providerId: 'B002V1NSN2',
       title: 'Confessor',
       seriesName: 'Sword of Truth',
-      seriesIndex: 11,
+      seriesIndex: '11',
       seriesMemberships: [
-        { seriesName: 'Sword of Truth', seriesIndex: 11 },
-        { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+        { seriesName: 'Sword of Truth', seriesIndex: '11' },
+        { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
       ],
     }
     const candidates = ref([audibleCandidate])

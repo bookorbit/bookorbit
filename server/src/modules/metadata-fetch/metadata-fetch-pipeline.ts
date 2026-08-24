@@ -11,6 +11,7 @@ import {
   MetadataProviderKey,
   MetadataSeriesMembership,
   ProviderConfigurations,
+  parseSeriesIndex,
 } from '@bookorbit/types';
 import { firstValueFrom, toArray } from 'rxjs';
 
@@ -529,7 +530,7 @@ export class MetadataFetchPipeline {
       const key = normalizeMetadataTextKey(seriesName);
       if (!seriesName || !key || seen.has(key)) continue;
 
-      const seriesIndex = typeof membership.seriesIndex === 'number' && Number.isFinite(membership.seriesIndex) ? membership.seriesIndex : null;
+      const seriesIndex = parseSeriesIndex(membership.seriesIndex);
       seen.add(key);
       normalized.push({ seriesName, seriesIndex });
     }

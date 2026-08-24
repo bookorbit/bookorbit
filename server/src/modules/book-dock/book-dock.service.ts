@@ -249,6 +249,12 @@ export class BookDockService {
     return { total, queued };
   }
 
+  async refetchMetadata(id: number, userId: number, canManageAll: boolean): Promise<void> {
+    await this.findFileForUser(id, userId, canManageAll);
+    const queued = await this.ingestService.refetchMetadata(id);
+    if (!queued) throw new BadRequestException('Metadata can only be re-fetched for a ready or failed Book Dock file');
+  }
+
   async bulkSetTarget(
     fileIds: number[],
     selectAll?: boolean,

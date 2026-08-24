@@ -143,8 +143,7 @@ const showSeriesPositionBadge = computed(
 const seriesPositionLabel = computed(() => {
   const index = props.book.seriesIndex
   if (index == null) return ''
-  const display = index % 1 === 0 ? String(Math.trunc(index)) : String(index)
-  return `#${display}`
+  return `#${index}`
 })
 const seriesPositionTooltip = computed(() => {
   const label = seriesPositionLabel.value

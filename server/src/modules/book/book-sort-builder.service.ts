@@ -4,6 +4,7 @@ import { AnyColumn, SQL, sql } from 'drizzle-orm';
 import { parseCustomSortFieldId } from '@bookorbit/types';
 import type { CustomMetadataFieldType, CustomMetadataFieldTypeMap, SortField, SortSpec } from '@bookorbit/types';
 import { bookMetadata, books, collectionBooks } from '../../db/schema';
+import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 
 export type BookSortContext = {
   defaultCollectionId?: number;
@@ -142,6 +143,12 @@ export class BookSortBuilder {
       case 'publishedYear':
         result.push(sql`${bookMetadata.publishedYear} ${sql.raw(D)} NULLS LAST`);
         break;
+      case 'seriesIndex':
+        result.push(...seriesIndexOrderBy(bookMetadata.seriesIndex, D));
+        if (!allSorts.some((s) => s.field === 'series')) {
+          result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
+        }
+        break;
       case 'format':
         result.push(sql.raw(`(SELECT bf.format FROM book_files bf WHERE bf.id = books.primary_file_id) ${D} NULLS LAST`));
         break;
@@ -149,9 +156,6 @@ export class BookSortBuilder {
         const col = SORT_FIELD_MAP[field];
         if (!col) return;
         result.push(sql`${col} ${sql.raw(D)} NULLS LAST`);
-        if (field === 'seriesIndex' && !allSorts.some((s) => s.field === 'series')) {
-          result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
-        }
       }
     }
   }

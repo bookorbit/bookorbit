@@ -262,6 +262,95 @@ describe('ComicVineClient', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // getVolumeById
+  // ---------------------------------------------------------------------------
+
+  describe('getVolumeById', () => {
+    const volume = { id: 796, name: 'Batman', publisher: { id: 10, name: 'DC Comics' } };
+
+    it('requests the ComicVine volume resource with publisher included', async () => {
+      mockFetch.mockResolvedValue(makeOkResponse(volume, false));
+
+      const pending = client.getVolumeById(796, 'key');
+      await vi.runAllTimersAsync();
+
+      expect(await pending).toEqual(volume);
+      const url = new URL(String(mockFetch.mock.calls[0]?.[0]));
+      expect(url.pathname).toBe('/api/volume/4050-796/');
+      expect(url.searchParams.get('field_list')?.split(',')).toContain('publisher');
+    });
+
+    it('returns a cached volume without another request', async () => {
+      mockFetch.mockResolvedValue(makeOkResponse(volume, false));
+
+      const first = client.getVolumeById(796, 'key');
+      await vi.runAllTimersAsync();
+      await first;
+
+      const second = client.getVolumeById(796, 'key');
+      await vi.runAllTimersAsync();
+
+      expect(await second).toEqual(volume);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('reuses a volume cached by a structured volume search', async () => {
+      mockFetch.mockResolvedValue(makeOkResponse([volume]));
+
+      const search = client.searchVolumes('Batman', 'key');
+      await vi.runAllTimersAsync();
+      await search;
+
+      const result = await client.getVolumeById(796, 'key');
+
+      expect(result).toEqual(volume);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('refreshes a cached volume after the TTL expires', async () => {
+      mockFetch.mockResolvedValueOnce(makeOkResponse(volume, false));
+
+      const first = client.getVolumeById(796, 'key');
+      await vi.runAllTimersAsync();
+      await first;
+      vi.advanceTimersByTime(10 * 60 * 1000 + 1);
+
+      const updated = { ...volume, publisher: { id: 11, name: 'Updated Comics' } };
+      mockFetch.mockResolvedValueOnce(makeOkResponse(updated, false));
+      const second = client.getVolumeById(796, 'key');
+      await vi.runAllTimersAsync();
+
+      expect(await second).toEqual(updated);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns null on a non-ok response', async () => {
+      mockFetch.mockResolvedValue(makeErrorResponse(404));
+
+      const pending = client.getVolumeById(796, 'key');
+      await vi.runAllTimersAsync();
+
+      expect(await pending).toBeNull();
+    });
+
+    it('rejects a malformed volume id without making a request', async () => {
+      await expect(client.getVolumeById(Number.NaN, 'key')).resolves.toBeNull();
+      await expect(client.getVolumeById(-1, 'key')).resolves.toBeNull();
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('throws ProviderThrottleError on 420', async () => {
+      mockFetch.mockResolvedValue(make420Response());
+
+      const pending = client.getVolumeById(796, 'key');
+      const assertion = expect(pending).rejects.toThrow(ProviderThrottleError);
+      await vi.runAllTimersAsync();
+      await assertion;
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // searchIssuesInVolume
   // ---------------------------------------------------------------------------
 

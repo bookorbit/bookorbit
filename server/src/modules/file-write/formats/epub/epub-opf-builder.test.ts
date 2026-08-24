@@ -46,7 +46,7 @@ describe('epub-opf-builder', () => {
       authors: [{ name: 'Frank Herbert', sortName: 'Herbert, Frank' }],
       genres: ['Sci-Fi'],
       seriesName: 'Dune',
-      seriesIndex: 1,
+      seriesIndex: '5.10',
       tags: ['Classic'],
     });
 
@@ -55,6 +55,8 @@ describe('epub-opf-builder', () => {
     expect(result.newOpfXml).toContain('New Title');
     expect(result.newOpfXml).toContain('Frank Herbert');
     expect(result.newOpfXml).toContain('belongs-to-collection');
+    expect(result.newOpfXml).toContain('content="5.10"');
+    expect(result.newOpfXml).toContain('>5.10</meta>');
     expect(result.newOpfXml).toContain('dcterms:modified');
     expect(result.newOpfXml).toContain('2026-01-02T03:04:05.000Z');
     expect(result.newOpfXml).not.toContain('Old Author');

@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises';
 import { XMLParser } from 'fast-xml-parser';
+import { parseSeriesIndex } from '@bookorbit/types';
 
 import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
 import { decodeFb2Document } from '../../../common/utils/fb2-encoding.utils';
@@ -116,7 +117,7 @@ export interface Fb2Metadata {
   publishedDate: string | null;
   publishedYear: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   authors: { name: string; sortName: string | null }[];
   genres: string[];
   tags: string[];
@@ -187,15 +188,14 @@ export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | 
 
     // Series: <sequence name="..." number="..."/>
     let seriesName: string | null = null;
-    let seriesIndex: number | null = null;
+    let seriesIndex: string | null = null;
     const seqRaw = titleInfo['sequence'];
     if (seqRaw != null) {
       const seq = (Array.isArray(seqRaw) ? seqRaw[0] : seqRaw) as Record<string, unknown>;
       seriesName = text(seq['@_name']);
       const num = seq['@_number'];
       if (typeof num === 'string' || typeof num === 'number') {
-        const parsed = parseFloat(String(num));
-        if (!isNaN(parsed)) seriesIndex = parsed;
+        seriesIndex = parseSeriesIndex(String(num));
       }
     }
 

@@ -1,4 +1,4 @@
-import { isAudioFormat, isComicFormat } from '@bookorbit/types';
+import { isAudioFormat, isComicFormat, parseSeriesIndex } from '@bookorbit/types';
 import { Injectable } from '@nestjs/common';
 import { posix } from 'node:path';
 
@@ -150,7 +150,7 @@ export class CalibreWebAutomatedNormalizer {
         publishedYear,
         language,
         seriesName,
-        seriesIndex: seriesName ? record.seriesIndex : null,
+        seriesIndex: seriesName ? parseSeriesIndex(record.seriesIndex) : null,
         rating,
         googleBooksId: normalizedIdentifiers.googleBooksId,
         goodreadsId: normalizedIdentifiers.goodreadsId,

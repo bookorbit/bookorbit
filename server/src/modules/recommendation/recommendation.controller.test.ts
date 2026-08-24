@@ -65,7 +65,7 @@ describe('RecommendationController', () => {
   });
 
   it('delegates series books lookup to the service', async () => {
-    const seriesBooks = [{ id: 1, title: 'Book 1', seriesIndex: 1, hasCover: true, authors: [], isAudiobook: false }];
+    const seriesBooks = [{ id: 1, title: 'Book 1', seriesIndex: '1', hasCover: true, authors: [], isAudiobook: false }];
     const recommendationService = {
       getSeriesBooks: vi.fn().mockResolvedValue(seriesBooks),
     };

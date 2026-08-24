@@ -66,6 +66,10 @@ function asNumber(v: unknown): number | null {
   return v as number | null
 }
 
+function asNumberInput(v: unknown): number | string | null {
+  return props.allowDecimal ? (v as string | null) : asNumber(v)
+}
+
 function asBoolean(v: unknown): boolean | null {
   return v as boolean | null
 }
@@ -129,7 +133,7 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
 
   <BookTableLockableCell v-else-if="cellType === 'number'" :is-locked="isLocked" :has-lock-field="hasLockField" @toggle-lock="emit('toggleLock')">
     <BookTableNumberCell
-      :value="asNumber(value)"
+      :value="asNumberInput(value)"
       :is-active="isActive"
       :is-read-only="isReadOnly"
       :allow-decimal="allowDecimal ?? false"

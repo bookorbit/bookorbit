@@ -32,7 +32,7 @@ describe('FileRenameRepository', () => {
       isbn13: '9780441172719',
       publishedYear: 1965,
       seriesName: 'Dune',
-      seriesIndex: 1,
+      seriesIndex: '1',
     };
 
     const db = {
@@ -76,7 +76,7 @@ describe('FileRenameRepository', () => {
         isbn13: '9780441172719',
         publishedYear: 1965,
         seriesName: 'Dune',
-        seriesIndex: 1,
+        seriesIndex: '1',
       },
       authors: ['Frank Herbert', 'Brian Herbert'],
     });

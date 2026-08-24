@@ -90,10 +90,6 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}`;
 }
 
-function formatSeriesIndex(val: number): string {
-  return val % 1 === 0 ? String(Math.trunc(val)) : String(val);
-}
-
 function formatRating(val: number): string {
   return Math.min(5.0, Math.max(0.0, val / 2.0)).toFixed(1);
 }
@@ -131,7 +127,7 @@ function setIssueNumberField(info: ComicInfoObject, fieldMask: Set<BookWritePayl
     }
   }
 
-  setComicInfoField(info, fieldMask, 'seriesIndex', 'Number', payload.seriesIndex, formatSeriesIndex);
+  setComicInfoField(info, fieldMask, 'seriesIndex', 'Number', payload.seriesIndex);
 }
 
 function resolveWebUrl(payload: BookWritePayload, fieldMask: Set<BookWritePayloadKey>): string | null {

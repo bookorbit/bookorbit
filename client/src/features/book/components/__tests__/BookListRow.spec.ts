@@ -118,7 +118,7 @@ const collapsedSeriesBook: BookCard = {
   authors: ['Series Author'],
   seriesId: 99,
   seriesName: 'The Trilogy',
-  seriesIndex: 1,
+  seriesIndex: '1',
   readingProgress: 33,
   collapsedSeries: {
     bookCount: 4,

@@ -195,7 +195,7 @@ describe('writeFb2Metadata byte preservation', () => {
       genres: ['Fantasy & Epic'],
       tags: ['a', 'b'],
       seriesName: 'S & S',
-      seriesIndex: 2,
+      seriesIndex: '2',
       publisher: 'P & P',
       isbn13: '9780000000001',
       publishedDate: '2001-02-03',
@@ -219,7 +219,7 @@ describe('writeFb2Metadata idempotency', () => {
       genres: ['Fantasy'],
       language: 'en',
       seriesName: 'Series',
-      seriesIndex: 2,
+      seriesIndex: '2',
       publishedDate: '2018-03-14',
       publisher: 'Pub',
       rating: 5,
@@ -358,7 +358,7 @@ describe('writeFb2Metadata encodings', () => {
     const path = await makeFile(content, 'win1251');
     const originalBytes = await readFile(path);
 
-    const result = await write(path, { title: 'Мастер и Маргарита', seriesName: 'Русская классика', seriesIndex: 1 });
+    const result = await write(path, { title: 'Мастер и Маргарита', seriesName: 'Русская классика', seriesIndex: '1' });
     expect(result.status).toBe('success');
 
     const updatedBytes = await readFile(path);

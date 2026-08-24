@@ -392,7 +392,7 @@ describe('BookCoverCard — series position overlay', () => {
   const bookWithSeries: BookCard = {
     ...presentBook,
     seriesName: 'The Expanse',
-    seriesIndex: 3,
+    seriesIndex: '3',
   }
 
   afterEach(() => {
@@ -425,16 +425,15 @@ describe('BookCoverCard — series position overlay', () => {
     expect(wrapper.text()).not.toContain('#')
   })
 
-  it('formats whole-number float 3.0 as #3 (no trailing decimal)', () => {
+  it('preserves trailing zeros in exact series labels', () => {
     cardOverlays.value = ['series-position']
-    const wrapper = mountCard({ ...presentBook, seriesIndex: 3.0, seriesName: 'Dune' })
-    expect(wrapper.text()).toContain('#3')
-    expect(wrapper.text()).not.toContain('#3.0')
+    const wrapper = mountCard({ ...presentBook, seriesIndex: '3.0', seriesName: 'Dune' })
+    expect(wrapper.text()).toContain('#3.0')
   })
 
   it('formats fractional index 1.5 as #1.5', () => {
     cardOverlays.value = ['series-position']
-    const wrapper = mountCard({ ...presentBook, seriesIndex: 1.5, seriesName: 'Dune' })
+    const wrapper = mountCard({ ...presentBook, seriesIndex: '1.5', seriesName: 'Dune' })
     expect(wrapper.text()).toContain('#1.5')
   })
 
@@ -448,7 +447,7 @@ describe('BookCoverCard — series position overlay', () => {
 
   it('tooltip shows only number when seriesName is null', () => {
     cardOverlays.value = ['series-position']
-    const wrapper = mountCard({ ...presentBook, seriesIndex: 5, seriesName: null })
+    const wrapper = mountCard({ ...presentBook, seriesIndex: '5', seriesName: null })
     const tooltip = wrapper.find('[data-testid="tooltip-content"]')
     expect(tooltip.exists()).toBe(true)
     expect(tooltip.text()).toBe('#5')
@@ -456,7 +455,7 @@ describe('BookCoverCard — series position overlay', () => {
 
   it('lock and series badges coexist in the top-right container', () => {
     cardOverlays.value = ['series-position', 'lock-status']
-    const wrapper = mountCard({ ...presentBook, seriesIndex: 2, seriesName: 'Dune', hasMetadataLocks: true })
+    const wrapper = mountCard({ ...presentBook, seriesIndex: '2', seriesName: 'Dune', hasMetadataLocks: true })
     expect(wrapper.text()).toContain('#2')
     expect(wrapper.find('.text-amber-400').exists()).toBe(true)
   })
@@ -468,7 +467,7 @@ describe('BookCoverCard — grid card labels', () => {
     title: 'Dune',
     authors: ['Frank Herbert'],
     seriesName: 'Dune Chronicles',
-    seriesIndex: 1,
+    seriesIndex: '1',
   }
 
   afterEach(() => {
@@ -557,7 +556,7 @@ describe('BookCoverCard — grid card labels', () => {
     gridCardPrimaryLabel.value = 'series-title-position'
     cardInfoMode.value = 'below-cover'
     const wrapper = mount(BookCoverCard, {
-      props: { book: { ...bookWithMeta, seriesIndex: 1.5 }, showLabel: true },
+      props: { book: { ...bookWithMeta, seriesIndex: '1.5' }, showLabel: true },
       global: { ...globalStubs, provide: { [COVER_ASPECT_RATIO_KEY as symbol]: ref('2/3') } },
     })
     expect(wrapper.find('[data-testid="grid-card-label-primary"]').text()).toBe('Dune Chronicles #1.5')

@@ -4774,6 +4774,7 @@
         "moveDown": "Move down",
         "removeSeries": "Remove series",
         "seriesIndexLabel": "Position in series",
+        "invalidSeriesIndex": "Enter digits with at most one decimal point, such as 5.10.",
         "totalLabel": "Books in series",
         "totalPlaceholder": "of",
         "totalHint": "Total books in this series. Shared with everyone who has this series."
@@ -5007,6 +5008,7 @@
     "nFailed": "{count} failed",
     "updatedOfFiles": "Updated {updated} of {total} files",
     "errorStatus": "Error {status}",
+    "invalidSeriesIndex": "Enter digits with at most one decimal point, such as 5.10.",
     "tab": {
       "all": "All",
       "pending": "Pending",

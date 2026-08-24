@@ -233,8 +233,8 @@ describe('RecommendationRepository', () => {
 
   it('queries series books with expected shape when input is valid', async () => {
     const rows = [
-      { bookId: 1, title: 'Book 1', coverAspectRatio: '2/3', seriesIndex: 1, coverSource: 'extracted', primaryFormat: 'm4b' },
-      { bookId: 2, title: 'Book 2', coverAspectRatio: '1/1', seriesIndex: 2, coverSource: null, primaryFormat: 'epub' },
+      { bookId: 1, title: 'Book 1', coverAspectRatio: '2/3', seriesIndex: '1', coverSource: 'extracted', primaryFormat: 'm4b' },
+      { bookId: 2, title: 'Book 2', coverAspectRatio: '1/1', seriesIndex: '2', coverSource: null, primaryFormat: 'epub' },
     ];
     const authorRows = [{ bookId: 1, name: 'Frank Herbert' }];
     const { db, select, chains } = makeDb([
@@ -251,7 +251,7 @@ describe('RecommendationRepository', () => {
         title: 'Book 1',
         coverAspectRatio: '2/3',
         updatedAt: null,
-        seriesIndex: 1,
+        seriesIndex: '1',
         coverSource: 'extracted',
         authorNames: ['Frank Herbert'],
         isAudiobook: true,
@@ -262,7 +262,7 @@ describe('RecommendationRepository', () => {
         title: 'Book 2',
         coverAspectRatio: '1/1',
         updatedAt: null,
-        seriesIndex: 2,
+        seriesIndex: '2',
         coverSource: null,
         authorNames: [],
         isAudiobook: false,
@@ -369,7 +369,7 @@ describe('RecommendationRepository', () => {
   });
 
   it('flags comic primary formats as isComic for series books', async () => {
-    const rows = [{ bookId: 9, title: 'Comic Issue', coverAspectRatio: '1/1', seriesIndex: 3, coverSource: 'extracted', primaryFormat: 'CBZ' }];
+    const rows = [{ bookId: 9, title: 'Comic Issue', coverAspectRatio: '1/1', seriesIndex: '3', coverSource: 'extracted', primaryFormat: 'CBZ' }];
     const { db } = makeDb([
       { terminal: 'limit', result: rows },
       { terminal: 'where', result: [] },
@@ -384,7 +384,7 @@ describe('RecommendationRepository', () => {
         title: 'Comic Issue',
         coverAspectRatio: '1/1',
         updatedAt: null,
-        seriesIndex: 3,
+        seriesIndex: '3',
         coverSource: 'extracted',
         authorNames: [],
         isAudiobook: false,

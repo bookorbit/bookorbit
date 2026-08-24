@@ -530,7 +530,7 @@ describe('UploadService', () => {
     mockExtractCbzMetadata.mockResolvedValue({
       title: 'Issue 1',
       seriesName: 'Batman',
-      seriesIndex: 1,
+      seriesIndex: '1',
       authors: [{ name: 'Bob Kane', sortName: null }],
       subtitle: null,
       description: null,
@@ -583,7 +583,7 @@ describe('UploadService', () => {
       publishedYear: null,
       language: null,
       seriesName: 'Trilogy',
-      seriesIndex: 3,
+      seriesIndex: '3',
       isbn13: null,
       authors: [{ name: 'Author' }],
       tags: [],
@@ -609,7 +609,7 @@ describe('UploadService', () => {
       publishedYear: null,
       language: null,
       seriesName: 'Trilogy',
-      seriesIndex: 1.5,
+      seriesIndex: '5.10',
       isbn13: null,
       authors: [{ name: 'Author' }],
       tags: [],
@@ -620,7 +620,7 @@ describe('UploadService', () => {
     const result = await service.upload(1, 2, 'raw.epub', {} as any, user);
 
     expect(result).toEqual({ bookId: 99, filename: 'Book Three.epub', format: 'epub', sizeBytes: 456 });
-    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Trilogy 01.5/Book Three.epub');
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Trilogy 05.10/Book Three.epub');
   });
 
   it('mobi parser throws - logs warning and returns base tokens', async () => {
@@ -765,7 +765,7 @@ describe('UploadService', () => {
       publishedYear: null,
       language: null,
       seriesName: 'Dune Chronicles',
-      seriesIndex: 1,
+      seriesIndex: '1',
       isbn13: null,
       authors: [{ name: 'Frank Herbert' }],
       tags: [],

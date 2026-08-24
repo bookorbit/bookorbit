@@ -1,6 +1,6 @@
 import { execFile as execFileCallback, spawn } from 'child_process';
 import { promisify } from 'util';
-import type { AudiobookChapter } from '@bookorbit/types';
+import { parseSeriesIndex as parseSeriesIndexLabel, type AudiobookChapter } from '@bookorbit/types';
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../common/utils/published-date.utils';
 
 const execFile = promisify(execFileCallback);
@@ -19,7 +19,7 @@ export interface AudioExtractResult {
   description: string | null;
   language: string | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   genres: string[];
   audibleId: string | null;
   librofmId: string | null;
@@ -224,10 +224,9 @@ function parseChapterStartMs(raw: string): number | null {
   return Number.isFinite(parsed) ? Math.round(parsed * 1000) : null;
 }
 
-function parseSeriesIndex(raw: string | null): number | null {
+function parseSeriesIndex(raw: string | null): string | null {
   if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseSeriesIndexLabel(raw);
 }
 
 function resolveDescription(...values: (string | null)[]): string | null {

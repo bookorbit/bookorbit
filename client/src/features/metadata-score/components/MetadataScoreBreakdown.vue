@@ -3,7 +3,13 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Minus } from '@lucide/vue'
 import type { BookDetail, MetadataScoreWeights } from '@bookorbit/types'
-import { METADATA_SCORE_FIELDS, METADATA_SCORE_GROUPS, type MetadataScoreField, type MetadataScoreGroup } from '@bookorbit/types'
+import {
+  METADATA_SCORE_FIELDS,
+  METADATA_SCORE_GROUPS,
+  isPositiveSeriesIndex,
+  type MetadataScoreField,
+  type MetadataScoreGroup,
+} from '@bookorbit/types'
 import { scoreFieldLabelKey } from '@/features/settings/metadata-score/lib/score-weights'
 
 const props = defineProps<{
@@ -55,7 +61,7 @@ function isFieldFilled(field: MetadataScoreField): boolean {
     case 'seriesName':
       return !!b.seriesName?.trim()
     case 'seriesIndex':
-      return b.seriesIndex != null && b.seriesIndex > 0
+      return b.seriesIndex != null && isPositiveSeriesIndex(b.seriesIndex)
     case 'googleBooksId':
       return !!b.providerIds.google?.trim()
     case 'goodreadsId':

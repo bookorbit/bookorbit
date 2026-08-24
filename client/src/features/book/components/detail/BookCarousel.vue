@@ -13,7 +13,7 @@ export interface CarouselBook {
   title: string | null
   coverAspectRatio: CoverAspectRatio
   updatedAt?: string | null
-  seriesIndex?: number | null
+  seriesIndex?: string | null
   hasCover: boolean
   authors: string[]
   isAudiobook?: boolean
@@ -49,9 +49,9 @@ function navigateToBook(bookId: number) {
   router.push({ name: 'book-detail', params: { bookId } })
 }
 
-function formatSeriesIndex(index: number | null | undefined): string {
+function formatSeriesIndex(index: string | null | undefined): string {
   if (index == null) return ''
-  return Number.isInteger(index) ? `#${index}` : `#${index}`
+  return `#${index}`
 }
 
 function isAudiobook(book: CarouselBook): boolean {

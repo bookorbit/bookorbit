@@ -234,13 +234,13 @@ describe('assembleBookCards', () => {
 
   it('includes all optional metadata fields', () => {
     const rows = [
-      makeBookRow(1, { seriesName: 'Dune', seriesIndex: 1, publishedDate: '1965-08-01', publishedYear: 1965, language: 'en', rating: 5 }),
+      makeBookRow(1, { seriesName: 'Dune', seriesIndex: '1', publishedDate: '1965-08-01', publishedYear: 1965, language: 'en', rating: 5 }),
     ];
 
     const [card] = assembleBookCards(rows, [], [], [], []);
 
     expect(card.seriesName).toBe('Dune');
-    expect(card.seriesIndex).toBe(1);
+    expect(card.seriesIndex).toBe('1');
     expect(card.publishedDate).toBe('1965-08-01');
     expect(card.publishedYear).toBe(1965);
     expect(card.language).toBe('en');
@@ -343,7 +343,7 @@ function makeCollapsedRow(id: number, overrides?: Record<string, unknown>) {
     addedAt: new Date('2024-01-01T00:00:00.000Z'),
     title: `Book ${id}`,
     seriesName: 'Test Series',
-    seriesIndex: id,
+    seriesIndex: String(id),
     publishedYear: null,
     language: null,
     rating: null,
@@ -372,7 +372,7 @@ function makeBookCard(id: number, overrides?: Record<string, unknown>) {
     title: `Book ${id}`,
     authors: [] as string[],
     seriesName: null as string | null,
-    seriesIndex: null as number | null,
+    seriesIndex: null as string | null,
     files: [] as { id: number; format: string | null; role: string }[],
     publishedYear: null,
     language: null,
@@ -502,9 +502,9 @@ describe('collapseBookCards', () => {
 
   it('collapses multiple books in the same series into one card', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'Dune', seriesIndex: 1 }),
-      makeBookCard(2, { seriesName: 'Dune', seriesIndex: 2 }),
-      makeBookCard(3, { seriesName: 'Dune', seriesIndex: 3 }),
+      makeBookCard(1, { seriesName: 'Dune', seriesIndex: '1' }),
+      makeBookCard(2, { seriesName: 'Dune', seriesIndex: '2' }),
+      makeBookCard(3, { seriesName: 'Dune', seriesIndex: '3' }),
     ];
     const result = collapseBookCards(cards);
 
@@ -513,7 +513,7 @@ describe('collapseBookCards', () => {
   });
 
   it('collapses series case-insensitively', () => {
-    const cards = [makeBookCard(1, { seriesName: 'DUNE', seriesIndex: 1 }), makeBookCard(2, { seriesName: 'dune', seriesIndex: 2 })];
+    const cards = [makeBookCard(1, { seriesName: 'DUNE', seriesIndex: '1' }), makeBookCard(2, { seriesName: 'dune', seriesIndex: '2' })];
     const result = collapseBookCards(cards);
 
     expect(result).toHaveLength(1);
@@ -530,9 +530,9 @@ describe('collapseBookCards', () => {
 
   it('picks representative with lowest seriesIndex', () => {
     const cards = [
-      makeBookCard(3, { seriesName: 'Mistborn', seriesIndex: 3 }),
-      makeBookCard(1, { seriesName: 'Mistborn', seriesIndex: 1 }),
-      makeBookCard(2, { seriesName: 'Mistborn', seriesIndex: 2 }),
+      makeBookCard(3, { seriesName: 'Mistborn', seriesIndex: '3' }),
+      makeBookCard(1, { seriesName: 'Mistborn', seriesIndex: '1' }),
+      makeBookCard(2, { seriesName: 'Mistborn', seriesIndex: '2' }),
     ];
     const result = collapseBookCards(cards);
 
@@ -550,7 +550,7 @@ describe('collapseBookCards', () => {
   });
 
   it('prefers books with indexes over books without when sorting', () => {
-    const cards = [makeBookCard(2, { seriesName: 'Arc', seriesIndex: null }), makeBookCard(1, { seriesName: 'Arc', seriesIndex: 1 })];
+    const cards = [makeBookCard(2, { seriesName: 'Arc', seriesIndex: null }), makeBookCard(1, { seriesName: 'Arc', seriesIndex: '1' })];
     const result = collapseBookCards(cards);
 
     expect(result[0]!.id).toBe(1);
@@ -576,9 +576,9 @@ describe('collapseBookCards', () => {
 
   it('prefers books with covers for coverBookIds', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, hasCover: false }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, hasCover: true }),
-      makeBookCard(3, { seriesName: 'S', seriesIndex: 3, hasCover: true }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1', hasCover: false }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2', hasCover: true }),
+      makeBookCard(3, { seriesName: 'S', seriesIndex: '3', hasCover: true }),
     ];
     const result = collapseBookCards(cards);
 
@@ -587,8 +587,8 @@ describe('collapseBookCards', () => {
 
   it('includes child cover timestamps when collapsing book cards client-side', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, updatedAt: '2024-02-01T00:00:00.000Z' }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, updatedAt: null, addedAt: '2024-03-01T00:00:00.000Z' }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1', updatedAt: '2024-02-01T00:00:00.000Z' }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2', updatedAt: null, addedAt: '2024-03-01T00:00:00.000Z' }),
     ];
     const result = collapseBookCards(cards);
 
@@ -600,8 +600,8 @@ describe('collapseBookCards', () => {
 
   it('falls back to all sorted books when none have covers', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, hasCover: false }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, hasCover: false }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1', hasCover: false }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2', hasCover: false }),
     ];
     const result = collapseBookCards(cards);
 
@@ -609,7 +609,7 @@ describe('collapseBookCards', () => {
   });
 
   it('caps coverBookIds at 4', () => {
-    const cards = Array.from({ length: 6 }, (_, i) => makeBookCard(i + 1, { seriesName: 'BigSeries', seriesIndex: i + 1, hasCover: true }));
+    const cards = Array.from({ length: 6 }, (_, i) => makeBookCard(i + 1, { seriesName: 'BigSeries', seriesIndex: String(i + 1), hasCover: true }));
     const result = collapseBookCards(cards);
 
     expect(result[0]!.collapsedSeries!.coverBookIds).toHaveLength(4);
@@ -618,9 +618,9 @@ describe('collapseBookCards', () => {
   it('returns results in first-occurrence order, preserving input sequence', () => {
     const cards = [
       makeBookCard(1, { title: 'Zephyr', seriesName: null }),
-      makeBookCard(2, { seriesName: 'Amber', seriesIndex: 1, title: null }),
+      makeBookCard(2, { seriesName: 'Amber', seriesIndex: '1', title: null }),
       makeBookCard(3, { title: 'Mango', seriesName: null }),
-      makeBookCard(4, { seriesName: 'Cobalt', seriesIndex: 1, title: null }),
+      makeBookCard(4, { seriesName: 'Cobalt', seriesIndex: '1', title: null }),
     ];
     const result = collapseBookCards(cards);
 
@@ -647,9 +647,9 @@ describe('collapseBookCards', () => {
 
   it('sets firstVolumeBookId to the first book by series index', () => {
     const cards = [
-      makeBookCard(3, { seriesName: 'S', seriesIndex: 3 }),
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1 }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2 }),
+      makeBookCard(3, { seriesName: 'S', seriesIndex: '3' }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1' }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2' }),
     ];
     const result = collapseBookCards(cards);
 
@@ -658,9 +658,9 @@ describe('collapseBookCards', () => {
 
   it('sets latestVolumeBookId to the last book by series index', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1 }),
-      makeBookCard(3, { seriesName: 'S', seriesIndex: 3 }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2 }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1' }),
+      makeBookCard(3, { seriesName: 'S', seriesIndex: '3' }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2' }),
     ];
     const result = collapseBookCards(cards);
 
@@ -669,9 +669,9 @@ describe('collapseBookCards', () => {
 
   it('sets firstUnreadBookId to the first unread book by series index', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, readStatus: { status: 'read' } }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, readStatus: { status: 'reading' } }),
-      makeBookCard(3, { seriesName: 'S', seriesIndex: 3, readStatus: null }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1', readStatus: { status: 'read' } }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2', readStatus: { status: 'reading' } }),
+      makeBookCard(3, { seriesName: 'S', seriesIndex: '3', readStatus: null }),
     ];
     const result = collapseBookCards(cards);
 
@@ -680,8 +680,8 @@ describe('collapseBookCards', () => {
 
   it('sets firstUnreadBookId to null when all books are read', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, readStatus: { status: 'read' } }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, readStatus: { status: 'read' } }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1', readStatus: { status: 'read' } }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2', readStatus: { status: 'read' } }),
     ];
     const result = collapseBookCards(cards);
 
@@ -690,8 +690,8 @@ describe('collapseBookCards', () => {
 
   it('sets firstUnreadBookId to first volume when no read statuses exist', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, readStatus: null }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 2, readStatus: null }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1', readStatus: null }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '2', readStatus: null }),
     ];
     const result = collapseBookCards(cards);
 
@@ -699,7 +699,7 @@ describe('collapseBookCards', () => {
   });
 
   it('sets all three volume IDs to the same book for single-book series', () => {
-    const cards = [makeBookCard(42, { seriesName: 'Solo', seriesIndex: 1 })];
+    const cards = [makeBookCard(42, { seriesName: 'Solo', seriesIndex: '1' })];
     const result = collapseBookCards(cards);
 
     expect(result[0]!.collapsedSeries!.firstVolumeBookId).toBe(42);
@@ -710,7 +710,7 @@ describe('collapseBookCards', () => {
   it('handles null series indices correctly for volume IDs', () => {
     const cards = [
       makeBookCard(2, { seriesName: 'S', seriesIndex: null, addedAt: '2024-03-01T00:00:00.000Z' }),
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1, addedAt: '2024-01-01T00:00:00.000Z' }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1', addedAt: '2024-01-01T00:00:00.000Z' }),
     ];
     const result = collapseBookCards(cards);
 
@@ -731,8 +731,8 @@ describe('collapseBookCards', () => {
 
   it('does not treat null-index book as latest volume when numeric indexes exist', () => {
     const cards = [
-      makeBookCard(1, { seriesName: 'S', seriesIndex: 1 }),
-      makeBookCard(2, { seriesName: 'S', seriesIndex: 5 }),
+      makeBookCard(1, { seriesName: 'S', seriesIndex: '1' }),
+      makeBookCard(2, { seriesName: 'S', seriesIndex: '5' }),
       makeBookCard(3, { seriesName: 'S', seriesIndex: null }),
     ];
     const result = collapseBookCards(cards);

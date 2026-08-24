@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import type { BookMetadataFetchReason } from '@bookorbit/types';
-import { MetadataProviderKey, NotificationType } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType, parseSeriesIndex } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { resolveIsAudiobook } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -328,7 +328,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (pageCount !== undefined) scalarFields.pageCount = pageCount;
     const seriesName = this.asNullableString(filteredResolved.seriesName);
     if (seriesName !== undefined) scalarFields.seriesName = seriesName;
-    const seriesIndex = this.asNullableNumber(filteredResolved.seriesIndex);
+    const seriesIndex = filteredResolved.seriesIndex === null ? null : (parseSeriesIndex(filteredResolved.seriesIndex) ?? undefined);
     if (seriesIndex !== undefined) scalarFields.seriesIndex = seriesIndex;
 
     if (filteredProviderIds[MetadataProviderKey.GOOGLE]) scalarFields.googleBooksId = filteredProviderIds[MetadataProviderKey.GOOGLE];

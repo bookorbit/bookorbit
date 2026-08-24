@@ -1,13 +1,17 @@
-import { AudiobookChapter, MetadataProviderKey, type MetadataCandidate, type MetadataSeriesMembership } from '@bookorbit/types';
+import {
+  AudiobookChapter,
+  MetadataProviderKey,
+  parseSeriesIndex as parseSeriesIndexLabel,
+  type MetadataCandidate,
+  type MetadataSeriesMembership,
+} from '@bookorbit/types';
 
 import { parsePublishedDateKey, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { stripHtml } from '../provider-utils';
 import { AudNexusBook, AudNexusChaptersResponse, AudNexusSeriesReference } from './audnexus.types';
 
-function parseSeriesIndex(value: string | number | undefined): number | undefined {
-  if (value == null || String(value).trim() === '') return undefined;
-  const parsed = parseFloat(String(value));
-  return Number.isFinite(parsed) ? parsed : undefined;
+function parseSeriesIndex(value: string | number | undefined): string | undefined {
+  return parseSeriesIndexLabel(value) ?? undefined;
 }
 
 function extractSeriesMemberships(book: AudNexusBook): MetadataSeriesMembership[] | undefined {

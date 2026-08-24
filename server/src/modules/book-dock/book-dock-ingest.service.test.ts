@@ -316,6 +316,63 @@ describe('BookDockIngestService', () => {
     });
   });
 
+  describe('refetchMetadata', () => {
+    it.each(['ready', 'error'])('queues a %s row and forces a provider fetch', async (status) => {
+      const { service, repo } = makeService();
+      const dockRow = {
+        id: 4,
+        status,
+        format: 'epub',
+        absolutePath: '/bucket/4.epub',
+        errorMessage: status === 'error' ? 'failed' : null,
+      };
+      repo.findById.mockResolvedValueOnce(dockRow).mockResolvedValueOnce({ ...dockRow, status: 'pending' });
+      repo.update.mockResolvedValue(dockRow);
+      const autoFetchSpy = vi.spyOn(service as any, 'autoFetchMetadataAsync').mockResolvedValue(undefined);
+
+      await expect(service.refetchMetadata(4)).resolves.toBe(true);
+      await (service as any).metadataQueue.waitForIdle();
+
+      expect(repo.update).toHaveBeenCalledWith(4, { status: 'pending', errorMessage: null });
+      expect(autoFetchSpy).toHaveBeenCalledWith(4, true);
+      expect((service as any).forcedAutoFetchFileIds.has(4)).toBe(false);
+    });
+
+    it('ignores missing, active, and unsupported rows', async () => {
+      const { service, repo } = makeService();
+      repo.findById
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 5, status: 'fetching', format: 'epub' })
+        .mockResolvedValueOnce({ id: 6, status: 'ready', format: null, absolutePath: '/bucket/6' });
+
+      await expect(service.refetchMetadata(4)).resolves.toBe(false);
+      await expect(service.refetchMetadata(5)).resolves.toBe(false);
+      await expect(service.refetchMetadata(6)).resolves.toBe(false);
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('restores the previous state when the work queue rejects the file', async () => {
+      const { service, repo } = makeService();
+      const dockRow = {
+        id: 7,
+        status: 'ready',
+        format: 'epub',
+        absolutePath: '/bucket/7.epub',
+        errorMessage: null,
+      };
+      repo.findById.mockResolvedValue(dockRow);
+      repo.update.mockResolvedValue(dockRow);
+      vi.spyOn(service as any, 'extractMetadataAsync').mockReturnValue(false);
+
+      await expect(service.refetchMetadata(7)).resolves.toBe(false);
+
+      expect(repo.update).toHaveBeenNthCalledWith(1, 7, { status: 'pending', errorMessage: null });
+      expect(repo.update).toHaveBeenNthCalledWith(2, 7, { status: 'ready', errorMessage: null });
+      expect((service as any).forcedAutoFetchFileIds.has(7)).toBe(false);
+    });
+  });
+
   describe('autoFetchMetadataAsync', () => {
     it('returns early when auto-fetch is disabled', async () => {
       const { service, appSettings, repo } = makeService();
@@ -325,6 +382,34 @@ describe('BookDockIngestService', () => {
 
       expect(repo.findById).not.toHaveBeenCalled();
       expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('forces an explicit refetch when automatic fetching is disabled', async () => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(false);
+      repo.findById.mockResolvedValue({
+        id: 8,
+        fileName: 'dune.epub',
+        status: 'ready',
+        embeddedMetadata: { title: 'Dune' },
+      });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({
+        resolved: { title: 'Dune' },
+        sources: { title: 'google' },
+      });
+
+      await (service as any).autoFetchMetadataAsync(8, true);
+
+      expect(appSettings.isBookDockAutoFetchEnabled).not.toHaveBeenCalled();
+      expect(metadataFetchPipeline.runWithSources).toHaveBeenCalledTimes(1);
+      expect(repo.update).toHaveBeenLastCalledWith(
+        8,
+        expect.objectContaining({
+          status: 'ready',
+          fetchedMetadata: { title: 'Dune' },
+          fetchedMetadataSources: { title: 'google' },
+        }),
+      );
     });
 
     it.each([
@@ -572,6 +657,31 @@ describe('BookDockIngestService', () => {
       expect(repo.update).toHaveBeenNthCalledWith(2, 13, { status: 'ready' });
     });
 
+    it('clears stale provider metadata when an explicit refetch finds no result', async () => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(false);
+      repo.findById.mockResolvedValue({
+        id: 15,
+        fileName: 'known-title.epub',
+        status: 'ready',
+        embeddedMetadata: { title: 'Known Title' },
+        fetchedMetadata: { title: 'Stale Title' },
+        fetchedMetadataSources: { title: 'google' },
+        confidence: 90,
+      });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({ resolved: {}, sources: {} });
+
+      await (service as any).autoFetchMetadataAsync(15, true);
+
+      expect(repo.update).toHaveBeenNthCalledWith(1, 15, { status: 'fetching' });
+      expect(repo.update).toHaveBeenNthCalledWith(2, 15, {
+        status: 'ready',
+        fetchedMetadata: null,
+        confidence: null,
+        fetchedMetadataSources: null,
+      });
+    });
+
     it('emits a summary refresh before provider fetching starts', async () => {
       const { service, appSettings, repo, metadataFetchPipeline } = makeService();
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
@@ -603,7 +713,7 @@ describe('BookDockIngestService', () => {
     await (service as any).metadataQueue.waitForIdle();
 
     expect(metadataService.extractAndSave).toHaveBeenCalledWith(12, '/bucket/12.epub', 'epub', '/books/book-dock/covers');
-    expect(autoFetchSpy).toHaveBeenCalledWith(12);
+    expect(autoFetchSpy).toHaveBeenCalledWith(12, false);
     expect(repo.update).toHaveBeenCalledWith(12, { status: 'extracting' });
     expect(emitSummarySpy).toHaveBeenCalledTimes(2);
     expect(events.emit).toHaveBeenCalledWith('book-dock.file.ingested', 12);

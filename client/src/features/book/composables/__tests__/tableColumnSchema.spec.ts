@@ -149,7 +149,7 @@ describe('tableColumnSchema', () => {
     const book = makeBook({
       title: 'Dune',
       seriesName: 'Dune Series',
-      seriesIndex: 1,
+      seriesIndex: '1',
       publishedDate: '1965-08-01',
       publishedYear: 1965,
       language: 'en',
@@ -187,9 +187,9 @@ describe('tableColumnSchema', () => {
   })
 
   it('seriesIndex accessor returns the series index', () => {
-    const book = makeBook({ seriesIndex: 2 })
+    const book = makeBook({ seriesIndex: '2' })
     const def = COLUMN_DEFS.find((c) => c.id === 'seriesIndex')!
-    expect(def.accessor!(book)).toBe(2)
+    expect(def.accessor!(book)).toBe('2')
   })
 
   it('publishedDate column uses the published year lock and full date sort field', () => {

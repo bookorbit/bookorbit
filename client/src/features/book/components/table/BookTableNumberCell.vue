@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue'
+import { parseSeriesIndex } from '@bookorbit/types'
 
 const props = defineProps<{
-  value: number | null
+  value: number | string | null
   isActive: boolean
   isReadOnly?: boolean
   min?: number
@@ -12,7 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   activate: []
-  save: [value: number | null]
+  save: [value: number | string | null]
   cancel: []
   navigate: [direction: 'next' | 'prev' | 'rowUp' | 'rowDown']
 }>()
@@ -35,10 +36,11 @@ watch(
   },
 )
 
-const parsedValue = computed<number | null>(() => {
+const parsedValue = computed<number | string | null>(() => {
   const trimmed = String(draft.value).trim()
   if (!trimmed) return null
-  const n = props.allowDecimal ? parseFloat(trimmed) : parseInt(trimmed, 10)
+  if (props.allowDecimal) return parseSeriesIndex(trimmed)
+  const n = parseInt(trimmed, 10)
   if (isNaN(n)) return null
   if (props.min != null && n < props.min) return props.min
   if (props.max != null && n > props.max) return props.max
@@ -47,10 +49,14 @@ const parsedValue = computed<number | null>(() => {
 
 function handleBlur() {
   if (wasCancelled) return
+  if (String(draft.value).trim() && parsedValue.value === null) {
+    emit('cancel')
+    return
+  }
   emitSaveIfChanged(parsedValue.value)
 }
 
-function emitSaveIfChanged(nextValue: number | null) {
+function emitSaveIfChanged(nextValue: number | string | null) {
   if (nextValue === props.value) {
     emit('cancel')
     return
@@ -66,6 +72,7 @@ function handleKeydown(e: KeyboardEvent) {
 
   if (e.key === 'Enter') {
     e.preventDefault()
+    if (String(draft.value).trim() && parsedValue.value === null) return
     emitSaveIfChanged(parsedValue.value)
   } else if (e.key === 'Escape') {
     e.preventDefault()
@@ -95,6 +102,7 @@ function handleClick() {
       ref="inputRef"
       v-model="draft"
       :type="allowDecimal ? 'text' : 'number'"
+      :inputmode="allowDecimal ? 'decimal' : undefined"
       class="w-full rounded border border-primary/50 bg-background px-1.5 py-0.5 text-sm text-foreground outline-none focus:border-primary/70"
       @blur="handleBlur"
       @keydown="handleKeydown"

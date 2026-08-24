@@ -144,9 +144,9 @@ describe('parseXmp', () => {
       expect(r?.seriesName).toBe('Dune Chronicles');
     });
 
-    it('parses bookorbit:seriesIndex as number', () => {
-      const r = parseXmp(xmpDoc('<bookorbit:seriesIndex>3</bookorbit:seriesIndex>'));
-      expect(r?.seriesIndex).toBe(3);
+    it('preserves bookorbit:seriesIndex as an exact label', () => {
+      const r = parseXmp(xmpDoc('<bookorbit:seriesIndex>5.10</bookorbit:seriesIndex>'));
+      expect(r?.seriesIndex).toBe('5.10');
     });
 
     it('parses bookorbit:tags list', () => {

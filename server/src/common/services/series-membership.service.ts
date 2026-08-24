@@ -14,13 +14,13 @@ type SeriesMembershipReadExecutor = Pick<Db, 'select'> | DbTransaction;
 
 export type SeriesMembershipInput = {
   seriesName: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: string | null;
 };
 
 export type SeriesMembershipRef = {
   seriesId: number;
   seriesName: string;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   displayOrder: number;
   expectedBookCount: number | null;
 };

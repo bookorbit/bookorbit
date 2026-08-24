@@ -50,7 +50,7 @@ export class BookDetailDto {
   pageCount: number | null;
   seriesId: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   seriesMemberships: BookSeriesMembership[];
   rating: number | null;
   personalNote: string | null;

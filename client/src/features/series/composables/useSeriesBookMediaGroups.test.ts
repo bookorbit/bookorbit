@@ -11,7 +11,7 @@ function makeBook(format: string | null | undefined, overrides: Partial<BookCard
     authors: [],
     seriesId: 42,
     seriesName: 'The Series',
-    seriesIndex: 1,
+    seriesIndex: '1',
     files: format === undefined ? [] : [{ id: 1, format, role: 'primary', sizeBytes: null }],
     publishedDate: null,
     publishedYear: null,

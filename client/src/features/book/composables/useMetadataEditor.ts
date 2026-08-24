@@ -13,7 +13,8 @@ import {
 
 export type EditableSeriesMembership = {
   seriesName: string
-  seriesIndex: number | null
+  seriesIndex: string | null
+  /** Series-level: saving it changes the total for every book in the series and every user. */
   expectedBookCount: number | null
 }
 
@@ -82,7 +83,11 @@ export function normalizeSeriesMemberships(values: readonly EditableSeriesMember
     const key = seriesName.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ seriesName, seriesIndex: value.seriesIndex ?? null, expectedBookCount: value.expectedBookCount ?? null })
+    out.push({
+      seriesName,
+      seriesIndex: value.seriesIndex !== null && String(value.seriesIndex).trim() !== '' ? String(value.seriesIndex).trim() : null,
+      expectedBookCount: value.expectedBookCount ?? null,
+    })
   }
   return out
 }
@@ -93,12 +98,20 @@ function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[]
     return normalizeSeriesMemberships(
       memberships.map((membership) => ({
         seriesName: membership.seriesName,
-        seriesIndex: membership.seriesIndex,
+        seriesIndex: membership.seriesIndex != null ? String(membership.seriesIndex) : null,
         expectedBookCount: membership.expectedBookCount ?? null,
       })),
     )
   }
-  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null }] : []
+  return book.seriesName
+    ? [
+        {
+          seriesName: book.seriesName,
+          seriesIndex: book.seriesIndex != null ? String(book.seriesIndex) : null,
+          expectedBookCount: null,
+        },
+      ]
+    : []
 }
 
 function changedCustomMetadataPayload(
@@ -132,7 +145,7 @@ export function useMetadataEditor() {
     pageCount: null as number | null,
     communityRatings: [] as BookCommunityRating[],
     seriesName: null as string | null,
-    seriesIndex: null as number | null,
+    seriesIndex: null as string | null,
     seriesMemberships: [] as EditableSeriesMembership[],
     isbn10: null as string | null,
     isbn13: null as string | null,
@@ -189,7 +202,7 @@ export function useMetadataEditor() {
     form.pageCount = book.pageCount
     form.communityRatings = [...book.communityRatings]
     form.seriesName = book.seriesName
-    form.seriesIndex = book.seriesIndex
+    form.seriesIndex = book.seriesIndex != null ? String(book.seriesIndex) : null
     form.seriesMemberships = seriesMembershipsFromBook(book)
     form.isbn10 = book.isbn10
     form.isbn13 = book.isbn13
@@ -263,7 +276,11 @@ export function useMetadataEditor() {
     }
 
     const currentCommunityRatings = form.communityRatings.map(({ provider, rating, ratingCount }) => ({ provider, rating, ratingCount }))
-    const previousCommunityRatings = previous.communityRatings.map(({ provider, rating, ratingCount }) => ({ provider, rating, ratingCount }))
+    const previousCommunityRatings = previous.communityRatings.map(({ provider, rating, ratingCount }) => ({
+      provider,
+      rating,
+      ratingCount,
+    }))
     if (JSON.stringify(currentCommunityRatings) !== JSON.stringify(previousCommunityRatings)) {
       payload.communityRatings = currentCommunityRatings
     }

@@ -399,7 +399,7 @@ export class UploadService {
         publishedYear?: number | null;
         language?: string | null;
         seriesName?: string | null;
-        seriesIndex?: number | null;
+        seriesIndex?: string | null;
         isbn13?: string | null;
         authors: { name: string }[];
       } | null = null;

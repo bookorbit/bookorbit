@@ -54,7 +54,7 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
     pageCount: 412,
     seriesId: null,
     seriesName: 'Dune',
-    seriesIndex: 1,
+    seriesIndex: '1',
     seriesMemberships: [],
     rating: 5,
     coverSource: 'extracted',
@@ -95,7 +95,7 @@ function makeManifestRow(overrides: Record<string, unknown> = {}) {
     subtitle: null,
     authors: ['Frank Herbert'],
     seriesName: 'Dune',
-    seriesIndex: 1,
+    seriesIndex: '1',
     language: 'en',
     publisher: 'Ace',
     publishedYear: 1965,
@@ -201,7 +201,7 @@ function makeService(
         id: 10,
         title: 'Dune',
         updatedAt: '2026-02-01T00:00:00.000Z',
-        seriesIndex: 1,
+        seriesIndex: '1',
         hasCover: true,
         authors: ['Frank Herbert'],
       },
@@ -209,7 +209,7 @@ function makeService(
         id: 11,
         title: 'Dune Messiah',
         updatedAt: '2026-02-02T00:00:00.000Z',
-        seriesIndex: 2,
+        seriesIndex: '2',
         hasCover: true,
         authors: ['Frank Herbert'],
       },
@@ -337,7 +337,7 @@ describe('KoreaderCatalogService', () => {
           description: null,
           seriesId: 42,
           seriesName: 'Dune',
-          seriesIndex: 1,
+          seriesIndex: '1',
           language: 'en',
           publisher: 'Ace',
           isbn13: null,
@@ -663,7 +663,7 @@ describe('KoreaderCatalogService', () => {
           description: null,
           seriesId: 42,
           seriesName: 'Dune',
-          seriesIndex: 1,
+          seriesIndex: '1',
           language: 'en',
           publisher: 'Ace',
           isbn13: null,
@@ -722,7 +722,7 @@ describe('KoreaderCatalogService', () => {
             sizeBytes: 1234,
             durationSeconds: null,
             downloadUrl: '/api/v1/koreader/plugin/catalog/files/100/download',
-            devicePath: 'Series/Dune/1.00 - Dune.epub',
+            devicePath: 'Series/Dune/01.00 - Dune.epub',
           },
         ],
         relatedSections: [
@@ -733,7 +733,7 @@ describe('KoreaderCatalogService', () => {
               expect.objectContaining({
                 id: 11,
                 title: 'Dune Messiah',
-                seriesIndex: 2,
+                seriesIndex: '2',
                 thumbnailUrl: '/api/v1/koreader/plugin/catalog/books/11/thumbnail',
               }),
             ],
@@ -1148,7 +1148,7 @@ describe('KoreaderCatalogService', () => {
       standaloneFileNamingPattern: '',
     };
 
-    async function manifestDevicePath(seriesIndex: number | null, organization = seriesPattern) {
+    async function manifestDevicePath(seriesIndex: string | null, organization = seriesPattern) {
       const { service, opdsBookService } = makeService(organization);
       opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ seriesIndex })], hasNext: false });
 
@@ -1156,7 +1156,7 @@ describe('KoreaderCatalogService', () => {
       return result.items[0]!.files[0]!.devicePath;
     }
 
-    async function detailDevicePath(seriesIndex: number | null, organization = seriesPattern) {
+    async function detailDevicePath(seriesIndex: string | null, organization = seriesPattern) {
       const { service, bookService } = makeService(organization);
       bookService.getDetail.mockResolvedValue(makeDetail({ seriesIndex }));
 
@@ -1164,27 +1164,27 @@ describe('KoreaderCatalogService', () => {
       return detail.files[0]?.devicePath;
     }
 
-    it.each<[number, string]>([
-      [1, 'Dune/01 - Dune.epub'],
-      [9, 'Dune/09 - Dune.epub'],
-      [10, 'Dune/10 - Dune.epub'],
-      [100, 'Dune/100 - Dune.epub'],
+    it.each<[string, string]>([
+      ['1', 'Dune/01 - Dune.epub'],
+      ['9', 'Dune/09 - Dune.epub'],
+      ['10', 'Dune/10 - Dune.epub'],
+      ['100', 'Dune/100 - Dune.epub'],
     ])('zero-pads a manifest series index of %s to two digits', async (seriesIndex, expected) => {
       await expect(manifestDevicePath(seriesIndex)).resolves.toBe(expected);
     });
 
-    it.each<[number, string]>([
-      [1, 'Dune/01 - Dune.epub'],
-      [9, 'Dune/09 - Dune.epub'],
-      [10, 'Dune/10 - Dune.epub'],
-      [100, 'Dune/100 - Dune.epub'],
+    it.each<[string, string]>([
+      ['1', 'Dune/01 - Dune.epub'],
+      ['9', 'Dune/09 - Dune.epub'],
+      ['10', 'Dune/10 - Dune.epub'],
+      ['100', 'Dune/100 - Dune.epub'],
     ])('zero-pads a book detail series index of %s to two digits', async (seriesIndex, expected) => {
       await expect(detailDevicePath(seriesIndex)).resolves.toBe(expected);
     });
 
     it('pads only the whole part of a fractional index', async () => {
-      await expect(manifestDevicePath(1.5)).resolves.toBe('Dune/01.5 - Dune.epub');
-      await expect(detailDevicePath(1.5)).resolves.toBe('Dune/01.5 - Dune.epub');
+      await expect(manifestDevicePath('5.10')).resolves.toBe('Dune/05.10 - Dune.epub');
+      await expect(detailDevicePath('5.10')).resolves.toBe('Dune/05.10 - Dune.epub');
     });
 
     it('drops the optional index block instead of padding nothing when the book has no index', async () => {
@@ -1192,14 +1192,14 @@ describe('KoreaderCatalogService', () => {
       await expect(detailDevicePath(null)).resolves.toBe('Dune/Dune.epub');
     });
 
-    it.each<[number]>([[1], [7], [10], [1.5]])('resolves index %s to the same token the library rename path uses', async (seriesIndex) => {
+    it.each<[string]>([['1'], ['7'], ['10'], ['5.10']])('resolves index %s to the same token the library rename path uses', async (seriesIndex) => {
       await expect(manifestDevicePath(seriesIndex)).resolves.toBe(`Dune/${formatSeriesIndex(seriesIndex)} - Dune.epub`);
     });
 
     it('keeps the manifest and the book detail agreeing on one path per file', async () => {
       const { service, opdsBookService, bookService } = makeService(seriesPattern);
-      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ seriesIndex: 3 })], hasNext: false });
-      bookService.getDetail.mockResolvedValue(makeDetail({ seriesIndex: 3 }));
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ seriesIndex: '3' })], hasNext: false });
+      bookService.getDetail.mockResolvedValue(makeDetail({ seriesIndex: '3' }));
 
       const manifest = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
       const detail = await service.getBookDetail(makeUser({ id: 7 }), 10, 'device-1');
@@ -1208,12 +1208,11 @@ describe('KoreaderCatalogService', () => {
       expect(detail.files[0]?.devicePath).toBe(manifest.items[0]!.files[0]!.devicePath);
     });
 
-    // fixed2 parses its input numerically, so padding upstream must leave the shipped
-    // default byte-identical; anything else would relocate every synced device library.
-    it.each<[number, string]>([
-      [1, 'Series/Dune/1.00 - Dune.epub'],
-      [10, 'Series/Dune/10.00 - Dune.epub'],
-      [1.5, 'Series/Dune/1.50 - Dune.epub'],
+    it.each<[string, string]>([
+      ['1', 'Series/Dune/01.00 - Dune.epub'],
+      ['10', 'Series/Dune/10.00 - Dune.epub'],
+      ['1.5', 'Series/Dune/01.50 - Dune.epub'],
+      ['5.10', 'Series/Dune/05.10 - Dune.epub'],
     ])('leaves the shipped fixed2 default unchanged for index %s', async (seriesIndex, expected) => {
       const defaultOrganization = {
         fileNamingPattern: DEFAULT_KOREADER_DEVICE_PATTERN,

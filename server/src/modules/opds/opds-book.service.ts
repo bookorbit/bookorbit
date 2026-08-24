@@ -23,6 +23,7 @@ import {
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import type { ContentFilterRules, GroupRule } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -49,7 +50,7 @@ type ContextSeriesRow = {
   bookId: number;
   seriesId: number;
   seriesName: string;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
 };
 
 type OpdsSortOrder =
@@ -77,8 +78,8 @@ const OPDS_SORT_MAP: Record<OpdsSortOrder, SQL[]> = {
   title_desc: [sql`${bookMetadata.title} DESC NULLS LAST`, sql`${books.id} ASC`],
   author_asc: [sql`min(${authors.sortName}) ASC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
   author_desc: [sql`min(${authors.sortName}) DESC NULLS LAST`, sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`],
-  series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, sql`${bookMetadata.seriesIndex} ASC NULLS LAST`, sql`${books.id} ASC`],
-  series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, sql`${bookMetadata.seriesIndex} DESC NULLS LAST`, sql`${books.id} ASC`],
+  series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, ...seriesIndexOrderBy(bookMetadata.seriesIndex, 'ASC'), sql`${books.id} ASC`],
+  series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, ...seriesIndexOrderBy(bookMetadata.seriesIndex, 'DESC'), sql`${books.id} ASC`],
 };
 
 const READ_STATUS_BUCKETS = {
@@ -97,7 +98,7 @@ export interface OpdsBookEntry {
   description: string | null;
   seriesId: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   language: string | null;
   publisher: string | null;
   isbn13: string | null;
@@ -122,7 +123,7 @@ export interface OpdsManifestBookRow {
   subtitle: string | null;
   authors: string[];
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   language: string | null;
   publisher: string | null;
   publishedYear: number | null;
@@ -906,11 +907,7 @@ export class OpdsBookService {
 
   private buildContextSeriesOrder(sortOrder: OpdsSortOrder): SQL[] {
     const direction = sortOrder === 'series_desc' ? 'DESC' : 'ASC';
-    return [
-      sql`${bookSeriesMemberships.seriesIndex} ${sql.raw(direction)} NULLS LAST`,
-      sql`${bookMetadata.title} ASC NULLS LAST`,
-      sql`${books.id} ASC`,
-    ];
+    return [...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, direction), sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`];
   }
 
   private fetchContextSeriesRows(bookIds: number[], filter: SeriesFilter): Promise<ContextSeriesRow[]> {

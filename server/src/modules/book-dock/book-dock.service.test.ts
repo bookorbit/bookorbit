@@ -49,6 +49,7 @@ function makeService() {
   };
   const ingestService = {
     retryFetch: vi.fn(),
+    refetchMetadata: vi.fn(),
     pauseProcessing: vi.fn(),
     resumeProcessing: vi.fn().mockResolvedValue(undefined),
     requeueProcessableFiles: vi.fn().mockResolvedValue(0),
@@ -258,6 +259,27 @@ describe('BookDockService', () => {
     expect(ingestService.retryFetch).toHaveBeenCalledTimes(2);
     expect(ingestService.retryFetch).toHaveBeenCalledWith(1);
     expect(ingestService.retryFetch).toHaveBeenCalledWith(3);
+  });
+
+  it('refetchMetadata enforces ownership and queues an eligible file', async () => {
+    const { service, repo, ingestService } = makeService();
+    repo.findById.mockResolvedValue(row({ id: 7, uploadedBy: 4 }));
+    ingestService.refetchMetadata.mockResolvedValue(true);
+
+    await expect(service.refetchMetadata(7, 4, false)).resolves.toBeUndefined();
+
+    expect(ingestService.refetchMetadata).toHaveBeenCalledWith(7);
+
+    await expect(service.refetchMetadata(7, 5, false)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(ingestService.refetchMetadata).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetchMetadata rejects a file that cannot be queued', async () => {
+    const { service, repo, ingestService } = makeService();
+    repo.findById.mockResolvedValue(row({ id: 7, uploadedBy: 4 }));
+    ingestService.refetchMetadata.mockResolvedValue(false);
+
+    await expect(service.refetchMetadata(7, 4, false)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('bulkSetTarget enforces complete destination tuple and returns update counts', async () => {

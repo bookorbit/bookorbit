@@ -6,6 +6,7 @@ import type { BookFileWriteField, WriteResult } from "./file-write";
 import type { CustomMetadataBookValue } from "./custom-metadata";
 import type { CoverAspectRatio } from "./library";
 import { DEFAULT_FORMAT_PRIORITY } from "./library";
+import type { SeriesIndex } from "./series-index";
 
 export const BOOK_FORMATS = DEFAULT_FORMAT_PRIORITY;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
@@ -113,7 +114,7 @@ export function getBookMediaProfile(files: readonly BookMediaFile[]): BookMediaP
 export type BookSeriesMembership = {
   seriesId: number;
   seriesName: string;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   displayOrder: number;
   expectedBookCount: number | null;
 };
@@ -126,7 +127,7 @@ export type BookCard = {
   authors: string[];
   seriesId?: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
   publishedDate: string | null;
@@ -205,7 +206,7 @@ export type BookDetail = {
   pageCount: number | null;
   seriesId?: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   seriesMemberships?: BookSeriesMembership[];
   rating: number | null;
   personalNote: string | null;
@@ -249,7 +250,7 @@ export type BookMetadataRefreshPreviewFields = {
   language?: string | null;
   pageCount?: number | null;
   seriesName?: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: SeriesIndex | null;
   seriesMemberships?: MetadataSeriesMembership[] | null;
   communityRatings?: BookCommunityRating[];
   coverUrl?: string;
@@ -334,7 +335,7 @@ export type SeriesBookRecommendation = {
   title: string | null;
   coverAspectRatio: CoverAspectRatio;
   updatedAt: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   hasCover: boolean;
   authors: string[];
   isAudiobook?: boolean;

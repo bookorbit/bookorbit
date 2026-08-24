@@ -13,7 +13,7 @@ export interface BookEligibilityData {
   pageCount: number | null;
   communityRating: readonly unknown[];
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   coverSource: string | null;
   hasAuthors: boolean;
   hasGenres: boolean;

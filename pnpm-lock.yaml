@@ -30,6 +30,7 @@ patchedDependencies:
   '@embedpdf/core@2.15.0': 2000da4fd605dad67860a28724f4ab90eafa7215b89abe29df3f001bebc15a77
   '@embedpdf/engines@2.15.0': b4b3f0ea41ff20fd1f076c2b0a880f5b580a3ebdf5c69c95a7ee09a91183f924
   '@embedpdf/plugin-scroll@2.15.0': ef47017e5f4370e4c13ae1a5b523683acaaa68db36290094f8badab4614c6d0d
+  '@embedpdf/plugin-zoom@2.15.0': 39f7f5ddd05c0dadd63f5fc076e679140d1b0f8761a4899176076b563e361d77
 
 importers:
 
@@ -133,7 +134,7 @@ importers:
         version: 2.15.0(@embedpdf/core@2.15.0(patch_hash=2000da4fd605dad67860a28724f4ab90eafa7215b89abe29df3f001bebc15a77)(preact@10.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(svelte@5.56.4(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3)))(preact@10.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(svelte@5.56.4(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))
       '@embedpdf/plugin-zoom':
         specifier: 2.15.0
-        version: 2.15.0(bae5492da052cd1ccfa4d859ce720d47)
+        version: 2.15.0(patch_hash=39f7f5ddd05c0dadd63f5fc076e679140d1b0f8761a4899176076b563e361d77)(bae5492da052cd1ccfa4d859ce720d47)
       '@fontsource-variable/fraunces':
         specifier: ^5.3.0
         version: 5.3.0
@@ -10542,7 +10543,7 @@ snapshots:
       svelte: 5.56.4(@typescript-eslint/types@8.67.0)
       vue: 3.5.41(typescript@6.0.3)
 
-  '@embedpdf/plugin-zoom@2.15.0(bae5492da052cd1ccfa4d859ce720d47)':
+  '@embedpdf/plugin-zoom@2.15.0(patch_hash=39f7f5ddd05c0dadd63f5fc076e679140d1b0f8761a4899176076b563e361d77)(bae5492da052cd1ccfa4d859ce720d47)':
     dependencies:
       '@embedpdf/core': 2.15.0(patch_hash=2000da4fd605dad67860a28724f4ab90eafa7215b89abe29df3f001bebc15a77)(preact@10.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(svelte@5.56.4(@typescript-eslint/types@8.67.0))(vue@3.5.41(typescript@6.0.3))
       '@embedpdf/models': 2.15.0

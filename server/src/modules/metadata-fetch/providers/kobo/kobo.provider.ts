@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { appConfig } from '../../../../config/config';
@@ -127,7 +127,7 @@ export class KoboProvider implements IdentifiableProvider {
       isbn10: data.isbn10,
       isbn13: data.isbn13,
       seriesName: data.seriesName,
-      seriesIndex: data.seriesIndex,
+      seriesIndex: parseSeriesIndex(data.seriesIndex) ?? undefined,
       genres: data.genres?.length ? data.genres : undefined,
       coverUrl: data.coverUrl,
       sourceUrl: fetched.url,

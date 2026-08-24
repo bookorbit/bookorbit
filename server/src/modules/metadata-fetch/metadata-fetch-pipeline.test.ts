@@ -1279,11 +1279,11 @@ describe('MetadataFetchPipeline', () => {
       of(
         candidate(MetadataProviderKey.AUDIBLE, 'B002V1NSN2', {
           seriesName: 'Sword of Truth',
-          seriesIndex: 11,
+          seriesIndex: '11',
           seriesMemberships: [
-            { seriesName: '  Sword   of Truth ', seriesIndex: 11 },
-            { seriesName: 'sword of truth', seriesIndex: 12 },
-            { seriesName: 'Chainfire\tTrilogy', seriesIndex: 3 },
+            { seriesName: '  Sword   of Truth ', seriesIndex: '11' },
+            { seriesName: 'sword of truth', seriesIndex: '12' },
+            { seriesName: 'Chainfire\tTrilogy', seriesIndex: '3' },
           ],
         }),
       ),
@@ -1292,10 +1292,10 @@ describe('MetadataFetchPipeline', () => {
     const resolved = await pipeline.run({ title: 'Confessor', isAudiobook: true }, {});
 
     expect(resolved.seriesName).toBe('Sword of Truth');
-    expect(resolved.seriesIndex).toBe(11);
+    expect(resolved.seriesIndex).toBe('11');
     expect(resolved.seriesMemberships).toEqual([
-      { seriesName: 'Sword of Truth', seriesIndex: 11 },
-      { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+      { seriesName: 'Sword of Truth', seriesIndex: '11' },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
     ]);
   });
 
@@ -1321,20 +1321,20 @@ describe('MetadataFetchPipeline', () => {
       of(
         candidate(MetadataProviderKey.AUDIBLE, 'B002V1NSN2', {
           seriesName: 'Sword of Truth',
-          seriesIndex: 11,
+          seriesIndex: '11',
           seriesMemberships: [
-            { seriesName: 'Sword of Truth', seriesIndex: 11 },
-            { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+            { seriesName: 'Sword of Truth', seriesIndex: '11' },
+            { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
           ],
         }),
-        candidate(MetadataProviderKey.GOOGLE, 'g1', { seriesIndex: 12 }),
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { seriesIndex: '12' }),
       ),
     );
 
     const resolved = await pipeline.run({ title: 'Confessor', isAudiobook: true }, {});
 
     expect(resolved.seriesName).toBe('Sword of Truth');
-    expect(resolved.seriesIndex).toBe(12);
+    expect(resolved.seriesIndex).toBe('12');
     expect(resolved.seriesMemberships).toBeUndefined();
   });
 
@@ -1360,16 +1360,16 @@ describe('MetadataFetchPipeline', () => {
       of(
         candidate(MetadataProviderKey.AUDIBLE, 'B002V1NSN2', {
           seriesName: 'Sword of Truth',
-          seriesIndex: 11,
+          seriesIndex: '11',
           seriesMemberships: [
-            { seriesName: 'Sword of Truth', seriesIndex: 11 },
-            { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+            { seriesName: 'Sword of Truth', seriesIndex: '11' },
+            { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
           ],
         }),
       ),
     );
 
-    const resolved = await pipeline.run({ title: 'Confessor', isAudiobook: true }, { seriesIndex: 99 });
+    const resolved = await pipeline.run({ title: 'Confessor', isAudiobook: true }, { seriesIndex: '99' });
 
     expect(resolved.seriesName).toBe('Sword of Truth');
     expect(resolved.seriesIndex).toBeUndefined();

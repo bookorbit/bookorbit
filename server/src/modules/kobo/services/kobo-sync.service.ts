@@ -103,7 +103,7 @@ export interface KoboBookEntry {
   language: string;
   isbn: string | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   fileFormat: string;
   fileSizeBytes: number | null;
   fileHash: string | null;
@@ -837,8 +837,8 @@ export class KoboSyncService {
       ? {
           Id: `series_${book.seriesName}`,
           Name: book.seriesName,
-          Number: book.seriesIndex != null ? String(book.seriesIndex) : '1',
-          NumberFloat: book.seriesIndex ?? 1.0,
+          Number: book.seriesIndex ?? '1',
+          NumberFloat: book.seriesIndex != null ? Number(book.seriesIndex) : 1.0,
         }
       : { Id: '', Name: '', Number: '', NumberFloat: 0.0 };
 
@@ -890,7 +890,7 @@ export class KoboSyncService {
     title: string | null;
     authors: string[];
     seriesName: string | null;
-    seriesIndex: number | null;
+    seriesIndex: string | null;
     metadataUpdatedAt: Date | null;
     entitlementId: string;
     coverImageId: string;

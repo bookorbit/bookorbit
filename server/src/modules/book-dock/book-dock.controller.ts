@@ -203,6 +203,12 @@ export class BookDockController {
     );
   }
 
+  @Post('files/:id/refetch-metadata')
+  @HttpCode(HttpStatus.ACCEPTED)
+  refetchMetadata(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
+    return this.service.refetchMetadata(id, user.id, this.canManageAll(user));
+  }
+
   @Post('files/set-target')
   setTarget(@CurrentUser() user: RequestUser, @Body() dto: BulkSetTargetDto) {
     return this.service.bulkSetTarget(

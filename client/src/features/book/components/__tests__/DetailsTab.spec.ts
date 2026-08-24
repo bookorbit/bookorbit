@@ -199,6 +199,29 @@ describe('DetailsTab - present state', () => {
     expect(wrapper.text()).not.toContain('Info Links')
   })
 
+  it('renders a direct ComicVine issue link with the monogram fallback', () => {
+    const wrapper = mount(DetailsTab, {
+      props: {
+        book: makeBook({
+          providerIds: {
+            comicvine: '1126983',
+          },
+        }),
+      },
+      global: globalStubs,
+    })
+
+    const comicVineLink = wrapper.find('a[title="Open in ComicVine"]')
+    expect(comicVineLink.exists()).toBe(true)
+    expect(comicVineLink.attributes()).toMatchObject({
+      href: 'https://comicvine.gamespot.com/issue/4000-1126983/',
+      target: '_blank',
+      rel: 'noopener noreferrer',
+    })
+    expect(comicVineLink.find('img').exists()).toBe(false)
+    expect(comicVineLink.text()).toBe('CV')
+  })
+
   it('fetches collections data for Kobo sync but does not display them', async () => {
     vi.mocked(api).mockImplementation(async (input) => {
       if (input === '/api/v1/collections/membership') {

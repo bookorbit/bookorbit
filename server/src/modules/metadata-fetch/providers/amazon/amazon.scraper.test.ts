@@ -118,22 +118,26 @@ describe('AmazonScraper', () => {
         const result = parseBookPage(seriesHtml('Book 3 of 7'));
 
         expect(result.seriesName).toBe('The Expanse');
-        expect(result.seriesIndex).toBe(3);
+        expect(result.seriesIndex).toBe('3');
         expect(result.seriesTotalBooks).toBe(7);
       });
 
       it('keeps a fractional position while still reading the length', () => {
         const result = parseBookPage(seriesHtml('Book 2.5 of 9'));
 
-        expect(result.seriesIndex).toBe(2.5);
+        expect(result.seriesIndex).toBe('2.5');
         expect(result.seriesTotalBooks).toBe(9);
       });
 
       it('still yields the position when the label states no length', () => {
         const result = parseBookPage(seriesHtml('Book 3 of'));
 
-        expect(result.seriesIndex).toBe(3);
+        expect(result.seriesIndex).toBe('3');
         expect(result.seriesTotalBooks).toBeUndefined();
+      });
+
+      it('preserves trailing zeros in a fractional position', () => {
+        expect(parseBookPage(seriesHtml('Book 5.10 of 12')).seriesIndex).toBe('5.10');
       });
 
       it('yields nothing when the page has no series block', () => {

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
@@ -100,7 +100,7 @@ export class LubimyczytacProvider implements IdentifiableProvider {
       isbn10: data.isbn10,
       isbn13: data.isbn13,
       seriesName: data.seriesName,
-      seriesIndex: data.seriesIndex,
+      seriesIndex: parseSeriesIndex(data.seriesIndex) ?? undefined,
       genres: data.genres?.length ? data.genres : undefined,
       coverUrl: data.coverUrl,
       sourceUrl: url,

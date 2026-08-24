@@ -11,7 +11,7 @@ import type {
   MetadataProviderInfo,
   WriteResult,
 } from '@bookorbit/types'
-import { BOOK_FILE_WRITE_FIELD_LABELS, FORMAT_TO_GROUP } from '@bookorbit/types'
+import { BOOK_FILE_WRITE_FIELD_LABELS, FORMAT_TO_GROUP, isValidSeriesIndex, parseSeriesIndex } from '@bookorbit/types'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
@@ -275,6 +275,9 @@ const saveErrorMessage = computed(() => {
 const combinedError = computed(() => lockError.value ?? saveErrorMessage.value)
 const hasLockedFields = computed(() => lockedFields.value.length > 0)
 const hasPendingChanges = computed(() => isDirty.value || locksDirty.value)
+const hasInvalidSeriesIndex = computed(() =>
+  form.seriesMemberships.some((membership) => membership.seriesIndex !== null && !isValidSeriesIndex(membership.seriesIndex)),
+)
 const isSeriesLocked = computed(() => isLocked('seriesName') || isLocked('seriesIndex'))
 const communityRatingLines = computed(() =>
   form.communityRatings.map((rating) => formatCommunityRatingLine(rating, availableMetadataProviders.value ?? [])),
@@ -329,14 +332,7 @@ function trackLockedField(field: BookMetadataLockField, skippedFields: BookMetad
   }
 }
 
-function normalizeSeriesIndex(value: unknown): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number.parseFloat(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  return null
-}
+const normalizeSeriesIndex = parseSeriesIndex
 
 function setSeriesMemberships(memberships: EditableSeriesMembership[]) {
   form.seriesMemberships = memberships
@@ -567,7 +563,7 @@ const {
 const coverMutationPending = computed(() => Boolean(coverPanel.value?.busy))
 const formMutationPending = computed(() => autoFilling.value || loadingFromFile.value || coverMutationPending.value)
 const formDisabled = computed(() => saving.value || writingAndRenaming.value || formMutationPending.value)
-const submitDisabled = computed(() => formDisabled.value || !hasPendingChanges.value)
+const submitDisabled = computed(() => formDisabled.value || !hasPendingChanges.value || hasInvalidSeriesIndex.value)
 let dismissTimer: ReturnType<typeof setTimeout> | null = null
 
 function pluralizeField(count: number): string {

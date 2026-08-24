@@ -826,7 +826,7 @@ export class KoreaderCatalogService {
     id: number;
     title: string | null;
     authors: string[];
-    seriesIndex?: number | null;
+    seriesIndex?: string | null;
     hasCover: boolean;
     updatedAt: string | null;
     isAudiobook?: boolean;

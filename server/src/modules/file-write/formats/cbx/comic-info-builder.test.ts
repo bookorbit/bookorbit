@@ -18,7 +18,7 @@ describe('buildComicInfoXml', () => {
         description: '<p>Epic &amp; vast</p>',
         publisher: 'Ace',
         seriesName: 'Dune Saga',
-        seriesIndex: 1,
+        seriesIndex: '5.10',
         publishedYear: 1965,
         pageCount: 412,
         language: 'en',
@@ -61,7 +61,7 @@ describe('buildComicInfoXml', () => {
 
     expect(parsed.ComicInfo.Title).toBe('Dune');
     expect(parsed.ComicInfo.Summary).toBe('Epic & vast');
-    expect(parsed.ComicInfo.Number).toBe('1');
+    expect(parsed.ComicInfo.Number).toBe('5.10');
     expect(parsed.ComicInfo.CommunityRating).toBe('4.0');
     expect(parsed.ComicInfo.Web).toBe('https://www.goodreads.com/book/show/44767458-dune');
     expect(parsed.ComicInfo.Notes).toContain('[bookorbit:subtitle] Anniversary Edition');
@@ -76,7 +76,7 @@ describe('buildComicInfoXml', () => {
     const xml = buildComicInfoXml(
       null,
       {
-        seriesIndex: 1,
+        seriesIndex: '1',
         comicIssueNumber: '12A',
         comicVolumeName: 'Year One',
         comicPencillers: ['Penciller A', 'Penciller B'],

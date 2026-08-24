@@ -54,6 +54,7 @@ patchedDependencies:
   "@embedpdf/core@2.15.0": patches/@embedpdf__core@2.15.0.patch
   "@embedpdf/engines@2.15.0": patches/@embedpdf__engines@2.15.0.patch
   "@embedpdf/plugin-scroll@2.15.0": patches/@embedpdf__plugin-scroll@2.15.0.patch
+  "@embedpdf/plugin-zoom@2.15.0": patches/@embedpdf__plugin-zoom@2.15.0.patch
 minimumReleaseAgeExclude:
   - "@tsconfig/node24@24.0.5"
   - "@vue/language-core@3.3.10"

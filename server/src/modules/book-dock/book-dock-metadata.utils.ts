@@ -110,7 +110,7 @@ function copySeriesMemberships(source: Record<string, unknown>, target: BookDock
   target.seriesMemberships = source.seriesMemberships.flatMap((value) => {
     if (!isRecord(value) || typeof value.seriesName !== 'string') return [];
     const membership: NonNullable<BookDockMetadata['seriesMemberships']>[number] = { seriesName: value.seriesName };
-    if (value.seriesIndex === null || typeof value.seriesIndex === 'number') membership.seriesIndex = value.seriesIndex;
+    if (value.seriesIndex === null || typeof value.seriesIndex === 'string') membership.seriesIndex = value.seriesIndex;
     return [membership];
   });
 }

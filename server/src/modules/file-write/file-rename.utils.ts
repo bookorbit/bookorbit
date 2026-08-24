@@ -10,7 +10,7 @@ export interface RenameMetadata {
   isbn13: string | null;
   publishedYear: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
 }
 
 export function buildTokens(

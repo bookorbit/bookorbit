@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
+import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookMetadata, books, bookSeries, bookSeriesMemberships, userBookStatus } from '../../db/schema';
@@ -30,7 +31,7 @@ type SeriesDetailRow = {
   readCount: number;
   expectedBookCount: number | null;
   authors: string[];
-  indices: number[];
+  indices: string[];
 };
 
 @Injectable()
@@ -316,7 +317,7 @@ export class SeriesRepository {
           isNotNull(bookMetadata.coverSource),
         ),
       )
-      .orderBy(bookSeriesMemberships.seriesId, asc(bookSeriesMemberships.seriesIndex), asc(books.addedAt));
+      .orderBy(bookSeriesMemberships.seriesId, ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, 'ASC'), asc(books.addedAt));
 
     const result = new Map<number, number[]>();
     for (const row of rows) {
@@ -379,10 +380,7 @@ export class SeriesRepository {
         return [dir(books.addedAt), asc(books.id)];
       case 'seriesIndex':
       default:
-        return [
-          order === 'asc' ? sql`${bookSeriesMemberships.seriesIndex} ASC NULLS LAST` : sql`${bookSeriesMemberships.seriesIndex} DESC NULLS LAST`,
-          asc(books.id),
-        ];
+        return [...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, order === 'asc' ? 'ASC' : 'DESC'), asc(books.id)];
     }
   }
 }

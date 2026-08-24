@@ -8,7 +8,7 @@ export interface MetadataSearchParams {
   // (e.g. ComicVine volume plus issue number). A comic title holds only the issue name, so the
   // pairing cannot be recovered from it.
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: string;
   // True when `title` is a query the caller typed rather than the book's own stored title. Stored
   // series context may then fill in what the query omits, but must not override what it states.
   titleIsExplicitQuery?: boolean;

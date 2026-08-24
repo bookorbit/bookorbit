@@ -19,7 +19,7 @@ function sampleBook(overrides?: Partial<OpdsBookEntry>): OpdsBookEntry {
     description: 'A fantasy novel by Brandon Sanderson',
     seriesId: 1,
     seriesName: 'Mistborn',
-    seriesIndex: 1,
+    seriesIndex: '1',
     language: 'en',
     publisher: 'Tor Books',
     isbn13: '9780765311788',

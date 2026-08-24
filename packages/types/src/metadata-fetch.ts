@@ -1,4 +1,5 @@
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
+import type { SeriesIndex } from "./series-index";
 
 export const MetadataProviderKey = {
   GOOGLE: "google",
@@ -48,7 +49,7 @@ export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof Meta
 
 export interface MetadataSeriesMembership {
   seriesName: string;
-  seriesIndex?: number | null;
+  seriesIndex?: SeriesIndex | null;
 }
 
 export interface BookCommunityRating {
@@ -77,7 +78,7 @@ export interface MetadataCandidate {
   isbn10?: string;
   isbn13?: string;
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: SeriesIndex;
   /** Books the provider believes the series contains in total, not a field of this book. */
   seriesTotalBooks?: number;
   seriesMemberships?: MetadataSeriesMembership[];
@@ -153,7 +154,7 @@ export interface MetadataSource {
   language: string | null;
   pageCount: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   isbn10: string | null;
   isbn13: string | null;
   authors: string[];

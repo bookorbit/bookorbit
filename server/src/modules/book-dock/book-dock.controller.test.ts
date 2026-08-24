@@ -33,6 +33,7 @@ function makeController() {
     bulkDiscard: vi.fn(),
     bulkApplyFetched: vi.fn(),
     bulkRetryFetch: vi.fn(),
+    refetchMetadata: vi.fn(),
     bulkSetTarget: vi.fn(),
     selectionSummary: vi.fn(),
     bulkEdit: vi.fn(),
@@ -145,6 +146,7 @@ describe('BookDockController', () => {
     await controller.bulkDiscard(MOCK_USER, { fileIds: [1], selectAll: false, excludedIds: [2], status: 'error', search: 'x' });
     await controller.applyFetched(MOCK_USER, { fileIds: [1], selectAll: true, excludedIds: [2], status: 'ready', search: 'x' });
     await controller.retryFetch(MOCK_USER, { fileIds: [3], selectAll: false, excludedIds: [4], status: 'error', search: 'y' });
+    await controller.refetchMetadata(MOCK_USER, 11);
     await controller.setTarget(MOCK_USER, {
       fileIds: [5],
       selectAll: false,
@@ -187,6 +189,7 @@ describe('BookDockController', () => {
     await controller.resume();
 
     expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, false, undefined);
+    expect(service.refetchMetadata).toHaveBeenCalledWith(11, MOCK_USER.id, false);
     expect(finalizeService.previewNames).toHaveBeenCalledWith([10], false, [], 2, MOCK_USER.id, false, undefined, undefined, undefined);
     expect(finalizeService.previewFinalize).toHaveBeenCalledWith(1, false, false, [10], false, [], 2, 3, [], undefined, undefined, undefined);
     expect(finalizeService.discardDuplicateCandidates).toHaveBeenCalledWith(

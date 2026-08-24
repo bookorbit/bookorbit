@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X, Loader2 } from '@lucide/vue'
-import type { BookDockBulkEditResult, BookDockMetadata } from '@bookorbit/types'
+import { isValidSeriesIndex, type BookDockBulkEditResult, type BookDockMetadata } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 const { t } = useI18n()
@@ -30,7 +30,7 @@ const FIELDS = computed<{ key: keyof BookDockMetadata; label: string; type: 'tex
   { key: 'isbn13', label: t('bookDock.field.isbn13'), type: 'text' },
   { key: 'isbn10', label: t('bookDock.field.isbn10'), type: 'text' },
   { key: 'seriesName', label: t('bookDock.field.series'), type: 'text' },
-  { key: 'seriesIndex', label: t('bookDock.field.seriesIndex'), type: 'number' },
+  { key: 'seriesIndex', label: t('bookDock.field.seriesIndex'), type: 'text' },
   { key: 'genres', label: t('bookDock.field.genres'), type: 'array' },
 ])
 
@@ -60,6 +60,14 @@ async function submit() {
     } else if (f.type === 'number') {
       const n = parseFloat(raw)
       if (!isNaN(n)) (fields as Record<string, unknown>)[f.key] = n
+    } else if (f.key === 'seriesIndex') {
+      const value = raw.trim()
+      if (value && !isValidSeriesIndex(value)) {
+        error.value = t('bookDock.invalidSeriesIndex')
+        loading.value = false
+        return
+      }
+      ;(fields as Record<string, unknown>)[f.key] = value || undefined
     } else {
       ;(fields as Record<string, unknown>)[f.key] = raw || undefined
     }

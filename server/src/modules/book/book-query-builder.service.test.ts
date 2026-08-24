@@ -161,14 +161,15 @@ function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unkn
       return { value: 'test' };
     case 'eq':
     case 'notEq':
-      return { value: isNumericField ? 10 : 'test' };
+      return { value: field === 'seriesIndex' ? '5.10' : isNumericField ? 10 : 'test' };
     case 'gt':
     case 'gte':
     case 'lt':
     case 'lte':
-      return { value: 10 };
+      return { value: field === 'seriesIndex' ? '5.10' : 10 };
     case 'between':
-      return dateFields.includes(field) ? { value: '2023-01-01', valueTo: '2023-12-31' } : { value: 10, valueTo: 20 };
+      if (dateFields.includes(field)) return { value: '2023-01-01', valueTo: '2023-12-31' };
+      return field === 'seriesIndex' ? { value: '5.2', valueTo: '5.10' } : { value: 10, valueTo: 20 };
     case 'before':
     case 'after':
       return { value: '2023-01-01' };
@@ -388,10 +389,11 @@ describe('BookQueryBuilder', () => {
 
     const result = builder.buildOrderBy([{ field: 'seriesIndex', dir: 'desc' }]);
 
-    expect(result).toHaveLength(3);
-    expect(raw).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(4);
+    expect(raw).toHaveBeenCalledTimes(3);
     expect(raw).toHaveBeenNthCalledWith(1, 'DESC');
     expect(raw).toHaveBeenNthCalledWith(2, 'DESC');
+    expect(raw).toHaveBeenNthCalledWith(3, 'DESC');
   });
 
   it('falls back to default order when runtime direction is invalid', () => {
@@ -1744,7 +1746,9 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
 
   it('generates seriesIndex with sort_title fallback when series is not in sort', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'seriesIndex', dir: 'asc' }], 1);
-    expect(result).toBe('series_index ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
+    expect(result).toContain("split_part(series_index::text, '.', 1)::numeric");
+    expect(result).toContain('series_index COLLATE "C" ASC NULLS LAST');
+    expect(result).toContain('sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('does not add sort_title fallback when series field is already in sort', () => {
@@ -1755,7 +1759,8 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
       ],
       1,
     );
-    expect(result).toBe('series_index ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
+    expect(result).toContain("split_part(series_index::text, '.', 1)::numeric");
+    expect(result).toContain('series_index COLLATE "C" ASC NULLS LAST, sort_title ASC NULLS LAST, r.id ASC');
   });
 
   it('generates user-scoped subquery for readProgress', () => {

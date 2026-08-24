@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { parseSeriesIndex } from '@bookorbit/types';
 import { constants as fsConstants } from 'fs';
 import { access, stat } from 'fs/promises';
 import type mysql from 'mysql2/promise';
@@ -526,7 +527,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
         language: asString(row.language),
         pageCount: asInteger(row.pageCount),
         seriesName: asString(row.seriesName),
-        seriesIndex: asNumber(row.seriesIndex),
+        seriesIndex: parseSeriesIndex(row.seriesIndex),
         rating: asInteger(row.rating),
         googleBooksId: asString(row.googleBooksId),
         goodreadsId: asString(row.goodreadsId),

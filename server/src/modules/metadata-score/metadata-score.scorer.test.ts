@@ -55,7 +55,7 @@ describe('MetadataScoreScorer', () => {
       publishedYear: 2020,
       pageCount: 450,
       rating: 4.5,
-      seriesIndex: 1,
+      seriesIndex: '1',
     });
     const weights: MetadataScoreWeights = {
       ...DEFAULT_METADATA_SCORE_WEIGHTS,

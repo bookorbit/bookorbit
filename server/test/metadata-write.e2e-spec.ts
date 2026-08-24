@@ -60,7 +60,7 @@ interface ExpectedWritePayload {
   language: string;
   pageCount: number;
   seriesName: string;
-  seriesIndex: number;
+  seriesIndex: string;
   isbn10: string;
   isbn13: string;
   rating: number;
@@ -84,7 +84,7 @@ const MATRIX_SET_PAYLOAD = {
   language: 'en',
   pageCount: 321,
   seriesName: 'Matrix Series',
-  seriesIndex: 3.5,
+  seriesIndex: '5.10',
   isbn10: '123456789X',
   isbn13: '9781234567890',
   rating: 5,
@@ -142,7 +142,7 @@ const ATOMICITY_BASELINE_PAYLOAD = {
   language: 'en',
   pageCount: 111,
   seriesName: 'Atomic Baseline Series',
-  seriesIndex: 1.5,
+  seriesIndex: '1.5',
   isbn10: '1111111111',
   isbn13: '9781111111111',
   rating: 4,
@@ -256,7 +256,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
           publishedYear: 2005,
           language: 'en',
           seriesName: 'DB Series',
-          seriesIndex: 2,
+          seriesIndex: '5.10',
           isbn13: '9781234567890',
           rating: 4,
           authors: ['DB Author A', 'DB Author B'],
@@ -292,7 +292,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         publishedYear: 2005,
         language: 'en',
         seriesName: 'DB Series',
-        seriesIndex: 2,
+        seriesIndex: '5.10',
         isbn13: '9781234567890',
         rating: 4,
       });
@@ -1002,7 +1002,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         language: 'en',
         pageCount: 203,
         seriesName: 'Parallel Patch Series A',
-        seriesIndex: 1.1,
+        seriesIndex: '1.1',
         isbn10: '1234500001',
         isbn13: '9781234500001',
         rating: 4,
@@ -1026,7 +1026,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         language: 'fr',
         pageCount: 204,
         seriesName: 'Parallel Patch Series B',
-        seriesIndex: 2.2,
+        seriesIndex: '2.2',
         isbn10: '1234500002',
         isbn13: '9781234500002',
         rating: 5,
@@ -1134,7 +1134,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         language: 'es',
         pageCount: 417,
         seriesName: 'Overlap Final Series',
-        seriesIndex: 7.7,
+        seriesIndex: '7.7',
         isbn10: '7654321098',
         isbn13: '9787654321098',
         rating: 5,
@@ -1345,7 +1345,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         method: 'PATCH',
         url: `/api/v1/books/${book.bookId}/metadata`,
         headers: authHeader(context.adminToken),
-        payload: { title: 'FB2 Written Title', seriesName: 'FB2 Series', seriesIndex: 2 },
+        payload: { title: 'FB2 Written Title', seriesName: 'FB2 Series', seriesIndex: '5.10' },
       });
       expect(patchResponse.statusCode).toBe(200);
 
@@ -1355,7 +1355,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
 
       const updated = await readFile(book.absolutePath, 'utf8');
       expect(updated).toContain('<book-title>FB2 Written Title</book-title>');
-      expect(updated).toContain('<sequence name="FB2 Series" number="2"/>');
+      expect(updated).toContain('<sequence name="FB2 Series" number="5.10"/>');
 
       const bodyOf = (text: string) => text.slice(text.indexOf('<body'), text.lastIndexOf('</body>') + '</body>'.length);
       expect(bodyOf(updated)).toBe(bodyOf(originalBytes.toString('utf8')));
@@ -1364,7 +1364,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
       const reparsed = await parseFb2File(book.absolutePath);
       expect(reparsed?.title).toBe('FB2 Written Title');
       expect(reparsed?.seriesName).toBe('FB2 Series');
-      expect(reparsed?.seriesIndex).toBe(2);
+      expect(reparsed?.seriesIndex).toBe('5.10');
     });
 
     it('skips fb2 book when the fb2 format is disabled for the library', async () => {
@@ -1716,7 +1716,7 @@ function buildAtomicityFailurePayload(failpoint: MetadataUpdateFailpoint) {
     language: 'de',
     pageCount: 520,
     seriesName: `Atomic Failure Series ${token}`,
-    seriesIndex: 9.9,
+    seriesIndex: '9.9',
     isbn10: '9999999999',
     isbn13: '9789999999999',
     rating: 2,

@@ -168,8 +168,11 @@ export class SeriesService {
     return { items, total: bookPage.total, page, size, seriesInfo };
   }
 
-  private computeGaps(indices: number[], bookCount: number, expectedBookCount: number | null): number[] {
-    const integerIndices = indices.filter((idx) => Math.abs(Math.round(idx) - idx) < 0.01).map((idx) => Math.round(idx));
+  private computeGaps(indices: string[], bookCount: number, expectedBookCount: number | null): number[] {
+    const integerIndices = indices
+      .filter((idx) => /^\d+$/.test(idx))
+      .map((idx) => Number(idx))
+      .filter(Number.isSafeInteger);
     if (integerIndices.length === 0) return [];
 
     const min = Math.min(...integerIndices);
@@ -193,7 +196,7 @@ export class SeriesService {
    * data contradicts it, because a false "you are missing #5" is worse than staying quiet.
    */
   private resolveTrustedExpectedMax(
-    indices: number[],
+    indices: string[],
     bookCount: number,
     integerIndices: number[],
     expectedBookCount: number | null,

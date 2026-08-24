@@ -7,6 +7,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { audiobookProgress, bookFiles, bookMetadata, books, readingProgress, userBookStatus } from '../../db/schema';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { seriesIndexSortKey } from '../../common/utils/series-index-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type UpNextInSeriesRow = { id: number };
@@ -205,11 +206,13 @@ export class DashboardRepository {
           ssb.completion_updated_at,
           lag(ssb.is_completed) over (
 	            partition by ssb.library_id, ssb.series_id
-            order by ssb.series_index asc, ssb.added_at asc, ssb.id asc
+            order by ${seriesIndexSortKey(sql.raw('ssb.series_index'))} asc,
+              ssb.series_index collate "C" asc, ssb.added_at asc, ssb.id asc
           ) as previous_is_completed,
           lag(ssb.completion_updated_at) over (
 	            partition by ssb.library_id, ssb.series_id
-            order by ssb.series_index asc, ssb.added_at asc, ssb.id asc
+            order by ${seriesIndexSortKey(sql.raw('ssb.series_index'))} asc,
+              ssb.series_index collate "C" asc, ssb.added_at asc, ssb.id asc
           ) as previous_completion_updated_at
         from scoped_series_books ssb
       ),
@@ -221,7 +224,8 @@ export class DashboardRepository {
         where os.previous_is_completed = true
           and os.is_completed = false
           and os.current_progress = 0
-	        order by os.library_id, os.series_id, os.series_index asc, os.added_at asc, os.id asc
+	        order by os.library_id, os.series_id, ${seriesIndexSortKey(sql.raw('os.series_index'))} asc,
+            os.series_index collate "C" asc, os.added_at asc, os.id asc
       )
       select nc.id
       from next_candidates nc

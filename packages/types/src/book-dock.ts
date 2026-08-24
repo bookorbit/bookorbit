@@ -1,5 +1,6 @@
 import type { AudiobookChapter } from "./audiobook";
 import type { ComicMetadataFields, MetadataProviderKey, MetadataSeriesMembership } from "./metadata-fetch";
+import type { SeriesIndex } from "./series-index";
 
 export type BookDockFileStatus = "pending" | "extracting" | "fetching" | "ready" | "error";
 export type BookDockAutoFinalizeMetadataMode = "safe_merge" | "fetched_only" | "embedded_only";
@@ -43,7 +44,7 @@ export interface BookDockMetadata {
   isbn10?: string | null;
   isbn13?: string | null;
   seriesName?: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: SeriesIndex | null;
   seriesMemberships?: MetadataSeriesMembership[] | null;
   genres?: string[];
   coverUrl?: string | null;

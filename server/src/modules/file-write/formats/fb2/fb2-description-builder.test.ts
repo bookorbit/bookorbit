@@ -102,13 +102,13 @@ describe('buildFb2Description field mapping', () => {
   });
 
   it('writes series name and index into a sequence element', () => {
-    const { descriptionXml, fieldsWritten } = build(MINIMAL, { seriesName: 'My "Series"', seriesIndex: 3 });
+    const { descriptionXml, fieldsWritten } = build(MINIMAL, { seriesName: 'My "Series"', seriesIndex: '3' });
     expect(descriptionXml).toContain('<sequence name="My &quot;Series&quot;" number="3"/>');
     expect(fieldsWritten).toEqual(expect.arrayContaining(['seriesName', 'seriesIndex']));
   });
 
   it('keeps a fractional series index, which real readers accept', () => {
-    const { descriptionXml, fieldsWritten } = build(MINIMAL, { seriesName: 'S', seriesIndex: 1.5 });
+    const { descriptionXml, fieldsWritten } = build(MINIMAL, { seriesName: 'S', seriesIndex: '1.5' });
     expect(descriptionXml).toContain('number="1.5"');
     expect(fieldsWritten).toContain('seriesIndex');
   });
@@ -228,7 +228,7 @@ describe('buildFb2Description structure', () => {
       tags: ['x'],
       publishedDate: '2001-02-03',
       seriesName: 'S',
-      seriesIndex: 1,
+      seriesIndex: '1',
     });
     expect(childOrder(descriptionXml, 'title-info')).toEqual(['genre', 'author', 'book-title', 'annotation', 'keywords', 'date', 'lang', 'sequence']);
   });
@@ -323,7 +323,7 @@ describe('buildFb2Description structure', () => {
       publisher: 'Pub',
       isbn13: '9780000000001',
       seriesName: 'S',
-      seriesIndex: 2,
+      seriesIndex: '2',
       rating: 4,
       description: 'Note.',
     };

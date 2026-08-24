@@ -58,6 +58,7 @@ const confidence = computed(() => props.file.confidence)
 const hasScore = computed(() => confidence.value !== null && confidence.value !== undefined && confidence.value > 0)
 const weakMatch = computed(() => hasScore.value && (confidence.value as number) < 85)
 const noMatchYet = computed(() => props.file.status === 'ready' && !hasScore.value)
+const canRefetch = computed(() => props.file.status === 'ready' || props.file.status === 'error')
 
 const edgeClass = computed(() => {
   if (props.file.status === 'error' || props.conflict) return 'border-l-red-500/60'
@@ -213,9 +214,10 @@ function onRetry() {
           <button
             type="button"
             data-testid="book-dock-row-retry"
-            class="grid size-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            class="grid size-7 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
             :title="t('bookDock.layout.row.refetch')"
             :aria-label="t('bookDock.layout.row.refetch')"
+            :disabled="!canRefetch"
             @click="onRetry"
           >
             <RotateCw class="size-3.5" />

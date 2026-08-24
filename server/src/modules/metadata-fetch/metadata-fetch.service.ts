@@ -35,7 +35,7 @@ export interface StoredProviderContext {
   libraryId: number;
   title: string | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   providerIds: Partial<Record<MetadataProviderKey, string>>;
 }
 

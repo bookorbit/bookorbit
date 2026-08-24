@@ -7,27 +7,27 @@ describe('file-rename.utils', () => {
     });
 
     it('formats whole number with zero-padding', () => {
-      expect(formatSeriesIndex(1)).toBe('01');
-      expect(formatSeriesIndex(5)).toBe('05');
-      expect(formatSeriesIndex(12)).toBe('12');
+      expect(formatSeriesIndex('1')).toBe('01');
+      expect(formatSeriesIndex('5')).toBe('05');
+      expect(formatSeriesIndex('12')).toBe('12');
     });
 
     it('formats fractional index correctly', () => {
-      expect(formatSeriesIndex(1.5)).toBe('01.5');
-      expect(formatSeriesIndex(3.25)).toBe('03.25');
-      expect(formatSeriesIndex(5.02)).toBe('05.02');
-      expect(formatSeriesIndex(5.08)).toBe('05.08');
-      expect(formatSeriesIndex(5.09)).toBe('05.09');
-      expect(formatSeriesIndex(5.1)).toBe('05.1');
-      expect(formatSeriesIndex(5.11)).toBe('05.11');
+      expect(formatSeriesIndex('1.5')).toBe('01.5');
+      expect(formatSeriesIndex('3.25')).toBe('03.25');
+      expect(formatSeriesIndex('5.02')).toBe('05.02');
+      expect(formatSeriesIndex('5.08')).toBe('05.08');
+      expect(formatSeriesIndex('5.09')).toBe('05.09');
+      expect(formatSeriesIndex('5.10')).toBe('05.10');
+      expect(formatSeriesIndex('5.11')).toBe('05.11');
     });
 
     it('formats zero correctly', () => {
-      expect(formatSeriesIndex(0)).toBe('00');
+      expect(formatSeriesIndex('0')).toBe('00');
     });
 
     it('formats large numbers', () => {
-      expect(formatSeriesIndex(100)).toBe('100');
+      expect(formatSeriesIndex('100')).toBe('100');
     });
   });
 
@@ -40,7 +40,7 @@ describe('file-rename.utils', () => {
       isbn13: '9780441172719',
       publishedYear: 1965,
       seriesName: 'Dune Chronicles',
-      seriesIndex: 1,
+      seriesIndex: '1',
     };
 
     it('builds all tokens from full metadata', () => {
@@ -114,7 +114,7 @@ describe('file-rename.utils', () => {
     });
 
     it('formats decimal series index tokens without precision artifacts', () => {
-      const tokens = buildTokens({ ...fullMetadata, seriesIndex: 5.02 }, [], 'book', 'epub');
+      const tokens = buildTokens({ ...fullMetadata, seriesIndex: '5.02' }, [], 'book', 'epub');
 
       expect(tokens['seriesIndex']).toBe('05.02');
     });

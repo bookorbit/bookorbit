@@ -28,7 +28,7 @@ import type {
   ComicMetadataFields,
   MetadataSeriesMembership,
 } from '@bookorbit/types';
-import { MetadataProviderKey, NotificationType, resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType, parseSeriesIndex, resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
 import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -87,7 +87,7 @@ type NormalizedFinalizeMetadata = {
   language: string | null;
   pageCount: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   authors: string[];
   genres: string[];
   coverUrl: string | null;
@@ -1010,12 +1010,6 @@ function normalizePublishedYear(value: unknown): number | null {
   return parsed;
 }
 
-function normalizeReal(value: unknown): number | null {
-  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value.trim()) : NaN;
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
 function normalizeIsbn(value: unknown, len: 10 | 13): string | null {
   if (typeof value !== 'string') return null;
   const compact = value.replace(/[\s-]+/g, '').toUpperCase();
@@ -1063,7 +1057,7 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     language: normalizeLanguage(normalizedMeta?.language),
     pageCount: normalizeInteger(normalizedMeta?.pageCount),
     seriesName: normalizeText(normalizedMeta?.seriesName, 500),
-    seriesIndex: normalizeReal(normalizedMeta?.seriesIndex),
+    seriesIndex: parseSeriesIndex(normalizedMeta?.seriesIndex),
     authors: normalizeStringArray(normalizedMeta?.authors, 500),
     genres: normalizeStringArray(normalizedMeta?.genres, 200),
     coverUrl: normalizeText(normalizedMeta?.coverUrl),
@@ -1099,7 +1093,7 @@ function normalizeSeriesMemberships(value: BookDockMetadata['seriesMemberships']
     const key = seriesName.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    memberships.push({ seriesName, seriesIndex: normalizeReal(item.seriesIndex) });
+    memberships.push({ seriesName, seriesIndex: parseSeriesIndex(item.seriesIndex) });
   }
   return memberships;
 }

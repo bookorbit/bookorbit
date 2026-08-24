@@ -32,7 +32,7 @@ export interface BookRenameData {
     isbn13: string | null;
     publishedYear: number | null;
     seriesName: string | null;
-    seriesIndex: number | null;
+    seriesIndex: string | null;
   };
   authors: string[];
 }
