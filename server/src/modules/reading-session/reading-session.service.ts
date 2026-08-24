@@ -86,7 +86,7 @@ export class ReadingSessionService {
           endedAt,
           progressDelta: dto.progressDelta ?? null,
           endProgress: dto.endProgress ?? null,
-          timezone: (user.settings as unknown as UserSettings)?.timezone ?? 'UTC',
+          timezone: resolveTimeZone((user.settings as unknown as UserSettings)?.timezone, 'UTC'),
         });
       }
     } catch (error) {

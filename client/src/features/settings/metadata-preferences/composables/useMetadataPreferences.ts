@@ -1,10 +1,12 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/lib/api'
 import type { FieldPreferenceOverrides, LibraryMetadataPreferences, MetadataFetchPreferences } from '@bookorbit/types'
 import { ALL_METADATA_FIELDS } from '@bookorbit/types'
 
 export function useMetadataPreferences() {
+  const { t } = useI18n()
   const globalPrefs = ref<MetadataFetchPreferences | null>(null)
   const libraryPrefs = ref<Map<number, LibraryMetadataPreferences>>(new Map())
   const loadingGlobal = ref(false)
@@ -37,14 +39,13 @@ export function useMetadataPreferences() {
       if (res.ok) {
         globalPrefs.value = prefs
         await fetchGlobal()
-        toast.success('Global preferences saved')
+        toast.success(t('settings.metadata.preferences.toast.saved'))
         return true
-      } else {
-        toast.error('Failed to save preferences')
-        return false
       }
+      toast.error(t('settings.metadata.preferences.toast.saveFailed'))
+      return false
     } catch {
-      toast.error('Failed to save preferences')
+      toast.error(t('settings.metadata.preferences.toast.saveFailed'))
       return false
     } finally {
       savingGlobal.value = false
@@ -59,7 +60,7 @@ export function useMetadataPreferences() {
     }
   }
 
-  async function saveLibraryDraft(libraryId: number, overrides: FieldPreferenceOverrides) {
+  async function saveLibraryDraft(libraryId: number, overrides: FieldPreferenceOverrides): Promise<boolean> {
     savingLibrary.value = libraryId
     try {
       const res = await api(`/api/v1/metadata-preferences/libraries/${libraryId}`, {
@@ -69,10 +70,14 @@ export function useMetadataPreferences() {
       })
       if (res.ok) {
         await fetchLibrary(libraryId)
-        toast.success('Library preferences saved')
-      } else {
-        toast.error('Failed to save library preferences')
+        toast.success(t('settings.metadata.preferences.toast.saved'))
+        return true
       }
+      toast.error(t('settings.metadata.preferences.toast.saveFailed'))
+      return false
+    } catch {
+      toast.error(t('settings.metadata.preferences.toast.saveFailed'))
+      return false
     } finally {
       savingLibrary.value = null
     }
@@ -82,9 +87,9 @@ export function useMetadataPreferences() {
     const res = await api('/api/v1/metadata-preferences/global', { method: 'DELETE' })
     if (res.ok || res.status === 204) {
       await fetchGlobal()
-      toast.success('Global preferences reset to system defaults')
+      toast.success(t('settings.metadata.preferences.toast.globalReset'))
     } else {
-      toast.error('Failed to reset global preferences')
+      toast.error(t('settings.metadata.preferences.toast.resetFailed'))
     }
   }
 
@@ -93,20 +98,16 @@ export function useMetadataPreferences() {
     for (const field of ALL_METADATA_FIELDS) {
       fields[field] = { ...prefs.fields[field], providers: [] }
     }
-    const cleared: MetadataFetchPreferences = {
-      ...prefs,
-      fields,
-    }
-    await saveGlobal(cleared)
+    await saveGlobal({ ...prefs, fields })
   }
 
   async function resetLibrary(libraryId: number) {
     const res = await api(`/api/v1/metadata-preferences/libraries/${libraryId}`, { method: 'DELETE' })
     if (res.ok || res.status === 204) {
       await fetchLibrary(libraryId)
-      toast.success('Library reset to global defaults')
+      toast.success(t('settings.metadata.preferences.toast.libraryReset'))
     } else {
-      toast.error('Failed to reset library')
+      toast.error(t('settings.metadata.preferences.toast.resetFailed'))
     }
   }
 

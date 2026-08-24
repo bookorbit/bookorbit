@@ -4,7 +4,7 @@ vi.mock('./opf-parser', () => ({ parseOpf: vi.fn() }));
 import * as unzipper from 'unzipper';
 
 import { parseOpf } from './opf-parser';
-import { extractEpubMetadata } from './epub';
+import { extractEpubFixedLayout, extractEpubMetadata, isPrePaginated } from './epub';
 
 const mockOpenFile = (unzipper as any).Open.file as vi.Mock;
 const mockParseOpf = parseOpf as MockedFunction<typeof parseOpf>;
@@ -140,5 +140,73 @@ describe('extractEpubMetadata', () => {
     });
 
     await expect(extractEpubMetadata('/books/y.epub')).resolves.toEqual(expect.objectContaining({ isbn10: '0306406152', isbn13: null }));
+  });
+});
+
+describe('isPrePaginated', () => {
+  it('recognizes the fixed-layout declaration', () => {
+    expect(isPrePaginated({ renditionLayout: 'pre-paginated' })).toBe(true);
+  });
+
+  it('tolerates surrounding whitespace and casing from hand-edited OPFs', () => {
+    expect(isPrePaginated({ renditionLayout: '  Pre-Paginated \n' })).toBe(true);
+  });
+
+  it('treats a reflowable, empty, or absent declaration as not fixed layout', () => {
+    expect(isPrePaginated({ renditionLayout: 'reflowable' })).toBe(false);
+    expect(isPrePaginated({ renditionLayout: '' })).toBe(false);
+    expect(isPrePaginated({ renditionLayout: null })).toBe(false);
+  });
+
+  it('does not match a value that merely contains the keyword', () => {
+    expect(isPrePaginated({ renditionLayout: 'not-pre-paginated' })).toBe(false);
+  });
+});
+
+describe('extractEpubFixedLayout', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  function mockEpub(renditionLayout: string | null) {
+    const containerXml = `<container><rootfiles><rootfile full-path="content.opf" /></rootfiles></container>`;
+    mockOpenFile.mockResolvedValue({
+      files: [zipFile('META-INF/container.xml', containerXml), zipFile('content.opf', '<package/>')],
+    });
+    mockParseOpf.mockReturnValue({ renditionLayout } as never);
+  }
+
+  it('reports a comic as fixed layout', async () => {
+    mockEpub('pre-paginated');
+    await expect(extractEpubFixedLayout('/books/manga.epub')).resolves.toBe(true);
+  });
+
+  it('reports a novel as not fixed layout', async () => {
+    mockEpub('reflowable');
+    await expect(extractEpubFixedLayout('/books/novel.epub')).resolves.toBe(false);
+  });
+
+  it('reports an EPUB that declares nothing as not fixed layout', async () => {
+    mockEpub(null);
+    await expect(extractEpubFixedLayout('/books/plain.epub')).resolves.toBe(false);
+  });
+
+  it('returns null rather than false when the file cannot be opened, so the answer is retried', async () => {
+    mockOpenFile.mockRejectedValue(new Error('ENOENT'));
+    await expect(extractEpubFixedLayout('/books/missing.epub')).resolves.toBeNull();
+  });
+
+  it('returns null when the archive has no container.xml to locate the OPF', async () => {
+    mockOpenFile.mockResolvedValue({ files: [] });
+    await expect(extractEpubFixedLayout('/books/broken.epub')).resolves.toBeNull();
+  });
+
+  it('returns null when the OPF itself cannot be parsed', async () => {
+    const containerXml = `<container><rootfiles><rootfile full-path="content.opf" /></rootfiles></container>`;
+    mockOpenFile.mockResolvedValue({
+      files: [zipFile('META-INF/container.xml', containerXml), zipFile('content.opf', '<package/>')],
+    });
+    mockParseOpf.mockImplementation(() => {
+      throw new Error('malformed xml');
+    });
+    await expect(extractEpubFixedLayout('/books/corrupt.epub')).resolves.toBeNull();
   });
 });

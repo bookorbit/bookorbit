@@ -17,6 +17,7 @@ export interface ParsedOpf {
   seriesName: string | null;
   seriesIndex: number | null;
   authors: { name: string; sortName: string | null }[];
+  narrators: string[];
   genres: string[];
   tags: string[];
   googleBooksId: string | null;
@@ -32,13 +33,15 @@ export interface ParsedOpf {
   itunesId: string | null;
   customMetadata: Record<string, string>;
   coverHref: string | null;
+  /** Raw `rendition:layout` value; `pre-paginated` marks a fixed-layout book such as a comic. */
+  renditionLayout: string | null;
 }
 
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   removeNSPrefix: true,
-  isArray: (name) => ['creator', 'identifier', 'subject', 'title', 'meta', 'item', 'reference'].includes(name),
+  isArray: (name) => ['creator', 'contributor', 'identifier', 'subject', 'title', 'meta', 'item', 'reference'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
   parseTagValue: false, // keep all values as strings to preserve ISBNs with leading zeroes
@@ -206,6 +209,9 @@ function parseCalibreUserMetadata(raw: string | null): { pageCount: number | nul
   return { pageCount, subtitle, extraTags };
 }
 
+// MARC relator `nrt`, plus the spelled-out word some writers emit instead of the code.
+const NARRATOR_ROLES = new Set(['nrt', 'narrator']);
+
 function normalizeCreatorRole(role: string | null | undefined): string {
   if (!role) return '';
   const trimmed = role.trim().toLowerCase();
@@ -296,28 +302,45 @@ export function parseOpf(xml: string): ParsedOpf {
   subtitle ??= namedMeta('bookorbit:subtitle');
   subtitle ??= calibreUser.subtitle;
 
-  // ── Authors ────────────────────────────────────────────────────────────────
+  // ── Authors and narrators ──────────────────────────────────────────────────
   const authors: { name: string; sortName: string | null }[] = [];
-  const rawCreators = toArray(metadata['creator']);
+  const narrators: string[] = [];
+  const seenNarrators = new Set<string>();
 
-  for (const c of rawCreators) {
-    const mo = (typeof c === 'object' && c !== null ? c : {}) as Record<string, unknown>;
-    const name = getText(c);
-    if (!name) continue;
+  // A roleless <dc:creator> is an author by EPUB 2 convention, but a roleless <dc:contributor> is
+  // not: contributors carry packaging tools (`bkp`) and other incidentals, so only an explicit
+  // narrator role is taken from them.
+  const collectPerson = (node: unknown, defaults: { role: string; allowAuthor: boolean }): void => {
+    const mo = (typeof node === 'object' && node !== null ? node : {}) as Record<string, unknown>;
+    const name = getText(node);
+    if (!name) return;
 
     const id = mo['@_id'] as string | undefined;
     // EPUB 3: role via refines
     const role3 = id ? getRefineValue(refineMap, id, 'role') : null;
     // EPUB 2: opf:role attribute
     const role2 = (mo['@_opf:role'] ?? mo['@_role']) as string | undefined;
-    const role = normalizeCreatorRole(role3 ?? role2 ?? 'aut');
-    if (role !== 'aut' && role !== '') continue; // skip editors, illustrators, etc.
+    const role = normalizeCreatorRole(role3 ?? role2 ?? defaults.role);
+
+    if (NARRATOR_ROLES.has(role)) {
+      const key = name.toLowerCase();
+      if (seenNarrators.has(key)) return;
+      seenNarrators.add(key);
+      narrators.push(name);
+      return;
+    }
+
+    if (!defaults.allowAuthor) return;
+    if (role !== 'aut' && role !== '') return; // skip editors, illustrators, etc.
 
     // EPUB 3: file-as via refines; EPUB 2: opf:file-as attribute
     const sortName = (id ? getRefineValue(refineMap, id, 'file-as') : null) ?? ((mo['@_opf:file-as'] ?? mo['@_file-as'] ?? null) as string | null);
 
     authors.push({ name, sortName: sortName?.trim() || null });
-  }
+  };
+
+  for (const creator of toArray(metadata['creator'])) collectPerson(creator, { role: 'aut', allowAuthor: true });
+  for (const contributor of toArray(metadata['contributor'])) collectPerson(contributor, { role: '', allowAuthor: false });
 
   // ── Identifiers → ISBN + provider IDs ─────────────────────────────────────
   let isbn10: string | null = null;
@@ -536,6 +559,7 @@ export function parseOpf(xml: string): ParsedOpf {
     seriesName: seriesName || null,
     seriesIndex,
     authors,
+    narrators,
     genres,
     tags,
     googleBooksId,
@@ -551,6 +575,7 @@ export function parseOpf(xml: string): ParsedOpf {
     itunesId,
     customMetadata,
     coverHref,
+    renditionLayout: propertyMeta('rendition:layout'),
   };
 }
 

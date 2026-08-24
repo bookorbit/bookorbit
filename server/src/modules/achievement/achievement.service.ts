@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { NotificationType, ACHIEVEMENT_CATEGORY_LABELS } from '@bookorbit/types';
 import type { AchievementCatalogueResponse, AchievementCategoryGroup, AchievementItem, AchievementCategory } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { getYearInTimeZone, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
 
 import { NotificationService } from '../notification/notification.service';
@@ -61,7 +62,8 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       earnedMap.set(ua.achievementKey, ua);
     }
 
-    const progressMap = await this.computeProgress(userId, user.isSuperuser, allAchievements, earnedMap);
+    const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    const progressMap = await this.computeProgress(userId, user.isSuperuser, timeZone, allAchievements, earnedMap);
 
     const categoryOrder: AchievementCategory[] = ['reading', 'library', 'exploration', 'dedication', 'devices'];
     const grouped = new Map<AchievementCategory, AchievementItem[]>();
@@ -127,8 +129,12 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     try {
       if (!(await this.userService.isAchievementEnabled(userId))) return;
 
-      const [earnedKeys, isSuperuser] = await Promise.all([this.repo.findUserEarnedKeys(userId), this.repo.findUserIsSuperuser(userId)]);
-      const awards = await this.registry.evaluate({ userId, isSuperuser, eventName, payload }, earnedKeys);
+      const [earnedKeys, isSuperuser, timeZone] = await Promise.all([
+        this.repo.findUserEarnedKeys(userId),
+        this.repo.findUserIsSuperuser(userId),
+        this.repo.findUserTimeZone(userId),
+      ]);
+      const awards = await this.registry.evaluate({ userId, isSuperuser, eventName, timeZone, payload }, earnedKeys);
       // Backfill is a retroactive catch-up, so it awards silently instead of flooding the user with notifications.
       const notify = eventName !== ACHIEVEMENT_EVENT_BACKFILL;
 
@@ -144,7 +150,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (awarded > 0) {
-        await this.evaluateMetaBadges(userId, isSuperuser, earnedKeys, notify);
+        await this.evaluateMetaBadges(userId, isSuperuser, timeZone, earnedKeys, notify);
       }
 
       if (awarded > 0) {
@@ -250,9 +256,9 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async evaluateMetaBadges(userId: number, isSuperuser: boolean, earnedKeys: Set<string>, notify: boolean): Promise<void> {
+  private async evaluateMetaBadges(userId: number, isSuperuser: boolean, timeZone: string, earnedKeys: Set<string>, notify: boolean): Promise<void> {
     const metaAwards = await this.registry.evaluate(
-      { userId, isSuperuser, eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED, payload: { userId } },
+      { userId, isSuperuser, eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED, timeZone, payload: { userId } },
       earnedKeys,
     );
     for (const award of metaAwards) {
@@ -268,6 +274,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
   private async computeProgress(
     userId: number,
     isSuperuser: boolean,
+    timeZone: string,
     allAchievements: AchievementRow[],
     earnedMap: Map<string, UserAchievementRow>,
   ): Promise<Map<string, number>> {
@@ -287,7 +294,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       .map(([groupKey]) => groupKey);
 
     const progressEntries = await Promise.all(
-      groupsToFetch.map(async (groupKey) => [groupKey, await this.getProgressForGroup(userId, isSuperuser, groupKey)] as const),
+      groupsToFetch.map(async (groupKey) => [groupKey, await this.getProgressForGroup(userId, isSuperuser, timeZone, groupKey)] as const),
     );
 
     for (const [groupKey, progress] of progressEntries) {
@@ -304,7 +311,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
 
     await Promise.all(
       singleBadgesToFetch.map(async (a) => {
-        const progress = await this.computeSingleBadgeProgress(userId, isSuperuser, a.key);
+        const progress = await this.computeSingleBadgeProgress(userId, isSuperuser, timeZone, a.key);
         if (progress !== null) {
           progressMap.set(a.key, progress);
         }
@@ -314,7 +321,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     return progressMap;
   }
 
-  private async computeSingleBadgeProgress(userId: number, isSuperuser: boolean, key: string): Promise<number | null> {
+  private async computeSingleBadgeProgress(userId: number, isSuperuser: boolean, timeZone: string, key: string): Promise<number | null> {
     switch (key) {
       case 'marathoner':
         return this.repo.getMaxSessionMinutes(userId);
@@ -340,13 +347,13 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       case 'note_keeper':
         return this.repo.countAnnotationsWithNotes(userId);
       case 'deep_dive_session':
-        return this.repo.countAnnotationsOnDay(userId, new Date());
+        return this.repo.countAnnotationsOnDay(userId, new Date(), timeZone);
       case 'monthly_reader_2': {
-        const now = new Date();
-        return this.repo.countBooksFinishedInMonth(userId, now.getUTCFullYear(), now.getUTCMonth() + 1);
+        const [year, month] = toDateKeyInTimeZone(new Date(), timeZone).split('-');
+        return this.repo.countBooksFinishedInMonth(userId, Number(year), Number(month));
       }
       case 'yearly_finisher_12':
-        return this.repo.countBooksFinishedInYear(userId, new Date().getUTCFullYear());
+        return this.repo.countBooksFinishedInYear(userId, getYearInTimeZone(new Date(), timeZone));
       case 'category_sweeper':
         return this.repo.countDistinctEarnedCategories(userId);
       case 'consistent_reader':
@@ -354,15 +361,14 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       case 'weekend_rhythm':
         return null;
       case 'seasonal_reader': {
-        const currentYear = new Date().getFullYear();
-        return this.repo.countDistinctSeasonsWithReading(userId, currentYear);
+        return this.repo.countDistinctSeasonsWithReading(userId, getYearInTimeZone(new Date(), timeZone));
       }
       case 'across_the_board':
         return this.repo.countDistinctRatingValues(userId);
       case 'power_hour':
         return this.repo.getMaxSessionPages(userId);
       case 'speed_reader':
-        return this.repo.getMaxPagesInADay(userId);
+        return this.repo.getMaxPagesInADay(userId, timeZone);
       case 'wordsmith':
         return this.repo.getMaxNoteLength(userId);
       case 'box_of_crayons':
@@ -376,7 +382,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async getProgressForGroup(userId: number, isSuperuser: boolean, groupKey: string): Promise<number | null> {
+  private async getProgressForGroup(userId: number, isSuperuser: boolean, timeZone: string, groupKey: string): Promise<number | null> {
     switch (groupKey) {
       case 'books_finished':
         return this.repo.countFinishedBooks(userId);
@@ -393,7 +399,7 @@ export class AchievementService implements OnModuleInit, OnModuleDestroy {
       case 'polyglot':
         return this.repo.countDistinctLanguagesRead(userId);
       case 'streak':
-        return this.repo.getCurrentStreak(userId);
+        return this.repo.getCurrentStreak(userId, timeZone);
       case 'long_book':
         return this.repo.getMaxFinishedBookPageCount(userId);
       case 'critic':

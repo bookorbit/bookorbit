@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, count, countDistinct, desc, eq, gt, gte, isNotNull, isNull, lt, lte, ne, notInArray, sql, sum } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { addDateKeyDays } from '../../common/utils/reading-daily-stats.utils';
+import { resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import {
@@ -108,6 +110,11 @@ export class AchievementRepository {
   async findUserIsSuperuser(userId: number): Promise<boolean> {
     const [row] = await this.db.select({ isSuperuser: users.isSuperuser }).from(users).where(eq(users.id, userId)).limit(1);
     return row?.isSuperuser ?? false;
+  }
+
+  async findUserTimeZone(userId: number): Promise<string> {
+    const [row] = await this.db.select({ settings: users.settings }).from(users).where(eq(users.id, userId)).limit(1);
+    return resolveTimeZone((row?.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
   }
 
   async countFinishedBooks(userId: number): Promise<number> {
@@ -265,8 +272,11 @@ export class AchievementRepository {
     return row?.title ?? null;
   }
 
-  async getCurrentStreak(userId: number): Promise<number> {
-    // Count consecutive days with reading activity ending at today or yesterday
+  async getCurrentStreak(userId: number, timeZone: string): Promise<number> {
+    // Count consecutive days with reading activity ending at today or yesterday.
+    // `day` is bucketed in the reader's timezone, so the "is it still alive" cutoff
+    // has to be their today too, not the database server's CURRENT_DATE.
+    const today = toDateKeyInTimeZone(new Date(), timeZone);
     const result = await this.db.execute(sql`
       WITH daily AS (
         SELECT DISTINCT day::date as d
@@ -280,7 +290,7 @@ export class AchievementRepository {
       SELECT COUNT(*) as streak_length
       FROM streak
       WHERE grp = (
-        SELECT grp FROM streak WHERE d >= CURRENT_DATE - INTERVAL '1 day' ORDER BY d DESC LIMIT 1
+        SELECT grp FROM streak WHERE d >= ${today}::date - INTERVAL '1 day' ORDER BY d DESC LIMIT 1
       )
     `);
     const rows = (result as unknown as { rows: Array<{ streak_length: string }> }).rows;
@@ -679,9 +689,10 @@ export class AchievementRepository {
     return rows.length > 0 ? rows[0].cnt : 0;
   }
 
-  async countAnnotationsOnDay(userId: number, date: Date): Promise<number> {
-    const dayStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  async countAnnotationsOnDay(userId: number, date: Date, timeZone: string): Promise<number> {
+    const day = toDateKeyInTimeZone(date, timeZone);
+    const dayStart = toTimeZoneStartOfDay(day, timeZone);
+    const dayEnd = toTimeZoneStartOfDay(addDateKeyDays(day, 1), timeZone);
     const [{ value }] = await this.db
       .select({ value: count() })
       .from(annotations)
@@ -988,9 +999,10 @@ export class AchievementRepository {
     return Math.floor(Number(result?.value ?? 0));
   }
 
-  async getPagesOnDay(userId: number, day: Date): Promise<number> {
-    const dayStart = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()));
-    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  async getPagesOnDay(userId: number, day: Date, timeZone: string): Promise<number> {
+    const dayKey = toDateKeyInTimeZone(day, timeZone);
+    const dayStart = toTimeZoneStartOfDay(dayKey, timeZone);
+    const dayEnd = toTimeZoneStartOfDay(addDateKeyDays(dayKey, 1), timeZone);
     const [result] = await this.db
       .select({
         value: sql<number>`coalesce(sum(${bookMetadata.pageCount} * least(greatest(${readingSessions.progressDelta}, 0), 100) / 100.0), 0)::float`,
@@ -1014,7 +1026,7 @@ export class AchievementRepository {
     return Math.floor(Number(result?.value ?? 0));
   }
 
-  async getMaxPagesInADay(userId: number): Promise<number> {
+  async getMaxPagesInADay(userId: number, timeZone: string): Promise<number> {
     const result = await this.db.execute<{ max_pages: number }>(sql`
       SELECT COALESCE(MAX(day_pages), 0)::float AS max_pages FROM (
         SELECT SUM(bm.page_count * LEAST(GREATEST(rs.progress_delta, 0), 100) / 100.0) AS day_pages
@@ -1025,7 +1037,7 @@ export class AchievementRepository {
           AND bm.page_count IS NOT NULL AND bm.page_count > 0
           AND rs.progress_delta IS NOT NULL AND rs.progress_delta > 0 AND rs.progress_delta <= 100
           AND rs.duration_seconds > 0
-        GROUP BY DATE_TRUNC('day', rs.started_at AT TIME ZONE 'UTC')
+        GROUP BY DATE_TRUNC('day', rs.started_at AT TIME ZONE ${timeZone})
       ) daily
     `);
     const rows = (result as unknown as { rows: Array<{ max_pages: number }> }).rows;

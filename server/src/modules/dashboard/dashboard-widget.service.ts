@@ -37,6 +37,7 @@ import {
   selectChallenge,
 } from './dashboard-widget.calculations';
 import { DashboardWidgetRepository } from './dashboard-widget.repository';
+import { dashboardLibraryScopeCacheKey, resolveDashboardLibraryIds } from './dashboard-library-scope';
 
 const DASHBOARD_LIVE_TTL_MS = 120_000;
 const DASHBOARD_STALE_TTL_MS = 300_000;
@@ -59,13 +60,21 @@ export class DashboardWidgetService {
     return user.isSuperuser ? undefined : user.contentFilters;
   }
 
+  private cacheOwnerKey(user: RequestUser, libraryIds: readonly number[]): string {
+    return `${user.id}:${dashboardLibraryScopeCacheKey(libraryIds)}`;
+  }
+
+  private async getLibraryIds(user: RequestUser): Promise<number[]> {
+    return resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
+  }
+
   async getReadingGoal(user: RequestUser): Promise<ReadingGoalWidgetData> {
     const settings = user.settings as UserSettings | undefined;
     const goalBooks = settings?.dashboardConfig?.readingGoal ?? null;
     const year = new Date().getUTCFullYear();
 
-    const completedBooks = await this.staleCache.get(String(user.id), `reading-goal-completed:${year}`, async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    const completedBooks = await this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), `reading-goal-completed:${year}`, async () => {
       const contentFilters = this.getContentFilters(user);
       return this.widgetRepo.getCompletedBooksThisYear(user.id, accessibleLibraryIds, contentFilters);
     });
@@ -74,32 +83,32 @@ export class DashboardWidgetService {
   }
 
   async getCurrentlyReading(user: RequestUser): Promise<CurrentlyReadingWidgetData> {
-    return this.liveCache.get(String(user.id), 'currently-reading', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.liveCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'currently-reading', async () => {
       const contentFilters = this.getContentFilters(user);
       return this.widgetRepo.getCurrentlyReadingBooks(user.id, accessibleLibraryIds, contentFilters);
     });
   }
 
   async getReadingStreak(user: RequestUser): Promise<ReadingStreakWidgetData> {
-    return this.liveCache.get(String(user.id), 'reading-streak', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.liveCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'reading-streak', async () => {
       const contentFilters = this.getContentFilters(user);
       return this.widgetRepo.getReadingStreak(user.id, accessibleLibraryIds, contentFilters);
     });
   }
 
   async getLibraryOverview(user: RequestUser): Promise<LibraryOverviewWidgetData> {
-    return this.staleCache.get(String(user.id), 'library-overview', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'library-overview', async () => {
       const contentFilters = this.getContentFilters(user);
       return this.widgetRepo.getLibraryOverview(accessibleLibraryIds, contentFilters);
     });
   }
 
   async getHighlightOfTheDay(user: RequestUser): Promise<HighlightOfTheDayWidgetData | null> {
-    return this.liveCache.get(String(user.id), 'highlight-of-the-day', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.liveCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'highlight-of-the-day', async () => {
       const contentFilters = this.getContentFilters(user);
       const total = await this.widgetRepo.getAnnotationCount(user.id, accessibleLibraryIds, contentFilters);
       if (total === 0) return null;
@@ -110,8 +119,8 @@ export class DashboardWidgetService {
   }
 
   async getMonthlyChallenge(user: RequestUser): Promise<MonthlyChallengeWidgetData> {
-    return this.staleCache.get(String(user.id), 'monthly-challenge', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'monthly-challenge', async () => {
       const contentFilters = this.getContentFilters(user);
       const today = new Date();
       const year = today.getUTCFullYear();
@@ -143,8 +152,8 @@ export class DashboardWidgetService {
   }
 
   async getYearProjection(user: RequestUser): Promise<YearProjectionWidgetData> {
-    return this.staleCache.get(String(user.id), 'year-projection', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'year-projection', async () => {
       const contentFilters = this.getContentFilters(user);
       const today = new Date();
       const year = today.getUTCFullYear();
@@ -168,16 +177,16 @@ export class DashboardWidgetService {
   }
 
   async getNeglectedGems(user: RequestUser): Promise<NeglectedGemsWidgetData> {
-    return this.staleCache.get(String(user.id), 'neglected-gems', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'neglected-gems', async () => {
       const contentFilters = this.getContentFilters(user);
       return this.widgetRepo.getNeglectedGems(user.id, accessibleLibraryIds, new Date(), contentFilters);
     });
   }
 
   async getReadingDna(user: RequestUser): Promise<ReadingDnaWidgetData> {
-    return this.staleCache.get(String(user.id), 'reading-dna', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'reading-dna', async () => {
       const contentFilters = this.getContentFilters(user);
       const since = new Date();
       since.setUTCMonth(since.getUTCMonth() - 6);
@@ -187,16 +196,16 @@ export class DashboardWidgetService {
   }
 
   async getLongWait(user: RequestUser): Promise<LongWaitWidgetData | null> {
-    return this.staleCache.get(String(user.id), 'long-wait', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'long-wait', async () => {
       const contentFilters = this.getContentFilters(user);
       return this.widgetRepo.getLongWait(user.id, accessibleLibraryIds, new Date(), contentFilters);
     });
   }
 
   async getDiversityScore(user: RequestUser): Promise<DiversityScoreWidgetData> {
-    return this.staleCache.get(String(user.id), 'diversity-score', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.staleCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'diversity-score', async () => {
       const contentFilters = this.getContentFilters(user);
       const data = await this.widgetRepo.getDiversityData(user.id, accessibleLibraryIds, contentFilters);
       return computeDiversityScore(
@@ -211,8 +220,8 @@ export class DashboardWidgetService {
   }
 
   async getReadingRhythm(user: RequestUser): Promise<ReadingRhythmWidgetData> {
-    return this.liveCache.get(String(user.id), 'reading-rhythm', async () => {
-      const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = await this.getLibraryIds(user);
+    return this.liveCache.get(this.cacheOwnerKey(user, accessibleLibraryIds), 'reading-rhythm', async () => {
       const contentFilters = this.getContentFilters(user);
       const today = new Date();
       const since = new Date(today);

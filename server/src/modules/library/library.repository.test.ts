@@ -144,6 +144,48 @@ describe('LibraryRepository', () => {
     });
   });
 
+  it('getStatsForLibraries aggregates every library in two queries', async () => {
+    const countChain = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          groupBy: vi.fn().mockResolvedValue([
+            { libraryId: 1, count: 3 },
+            { libraryId: 2, count: 1 },
+          ]),
+        }),
+      }),
+    };
+
+    const formatChain = {
+      from: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            groupBy: vi.fn().mockResolvedValue([
+              { libraryId: 1, format: 'epub', count: 2, totalSize: '3000' },
+              { libraryId: 1, format: 'pdf', count: 1, totalSize: '700' },
+              { libraryId: 2, format: 'cbz', count: 1, totalSize: '500' },
+            ]),
+          }),
+        }),
+      }),
+    };
+
+    db.select.mockReturnValueOnce(countChain as any).mockReturnValueOnce(formatChain as any);
+
+    const stats = await repo.getStatsForLibraries([1, 2, 3]);
+
+    expect(db.select).toHaveBeenCalledTimes(2);
+    expect(stats.get(1)).toEqual({ totalBooks: 3, totalSizeBytes: 3700, formatCounts: { epub: 2, pdf: 1 } });
+    expect(stats.get(2)).toEqual({ totalBooks: 1, totalSizeBytes: 500, formatCounts: { cbz: 1 } });
+    // A library with no present books still gets an entry, so the caller never has to guess.
+    expect(stats.get(3)).toEqual({ totalBooks: 0, totalSizeBytes: 0, formatCounts: {} });
+  });
+
+  it('getStatsForLibraries issues no query for an empty id list', async () => {
+    await expect(repo.getStatsForLibraries([])).resolves.toEqual(new Map());
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
   it('hasUserAccess returns false when no access row exists', async () => {
     (db.query.userLibraryAccess.findFirst as vi.Mock).mockResolvedValue(undefined);
 

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { KeyRound, LockOpen, MoreVertical, Pencil, Save, Search, ShieldAlert, ShieldCheck, Trash2, UserPlus } from '@lucide/vue'
-import { Permission, type AuthUser, type DefaultLibraryAccessConfig } from '@bookorbit/types'
+import { Search, TriangleAlert, UserPlus, X } from '@lucide/vue'
+import { Permission, type AuthUser, type DefaultLibraryAccessConfig, type UserListSortField, type UserListState } from '@bookorbit/types'
+
+import { Button } from '@/components/ui/button'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -11,12 +13,12 @@ import { useUsers, type UserRow } from './composables/useUsers'
 import { useSelfRegistration } from './composables/useSelfRegistration'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'
-import StatusPill from './components/StatusPill.vue'
-import type { StatusPillTone } from './lib/status-pill-styles'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import NewAccountDefaults from './components/NewAccountDefaults.vue'
+import UserAttentionBand from './components/UserAttentionBand.vue'
+import UserRosterCards from './components/UserRosterCards.vue'
+import UserRosterTable from './components/UserRosterTable.vue'
+
+const HEADER_ACTIONS_TARGET = '#settings-header-actions'
 
 const { t } = useI18n()
 const { isSuperuser, hasPermission } = usePermissions()
@@ -24,18 +26,27 @@ const { isSuperuser, hasPermission } = usePermissions()
 const {
   users,
   libraries,
+  summary,
+  attention,
   page,
   totalPages,
+  total,
   search,
   state,
   sortBy,
   sortDir,
   loading,
+  initialLoad,
   error,
+  hasActiveFilters,
   defaultLibraryIds,
   defaultLibraryIdsArray,
   hasDefaultLibraryChanges,
   load,
+  loadStatic,
+  reload,
+  toggleSort,
+  setState,
   resetFilters,
   toggleDefaultLibrary,
   markDefaultLibrariesSaved,
@@ -47,12 +58,19 @@ const resetUrl = ref<string | null>(null)
 const deleteConfirmUser = ref<UserRow | null>(null)
 const deleting = ref(false)
 const actionError = ref<string | null>(null)
+const busyUserId = ref<number | null>(null)
+/**
+ * The header slot only exists when this page is mounted inside the settings shell. Falling
+ * back to rendering in place keeps the primary action reachable anywhere else, including tests.
+ */
+const headerSlotAvailable = ref(false)
 
 const savingDefaultLibraryAccess = ref(false)
 const defaultLibraryAccessError = ref<string | null>(null)
 
 const canManageUserDefaults = computed(() => hasPermission(Permission.ManageUsers))
 const canManageAppSettings = computed(() => hasPermission(Permission.ManageAppSettings))
+const showDefaults = computed(() => !initialLoad.value && !error.value && (canManageAppSettings.value || canManageUserDefaults.value))
 
 const {
   allowRegistration,
@@ -62,30 +80,38 @@ const {
   setAllowRegistration,
 } = useSelfRegistration()
 
-const hasActiveFilters = computed(() => search.value.length > 0 || state.value.length > 0 || sortBy.value !== 'username' || sortDir.value !== 'asc')
+const stateFilters = computed<{ value: UserListState | ''; label: string; count: number }[]>(() => [
+  { value: '', label: t('adminFeature.usersPage.filters.allUsers'), count: summary.value.total },
+  { value: 'admins', label: t('adminFeature.usersPage.filters.admins'), count: summary.value.admins },
+  { value: 'active', label: t('adminFeature.usersPage.filters.active'), count: summary.value.active },
+  { value: 'inactive', label: t('adminFeature.usersPage.filters.inactive'), count: summary.value.inactive },
+])
 
-const sortSelection = computed<string>({
-  get: () => `${sortBy.value}:${sortDir.value}`,
-  set: (value) => {
-    const [field, direction] = value.split(':') as [typeof sortBy.value, typeof sortDir.value]
-    sortBy.value = field
-    sortDir.value = direction
-  },
-})
+const pageSubtitle = computed(() =>
+  t('adminFeature.usersPage.headerSummary', {
+    accounts: formatNumber(summary.value.total),
+    admins: formatNumber(summary.value.admins),
+    count: summary.value.total,
+  }),
+)
 
 onMounted(async () => {
-  await load()
+  headerSlotAvailable.value = document.getElementById(HEADER_ACTIONS_TARGET.slice(1)) !== null
+  await Promise.all([reload(), loadStatic()])
   if (canManageAppSettings.value) await loadSelfRegistration()
 })
 
-function applyFilters() {
-  page.value = 1
-  void load()
+function clearSearch() {
+  search.value = ''
 }
 
 function clearFilters() {
   resetFilters()
   void load()
+}
+
+function showAttentionOnly() {
+  setState(state.value === 'attention' ? '' : 'attention')
 }
 
 function previousPage() {
@@ -110,18 +136,17 @@ function openEdit(user: UserRow) {
   drawerOpen.value = true
 }
 
+function openById(userId: number) {
+  const match = users.value.find((user) => user.id === userId)
+  if (match) openEdit(match)
+}
+
 function closeDrawer() {
   drawerOpen.value = false
 }
 
 function clearResetUrl() {
   resetUrl.value = null
-}
-
-/** Granted permissions read as a capability tier, so a plain viewer stays neutral. */
-function accessTone(user: UserRow): StatusPillTone {
-  if (user.isSuperuser) return 'accent'
-  return (user.permissions?.length ?? 0) > 0 ? 'info' : 'neutral'
 }
 
 function canManage(user: UserRow): boolean {
@@ -132,34 +157,54 @@ function isPasswordResettable(user: UserRow): boolean {
   return user.provisioningMethod !== 'oidc' && user.provisioningMethod !== 'shared'
 }
 
-function resetPasswordHint(user: UserRow): string {
-  if (user.provisioningMethod === 'oidc') return t('adminFeature.usersPage.resetPasswordOidcHint')
-  if (user.provisioningMethod === 'shared') return t('adminFeature.usersPage.resetPasswordSharedHint')
-  return t('adminFeature.usersPage.resetPassword')
-}
-
 function isLocked(user: UserRow): boolean {
   return Boolean(user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now())
 }
 
+/** Mirrors the server's attention predicate so the row marker agrees with the band. */
+function needsAttention(user: UserRow): boolean {
+  if (!user.active) return false
+  return isLocked(user) || user.lastAuthenticatedAt === null || user.isDefaultPassword
+}
+
 async function handleUnlock(userId: number) {
   actionError.value = null
-  const res = await api(`/api/v1/users/${userId}/unlock`, { method: 'POST' })
-  if (!res.ok) {
-    actionError.value = t('adminFeature.usersPage.errors.unlock')
-    return
+  busyUserId.value = userId
+  try {
+    const res = await api(`/api/v1/users/${userId}/unlock`, { method: 'POST' })
+    if (!res.ok) {
+      actionError.value = t('adminFeature.usersPage.errors.unlock')
+      return
+    }
+    await reload()
+  } finally {
+    busyUserId.value = null
   }
-  await load()
 }
 
 async function handleResetPassword(userId: number) {
-  const res = await api(`/api/v1/users/${userId}/reset-password`, { method: 'POST' })
-  if (!res.ok) {
-    actionError.value = t('adminFeature.usersPage.errors.resetPassword')
-    return
+  actionError.value = null
+  busyUserId.value = userId
+  try {
+    const res = await api(`/api/v1/users/${userId}/reset-password`, { method: 'POST' })
+    if (!res.ok) {
+      actionError.value = t('adminFeature.usersPage.errors.resetPassword')
+      return
+    }
+    const data = await res.json()
+    resetUrl.value = data.resetUrl
+    await reload()
+  } finally {
+    busyUserId.value = null
   }
-  const data = await res.json()
-  resetUrl.value = data.resetUrl
+}
+
+function unlockUser(user: UserRow) {
+  void handleUnlock(user.id)
+}
+
+function resetUserPassword(user: UserRow) {
+  void handleResetPassword(user.id)
 }
 
 function requestDeleteUser(user: UserRow) {
@@ -183,7 +228,7 @@ async function confirmDeleteUser() {
       return
     }
     deleteConfirmUser.value = null
-    await load()
+    await reload()
   } catch {
     actionError.value = t('adminFeature.usersPage.errors.deleteUser')
   } finally {
@@ -194,12 +239,20 @@ async function confirmDeleteUser() {
 async function onSaved(newResetUrl?: string) {
   drawerOpen.value = false
   if (newResetUrl) resetUrl.value = newResetUrl
-  await load()
+  await reload()
 }
 
 async function toggleSelfRegistration() {
   if (savingSelfRegistration.value) return
   await setAllowRegistration(!allowRegistration.value)
+}
+
+function handleSort(field: UserListSortField) {
+  toggleSort(field)
+}
+
+function selectState(value: UserListState | '') {
+  setState(value)
 }
 
 async function saveDefaultLibraryAccess() {
@@ -229,347 +282,161 @@ async function saveDefaultLibraryAccess() {
 
 <template>
   <div class="space-y-4">
-    <form
-      class="grid gap-2 rounded-lg border border-border bg-card p-2 md:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_minmax(9rem,auto)_minmax(10rem,auto)_auto_auto_auto]"
-      @submit.prevent="applyFilters"
-    >
-      <label class="relative block">
-        <span class="sr-only">{{ t('adminFeature.usersPage.filters.search') }}</span>
-        <Search :size="15" class="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <input
-          v-model="search"
-          type="search"
-          class="h-9 w-full rounded-md border border-input bg-background ps-9 pe-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :placeholder="t('adminFeature.usersPage.filters.searchPlaceholder')"
-        />
-      </label>
-      <label>
-        <span class="sr-only">{{ t('adminFeature.usersPage.filters.state') }}</span>
-        <select v-model="state" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" @change="applyFilters">
-          <option value="">{{ t('adminFeature.usersPage.filters.allUsers') }}</option>
-          <option value="admins">{{ t('adminFeature.usersPage.filters.admins') }}</option>
-          <option value="active">{{ t('adminFeature.usersPage.filters.active') }}</option>
-          <option value="inactive">{{ t('adminFeature.usersPage.filters.inactive') }}</option>
-        </select>
-      </label>
-      <label>
-        <span class="sr-only">{{ t('adminFeature.usersPage.filters.sort') }}</span>
-        <select v-model="sortSelection" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" @change="applyFilters">
-          <option value="username:asc">{{ t('adminFeature.usersPage.filters.usernameAsc') }}</option>
-          <option value="name:asc">{{ t('adminFeature.usersPage.filters.nameAsc') }}</option>
-          <option value="createdAt:desc">{{ t('adminFeature.usersPage.filters.newest') }}</option>
-          <option value="createdAt:asc">{{ t('adminFeature.usersPage.filters.oldest') }}</option>
-        </select>
-      </label>
-      <Button size="sm" type="submit" class="h-9">{{ t('adminFeature.usersPage.filters.apply') }}</Button>
-      <Button variant="outline" size="sm" v-if="hasActiveFilters" type="button" class="h-9" @click="clearFilters">
-        {{ t('adminFeature.usersPage.filters.clear') }}
-      </Button>
-      <Button size="sm" type="button" class="h-9 xl:ms-2" @click="openCreate">
+    <Teleport :to="HEADER_ACTIONS_TARGET" defer :disabled="!headerSlotAvailable">
+      <p class="hidden text-sm text-muted-foreground lg:block">{{ pageSubtitle }}</p>
+      <Button size="sm" type="button" @click="openCreate">
         <UserPlus :size="14" aria-hidden="true" />
         {{ t('adminFeature.usersPage.createUser') }}
       </Button>
-    </form>
+    </Teleport>
 
-    <p v-if="actionError" role="alert" class="settings-error-state">{{ actionError }}</p>
     <p v-if="error" role="alert" class="settings-error-state">{{ t('adminFeature.usersPage.errors.load') }}</p>
-    <p v-else-if="loading" role="status" class="settings-loading-state">{{ t('common.loading') }}</p>
-    <div v-else-if="users.length === 0" class="settings-empty-state">
-      <p class="text-sm font-medium text-foreground">{{ t('adminFeature.usersPage.empty.title') }}</p>
-      <p class="mt-1 text-sm text-muted-foreground">
-        {{ hasActiveFilters ? t('adminFeature.usersPage.empty.filtered') : t('adminFeature.usersPage.empty.description') }}
-      </p>
-    </div>
 
     <template v-else>
-      <div class="hidden overflow-x-auto rounded-lg border border-border bg-card shadow-xs md:block">
-        <table class="w-full min-w-[820px] table-fixed text-sm">
-          <colgroup>
-            <col class="w-[26%]" />
-            <col class="w-[24%]" />
-            <col class="w-[22%]" />
-            <col class="w-[14%]" />
-            <col class="w-[14%]" />
-          </colgroup>
-          <thead class="bg-muted/50 text-muted-foreground">
-            <tr>
-              <th class="px-3 py-2 text-start text-xs font-medium">{{ t('adminFeature.usersPage.columns.name') }}</th>
-              <th class="px-3 py-2 text-start text-xs font-medium">{{ t('adminFeature.usersPage.columns.email') }}</th>
-              <th class="px-3 py-2 text-start text-xs font-medium">{{ t('adminFeature.usersPage.columns.access') }}</th>
-              <th class="px-3 py-2 text-start text-xs font-medium">{{ t('adminFeature.usersPage.columns.status') }}</th>
-              <th class="px-3 py-2 text-end text-xs font-medium">{{ t('adminFeature.usersPage.columns.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-border">
-            <tr v-for="user in users" :key="user.id" class="bg-card hover:bg-muted/30">
-              <td class="px-3 py-2">
-                <p class="truncate font-medium text-foreground">{{ user.name }}</p>
-                <p class="truncate font-mono text-xs text-muted-foreground">@{{ user.username }}</p>
-              </td>
-              <td class="truncate px-3 py-2 text-xs text-muted-foreground">{{ user.email ?? '-' }}</td>
-              <td class="px-3 py-2">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <StatusPill v-if="user.isSuperuser" tone="accent">
-                    <ShieldCheck :size="11" aria-hidden="true" />
-                    {{ t('adminFeature.usersPage.adminBadge') }}
-                  </StatusPill>
-                  <StatusPill v-else :tone="accessTone(user)">
-                    {{ t('adminFeature.usersPage.permissionCount', { count: user.permissions?.length ?? 0 }) }}
-                  </StatusPill>
-                  <Tooltip v-if="user.hasContentFilters">
-                    <TooltipTrigger as-child>
-                      <span>
-                        <StatusPill tone="warning">
-                          <ShieldAlert :size="11" aria-hidden="true" />
-                          {{ t('adminFeature.usersPage.filteredBadge') }}
-                        </StatusPill>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{{ t('adminFeature.usersPage.contentRestrictionsActive') }}</TooltipContent>
-                  </Tooltip>
-                </div>
-              </td>
-              <td class="px-3 py-2">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <StatusPill :tone="user.active ? 'success' : 'danger'">
-                    {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
-                  </StatusPill>
-                  <StatusPill v-if="isLocked(user)" tone="warning">
-                    {{ t('adminFeature.usersPage.lockedBadge') }}
-                  </StatusPill>
-                </div>
-              </td>
-              <td class="px-3 py-2">
-                <div class="flex items-center justify-end gap-1">
-                  <template v-if="canManage(user)">
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          type="button"
-                          :aria-label="t('adminFeature.usersPage.editUserAria', { name: user.name })"
-                          @click="openEdit(user)"
-                        >
-                          <Pencil :size="14" aria-hidden="true" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{{ t('common.edit') }}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip v-if="isLocked(user)">
-                      <TooltipTrigger as-child>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          type="button"
-                          :aria-label="t('adminFeature.usersPage.unlockAria', { name: user.name })"
-                          @click="handleUnlock(user.id)"
-                        >
-                          <LockOpen :size="14" aria-hidden="true" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{{ t('adminFeature.usersPage.unlockHint') }}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <span>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            type="button"
-                            :disabled="!isPasswordResettable(user)"
-                            :aria-label="t('adminFeature.usersPage.resetPasswordAria', { name: user.name })"
-                            @click="handleResetPassword(user.id)"
-                          >
-                            <KeyRound :size="14" aria-hidden="true" />
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{{ resetPasswordHint(user) }}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger as-child>
-                        <Button
-                          variant="destructive-ghost"
-                          size="icon-sm"
-                          type="button"
-                          :aria-label="t('adminFeature.usersPage.deleteUserAria', { name: user.name })"
-                          @click="requestDeleteUser(user)"
-                        >
-                          <Trash2 :size="14" aria-hidden="true" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{{ t('common.delete') }}</TooltipContent>
-                    </Tooltip>
-                  </template>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <UserAttentionBand
+        v-if="attention.length > 0"
+        :items="attention"
+        :total="summary.attention"
+        :busy-user-id="busyUserId"
+        @unlock="handleUnlock"
+        @send-reset-link="handleResetPassword"
+        @open="openById"
+      />
 
-      <div class="space-y-2 md:hidden">
-        <article v-for="user in users" :key="user.id" class="rounded-lg border border-border bg-card p-3 shadow-xs">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="truncate font-medium text-foreground">{{ user.name }}</p>
-              <p class="truncate font-mono text-xs text-muted-foreground">@{{ user.username }}</p>
-            </div>
-            <StatusPill :tone="user.active ? 'success' : 'danger'" class="shrink-0">
-              {{ user.active ? t('adminFeature.usersPage.statusActive') : t('adminFeature.usersPage.statusInactive') }}
-            </StatusPill>
-          </div>
-          <div class="mt-3 flex flex-wrap items-center gap-1.5">
-            <StatusPill v-if="user.isSuperuser" tone="accent">
-              <ShieldCheck :size="11" aria-hidden="true" />
-              {{ t('adminFeature.usersPage.adminBadge') }}
-            </StatusPill>
-            <StatusPill v-else :tone="accessTone(user)">
-              {{ t('adminFeature.usersPage.permissionCount', { count: user.permissions?.length ?? 0 }) }}
-            </StatusPill>
-            <StatusPill v-if="user.hasContentFilters" tone="warning">
-              <ShieldAlert :size="11" aria-hidden="true" />
-              {{ t('adminFeature.usersPage.filteredBadge') }}
-            </StatusPill>
-            <StatusPill v-if="isLocked(user)" tone="warning">
-              {{ t('adminFeature.usersPage.lockedBadge') }}
-            </StatusPill>
-          </div>
-          <div v-if="canManage(user)" class="mt-3 flex items-center gap-2 border-t border-border pt-3">
-            <Button variant="outline" size="sm" type="button" @click="openEdit(user)">
-              {{ t('common.edit') }}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <Button variant="outline" size="icon-sm" type="button" :aria-label="t('adminFeature.usersPage.moreActionsAria', { name: user.name })">
-                  <MoreVertical :size="16" aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" class="w-56">
-                <DropdownMenuItem v-if="isLocked(user)" @click="handleUnlock(user.id)">
-                  {{ t('adminFeature.usersPage.unlockAccount') }}
-                </DropdownMenuItem>
-                <DropdownMenuItem :disabled="!isPasswordResettable(user)" @click="handleResetPassword(user.id)">
-                  {{ t('adminFeature.usersPage.resetPassword') }}
-                </DropdownMenuItem>
-                <DropdownMenuItem class="text-destructive focus:text-destructive" @click="requestDeleteUser(user)">
-                  {{ t('adminFeature.usersPage.deleteUserAction') }}
-                </DropdownMenuItem>
-                <template v-if="!isPasswordResettable(user)">
-                  <DropdownMenuSeparator />
-                  <p class="px-2 py-1.5 text-xs leading-4 text-muted-foreground">
-                    {{
-                      user.provisioningMethod === 'oidc'
-                        ? t('adminFeature.usersPage.resetPasswordOidcHintFull')
-                        : t('adminFeature.usersPage.resetPasswordSharedHintFull')
-                    }}
-                  </p>
-                </template>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </article>
-      </div>
+      <p v-if="actionError" role="alert" class="settings-error-state">{{ actionError }}</p>
 
-      <nav v-if="totalPages > 1" :aria-label="t('adminFeature.usersPage.pagination.label')" class="flex items-center justify-between gap-3">
-        <p class="text-sm text-muted-foreground">
-          {{ t('adminFeature.usersPage.pagination.page', { page: formatNumber(page), totalPages: formatNumber(totalPages) }) }}
-        </p>
-        <div class="flex gap-2">
-          <Button variant="outline" size="sm" type="button" :disabled="page <= 1" @click="previousPage">{{ t('common.previous') }}</Button>
-          <Button variant="outline" size="sm" type="button" :disabled="page >= totalPages" @click="nextPage">{{ t('common.next') }}</Button>
-        </div>
-      </nav>
-    </template>
-
-    <section
-      v-if="!loading && !error && canManageAppSettings"
-      aria-labelledby="self-registration-heading"
-      class="space-y-2 border-t border-border/70 pt-6"
-    >
-      <div>
-        <h3 id="self-registration-heading" class="settings-group-label mb-1">
-          {{ t('adminFeature.usersPage.selfRegistration.title') }}
-        </h3>
-        <p class="text-sm text-muted-foreground">{{ t('adminFeature.usersPage.selfRegistration.subtitle') }}</p>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-4 shadow-xs">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div class="min-w-0">
-            <p class="settings-label">{{ t('adminFeature.usersPage.selfRegistration.label') }}</p>
-            <p class="settings-hint">{{ t('adminFeature.usersPage.selfRegistration.hint') }}</p>
-          </div>
-          <ToggleSwitch
-            :model-value="allowRegistration"
-            :disabled="savingSelfRegistration"
-            :aria-label="t('adminFeature.usersPage.selfRegistration.label')"
-            class="self-start md:self-auto"
-            @update:model-value="toggleSelfRegistration"
+      <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
+        <label class="relative block min-w-0 flex-1 lg:order-1">
+          <span class="sr-only">{{ t('adminFeature.usersPage.filters.search') }}</span>
+          <Search :size="15" class="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            v-model="search"
+            type="search"
+            class="input-field h-9 w-full ps-9 pe-9"
+            :placeholder="t('adminFeature.usersPage.filters.searchPlaceholder')"
           />
-        </div>
-        <p v-if="allowRegistration" class="mt-3 text-sm text-muted-foreground">
-          {{ t('adminFeature.usersPage.selfRegistration.enabledNotice') }}
-        </p>
-        <p v-if="selfRegistrationError" role="alert" class="mt-3 text-sm text-destructive">
-          {{
-            selfRegistrationError === 'save'
-              ? t('adminFeature.usersPage.selfRegistration.saveError')
-              : t('adminFeature.usersPage.selfRegistration.loadError')
-          }}
-        </p>
-      </div>
-    </section>
+          <button
+            v-if="search"
+            type="button"
+            class="absolute end-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :aria-label="t('adminFeature.usersPage.filters.clear')"
+            @click="clearSearch"
+          >
+            <X :size="14" aria-hidden="true" />
+          </button>
+        </label>
 
-    <section
-      v-if="!loading && !error && canManageUserDefaults"
-      aria-labelledby="default-library-access-heading"
-      class="space-y-2 border-t border-border/70 pt-6"
-    >
-      <div>
-        <h3 id="default-library-access-heading" class="settings-group-label mb-1">
-          {{ t('adminFeature.usersPage.defaultLibraryAccess.title') }}
-        </h3>
-        <p class="text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.subtitle') }}</p>
-      </div>
-      <div class="rounded-lg border border-border bg-card p-4 shadow-xs">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p class="max-w-2xl text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.description') }}</p>
+        <div class="flex min-w-0 items-center gap-2 lg:order-2 lg:shrink-0">
+          <div
+            role="group"
+            :aria-label="t('adminFeature.usersPage.filters.state')"
+            class="flex min-w-0 gap-0.5 overflow-x-auto rounded-lg border border-border bg-muted p-0.5"
+          >
+            <button
+              v-for="filter in stateFilters"
+              :key="filter.value || 'all'"
+              type="button"
+              class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :class="state === filter.value ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              :aria-pressed="state === filter.value"
+              @click="selectState(filter.value)"
+            >
+              {{ filter.label }}
+              <span
+                class="rounded px-1 text-xs tabular-nums"
+                :class="state === filter.value ? 'bg-primary/15 text-primary' : 'bg-foreground/8 text-muted-foreground'"
+              >
+                {{ formatNumber(filter.count) }}
+              </span>
+            </button>
+          </div>
+
           <Button
+            v-if="summary.attention > 0"
             variant="outline"
             size="sm"
             type="button"
-            class="md:justify-start"
-            :disabled="savingDefaultLibraryAccess || !hasDefaultLibraryChanges"
-            @click="saveDefaultLibraryAccess"
+            class="h-9 shrink-0 border-[var(--pill-warning)]/40 text-[var(--pill-warning)] hover:text-[var(--pill-warning)]"
+            :aria-pressed="state === 'attention'"
+            :aria-label="t('adminFeature.usersPage.attention.filter', { count: summary.attention })"
+            @click="showAttentionOnly"
           >
-            <Save :size="14" aria-hidden="true" />
-            {{
-              savingDefaultLibraryAccess
-                ? t('adminFeature.usersPage.defaultLibraryAccess.saving')
-                : t('adminFeature.usersPage.defaultLibraryAccess.save')
-            }}
+            <TriangleAlert :size="14" aria-hidden="true" />
+            <span class="sm:hidden">{{ formatNumber(summary.attention) }}</span>
+            <span class="hidden sm:inline">{{ t('adminFeature.usersPage.attention.filter', { count: summary.attention }) }}</span>
           </Button>
         </div>
-        <div v-if="libraries.length > 0" class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <label
-            v-for="lib in libraries"
-            :key="lib.id"
-            class="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 transition-colors hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring"
-          >
-            <input
-              type="checkbox"
-              :checked="defaultLibraryIds.has(lib.id)"
-              class="size-4 rounded border-input accent-primary"
-              @change="toggleDefaultLibrary(lib.id)"
-            />
-            <span class="min-w-0 truncate text-sm text-foreground">{{ lib.name }}</span>
-          </label>
-        </div>
-        <p v-else class="mt-3 text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.noLibraries') }}</p>
-        <p v-if="defaultLibraryAccessError" role="alert" class="mt-3 text-sm text-destructive">{{ defaultLibraryAccessError }}</p>
       </div>
-    </section>
+
+      <p v-if="initialLoad" role="status" class="settings-loading-state">{{ t('common.loading') }}</p>
+
+      <div v-else-if="users.length === 0" class="settings-empty-state">
+        <p class="text-sm font-medium text-foreground">{{ t('adminFeature.usersPage.empty.title') }}</p>
+        <p class="mt-1 text-sm text-muted-foreground">
+          {{ hasActiveFilters ? t('adminFeature.usersPage.empty.filtered') : t('adminFeature.usersPage.empty.description') }}
+        </p>
+        <Button v-if="hasActiveFilters" variant="outline" size="sm" type="button" class="mt-3" @click="clearFilters">
+          {{ t('adminFeature.usersPage.filters.clear') }}
+        </Button>
+      </div>
+
+      <template v-else>
+        <div :class="loading ? 'opacity-60 transition-opacity' : 'transition-opacity'" :aria-busy="loading">
+          <UserRosterTable
+            :users="users"
+            :library-total="libraries.length"
+            :sort-by="sortBy"
+            :sort-dir="sortDir"
+            :can-manage="canManage"
+            :is-locked="isLocked"
+            :is-resettable="isPasswordResettable"
+            :needs-attention="needsAttention"
+            @sort="handleSort"
+            @edit="openEdit"
+            @unlock="unlockUser"
+            @reset-password="resetUserPassword"
+            @remove="requestDeleteUser"
+          />
+          <UserRosterCards
+            :users="users"
+            :library-total="libraries.length"
+            :can-manage="canManage"
+            :needs-attention="needsAttention"
+            @open="openEdit"
+          />
+        </div>
+
+        <nav :aria-label="t('adminFeature.usersPage.pagination.label')" class="flex items-center justify-between gap-3">
+          <p class="text-sm text-muted-foreground">
+            {{ t('adminFeature.usersPage.pagination.showing', { shown: formatNumber(users.length), total: formatNumber(total) }) }}
+          </p>
+          <div v-if="totalPages > 1" class="flex items-center gap-2">
+            <Button variant="outline" size="sm" type="button" :disabled="page <= 1" @click="previousPage">{{ t('common.previous') }}</Button>
+            <span class="text-sm tabular-nums text-muted-foreground">
+              {{ t('adminFeature.usersPage.pagination.page', { page: formatNumber(page), totalPages: formatNumber(totalPages) }) }}
+            </span>
+            <Button variant="outline" size="sm" type="button" :disabled="page >= totalPages" @click="nextPage">{{ t('common.next') }}</Button>
+          </div>
+        </nav>
+      </template>
+    </template>
+
+    <NewAccountDefaults
+      v-if="showDefaults"
+      :show-self-registration="canManageAppSettings"
+      :show-library-defaults="canManageUserDefaults"
+      :allow-registration="allowRegistration"
+      :saving-self-registration="savingSelfRegistration"
+      :self-registration-error="selfRegistrationError"
+      :libraries="libraries"
+      :selected-library-ids="defaultLibraryIds"
+      :saving-library-defaults="savingDefaultLibraryAccess"
+      :library-defaults-error="defaultLibraryAccessError"
+      :has-library-changes="hasDefaultLibraryChanges"
+      @toggle-self-registration="toggleSelfRegistration"
+      @toggle-library="toggleDefaultLibrary"
+      @save-library-defaults="saveDefaultLibraryAccess"
+    />
 
     <UserFormDrawer
       v-if="drawerOpen"

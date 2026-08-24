@@ -385,6 +385,25 @@
   .settings-value {
     @apply text-sm font-medium tabular-nums text-foreground;
   }
+  /* ── Provider chips ────────────────────────────────────────
+     Callers set --provider-color; the ink/fill/ring mixes come from the theme so
+     light mode darkens the brand hue enough to pass contrast. See tokens.css.
+  ────────────────────────────────────────────────────────────── */
+  .provider-chip {
+    background-color: color-mix(in srgb, var(--provider-color) var(--provider-fill), transparent);
+    color: color-mix(in srgb, var(--provider-color) var(--provider-ink), var(--provider-ink-base));
+    outline: 1px solid color-mix(in srgb, var(--provider-color) var(--provider-ring), transparent);
+    outline-offset: -1px;
+  }
+  /* A provider that stays in the priority order but is skipped on every fetch.
+     Dashed and neutral so it reads as inert rather than merely dimmed. */
+  .provider-chip-skipped {
+    background-color: transparent;
+    color: var(--muted-foreground);
+    outline: 1px dashed var(--border);
+    outline-offset: -1px;
+  }
+
   .settings-card {
     @apply overflow-hidden rounded-lg border border-border bg-card divide-y divide-border shadow-xs;
   }

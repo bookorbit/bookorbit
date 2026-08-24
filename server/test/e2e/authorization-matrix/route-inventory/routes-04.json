@@ -482,6 +482,18 @@
   {
     "file": "server/src/modules/library/library.controller.ts",
     "className": "LibraryController",
+    "methodName": "getOverview",
+    "httpMethod": "GET",
+    "path": "/libraries/overview",
+    "permissions": ["Permission.ManageLibraries"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
     "methodName": "findOne",
     "httpMethod": "GET",
     "path": "/libraries/:id",

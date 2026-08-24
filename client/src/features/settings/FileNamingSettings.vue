@@ -1,102 +1,182 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BookOpen, Check, CircleHelp, File, FolderOpen, Loader2, RotateCcw } from '@lucide/vue'
-import {
-  DEFAULT_DOWNLOAD_PATTERN,
-  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
-  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
-  type Library,
-} from '@bookorbit/types'
-import { useFileNamingPattern } from './composables/useFileNamingPattern'
-import { useDebouncedPatternPreview } from './composables/useDebouncedPatternPreview'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Badge } from '@/components/ui/badge'
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { Info, Loader2 } from '@lucide/vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
-import PatternField from './PatternField.vue'
-import PatternPreview from './PatternPreview.vue'
-import PatternHelpSheet from './PatternHelpSheet.vue'
-import AppIcon from '@/components/AppIcon.vue'
+import NamingRuleRail, { type RailItem } from './file-naming/components/NamingRuleRail.vue'
+import NamingRuleEditor from './file-naming/components/NamingRuleEditor.vue'
+import NamingResultPanel from './file-naming/components/NamingResultPanel.vue'
+import FileNamingSaveBar from './file-naming/components/FileNamingSaveBar.vue'
+import PatternExamplesSheet from './file-naming/components/PatternExamplesSheet.vue'
+import { useDebouncedPatternPreview } from './composables/useDebouncedPatternPreview'
+import { useFileNamingRules } from './file-naming/composables/useFileNamingRules'
+import { GLOBAL_RULE_ICONS, globalKeyForMode, librariesGovernedBy, type NamingRule, type NamingRuleId } from './file-naming/lib/naming-rules'
 
-const { t } = useI18n()
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
+const { t } = useI18n()
+
 const {
-  globalPattern,
-  globalError,
-  globalDirty,
-  folderPattern,
-  folderError,
-  folderDirty,
-  downloadPattern,
-  downloadError,
-  downloadDirty,
   libraries,
-  loadingGlobal,
-  savingGlobal,
-  loadingFolder,
-  savingFolder,
-  loadingDownload,
-  savingDownload,
+  visibleRules,
+  selectedRuleId,
+  selectedRule,
+  query,
+  loading,
+  saving,
   crossPlatformSanitizationEnabled,
-  loadingCrossPlatformSanitization,
   savingCrossPlatformSanitization,
-  savingLibraryId,
-  fetchGlobalPattern,
-  fetchFolderPattern,
-  fetchDownloadPattern,
-  fetchCrossPlatformSanitization,
-  loadLibraries,
-  isLibraryDirty,
-  onGlobalPatternInput,
-  onFolderPatternInput,
-  onDownloadPatternInput,
-  saveGlobalPattern,
-  saveFolderPattern,
-  saveDownloadPattern,
+  overriddenLibraryIds,
+  dirtyRules,
+  blockedByError,
+  ruleName,
+  effectivePattern,
+  isInherited,
+  isDirty,
+  errorFor,
+  load,
+  setDraft,
+  addOverride,
+  removeOverride,
+  resetToShippedDefault,
+  discardAll,
+  saveAll,
   setCrossPlatformSanitization,
-  saveLibraryPattern,
-  clearLibraryPattern,
-  getEffectivePreview,
-  previewDownloadName,
-  previewPath,
-} = useFileNamingPattern()
+} = useFileNamingRules()
 
 const helpOpen = ref(false)
+/** Below md the rail and the editor are separate screens, so one of them is showing. */
+const mobileView = ref<'rail' | 'editor'>('rail')
 
-const debouncedGlobalPattern = useDebouncedPatternPreview(globalPattern)
-const debouncedFolderPattern = useDebouncedPatternPreview(folderPattern)
-const debouncedDownloadPattern = useDebouncedPatternPreview(downloadPattern)
+const EDITOR_ID = 'file-naming-editor'
 
-const uploadPreviewValue = computed(() => previewPath(debouncedGlobalPattern.value))
-const folderPreviewValue = computed(() => previewPath(debouncedFolderPattern.value))
-const downloadPreviewValue = computed(() => previewDownloadName(debouncedDownloadPattern.value))
-
-onMounted(async () => {
-  await Promise.all([fetchGlobalPattern(), fetchFolderPattern(), fetchDownloadPattern(), fetchCrossPlatformSanitization(), loadLibraries()])
+onMounted(() => {
+  void load()
 })
+
+// A filter that hides the selected rule would leave the editor showing something the
+// rail no longer lists, so follow the filter down to the first surviving rule.
+watch(visibleRules, (rules) => {
+  if (rules.length === 0) return
+  if (rules.some((rule) => rule.id === selectedRuleId.value)) return
+  const first = rules[0]
+  if (first) selectedRuleId.value = first.id
+})
+
+function ruleIcon(rule: NamingRule): string {
+  if (rule.kind === 'global') return GLOBAL_RULE_ICONS[rule.globalKey!]
+  return rule.library?.icon || 'FolderOpen'
+}
+
+// A library's organization mode decides which global default it falls back to, which is
+// the fact that matters on this page; a book count would not tell the reader anything here.
+function railDetail(rule: NamingRule): string {
+  if (rule.kind === 'library') {
+    return rule.organizationMode === 'book_per_folder'
+      ? t('settings.reader.fileNaming.orgFolderAsBook')
+      : t('settings.reader.fileNaming.orgFileAsBook')
+  }
+  if (rule.globalKey === 'download') return t('settings.reader.fileNaming.downloadScope')
+  const governed = librariesGovernedBy(rule, libraries.value, overriddenLibraryIds.value).length
+  return t('settings.reader.fileNaming.appliesToLibraries', { count: governed })
+}
+
+function toRailItem(rule: NamingRule): RailItem {
+  return {
+    id: rule.id,
+    name: ruleName(rule),
+    detail: railDetail(rule),
+    icon: ruleIcon(rule),
+    custom: rule.kind === 'library' && !isInherited(rule),
+    dirty: isDirty(rule),
+  }
+}
+
+const railGlobals = computed(() => visibleRules.value.filter((rule) => rule.kind === 'global').map(toRailItem))
+const railLibraries = computed(() => visibleRules.value.filter((rule) => rule.kind === 'library').map(toRailItem))
+
+const activePattern = computed(() => (selectedRule.value ? effectivePattern(selectedRule.value) : ''))
+const activeName = computed(() => (selectedRule.value ? ruleName(selectedRule.value) : ''))
+const activeInherited = computed(() => (selectedRule.value ? isInherited(selectedRule.value) : false))
+const activeError = computed(() => (selectedRule.value ? errorFor(selectedRule.value) : ''))
+
+// The result panel resolves the pattern four times over. Phones cannot do that per
+// keystroke without the on-screen keyboard stuttering, so the preview trails the field
+// there and stays in lockstep on desktop.
+const previewPattern = useDebouncedPatternPreview(activePattern)
+
+/** The global rule a library falls back to, named so the copy can point at it. */
+const inheritedFromName = computed(() => {
+  const rule = selectedRule.value
+  if (!rule || rule.kind !== 'library') return ''
+  return t(
+    `settings.reader.fileNaming.rule.${globalKeyForMode(rule.organizationMode ?? 'book_per_file')}` as 'settings.reader.fileNaming.rule.fileAsBook',
+  )
+})
+
+/** One line under the field saying exactly what this pattern governs today. */
+const scopeSummary = computed(() => {
+  const rule = selectedRule.value
+  if (!rule) return ''
+  if (rule.kind === 'library') return t('settings.reader.fileNaming.scopeLibrary', { name: rule.library?.name ?? '' })
+  if (rule.globalKey === 'download') return t('settings.reader.fileNaming.scopeDownload')
+  const governed = librariesGovernedBy(rule, libraries.value, overriddenLibraryIds.value).length
+  if (governed === 0) return t('settings.reader.fileNaming.scopeGlobalNone')
+  return t('settings.reader.fileNaming.scopeGlobal', { count: governed })
+})
+
+function handleSelect(id: NamingRuleId) {
+  selectedRuleId.value = id
+  mobileView.value = 'editor'
+}
+
+function handleQuery(value: string) {
+  query.value = value
+}
+
+function handlePattern(value: string) {
+  if (selectedRule.value) setDraft(selectedRule.value, value)
+}
+
+function handleAddOverride() {
+  if (selectedRule.value) addOverride(selectedRule.value)
+}
+
+function handleRemoveOverride() {
+  if (selectedRule.value) removeOverride(selectedRule.value)
+}
+
+function handleResetToShipped() {
+  if (selectedRule.value) resetToShippedDefault(selectedRule.value)
+}
+
+function handleBack() {
+  mobileView.value = 'rail'
+}
 
 function openHelp() {
   helpOpen.value = true
 }
 
-function organizationBadgeClass(library: Library): string {
-  return library.organizationMode === 'book_per_folder'
-    ? 'border-[var(--pill-folder-as-book)]/40 bg-[var(--pill-folder-as-book)]/10 text-[var(--pill-folder-as-book)]'
-    : 'border-[var(--pill-file-as-book)]/40 bg-[var(--pill-file-as-book)]/10 text-[var(--pill-file-as-book)]'
+function handleApplyExample(pattern: string) {
+  if (selectedRule.value) setDraft(selectedRule.value, pattern)
 }
 
-function libraryPlaceholder(library: Library): string {
-  return library.organizationMode === 'book_per_folder'
-    ? folderPattern.value || DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER
-    : globalPattern.value || DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE
+function handleSave() {
+  void saveAll()
+}
+
+function handleDiscard() {
+  discardAll()
+}
+
+function handleSanitize(value: boolean) {
+  void setCrossPlatformSanitization(value)
 }
 </script>
 
 <template>
-  <div class="space-y-8 pb-20">
+  <div class="space-y-4 pb-16">
     <SettingsPageHeader
       v-if="!props.embedded"
       class="hidden md:flex"
@@ -105,186 +185,90 @@ function libraryPlaceholder(library: Library): string {
     />
     <div v-if="!props.embedded" class="px-1 md:hidden">
       <h1 class="text-xl font-semibold tracking-tight text-foreground">{{ t('settings.reader.fileNaming.title') }}</h1>
-      <p
-        class="mt-1 overflow-hidden text-ellipsis text-sm leading-5 text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
-      >
-        {{ t('settings.reader.fileNaming.subtitle') }}
-      </p>
+      <p class="mt-1 text-sm leading-5 text-muted-foreground">{{ t('settings.reader.fileNaming.subtitleShort') }}</p>
     </div>
 
-    <section aria-labelledby="file-naming-global-defaults-heading" class="space-y-2">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="min-w-0">
-          <h2 id="file-naming-global-defaults-heading" class="settings-group-label mb-0">
-            {{ t('settings.reader.fileNaming.globalDefaults') }}
-          </h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.reader.fileNaming.patternHelpIntro', { titleToken: '{title}', authorsToken: '{authors}' }) }}
-          </p>
-        </div>
-        <Button variant="secondary" size="sm" type="button" class="shrink-0 self-start sm:self-auto" @click="openHelp">
-          <BookOpen :size="14" aria-hidden="true" />
-          {{ t('settings.reader.fileNaming.browseTokensAndExamples') }}
-        </Button>
-      </div>
+    <div v-if="loading" class="flex items-center justify-center rounded-lg border border-border bg-card px-6 py-20 shadow-xs">
+      <Loader2 :size="24" class="animate-spin text-muted-foreground" aria-hidden="true" />
+      <span class="sr-only">{{ t('common.loading') }}</span>
+    </div>
 
-      <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
-        <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5 md:py-5">
-          <div class="min-w-0 max-w-2xl">
-            <p class="settings-label">{{ t('settings.reader.fileNaming.crossPlatform') }}</p>
-            <p class="settings-hint">{{ t('settings.reader.fileNaming.crossPlatformHint') }}</p>
-          </div>
-          <ToggleSwitch
-            :model-value="crossPlatformSanitizationEnabled"
-            :disabled="loadingCrossPlatformSanitization || savingCrossPlatformSanitization"
-            :aria-label="t('settings.reader.fileNaming.crossPlatform')"
-            class="self-start md:ml-4 md:self-auto"
-            @update:model-value="setCrossPlatformSanitization"
+    <template v-else>
+      <div class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+        <div class="md:grid md:grid-cols-[17.5rem_minmax(0,1fr)] md:items-stretch">
+          <NamingRuleRail
+            :class="mobileView === 'editor' ? 'hidden md:flex' : 'flex'"
+            :globals="railGlobals"
+            :libraries="railLibraries"
+            :libraries-total="libraries.length"
+            :custom-count="overriddenLibraryIds.size"
+            :selected-id="selectedRuleId"
+            :query="query"
+            :editor-id="EDITOR_ID"
+            @select="handleSelect"
+            @update:query="handleQuery"
           />
-        </div>
 
-        <PatternField
-          field-id="file-naming-file-as-book"
-          :label="t('settings.reader.fileNaming.fileAsBookDefault')"
-          :hint="t('settings.reader.fileNaming.fileAsBookDefaultHint')"
-          :model-value="globalPattern"
-          :placeholder="DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE"
-          :preview="uploadPreviewValue"
-          :error="globalError"
-          :loading="loadingGlobal"
-          :saving="savingGlobal"
-          :dirty="globalDirty"
-          @update:model-value="onGlobalPatternInput"
-          @save="saveGlobalPattern"
-          @help="openHelp"
-        />
+          <div :id="EDITOR_ID" :class="mobileView === 'rail' ? 'hidden md:block' : 'block'">
+            <div v-if="selectedRule" class="xl:grid xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-start">
+              <NamingRuleEditor
+                :rule="selectedRule"
+                :name="activeName"
+                :icon="ruleIcon(selectedRule)"
+                :pattern="activePattern"
+                :inherited="activeInherited"
+                :dirty="isDirty(selectedRule)"
+                :error="activeError"
+                :scope-summary="scopeSummary"
+                :inherited-from-name="inheritedFromName"
+                :sanitize="crossPlatformSanitizationEnabled"
+                @update:pattern="handlePattern"
+                @add-override="handleAddOverride"
+                @remove-override="handleRemoveOverride"
+                @reset-to-shipped="handleResetToShipped"
+                @open-help="openHelp"
+                @back="handleBack"
+              />
 
-        <PatternField
-          field-id="file-naming-folder-as-book"
-          :label="t('settings.reader.fileNaming.folderAsBookDefault')"
-          :hint="t('settings.reader.fileNaming.folderAsBookDefaultHint')"
-          :model-value="folderPattern"
-          :placeholder="DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER"
-          :preview="folderPreviewValue"
-          :error="folderError"
-          :loading="loadingFolder"
-          :saving="savingFolder"
-          :dirty="folderDirty"
-          @update:model-value="onFolderPatternInput"
-          @save="saveFolderPattern"
-          @help="openHelp"
-        />
-
-        <PatternField
-          field-id="file-naming-download"
-          :label="t('settings.reader.fileNaming.downloadPattern')"
-          :hint="t('settings.reader.fileNaming.downloadPatternHint')"
-          :model-value="downloadPattern"
-          :placeholder="DEFAULT_DOWNLOAD_PATTERN"
-          :preview="downloadPreviewValue"
-          :error="downloadError"
-          :loading="loadingDownload"
-          :saving="savingDownload"
-          :dirty="downloadDirty"
-          @update:model-value="onDownloadPatternInput"
-          @save="saveDownloadPattern"
-          @help="openHelp"
-        />
-      </div>
-    </section>
-
-    <section class="space-y-2">
-      <div class="flex items-center gap-1.5">
-        <h2 class="settings-group-label mb-0">{{ t('settings.reader.fileNaming.libraryOverrides') }}</h2>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('settings.reader.fileNaming.patternHelp')" @click="openHelp">
-              <CircleHelp :size="14" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('settings.reader.fileNaming.patternHelp') }}</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
-        <p v-if="libraries.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground md:px-5 md:py-10">
-          {{ t('settings.reader.fileNaming.noLibraries') }}
-        </p>
-
-        <div v-for="lib in libraries" :key="lib.id" class="space-y-3 px-4 py-4 md:px-5 md:py-5">
-          <div class="flex items-start gap-3">
-            <span class="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <AppIcon :icon="lib.icon || 'FolderOpen'" fallback="FolderOpen" :size="16" aria-hidden="true" />
-            </span>
-            <div class="min-w-0 space-y-1.5">
-              <label :for="`file-naming-library-${lib.id}`" class="settings-label block truncate">{{ lib.name }}</label>
-              <div class="flex flex-wrap items-center gap-1.5">
-                <Badge :variant="lib.fileNamingPattern ? 'secondary' : 'outline'">
-                  {{ lib.fileNamingPattern ? t('settings.reader.fileNaming.badgeCustom') : t('settings.reader.fileNaming.badgeDefault') }}
-                </Badge>
-                <Badge variant="outline" class="gap-1" :class="organizationBadgeClass(lib)">
-                  <FolderOpen v-if="lib.organizationMode === 'book_per_folder'" :size="11" aria-hidden="true" />
-                  <File v-else :size="11" aria-hidden="true" />
-                  {{
-                    lib.organizationMode === 'book_per_folder'
-                      ? t('settings.reader.fileNaming.orgFolderAsBook')
-                      : t('settings.reader.fileNaming.orgFileAsBook')
-                  }}
-                </Badge>
+              <div class="px-3.5 pb-4 md:px-5 xl:sticky xl:top-4 xl:self-start xl:border-l xl:border-border xl:px-4 xl:pt-4">
+                <NamingResultPanel
+                  :pattern="previewPattern"
+                  :target="selectedRule.target"
+                  :rule-name="activeName"
+                  :sanitize="crossPlatformSanitizationEnabled"
+                  :sanitize-busy="savingCrossPlatformSanitization"
+                  @update:sanitize="handleSanitize"
+                />
               </div>
             </div>
           </div>
-
-          <div class="flex items-center gap-2">
-            <input
-              :id="`file-naming-library-${lib.id}`"
-              v-model="lib.fileNamingPattern"
-              type="text"
-              autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
-              :placeholder="libraryPlaceholder(lib)"
-              class="input-field w-full min-w-0 font-mono"
-            />
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  type="button"
-                  class="shrink-0"
-                  :disabled="savingLibraryId === lib.id || !isLibraryDirty(lib)"
-                  :aria-label="t('settings.reader.fileNaming.saveLibraryPattern', { name: lib.name })"
-                  @click="saveLibraryPattern(lib)"
-                >
-                  <Loader2 v-if="savingLibraryId === lib.id" :size="14" class="animate-spin" aria-hidden="true" />
-                  <Check v-else :size="14" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{{ t('settings.reader.fileNaming.saveLibraryPattern', { name: lib.name }) }}</TooltipContent>
-            </Tooltip>
-            <Tooltip v-if="lib.fileNamingPattern">
-              <TooltipTrigger as-child>
-                <Button
-                  variant="destructive-ghost"
-                  size="icon-sm"
-                  type="button"
-                  class="shrink-0"
-                  :aria-label="t('settings.reader.fileNaming.resetLibraryPattern', { name: lib.name })"
-                  @click="clearLibraryPattern(lib)"
-                >
-                  <RotateCcw :size="14" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{{ t('settings.reader.fileNaming.resetToDefault') }}</TooltipContent>
-            </Tooltip>
-          </div>
-
-          <PatternPreview :value="getEffectivePreview(lib)" :label="lib.name" />
         </div>
-      </div>
-    </section>
 
-    <PatternHelpSheet v-model:open="helpOpen" />
+        <FileNamingSaveBar
+          :unsaved-count="dirtyRules.length"
+          :saving="saving"
+          :blocked="blockedByError"
+          @save="handleSave"
+          @discard="handleDiscard"
+        />
+      </div>
+
+      <div class="flex items-start gap-3 rounded-lg border border-primary/15 bg-primary/5 px-4 py-3 shadow-xs">
+        <Info :size="16" class="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
+        <p class="text-xs leading-relaxed text-muted-foreground">
+          <span class="font-medium text-foreground">{{ t('settings.reader.fileNaming.howItWorks.title') }}</span>
+          {{ ' ' }}{{ t('settings.reader.fileNaming.howItWorks.summary') }}
+        </p>
+      </div>
+    </template>
+
+    <PatternExamplesSheet
+      v-if="selectedRule"
+      v-model:open="helpOpen"
+      :target="selectedRule.target"
+      :organization-mode="selectedRule.organizationMode"
+      :sanitize="crossPlatformSanitizationEnabled"
+      @apply="handleApplyExample"
+    />
   </div>
 </template>

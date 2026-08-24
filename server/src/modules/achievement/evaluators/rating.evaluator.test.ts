@@ -19,7 +19,7 @@ function makeRatingPayload(overrides: Partial<Record<string, unknown>> = {}) {
 describe('RatingEvaluator', () => {
   let evaluator: RatingEvaluator;
   let repo: ReturnType<typeof makeRepo>;
-  const backfillCtx = { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never };
+  const backfillCtx = { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never };
 
   beforeEach(() => {
     repo = makeRepo();
@@ -27,7 +27,7 @@ describe('RatingEvaluator', () => {
   });
 
   function ratingCtx(payload = makeRatingPayload()) {
-    return { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, payload: payload as never };
+    return { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, payload: payload as never };
   }
 
   it('supports rating-changed and backfill events', () => {

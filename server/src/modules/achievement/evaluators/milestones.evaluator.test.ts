@@ -46,7 +46,13 @@ describe('MilestonesEvaluator', () => {
   describe('bookmarked', () => {
     it('awards bookmarked on annotation creation', async () => {
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ANNOTATION_CREATED, payload: { userId: 1, bookId: 5 } as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_ANNOTATION_CREATED,
+          payload: { userId: 1, bookId: 5 } as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'bookmarked' }));
@@ -189,7 +195,7 @@ describe('MilestonesEvaluator', () => {
     it('awards first_series via backfill', async () => {
       repo.hasFinishedBookInSeries.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'first_series' }));
@@ -200,7 +206,13 @@ describe('MilestonesEvaluator', () => {
     it('awards category_sweeper when all 4 categories have at least one badge earned', async () => {
       repo.countDistinctEarnedCategories.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED, payload: { userId: 1, keys: ['some_key'] } as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED,
+          payload: { userId: 1, keys: ['some_key'] } as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'category_sweeper' }));
@@ -209,7 +221,13 @@ describe('MilestonesEvaluator', () => {
     it('does not award category_sweeper below 4 categories', async () => {
       repo.countDistinctEarnedCategories.mockResolvedValue(3);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED, payload: { userId: 1, keys: ['some_key'] } as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED,
+          payload: { userId: 1, keys: ['some_key'] } as never,
+        },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'category_sweeper')).toBeUndefined();
@@ -218,7 +236,13 @@ describe('MilestonesEvaluator', () => {
     it('does not award category_sweeper when already earned', async () => {
       repo.countDistinctEarnedCategories.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED, payload: { userId: 1, keys: ['some_key'] } as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED,
+          payload: { userId: 1, keys: ['some_key'] } as never,
+        },
         new Set(['category_sweeper']),
       );
       expect(awards.find((a) => a.key === 'category_sweeper')).toBeUndefined();
@@ -227,7 +251,7 @@ describe('MilestonesEvaluator', () => {
     it('awards category_sweeper via backfill', async () => {
       repo.countDistinctEarnedCategories.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'category_sweeper' }));
@@ -236,7 +260,7 @@ describe('MilestonesEvaluator', () => {
     it('does not award category_sweeper via backfill below 4 categories', async () => {
       repo.countDistinctEarnedCategories.mockResolvedValue(3);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'category_sweeper')).toBeUndefined();
@@ -247,7 +271,7 @@ describe('MilestonesEvaluator', () => {
     it('awards bookmarked via backfill when user has annotations', async () => {
       repo.countAnnotations.mockResolvedValue(3);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'bookmarked' }));
@@ -256,7 +280,7 @@ describe('MilestonesEvaluator', () => {
     it('does not award bookmarked via backfill when no annotations', async () => {
       repo.countAnnotations.mockResolvedValue(0);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'bookmarked')).toBeUndefined();
@@ -265,7 +289,7 @@ describe('MilestonesEvaluator', () => {
     it('awards new_year_reader via backfill when a Jan 1 session exists', async () => {
       repo.hasSessionOnJanFirst.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'new_year_reader' }));
@@ -338,7 +362,7 @@ describe('MilestonesEvaluator', () => {
     it('awards dnf_self_aware via backfill when an abandoned book exists', async () => {
       repo.hasAbandonedBook.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'dnf_self_aware' }));

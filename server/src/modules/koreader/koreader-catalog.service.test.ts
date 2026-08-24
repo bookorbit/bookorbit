@@ -13,6 +13,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DEFAULT_KOREADER_DEVICE_PATTERN } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
 
+import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { makeUser } from '../../common/test-utils/make-user';
 import { KoreaderCatalogBooksQueryDto, KoreaderCatalogManifestQueryDto } from './dto/koreader-catalog-query.dto';
 import { KoreaderCatalogService } from './koreader-catalog.service';
@@ -84,6 +85,38 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
     fileWriteStatus: { enabled: false, reason: 'library_disabled', writableFormats: [], writableFields: [] },
     ...overrides,
   };
+}
+
+function makeManifestRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 10,
+    libraryName: 'Main',
+    title: 'Dune',
+    subtitle: null,
+    authors: ['Frank Herbert'],
+    seriesName: 'Dune',
+    seriesIndex: 1,
+    language: 'en',
+    publisher: 'Ace',
+    publishedYear: 1965,
+    isbn10: null,
+    isbn13: '9780441172719',
+    files: [
+      {
+        id: 100,
+        format: 'EPUB',
+        sizeBytes: 1234,
+        fileHash: 'abcdef0123456789',
+        filename: 'dune.epub',
+        contentVersion: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function makeQuery(overrides: Record<string, unknown> = {}) {
+  return Object.assign(new KoreaderCatalogManifestQueryDto(), overrides);
 }
 
 function makeService(
@@ -947,38 +980,6 @@ describe('KoreaderCatalogService', () => {
   });
 
   describe('bulk download manifest', () => {
-    function makeManifestRow(overrides: Record<string, unknown> = {}) {
-      return {
-        id: 10,
-        libraryName: 'Main',
-        title: 'Dune',
-        subtitle: null,
-        authors: ['Frank Herbert'],
-        seriesName: 'Dune',
-        seriesIndex: 1,
-        language: 'en',
-        publisher: 'Ace',
-        publishedYear: 1965,
-        isbn10: null,
-        isbn13: '9780441172719',
-        files: [
-          {
-            id: 100,
-            format: 'EPUB',
-            sizeBytes: 1234,
-            fileHash: 'abcdef0123456789',
-            filename: 'dune.epub',
-            contentVersion: new Date('2026-02-01T00:00:00.000Z'),
-          },
-        ],
-        ...overrides,
-      };
-    }
-
-    function makeQuery(overrides: Record<string, unknown> = {}) {
-      return Object.assign(new KoreaderCatalogManifestQueryDto(), overrides);
-    }
-
     it('returns everything a bulk transfer needs and no internal path', async () => {
       const { service, opdsBookService } = makeService();
       opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow()], hasNext: false });
@@ -1106,7 +1107,7 @@ describe('KoreaderCatalogService', () => {
 
       const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
 
-      expect(result.items[0]!.files[0]!.devicePath).toBe('Dune/1 - Dune.epub');
+      expect(result.items[0]!.files[0]!.devicePath).toBe('Dune/01 - Dune.epub');
     });
 
     it('resolves the library token so each library keeps its own subtree on the device', async () => {
@@ -1137,6 +1138,91 @@ describe('KoreaderCatalogService', () => {
       const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
 
       expect(result.items[0]!.files[0]!.devicePath).toBe('Dune.epub');
+    });
+  });
+
+  describe('series index device paths', () => {
+    const seriesPattern = {
+      fileNamingPattern: '',
+      seriesFileNamingPattern: '{series}/<{seriesIndex} - >{title}',
+      standaloneFileNamingPattern: '',
+    };
+
+    async function manifestDevicePath(seriesIndex: number | null, organization = seriesPattern) {
+      const { service, opdsBookService } = makeService(organization);
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ seriesIndex })], hasNext: false });
+
+      const result = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
+      return result.items[0]!.files[0]!.devicePath;
+    }
+
+    async function detailDevicePath(seriesIndex: number | null, organization = seriesPattern) {
+      const { service, bookService } = makeService(organization);
+      bookService.getDetail.mockResolvedValue(makeDetail({ seriesIndex }));
+
+      const detail = await service.getBookDetail(makeUser({ id: 7 }), 10, 'device-1');
+      return detail.files[0]?.devicePath;
+    }
+
+    it.each<[number, string]>([
+      [1, 'Dune/01 - Dune.epub'],
+      [9, 'Dune/09 - Dune.epub'],
+      [10, 'Dune/10 - Dune.epub'],
+      [100, 'Dune/100 - Dune.epub'],
+    ])('zero-pads a manifest series index of %s to two digits', async (seriesIndex, expected) => {
+      await expect(manifestDevicePath(seriesIndex)).resolves.toBe(expected);
+    });
+
+    it.each<[number, string]>([
+      [1, 'Dune/01 - Dune.epub'],
+      [9, 'Dune/09 - Dune.epub'],
+      [10, 'Dune/10 - Dune.epub'],
+      [100, 'Dune/100 - Dune.epub'],
+    ])('zero-pads a book detail series index of %s to two digits', async (seriesIndex, expected) => {
+      await expect(detailDevicePath(seriesIndex)).resolves.toBe(expected);
+    });
+
+    it('pads only the whole part of a fractional index', async () => {
+      await expect(manifestDevicePath(1.5)).resolves.toBe('Dune/01.5 - Dune.epub');
+      await expect(detailDevicePath(1.5)).resolves.toBe('Dune/01.5 - Dune.epub');
+    });
+
+    it('drops the optional index block instead of padding nothing when the book has no index', async () => {
+      await expect(manifestDevicePath(null)).resolves.toBe('Dune/Dune.epub');
+      await expect(detailDevicePath(null)).resolves.toBe('Dune/Dune.epub');
+    });
+
+    it.each<[number]>([[1], [7], [10], [1.5]])('resolves index %s to the same token the library rename path uses', async (seriesIndex) => {
+      await expect(manifestDevicePath(seriesIndex)).resolves.toBe(`Dune/${formatSeriesIndex(seriesIndex)} - Dune.epub`);
+    });
+
+    it('keeps the manifest and the book detail agreeing on one path per file', async () => {
+      const { service, opdsBookService, bookService } = makeService(seriesPattern);
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow({ seriesIndex: 3 })], hasNext: false });
+      bookService.getDetail.mockResolvedValue(makeDetail({ seriesIndex: 3 }));
+
+      const manifest = await service.getBulkManifest(makeUser({ id: 7 }), makeQuery({ deviceId: 'device-1' }));
+      const detail = await service.getBookDetail(makeUser({ id: 7 }), 10, 'device-1');
+
+      expect(manifest.items[0]!.files[0]!.devicePath).toBe('Dune/03 - Dune.epub');
+      expect(detail.files[0]?.devicePath).toBe(manifest.items[0]!.files[0]!.devicePath);
+    });
+
+    // fixed2 parses its input numerically, so padding upstream must leave the shipped
+    // default byte-identical; anything else would relocate every synced device library.
+    it.each<[number, string]>([
+      [1, 'Series/Dune/1.00 - Dune.epub'],
+      [10, 'Series/Dune/10.00 - Dune.epub'],
+      [1.5, 'Series/Dune/1.50 - Dune.epub'],
+    ])('leaves the shipped fixed2 default unchanged for index %s', async (seriesIndex, expected) => {
+      const defaultOrganization = {
+        fileNamingPattern: DEFAULT_KOREADER_DEVICE_PATTERN,
+        seriesFileNamingPattern: '',
+        standaloneFileNamingPattern: '',
+      };
+
+      await expect(manifestDevicePath(seriesIndex, defaultOrganization)).resolves.toBe(expected);
+      await expect(detailDevicePath(seriesIndex, defaultOrganization)).resolves.toBe(expected);
     });
   });
 });

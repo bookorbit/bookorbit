@@ -119,7 +119,7 @@ describe('SettingsNav', () => {
       const labels = itemLabels(mountNav({ perms: ['manage_metadata_config'] }))
       expect(labels).toContain('Providers')
       expect(labels).toContain('Field Rules')
-      expect(labels).toContain('Score')
+      expect(labels).toContain('Confidence Score')
     })
 
     it('keeps custom fields behind manage_libraries rather than metadata config', () => {

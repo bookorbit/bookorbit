@@ -280,7 +280,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'libraries',
             name: 'settings-libraries',
             component: () => import('@/features/settings/LibrariesSettings.vue'),
-            meta: { maxWidth: 'max-w-[52rem]', title: () => t('titles.libraries') },
+            meta: { maxWidth: 'max-w-[82rem]', title: () => t('titles.libraries') },
           },
           {
             path: 'metadata',
@@ -291,13 +291,15 @@ export const routes: RouteRecordRaw[] = [
             path: 'metadata/providers',
             name: 'settings-metadata-providers',
             component: () => import('@/features/settings/metadata-preferences/MetadataPreferencesSettings.vue'),
-            meta: { maxWidth: 'max-w-4xl', title: () => t('titles.metadata.providers') },
+            meta: { maxWidth: 'max-w-5xl', title: () => t('titles.metadata.providers') },
           },
           {
             path: 'metadata/field-rules',
             name: 'settings-metadata-field-rules',
             component: () => import('@/features/settings/metadata-preferences/MetadataFieldRulesSettings.vue'),
-            meta: { maxWidth: 'max-w-6xl', title: () => t('titles.metadata.field-rules') },
+            // The rule table needs room for a 14-chip priority order beside a merge control;
+            // 6xl wrapped the chip lane while a third of a 1080p desk sat empty.
+            meta: { maxWidth: 'max-w-[100rem]', title: () => t('titles.metadata.field-rules') },
           },
           {
             path: 'metadata/custom-fields',
@@ -308,8 +310,10 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'metadata/score',
             name: 'settings-metadata-score',
-            component: () => import('@/features/settings/MetadataScoreWeightsSettings.vue'),
-            meta: { maxWidth: 'max-w-3xl', title: () => t('titles.metadata.score') },
+            component: () => import('@/features/settings/metadata-score/MetadataScoreWeightsSettings.vue'),
+            // The ledger splits into two ranked columns so all 24 fields land above the fold;
+            // max-w-3xl fitted 720px of a 1920 pane and pushed half the list under it.
+            meta: { maxWidth: 'max-w-[100rem]', title: () => t('titles.metadata.score') },
           },
           {
             path: 'metadata/auto-fetch',
@@ -334,7 +338,7 @@ export const routes: RouteRecordRaw[] = [
             name: 'settings-file-naming',
             component: () => import('@/features/settings/FileNamingSettings.vue'),
             props: { embedded: true },
-            meta: { maxWidth: 'max-w-5xl', title: () => t('titles.system.file-naming') },
+            meta: { maxWidth: 'max-w-[100rem]', title: () => t('titles.system.file-naming') },
           },
           {
             path: 'library/maintenance',

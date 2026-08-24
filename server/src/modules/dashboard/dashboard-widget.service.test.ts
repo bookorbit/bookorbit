@@ -112,6 +112,50 @@ describe('DashboardWidgetService', () => {
       expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenCalledWith(7, [3, 5], EMPTY_CONTENT_FILTER_RULES);
       expect(result).toEqual(mockData);
     });
+
+    it('intersects widget queries with the saved dashboard library selection', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      const user = makeUser({ id: 7, settings: { dashboardConfig: { libraryIds: [5, 99] } } });
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([3, 5]);
+      widgetRepo.getCurrentlyReadingBooks.mockResolvedValue({ books: [] });
+
+      await service.getCurrentlyReading(user);
+
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenCalledWith(7, [5], EMPTY_CONTENT_FILTER_RULES);
+    });
+
+    it('does not reuse cached widget data after the dashboard library selection changes', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      const firstUser = makeUser({ id: 7, settings: { dashboardConfig: { libraryIds: [3] } } });
+      const secondUser = makeUser({ id: 7, settings: { dashboardConfig: { libraryIds: [5] } } });
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([3, 5]);
+      widgetRepo.getCurrentlyReadingBooks.mockResolvedValueOnce({ books: [{ bookId: 3 }] }).mockResolvedValueOnce({ books: [{ bookId: 5 }] });
+
+      const first = await service.getCurrentlyReading(firstUser);
+      const second = await service.getCurrentlyReading(secondUser);
+
+      expect(first.books).toEqual([{ bookId: 3 }]);
+      expect(second.books).toEqual([{ bookId: 5 }]);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenCalledTimes(2);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenNthCalledWith(1, 7, [3], EMPTY_CONTENT_FILTER_RULES);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenNthCalledWith(2, 7, [5], EMPTY_CONTENT_FILTER_RULES);
+    });
+
+    it('does not reuse cached widget data after library access is revoked', async () => {
+      const { service, widgetRepo, libraryService } = makeService();
+      const user = makeUser({ id: 7, settings: { dashboardConfig: { libraryIds: [3, 5] } } });
+      libraryService.findAccessibleLibraryIds.mockResolvedValueOnce([3, 5]).mockResolvedValueOnce([3]);
+      widgetRepo.getCurrentlyReadingBooks.mockResolvedValueOnce({ books: [{ bookId: 5 }] }).mockResolvedValueOnce({ books: [] });
+
+      const beforeRevocation = await service.getCurrentlyReading(user);
+      const afterRevocation = await service.getCurrentlyReading(user);
+
+      expect(beforeRevocation.books).toEqual([{ bookId: 5 }]);
+      expect(afterRevocation.books).toEqual([]);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenCalledTimes(2);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenNthCalledWith(1, 7, [3, 5], EMPTY_CONTENT_FILTER_RULES);
+      expect(widgetRepo.getCurrentlyReadingBooks).toHaveBeenNthCalledWith(2, 7, [3], EMPTY_CONTENT_FILTER_RULES);
+    });
   });
 
   describe('getReadingStreak', () => {

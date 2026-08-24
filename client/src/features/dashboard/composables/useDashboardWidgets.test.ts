@@ -150,6 +150,37 @@ describe('useDashboardWidgets', () => {
     })
   })
 
+  describe('libraryIds', () => {
+    it('uses null for all libraries and normalizes a saved explicit selection', () => {
+      setupAuth()
+      expect(useDashboardWidgets().libraryIds.value).toBeNull()
+
+      setupAuth({ dashboardConfig: { libraryIds: [5, 2, 5, 0, 1.5] } })
+      expect(useDashboardWidgets().libraryIds.value).toEqual([5, 2])
+    })
+
+    it('saves an explicit selection while preserving other dashboard settings', async () => {
+      const { me } = setupAuth({ dashboardConfig: { readingGoal: 12, widgets: [] } })
+      const { saveLibraryScope } = useDashboardWidgets()
+
+      await saveLibraryScope([8, 3, 8])
+
+      const body = JSON.parse((mockApi.mock.calls[0]![1] as { body: string }).body)
+      expect(body.settings.dashboardConfig).toEqual({ readingGoal: 12, widgets: [], libraryIds: [8, 3] })
+      expect(me).toHaveBeenCalledOnce()
+    })
+
+    it('removes libraryIds when switching back to all libraries', async () => {
+      setupAuth({ dashboardConfig: { readingGoal: 12, libraryIds: [8] } })
+      const { saveLibraryScope } = useDashboardWidgets()
+
+      await saveLibraryScope(null)
+
+      const body = JSON.parse((mockApi.mock.calls[0]![1] as { body: string }).body)
+      expect(body.settings.dashboardConfig).toEqual({ readingGoal: 12 })
+    })
+  })
+
   describe('saveWidgets', () => {
     it('calls PATCH /api/v1/users/me/settings with read-modify-write pattern, appending missing types', async () => {
       const { me } = setupAuth({ dashboardConfig: { readingGoal: 12, widgets: [] } })
@@ -169,6 +200,17 @@ describe('useDashboardWidgets', () => {
       expect(body.settings.dashboardConfig.widgets).toHaveLength(WIDGET_TYPES.length)
       expect(body.settings.dashboardConfig.widgets[0].type).toBe('reading-goal')
       expect(me).toHaveBeenCalled()
+    })
+
+    it('saves widgets and a changed library scope atomically', async () => {
+      setupAuth({ dashboardConfig: { readingGoal: 12, libraryIds: [1] } })
+      const { saveWidgets } = useDashboardWidgets()
+
+      await saveWidgets([{ id: '1', type: 'reading-goal', enabled: true, order: 1 }], [2])
+
+      const body = JSON.parse((mockApi.mock.calls[0]![1] as { body: string }).body)
+      expect(body.settings.dashboardConfig.libraryIds).toEqual([2])
+      expect(body.settings.dashboardConfig.widgets).toHaveLength(WIDGET_TYPES.length)
     })
 
     it('throws if API returns non-ok response', async () => {

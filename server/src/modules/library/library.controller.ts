@@ -33,6 +33,17 @@ export class LibraryController {
     return this.libraryService.findAll(user);
   }
 
+  /**
+   * Declared before the ':id' route so 'overview' is never parsed as a library id.
+   * Scan error text can name server paths, so this stays behind ManageLibraries even
+   * though the per-library stats route is viewer-level.
+   */
+  @Get('overview')
+  @RequirePermission(Permission.ManageLibraries)
+  getOverview(@CurrentUser() user: RequestUser) {
+    return this.libraryService.getOverview(user);
+  }
+
   @Get(':id')
   @RequireLibraryAccess('viewer')
   findOne(@Param('id', ParseIntPipe) id: number) {

@@ -4,7 +4,8 @@ vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
 }));
 
-vi.mock('../lib/epub', () => ({
+vi.mock('../lib/epub', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/epub')>()),
   extractEpubMetadata: vi.fn(),
 }));
 
@@ -122,6 +123,7 @@ describe('metadata format extractors', () => {
       seriesName: 'Dune Chronicles',
       seriesIndex: 1,
       authors: [{ name: 'Frank Herbert', sortName: null }],
+      narrators: [],
       genres: ['Science Fiction'],
       tags: ['SF', 'Classic'],
       rating: 9,
@@ -168,6 +170,7 @@ describe('metadata format extractors', () => {
       seriesName: null,
       seriesIndex: null,
       authors: [{ name: 'Frank Herbert', sortName: null }],
+      narrators: [],
       genres: [],
       tags: ['Science Fiction'],
       rating: null,
@@ -228,6 +231,51 @@ describe('metadata format extractors', () => {
       }),
     );
     expect(mockReadFile).toHaveBeenCalledWith('/books/metadata.opf', 'utf8');
+  });
+
+  it('opf extractor carries narrators declared by role nrt', async () => {
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:title>Audiobook Title</dc:title>
+          <dc:creator opf:role="aut">Sidecar Author</dc:creator>
+          <dc:creator opf:role="nrt">Sidecar Narrator</dc:creator>
+        </metadata>
+      </package>
+    `);
+
+    await expect(new OpfFormatExtractor().extract('/books/book.opf')).resolves.toEqual(
+      expect.objectContaining({
+        authors: [{ name: 'Sidecar Author', sortName: null }],
+        narrators: ['Sidecar Narrator'],
+      }),
+    );
+  });
+
+  it('opf extractor treats a narrator-only sidecar as usable metadata', async () => {
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:contributor opf:role="nrt">Sidecar Narrator</dc:contributor>
+        </metadata>
+      </package>
+    `);
+
+    await expect(new OpfFormatExtractor().extract('/books/book.opf')).resolves.toEqual(expect.objectContaining({ narrators: ['Sidecar Narrator'] }));
+  });
+
+  it('opf extractor leaves narrators undefined when the sidecar names none, so nothing is wiped', async () => {
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:title>Sidecar Title</dc:title>
+          <dc:creator opf:role="aut">Sidecar Author</dc:creator>
+        </metadata>
+      </package>
+    `);
+
+    const parsed = await new OpfFormatExtractor().extract('/books/book.opf');
+    expect(parsed?.narrators).toBeUndefined();
   });
 
   it('opf extractor returns null for sidecars without usable metadata', async () => {
@@ -478,6 +526,7 @@ describe('metadata format extractors', () => {
       seriesName: null,
       seriesIndex: null,
       authors: [],
+      narrators: [],
       genres: [],
       tags: [],
       rating: null,

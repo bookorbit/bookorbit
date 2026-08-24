@@ -36,6 +36,29 @@ async function findOpfPath(zip: unzipper.CentralDirectory): Promise<string> {
 }
 
 /**
+ * True when an OPF declares the EPUB fixed-layout. Comics and manga converted by tools
+ * such as Kindle Comic Converter set this; readers must render them without reflow margins.
+ */
+export function isPrePaginated(opf: Pick<ParsedOpf, 'renditionLayout'>): boolean {
+  return opf.renditionLayout?.trim().toLowerCase() === 'pre-paginated';
+}
+
+/**
+ * Read only the fixed-layout flag from an EPUB. Returns null when the file cannot be opened
+ * or parsed, which callers must keep distinct from a parsed `false` so a transient read
+ * failure is never persisted as "this book reflows".
+ */
+export async function extractEpubFixedLayout(absolutePath: string): Promise<boolean | null> {
+  try {
+    const zip = await unzipper.Open.file(absolutePath);
+    const opfPath = await findOpfPath(zip);
+    return isPrePaginated(parseOpf(await readFileFromZip(zip, opfPath)));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Open an EPUB file and extract metadata from its OPF.
  * Returns null if the file is not a valid EPUB or parsing fails.
  */

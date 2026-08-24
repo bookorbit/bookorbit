@@ -1,5 +1,19 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, foreignKey, index, integer, numeric, pgTable, serial, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  check,
+  foreignKey,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  serial,
+  timestamp,
+  unique,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 import { libraryFolders, libraries } from './libraries';
 
@@ -67,6 +81,8 @@ export const bookFiles = pgTable(
     role: varchar('role', { length: 20 }).notNull().default('content'),
     sortOrder: integer('sort_order'),
     durationSeconds: integer('duration_seconds'),
+    // null means "not determined yet"; rows predating this column are backfilled lazily on Kobo sync.
+    isFixedLayout: boolean('is_fixed_layout'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()

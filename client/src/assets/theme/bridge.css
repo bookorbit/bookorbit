@@ -31,6 +31,8 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-star-highlight: var(--star-highlight);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -47,6 +49,11 @@
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
   --color-surface-4: var(--surface-4);
+
+  --color-pattern-token: var(--pattern-token);
+  --color-pattern-modifier: var(--pattern-modifier);
+  --color-pattern-optional: var(--pattern-optional);
+  --color-pattern-fallback: var(--pattern-fallback);
 
   --shadow-xs: var(--elevation-xs);
   --shadow-sm: var(--elevation-sm);

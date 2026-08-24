@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { toZonedTime } from 'date-fns-tz';
 
+import { getYearInTimeZone } from '../../../common/utils/timezone.utils';
+
 import { AchievementRepository } from '../achievement.repository';
 import {
   ACHIEVEMENT_EVENT_BACKFILL,
@@ -41,10 +43,10 @@ export class DedicationEvaluator implements IAchievementEvaluator {
 
     if (ctx.eventName === ACHIEVEMENT_EVENT_READING_SESSION_SAVED) {
       const payload = ctx.payload as unknown as ReadingSessionSavedPayload;
-      await this.evaluateStreakTiers(ctx.userId, earnedKeys, awards);
-      await this.evaluateYearRoundReader(ctx.userId, earnedKeys, awards);
+      await this.evaluateStreakTiers(ctx.userId, ctx.timeZone, earnedKeys, awards);
+      await this.evaluateYearRoundReader(ctx.userId, ctx.timeZone, earnedKeys, awards);
       await this.evaluateComebackKid(ctx.userId, payload, earnedKeys, awards);
-      await this.evaluateSeasonalReader(ctx.userId, earnedKeys, awards);
+      await this.evaluateSeasonalReader(ctx.userId, ctx.timeZone, earnedKeys, awards);
       await this.evaluatePerfectMonth(ctx.userId, earnedKeys, awards);
       await this.evaluateConsistentReader(ctx.userId, earnedKeys, awards);
       await this.evaluateWeekendRhythm(ctx.userId, earnedKeys, awards);
@@ -60,11 +62,11 @@ export class DedicationEvaluator implements IAchievementEvaluator {
     }
 
     if (ctx.eventName === ACHIEVEMENT_EVENT_BACKFILL) {
-      await this.evaluateStreakTiers(ctx.userId, earnedKeys, awards);
-      await this.evaluateYearRoundReader(ctx.userId, earnedKeys, awards);
+      await this.evaluateStreakTiers(ctx.userId, ctx.timeZone, earnedKeys, awards);
+      await this.evaluateYearRoundReader(ctx.userId, ctx.timeZone, earnedKeys, awards);
       await this.evaluateComebackKidBackfill(ctx.userId, earnedKeys, awards);
       await this.evaluateRebornBackfill(ctx.userId, earnedKeys, awards);
-      await this.evaluateSeasonalReader(ctx.userId, earnedKeys, awards);
+      await this.evaluateSeasonalReader(ctx.userId, ctx.timeZone, earnedKeys, awards);
       await this.evaluatePerfectMonth(ctx.userId, earnedKeys, awards);
       await this.evaluateConsistentReader(ctx.userId, earnedKeys, awards);
       await this.evaluateWeekendRhythm(ctx.userId, earnedKeys, awards);
@@ -75,11 +77,11 @@ export class DedicationEvaluator implements IAchievementEvaluator {
     return awards;
   }
 
-  private async evaluateStreakTiers(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+  private async evaluateStreakTiers(userId: number, timeZone: string, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
     const unearnedTiers = STREAK_TIERS.filter((t) => !earnedKeys.has(t.key));
     if (unearnedTiers.length === 0) return;
 
-    const streak = await this.repo.getCurrentStreak(userId);
+    const streak = await this.repo.getCurrentStreak(userId, timeZone);
 
     for (const tier of unearnedTiers) {
       if (streak >= tier.threshold) {
@@ -88,9 +90,9 @@ export class DedicationEvaluator implements IAchievementEvaluator {
     }
   }
 
-  private async evaluateYearRoundReader(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+  private async evaluateYearRoundReader(userId: number, timeZone: string, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
     if (earnedKeys.has('year_round_reader')) return;
-    const currentYear = new Date().getFullYear();
+    const currentYear = getYearInTimeZone(new Date(), timeZone);
     const months = await this.repo.countDistinctMonthsWithReading(userId, currentYear);
     if (months >= 12) {
       awards.push({ key: 'year_round_reader', context: { year: currentYear } });
@@ -138,9 +140,9 @@ export class DedicationEvaluator implements IAchievementEvaluator {
     }
   }
 
-  private async evaluateSeasonalReader(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+  private async evaluateSeasonalReader(userId: number, timeZone: string, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
     if (earnedKeys.has('seasonal_reader')) return;
-    const currentYear = new Date().getFullYear();
+    const currentYear = getYearInTimeZone(new Date(), timeZone);
     const seasonCount = await this.repo.countDistinctSeasonsWithReading(userId, currentYear);
     if (seasonCount >= SEASONAL_READER_THRESHOLD) {
       awards.push({ key: 'seasonal_reader', context: { year: currentYear, seasonCount } });

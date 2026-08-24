@@ -590,6 +590,18 @@
   {
     "file": "server/src/modules/scanner/scanner.controller.ts",
     "className": "ScannerController",
+    "methodName": "scanHistory",
+    "httpMethod": "GET",
+    "path": "/scanner/libraries/:id/scan-history",
+    "permissions": ["Permission.ManageLibraries"],
+    "libraryAccess": ["viewer"],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/scanner/scanner.controller.ts",
+    "className": "ScannerController",
     "methodName": "refreshCovers",
     "httpMethod": "POST",
     "path": "/scanner/libraries/:id/refresh-covers",

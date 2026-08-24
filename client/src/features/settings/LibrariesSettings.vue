@@ -1,41 +1,32 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatDate } from '@/i18n/formatters'
-import { formatBytes } from '@/lib/formatting'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  FolderOpen,
-  Plus,
-  RefreshCw,
-  Pencil,
-  Trash2,
-  Images,
-  FileEdit,
-  MoreHorizontal,
-  BookOpen,
-  HardDrive,
-  Eye,
-  FileText,
-  Folder,
-  CalendarClock,
-} from '@lucide/vue'
+import { FolderOpen, Plus, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import type { Library as LibraryType } from '@bookorbit/types'
+
+import { Button } from '@/components/ui/button'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
+import { Skeleton } from '@/components/ui/skeleton'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
-import type { Library as LibraryType, LibraryStats } from '@bookorbit/types'
+import { usePermissions } from '@/features/auth/composables/usePermissions'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import { useLibraryFileSync } from '@/features/library/composables/useLibraryFileSync'
-import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { parseCronToHuman } from '@/features/library/utils/cron'
-import { usePermissions } from '@/features/auth/composables/usePermissions'
-import AppIcon from '@/components/AppIcon.vue'
+import { getSocket, useScanProgress } from '@/features/scanner/composables/useScanProgress'
+import LibrariesToolbar from './libraries/components/LibrariesToolbar.vue'
+import LibraryLedgerCards from './libraries/components/LibraryLedgerCards.vue'
+import LibraryLedgerList from './libraries/components/LibraryLedgerList.vue'
+import { useLibraryDetail } from './libraries/composables/useLibraryDetail'
+import { useLibraryOverview } from './libraries/composables/useLibraryOverview'
+import { matchesLibraryQuery, sortLibraries, type LibrarySortField } from './libraries/lib/library-sort'
 
-const { t } = useI18n()
+const HEADER_ACTIONS_TARGET = '#settings-header-actions'
+
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { hasPermission } = usePermissions()
@@ -46,9 +37,14 @@ if (!hasPermission('manage_libraries')) {
 
 const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
 const { handleLibraryCreated } = useLibraryCreationRedirect()
-const { subscribeLibrary, getProgress, isScanning, progressMap, getCoverRefreshProgress, isRefreshingCovers } = useScanProgress()
+const { subscribeLibrary, getProgress, isScanning, progressMap, isRefreshingCovers } = useScanProgress()
+const { syncAll: syncAllFiles } = useLibraryFileSync()
+const overview = useLibraryOverview()
+const detail = useLibraryDetail()
 
-const stats = ref<Record<number, LibraryStats>>({})
+const query = ref('')
+const expandedId = ref<number | null>(null)
+const sortBy = ref<LibrarySortField>('default')
 const scanningAll = ref(false)
 const creatorOpen = ref(false)
 const editingLibrary = ref<LibraryType | null>(null)
@@ -58,73 +54,113 @@ const deleting = ref(false)
 const fileSyncingMap = ref<Record<number, boolean>>({})
 const confirmSyncLibrary = ref<LibraryType | null>(null)
 
-const { syncAll: syncAllFiles } = useLibraryFileSync()
+/**
+ * The header renders the primary actions beside the title. Falling back to rendering in place keeps
+ * them reachable when this panel is mounted outside the settings shell, including in tests.
+ */
+const headerSlotAvailable = ref(false)
 
-function promptSyncFiles(lib: LibraryType) {
-  confirmSyncLibrary.value = lib
-}
-
-async function confirmSyncFiles() {
-  const lib = confirmSyncLibrary.value
-  if (!lib) return
-  confirmSyncLibrary.value = null
-  fileSyncingMap.value[lib.id] = true
-  try {
-    await syncAllFiles(lib.id)
-    toast.success(t('settings.admin.libraries.metadataSynced', { name: lib.name }))
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : ''
-    if (msg.includes('400')) {
-      toast.error(t('settings.admin.libraries.fileWriteNotEnabled'))
-    } else {
-      toast.error(t('settings.admin.libraries.fileSyncFailed', { name: lib.name }))
-    }
-  } finally {
-    fileSyncingMap.value[lib.id] = false
-  }
-}
-
-async function loadAllStats() {
-  await Promise.all(
-    libraries.value.map(async (lib) => {
-      const res = await api(`/api/v1/libraries/${lib.id}/stats`)
-      if (res.ok) stats.value[lib.id] = await res.json()
-    }),
-  )
-}
+const collator = computed(() => new Intl.Collator(locale.value, { sensitivity: 'base', numeric: true }))
+const visibleLibraries = computed(() =>
+  sortLibraries(
+    libraries.value.filter((library) => matchesLibraryQuery(library, query.value)),
+    sortBy.value,
+    overview.entries.value,
+    collator.value,
+  ),
+)
+const folderCount = computed(() => libraries.value.reduce((sum, library) => sum + library.folders.length, 0))
+const hasLibraries = computed(() => libraries.value.length > 0)
+const showSkeleton = computed(() => !overview.loaded.value && !overview.error.value && hasLibraries.value)
 
 function subscribeAll() {
-  for (const lib of libraries.value) {
-    subscribeLibrary(lib.id)
-  }
+  for (const library of libraries.value) subscribeLibrary(library.id)
 }
 
 onMounted(async () => {
+  headerSlotAvailable.value = document.getElementById(HEADER_ACTIONS_TARGET.slice(1)) !== null
   getSocket()
   await fetchLibraries()
   subscribeAll()
-  loadAllStats()
+  void overview.load()
 })
 
-const statsReloadedFor = new Set<number>()
+onUnmounted(() => {
+  overview.dispose()
+})
+
+/**
+ * A completed event lingers in the map for a few seconds, and the map is replaced on every socket
+ * tick, so each finished job is recorded and acted on exactly once. Ids are pruned as their events
+ * leave the map, which keeps the set bounded to the scans currently in flight.
+ */
+const handledScanJobs = new Set<number>()
 
 watch(progressMap, (map) => {
-  for (const [libraryId, event] of map) {
-    if (event.status === 'completed' && !statsReloadedFor.has(libraryId)) {
-      statsReloadedFor.add(libraryId)
-      api(`/api/v1/libraries/${libraryId}/stats`).then(async (res) => {
-        if (res.ok) stats.value[libraryId] = await res.json()
-        setTimeout(() => statsReloadedFor.delete(libraryId), 5000)
-      })
-    }
+  const liveJobIds = new Set<number>()
+  let finished = false
+  for (const event of map.values()) {
+    liveJobIds.add(event.jobId)
+    if (event.status === 'running' || handledScanJobs.has(event.jobId)) continue
+    handledScanJobs.add(event.jobId)
+    finished = true
   }
+  for (const jobId of handledScanJobs) {
+    if (!liveJobIds.has(jobId)) handledScanJobs.delete(jobId)
+  }
+  if (!finished) return
+
+  // A finished scan changes counts, sizes and the last-scan row, and appends a history row.
+  overview.scheduleReload()
+  detail.invalidate()
+  if (expandedId.value !== null) void detail.load(expandedId.value)
 })
+
+function isSyncingFiles(libraryId: number): boolean {
+  return Boolean(fileSyncingMap.value[libraryId])
+}
+
+/** One row open at a time keeps the list scannable and bounds the lazy detail fetches. */
+function toggleDetail(lib: LibraryType) {
+  if (expandedId.value === lib.id) {
+    expandedId.value = null
+    return
+  }
+  expandedId.value = lib.id
+  void detail.load(lib.id)
+}
+
+function historyFor(libraryId: number) {
+  return detail.get(libraryId)?.history ?? null
+}
+
+function accessCountFor(libraryId: number): number | null {
+  return detail.get(libraryId)?.accessCount ?? null
+}
+
+function isDetailLoading(libraryId: number): boolean {
+  return detail.loading.value.has(libraryId)
+}
+
+function isDetailFailed(libraryId: number): boolean {
+  return detail.failed.value.has(libraryId)
+}
+
+function updateQuery(value: string) {
+  query.value = value
+}
+
+function updateSortBy(value: LibrarySortField) {
+  sortBy.value = value
+}
+
+function clearQuery() {
+  query.value = ''
+}
 
 async function scan(lib: LibraryType) {
   try {
-    const res = await api(`/api/v1/scanner/libraries/${lib.id}/scan`, {
-      method: 'POST',
-    })
+    const res = await api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })
     if (res.ok) {
       toast.success(t('settings.admin.libraries.scanStarted', { name: lib.name }))
       subscribeLibrary(lib.id)
@@ -149,7 +185,7 @@ async function scanAll() {
   scanningAll.value = true
   try {
     const results = await Promise.all(libraries.value.map((lib) => api(`/api/v1/scanner/libraries/${lib.id}/scan`, { method: 'POST' })))
-    const failed = results.filter((r) => !r.ok).length
+    const failed = results.filter((res) => !res.ok).length
     if (failed === 0) {
       toast.success(t('settings.admin.libraries.scanStartedAll'))
       subscribeAll()
@@ -160,6 +196,34 @@ async function scanAll() {
     toast.error(t('settings.admin.libraries.scansStartFailed'))
   } finally {
     scanningAll.value = false
+  }
+}
+
+function promptSyncFiles(lib: LibraryType) {
+  confirmSyncLibrary.value = lib
+}
+
+function cancelLibrarySync() {
+  confirmSyncLibrary.value = null
+}
+
+async function confirmSyncFiles() {
+  const lib = confirmSyncLibrary.value
+  if (!lib) return
+  confirmSyncLibrary.value = null
+  fileSyncingMap.value[lib.id] = true
+  try {
+    await syncAllFiles(lib.id)
+    toast.success(t('settings.admin.libraries.metadataSynced', { name: lib.name }))
+  } catch (e) {
+    const message = e instanceof Error ? e.message : ''
+    if (message.includes('400')) {
+      toast.error(t('settings.admin.libraries.fileWriteNotEnabled'))
+    } else {
+      toast.error(t('settings.admin.libraries.fileSyncFailed', { name: lib.name }))
+    }
+  } finally {
+    fileSyncingMap.value[lib.id] = false
   }
 }
 
@@ -190,7 +254,9 @@ async function onSaved(library: LibraryType) {
     toast.success(t('settings.admin.libraries.libraryUpdated', { name: library.name }))
     await refreshLibraries()
   }
-  loadAllStats()
+  detail.invalidate()
+  if (expandedId.value !== null) void detail.load(expandedId.value)
+  void overview.load()
 }
 
 function openDelete(lib: LibraryType) {
@@ -198,27 +264,27 @@ function openDelete(lib: LibraryType) {
   deleteConfirmName.value = ''
 }
 
+function cancelLibraryDelete() {
+  deletingLibrary.value = null
+}
+
 async function confirmDelete() {
-  if (!deletingLibrary.value) return
+  const lib = deletingLibrary.value
+  if (!lib) return
   deleting.value = true
-  const deletedId = deletingLibrary.value.id
-  const deletedName = deletingLibrary.value.name
   try {
-    const res = await api(`/api/v1/libraries/${deletedId}`, {
-      method: 'DELETE',
-    })
+    const res = await api(`/api/v1/libraries/${lib.id}`, { method: 'DELETE' })
     if (res.ok) {
-      toast.success(t('settings.admin.libraries.libraryDeleted', { name: deletedName }))
+      toast.success(t('settings.admin.libraries.libraryDeleted', { name: lib.name }))
       deletingLibrary.value = null
+      if (expandedId.value === lib.id) expandedId.value = null
+      detail.invalidate()
       await refreshLibraries()
-      loadAllStats()
-      if (route.name === 'library' && Number(route.params.id) === deletedId) {
+      void overview.load()
+      if (route.name === 'library' && Number(route.params.id) === lib.id) {
         const next = libraries.value[0]
-        if (next) {
-          router.replace({ name: 'library', params: { id: next.id } })
-        } else {
-          router.replace('/')
-        }
+        if (next) router.replace({ name: 'library', params: { id: next.id } })
+        else router.replace('/')
       }
     } else {
       toast.error(t('settings.admin.libraries.deleteFailed'))
@@ -229,347 +295,141 @@ async function confirmDelete() {
     deleting.value = false
   }
 }
-
-function scanProgressLabel(libraryId: number): string {
-  const p = getProgress(libraryId)
-  if (!p) return ''
-  if (p.status === 'running') {
-    if (p.total === 0) return t('settings.admin.libraries.scanning')
-    const pct = Math.floor((p.processed / p.total) * 100)
-    return t('settings.admin.libraries.scanningProgress', {
-      pct,
-      processed: p.processed,
-      total: p.total,
-    })
-  }
-  if (p.status === 'completed')
-    return t('settings.admin.libraries.scanDone', {
-      added: p.added,
-      updated: p.updated,
-    })
-  if (p.status === 'failed')
-    return p.errorMessage
-      ? t('settings.admin.libraries.scanFailedWithError', {
-          error: p.errorMessage,
-        })
-      : t('settings.admin.libraries.scanFailed')
-  return ''
-}
-
-function coverRefreshLabel(libraryId: number): string {
-  const p = getCoverRefreshProgress(libraryId)
-  if (!p) return ''
-  if (p.status === 'running') {
-    const pct = p.total > 0 ? Math.floor((p.processed / p.total) * 100) : 0
-    return t('settings.admin.libraries.refreshingCovers', {
-      pct,
-      processed: p.processed,
-      total: p.total,
-    })
-  }
-  if (p.status === 'completed') return t('settings.admin.libraries.coversRefreshed', { count: p.total })
-  return ''
-}
-function cancelLibraryDelete() {
-  deletingLibrary.value = null
-}
-
-function cancelLibrarySync() {
-  confirmSyncLibrary.value = null
-}
 </script>
 
 <template>
-  <div
-    class="sticky top-0 z-20 mb-4 -mx-4 border-y border-border/70 bg-card/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/75 md:static md:mx-0 md:flex md:justify-end md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
-  >
-    <div class="grid grid-cols-2 gap-2 md:flex md:items-center">
-      <Button variant="outline" size="sm" class="w-full md:w-auto" :disabled="scanningAll || libraries.length === 0" @click="scanAll" type="button">
-        <RefreshCw :size="14" :class="scanningAll ? 'animate-spin' : ''" />
-        {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
-      </Button>
-      <Button size="sm" class="w-full md:w-auto" @click="openCreate" type="button">
-        <Plus :size="14" />
-        {{ t('settings.admin.libraries.addLibrary') }}
-      </Button>
-    </div>
-  </div>
-
-  <!-- Library cards -->
   <TooltipProvider>
-    <div class="space-y-2 md:space-y-4">
-      <div v-for="lib in libraries" :key="lib.id" class="rounded-lg border border-border bg-card overflow-hidden shadow-xs">
-        <div class="px-4 py-3.5 md:px-5 md:py-4">
-          <div class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 md:flex md:items-center">
-            <!-- Icon -->
-            <RouterLink
-              :to="{ name: 'library', params: { id: lib.id } }"
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors"
-            >
-              <AppIcon :icon="lib.icon || 'FolderOpen'" fallback="FolderOpen" :size="16" class="text-primary" />
-            </RouterLink>
-
-            <!-- Name + stats -->
-            <div class="flex-1 min-w-0">
-              <RouterLink
-                :to="{ name: 'library', params: { id: lib.id } }"
-                class="settings-label hover:text-primary transition-colors truncate block leading-snug"
-              >
-                {{ lib.name }}
-              </RouterLink>
-              <div class="grid grid-rows-4 grid-cols-2 md:grid-rows-2 md:grid-cols-[90px_100px_200px_96px] grid-flow-col gap-x-4 gap-y-1.5 mt-1.5">
-                <!-- Col 1 -->
-                <span v-if="stats[lib.id]" class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                  <BookOpen :size="11" class="shrink-0" />
-                  <span class="truncate">{{
-                    t('settings.admin.libraries.bookCount', {
-                      count: stats[lib.id]?.totalBooks ?? 0,
-                    })
-                  }}</span>
-                </span>
-                <span v-else class="text-xs text-muted-foreground truncate min-w-0">
-                  {{
-                    t('settings.admin.libraries.addedDate', {
-                      date: formatDate(new Date(lib.createdAt), {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      }),
-                    })
-                  }}
-                </span>
-
-                <span
-                  v-if="stats[lib.id] && (stats[lib.id]?.totalSizeBytes ?? 0) > 0"
-                  class="flex items-center gap-1 text-xs text-muted-foreground min-w-0"
-                >
-                  <HardDrive :size="11" class="shrink-0" />
-                  <span class="truncate">{{ formatBytes(stats[lib.id]?.totalSizeBytes ?? 0) }}</span>
-                </span>
-                <span v-else class="min-w-0"></span>
-
-                <!-- Col 2 -->
-                <span class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                  <component :is="lib.organizationMode === 'book_per_file' ? FileText : Folder" :size="11" class="shrink-0" />
-                  <span class="truncate">{{
-                    lib.organizationMode === 'book_per_file' ? t('settings.admin.libraries.fileMode') : t('settings.admin.libraries.folderMode')
-                  }}</span>
-                </span>
-
-                <Tooltip v-if="lib.folders.length > 0">
-                  <TooltipTrigger as-child>
-                    <span class="flex items-center gap-1 text-xs text-muted-foreground cursor-default min-w-0">
-                      <FolderOpen :size="11" class="shrink-0" />
-                      <span class="truncate">{{
-                        t('settings.admin.libraries.folderCount', {
-                          count: lib.folders.length,
-                        })
-                      }}</span>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent class="max-w-xs">
-                    <div class="space-y-0.5">
-                      <p v-for="folder in lib.folders" :key="folder.id" class="font-mono text-xs break-all">
-                        {{ folder.path }}
-                      </p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-                <span v-else class="min-w-0"></span>
-
-                <!-- Col 3 -->
-                <span v-if="lib.watch" class="flex items-center gap-1 text-xs font-medium text-primary min-w-0">
-                  <Eye :size="11" class="shrink-0" />
-                  <span class="truncate">{{ t('settings.admin.libraries.watching') }}</span>
-                </span>
-                <span v-else class="min-w-0"></span>
-
-                <span
-                  v-if="parseCronToHuman(lib.autoScanCronExpression)"
-                  class="flex items-center gap-1 text-xs text-muted-foreground min-w-0"
-                  :title="parseCronToHuman(lib.autoScanCronExpression) || undefined"
-                >
-                  <CalendarClock :size="11" class="shrink-0" />
-                  <span class="truncate">{{ parseCronToHuman(lib.autoScanCronExpression) }}</span>
-                </span>
-                <span v-else class="min-w-0"></span>
-
-                <!-- Col 4 -->
-                <span v-if="lib.fileWriteEnabled" class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                  <FileEdit :size="11" class="shrink-0" />
-                  <span class="truncate">{{ t('settings.admin.libraries.fileWrite') }}</span>
-                </span>
-                <span v-else class="min-w-0"></span>
-
-                <span v-if="lib.fileRenameEnabled" class="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
-                  <Pencil :size="11" class="shrink-0" />
-                  <span class="truncate">{{ t('settings.admin.libraries.fileRename') }}</span>
-                </span>
-                <span v-else class="min-w-0"></span>
-              </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:flex md:shrink-0">
-              <Button variant="outline" size="sm" class="md:justify-start" :disabled="isScanning(lib.id)" @click="scan(lib)" type="button">
-                <RefreshCw :size="14" :class="isScanning(lib.id) ? 'animate-spin' : ''" />
-                {{ isScanning(lib.id) ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scan') }}
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="outline" size="icon-sm" class="md:w-auto size-11 md:size-8">
-                    <MoreHorizontal :size="16" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="w-52">
-                  <DropdownMenuItem @click="openEdit(lib)">
-                    <Pencil />
-                    {{ t('settings.admin.libraries.editLibrary') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="isRefreshingCovers(lib.id)" @click="refreshCovers(lib)">
-                    <Images :class="isRefreshingCovers(lib.id) ? 'animate-pulse' : ''" />
-                    {{ t('settings.admin.libraries.refreshCovers') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="!!fileSyncingMap[lib.id] || !lib.fileWriteEnabled" @click="promptSyncFiles(lib)">
-                    <FileEdit :class="fileSyncingMap[lib.id] ? 'animate-pulse' : ''" />
-                    <span class="flex-1">{{ t('settings.admin.libraries.syncMetadataToFiles') }}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" @click="openDelete(lib)">
-                    <Trash2 />
-                    {{ t('settings.admin.libraries.deleteLibrary') }}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-
-        <!-- Progress bars (shown below the main row, full width) -->
-        <div
-          v-if="getProgress(lib.id) || getCoverRefreshProgress(lib.id)"
-          class="border-t border-border px-4 py-2.5 space-y-2 md:px-5 md:py-3 md:space-y-2.5"
+    <div class="space-y-4">
+      <Teleport :to="HEADER_ACTIONS_TARGET" defer :disabled="!headerSlotAvailable">
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          class="max-sm:size-8 max-sm:p-0"
+          :disabled="scanningAll || libraries.length === 0"
+          :aria-label="t('settings.admin.libraries.scanAll')"
+          @click="scanAll"
         >
-          <div v-if="getProgress(lib.id)">
-            <div class="flex items-center justify-between mb-1.5 min-w-0">
-              <span
-                class="block min-w-0 text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible"
-                :class="getProgress(lib.id)?.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'"
-              >
-                {{ scanProgressLabel(lib.id) }}
-              </span>
-            </div>
-            <div v-if="getProgress(lib.id)?.status === 'running'" class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                class="h-full rounded-full bg-primary transition-all duration-300"
-                :style="{
-                  width:
-                    getProgress(lib.id)!.total > 0 ? `${Math.floor((getProgress(lib.id)!.processed / getProgress(lib.id)!.total) * 100)}%` : '100%',
-                  animation: getProgress(lib.id)!.total === 0 ? 'pulse 1.5s ease-in-out infinite' : 'none',
-                }"
-              />
-            </div>
-          </div>
-          <div v-if="getCoverRefreshProgress(lib.id)">
-            <div class="flex items-center justify-between mb-1.5 min-w-0">
-              <span
-                class="block min-w-0 text-xs font-medium text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible"
-              >
-                {{ coverRefreshLabel(lib.id) }}
-              </span>
-            </div>
-            <div v-if="getCoverRefreshProgress(lib.id)?.status === 'running'" class="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                class="h-full rounded-full bg-accent transition-all duration-300"
-                :style="{
-                  width:
-                    getCoverRefreshProgress(lib.id)!.total > 0
-                      ? `${Math.floor((getCoverRefreshProgress(lib.id)!.processed / getCoverRefreshProgress(lib.id)!.total) * 100)}%`
-                      : '0%',
-                }"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+          <RefreshCw :size="14" :class="scanningAll ? 'animate-spin motion-reduce:animate-none' : ''" aria-hidden="true" />
+          <span class="max-sm:sr-only">
+            {{ scanningAll ? t('settings.admin.libraries.scanning') : t('settings.admin.libraries.scanAll') }}
+          </span>
+        </Button>
+        <Button size="sm" type="button" @click="openCreate">
+          <Plus :size="14" aria-hidden="true" />
+          {{ t('settings.admin.libraries.addLibrary') }}
+        </Button>
+      </Teleport>
 
-      <!-- Empty state -->
-      <div v-if="libraries.length === 0" class="settings-empty-state px-8 py-16">
-        <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted mx-auto mb-4">
-          <FolderOpen :size="22" class="text-muted-foreground" />
+      <template v-if="hasLibraries">
+        <LibrariesToolbar
+          :query="query"
+          :sort-by="sortBy"
+          :library-count="libraries.length"
+          :folder-count="folderCount"
+          :total-books="overview.totalBooks.value"
+          :total-size-bytes="overview.totalSizeBytes.value"
+          :stats-pending="!overview.loaded.value"
+          @update:query="updateQuery"
+          @update:sort-by="updateSortBy"
+        />
+
+        <p v-if="overview.error.value" role="alert" class="settings-error-state">
+          {{ t('settings.admin.libraries.statsFailed') }}
+        </p>
+
+        <div v-if="showSkeleton" class="space-y-2.5" aria-hidden="true">
+          <Skeleton v-for="index in libraries.length" :key="index" class="h-44 w-full rounded-xl md:h-[7.6875rem]" />
         </div>
-        <p class="text-sm font-medium text-foreground mb-1">
-          {{ t('settings.admin.libraries.emptyTitle') }}
-        </p>
-        <p class="text-sm text-muted-foreground mb-5">
-          {{ t('settings.admin.libraries.emptyHint') }}
-        </p>
-        <Button size="sm" @click="openCreate" type="button">
-          <Plus :size="14" />
+
+        <template v-else-if="visibleLibraries.length > 0">
+          <LibraryLedgerList
+            :libraries="visibleLibraries"
+            :overview="overview.entries.value"
+            :overview-loaded="overview.loaded.value"
+            :expanded-id="expandedId"
+            :progress-for="getProgress"
+            :is-scanning="isScanning"
+            :is-refreshing-covers="isRefreshingCovers"
+            :is-syncing-files="isSyncingFiles"
+            :history-for="historyFor"
+            :access-count-for="accessCountFor"
+            :is-detail-loading="isDetailLoading"
+            :is-detail-failed="isDetailFailed"
+            @toggle="toggleDetail"
+            @scan="scan"
+            @edit="openEdit"
+            @refresh-covers="refreshCovers"
+            @sync-files="promptSyncFiles"
+            @remove="openDelete"
+          />
+          <LibraryLedgerCards
+            :libraries="visibleLibraries"
+            :overview="overview.entries.value"
+            :overview-loaded="overview.loaded.value"
+            :progress-for="getProgress"
+            :is-scanning="isScanning"
+            :is-refreshing-covers="isRefreshingCovers"
+            :is-syncing-files="isSyncingFiles"
+            @scan="scan"
+            @edit="openEdit"
+            @refresh-covers="refreshCovers"
+            @sync-files="promptSyncFiles"
+            @remove="openDelete"
+          />
+        </template>
+
+        <div v-else class="settings-empty-state px-6 py-10">
+          <p class="text-sm font-medium text-foreground">{{ t('settings.admin.libraries.noMatchesTitle') }}</p>
+          <p class="mt-1 text-sm text-muted-foreground">{{ t('settings.admin.libraries.noMatchesHint', { query }) }}</p>
+          <Button variant="outline" size="sm" type="button" class="mt-4" @click="clearQuery">
+            {{ t('settings.admin.libraries.filterClear') }}
+          </Button>
+        </div>
+      </template>
+
+      <div v-else class="settings-empty-state px-8 py-16">
+        <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-lg bg-muted">
+          <FolderOpen :size="22" class="text-muted-foreground" aria-hidden="true" />
+        </div>
+        <p class="mb-1 text-sm font-medium text-foreground">{{ t('settings.admin.libraries.emptyTitle') }}</p>
+        <p class="mb-5 text-sm text-muted-foreground">{{ t('settings.admin.libraries.emptyHint') }}</p>
+        <Button size="sm" type="button" @click="openCreate">
+          <Plus :size="14" aria-hidden="true" />
           {{ t('settings.admin.libraries.addFirstLibrary') }}
         </Button>
       </div>
     </div>
+
+    <LibraryCreatorModal v-if="creatorOpen" :library="editingLibrary" @close="closeCreator" @saved="onSaved" />
+
+    <ConfirmDialog
+      v-if="deletingLibrary"
+      open
+      destructive
+      :title="t('settings.admin.libraries.deleteConfirmTitle', { name: deletingLibrary.name })"
+      :description="t('settings.admin.libraries.deleteConfirmBody')"
+      :confirm-label="deleting ? t('settings.admin.libraries.deleting') : t('settings.admin.libraries.deleteLibraryButton')"
+      :busy="deleting"
+      :confirm-disabled="deleteConfirmName !== deletingLibrary.name"
+      @confirm="confirmDelete"
+      @cancel="cancelLibraryDelete"
+    >
+      <label class="mt-4 block">
+        <span class="text-sm text-foreground">{{ t('settings.admin.libraries.deleteConfirmTypeName') }}</span>
+        <input v-model="deleteConfirmName" type="text" class="input-field mt-2 w-full" :placeholder="deletingLibrary.name" />
+      </label>
+    </ConfirmDialog>
+
+    <ConfirmDialog
+      v-if="confirmSyncLibrary"
+      open
+      :destructive="false"
+      :title="t('settings.admin.libraries.syncConfirmTitle')"
+      :description="t('settings.admin.libraries.syncConfirmBody', { name: confirmSyncLibrary.name })"
+      :confirm-label="t('settings.admin.libraries.syncFiles')"
+      @confirm="confirmSyncFiles"
+      @cancel="cancelLibrarySync"
+    />
   </TooltipProvider>
-
-  <!-- Library creator/editor modal -->
-  <LibraryCreatorModal v-if="creatorOpen" :library="editingLibrary" @close="closeCreator" @saved="onSaved" />
-
-  <!-- Delete confirmation dialog -->
-  <div v-if="deletingLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-    <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
-      <h3 class="text-base font-semibold text-foreground mb-1">
-        {{
-          t('settings.admin.libraries.deleteConfirmTitle', {
-            name: deletingLibrary.name,
-          })
-        }}
-      </h3>
-      <p class="text-sm text-muted-foreground mb-4">
-        {{ t('settings.admin.libraries.deleteConfirmBody') }}
-      </p>
-      <p class="text-sm text-foreground mb-2">
-        {{ t('settings.admin.libraries.deleteConfirmTypeName') }}
-      </p>
-      <input
-        v-model="deleteConfirmName"
-        type="text"
-        :placeholder="deletingLibrary.name"
-        class="w-full text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-destructive mb-4"
-        @keydown.enter="deleteConfirmName === deletingLibrary.name && !deleting ? confirmDelete() : null"
-        @keydown.escape="deletingLibrary = null"
-      />
-      <div class="flex justify-end gap-2">
-        <Button variant="outline" size="sm" @click="cancelLibraryDelete">
-          {{ t('common.cancel') }}
-        </Button>
-        <Button variant="destructive" size="sm" :disabled="deleteConfirmName !== deletingLibrary.name || deleting" @click="confirmDelete">
-          {{ deleting ? t('settings.admin.libraries.deleting') : t('settings.admin.libraries.deleteLibraryButton') }}
-        </Button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sync confirmation dialog -->
-  <div v-if="confirmSyncLibrary" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-    <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-sm p-6">
-      <h3 class="text-base font-semibold text-foreground mb-1">
-        {{ t('settings.admin.libraries.syncConfirmTitle') }}
-      </h3>
-      <p class="text-sm text-muted-foreground mb-4">
-        {{ t('settings.admin.libraries.syncConfirmBodyPrefix') }}
-        <span class="font-medium text-foreground">{{ confirmSyncLibrary.name }}</span>
-        {{ t('settings.admin.libraries.syncConfirmBodySuffix') }}
-      </p>
-      <div class="flex justify-end gap-2">
-        <Button variant="outline" size="sm" @click="cancelLibrarySync">
-          {{ t('common.cancel') }}
-        </Button>
-        <Button size="sm" @click="confirmSyncFiles">
-          {{ t('settings.admin.libraries.syncFiles') }}
-        </Button>
-      </div>
-    </div>
-  </div>
 </template>

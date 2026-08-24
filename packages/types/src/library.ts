@@ -1,3 +1,5 @@
+import type { LibraryLastScan } from "./scanner";
+
 export type OrganizationMode = "book_per_file" | "book_per_folder";
 export type CoverAspectRatio = "2/3" | "1/1";
 
@@ -91,6 +93,15 @@ export interface LibraryStats {
   totalBooks: number;
   totalSizeBytes: number;
   formatCounts: Record<string, number>;
+}
+
+/**
+ * One row of the libraries overview: the same counts `/libraries/:id/stats` returns,
+ * plus the library's most recent scan, batched so the settings page needs a single request.
+ */
+export interface LibraryOverviewEntry extends LibraryStats {
+  libraryId: number;
+  lastScan: LibraryLastScan | null;
 }
 
 export interface PrescanPathResult {

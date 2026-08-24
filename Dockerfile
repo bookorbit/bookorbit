@@ -58,7 +58,7 @@ COPY server/requirements/kobo-cloudscraper.txt /tmp/kobo-cloudscraper-requiremen
 # pip is build-only here. Leaving it installed also leaves pip/_vendor/vendor.txt,
 # which Trivy reads as installed msgpack and setuptools and fails the image scan on.
 RUN apk upgrade --no-cache && \
-    apk add --no-cache poppler-utils su-exec ffmpeg python3 py3-pip tini && \
+    apk add --no-cache poppler-utils su-exec ffmpeg python3 py3-pip tini tzdata && \
     python3 -m venv /opt/bookorbit-python && \
     /opt/bookorbit-python/bin/python -m pip install --no-cache-dir -r /tmp/kobo-cloudscraper-requirements.txt && \
     /opt/bookorbit-python/bin/python -m pip uninstall -y pip && \

@@ -43,6 +43,11 @@
   --success: oklch(0.52 0.14 148);
   --success-foreground: oklch(0.985 0 0);
 
+  /* Warning text: a state that needs attention but is not an error. Tuned per theme like
+     --muted-foreground, because amber at one lightness cannot clear AA on both grounds. */
+  --warning: oklch(0.52 0.13 68);
+  --warning-foreground: oklch(0.985 0 0);
+
   --star-highlight: oklch(0.76 0.18 90);
 
   --border: oklch(0.878 var(--tint-c-surface) var(--tint-h));
@@ -71,6 +76,15 @@
   --elevation-lg: 0 10px 15px -3px oklch(0 0 0 / 0.08), 0 4px 6px -4px oklch(0 0 0 / 0.05);
   --elevation-xl: 0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0 0 0 / 0.06);
   --elevation-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.18);
+
+  /* Provider chips: the brand hue is the identity, but the raw brand hex as text
+     over a tint of itself lands near 1.7:1 in light mode (Goodreads cyan, ComicVine
+     yellow). Mixing the ink toward the surface ink keeps the hue recognisable and
+     clears AA. Dark mode needs no correction, so the mix there is a no-op. */
+  --provider-fill: 17%;
+  --provider-ring: 42%;
+  --provider-ink: 46%;
+  --provider-ink-base: oklch(0.16 0.02 var(--tint-h));
 
   /* Shape */
   --radius: 0.625rem;
@@ -104,6 +118,26 @@
   --pill-success: oklch(0.58 0.15 150);
   --pill-warning: oklch(0.62 0.14 70);
   --pill-info: oklch(0.55 0.16 245);
+
+  /* Format-family hues for the library composition bar. Bounded at five families plus a
+     fallback so a bar stays readable however many extensions a library holds, and fixed like
+     the pills so the same family is the same colour under every accent. These are fills, not
+     text, so they only need to separate from each other and from --surface-3. */
+  --format-ebook: oklch(0.58 0.16 263);
+  --format-kindle: oklch(0.6 0.13 175);
+  --format-document: oklch(0.58 0.17 25);
+  --format-comic: oklch(0.62 0.14 95);
+  --format-audio: oklch(0.56 0.15 150);
+  --format-other: oklch(0.62 0.02 var(--tint-h));
+
+  /* Naming-pattern syntax. Fixed hues like the pills so a pattern reads the same
+     under every accent, and tuned per theme because one lightness cannot clear AA
+     on both a light card and a dark one. Literal text stays --foreground and the
+     path separator stays --muted-foreground; only the grammar gets its own hue. */
+  --pattern-token: oklch(0.48 0.19 265);
+  --pattern-modifier: oklch(0.47 0.17 305);
+  --pattern-optional: oklch(0.46 0.1 195);
+  --pattern-fallback: oklch(0.48 0.13 68);
 
   --audit-authentication: oklch(0.55 0.17 295);
   --audit-books: oklch(0.55 0.16 245);
@@ -159,6 +193,9 @@
   --success: oklch(0.72 0.15 148);
   --success-foreground: oklch(0.145 0 0);
 
+  --warning: oklch(0.8 0.13 75);
+  --warning-foreground: oklch(0.145 0 0);
+
   --star-highlight: oklch(0.84 0.17 95);
 
   --border: oklch(1 0 0 / 10%);
@@ -188,6 +225,11 @@
   --elevation-xl: 0 20px 30px -5px oklch(0 0 0 / 0.6), 0 8px 12px -6px oklch(0 0 0 / 0.4);
   --elevation-2xl: 0 25px 50px -12px oklch(0 0 0 / 0.7);
 
+  --provider-fill: 14%;
+  --provider-ring: 35%;
+  --provider-ink: 100%;
+  --provider-ink-base: transparent;
+
   --dot-color: oklch(calc(0.3 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));
 
   --scrollbar-thumb: oklch(0.35 var(--tint-c) var(--tint-h));
@@ -204,6 +246,19 @@
   --pill-success: oklch(0.75 0.13 150);
   --pill-warning: oklch(0.78 0.13 70);
   --pill-info: oklch(0.72 0.14 245);
+
+  /* Lifted the same way the pills are, so segments separate on a dark card */
+  --format-ebook: oklch(0.72 0.16 263);
+  --format-kindle: oklch(0.76 0.12 175);
+  --format-document: oklch(0.7 0.17 25);
+  --format-comic: oklch(0.78 0.13 95);
+  --format-audio: oklch(0.74 0.14 150);
+  --format-other: oklch(0.62 0.02 var(--tint-h));
+
+  --pattern-token: oklch(0.8 0.13 265);
+  --pattern-modifier: oklch(0.8 0.11 305);
+  --pattern-optional: oklch(0.82 0.09 195);
+  --pattern-fallback: oklch(0.82 0.12 75);
 
   --audit-authentication: oklch(0.72 0.17 295);
   --audit-books: oklch(0.72 0.14 245);

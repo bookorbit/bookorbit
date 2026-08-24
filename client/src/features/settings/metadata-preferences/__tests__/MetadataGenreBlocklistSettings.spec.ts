@@ -141,6 +141,6 @@ describe('MetadataGenreBlocklistSettings', () => {
 
     expect(wrapper.text()).toContain('Audiobook')
     expect(wrapper.text()).toContain('Adult')
-    expect(toastError).toHaveBeenCalledWith('Failed to save preferences')
+    expect(toastError).toHaveBeenCalledWith('Could not save metadata preferences. Check your connection and try again.')
   })
 })

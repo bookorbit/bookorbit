@@ -1078,13 +1078,10 @@
         "syncMetadataToFiles": "Sync metadata to files",
         "deleteLibrary": "Delete library",
         "bookCount": "{count, plural, =0 {no books} one {# book} other {# books}}",
-        "addedDate": "Added {date}",
+        "booksUnit": "{count, plural, one {book} other {books}}",
+        "folderCount": "{count, plural, =0 {no folders} one {# folder} other {# folders}}",
         "fileMode": "File mode",
         "folderMode": "Folder mode",
-        "folderCount": "{count, plural, =0 {no folders} one {# folder} other {# folders}}",
-        "watching": "Watching",
-        "fileWrite": "File write",
-        "fileRename": "File rename",
         "emptyTitle": "No libraries yet",
         "emptyHint": "Add a library to start organizing your books.",
         "addFirstLibrary": "Add your first library",
@@ -1094,8 +1091,6 @@
         "deleting": "Deleting...",
         "deleteLibraryButton": "Delete Library",
         "syncConfirmTitle": "Sync metadata to files?",
-        "syncConfirmBodyPrefix": "This will overwrite the metadata inside every supported file in",
-        "syncConfirmBodySuffix": "directly on disk. This cannot be undone.",
         "syncFiles": "Sync files",
         "metadataSynced": "Metadata synced to files for \"{name}\"",
         "fileWriteNotEnabled": "Metadata file write is not enabled for this library. Enable it in the library settings.",
@@ -1110,12 +1105,111 @@
         "libraryUpdated": "Library \"{name}\" updated",
         "libraryDeleted": "\"{name}\" deleted",
         "deleteFailed": "Failed to delete library",
-        "scanningProgress": "Scanning {pct}% ({processed}/{total})",
-        "scanDone": "Done - {added} added, {updated} updated",
-        "scanFailedWithError": "Failed: {error}",
-        "scanFailed": "Scan failed",
         "refreshingCovers": "Refreshing covers {pct}% ({processed}/{total})",
-        "coversRefreshed": "Covers refreshed ({count} processed)"
+        "coversRefreshed": "Covers refreshed ({count} processed)",
+        "onDiskUnit": "{size} on disk",
+        "noFilesIndexed": "No files indexed",
+        "formatEntry": "{format} {count}",
+        "formatOverflow": "{count, plural, one {+# more format} other {+# more formats}}",
+        "extraFolders": "{count, plural, one {+# folder} other {+# folders}}",
+        "openLibrary": "Open {name}",
+        "moreActions": "More actions for {name}",
+        "statsFailed": "Could not load library counts. Everything else on this page still works.",
+        "filterLabel": "Filter libraries",
+        "filterPlaceholder": "Filter by name or path",
+        "filterClear": "Clear filter",
+        "sortLabel": "Sort",
+        "noMatchesTitle": "No libraries match that filter",
+        "noMatchesHint": "Nothing matches \"{query}\" by name or folder path.",
+        "totalLibraries": "{count, plural, one {# library} other {# libraries}}",
+        "neverScanned": "Never scanned",
+        "neverScannedHint": "Run a scan to index its folders",
+        "scanFailedAt": "Failed {time}",
+        "scanningPercent": "Scanning {pct}%",
+        "scanCounting": "Counting files",
+        "scanCounts": "{processed} of {total}",
+        "scanAdded": "{count, plural, one {+# added} other {+# added}}",
+        "scanUpdated": "{count, plural, one {# updated} other {# updated}}",
+        "scanMissing": "{count, plural, one {# missing} other {# missing}}",
+        "scanNoChange": "no change",
+        "outcomeSeparator": ", ",
+        "scanOutcome": "{trigger} - {outcome}",
+        "syncConfirmBody": "This will overwrite the metadata inside every supported file in {name} directly on disk. This cannot be undone.",
+        "columns": {
+          "library": "Library",
+          "contents": "Contents",
+          "onDisk": "On disk",
+          "automation": "Automation",
+          "lastScan": "Last scan",
+          "actions": "Actions"
+        },
+        "sort": {
+          "default": "Default order",
+          "name": "Name",
+          "books": "Books",
+          "size": "Size on disk",
+          "lastScan": "Last scan"
+        },
+        "trigger": {
+          "manual": "Manual",
+          "watcher": "Watcher",
+          "schedule": "Schedule"
+        },
+        "capability": {
+          "watch": "Watch folders",
+          "schedule": "Scheduled scan",
+          "fileWrite": "Write to file",
+          "fileRename": "Rename files",
+          "on": "{name}: on",
+          "off": "{name}: off",
+          "legendHint": "Dashed means off"
+        },
+        "stateOn": "On",
+        "stateOff": "Off",
+        "toggleDetail": "Show details for {name}",
+        "durationMs": "{ms} ms",
+        "durationSeconds": "{seconds}s",
+        "durationMinutes": "{minutes}m {seconds}s",
+        "history": {
+          "when": "When",
+          "trigger": "Trigger",
+          "duration": "Duration",
+          "result": "Result",
+          "status": "Status",
+          "statusValue": {
+            "running": "Running",
+            "completed": "Completed",
+            "failed": "Failed"
+          }
+        },
+        "detail": {
+          "foldersTitle": "Folders & layout",
+          "metadataTitle": "Metadata & reading",
+          "accessTitle": "Access",
+          "historyTitle": "Scan history",
+          "path": "Path {index}",
+          "organization": "Organization",
+          "excludePatterns": "Exclude patterns",
+          "precedence": "Source precedence",
+          "allowedFormats": "Allowed formats",
+          "countsAsStarted": "Counts as started",
+          "countsAsFinished": "Counts as finished",
+          "peopleWithAccess": "People with access",
+          "added": "Added",
+          "coverShape": "Cover shape",
+          "coverShapeValue": {
+            "portrait": "2:3 portrait",
+            "square": "1:1 square"
+          },
+          "none": "None",
+          "allSupported": "All supported",
+          "patternCount": "{count, plural, one {# pattern} other {# patterns}}",
+          "peopleCount": "{count, plural, =0 {No explicit grants} one {# person} other {# people}}",
+          "historyEmpty": "This library has never been scanned.",
+          "historyFailed": "Could not load the scan history for this library."
+        },
+        "scannedAt": "Scanned {time}",
+        "detailRegion": "Details for {name}"
       },
       "authorEnrichment": {
         "configuration": "Configuration",
@@ -1169,6 +1263,10 @@
         "resetToDefaultsButton": "Reset to defaults",
         "recalculateAll": "Recalculate all",
         "confirmReset": "Confirm reset",
+        "resetDialog": {
+          "title": "Reset every weight to its default?",
+          "description": "All 24 fields go back to the weights BookOrbit ships with. Nothing is saved until you choose Save and rescore."
+        },
         "reset": "Reset",
         "recalculate": "Recalculate",
         "subtotal": "subtotal: {count}",
@@ -1176,7 +1274,81 @@
         "saveFailed": "Failed to save score weights",
         "recalcStarted": "Score recalculation started in the background",
         "recalcFailed": "Recalculation failed",
-        "resetToDefaults": "Weights reset to defaults. Save to apply."
+        "resetToDefaults": "Weights reset to defaults. Save to apply.",
+        "howItWorks": {
+          "title": "How this works.",
+          "summary": "Every book gets a score out of 100 for how complete its metadata is. A weight is only meaningful next to the others, so each field below shows the share of a finished score it is responsible for. Doubling every weight changes nothing."
+        },
+        "readOnly": "You can see how scores are calculated, but changing weights needs the App settings permission.",
+        "compositionTitle": "Where a score comes from",
+        "compositionHint": "Percentages always add up to 100.",
+        "searchFields": "Filter fields",
+        "clearSearch": "Clear search",
+        "noMatches": "No fields match that search.",
+        "totalSummary": "{scoring} of 24 fields scoring, {total} points total",
+        "countGroups": "Count towards the score",
+        "notScored": "Not scored",
+        "notScoredHeading": "Not scored ({count})",
+        "notScoredHint": "A field at zero leaves the total too, so books missing it are not marked down.",
+        "decreaseWeight": "Decrease the weight of {field}",
+        "increaseWeight": "Increase the weight of {field}",
+        "revertField": "Revert {field} to the saved weight",
+        "table": {
+          "field": "Field",
+          "weight": "Weight",
+          "share": "Share of score",
+          "versusDefault": "Change"
+        },
+        "groups": {
+          "core": "Core",
+          "publishing": "Publishing",
+          "classification": "Classification",
+          "enrichment": "Enrichment",
+          "providers": "Provider IDs"
+        },
+        "rules": {
+          "text": "Counts when it is not empty",
+          "positive": "Counts when it is above zero",
+          "count": "Counts when at least one is set",
+          "cover": "Counts when a cover image is stored",
+          "providerId": "Counts when the ID is stored",
+          "seriesIndex": "Counts when above zero, so volume 0 never counts"
+        },
+        "rail": {
+          "title": "Where your books land",
+          "description": "The badge colour a reader sees on a book card, against every book you can see today.",
+          "bandsLabel": "Badge colour bands",
+          "bands": {
+            "poor": "UNDER 50",
+            "fair": "50-69",
+            "good": "70-89",
+            "great": "90+"
+          },
+          "median": "Median",
+          "belowFifty": "Under 50",
+          "ninetyPlus": "90 and up",
+          "noBooks": "No scored books yet. Run a rescore once your library has finished importing.",
+          "scopeNote": "Across {count, plural, one {# book} other {# books}} in the libraries you can access, scored with the weights currently saved."
+        },
+        "progress": {
+          "running": "Rescoring library",
+          "failed": "Rescore failed",
+          "count": "{processed} books processed",
+          "countOf": "{processed} of {total} books",
+          "failedCount": "({count} failed)",
+          "safeToLeave": "Safe to leave this page.",
+          "dismiss": "Dismiss"
+        },
+        "save": {
+          "upToDate": "All changes saved.",
+          "unsaved": "{count, plural, one {# field changed} other {# fields changed}}",
+          "totalShift": "total {from} to {to} points",
+          "rescores": "Saving rescores {count, plural, one {# book} other {# books}} in the background.",
+          "rescoresUnknown": "Saving rescores your library in the background.",
+          "action": "Save and rescore",
+          "discard": "Discard",
+          "leaveWarning": "You have unsaved weight changes. Leave the page and lose them?"
+        }
       },
       "tabs": {
         "users": "Users",
@@ -1245,20 +1417,34 @@
         "genres": "Genres",
         "narrators": "Narrators",
         "duration": "Duration",
-        "abridged": "Abridged"
+        "abridged": "Abridged",
+        "tags": "Tags",
+        "isbn13": "ISBN-13",
+        "isbn10": "ISBN-10",
+        "googleBooksId": "Google Books ID",
+        "goodreadsId": "Goodreads ID",
+        "amazonId": "Amazon ID",
+        "hardcoverId": "Hardcover ID",
+        "openLibraryId": "Open Library ID",
+        "itunesId": "iTunes ID",
+        "koboId": "Kobo ID",
+        "aladinId": "Aladin ID"
       },
       "mergeStrategy": {
         "fillMissing": {
           "label": "Fill missing",
-          "description": "Only write if field is currently empty"
+          "description": "Only write if field is currently empty",
+          "short": "Fill gaps"
         },
         "overwriteIfProvided": {
           "label": "Overwrite if provided",
-          "description": "Write if provider returned a value"
+          "description": "Write if provider returned a value",
+          "short": "If provided"
         },
         "overwrite": {
           "label": "Always overwrite",
-          "description": "Always replace existing value"
+          "description": "Always replace existing value",
+          "short": "Always"
         }
       },
       "autoFetch": {
@@ -1326,16 +1512,38 @@
       "providers": {
         "availableSources": "Available Sources",
         "saveChanges": "Save Changes",
+        "discard": "Discard",
+        "configure": "Configure",
         "test": "Test",
         "testing": "Testing...",
+        "testHint": "Checks these credentials against the live service. Nothing is saved.",
         "enabled": "Enabled",
         "retryIn": "Retry in {duration}",
         "runTestBeforeEnabling": "Run Test before enabling",
         "hardcoverEnableHint": "Run Test with the current token to unlock the enable switch.",
+        "searchPlaceholder": "Filter sources",
+        "sourcesEnabled": "{enabled} of {total} sources enabled",
+        "groupEnabled": "{enabled} of {total} on",
+        "unsavedChanges": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+        "noMatches": "No sources match this filter.",
+        "clearFilters": "Clear filters",
+        "filter": {
+          "label": "Filter sources by state",
+          "all": "All",
+          "enabled": "Enabled",
+          "needsSetup": "Needs setup"
+        },
+        "groups": {
+          "books": "General book catalogues",
+          "audiobooks": "Audiobooks",
+          "comics": "Comics & light novels",
+          "regional": "Regional catalogues"
+        },
         "badge": {
           "setupRequired": "Setup Required",
           "throttled": "Throttled",
-          "ready": "Ready"
+          "ready": "Ready",
+          "active": "Active"
         },
         "fields": {
           "apiKey": "API Key",
@@ -1359,6 +1567,7 @@
           "kobo": "Scrapes Kobo's public book pages. Country and language must match Kobo URL paths; bot protection can block requests.",
           "audible": "Pulls audiobook metadata from Audible. No additional setup is required.",
           "audnexus": "Community-driven audiobook metadata. No setup required.",
+          "librofm": "DRM-free audiobook catalog metadata. Uses an undocumented Libro.fm endpoint and is disabled by default.",
           "comicvine": "Comic book metadata from ComicVine. A free API key is required from comicvine.gamespot.com.",
           "ranobedb": "Japanese light novel metadata from RanobeDB. No setup required.",
           "lubimyczytac": "Polish book catalog (lubimyczytac.pl). Scrapes public book pages. No setup required.",
@@ -1391,7 +1600,8 @@
             "fillMissingBody": "Only write if current value is empty.",
             "overwriteTerm": "Overwrite:",
             "overwriteBody": "Replace whenever a provider has data."
-          }
+          },
+          "summary": "Providers are tried top to bottom and the first one that returns a value wins. The merge strategy decides whether that value may replace what the book already has. Set defaults here, then override individual fields per library."
         },
         "libraryOverrides": {
           "title": "Library Overrides",
@@ -1444,13 +1654,15 @@
         },
         "groupSummary": {
           "base": "{fields} fields · {enabled} enabled",
-          "withOverrides": "{base} · {overrides} overrides"
+          "withOverrides": "{base} · {overrides} overrides",
+          "enabledOf": "{enabled} of {fields} enabled"
         },
         "table": {
           "field": "Field",
           "activeProviders": "Active Providers (ordered by priority)",
           "mergeStrategy": "Merge Strategy",
-          "status": "Status"
+          "status": "Status",
+          "noMatches": "No fields match these filters."
         },
         "field": {
           "noProviders": "Enabled but has no providers",
@@ -1458,7 +1670,19 @@
           "config": "Config",
           "custom": "Custom",
           "default": "Default",
-          "resetToDefault": "Reset to default"
+          "resetToDefault": "Reset to default",
+          "toggle": "Fetch {field} during metadata refresh",
+          "configure": "Configure {field}",
+          "add": "Add",
+          "addHint": "Added at the end of the order. Drag a chip to move it earlier.",
+          "addProviderTo": "Add a provider to {field}",
+          "removeProvider": "Remove {provider}",
+          "noProvidersYet": "No providers yet",
+          "skippedCount": "{count, plural, one {# skipped} other {# skipped}}",
+          "unsaved": "Unsaved",
+          "override": "Override",
+          "inherited": "Inherited",
+          "morePreview": "+{count} more"
         },
         "reservoir": {
           "disabled": "{provider} - disabled",
@@ -1472,6 +1696,69 @@
           "statusDisabled": "disabled",
           "statusNotConfigured": "not configured",
           "done": "Done"
+        },
+        "scope": {
+          "label": "Rule scope",
+          "global": "Global defaults",
+          "overrideCount": "{count, plural, one {# overridden field} other {# overridden fields}}",
+          "unsavedMarker": "Has unsaved changes"
+        },
+        "toolbar": {
+          "searchFields": "Search fields",
+          "clearSearch": "Clear search",
+          "provider": "Provider",
+          "anyProvider": "Any",
+          "providerMenuTitle": "Filter and bulk edit by provider",
+          "usedIn": "{count, plural, =0 {unused} one {# field} other {# fields}}",
+          "showOnlyThese": "Show only fields using it",
+          "bulkLabel": "Apply to all {count} fields that use it",
+          "makeFirst": "Make first everywhere",
+          "makeLast": "Make last everywhere",
+          "removeEverywhere": "Remove from all fields",
+          "allFields": "All fields",
+          "overridesOnly": "Overrides only",
+          "clearFilters": "Clear filters"
+        },
+        "providerState": {
+          "disabled": "Disabled",
+          "notConfigured": "Not configured",
+          "disabledDetail": "{provider} is turned off, so it stays in the order but is skipped.",
+          "notConfiguredDetail": "{provider} has no credentials yet, so it stays in the order but is skipped."
+        },
+        "detail": {
+          "priority": "Provider priority",
+          "priorityHint": "The first provider that returns a value wins.",
+          "moveUp": "Move {provider} earlier",
+          "moveDown": "Move {provider} later",
+          "result": "Result",
+          "resultHint": "On the next refresh this field resolves in this order:",
+          "noUsableProviders": "No usable provider - this field will not be filled.",
+          "skippedSummary": "{count, plural, one {{providers} is in the order but will be skipped.} other {{providers} are in the order but will be skipped.}}",
+          "appliesTo": "Applies to {scope}.",
+          "inheritGlobal": "Inherit global rule",
+          "inheritingGlobal": "Inheriting the global rule.",
+          "collapse": "Collapse"
+        },
+        "save": {
+          "upToDate": "No unsaved changes",
+          "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}} in {scope}",
+          "discard": "Discard",
+          "action": "Save {scope}"
+        },
+        "confirm": {
+          "clearProviders": {
+            "title": "Remove every provider?",
+            "description": "This empties the provider list on all 16 fields in {scope}. Nothing is saved until you choose Save."
+          },
+          "resetScope": {
+            "title": "Reset to defaults?",
+            "globalDescription": "This replaces your global field rules with the system defaults and saves immediately.",
+            "libraryDescription": "This removes every override on {scope} so it inherits the global rules again, and saves immediately."
+          },
+          "removeProvider": {
+            "title": "Remove {provider} from every field?",
+            "description": "This takes {provider} out of the provider order on every field in {scope}. Nothing is saved until you choose Save."
+          }
         }
       },
       "genreBlocklist": {
@@ -1545,7 +1832,7 @@
         "field-rules": "Field Rules",
         "custom-fields": "Custom Fields",
         "genre-blocklist": "Genre Blocklist",
-        "score": "Score",
+        "score": "Confidence Score",
         "auto-fetch": "Books",
         "authors": "Authors"
       },
@@ -1563,9 +1850,18 @@
         "field-rules": "Control which provider supplies each metadata field and how values are merged across your libraries.",
         "custom-fields": "Define custom metadata fields and choose which libraries use them.",
         "genre-blocklist": "Prevent unwanted provider genre values from being written to books.",
-        "score": "Assign weights to metadata fields to calculate how much to trust fetched results.",
+        "score": "How each metadata field counts towards the completeness score shown on every book.",
         "auto-fetch": "Automatically fetch covers, descriptions, and other details when new books are added to your library.",
         "authors": "Automatically fetch biographies and profile photos when new authors appear in your library."
+      },
+      "preferences": {
+        "toast": {
+          "saved": "Metadata preferences saved",
+          "saveFailed": "Could not save metadata preferences. Check your connection and try again.",
+          "globalReset": "Global field rules reset to system defaults",
+          "libraryReset": "Library reset to the global rules",
+          "resetFailed": "Could not reset metadata preferences. Check your connection and try again."
+        }
       }
     },
     "reader": {
@@ -1891,7 +2187,104 @@
         "tokenOriginalFilename": "Original filename (without extension)",
         "tokenExtension": "File extension (without dot)",
         "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
-        "browseTokensAndExamples": "Browse tokens and examples"
+        "browseTokensAndExamples": "Browse tokens and examples",
+        "subtitleShort": "Folder and filename patterns for stored files.",
+        "rule": {
+          "fileAsBook": "File as Book default",
+          "folderAsBook": "Folder as Book default",
+          "download": "Download filename"
+        },
+        "howItWorks": {
+          "title": "How a path is chosen.",
+          "summary": "A library with a pattern of its own wins. Every other library follows the global default for its organization mode. Changing a pattern does not move books already on disk; new uploads follow it from the next upload on."
+        },
+        "filterRules": "Filter rules",
+        "librariesGroup": "Libraries",
+        "customCount": "{custom}/{total} custom",
+        "noRuleMatches": "No rule matches \"{query}\".",
+        "unsavedMarker": "Has unsaved changes",
+        "backToRules": "Back to naming rules",
+        "appliesToLibraries": "{count, plural, =0 {No libraries use this default} one {Applies to # library} other {Applies to # libraries}}",
+        "downloadScope": "Downloads and export ZIPs",
+        "badgeInherits": "Inherits default",
+        "badgeUnsaved": "Unsaved",
+        "patternLabel": "Pattern",
+        "readOnlyFromGlobal": "Read-only, from the global default",
+        "useGlobalDefault": "Use the global default",
+        "resetToShipped": "Reset to shipped default",
+        "addOverride": "Add an override",
+        "inheritsNotice": "This library follows the {base}. Add an override to give it a pattern of its own.",
+        "libraryRuleHint": "Overrides the {base} for this library only.",
+        "scopeLibrary": "Applies to uploads into {name} only.",
+        "scopeDownload": "Applies to every single-file download and every file inside an export ZIP.",
+        "scopeGlobal": "{count, plural, one {Applies to # library that has no pattern of its own.} other {Applies to # libraries that have no pattern of their own.}}",
+        "scopeGlobalNone": "No library uses this default right now; every library in this mode has its own pattern.",
+        "unbalancedOptional": "An optional group is missing its closing angle bracket",
+        "unbalancedToken": "A token is missing its closing brace",
+        "structure": "Structure",
+        "paletteOptional": "optional",
+        "paletteOptionalHint": "Wraps a segment so it is dropped when a token inside it is empty",
+        "paletteFallback": "fallback",
+        "paletteFallbackHint": "Inside an optional group, the text used when the left side cannot be filled",
+        "paletteSeparator": "folder",
+        "paletteSeparatorHint": "Starts a new folder level",
+        "modUpper": "UPPERCASE",
+        "modLower": "lowercase",
+        "recipesLabel": "Or start from a recipe",
+        "recipe": {
+          "seriesShelf": "Series shelf",
+          "calibre": "Calibre style",
+          "alphabetical": "Alphabetical",
+          "flat": "Flat, no folders",
+          "originalName": "Original filename",
+          "authorTitle": "Author and title",
+          "titleOnly": "Title only",
+          "seriesOrdered": "Series ordered"
+        },
+        "resultPanel": "Resolved result",
+        "resultFor": "Result: {rule}",
+        "copyResult": "Copy the resolved result",
+        "resultCopied": "Resolved result copied to clipboard",
+        "resultCopyFailed": "Failed to copy the resolved result",
+        "sampleBookNote": "Sample book used for every preview",
+        "missingMetadata": "If metadata is missing",
+        "caseNoSeriesLabel": "No series",
+        "caseNoYearLabel": "No year",
+        "caseNoAuthorLabel": "No author",
+        "previewEmpty": "This pattern resolves to nothing, so the original filename would be used instead.",
+        "previewEmptyShort": "Resolves to nothing",
+        "crossPlatformShortHint": "Replaces characters Windows rejects. Previews reflect this setting.",
+        "rulesSaved": "{count, plural, one {# naming rule saved} other {# naming rules saved}}",
+        "rulesSaveFailed": "{count, plural, one {Failed to save # naming rule} other {Failed to save # naming rules}}",
+        "rulesPartiallySaved": "Saved {saved}, failed {failed}. The rules that failed still have unsaved changes.",
+        "save": {
+          "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+          "upToDate": "No unsaved changes",
+          "discard": "Discard",
+          "action": "Save changes",
+          "blocked": "Fix the invalid pattern before saving"
+        },
+        "examplesDescription": "Idioms the recipes do not cover. A pattern ending in a slash resolves to a folder and keeps the uploaded filename inside it.",
+        "examplesApply": "Apply",
+        "examplesApplyAria": "Apply the {label} pattern",
+        "examplesUploadOnly": "These are upload patterns, shown here for reference. Switch to a File as Book or Folder as Book rule to apply one.",
+        "examplesFileModeOnly": "Folder as Book needs a filename segment of its own, so this idiom applies to File as Book libraries only.",
+        "example": {
+          "seriesOrStandalone": "Series, or a Standalone folder",
+          "optionalSubtitle": "Optional subtitle",
+          "languageFolder": "Language folder",
+          "publisherFolder": "Publisher folder",
+          "stackedOptional": "Stacked optional folders",
+          "folderDrop": "Folder only, keep the uploaded filename"
+        },
+        "exampleCase": {
+          "complete": "Complete",
+          "noSeries": "No series",
+          "noSubtitle": "No subtitle",
+          "noLanguage": "No language",
+          "noPublisher": "No publisher"
+        },
+        "unknownModifier": "Unknown modifier \"{modifier}\". It will be ignored, leaving the value unchanged."
       },
       "kobo": {
         "title": "Kobo Sync",
@@ -2674,7 +3067,10 @@
         "email": "Email",
         "access": "Access",
         "status": "Status",
-        "actions": "Actions"
+        "actions": "Actions",
+        "user": "User",
+        "libraries": "Libraries",
+        "lastActive": "Last active"
       },
       "adminBadge": "Admin",
       "permissionCount": "{count, plural, =0 {no permissions} one {one permission} other {# permissions}}",
@@ -2723,11 +3119,6 @@
         "search": "Search users",
         "searchPlaceholder": "Search by name, username or email",
         "sort": "Sort users",
-        "usernameAsc": "Username A-Z",
-        "nameAsc": "Name A-Z",
-        "newest": "Newest first",
-        "oldest": "Oldest first",
-        "apply": "Apply",
         "clear": "Clear",
         "state": "Filter users",
         "allUsers": "All users",
@@ -2742,12 +3133,66 @@
       },
       "pagination": {
         "label": "Users pagination",
-        "page": "Page {page} of {totalPages}"
+        "page": "Page {page} of {totalPages}",
+        "showing": "Showing {shown} of {total} accounts"
       },
       "editUserAria": "Edit {name}",
       "resetPasswordAria": "Reset the password for {name}",
       "deleteUserAria": "Delete {name}",
-      "moreActionsAria": "More actions for {name}"
+      "moreActionsAria": "More actions for {name}",
+      "headerSummary": "{count, plural, =0 {No accounts} one {# account} other {# accounts}} · {admins} with administrator access",
+      "noEmail": "No address",
+      "editAccount": "Edit account",
+      "cardMeta": "{access} · {libraries} · {lastActive}",
+      "accessTier": {
+        "superuser": "Superuser",
+        "admin": "Admin",
+        "standard": "Standard",
+        "custom": "Custom",
+        "none": "No access"
+      },
+      "libraries": {
+        "all": "All {total}",
+        "some": "{granted} of {total}"
+      },
+      "statusLocked": "Locked",
+      "status": {
+        "never": "Never",
+        "neverSignedIn": "Never signed in",
+        "defaultPassword": "Default password",
+        "contentFiltered": "Content filtered",
+        "unlocksIn": "Unlocks {when}"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "count": "{count, plural, one {# account} other {# accounts}}",
+        "filter": "{count, plural, one {# needs attention} other {# need attention}}",
+        "more": "{count} more not shown here",
+        "reason": {
+          "locked": "{name} is locked out after too many failed sign-ins",
+          "neverSignedIn": "{name} has never signed in",
+          "defaultPassword": "{name} is still using the password the account was created with"
+        },
+        "detail": {
+          "unlocksIn": "Unlocks automatically {when}",
+          "created": "Created {when}",
+          "linkExpired": "Created {when} · the sign-in link has expired",
+          "linkValid": "Created {when} · sign-in link valid until {expiry}"
+        },
+        "action": {
+          "unlock": "Unlock now",
+          "sendResetLink": "Send reset link",
+          "sendNewLink": "Send new link"
+        },
+        "collapse": "Hide",
+        "expand": "Show"
+      },
+      "defaults": {
+        "title": "Defaults for new accounts",
+        "appliesTo": "Applies to self-registration and OIDC",
+        "startingLibraries": "Starting libraries",
+        "startingLibrariesHint": "Viewer access granted automatically to every new account."
+      }
     }
   },
   "annotations": {
@@ -5100,6 +5545,14 @@
         "wideDescription": "Show one shelf per row.",
         "twoColumns": "Two columns",
         "twoColumnsDescription": "Show two shelves per row."
+      },
+      "libraryScope": {
+        "title": "Dashboard libraries",
+        "description": "Choose which libraries contribute books and reading data to this dashboard.",
+        "allLibraries": "All accessible libraries",
+        "summaryNone": "No libraries selected",
+        "summaryCount": "{count, plural, one {# library} other {# libraries}}",
+        "required": "Select at least one library."
       },
       "shelfRows": {
         "label": "Rows of books",

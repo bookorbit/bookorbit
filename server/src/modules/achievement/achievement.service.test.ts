@@ -9,6 +9,7 @@ function makeRepo() {
     findUserAchievements: vi.fn().mockResolvedValue([]),
     findUserEarnedKeys: vi.fn().mockResolvedValue(new Set()),
     findUserIsSuperuser: vi.fn().mockResolvedValue(false),
+    findUserTimeZone: vi.fn().mockResolvedValue('UTC'),
     award: vi.fn().mockResolvedValue({ id: 1, achievementKey: 'test', userId: 1, awardedAt: new Date(), contextJson: null }),
     upsertCatalogue: vi.fn().mockResolvedValue(undefined),
     countFinishedBooks: vi.fn().mockResolvedValue(0),

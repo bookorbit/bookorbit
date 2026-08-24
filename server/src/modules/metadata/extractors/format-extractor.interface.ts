@@ -39,6 +39,11 @@ export interface ParsedBookData {
   chapters?: { title: string; startMs: number }[];
   // ebook-specific extras
   pageCount?: number | null;
+  /**
+   * Fixed-layout (`rendition:layout: pre-paginated`) declaration. Only EPUB extraction sets it,
+   * because it describes the book file itself, not the bibliographic metadata a sidecar can carry.
+   */
+  isFixedLayout?: boolean | null;
   comicMetadata?: ParsedCbzComicMetadata | null;
 }
 

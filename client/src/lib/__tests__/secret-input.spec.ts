@@ -76,7 +76,7 @@ describe('secret input policy', () => {
 
     expect(converted).toEqual(
       expect.arrayContaining([
-        'features/settings/metadata-preferences/components/ProviderConfigPanel.vue',
+        'features/settings/metadata-preferences/components/ProviderRow.vue',
         'features/hardcover/components/HardcoverConnectionCard.vue',
         'features/readwise/components/ReadwiseSettings.vue',
         'features/storygraph/components/StorygraphConnectionCard.vue',

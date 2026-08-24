@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, getTableColumns, inArray, isNotNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { AccessLevel, ContentFilterRules } from '@bookorbit/types';
+import type { AccessLevel, ContentFilterRules, LibraryStats } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
@@ -176,6 +176,55 @@ export class LibraryRepository {
       totalSizeBytes: toSafeNumber(totalSizeBytes),
       formatCounts,
     };
+  }
+
+  /**
+   * The same aggregates as getStats, for many libraries in two round trips instead of two per
+   * library. Book counts come from books alone so titles with no primary file still count, while
+   * sizes and formats need the bookFiles join.
+   */
+  async getStatsForLibraries(libraryIds: number[]) {
+    if (libraryIds.length === 0) return new Map<number, LibraryStats>();
+
+    const [countRows, formatRows] = await Promise.all([
+      this.db
+        .select({ libraryId: books.libraryId, count: sql<number>`count(*)::int` })
+        .from(books)
+        .where(and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
+        .groupBy(books.libraryId),
+      this.db
+        .select({
+          libraryId: books.libraryId,
+          format: bookFiles.format,
+          count: sql<number>`count(*)::int`,
+          totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint`,
+        })
+        .from(books)
+        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+        .where(and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
+        .groupBy(books.libraryId, bookFiles.format),
+    ]);
+
+    const sizeByLibrary = new Map<number, bigint>();
+    const formatsByLibrary = new Map<number, Record<string, number>>();
+    for (const row of formatRows) {
+      sizeByLibrary.set(row.libraryId, (sizeByLibrary.get(row.libraryId) ?? 0n) + toBigInt(row.totalSize));
+      if (!row.format) continue;
+      const formats = formatsByLibrary.get(row.libraryId);
+      if (formats) formats[row.format] = row.count;
+      else formatsByLibrary.set(row.libraryId, { [row.format]: row.count });
+    }
+
+    const countByLibrary = new Map(countRows.map((row) => [row.libraryId, row.count]));
+    const stats = new Map<number, LibraryStats>();
+    for (const libraryId of libraryIds) {
+      stats.set(libraryId, {
+        totalBooks: countByLibrary.get(libraryId) ?? 0,
+        totalSizeBytes: toSafeNumber(sizeByLibrary.get(libraryId) ?? 0n),
+        formatCounts: formatsByLibrary.get(libraryId) ?? {},
+      });
+    }
+    return stats;
   }
 
   async hasUserAccess(userId: number, libraryId: number): Promise<boolean> {

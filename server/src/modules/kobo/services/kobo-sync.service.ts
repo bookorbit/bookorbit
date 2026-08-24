@@ -1,14 +1,17 @@
 import { createHash } from 'crypto';
-import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { SQL, and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
+import { mapWithConcurrency } from '../../../common/utils/batch.utils';
 import { buildContentFilterClauses } from '../../../common/utils/content-filter-sql.utils';
+import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../../common/utils/timezone.utils';
 import { ContentFilterRepository } from '../../user/content-filter.repository';
 import { BookQueryBuilder } from '../../book/book-query-builder.service';
+import { MetadataExtractionService } from '../../metadata/metadata-extraction.service';
 import { SmartScopeService } from '../../smart-scope/smart-scope.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
@@ -25,6 +28,12 @@ export const SYNC_PAGE_SIZE = 50;
 const SNAPSHOT_RECONCILE_BATCH_SIZE = 5000;
 const SNAPSHOT_CREATE_BATCH_SIZE = 5000;
 const METADATA_SERIALIZER_VERSION = 2;
+
+// Fixed-layout detection opens the EPUB, so a sync never resolves the whole backlog at once.
+// Each pass persists what it learns, so a library converges over successive syncs and every
+// later sync reads the stored answer instead of touching the filesystem.
+const FIXED_LAYOUT_BACKFILL_LIMIT = 500;
+const FIXED_LAYOUT_BACKFILL_CONCURRENCY = 8;
 
 type EligibleSnapshotRow = {
   bookId: number;
@@ -56,7 +65,16 @@ type KoboDeliverySettings = {
   kepubConversionLimitMb: number;
 };
 
-type KoboDeliveryFormat = 'EPUB3' | 'KEPUB' | 'PDF';
+// EPUB3FL tells the device to use its fixed-layout renderer, which is what makes a comic fill
+// the screen instead of picking up the reflowable reading margins.
+type KoboDeliveryFormat = 'EPUB3' | 'EPUB3FL' | 'KEPUB' | 'PDF';
+
+type FixedLayoutCandidate = {
+  fileId: number;
+  fileAbsolutePath: string;
+  fileFormat: string | null;
+  isFixedLayout: boolean | null;
+};
 
 type KoboDeliveryInfo = {
   format: KoboDeliveryFormat;
@@ -99,6 +117,8 @@ export interface KoboBookEntry {
 
 @Injectable()
 export class KoboSyncService {
+  private readonly logger = new Logger(KoboSyncService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly bookAccessService: KoboBookAccessService,
@@ -107,6 +127,7 @@ export class KoboSyncService {
     private readonly bookIdentityService: KoboBookIdentityService,
     private readonly queryBuilder: BookQueryBuilder,
     private readonly smartScopeService: SmartScopeService,
+    private readonly metadataExtractionService: MetadataExtractionService,
   ) {}
 
   async getDelta(
@@ -129,7 +150,7 @@ export class KoboSyncService {
 
     const hadDeviceSnapshot = snapshot ? true : await this.hasDeviceSnapshot(userId);
     const legacyNumericRemovalBookIds = snapshot ? new Set<number>() : await this.getLegacyNumericRemovalBookIds(userId, deviceId);
-    const eligibleSnapshotRows = await this.fetchEligibleSnapshotRows(userId, hadDeviceSnapshot, smartScopeMatchCache);
+    const eligibleSnapshotRows = await this.fetchEligibleSnapshotRows(userId, hadDeviceSnapshot, smartScopeMatchCache, true);
 
     if (!snapshot) {
       const created = await this.createSnapshot(userId, deviceId, eligibleSnapshotRows, legacyNumericRemovalBookIds);
@@ -891,34 +912,110 @@ export class KoboSyncService {
     return createHash('sha256').update(metaStr).digest('hex').slice(0, 16);
   }
 
+  /**
+   * `hyphenate` describes the bytes actually delivered, not the announced format, so a hyphenated
+   * kepub and a plain one never collide even when both are announced as EPUB3FL.
+   */
   private buildDeliveryHash(format: KoboDeliveryFormat, hyphenate: boolean): string {
     return createHash('sha256')
-      .update([format, format === 'KEPUB' && hyphenate ? 'hyphenate' : 'plain'].join('|'))
+      .update([format, hyphenate ? 'hyphenate' : 'plain'].join('|'))
       .digest('hex')
       .slice(0, 16);
   }
 
-  private getDeliveryInfo(fileFormat: string | null, fileSizeBytes: number | null, settings: KoboDeliverySettings): KoboDeliveryInfo {
+  private getDeliveryInfo(
+    fileFormat: string | null,
+    fileSizeBytes: number | null,
+    settings: KoboDeliverySettings,
+    isFixedLayout: boolean | null,
+  ): KoboDeliveryInfo {
     const normalizedFormat = (fileFormat ?? 'epub').toLowerCase();
 
     if (normalizedFormat === 'pdf') {
       return { format: 'PDF', hash: this.buildDeliveryHash('PDF', false) };
     }
 
+    const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
+    const convertsToKepub = normalizedFormat === 'epub' && settings.convertToKepub && (!fileSizeBytes || fileSizeBytes <= limitBytes);
+    const hyphenated = convertsToKepub && settings.forceEnableHyphenation;
+
+    // Announcing EPUB3FL is what earns the full-screen renderer; the bytes are deliberately left
+    // alone. A kepub renders full screen just the same once the format says fixed layout, and
+    // keeping the conversion preserves the KoboSpan positions two-way progress sync depends on.
+    if (isFixedLayout && (normalizedFormat === 'epub' || normalizedFormat === 'kepub')) {
+      return { format: 'EPUB3FL', hash: this.buildDeliveryHash('EPUB3FL', hyphenated) };
+    }
+
     if (normalizedFormat === 'kepub') {
       return { format: 'KEPUB', hash: this.buildDeliveryHash('KEPUB', false) };
     }
 
-    if (normalizedFormat === 'epub') {
-      const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
-      const withinLimit = !fileSizeBytes || fileSizeBytes <= limitBytes;
-
-      if (settings.convertToKepub && withinLimit) {
-        return { format: 'KEPUB', hash: this.buildDeliveryHash('KEPUB', settings.forceEnableHyphenation) };
-      }
+    if (convertsToKepub) {
+      return { format: 'KEPUB', hash: this.buildDeliveryHash('KEPUB', hyphenated) };
     }
 
     return { format: 'EPUB3', hash: this.buildDeliveryHash('EPUB3', false) };
+  }
+
+  /**
+   * Resolves the fixed-layout flag for eligible files that have never been checked, and stores what
+   * it finds so later syncs read the column instead of the filesystem. Capped per sync because this
+   * runs on the whole-library pass; anything left over is picked up by the next sync, which only
+   * delays a comic's re-announcement rather than losing it.
+   *
+   * A file that cannot be read stays null so it is retried later: persisting a read failure as
+   * `false` would permanently mark a comic reflowable.
+   */
+  private async backfillFixedLayout(rows: readonly FixedLayoutCandidate[]): Promise<Map<number, boolean>> {
+    const pending = rows
+      .filter((row) => row.isFixedLayout === null && (row.fileFormat === 'epub' || row.fileFormat === 'kepub'))
+      .slice(0, FIXED_LAYOUT_BACKFILL_LIMIT);
+    const resolved = new Map<number, boolean>();
+    if (pending.length === 0) return resolved;
+
+    const startedAt = Date.now();
+    const detected = await mapWithConcurrency(pending, FIXED_LAYOUT_BACKFILL_CONCURRENCY, async (row) => {
+      try {
+        return await this.metadataExtractionService.detectFixedLayout(row.fileAbsolutePath, row.fileFormat!);
+      } catch {
+        return null;
+      }
+    });
+
+    const fileIdsByValue = new Map<boolean, number[]>();
+    detected.forEach((value, index) => {
+      if (value === null) return;
+      const fileId = pending[index]!.fileId;
+      resolved.set(fileId, value);
+      const bucket = fileIdsByValue.get(value) ?? [];
+      bucket.push(fileId);
+      fileIdsByValue.set(value, bucket);
+    });
+
+    try {
+      for (const [value, fileIds] of fileIdsByValue) {
+        // Still-null guard: keeps the write idempotent, avoids clobbering a value a concurrent
+        // scan just wrote, and keeps book_files.updatedAt (the KOReader library token and OPDS
+        // entry timestamps) from being bumped by a sync that changed nothing.
+        await this.db
+          .update(schema.bookFiles)
+          .set({ isFixedLayout: value })
+          .where(and(inArray(schema.bookFiles.id, fileIds), isNull(schema.bookFiles.isFixedLayout)));
+      }
+    } catch (err) {
+      // The detected values are still returned, so this sync announces the right format either
+      // way; only the persistence that saves the next sync the work is lost.
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[kobo.fixed_layout_backfill] [fail] candidates=${pending.length} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - could not persist fixed layout flags`,
+      );
+      return resolved;
+    }
+
+    this.logger.debug(
+      `[kobo.fixed_layout_backfill] [end] candidates=${pending.length} resolved=${resolved.size} fixedLayout=${fileIdsByValue.get(true)?.length ?? 0} durationMs=${Date.now() - startedAt} - fixed layout flags backfilled`,
+    );
+    return resolved;
   }
 
   private async getDeliverySettings(userId: number): Promise<KoboDeliverySettings> {
@@ -990,6 +1087,7 @@ export class KoboSyncService {
     userId: number,
     needsLegacyNumericRemovalForNewMappings: boolean,
     smartScopeMatchCache: SmartScopeMatchCache,
+    backfillFixedLayout = false,
   ): Promise<EligibleSnapshotRow[]> {
     const whereClause = await this.buildEligibleBooksWhereClause(userId, smartScopeMatchCache);
     if (!whereClause) return [];
@@ -1008,6 +1106,9 @@ export class KoboSyncService {
         fileFormat: schema.bookFiles.format,
         fileSizeBytes: schema.bookFiles.sizeBytes,
         fileHash: schema.bookFiles.fileHash,
+        fileId: schema.bookFiles.id,
+        fileAbsolutePath: schema.bookFiles.absolutePath,
+        isFixedLayout: schema.bookFiles.isFixedLayout,
         authorNamesCsv: sql<string>`coalesce(string_agg(${schema.authors.name}, ',' ORDER BY ${schema.bookAuthors.displayOrder}, ${schema.bookAuthors.authorId}), '')`,
       })
       .from(schema.books)
@@ -1028,6 +1129,9 @@ export class KoboSyncService {
         schema.bookFiles.format,
         schema.bookFiles.sizeBytes,
         schema.bookFiles.fileHash,
+        schema.bookFiles.id,
+        schema.bookFiles.absolutePath,
+        schema.bookFiles.isFixedLayout,
       );
 
     const identitiesById = await this.bookIdentityService.ensureForBooks(
@@ -1036,8 +1140,11 @@ export class KoboSyncService {
       needsLegacyNumericRemovalForNewMappings,
     );
 
+    const fixedLayoutByFileId = backfillFixedLayout ? await this.backfillFixedLayout(rows) : new Map<number, boolean>();
+
     return rows.map((row) => {
-      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings);
+      const isFixedLayout = row.isFixedLayout ?? fixedLayoutByFileId.get(row.fileId) ?? null;
+      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings, isFixedLayout);
       const identity = identitiesById.get(row.bookId);
       const coverImageId = identity
         ? this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.metadataUpdatedAt)
@@ -1091,6 +1198,7 @@ export class KoboSyncService {
         fileFormat: schema.bookFiles.format,
         fileSizeBytes: schema.bookFiles.sizeBytes,
         fileHash: schema.bookFiles.fileHash,
+        isFixedLayout: schema.bookFiles.isFixedLayout,
         metadataUpdatedAt: schema.bookMetadata.updatedAt,
         addedAt: schema.books.addedAt,
         updatedAt: schema.books.updatedAt,
@@ -1142,7 +1250,7 @@ export class KoboSyncService {
     const byId = new Map<number, KoboBookEntry>();
     for (const row of rows) {
       const authors = authorsByBook.get(row.bookId) ?? [];
-      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings);
+      const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings, row.isFixedLayout);
       const identity = identitiesById.get(row.bookId);
       if (!identity) continue;
       const coverImageId = this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.metadataUpdatedAt);

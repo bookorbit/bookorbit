@@ -17,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   opf: vi.fn(),
   pdf: vi.fn(),
   pdfOptions: undefined as { onWarning?: (warning: Record<string, unknown>) => void; extractCover?: boolean } | undefined,
+  epubFixedLayout: vi.fn(),
+}));
+
+vi.mock('./lib/epub', () => ({
+  extractEpubFixedLayout: mocks.epubFixedLayout,
 }));
 
 vi.mock('./lib/cover', () => ({
@@ -186,5 +191,37 @@ describe('MetadataExtractionService', () => {
       thresholdBytes: 5_000_000,
     });
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('sizeBytes=10000000 thresholdBytes=5000000'));
+  });
+});
+
+describe('MetadataExtractionService.detectFixedLayout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.epubFixedLayout.mockResolvedValue(null);
+  });
+
+  it('reads the declaration for an epub', async () => {
+    mocks.epubFixedLayout.mockResolvedValue(true);
+
+    await expect(new MetadataExtractionService().detectFixedLayout('/books/manga.epub', 'epub')).resolves.toBe(true);
+    expect(mocks.epubFixedLayout).toHaveBeenCalledWith('/books/manga.epub');
+  });
+
+  it('reads the declaration for a kepub, which carries the same OPF', async () => {
+    mocks.epubFixedLayout.mockResolvedValue(true);
+
+    await expect(new MetadataExtractionService().detectFixedLayout('/books/manga.kepub', 'kepub')).resolves.toBe(true);
+  });
+
+  it('passes a reflowable answer through unchanged', async () => {
+    mocks.epubFixedLayout.mockResolvedValue(false);
+
+    await expect(new MetadataExtractionService().detectFixedLayout('/books/novel.epub', 'epub')).resolves.toBe(false);
+  });
+
+  it('returns null without touching the filesystem for a format that cannot declare a layout', async () => {
+    await expect(new MetadataExtractionService().detectFixedLayout('/books/comic.cbz', 'cbz')).resolves.toBeNull();
+    await expect(new MetadataExtractionService().detectFixedLayout('/books/scan.pdf', 'pdf')).resolves.toBeNull();
+    expect(mocks.epubFixedLayout).not.toHaveBeenCalled();
   });
 });

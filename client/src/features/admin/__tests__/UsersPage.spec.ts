@@ -30,40 +30,70 @@ const USER = {
   email: 'ada@example.com',
   active: true,
   isSuperuser: false,
+  isDefaultPassword: false,
   permissions: ['library_download'],
   provisioningMethod: 'local',
   hasContentFilters: false,
+  libraryAccessCount: 1,
+  lastAuthenticatedAt: '2026-08-20T00:00:00.000Z',
+  createdAt: '2026-01-01T00:00:00.000Z',
 }
+
+const EMPTY_SUMMARY = { total: 1, admins: 0, active: 1, inactive: 0, attention: 0 }
 
 function jsonResponse(body: unknown) {
   return { ok: true, json: async () => body }
 }
 
-function stubApi(overrides: { users?: unknown[]; total?: number; allowRegistration?: boolean } = {}) {
+interface StubOptions {
+  users?: unknown[]
+  total?: number
+  allowRegistration?: boolean
+  summary?: Partial<typeof EMPTY_SUMMARY>
+  attention?: unknown[]
+}
+
+function stubApi(overrides: StubOptions = {}) {
   apiMock.mockImplementation(async (input: string) => {
-    if (input.startsWith('/api/v1/users')) {
+    if (input === '/api/v1/users/summary') return jsonResponse({ ...EMPTY_SUMMARY, ...overrides.summary })
+    if (input === '/api/v1/users/attention') {
+      const items = overrides.attention ?? []
+      return jsonResponse({ items, total: items.length })
+    }
+    if (input.startsWith('/api/v1/users?')) {
       return jsonResponse({ users: overrides.users ?? [USER], total: overrides.total ?? 1 })
     }
-    if (input === '/api/v1/libraries') return jsonResponse({ libraries: [] })
+    if (input === '/api/v1/libraries') return jsonResponse({ libraries: [{ id: 1, name: 'Novels' }] })
     if (input === '/api/v1/app-settings/default-library-access') return jsonResponse({ libraryIds: [] })
     if (input === '/api/v1/app-settings') {
       return jsonResponse([{ key: 'allow_registration', value: String(overrides.allowRegistration ?? false) }])
     }
     if (input === '/api/v1/app-settings/allow_registration') return jsonResponse({ key: 'allow_registration', value: 'true' })
+    if (/\/api\/v1\/users\/\d+\/unlock$/.test(input)) return jsonResponse({})
+    if (/\/api\/v1\/users\/\d+\/reset-password$/.test(input)) return jsonResponse({ resetUrl: 'https://example.test/reset' })
     return { ok: false, json: async () => ({}) }
   })
 }
 
 function selfRegistrationToggle(wrapper: ReturnType<typeof mount>) {
-  return wrapper.find('section[aria-labelledby="self-registration-heading"] button[role="switch"]')
+  return wrapper.find('button[role="switch"][aria-label="Allow self-registration"]')
 }
 
 function listUrls(): string[] {
   return apiMock.mock.calls.map(([input]) => input).filter((url) => url.startsWith('/api/v1/users?'))
 }
 
+function searchInput(wrapper: ReturnType<typeof mount>) {
+  return wrapper.find('input[type="search"]')
+}
+
+function stateButton(wrapper: ReturnType<typeof mount>, label: string) {
+  return wrapper.findAll('[role="group"] button').find((button) => button.text().startsWith(label))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useRealTimers()
   permState.isSuperuser = true
   permState.denied = []
   stubApi()
@@ -128,7 +158,7 @@ describe('UsersPage self-registration toggle', () => {
     const wrapper = mount(UsersPage)
     await flushPromises()
 
-    expect(wrapper.find('section[aria-labelledby="self-registration-heading"]').exists()).toBe(false)
+    expect(selfRegistrationToggle(wrapper).exists()).toBe(false)
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/app-settings')
   })
 
@@ -145,18 +175,41 @@ describe('UsersPage self-registration toggle', () => {
   })
 })
 
-describe('UsersPage', () => {
-  it('visually separates account-level settings from the user list', async () => {
+describe('UsersPage defaults zone', () => {
+  it('gathers both new-account settings under one heading, separated from the roster', async () => {
     const wrapper = mount(UsersPage)
     await flushPromises()
 
-    for (const headingId of ['self-registration-heading', 'default-library-access-heading']) {
-      const section = wrapper.find(`section[aria-labelledby="${headingId}"]`)
-      expect(section.classes()).toContain('border-t')
-      expect(section.classes()).toContain('pt-6')
-    }
+    const section = wrapper.find('section[aria-labelledby="new-account-defaults-heading"]')
+    expect(section.exists()).toBe(true)
+    expect(section.classes()).toContain('border-t')
+    expect(section.text()).toContain('Defaults for new accounts')
+    expect(section.text()).toContain('Allow self-registration')
+    expect(section.text()).toContain('Starting libraries')
   })
 
+  it('keeps the starting-library save disabled until something changes', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    const save = wrapper
+      .find('section[aria-labelledby="new-account-defaults-heading"]')
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Save')
+    expect(save?.attributes('disabled')).toBeDefined()
+
+    await wrapper.find('section[aria-labelledby="new-account-defaults-heading"] input[type="checkbox"]').setValue(true)
+    await flushPromises()
+
+    const enabled = wrapper
+      .find('section[aria-labelledby="new-account-defaults-heading"]')
+      .findAll('button')
+      .find((button) => button.text().trim() === 'Save')
+    expect(enabled?.attributes('disabled')).toBeUndefined()
+  })
+})
+
+describe('UsersPage roster', () => {
   it('does not duplicate the shared settings page header', async () => {
     const wrapper = shallowMount(UsersPage)
     await flushPromises()
@@ -165,20 +218,13 @@ describe('UsersPage', () => {
     expect(wrapper.text()).not.toContain('Manage user accounts and permission assignments.')
   })
 
-  it('opens the create drawer from the primary CTA', async () => {
+  it('opens the create drawer from the primary action', async () => {
     const wrapper = shallowMount(UsersPage, {
-      global: {
-        stubs: {
-          Button: { template: '<button><slot /></button>' },
-        },
-      },
+      global: { stubs: { Button: { template: '<button><slot /></button>' }, teleport: false } },
     })
     await flushPromises()
 
-    const createButton = wrapper
-      .find('form')
-      .findAll('button')
-      .find((button) => button.text().includes('Create user'))
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('Create user'))
     expect(createButton).toBeDefined()
     expect(wrapper.find('user-form-drawer-stub').exists()).toBe(false)
 
@@ -198,52 +244,116 @@ describe('UsersPage', () => {
     expect(url).toContain('sortDir=asc')
   })
 
-  it('sends the search term to the server and resets to the first page', async () => {
+  it('fetches the counts and the attention band alongside the first page', async () => {
+    shallowMount(UsersPage)
+    await flushPromises()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/users/summary')
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/users/attention')
+  })
+
+  it('does not refetch libraries or the default-access config on every list request', async () => {
     const wrapper = mount(UsersPage)
     await flushPromises()
 
-    await wrapper.find('input[type="search"]').setValue('ada')
-    await wrapper.find('form').trigger('submit')
+    const librariesBefore = apiMock.mock.calls.filter(([url]) => url === '/api/v1/libraries').length
+    stateButton(wrapper, 'Inactive')?.trigger('click')
+    await flushPromises()
+
+    expect(apiMock.mock.calls.filter(([url]) => url === '/api/v1/libraries')).toHaveLength(librariesBefore)
+  })
+
+  it('sends the debounced search term to the server and resets to the first page', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(UsersPage)
+    await vi.runOnlyPendingTimersAsync()
+    await flushPromises()
+
+    const urlsBefore = listUrls().length
+    await searchInput(wrapper).setValue('ada')
+    expect(listUrls()).toHaveLength(urlsBefore)
+
+    await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
 
     const url = listUrls().at(-1)
     expect(url).toContain('search=ada')
     expect(url).toContain('page=0')
+    vi.useRealTimers()
+  })
+
+  it('collapses a burst of keystrokes into a single request', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(UsersPage)
+    await vi.runOnlyPendingTimersAsync()
+    await flushPromises()
+
+    const before = listUrls().length
+    for (const term of ['a', 'ad', 'ada']) {
+      await searchInput(wrapper).setValue(term)
+      await vi.advanceTimersByTimeAsync(50)
+    }
+    await vi.advanceTimersByTimeAsync(300)
+    await flushPromises()
+
+    expect(listUrls().length - before).toBe(1)
+    vi.useRealTimers()
   })
 
   it('filters by state from the toolbar and drops the param when cleared', async () => {
     const wrapper = mount(UsersPage)
     await flushPromises()
 
-    const stateSelect = wrapper.findAll('select')[0]
-    await stateSelect?.setValue('admins')
+    await stateButton(wrapper, 'Inactive')?.trigger('click')
     await flushPromises()
-    expect(listUrls().at(-1)).toContain('state=admins')
+    expect(listUrls().at(-1)).toContain('state=inactive')
 
-    await stateSelect?.setValue('')
+    await stateButton(wrapper, 'All users')?.trigger('click')
     await flushPromises()
     expect(listUrls().at(-1)).not.toContain('state=')
   })
 
-  it('renders a pager only when there is more than one page', async () => {
+  it('sorts from the column headers and flips direction on a second click', async () => {
     const wrapper = mount(UsersPage)
     await flushPromises()
-    expect(wrapper.find('nav').exists()).toBe(false)
 
-    stubApi({ total: 60 })
+    const header = wrapper.findAll('thead th button').find((button) => button.text().startsWith('Last active'))
+    await header?.trigger('click')
+    await flushPromises()
+    expect(listUrls().at(-1)).toContain('sortBy=lastActive')
+    expect(listUrls().at(-1)).toContain('sortDir=desc')
+
+    await header?.trigger('click')
+    await flushPromises()
+    expect(listUrls().at(-1)).toContain('sortDir=asc')
+  })
+
+  it('marks the sorted column for assistive technology', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    const userHeader = wrapper.findAll('thead th').find((th) => th.text().startsWith('User'))
+    expect(userHeader?.attributes('aria-sort')).toBe('ascending')
+  })
+
+  it('renders pager controls only when there is more than one page', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+    expect(wrapper.findAll('button').some((button) => button.text().trim() === 'Next')).toBe(false)
+    expect(wrapper.text()).toContain('Showing 1 of 1 accounts')
+
+    stubApi({ total: 60, summary: { total: 60, active: 60 } })
     const paged = mount(UsersPage)
     await flushPromises()
-    expect(paged.find('nav').exists()).toBe(true)
     expect(paged.text()).toContain('Page 1 of 3')
   })
 
   it('advances to the next page without losing the active filters', async () => {
-    stubApi({ total: 60 })
+    stubApi({ total: 60, summary: { total: 60, active: 60 } })
     const wrapper = mount(UsersPage)
     await flushPromises()
 
-    await wrapper.find('input[type="search"]').setValue('ada')
-    await wrapper.find('form').trigger('submit')
+    await stateButton(wrapper, 'Active')?.trigger('click')
     await flushPromises()
 
     const nextButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Next')
@@ -252,57 +362,63 @@ describe('UsersPage', () => {
 
     const url = listUrls().at(-1)
     expect(url).toContain('page=1')
-    expect(url).toContain('search=ada')
+    expect(url).toContain('state=active')
   })
 
-  it('gives every icon-only row action an accessible name', async () => {
+  it('names access by the preset it matches rather than a raw permission count', async () => {
     const wrapper = mount(UsersPage)
     await flushPromises()
 
-    expect(wrapper.find('button[aria-label="Edit Ada Lovelace"]').exists()).toBe(true)
-    expect(wrapper.find('button[aria-label="Reset the password for Ada Lovelace"]').exists()).toBe(true)
-    expect(wrapper.find('button[aria-label="Delete Ada Lovelace"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Custom')
+    expect(wrapper.text()).not.toContain('1 permission')
   })
 
-  it('offers the unlock action only while the account is actually locked', async () => {
+  it('gives the row overflow menu an accessible name', async () => {
     const wrapper = mount(UsersPage)
     await flushPromises()
-    expect(wrapper.find('button[aria-label="Unlock Ada Lovelace"]').exists()).toBe(false)
+
+    expect(wrapper.find('button[aria-label="More actions for Ada Lovelace"]').exists()).toBe(true)
+  })
+
+  it('reports a locked account with the time remaining, and only while it is locked', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Locked')
 
     stubApi({ users: [{ ...USER, lockedUntil: new Date(Date.now() - 60_000).toISOString() }] })
     const expired = mount(UsersPage)
     await flushPromises()
-    expect(expired.find('button[aria-label="Unlock Ada Lovelace"]').exists()).toBe(false)
+    expect(expired.text()).not.toContain('Locked')
 
-    stubApi({ users: [{ ...USER, lockedUntil: new Date(Date.now() + 60_000).toISOString() }] })
+    stubApi({ users: [{ ...USER, lockedUntil: new Date(Date.now() + 45 * 60_000).toISOString() }] })
     const locked = mount(UsersPage)
     await flushPromises()
-    expect(locked.find('button[aria-label="Unlock Ada Lovelace"]').exists()).toBe(true)
     expect(locked.text()).toContain('Locked')
+    expect(locked.text()).toContain('Unlocks')
   })
 
-  it('clears the lockout through the unlock endpoint and reloads', async () => {
-    stubApi({ users: [{ ...USER, lockedUntil: new Date(Date.now() + 60_000).toISOString() }] })
+  it('flags an account that has never signed in ahead of one on its default password', async () => {
+    stubApi({ users: [{ ...USER, lastAuthenticatedAt: null, isDefaultPassword: true }] })
     const wrapper = mount(UsersPage)
     await flushPromises()
 
-    await wrapper.find('button[aria-label="Unlock Ada Lovelace"]').trigger('click')
-    await flushPromises()
-
-    expect(apiMock).toHaveBeenCalledWith('/api/v1/users/4/unlock', { method: 'POST' })
-    expect(listUrls().length).toBeGreaterThan(1)
+    expect(wrapper.text()).toContain('Never signed in')
+    expect(wrapper.text()).not.toContain('Default password')
   })
 
   it('shows a filtered empty state that differs from the unfiltered one', async () => {
-    stubApi({ users: [], total: 0 })
+    vi.useFakeTimers()
+    stubApi({ users: [], total: 0, summary: { total: 0, active: 0 } })
     const wrapper = mount(UsersPage)
+    await vi.runOnlyPendingTimersAsync()
     await flushPromises()
     expect(wrapper.text()).toContain('No users yet')
 
-    await wrapper.find('input[type="search"]').setValue('nobody')
-    await wrapper.find('form').trigger('submit')
+    await searchInput(wrapper).setValue('nobody')
+    await vi.advanceTimersByTimeAsync(300)
     await flushPromises()
     expect(wrapper.text()).toContain('No users match')
+    vi.useRealTimers()
   })
 
   it('surfaces a load failure through an alert', async () => {
@@ -311,5 +427,98 @@ describe('UsersPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+  })
+})
+
+describe('UsersPage attention band', () => {
+  const LOCKED = {
+    id: 9,
+    username: 'tomf',
+    name: 'Tom Feld',
+    avatarUrl: null,
+    provisioningMethod: 'local',
+    reason: 'locked',
+    lockedUntil: new Date(Date.now() + 45 * 60_000).toISOString(),
+    createdAt: '2026-06-01T00:00:00.000Z',
+    resetLinkExpiresAt: null,
+  }
+  const OIDC_NEVER = {
+    ...LOCKED,
+    id: 11,
+    username: 'sam',
+    name: 'Sam Whitfield',
+    provisioningMethod: 'oidc',
+    reason: 'neverSignedIn',
+    lockedUntil: null,
+  }
+
+  it('stays out of the way when nothing needs repair', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    expect(wrapper.find('section[aria-labelledby="user-attention-heading"]').exists()).toBe(false)
+  })
+
+  it('states the problem and offers the one action that fixes it', async () => {
+    stubApi({ attention: [LOCKED], summary: { attention: 1 } })
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    const band = wrapper.find('section[aria-labelledby="user-attention-heading"]')
+    expect(band.text()).toContain('Tom Feld')
+    expect(band.text()).toContain('is locked out after too many failed sign-ins')
+    expect(band.findAll('button').some((button) => button.text().includes('Unlock now'))).toBe(true)
+  })
+
+  it('clears the lockout through the unlock endpoint and refreshes the band', async () => {
+    stubApi({ attention: [LOCKED], summary: { attention: 1 } })
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    const unlock = wrapper
+      .find('section[aria-labelledby="user-attention-heading"]')
+      .findAll('button')
+      .find((button) => button.text().includes('Unlock now'))
+    await unlock?.trigger('click')
+    await flushPromises()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/users/9/unlock', { method: 'POST' })
+    expect(apiMock.mock.calls.filter(([url]) => url === '/api/v1/users/attention').length).toBeGreaterThan(1)
+  })
+
+  it('explains itself instead of offering a reset link an OIDC account cannot use', async () => {
+    stubApi({ attention: [OIDC_NEVER], summary: { attention: 1 } })
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    const band = wrapper.find('section[aria-labelledby="user-attention-heading"]')
+    expect(band.findAll('button').some((button) => button.text().includes('Send'))).toBe(false)
+    expect(band.text()).toContain('OIDC users reset passwords in their identity provider.')
+  })
+
+  it('can be collapsed without losing the filter chip', async () => {
+    stubApi({ attention: [LOCKED], summary: { attention: 1 } })
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    const toggle = wrapper.find('section[aria-labelledby="user-attention-heading"] button[aria-expanded]')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+
+    const chip = wrapper.findAll('button').find((button) => button.attributes('aria-label')?.includes('attention'))
+    expect(chip).toBeDefined()
+  })
+
+  it('filters the roster down to the flagged accounts from the toolbar chip', async () => {
+    stubApi({ attention: [LOCKED], summary: { attention: 1 } })
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+
+    const chip = wrapper.findAll('button').find((button) => button.attributes('aria-label')?.includes('attention'))
+    await chip?.trigger('click')
+    await flushPromises()
+
+    expect(listUrls().at(-1)).toContain('state=attention')
   })
 })

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -50,6 +50,46 @@ export class ScannerRepository {
 
   async failAllRunningJobs(errorMessage: string): Promise<void> {
     await this.db.update(scanJobs).set({ status: 'failed', errorMessage, completedAt: new Date() }).where(eq(scanJobs.status, 'running'));
+  }
+
+  /** Newest scan jobs for one library, for the history panel. */
+  async findRecentScanJobs(libraryId: number, limit: number) {
+    return this.db
+      .select({
+        id: scanJobs.id,
+        status: scanJobs.status,
+        triggeredBy: scanJobs.triggeredBy,
+        startedAt: scanJobs.startedAt,
+        completedAt: scanJobs.completedAt,
+        addedCount: scanJobs.addedCount,
+        updatedCount: scanJobs.updatedCount,
+        missingCount: scanJobs.missingCount,
+        errorMessage: scanJobs.errorMessage,
+      })
+      .from(scanJobs)
+      .where(eq(scanJobs.libraryId, libraryId))
+      .orderBy(desc(scanJobs.startedAt))
+      .limit(limit);
+  }
+
+  /** Most recent scan job per library, in one round trip. Libraries never scanned are simply absent. */
+  async findLatestScanJobs(libraryIds: number[]) {
+    if (libraryIds.length === 0) return [];
+    return this.db
+      .selectDistinctOn([scanJobs.libraryId], {
+        libraryId: scanJobs.libraryId,
+        status: scanJobs.status,
+        triggeredBy: scanJobs.triggeredBy,
+        startedAt: scanJobs.startedAt,
+        completedAt: scanJobs.completedAt,
+        addedCount: scanJobs.addedCount,
+        updatedCount: scanJobs.updatedCount,
+        missingCount: scanJobs.missingCount,
+        errorMessage: scanJobs.errorMessage,
+      })
+      .from(scanJobs)
+      .where(inArray(scanJobs.libraryId, libraryIds))
+      .orderBy(scanJobs.libraryId, desc(scanJobs.startedAt));
   }
 
   // ── Library Folders ────────────────────────────────────────────────────────

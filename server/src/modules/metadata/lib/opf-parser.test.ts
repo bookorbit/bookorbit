@@ -175,6 +175,90 @@ describe('parseOpf', () => {
     });
   });
 
+  describe('narrators', () => {
+    it('reads an EPUB2 creator with role nrt as a narrator, not an author', () => {
+      const xml = epub2Opf(`
+        <dc:creator opf:role="aut">Author Name</dc:creator>
+        <dc:creator opf:role="nrt">Narrator Name</dc:creator>
+      `);
+      const r = parseOpf(xml);
+      expect(r.narrators).toEqual(['Narrator Name']);
+      expect(r.authors).toEqual([{ name: 'Author Name', sortName: null }]);
+    });
+
+    it('reads an EPUB2 contributor with role nrt as a narrator', () => {
+      const xml = epub2Opf(`
+        <dc:creator opf:role="aut">Author Name</dc:creator>
+        <dc:contributor opf:role="nrt">Narrator Name</dc:contributor>
+      `);
+      const r = parseOpf(xml);
+      expect(r.narrators).toEqual(['Narrator Name']);
+      expect(r.authors).toEqual([{ name: 'Author Name', sortName: null }]);
+    });
+
+    it('reads an EPUB3 narrator declared through refines', () => {
+      const xml = epub3Opf(`
+        <dc:creator id="cr1">Neil Gaiman</dc:creator>
+        <meta refines="#cr1" property="role" scheme="marc:relators">aut</meta>
+        <dc:contributor id="ct1">Lenny Henry</dc:contributor>
+        <meta refines="#ct1" property="role" scheme="marc:relators">nrt</meta>
+      `);
+      const r = parseOpf(xml);
+      expect(r.narrators).toEqual(['Lenny Henry']);
+      expect(r.authors).toEqual([{ name: 'Neil Gaiman', sortName: null }]);
+    });
+
+    it('accepts a narrator role in full relator URI form', () => {
+      const xml = epub3Opf(`
+        <dc:contributor id="ct1">Rosamund Pike</dc:contributor>
+        <meta refines="#ct1" property="role">http://id.loc.gov/vocabulary/relators/nrt</meta>
+      `);
+      expect(parseOpf(xml).narrators).toEqual(['Rosamund Pike']);
+    });
+
+    it('accepts uppercase role codes and the spelled-out word', () => {
+      expect(parseOpf(epub2Opf(`<dc:creator opf:role="NRT">Jim Dale</dc:creator>`)).narrators).toEqual(['Jim Dale']);
+      expect(parseOpf(epub2Opf(`<dc:contributor opf:role="narrator">Stephen Fry</dc:contributor>`)).narrators).toEqual(['Stephen Fry']);
+    });
+
+    it('keeps multiple narrators in document order', () => {
+      const xml = epub2Opf(`
+        <dc:creator opf:role="nrt">First Narrator</dc:creator>
+        <dc:contributor opf:role="nrt">Second Narrator</dc:contributor>
+      `);
+      expect(parseOpf(xml).narrators).toEqual(['First Narrator', 'Second Narrator']);
+    });
+
+    it('deduplicates a narrator repeated as both creator and contributor', () => {
+      const xml = epub2Opf(`
+        <dc:creator opf:role="nrt">Bahni Turpin</dc:creator>
+        <dc:contributor opf:role="nrt">bahni turpin</dc:contributor>
+      `);
+      expect(parseOpf(xml).narrators).toEqual(['Bahni Turpin']);
+    });
+
+    it('ignores contributors that declare no role, so packaging tools never become people', () => {
+      const xml = epub2Opf(`
+        <dc:creator opf:role="aut">Author Name</dc:creator>
+        <dc:contributor>Some Tool</dc:contributor>
+        <dc:contributor opf:role="bkp">calibre (7.16.0)</dc:contributor>
+      `);
+      const r = parseOpf(xml);
+      expect(r.narrators).toEqual([]);
+      expect(r.authors).toEqual([{ name: 'Author Name', sortName: null }]);
+    });
+
+    it('skips narrator entries with empty text', () => {
+      const xml = epub2Opf(`<dc:contributor opf:role="nrt">   </dc:contributor>`);
+      expect(parseOpf(xml).narrators).toEqual([]);
+    });
+
+    it('returns an empty narrators array when the OPF declares none', () => {
+      const xml = epub2Opf(`<dc:creator opf:role="aut">Author Name</dc:creator>`);
+      expect(parseOpf(xml).narrators).toEqual([]);
+    });
+  });
+
   describe('ISBN parsing', () => {
     it('detects bare ISBN-13 from unique identifier with no scheme', () => {
       const xml = epub3Opf(`<dc:identifier id="bookid">9780008337193</dc:identifier>`);
@@ -903,6 +987,49 @@ describe('parseOpf', () => {
         `,
       });
       expect(parseOpf(xml).coverHref).toBe('epub3-cover.jpg');
+    });
+  });
+
+  describe('rendition layout', () => {
+    it('parses the pre-paginated declaration a comic converter writes', () => {
+      const xml = epub3Opf(`
+        <dc:title>Manga Vol. 1</dc:title>
+        <meta property="rendition:spread">landscape</meta>
+        <meta property="rendition:layout">pre-paginated</meta>
+      `);
+      expect(parseOpf(xml).renditionLayout).toBe('pre-paginated');
+    });
+
+    it('parses a reflowable declaration without confusing it for a fixed layout', () => {
+      const xml = epub3Opf(`
+        <dc:title>Novel</dc:title>
+        <meta property="rendition:layout">reflowable</meta>
+      `);
+      expect(parseOpf(xml).renditionLayout).toBe('reflowable');
+    });
+
+    it('is null when the OPF declares no layout at all', () => {
+      expect(parseOpf(epub3Opf('<dc:title>Novel</dc:title>')).renditionLayout).toBeNull();
+    });
+
+    it('reads the declaration through a namespace-prefixed meta element', () => {
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
+<opf:package xmlns:opf="http://www.idpf.org/2007/opf" version="3.0">
+  <opf:metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Manga Vol. 2</dc:title>
+    <opf:meta property="rendition:layout">pre-paginated</opf:meta>
+  </opf:metadata>
+</opf:package>`;
+      expect(parseOpf(xml).renditionLayout).toBe('pre-paginated');
+    });
+
+    it('ignores a spine-level fixed-layout override so a mostly reflowable book stays reflowable', () => {
+      const xml = `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Novel</dc:title></metadata>
+  <spine><itemref idref="map" properties="rendition:layout-pre-paginated"/></spine>
+</package>`;
+      expect(parseOpf(xml).renditionLayout).toBeNull();
     });
   });
 });

@@ -111,7 +111,11 @@ export class MetadataService {
         return false;
       }
 
-      await Promise.all([this.persistMetadata(bookId, data, format), data.cover ? this.persistCover(bookId, data.cover, true) : Promise.resolve()]);
+      await Promise.all([
+        this.persistMetadata(bookId, data, format),
+        data.cover ? this.persistCover(bookId, data.cover, true) : Promise.resolve(),
+        this.persistFixedLayout(bookId, absolutePath, data.isFixedLayout),
+      ]);
 
       await this.scoreService.calculateAndSave(bookId);
 
@@ -141,7 +145,9 @@ export class MetadataService {
       audibleId: boundProviderId('audibleId', data.audibleId),
       librofmId: boundProviderId('librofmId', data.librofmId),
       audioMetadata: {
-        narrators: data.narrators,
+        // Omitted when the tags name none: this pass fills in fields the shared metadata source
+        // cannot carry, so an untagged file must not erase narrators another source already set.
+        ...(data.narrators && data.narrators.length > 0 ? { narrators: data.narrators } : {}),
         chapters: data.chapters && data.chapters.length > 0 ? data.chapters : null,
       },
     });
@@ -254,6 +260,27 @@ export class MetadataService {
   }
 
   // ── Audio helpers ────────────────────────────────────────────────────────────
+
+  /**
+   * Records whether the extracted file is a fixed-layout EPUB. Kobo sync reads this to announce
+   * comics as EPUB3FL so the device renders them full screen instead of adding reflow margins.
+   */
+  private async persistFixedLayout(bookId: number, absolutePath: string, isFixedLayout: boolean | null | undefined): Promise<void> {
+    if (isFixedLayout == null) return;
+    // `is distinct from` keeps a re-extraction of an unchanged file from touching the row at all.
+    // Any write bumps book_files.updatedAt, which feeds the KOReader library token and OPDS entry
+    // timestamps, so a no-op update would invalidate both for nothing.
+    await this.db
+      .update(schema.bookFiles)
+      .set({ isFixedLayout })
+      .where(
+        and(
+          eq(schema.bookFiles.bookId, bookId),
+          eq(schema.bookFiles.absolutePath, absolutePath),
+          sql`${schema.bookFiles.isFixedLayout} is distinct from ${isFixedLayout}`,
+        ),
+      );
+  }
 
   async extractAudioFileDuration(bookId: number, absolutePath: string): Promise<void> {
     const durationSeconds = await parseAudioDuration(absolutePath);
@@ -662,6 +689,9 @@ export class MetadataService {
       aladinId: boundProviderId('aladinId', data.aladinId),
       itunesId: boundProviderId('itunesId', data.itunesId),
       comicMetadata: data.comicMetadata ?? undefined,
+      // A sidecar can name narrators (OPF role="nrt"); only sent when it did, so an extractor that
+      // has no narrator concept never reaches the replace below.
+      audioMetadata: data.narrators && data.narrators.length > 0 ? { narrators: data.narrators } : undefined,
     });
 
     const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
@@ -722,6 +752,10 @@ export class MetadataService {
 
     if (filtered.comicMetadata) {
       await this.comicMetadataRepository.upsert(bookId, filtered.comicMetadata);
+    }
+
+    if (filtered.audioMetadata?.narrators !== undefined) {
+      await this.narratorService.replaceForBook(bookId, filtered.audioMetadata.narrators);
     }
 
     // ComicInfo Count describes the series the file names, so it is read from the parsed file

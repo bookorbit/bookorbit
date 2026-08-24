@@ -523,8 +523,15 @@
     {
       "idx": 74,
       "version": "7",
-      "when": 1787445299527,
-      "tag": "0074_add_origin_country",
+      "when": 1787522267109,
+      "tag": "0074_add_scan_jobs_library_started_at_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1787530767419,
+      "tag": "0075_add_book_file_fixed_layout",
       "breakpoints": true
     }
   ]

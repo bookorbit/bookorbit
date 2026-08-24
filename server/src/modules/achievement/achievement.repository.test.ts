@@ -10,6 +10,19 @@ function flattenSql(value: unknown): string {
   return [flattenSql(record.value), flattenSql(record.queryChunks)].join(' ');
 }
 
+/** Collects the primitives drizzle binds into a query, so tests can assert on parameters rather than SQL text. */
+function boundValues(node: unknown, out: unknown[] = [], seen = new Set<unknown>()): unknown[] {
+  if (node === null || node === undefined || seen.has(node)) return out;
+  if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
+    out.push(node instanceof Date ? node.toISOString() : node);
+    return out;
+  }
+  if (typeof node !== 'object') return out;
+  seen.add(node);
+  for (const value of Object.values(node as Record<string, unknown>)) boundValues(value, out, seen);
+  return out;
+}
+
 function makeSelectChain(resolvedValue: unknown) {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   const methods = ['from', 'where', 'orderBy', 'limit', 'groupBy', 'innerJoin', 'leftJoin', 'having', 'as', '$dynamic'];
@@ -618,7 +631,7 @@ describe('AchievementRepository', () => {
       const db = { execute: vi.fn().mockResolvedValue({ rows: [{ streak_length: '7' }] }) };
       const repo = makeRepo(db);
 
-      const result = await repo.getCurrentStreak(1);
+      const result = await repo.getCurrentStreak(1, 'UTC');
 
       expect(result).toBe(7);
     });
@@ -627,9 +640,85 @@ describe('AchievementRepository', () => {
       const db = { execute: vi.fn().mockResolvedValue({ rows: [] }) };
       const repo = makeRepo(db);
 
-      const result = await repo.getCurrentStreak(1);
+      const result = await repo.getCurrentStreak(1, 'UTC');
 
       expect(result).toBe(0);
+    });
+  });
+
+  describe('reader-timezone day bucketing', () => {
+    // user_reading_daily_stats.day and reading_sessions are bucketed in the reader's timezone,
+    // so every "in a day" query has to agree with that rather than with UTC or the database server.
+    it("getCurrentStreak cuts off at the reader's today, not the database server's CURRENT_DATE", async () => {
+      const db = { execute: vi.fn().mockResolvedValue({ rows: [{ streak_length: '4' }] }) };
+      const repo = makeRepo(db);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-23T22:30:00.000Z'));
+
+      await repo.getCurrentStreak(1, 'Pacific/Auckland');
+
+      const sql = flattenSql(db.execute.mock.calls[0]![0]);
+      expect(sql).not.toContain('CURRENT_DATE');
+      // 22:30 UTC on the 23rd is already the 24th in Auckland.
+      expect(boundValues(db.execute.mock.calls[0]![0])).toContain('2026-08-24');
+      vi.useRealTimers();
+    });
+
+    it("getMaxPagesInADay groups by the reader's local day", async () => {
+      const db = { execute: vi.fn().mockResolvedValue({ rows: [{ max_pages: 10 }] }) };
+      const repo = makeRepo(db);
+
+      await repo.getMaxPagesInADay(1, 'Pacific/Auckland');
+
+      expect(flattenSql(db.execute.mock.calls[0]![0])).toContain('AT TIME ZONE');
+      expect(boundValues(db.execute.mock.calls[0]![0])).toContain('Pacific/Auckland');
+    });
+
+    it("getPagesOnDay windows the day in the reader's timezone", async () => {
+      const chain = makeSelectChain([{ value: 42 }]);
+      const repo = makeRepo({ select: vi.fn().mockReturnValue(chain) });
+
+      await repo.getPagesOnDay(1, new Date('2026-08-23T22:30:00.000Z'), 'Pacific/Auckland');
+
+      const bounds = boundValues(chain.where!.mock.calls[0]![0]);
+      // Auckland is UTC+12, so their 24th runs from 12:00 UTC on the 23rd to 12:00 UTC on the 24th.
+      expect(bounds).toContain('2026-08-23T12:00:00.000Z');
+      expect(bounds).toContain('2026-08-24T12:00:00.000Z');
+    });
+
+    it("countAnnotationsOnDay windows the day in the reader's timezone", async () => {
+      const chain = makeSelectChain([{ value: 3 }]);
+      const repo = makeRepo({ select: vi.fn().mockReturnValue(chain) });
+
+      await repo.countAnnotationsOnDay(1, new Date('2026-08-23T22:30:00.000Z'), 'Pacific/Auckland');
+
+      const bounds = boundValues(chain.where!.mock.calls[0]![0]);
+      expect(bounds).toContain('2026-08-23T12:00:00.000Z');
+      expect(bounds).toContain('2026-08-24T12:00:00.000Z');
+    });
+  });
+
+  describe('findUserTimeZone', () => {
+    it("returns the reader's configured timezone", async () => {
+      const chain = makeSelectChain([{ settings: { timezone: 'Europe/Stockholm' } }]);
+      const repo = makeRepo({ select: vi.fn().mockReturnValue(chain) });
+
+      await expect(repo.findUserTimeZone(1)).resolves.toBe('Europe/Stockholm');
+    });
+
+    it('falls back to UTC for a missing or unusable timezone', async () => {
+      for (const settings of [{}, { timezone: '' }, { timezone: 'Not/AZone' }, null]) {
+        const chain = makeSelectChain([{ settings }]);
+        const repo = makeRepo({ select: vi.fn().mockReturnValue(chain) });
+        await expect(repo.findUserTimeZone(1)).resolves.toBe('UTC');
+      }
+    });
+
+    it('falls back to UTC when the user row is missing', async () => {
+      const chain = makeSelectChain([]);
+      const repo = makeRepo({ select: vi.fn().mockReturnValue(chain) });
+
+      await expect(repo.findUserTimeZone(1)).resolves.toBe('UTC');
     });
   });
 
@@ -1786,7 +1875,7 @@ describe('AchievementRepository', () => {
       const db = { execute: vi.fn().mockResolvedValue({ rows: [{ max_pages: 203.7 }] }) };
       const repo = makeRepo(db);
 
-      const result = await repo.getMaxPagesInADay(1);
+      const result = await repo.getMaxPagesInADay(1, 'UTC');
 
       expect(result).toBe(203);
     });
@@ -1795,7 +1884,7 @@ describe('AchievementRepository', () => {
       const db = { execute: vi.fn().mockResolvedValue({ rows: [{ max_pages: 0 }] }) };
       const repo = makeRepo(db);
 
-      const result = await repo.getMaxPagesInADay(1);
+      const result = await repo.getMaxPagesInADay(1, 'UTC');
 
       expect(result).toBe(0);
     });
@@ -1804,7 +1893,7 @@ describe('AchievementRepository', () => {
       const db = { execute: vi.fn().mockResolvedValue({ rows: [] }) };
       const repo = makeRepo(db);
 
-      const result = await repo.getMaxPagesInADay(1);
+      const result = await repo.getMaxPagesInADay(1, 'UTC');
 
       expect(result).toBe(0);
     });

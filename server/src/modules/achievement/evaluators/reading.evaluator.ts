@@ -87,7 +87,7 @@ export class ReadingEvaluator implements IAchievementEvaluator {
       this.evaluateEarlyBird(payload, earnedKeys, awards);
       this.evaluateOneSitting(payload, earnedKeys, awards);
       await this.evaluatePowerHour(payload, earnedKeys, awards);
-      await this.evaluateSpeedReader(ctx.userId, payload, earnedKeys, awards);
+      await this.evaluateSpeedReader(ctx.userId, ctx.timeZone, payload, earnedKeys, awards);
     }
 
     if (ctx.eventName === ACHIEVEMENT_EVENT_BACKFILL) {
@@ -104,7 +104,7 @@ export class ReadingEvaluator implements IAchievementEvaluator {
       await this.evaluateMonthlyReader2Backfill(ctx.userId, earnedKeys, awards);
       await this.evaluateOneSittingBackfill(ctx.userId, earnedKeys, awards);
       await this.evaluatePowerHourBackfill(ctx.userId, earnedKeys, awards);
-      await this.evaluateSpeedReaderBackfill(ctx.userId, earnedKeys, awards);
+      await this.evaluateSpeedReaderBackfill(ctx.userId, ctx.timeZone, earnedKeys, awards);
     }
 
     return awards;
@@ -338,12 +338,13 @@ export class ReadingEvaluator implements IAchievementEvaluator {
 
   private async evaluateSpeedReader(
     userId: number,
+    timeZone: string,
     payload: ReadingSessionSavedPayload,
     earnedKeys: Set<string>,
     awards: AchievementAward[],
   ): Promise<void> {
     if (earnedKeys.has('speed_reader')) return;
-    const pages = await this.repo.getPagesOnDay(userId, payload.startedAt);
+    const pages = await this.repo.getPagesOnDay(userId, payload.startedAt, timeZone);
     if (pages >= SPEED_READER_PAGES) {
       awards.push({ key: 'speed_reader', context: { pages } });
     }
@@ -357,9 +358,9 @@ export class ReadingEvaluator implements IAchievementEvaluator {
     }
   }
 
-  private async evaluateSpeedReaderBackfill(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+  private async evaluateSpeedReaderBackfill(userId: number, timeZone: string, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
     if (earnedKeys.has('speed_reader')) return;
-    const maxDayPages = await this.repo.getMaxPagesInADay(userId);
+    const maxDayPages = await this.repo.getMaxPagesInADay(userId, timeZone);
     if (maxDayPages >= SPEED_READER_PAGES) {
       awards.push({ key: 'speed_reader', context: { pages: maxDayPages } });
     }

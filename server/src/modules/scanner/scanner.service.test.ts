@@ -75,6 +75,8 @@ function makeBookFile(overrides: Record<string, unknown> = {}) {
 function makeRepo(overrides: Record<string, unknown> = {}) {
   return {
     failAllRunningJobs: vi.fn().mockResolvedValue(undefined),
+    findRecentScanJobs: vi.fn().mockResolvedValue([]),
+    findLatestScanJobs: vi.fn().mockResolvedValue([]),
     findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
     findLibrarySettings: vi.fn().mockResolvedValue({
       allowedFormats: [],
@@ -200,6 +202,67 @@ beforeEach(() => {
 });
 
 // ── startScan — precondition checks ──────────────────────────────────────────
+
+describe('scan history', () => {
+  const row = {
+    id: 3,
+    status: 'completed',
+    triggeredBy: 'watcher',
+    startedAt: new Date('2026-08-23T10:00:00.000Z'),
+    completedAt: new Date('2026-08-23T10:00:12.000Z'),
+    addedCount: 4,
+    updatedCount: 1,
+    missingCount: 0,
+    errorMessage: null,
+  };
+
+  it('serialises timestamps and passes the requested limit through', async () => {
+    const repo = makeRepo({ findRecentScanJobs: vi.fn().mockResolvedValue([row]) });
+    const { service } = makeService(repo);
+
+    await expect(service.getScanHistory(7, 5)).resolves.toEqual([
+      {
+        id: 3,
+        status: 'completed',
+        triggeredBy: 'watcher',
+        startedAt: '2026-08-23T10:00:00.000Z',
+        completedAt: '2026-08-23T10:00:12.000Z',
+        addedCount: 4,
+        updatedCount: 1,
+        missingCount: 0,
+        errorMessage: null,
+      },
+    ]);
+    expect(repo.findRecentScanJobs).toHaveBeenCalledWith(7, 5);
+  });
+
+  it('caps an oversized limit so a caller cannot request an unbounded page', async () => {
+    const repo = makeRepo();
+    const { service } = makeService(repo);
+
+    await service.getScanHistory(7, 5000);
+
+    expect(repo.findRecentScanJobs).toHaveBeenCalledWith(7, 10);
+  });
+
+  it('floors a zero or negative limit so it never reaches SQL', async () => {
+    const repo = makeRepo();
+    const { service } = makeService(repo);
+
+    await service.getScanHistory(7, -5);
+    await service.getScanHistory(7, 0);
+
+    expect(repo.findRecentScanJobs).toHaveBeenNthCalledWith(1, 7, 1);
+    expect(repo.findRecentScanJobs).toHaveBeenNthCalledWith(2, 7, 1);
+  });
+
+  it('leaves a never-scanned library with an empty history', async () => {
+    const repo = makeRepo();
+    const { service } = makeService(repo);
+
+    await expect(service.getScanHistory(7)).resolves.toEqual([]);
+  });
+});
 
 describe('startScan — preconditions', () => {
   it('throws ConflictException when a scan is already running for the library', async () => {
@@ -671,6 +734,78 @@ describe('genuinely new primary file', () => {
 
     expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Book/metadata.opf', 'opf');
+  });
+
+  it('still reads audio chapters and narrators when a sidecar OPF outranks the audio winner', async () => {
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', format: 'm4b', role: 'content' });
+    const opf = makeFileStat({
+      absolutePath: '/library/Book/book.opf',
+      relPath: 'Book/book.opf',
+      ino: 1002n,
+      format: 'opf',
+      role: 'metadata',
+    });
+    const candidate = makeCandidate('/library/Book', [m4b, opf]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const calls: string[] = [];
+    mockMetadata.extractAudioChaptersAndNarrators.mockImplementation(() => {
+      calls.push('audio');
+      return Promise.resolve(undefined);
+    });
+    mockMetadata.extractAndSave.mockImplementation(() => {
+      calls.push('shared');
+      return Promise.resolve(undefined);
+    });
+
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        metadataPrecedence: ['opfFile', 'embedded'],
+        excludePatterns: [],
+        organizationMode: 'book_per_folder',
+      }),
+    });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath, 'm4b');
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), opf.absolutePath, 'opf');
+    // Audio first, so an OPF that names narrators overwrites the composer tag rather than losing to it.
+    expect(calls).toEqual(['audio', 'shared']);
+  });
+
+  it('does not re-read the audio winner when embedded metadata already leads', async () => {
+    const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', format: 'm4b', role: 'content' });
+    const opf = makeFileStat({
+      absolutePath: '/library/Book/book.opf',
+      relPath: 'Book/book.opf',
+      ino: 1002n,
+      format: 'opf',
+      role: 'metadata',
+    });
+    const candidate = makeCandidate('/library/Book', [m4b, opf]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        metadataPrecedence: ['embedded', 'opfFile'],
+        excludePatterns: [],
+        organizationMode: 'book_per_folder',
+      }),
+    });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath, 'm4b');
+    expect(mockMetadata.extractAudioChaptersAndNarrators).not.toHaveBeenCalled();
   });
 
   it('keeps embedded metadata ahead of sidecar OPF when embedded precedes opfFile', async () => {

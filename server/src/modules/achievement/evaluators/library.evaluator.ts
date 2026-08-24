@@ -52,7 +52,7 @@ export class LibraryEvaluator implements IAchievementEvaluator {
       const payload = ctx.payload as unknown as AnnotationCreatedPayload;
       await this.evaluateAnnotatorTiers(ctx.userId, earnedKeys, awards);
       await this.evaluateNoteKeeper(ctx.userId, earnedKeys, awards);
-      await this.evaluateDeepDiveSession(ctx.userId, payload, earnedKeys, awards);
+      await this.evaluateDeepDiveSession(ctx.userId, ctx.timeZone, payload, earnedKeys, awards);
       await this.evaluateWordsmith(ctx.userId, payload, earnedKeys, awards);
       await this.evaluateBoxOfCrayons(ctx.userId, earnedKeys, awards);
     }
@@ -145,13 +145,13 @@ export class LibraryEvaluator implements IAchievementEvaluator {
 
   private async evaluateDeepDiveSession(
     userId: number,
+    timeZone: string,
     payload: AnnotationCreatedPayload,
     earnedKeys: Set<string>,
     awards: AchievementAward[],
   ): Promise<void> {
     if (earnedKeys.has('deep_dive_session')) return;
-    const today = new Date();
-    const count = await this.repo.countAnnotationsOnDay(userId, today);
+    const count = await this.repo.countAnnotationsOnDay(userId, new Date(), timeZone);
     if (count >= DEEP_DIVE_SESSION_THRESHOLD) {
       awards.push({ key: 'deep_dive_session', context: { count, bookId: payload.bookId } });
     }

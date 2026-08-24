@@ -2,6 +2,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ op: 'and', clauses })),
   asc: vi.fn((value: unknown) => ({ op: 'asc', value })),
   count: vi.fn(() => ({ op: 'count' })),
+  desc: vi.fn((value: unknown) => ({ op: 'desc', value })),
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   ilike: vi.fn((left: unknown, right: unknown) => ({ op: 'ilike', left, right })),
   inArray: vi.fn((left: unknown, right: unknown) => ({ op: 'inArray', left, right })),
@@ -161,12 +162,17 @@ describe('UserRepository', () => {
     const genreFilterWhere = vi.fn().mockResolvedValue([]);
     const genreFilterFrom = vi.fn().mockReturnValue({ where: genreFilterWhere });
 
+    const libraryAccessGroupBy = vi.fn().mockResolvedValue([{ userId: 10, granted: 3 }]);
+    const libraryAccessWhere = vi.fn().mockReturnValue({ groupBy: libraryAccessGroupBy });
+    const libraryAccessFrom = vi.fn().mockReturnValue({ where: libraryAccessWhere });
+
     select
       .mockReturnValueOnce({ from: idFrom })
       .mockReturnValueOnce({ from: countFrom })
       .mockReturnValueOnce({ from: rowsFrom })
       .mockReturnValueOnce({ from: tagFilterFrom })
-      .mockReturnValueOnce({ from: genreFilterFrom });
+      .mockReturnValueOnce({ from: genreFilterFrom })
+      .mockReturnValueOnce({ from: libraryAccessFrom });
 
     const result = await repo.findAll({ page: 0, pageSize: 25, sortBy: 'username', sortDir: 'asc' });
 
@@ -177,7 +183,98 @@ describe('UserRepository', () => {
       username: 'alice',
       provisioningMethod: 'local',
       permissions: ['library_download', 'kobo_sync'],
+      libraryAccessCount: 3,
     });
+  });
+
+  it("summary counts every account regardless of the caller's filter", async () => {
+    const summaryFrom = vi.fn().mockResolvedValue([{ total: 9, admins: 1, active: 8, inactive: 1, attention: 3 }]);
+    select.mockReturnValueOnce({ from: summaryFrom });
+
+    await expect(repo.summary()).resolves.toEqual({ total: 9, admins: 1, active: 8, inactive: 1, attention: 3 });
+    expect(summaryFrom).toHaveBeenCalledWith(schema.users);
+  });
+
+  it('summary falls back to zeroes when the aggregate returns no row', async () => {
+    select.mockReturnValueOnce({ from: vi.fn().mockResolvedValue([]) });
+
+    await expect(repo.summary()).resolves.toEqual({ total: 0, admins: 0, active: 0, inactive: 0, attention: 0 });
+  });
+
+  it('findNeedingAttention ranks locked above never-signed-in above default-password', async () => {
+    const later = new Date(Date.now() + 60 * 60_000);
+    const rows = [
+      {
+        id: 1,
+        username: 'tom',
+        name: 'Tom',
+        avatarUrl: null,
+        provisioningMethod: 'local',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        lockedUntil: later,
+        isDefaultPassword: true,
+        lastAuthenticatedAt: null,
+      },
+      {
+        id: 2,
+        username: 'jules',
+        name: 'Jules',
+        avatarUrl: null,
+        provisioningMethod: 'local',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+        lockedUntil: null,
+        isDefaultPassword: true,
+        lastAuthenticatedAt: null,
+      },
+      {
+        id: 3,
+        username: 'test1',
+        name: 'test1',
+        avatarUrl: null,
+        provisioningMethod: 'local',
+        createdAt: new Date('2026-03-01T00:00:00.000Z'),
+        lockedUntil: null,
+        isDefaultPassword: true,
+        lastAuthenticatedAt: new Date('2026-03-02T00:00:00.000Z'),
+      },
+    ];
+    const rowsLimit = vi.fn().mockResolvedValue(rows);
+    const rowsOrderBy = vi.fn().mockReturnValue({ limit: rowsLimit });
+    const rowsWhere = vi.fn().mockReturnValue({ orderBy: rowsOrderBy });
+    const rowsFrom = vi.fn().mockReturnValue({ where: rowsWhere });
+
+    const tokenExpiry = new Date('2026-03-05T00:00:00.000Z');
+    const tokenOrderBy = vi.fn().mockResolvedValue([
+      { userId: 2, expiresAt: tokenExpiry },
+      { userId: 2, expiresAt: new Date('2020-01-01T00:00:00.000Z') },
+    ]);
+    const tokenWhere = vi.fn().mockReturnValue({ orderBy: tokenOrderBy });
+    const tokenFrom = vi.fn().mockReturnValue({ where: tokenWhere });
+
+    select.mockReturnValueOnce({ from: rowsFrom }).mockReturnValueOnce({ from: tokenFrom });
+
+    const result = await repo.findNeedingAttention(8);
+
+    // an expired lock loses to nothing, but a live one outranks both other reasons
+    expect(result.map((r) => [r.username, r.reason])).toEqual([
+      ['tom', 'locked'],
+      ['jules', 'neverSignedIn'],
+      ['test1', 'defaultPassword'],
+    ]);
+    // only the newest unused link is reported, and only for the account that has one
+    expect(result[1].resetLinkExpiresAt).toBe(tokenExpiry);
+    expect(result[0].resetLinkExpiresAt).toBeNull();
+    expect(rowsLimit).toHaveBeenCalledWith(8);
+  });
+
+  it('findNeedingAttention skips the reset-token lookup when nothing is flagged', async () => {
+    const rowsLimit = vi.fn().mockResolvedValue([]);
+    const rowsOrderBy = vi.fn().mockReturnValue({ limit: rowsLimit });
+    const rowsWhere = vi.fn().mockReturnValue({ orderBy: rowsOrderBy });
+    select.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: rowsWhere }) });
+
+    await expect(repo.findNeedingAttention(8)).resolves.toEqual([]);
+    expect(select).toHaveBeenCalledTimes(1);
   });
 
   it('findAll filters by search across name, username and email and escapes wildcards', async () => {

@@ -1,17 +1,50 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { and, asc, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcryptjs';
 
 import { Permission } from '@bookorbit/types';
-import type { UserListSortDirection, UserListSortField, UserListState } from '@bookorbit/types';
+import type { UserAttentionReason, UserListSortDirection, UserListSortField, UserListState, UserListSummary } from '@bookorbit/types';
 import { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+
+/**
+ * An account needs an administrator's attention when it is locked out, is still on the
+ * password it was created with, or was provisioned and never arrived. Disabled accounts are
+ * excluded: there is nothing to repair on an account nobody can sign in to.
+ */
+function attentionCondition(): SQL {
+  return and(
+    eq(schema.users.active, true),
+    or(
+      sql`${schema.users.lockedUntil} is not null and ${schema.users.lockedUntil} > now()`,
+      eq(schema.users.isDefaultPassword, true),
+      isNull(schema.users.lastAuthenticatedAt),
+    ),
+  )!;
+}
+
+/**
+ * One reason per account, most urgent first. `neverSignedIn` outranks `defaultPassword`
+ * because every freshly created account carries the default-password flag until its reset
+ * link is used - reporting that instead would hide every invite that never landed.
+ */
+function attentionReason(row: { lockedUntil: Date | null; lastAuthenticatedAt: Date | null }): UserAttentionReason {
+  if (row.lockedUntil && row.lockedUntil.getTime() > Date.now()) return 'locked';
+  if (row.lastAuthenticatedAt === null) return 'neverSignedIn';
+  return 'defaultPassword';
+}
+
+/** Same ranking as `attentionReason`, expressed for the ORDER BY. */
+const attentionRank = sql`case
+  when ${schema.users.lockedUntil} is not null and ${schema.users.lockedUntil} > now() then 0
+  when ${schema.users.lastAuthenticatedAt} is null then 1
+  else 2 end`;
 
 export interface UserListQuery {
   page: number;
@@ -36,7 +69,9 @@ export class UserRepository {
     const sortColumn = {
       username: schema.users.username,
       name: schema.users.name,
+      email: schema.users.email,
       createdAt: schema.users.createdAt,
+      lastActive: schema.users.lastAuthenticatedAt,
     }[query.sortBy];
     const direction = query.sortDir === 'desc' ? sql.raw('desc') : sql.raw('asc');
 
@@ -65,8 +100,11 @@ export class UserRepository {
         isSuperuser: schema.users.isSuperuser,
         isDefaultPassword: schema.users.isDefaultPassword,
         lockedUntil: schema.users.lockedUntil,
+        failedLoginAttempts: schema.users.failedLoginAttempts,
         provisioningMethod: schema.users.provisioningMethod,
+        avatarUrl: schema.users.avatarUrl,
         createdAt: schema.users.createdAt,
+        lastAuthenticatedAt: schema.users.lastAuthenticatedAt,
         permissionName: schema.userPermissions.permissionName,
       })
       .from(schema.users)
@@ -83,10 +121,14 @@ export class UserRepository {
       isSuperuser: boolean;
       isDefaultPassword: boolean;
       lockedUntil: Date | null;
+      failedLoginAttempts: number;
       provisioningMethod: string;
+      avatarUrl: string | null;
       createdAt: Date;
+      lastAuthenticatedAt: Date | null;
       permissions: Permission[];
       hasContentFilters: boolean;
+      libraryAccessCount: number;
     };
 
     const usersMap = new Map<number, UserListItem>();
@@ -101,10 +143,14 @@ export class UserRepository {
           isSuperuser: row.isSuperuser,
           isDefaultPassword: row.isDefaultPassword,
           lockedUntil: row.lockedUntil,
+          failedLoginAttempts: row.failedLoginAttempts,
           provisioningMethod: row.provisioningMethod,
+          avatarUrl: row.avatarUrl,
           createdAt: row.createdAt,
+          lastAuthenticatedAt: row.lastAuthenticatedAt,
           permissions: [],
           hasContentFilters: false,
+          libraryAccessCount: 0,
         });
       }
       if (row.permissionName) {
@@ -113,7 +159,7 @@ export class UserRepository {
     }
 
     if (userIds.length > 0) {
-      const [tagFilterUsers, genreFilterUsers] = await Promise.all([
+      const [tagFilterUsers, genreFilterUsers, libraryAccessCounts] = await Promise.all([
         this.db
           .select({ userId: schema.userContentFilterTags.userId })
           .from(schema.userContentFilterTags)
@@ -122,6 +168,11 @@ export class UserRepository {
           .select({ userId: schema.userContentFilterGenres.userId })
           .from(schema.userContentFilterGenres)
           .where(inArray(schema.userContentFilterGenres.userId, userIds)),
+        this.db
+          .select({ userId: schema.userLibraryAccess.userId, granted: count() })
+          .from(schema.userLibraryAccess)
+          .where(inArray(schema.userLibraryAccess.userId, userIds))
+          .groupBy(schema.userLibraryAccess.userId),
       ]);
       const usersWithFilters = new Set<number>();
       for (const r of tagFilterUsers) usersWithFilters.add(r.userId);
@@ -129,10 +180,84 @@ export class UserRepository {
       for (const [id, user] of usersMap) {
         if (usersWithFilters.has(id)) user.hasContentFilters = true;
       }
+      for (const row of libraryAccessCounts) {
+        const user = usersMap.get(row.userId);
+        if (user) user.libraryAccessCount = Number(row.granted);
+      }
     }
 
     const users = userIds.map((id) => usersMap.get(id)).filter((user): user is UserListItem => user !== undefined);
     return { users, total: normalizedTotal };
+  }
+
+  /** Counts across every account, deliberately ignoring the caller's current filter. */
+  async summary(): Promise<UserListSummary> {
+    const [row] = await this.db
+      .select({
+        total: sql<number>`count(*)::int`,
+        admins: sql<number>`count(*) filter (where ${schema.users.isSuperuser} = true)::int`,
+        active: sql<number>`count(*) filter (where ${schema.users.active} = true)::int`,
+        inactive: sql<number>`count(*) filter (where ${schema.users.active} = false)::int`,
+        attention: sql<number>`count(*) filter (where ${attentionCondition()})::int`,
+      })
+      .from(schema.users);
+    return row ?? { total: 0, admins: 0, active: 0, inactive: 0, attention: 0 };
+  }
+
+  async findNeedingAttention(limit: number) {
+    const rows = await this.db
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        name: schema.users.name,
+        avatarUrl: schema.users.avatarUrl,
+        provisioningMethod: schema.users.provisioningMethod,
+        createdAt: schema.users.createdAt,
+        lockedUntil: schema.users.lockedUntil,
+        isDefaultPassword: schema.users.isDefaultPassword,
+        lastAuthenticatedAt: schema.users.lastAuthenticatedAt,
+      })
+      .from(schema.users)
+      .where(attentionCondition())
+      .orderBy(attentionRank, asc(schema.users.createdAt))
+      .limit(limit);
+
+    if (rows.length === 0) return [];
+
+    // Only the newest unused link per account matters; the set is bounded by `limit`.
+    const tokens = await this.db
+      .select({
+        userId: schema.passwordResetTokens.userId,
+        expiresAt: schema.passwordResetTokens.expiresAt,
+      })
+      .from(schema.passwordResetTokens)
+      .where(
+        and(
+          inArray(
+            schema.passwordResetTokens.userId,
+            rows.map((r) => r.id),
+          ),
+          isNull(schema.passwordResetTokens.usedAt),
+        ),
+      )
+      .orderBy(desc(schema.passwordResetTokens.createdAt));
+
+    const latestLink = new Map<number, Date>();
+    for (const token of tokens) {
+      if (!latestLink.has(token.userId)) latestLink.set(token.userId, token.expiresAt);
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      username: row.username,
+      name: row.name,
+      avatarUrl: row.avatarUrl,
+      provisioningMethod: row.provisioningMethod,
+      createdAt: row.createdAt,
+      lockedUntil: row.lockedUntil,
+      reason: attentionReason(row),
+      resetLinkExpiresAt: latestLink.get(row.id) ?? null,
+    }));
   }
 
   private buildListFilters(query: UserListQuery): SQL[] {
@@ -152,6 +277,8 @@ export class UserRepository {
       filters.push(eq(schema.users.active, true));
     } else if (query.state === 'inactive') {
       filters.push(eq(schema.users.active, false));
+    } else if (query.state === 'attention') {
+      filters.push(attentionCondition());
     }
 
     return filters;

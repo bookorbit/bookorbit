@@ -49,6 +49,7 @@ describe('LibraryService', () => {
     delete: vi.fn(),
     findAllFolderPaths: vi.fn(),
     getStats: vi.fn(),
+    getStatsForLibraries: vi.fn(),
     updateDisplayOrders: vi.fn(),
     getAccessWithUsers: vi.fn(),
     grantAccess: vi.fn(),
@@ -57,7 +58,7 @@ describe('LibraryService', () => {
   };
 
   const config = { get: vi.fn().mockReturnValue('/books') };
-  const scannerService = { startScanAsync: vi.fn() };
+  const scannerService = { startScanAsync: vi.fn(), getLatestScans: vi.fn() };
   const fileWatcherService = { startWatcher: vi.fn(), stopWatcher: vi.fn() };
   const fileWriteService = {
     findNonMissingPrimaryFilesByLibrary: vi.fn(),
@@ -511,6 +512,54 @@ describe('LibraryService', () => {
     const result = await service.prescan({ paths: ['/tmp/missing'] } as any);
 
     expect(result.paths[0]).toEqual(expect.objectContaining({ accessible: false, error: 'Path does not exist' }));
+  });
+
+  it('getOverview scopes to the caller and merges stats with the last scan', async () => {
+    libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    libraryRepo.getStatsForLibraries.mockResolvedValue(
+      new Map([
+        [1, { totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 } }],
+        [2, { totalBooks: 0, totalSizeBytes: 0, formatCounts: {} }],
+      ]),
+    );
+    const lastScan = {
+      status: 'completed' as const,
+      triggeredBy: 'manual' as const,
+      startedAt: '2026-08-23T00:00:00.000Z',
+      completedAt: '2026-08-23T00:01:00.000Z',
+      addedCount: 3,
+      updatedCount: 0,
+      missingCount: 0,
+      errorMessage: null,
+    };
+    scannerService.getLatestScans.mockResolvedValue(new Map([[1, lastScan]]));
+
+    const result = await service.getOverview({ id: 7, isSuperuser: false } as any);
+
+    expect(libraryRepo.findAccessibleIdsForUser).toHaveBeenCalledWith(7);
+    expect(libraryRepo.findAllIds).not.toHaveBeenCalled();
+    expect(libraryRepo.getStatsForLibraries).toHaveBeenCalledWith([1, 2]);
+    expect(result).toEqual([
+      { libraryId: 1, totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 }, lastScan },
+      { libraryId: 2, totalBooks: 0, totalSizeBytes: 0, formatCounts: {}, lastScan: null },
+    ]);
+  });
+
+  it('getOverview returns nothing and issues no queries when the caller has no libraries', async () => {
+    libraryRepo.findAllIds.mockResolvedValue([]);
+
+    const result = await service.getOverview({ id: 1, isSuperuser: true } as any);
+
+    expect(result).toEqual([]);
+    expect(libraryRepo.getStatsForLibraries).not.toHaveBeenCalled();
+    expect(scannerService.getLatestScans).not.toHaveBeenCalled();
+  });
+
+  it('getOverview maps repository overflow errors to InternalServerErrorException', async () => {
+    libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }]);
+    libraryRepo.getStatsForLibraries.mockRejectedValue(new RangeError('overflow'));
+
+    await expect(service.getOverview({ id: 1, isSuperuser: true } as any)).rejects.toBeInstanceOf(InternalServerErrorException);
   });
 
   it('getStats maps repository overflow errors to InternalServerErrorException', async () => {

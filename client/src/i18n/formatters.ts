@@ -6,6 +6,7 @@ const numberFormatters = new Map<string, Intl.NumberFormat>()
 const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>()
 const relativeTimeFormatters = new Map<string, Intl.RelativeTimeFormat>()
 const languageNameFormatters = new Map<Locale, Intl.DisplayNames>()
+const listFormatters = new Map<string, Intl.ListFormat>()
 
 function activeLocale(): Locale {
   return (i18n.global.locale as Ref<Locale>).value
@@ -27,12 +28,37 @@ export function formatNumber(value: number, options: Intl.NumberFormatOptions = 
 }
 
 /**
+ * Percentages of a whole. Takes the fraction (0.128), not the percentage (12.8), so the locale
+ * decides where the sign goes and whether it gets a space.
+ */
+export function formatPercent(fraction: number, fractionDigits = 0): string {
+  return formatNumber(fraction, {
+    style: 'percent',
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })
+}
+
+/**
  * Short form for counts in tight spots such as sidebar badges: 1000 becomes 1K, 1234 becomes 1.2K.
  * Locales without a short thousands form (German) keep the grouped number, which is the correct
  * rendering for them.
  */
 export function formatCompactNumber(value: number): string {
   return formatNumber(value, { notation: 'compact' })
+}
+
+/** Joins values into a locale-aware list: "Audiobooks, Comics, Novels" in English. */
+export function formatList(values: string[]): string {
+  const locale = activeLocale()
+  const options: Intl.ListFormatOptions = { style: 'short', type: 'unit' }
+  const key = formatterKey(locale, options)
+  let formatter = listFormatters.get(key)
+  if (!formatter) {
+    formatter = new Intl.ListFormat(locale, options)
+    listFormatters.set(key, formatter)
+  }
+  return formatter.format(values)
 }
 
 export function formatDate(value: Date | number, options: Intl.DateTimeFormatOptions = {}): string {

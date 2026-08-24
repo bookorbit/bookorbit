@@ -1,1 +1,0 @@
-ALTER TABLE "book_metadata" ADD COLUMN "origin_country" varchar(2);

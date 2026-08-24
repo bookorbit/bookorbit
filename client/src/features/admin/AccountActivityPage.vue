@@ -12,7 +12,8 @@ import type {
   ReadingInsightsSharingLevel,
 } from '@bookorbit/types'
 
-import { formatDate, formatDateTime, formatNumber, formatRelativeTime } from '@/i18n/formatters'
+import { formatDate, formatDateTime, formatNumber } from '@/i18n/formatters'
+import { relativeTimestamp as formatRelative } from './lib/relative-time'
 import { useAccountActivity } from './composables/useAccountActivity'
 
 const { t } = useI18n()
@@ -82,14 +83,7 @@ function openSharedInsights(item: AccountActivityListItem) {
 }
 
 function relativeTimestamp(value: string | null): string {
-  if (!value) return t('adminFeature.accountActivity.never')
-  const differenceMs = new Date(value).getTime() - Date.now()
-  const absoluteMs = Math.abs(differenceMs)
-  if (absoluteMs < 60 * 60 * 1000) return formatRelativeTime(Math.round(differenceMs / 60_000), 'minute')
-  if (absoluteMs < 24 * 60 * 60 * 1000) return formatRelativeTime(Math.round(differenceMs / 3_600_000), 'hour')
-  if (absoluteMs < 30 * 24 * 60 * 60 * 1000) return formatRelativeTime(Math.round(differenceMs / 86_400_000), 'day')
-  if (absoluteMs < 365 * 24 * 60 * 60 * 1000) return formatRelativeTime(Math.round(differenceMs / 2_592_000_000), 'month')
-  return formatRelativeTime(Math.round(differenceMs / 31_536_000_000), 'year')
+  return value ? formatRelative(value) : t('adminFeature.accountActivity.never')
 }
 
 function exactTimestamp(value: string | null): string {

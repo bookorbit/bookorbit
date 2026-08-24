@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Permission } from '@bookorbit/types';
-import type { UserSettings } from '@bookorbit/types';
+import type { ProvisioningMethod, UserAttentionResponse, UserListSummary, UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { ContentFilterRepository } from './content-filter.repository';
@@ -17,6 +17,9 @@ import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
 import { UserRepository, type UserListQuery } from './user.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+
+/** The band is a to-do list, not a second roster. */
+const ATTENTION_BAND_LIMIT = 8;
 
 @Injectable()
 export class UserService {
@@ -85,6 +88,32 @@ export class UserService {
 
   findAssignable() {
     return this.userRepo.findAssignable();
+  }
+
+  summary(): Promise<UserListSummary> {
+    return this.userRepo.summary();
+  }
+
+  /**
+   * The roster's attention band. Capped because the band is a to-do list, not a second
+   * roster; `total` tells the UI when there is more behind the `attention` filter.
+   */
+  async findNeedingAttention(): Promise<UserAttentionResponse> {
+    const [rows, summary] = await Promise.all([this.userRepo.findNeedingAttention(ATTENTION_BAND_LIMIT), this.userRepo.summary()]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        username: row.username,
+        name: row.name,
+        avatarUrl: row.avatarUrl,
+        provisioningMethod: row.provisioningMethod as ProvisioningMethod,
+        reason: row.reason,
+        lockedUntil: row.lockedUntil?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        resetLinkExpiresAt: row.resetLinkExpiresAt?.toISOString() ?? null,
+      })),
+      total: summary.attention,
+    };
   }
 
   async findById(id: number) {

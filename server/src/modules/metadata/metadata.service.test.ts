@@ -17,7 +17,8 @@ vi.mock('./lib/cbz-metadata', () => ({
   extractCb7Metadata: vi.fn(),
 }));
 
-vi.mock('./lib/epub', () => ({
+vi.mock('./lib/epub', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./lib/epub')>()),
   extractEpubMetadata: vi.fn(),
 }));
 
@@ -298,6 +299,7 @@ describe('MetadataService', () => {
       seriesName: null,
       seriesIndex: null,
       authors: [],
+      narrators: [],
       genres: [],
       tags: [],
       rating: null,
@@ -434,6 +436,7 @@ describe('MetadataService', () => {
       seriesName: null,
       seriesIndex: null,
       authors: [],
+      narrators: [],
       genres: [],
       tags: [],
       rating: null,
@@ -488,6 +491,7 @@ describe('MetadataService', () => {
       seriesName: null,
       seriesIndex: null,
       authors: [],
+      narrators: [],
       genres: [],
       tags: [],
       rating: null,
@@ -536,6 +540,7 @@ describe('MetadataService', () => {
         seriesName: null,
         seriesIndex: null,
         authors: [],
+        narrators: [],
         genres: [],
         tags: [],
         rating: null,
@@ -576,6 +581,7 @@ describe('MetadataService', () => {
       seriesName: 'Series   Name',
       seriesIndex: 2,
       authors: [{ name: 'Author A', sortName: null }],
+      narrators: [],
       genres: ['Fantasy'],
       tags: ['Shelf'],
       rating: 4.6,
@@ -1113,6 +1119,104 @@ describe('MetadataService', () => {
     expect(insertedTags).toEqual(['Shelf', 'Y'.repeat(200)]);
   });
 
+  describe('narrators from a sidecar OPF', () => {
+    const opfXml = (metadataBody: string) => `
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:title>Sidecar Title</dc:title>
+          ${metadataBody}
+        </metadata>
+      </package>`;
+
+    it('persists narrators declared by role nrt on a non-audio source', async () => {
+      const { db } = makeDb();
+      const narratorService = { replaceForBook: vi.fn().mockResolvedValue(undefined) };
+      const service = makeService(db, undefined, { narratorService });
+      mockReadFile.mockResolvedValue(
+        opfXml(`
+          <dc:creator opf:role="nrt">First Narrator</dc:creator>
+          <dc:contributor opf:role="nrt">Second Narrator</dc:contributor>
+        `),
+      );
+
+      await service.extractAndSave(31, '/books/Book/book.opf', 'opf');
+
+      expect(narratorService.replaceForBook).toHaveBeenCalledWith(31, ['First Narrator', 'Second Narrator']);
+    });
+
+    it('leaves narrators untouched when the OPF declares none', async () => {
+      const { db } = makeDb();
+      const narratorService = { replaceForBook: vi.fn().mockResolvedValue(undefined) };
+      const service = makeService(db, undefined, { narratorService });
+      mockReadFile.mockResolvedValue(opfXml(`<dc:publisher>Ace</dc:publisher>`));
+
+      await service.extractAndSave(32, '/books/Book/book.opf', 'opf');
+
+      expect(narratorService.replaceForBook).not.toHaveBeenCalled();
+    });
+
+    it('skips narrators when the field is locked', async () => {
+      const { db } = makeDb();
+      const narratorService = { replaceForBook: vi.fn().mockResolvedValue(undefined) };
+      const lockService = {
+        isFieldLocked: vi.fn().mockResolvedValue(false),
+        filterAutomatedBookUpdate: vi.fn().mockImplementation((_bookId: number, dto: Record<string, unknown>) => {
+          const rest = { ...dto };
+          delete rest.audioMetadata;
+          return Promise.resolve({ dto: rest, skippedFields: ['narrators'] });
+        }),
+      };
+      const service = makeService(db, undefined, { narratorService, bookMetadataLockService: lockService });
+      mockReadFile.mockResolvedValue(opfXml(`<dc:creator opf:role="nrt">First Narrator</dc:creator>`));
+
+      await service.extractAndSave(33, '/books/Book/book.opf', 'opf');
+
+      expect(lockService.filterAutomatedBookUpdate).toHaveBeenCalledWith(
+        33,
+        expect.objectContaining({ audioMetadata: { narrators: ['First Narrator'] } }),
+      );
+      expect(narratorService.replaceForBook).not.toHaveBeenCalled();
+    });
+  });
+
+  it('extractAudioChaptersAndNarrators leaves narrators alone when the audio tags name none', async () => {
+    const { db, updateSet } = makeDb();
+    const narratorService = { replaceForBook: vi.fn().mockResolvedValue(undefined) };
+    const lockService = {
+      isFieldLocked: vi.fn().mockResolvedValue(false),
+      filterAutomatedBookUpdate: vi.fn().mockImplementation((_bookId: number, dto: unknown) => Promise.resolve({ dto, skippedFields: [] })),
+    };
+    const service = makeService(db, undefined, { narratorService, bookMetadataLockService: lockService });
+
+    mockExtractAudioMetadata.mockResolvedValueOnce({
+      title: null,
+      subtitle: null,
+      authors: [],
+      narrators: [],
+      publisher: null,
+      publishedYear: null,
+      description: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      genres: [],
+      audibleId: null,
+      librofmId: null,
+      durationSeconds: null,
+      chapters: [{ title: 'Chapter 1', startMs: 0 }],
+      coverBytes: null,
+    } as never);
+
+    await service.extractAudioChaptersAndNarrators(73, '/tmp/audio.m4b', 'm4b');
+
+    expect(lockService.filterAutomatedBookUpdate).toHaveBeenCalledWith(
+      73,
+      expect.objectContaining({ audioMetadata: { chapters: [{ title: 'Chapter 1', startMs: 0 }] } }),
+    );
+    expect(narratorService.replaceForBook).not.toHaveBeenCalled();
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ chapters: [{ title: 'Chapter 1', startMs: 0 }] }));
+  });
+
   it('extractAudioChaptersAndNarrators updates filtered audio fields and supports early exits', async () => {
     const { db, updateSet } = makeDb();
     const narratorService = {
@@ -1191,6 +1295,92 @@ describe('MetadataService', () => {
     await expect(service.extractAudioChaptersAndNarrators(71, '/tmp/audio.unknown', 'unknown')).resolves.toBeUndefined();
 
     await expect(service.extractAudioChaptersAndNarrators(72, '/tmp/book.pdf', 'pdf')).resolves.toBeUndefined();
+  });
+
+  describe('fixed-layout persistence', () => {
+    function epubOpf(renditionLayout: string | null) {
+      return {
+        title: 'Manga Vol. 1',
+        subtitle: null,
+        description: null,
+        isbn10: null,
+        isbn13: null,
+        publisher: null,
+        publishedDate: null,
+        publishedYear: null,
+        language: null,
+        pageCount: null,
+        rating: null,
+        seriesName: null,
+        seriesIndex: null,
+        authors: [],
+        narrators: [],
+        genres: [],
+        tags: [],
+        customMetadata: {},
+        coverHref: null,
+        renditionLayout,
+      };
+    }
+
+    it('records a comic as fixed layout so Kobo sync can announce it as EPUB3FL', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      mockExtractEpubMetadata.mockResolvedValueOnce(epubOpf('pre-paginated') as never);
+
+      await service.extractAndSave(42, '/books/manga.epub', 'epub');
+
+      expect(updateSet).toHaveBeenCalledWith({ isFixedLayout: true });
+    });
+
+    it('records a reflowable novel explicitly, so it is never re-read on every sync', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      mockExtractEpubMetadata.mockResolvedValueOnce(epubOpf('reflowable') as never);
+
+      await service.extractAndSave(42, '/books/novel.epub', 'epub');
+
+      expect(updateSet).toHaveBeenCalledWith({ isFixedLayout: false });
+    });
+
+    it('records an EPUB that declares no layout as reflowable', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      mockExtractEpubMetadata.mockResolvedValueOnce(epubOpf(null) as never);
+
+      await service.extractAndSave(42, '/books/plain.epub', 'epub');
+
+      expect(updateSet).toHaveBeenCalledWith({ isFixedLayout: false });
+    });
+
+    it('writes nothing for a format whose extractor cannot report a layout', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      vi.spyOn(service, 'replaceAuthors').mockResolvedValue(undefined);
+      vi.spyOn(service, 'replaceGenres').mockResolvedValue(undefined);
+      vi.spyOn(service, 'replaceTags').mockResolvedValue(undefined);
+      mockParsePdfFile.mockResolvedValueOnce({
+        title: 'Scan',
+        subtitle: null,
+        description: null,
+        isbn10: null,
+        isbn13: null,
+        publisher: null,
+        publishedYear: null,
+        language: null,
+        seriesName: null,
+        seriesIndex: null,
+        authors: [],
+        genres: [],
+        tags: [],
+        rating: null,
+        pageCount: 10,
+      } as never);
+
+      await service.extractAndSave(42, '/books/scan.pdf', 'pdf');
+
+      expect(updateSet).not.toHaveBeenCalledWith(expect.objectContaining({ isFixedLayout: expect.anything() }));
+    });
   });
 
   it('extractAudioFileDuration writes duration only when parser returns a value', async () => {

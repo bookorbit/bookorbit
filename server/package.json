@@ -43,9 +43,9 @@
     "lint": "pnpm run lint:check",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "vitest run --exclude test/scanner-scenarios.e2e-spec.ts --exclude test/scanner-file-operations.e2e-spec.ts",
+    "test": "node ../scripts/dev/with-test-lock.mjs -- vitest run --exclude test/scanner-scenarios.e2e-spec.ts --exclude test/scanner-file-operations.e2e-spec.ts",
     "test:watch": "vitest",
-    "test:cov": "vitest run --coverage",
+    "test:cov": "node ../scripts/dev/with-test-lock.mjs -- vitest run --coverage",
     "e2e:run": "vitest run test/app-smoke.e2e-spec.ts"
   },
   "dependencies": {

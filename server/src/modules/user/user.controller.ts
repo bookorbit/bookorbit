@@ -59,6 +59,18 @@ export class UserController {
   }
 
   // Must be before :id routes to avoid named segments being parsed as ints
+  @Get('summary')
+  @RequirePermission(Permission.ManageUsers)
+  summary() {
+    return this.userService.summary();
+  }
+
+  @Get('attention')
+  @RequirePermission(Permission.ManageUsers)
+  findNeedingAttention() {
+    return this.userService.findNeedingAttention();
+  }
+
   @Get('assignable')
   @RequirePermission(Permission.ManageLibraries)
   findAssignable() {

@@ -374,4 +374,20 @@ describe('ScannerRepository', () => {
     await repo.clearDirScanState(21);
     expect(db.delete).toHaveBeenCalledTimes(1);
   });
+
+  it('findRecentScanJobs reads the newest jobs for one library', async () => {
+    const { repo, queues, db } = makeRepo();
+    queues.select.push([{ id: 2 }, { id: 1 }]);
+
+    await expect(repo.findRecentScanJobs(4, 5)).resolves.toEqual([{ id: 2 }, { id: 1 }]);
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('findLatestScanJobs issues no query for an empty id list', async () => {
+    const { repo, db } = makeRepo();
+    db.selectDistinctOn = vi.fn();
+
+    await expect(repo.findLatestScanJobs([])).resolves.toEqual([]);
+    expect(db.selectDistinctOn).not.toHaveBeenCalled();
+  });
 });

@@ -40,6 +40,7 @@ import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pag
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
+import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { storageConfig } from '../../config/config';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
@@ -370,7 +371,7 @@ export class KoreaderCatalogService {
               authors: authorNames,
               year: row.publishedYear ? String(row.publishedYear) : '',
               series: row.seriesName ?? '',
-              seriesIndex: row.seriesIndex == null ? '' : String(row.seriesIndex),
+              seriesIndex: formatSeriesIndex(row.seriesIndex) ?? '',
               language: row.language ?? '',
               publisher: row.publisher ?? '',
               isbn: row.isbn13 ?? row.isbn10 ?? '',
@@ -719,7 +720,7 @@ export class KoreaderCatalogService {
                 authors: detail.authors.map((author) => author.name).join(', '),
                 year: detail.publishedYear ? String(detail.publishedYear) : '',
                 series: detail.seriesName ?? '',
-                seriesIndex: detail.seriesIndex == null ? '' : String(detail.seriesIndex),
+                seriesIndex: formatSeriesIndex(detail.seriesIndex) ?? '',
                 language: detail.language ?? '',
                 publisher: detail.publisher ?? '',
                 isbn: detail.isbn13 ?? detail.isbn10 ?? '',

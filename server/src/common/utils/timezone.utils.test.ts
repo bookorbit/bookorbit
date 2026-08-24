@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isDateKey, isValidTimeZone, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from './timezone.utils';
+import { getYearInTimeZone, isDateKey, isValidTimeZone, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from './timezone.utils';
 
 describe('timezone utils', () => {
   it('validates IANA timezones and rejects invalid values', () => {
@@ -65,5 +65,12 @@ describe('timezone utils', () => {
 
   it('throws when date key is malformed', () => {
     expect(() => toTimeZoneStartOfDay('2026-02-30', 'UTC')).toThrow(RangeError);
+  });
+
+  it("reads the year in the given timezone, not the host's", () => {
+    const newYearsEveUtc = new Date('2026-12-31T23:30:00.000Z');
+    expect(getYearInTimeZone(newYearsEveUtc, 'UTC')).toBe(2026);
+    expect(getYearInTimeZone(newYearsEveUtc, 'Pacific/Auckland')).toBe(2027);
+    expect(getYearInTimeZone(newYearsEveUtc, 'America/New_York')).toBe(2026);
   });
 });
