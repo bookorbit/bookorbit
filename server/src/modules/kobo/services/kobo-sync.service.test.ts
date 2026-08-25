@@ -249,8 +249,8 @@ describe('KoboSyncService', () => {
     expect(createSpy).toHaveBeenNthCalledWith(2, 5, 202, eligible, new Set());
     expect((service as any).fetchEligibleSnapshotRows).toHaveBeenNthCalledWith(1, 5, false, expect.any(Map), true);
     expect((service as any).fetchEligibleSnapshotRows).toHaveBeenNthCalledWith(2, 5, true, expect.any(Map), true);
-    expect(pageSpy).toHaveBeenNthCalledWith(1, 5, 11, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
-    expect(pageSpy).toHaveBeenNthCalledWith(2, 5, 22, 'device-b-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    expect(pageSpy).toHaveBeenNthCalledWith(1, 5, 11, 101, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    expect(pageSpy).toHaveBeenNthCalledWith(2, 5, 22, 202, 'device-b-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
   });
 
   it('reconciles only the caller device snapshot when it already exists', async () => {
@@ -265,8 +265,8 @@ describe('KoboSyncService', () => {
     await service.getDelta(5, 101, 'device-a-token', 'https://reader.example.com');
 
     expect(reconcileSpy).toHaveBeenCalledWith(9, eligible);
-    expect(pageSpy).toHaveBeenCalledWith(5, 9, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
-    await expect(pageSpy.mock.calls[0]![5]()).resolves.toEqual(new Set([1]));
+    expect(pageSpy).toHaveBeenCalledWith(5, 9, 101, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    await expect(pageSpy.mock.calls[0]![6]()).resolves.toEqual(new Set([1]));
   });
 
   it('serves the next page without reconciling while the device still has pending rows', async () => {
@@ -281,7 +281,7 @@ describe('KoboSyncService', () => {
 
     expect(reconcileSpy).not.toHaveBeenCalled();
     expect(eligibleSpy).not.toHaveBeenCalled();
-    expect(pageSpy).toHaveBeenCalledWith(5, 9, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    expect(pageSpy).toHaveBeenCalledWith(5, 9, 101, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
   });
 
   it('still resolves eligible ids for tag delivery when a pending page drains before it is served', async () => {
@@ -295,7 +295,7 @@ describe('KoboSyncService', () => {
 
     await service.getDelta(5, 101, 'device-a-token', 'https://reader.example.com');
 
-    await expect(pageSpy.mock.calls[0]![5]()).resolves.toEqual(new Set([7]));
+    await expect(pageSpy.mock.calls[0]![6]()).resolves.toEqual(new Set([7]));
     expect(eligibleSpy).toHaveBeenCalledWith(5, true, expect.any(Map));
   });
 
@@ -506,7 +506,7 @@ describe('KoboSyncService', () => {
     const service = makeService(db);
     vi.spyOn(service as any, 'buildTagItems').mockResolvedValue([{ ChangedTag: {} }]);
 
-    const result = await (service as any).getPageFromSnapshot(7, 1, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([1])));
+    const result = await (service as any).getPageFromSnapshot(7, 1, 101, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([1])));
 
     expect(result).toEqual({
       entitlements: [{ ChangedTag: {} }],
@@ -533,7 +533,9 @@ describe('KoboSyncService', () => {
     );
     readingStateService.getRawState.mockResolvedValue(null);
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([1, 2, 3])));
+    const result = await (service as any).getPageFromSnapshot(7, 22, 101, 'tok', 'https://base', new Map(), () =>
+      Promise.resolve(new Set([1, 2, 3])),
+    );
 
     expect(result.hasMore).toBe(false);
     expect(result.entitlements).toHaveLength(3);
@@ -552,7 +554,7 @@ describe('KoboSyncService', () => {
     vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map([[3, makeBook(3)]]));
     readingStateService.getRawState.mockResolvedValue({ EntitlementId: 'entitlement-3', CurrentBookmark: { ProgressPercent: 61 } });
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
+    const result = await (service as any).getPageFromSnapshot(7, 22, 101, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
 
     expect(result.entitlements).toHaveLength(2);
     expect(result.entitlements[0]).toHaveProperty('ChangedProductMetadata');
@@ -572,7 +574,7 @@ describe('KoboSyncService', () => {
     bookIdentityService.findByBookIds.mockResolvedValue(new Map([[3, makeIdentity(3, false)]]));
     readingStateService.getRawState.mockResolvedValue({ EntitlementId: 'entitlement-3', CurrentBookmark: { ProgressPercent: 61 } });
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
+    const result = await (service as any).getPageFromSnapshot(7, 22, 101, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
 
     expect(result.entitlements).toHaveLength(2);
     expect(result.entitlements[0]).toHaveProperty('ChangedEntitlement');
@@ -592,7 +594,7 @@ describe('KoboSyncService', () => {
     vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map());
     bookIdentityService.findByBookIds.mockResolvedValue(new Map([[3, makeIdentity(3, true)]]));
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set()));
+    const result = await (service as any).getPageFromSnapshot(7, 22, 101, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set()));
     const removedIds = result.entitlements.map(
       (entry: Record<string, { BookEntitlement: { Id: string } }>) => entry.ChangedEntitlement.BookEntitlement.Id,
     );

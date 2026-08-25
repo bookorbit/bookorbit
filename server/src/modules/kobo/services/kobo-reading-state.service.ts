@@ -15,8 +15,11 @@ import { advanceIsoTimestamp, maxIsoTimestamp } from '../../../common/utils/iso-
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 
 type Db = NodePgDatabase<typeof schema>;
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type Executor = Db | Tx;
 type JsonObj = Record<string, unknown>;
 const PROGRESS_EPSILON = 0.0001;
+const HUB_REFRESH_EVENT = 'kobo.reading_state_hub_refresh';
 
 type KoboSectionResult = { Result: 'Success' | 'Ignored' };
 
@@ -233,7 +236,13 @@ export class KoboReadingStateService {
     }
   }
 
-  async getRawState(userId: number, bookId: number): Promise<unknown> {
+  /**
+   * `requestingDeviceId`, when known, is excluded from the snapshot re-queue a hub refresh
+   * triggers: that device is the one asking right now and is about to receive the corrected
+   * bookmark directly in this response, so re-queuing it too would just make its very next
+   * sync redeliver a book it was already just given.
+   */
+  async getRawState(userId: number, bookId: number, requestingDeviceId?: number): Promise<unknown> {
     const book = await this.db.query.books.findFirst({
       where: eq(schema.books.id, bookId),
       columns: { id: true },
@@ -248,7 +257,7 @@ export class KoboReadingStateService {
 
     if (!row) return null;
 
-    const refreshed = await this.refreshBookmarkFromHub(userId, bookId, row).catch((error: unknown) => {
+    const refreshed = await this.refreshBookmarkFromHub(userId, bookId, row, requestingDeviceId).catch((error: unknown) => {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.warn(
         `[kobo.reading_state_refresh] [fail] userId=${userId} bookId=${bookId} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - hub bookmark refresh failed, serving stored bookmark`,
@@ -277,6 +286,7 @@ export class KoboReadingStateService {
     userId: number,
     bookId: number,
     state: { currentBookmark: unknown; lastModifiedKobo: string | null; priorityTimestamp: string | null },
+    requestingDeviceId?: number,
   ): Promise<{ bookmark: JsonObj; lastModifiedKobo: string } | null> {
     const bookmark = this.asJsonObj(state.currentBookmark);
     const settings = await this.settingsService.getSettings(userId);
@@ -327,16 +337,43 @@ export class KoboReadingStateService {
     if (point.contentSourceProgressPercent != null) merged.ContentSourceProgressPercent = point.contentSourceProgressPercent;
     else delete merged.ContentSourceProgressPercent;
 
-    await this.db
-      .update(schema.koboReadingStates)
-      .set({ currentBookmark: merged, lastModifiedKobo: nowIso, priorityTimestamp: nowIso, updatedAt: new Date() })
-      .where(and(eq(schema.koboReadingStates.userId, userId), eq(schema.koboReadingStates.bookId, bookId)));
-    await this.stampProgressLocation(userId, primaryFile.fileId, point);
-    // A device whose snapshot row was already marked synced before this refresh computed a
-    // changed bookmark would otherwise never see it: incremental sync only resends rows with
-    // synced = false, and this hub-driven refresh is the one write path to currentBookmark
-    // that isn't already followed by an unsync call elsewhere.
-    await this.markSnapshotBookUnsyncedForAllDevices(userId, bookId);
+    // The bookmark update, the progress-location stamp, and the snapshot re-queue must land
+    // together: stampProgressLocation sets readingProgress.koboLocationValue, which is exactly
+    // the field that gates whether a future call even attempts this refresh again (see the
+    // comment above). If the snapshot re-queue failed after that stamp landed outside a
+    // transaction, the corrected bookmark would be unreachable both by a device (never
+    // re-queued) and by a later retry (already stamped, so gated out).
+    const startedAt = Date.now();
+    this.logger.log(`[${HUB_REFRESH_EVENT}] [start] userId=${userId} bookId=${bookId} - persisting hub bookmark refresh`);
+    try {
+      await this.db.transaction(async (tx) => {
+        await tx
+          .update(schema.koboReadingStates)
+          .set({ currentBookmark: merged, lastModifiedKobo: nowIso, priorityTimestamp: nowIso, updatedAt: new Date() })
+          .where(and(eq(schema.koboReadingStates.userId, userId), eq(schema.koboReadingStates.bookId, bookId)));
+        await this.stampProgressLocation(userId, primaryFile.fileId, point, tx);
+        // A device whose snapshot row was already marked synced before this refresh computed a
+        // changed bookmark would otherwise never see it: incremental sync only resends rows with
+        // synced = false, and this hub-driven refresh is the one write path to currentBookmark
+        // that isn't already followed by an unsync call elsewhere. requestingDeviceId, when
+        // known, is excluded: that device is about to receive this same corrected bookmark
+        // directly in the response that triggered this refresh, so it does not need re-queuing.
+        if (requestingDeviceId != null) {
+          await this.markSnapshotBookUnsyncedForOtherDevices(userId, bookId, requestingDeviceId, tx);
+        } else {
+          await this.markSnapshotBookUnsyncedForAllDevices(userId, bookId, tx);
+        }
+      });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[${HUB_REFRESH_EVENT}] [fail] userId=${userId} bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - hub bookmark refresh transaction rolled back, nothing persisted`,
+      );
+      throw error;
+    }
+    this.logger.log(
+      `[${HUB_REFRESH_EVENT}] [end] userId=${userId} bookId=${bookId} durationMs=${Date.now() - startedAt} - hub bookmark refresh persisted and snapshot re-queued`,
+    );
 
     return { bookmark: merged, lastModifiedKobo: nowIso };
   }
@@ -346,8 +383,9 @@ export class KoboReadingStateService {
     userId: number,
     fileId: number,
     point: { source: string; value: string; contentSourceProgressPercent: number | null },
+    executor: Executor = this.db,
   ): Promise<void> {
-    await this.db
+    await executor
       .update(schema.readingProgress)
       .set({
         koboLocationSource: point.source,
@@ -495,8 +533,13 @@ export class KoboReadingStateService {
       });
   }
 
-  private async markSnapshotBookUnsyncedForOtherDevices(userId: number, bookId: number, sourceDeviceId: number): Promise<void> {
-    await this.db.execute(sql`
+  private async markSnapshotBookUnsyncedForOtherDevices(
+    userId: number,
+    bookId: number,
+    sourceDeviceId: number,
+    executor: Executor = this.db,
+  ): Promise<void> {
+    await executor.execute(sql`
       UPDATE ${schema.koboSnapshotBooks} AS sb
       SET synced = false,
           is_new = false
@@ -511,9 +554,9 @@ export class KoboReadingStateService {
     `);
   }
 
-  /** Same as above with no device excluded, for a hub-driven refresh with no source device of its own. */
-  private async markSnapshotBookUnsyncedForAllDevices(userId: number, bookId: number): Promise<void> {
-    await this.db.execute(sql`
+  /** Same as above with no device excluded, for a hub-driven refresh whose requesting device is unknown. */
+  private async markSnapshotBookUnsyncedForAllDevices(userId: number, bookId: number, executor: Executor = this.db): Promise<void> {
+    await executor.execute(sql`
       UPDATE ${schema.koboSnapshotBooks} AS sb
       SET synced = false,
           is_new = false
