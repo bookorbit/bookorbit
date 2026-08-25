@@ -10,10 +10,6 @@ function makeReply() {
   };
 }
 
-function makeHeaders(entries: Record<string, string | string[] | undefined>): Record<string, string | string[] | undefined> {
-  return entries;
-}
-
 describe('KoboProxyService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -97,7 +93,7 @@ describe('KoboProxyService', () => {
       {
         method: 'GET',
         url: '/v1/affiliate',
-        headers: makeHeaders({}),
+        headers: {},
         body: { ignored: true },
       } as never,
       makeReply() as never,
@@ -121,7 +117,7 @@ describe('KoboProxyService', () => {
     const req = {
       method: 'PUT',
       url: `/api/v1/kobo/device-1/v1/library/${entitlementId}/state`,
-      headers: makeHeaders({
+      headers: {
         accept: 'application/json',
         authorization: 'Bearer kobo-oauth-token',
         'content-type': 'application/json',
@@ -129,7 +125,7 @@ describe('KoboProxyService', () => {
         'x-kobo-appversion': '4.45.23697',
         'x-kobo-deviceid': 'device-id',
         host: 'bookorbit.example.com',
-      }),
+      },
       body,
     };
     const reply = makeReply();
@@ -164,7 +160,7 @@ describe('KoboProxyService', () => {
       {
         method: 'GET',
         url: '/api/v1/kobo/dev/v1/library/sync',
-        headers: makeHeaders({}),
+        headers: {},
       } as never,
       reply as never,
       'dev',
@@ -189,13 +185,13 @@ describe('KoboProxyService', () => {
       const req = {
         method: 'POST',
         url: '/api/v1/kobo/dev/v1/library/borrow',
-        headers: makeHeaders({
+        headers: {
           accept: 'application/json',
           'content-type': 'application/json',
           'x-kobo-userkey': 'device-user-key',
           'x-kobo-deviceid': 'device-id',
           'x-kobo-synctoken': composite,
-        }),
+        },
         body: { BookId: '9780123456789' },
       };
       const reply = makeReply();
@@ -228,10 +224,10 @@ describe('KoboProxyService', () => {
       const req = {
         method: 'POST',
         url: '/api/v1/kobo/dev/v1/library/borrow',
-        headers: makeHeaders({
+        headers: {
           'x-kobo-userkey': 'device-user-key',
           'x-kobo-synctoken': composite,
-        }),
+        },
         body: {},
       };
 
@@ -258,10 +254,10 @@ describe('KoboProxyService', () => {
         {
           method: 'GET',
           url: '/api/v1/kobo/dev/v1/library/sync',
-          headers: makeHeaders({
+          headers: {
             trailer: 'x-internal-state',
             'x-kobo-deviceid': 'device-id',
-          }),
+          },
         } as never,
         makeReply() as never,
         'dev',
@@ -286,12 +282,12 @@ describe('KoboProxyService', () => {
         {
           method: 'GET',
           url: '/api/v1/kobo/dev/v1/library/sync',
-          headers: makeHeaders({
+          headers: {
             connection: 'x-kobo-tracking, x-kobo-internal',
             'x-kobo-tracking': 'should-be-stripped',
             'x-kobo-internal': 'also-stripped',
             'x-kobo-deviceid': 'device-id',
-          }),
+          },
         } as never,
         makeReply() as never,
         'dev',
@@ -323,7 +319,7 @@ describe('KoboProxyService', () => {
         {
           method: 'GET',
           url: '/api/v1/kobo/dev/v1/library/sync',
-          headers: makeHeaders({}),
+          headers: {},
         } as never,
         reply as never,
         'dev',
@@ -349,7 +345,7 @@ describe('KoboProxyService', () => {
     const syncRequest = {
       method: 'GET',
       url: '/api/v1/kobo/dev/v1/library/sync?Filter=ALL',
-      headers: makeHeaders({ authorization: 'Bearer kobo-jwt', 'x-kobo-synctoken': 'PX.composite', 'x-kobo-userkey': 'user-secret' }),
+      headers: { authorization: 'Bearer kobo-jwt', 'x-kobo-synctoken': 'PX.composite', 'x-kobo-userkey': 'user-secret' },
     };
 
     it('returns the upstream response with lowercased headers instead of piping it', async () => {
