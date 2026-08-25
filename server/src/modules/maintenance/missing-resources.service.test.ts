@@ -9,6 +9,8 @@ import { MissingResourcesService } from './missing-resources.service';
 
 const user = { id: 7, isSuperuser: true } as never;
 
+const SWEEP_SETTLE_TIMEOUT_MS = 10_000;
+
 describe('MissingResourcesService', () => {
   let appDataPath: string;
   let coversRoot: string;
@@ -54,9 +56,13 @@ describe('MissingResourcesService', () => {
 
   async function runSweep(service: MissingResourcesService): Promise<void> {
     await service.startSweep(user);
-    // The sweep runs detached; drain the microtask/IO queue until it settles.
-    for (let attempt = 0; attempt < 50 && store.isRunning(user.id); attempt += 1) {
-      await new Promise((resolve) => setImmediate(resolve));
+    // The sweep runs detached over real filesystem I/O, so wait on the store rather than draining a
+    // fixed number of turns: a loaded runner outlasts any turn budget, and giving up silently left
+    // the sweep running into the next call, which failed as an unrelated "sweep is not complete".
+    const deadline = Date.now() + SWEEP_SETTLE_TIMEOUT_MS;
+    while (store.isRunning(user.id)) {
+      if (Date.now() >= deadline) throw new Error(`cover sweep did not settle within ${SWEEP_SETTLE_TIMEOUT_MS}ms`);
+      await new Promise((resolve) => setTimeout(resolve, 5));
     }
   }
 
