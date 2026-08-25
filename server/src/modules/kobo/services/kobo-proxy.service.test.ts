@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 
+import type { KoboProxyRequestOptions } from './kobo-proxy.service';
 import { KoboProxyService } from './kobo-proxy.service';
 
 function makeReply() {
@@ -239,6 +240,75 @@ describe('KoboProxyService', () => {
     });
   });
 
+  describe('credentials that must not reach Kobo', () => {
+    function stubFetch() {
+      const fetchMock = vi.fn().mockResolvedValue({
+        status: 200,
+        headers: new Headers(),
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      return fetchMock;
+    }
+
+    async function sentHeaders(headers: Record<string, string>, options?: KoboProxyRequestOptions): Promise<Record<string, string>> {
+      const fetchMock = stubFetch();
+      await new KoboProxyService().request({ method: 'GET', url: '/api/v1/kobo/dev/v1/library/sync', headers } as never, 'dev', options);
+      return fetchMock.mock.calls[0][1].headers as Record<string, string>;
+    }
+
+    const composite = `PX.${Buffer.from(JSON.stringify({ snapshotId: 4, koboSyncToken: 'kobo-cursor-9' })).toString('base64')}`;
+
+    // Every caller gets the substitution, not just the ones that remember to ask: forwardTagDelete
+    // relays through request() with no options and must not hand Kobo a token it cannot read.
+    it('substitutes the Kobo cursor for the composite token even with no options', async () => {
+      expect((await sentHeaders({ 'x-kobo-synctoken': composite }))['x-kobo-synctoken']).toBe('kobo-cursor-9');
+    });
+
+    it('drops a composite token it cannot decode rather than forwarding it', async () => {
+      expect(await sentHeaders({ 'x-kobo-synctoken': 'PX.not-base64-json' })).not.toHaveProperty('x-kobo-synctoken');
+    });
+
+    it('still lets omitHeaders drop the token the substitution would have written', async () => {
+      const headers = await sentHeaders({ 'x-kobo-synctoken': composite }, { omitHeaders: ['x-kobo-synctoken'] });
+      expect(headers).not.toHaveProperty('x-kobo-synctoken');
+    });
+
+    it('still lets extraHeaders override the token the substitution would have written', async () => {
+      const headers = await sentHeaders({ 'x-kobo-synctoken': composite }, { extraHeaders: { 'x-kobo-synctoken': 'server-cursor' } });
+      expect(headers['x-kobo-synctoken']).toBe('server-cursor');
+    });
+
+    // These routes sit on the BookOrbit origin, so a browser carrying a session reaches them with
+    // our auth cookies attached. Kobo must never receive those; cookies it set itself still ride.
+    it('strips the BookOrbit session cookies while keeping the rest of the jar', async () => {
+      const headers = await sentHeaders({ cookie: 'access_token=secret; kobo_session=keep-me; refresh_token=secret; wsid=abc' });
+      expect(headers.cookie).toBe('kobo_session=keep-me; wsid=abc');
+    });
+
+    it('sends no cookie header at all when only BookOrbit cookies were present', async () => {
+      expect(await sentHeaders({ cookie: 'access_token=secret; refresh_token=secret' })).not.toHaveProperty('cookie');
+    });
+
+    it('drops the reverse proxy forwarding headers that describe our hop', async () => {
+      const headers = await sentHeaders({
+        forwarded: 'for=10.0.0.5',
+        'x-forwarded-for': '10.0.0.5',
+        'x-forwarded-host': 'books.example',
+        'x-forwarded-proto': 'https',
+        'x-real-ip': '10.0.0.5',
+        'x-kobo-userkey': 'device-user-key',
+      });
+
+      expect(headers).not.toHaveProperty('forwarded');
+      expect(headers).not.toHaveProperty('x-forwarded-for');
+      expect(headers).not.toHaveProperty('x-forwarded-host');
+      expect(headers).not.toHaveProperty('x-forwarded-proto');
+      expect(headers).not.toHaveProperty('x-real-ip');
+      expect(headers['x-kobo-userkey']).toBe('device-user-key');
+    });
+  });
+
   describe('hop-by-hop header handling', () => {
     it('strips the singular Trailer header field on the way out', async () => {
       const service = new KoboProxyService();
@@ -419,7 +489,7 @@ describe('KoboProxyService', () => {
     });
 
     it('throws for a path that introduces a scheme override', () => {
-      expect(() => (service as any).buildTargetUrl('https://***@evil.com/path')).toThrow(BadRequestException);
+      expect(() => (service as any).buildTargetUrl('https://storeapi.kobo.com@evil.com/path')).toThrow(BadRequestException);
     });
 
     it('throws for a javascript: scheme in the path', () => {

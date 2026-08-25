@@ -28,7 +28,29 @@ const DROP_HEADERS = new Set([
   'upgrade',
   'content-length',
   'content-encoding',
+  // Added by the operator's reverse proxy; describes our hop, not the device's, and tells Kobo
+  // about the deployment's internal addressing.
+  'forwarded',
+  'x-forwarded-for',
+  'x-forwarded-host',
+  'x-forwarded-proto',
+  'x-real-ip',
 ]);
+
+const SYNC_TOKEN_HEADER = 'x-kobo-synctoken';
+
+// BookOrbit's own session cookies. The device token in the path is the credential for these
+// routes, so a browser that carries a BookOrbit session to one must not hand it to Kobo.
+const BOOKORBIT_COOKIE_NAMES = new Set(['access_token', 'refresh_token']);
+
+/** Drops BookOrbit's session cookies from a Cookie header, keeping any the device set itself. */
+function stripBookOrbitCookies(cookieHeader: string): string {
+  return cookieHeader
+    .split(';')
+    .filter((pair) => !BOOKORBIT_COOKIE_NAMES.has(pair.split('=')[0].trim()))
+    .join(';')
+    .trim();
+}
 
 export type KoboProxyResponse = {
   status: number;
@@ -75,7 +97,23 @@ export class KoboProxyService {
       const lowerKey = key.toLowerCase();
       if (DROP_HEADERS.has(lowerKey)) continue;
       if (connectionFields.has(lowerKey)) continue;
-      headers[lowerKey] = Array.isArray(value) ? (value[0] ?? '') : value;
+      const raw = Array.isArray(value) ? (value[0] ?? '') : value;
+
+      // Kobo cannot read the BookOrbit composite token, so it gets its own cursor or nothing.
+      // Applied before omitHeaders and extraHeaders so callers can still override either way.
+      if (lowerKey === SYNC_TOKEN_HEADER) {
+        const koboCursor = decodeSyncToken(raw).koboSyncToken;
+        if (koboCursor !== undefined) headers[lowerKey] = koboCursor;
+        continue;
+      }
+
+      if (lowerKey === 'cookie') {
+        const kept = stripBookOrbitCookies(raw);
+        if (kept.length > 0) headers[lowerKey] = kept;
+        continue;
+      }
+
+      headers[lowerKey] = raw;
     }
 
     for (const key of options.omitHeaders ?? []) {
@@ -119,17 +157,8 @@ export class KoboProxyService {
 
     this.logger.debug(`[kobo.proxy] [start] deviceId=${deviceId ?? 'unknown'} - upstream Kobo relay started`);
 
-    const syncTokenHeader = this.readSyncTokenHeader(req);
-    const koboCursor = syncTokenHeader ? decodeSyncToken(syncTokenHeader).koboSyncToken : undefined;
-
     try {
-      const response = await this.request(req, deviceToken, {
-        ...(syncTokenHeader !== undefined
-          ? koboCursor !== undefined
-            ? { extraHeaders: { 'x-kobo-synctoken': koboCursor } }
-            : { omitHeaders: ['x-kobo-synctoken'] }
-          : {}),
-      });
+      const response = await this.request(req, deviceToken);
       this.sendUpstream(reply, response);
       this.logger.debug(
         `[kobo.proxy] [end] deviceId=${deviceId ?? 'unknown'} durationMs=${Date.now() - startedAt} upstreamStatus=${response.status} - upstream Kobo relay completed`,
@@ -156,12 +185,6 @@ export class KoboProxyService {
       reply.header(lowerKey, value);
     }
     reply.send(response.body);
-  }
-
-  private readSyncTokenHeader(req: FastifyRequest): string | undefined {
-    const raw = (req.headers as Record<string, string | string[] | undefined>)['x-kobo-synctoken'];
-    if (raw === undefined) return undefined;
-    return Array.isArray(raw) ? raw[0] : raw;
   }
 
   private resolveTargetUrl(req: FastifyRequest, deviceToken: string): string {
