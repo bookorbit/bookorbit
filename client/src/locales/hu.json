@@ -2,6 +2,7 @@
   "common": {
     "resetSortAria": "Visszaállítás alap állapotra",
     "save": "Mentés",
+    "cancel": "Mégsem",
     "yes": "Igen",
     "no": "Nem"
   }
