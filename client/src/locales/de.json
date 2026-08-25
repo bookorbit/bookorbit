@@ -173,6 +173,9 @@
       },
       "bookCovers": {
         "title": "Buchcover",
+        "coverSearch": {
+          "label": "Standard Titelbild Suchmaschine"
+        },
         "displayMode": {
           "title": "Cover-Anzeigemodus",
           "hint": "Steuert, wie echte Cover in Buchplätze passen, wenn sich die Seitenverhältnisse unterscheiden",
@@ -980,9 +983,9 @@
         "syncMetadataToFiles": "Metadaten mit Dateien synchronisieren",
         "deleteLibrary": "Bibliothek löschen",
         "bookCount": "{count, plural, =0 {keine Bücher} one {# Buch} other {# Bücher}}",
+        "folderCount": "{count, plural, =0 {keine Ordner} one {# Ordner} other {# Ordner}}",
         "fileMode": "Dateimodus",
         "folderMode": "Ordnermodus",
-        "folderCount": "{count, plural, =0 {keine Ordner} one {# Ordner} other {# Ordner}}",
         "emptyTitle": "Noch keine Bibliotheken",
         "emptyHint": "Fügen Sie eine Bibliothek hinzu, um Ihre Bücher zu organisieren.",
         "addFirstLibrary": "Fügen Sie Ihre erste Bibliothek hinzu",
