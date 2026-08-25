@@ -1,6 +1,6 @@
 {
-  "id": "e0648b03-4eeb-4e6b-b601-e964f5850119",
-  "prevId": "6cbe2704-732a-4e70-9285-49bf6faa2f45",
+  "id": "6a387111-e377-4793-a96d-9b383f930849",
+  "prevId": "e0648b03-4eeb-4e6b-b601-e964f5850119",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5744,6 +5744,12 @@
         "publisher": {
           "name": "publisher",
           "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "origin_country": {
+          "name": "origin_country",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },

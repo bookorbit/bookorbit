@@ -10,6 +10,7 @@ describe('KoboAnalyticsService', () => {
   const bookService = { bulkSetRating: vi.fn() };
   const user = { id: 7 } as never;
   const device = { deviceId: 2, deviceToken: 'tok', userId: 7 } as never;
+  const syncOptions = { sourceDeviceKey: '2', estimateSessionIdPrefix: 'kst:2:' };
 
   function makeService() {
     return new KoboAnalyticsService(bookIdentityService as never, resolver as never, readingSessionService as never, bookService as never);
@@ -68,6 +69,7 @@ describe('KoboAnalyticsService', () => {
       },
       user,
       'kobo',
+      syncOptions,
     );
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       2,
@@ -79,6 +81,7 @@ describe('KoboAnalyticsService', () => {
       }),
       user,
       'kobo',
+      syncOptions,
     );
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       3,
@@ -89,6 +92,7 @@ describe('KoboAnalyticsService', () => {
       }),
       user,
       'kobo',
+      syncOptions,
     );
   });
 
@@ -109,7 +113,7 @@ describe('KoboAnalyticsService', () => {
       device,
     );
 
-    expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'kobo-src' }), user, 'kobo');
+    expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'kobo-src' }), user, 'kobo', syncOptions);
   });
 
   it('pairs OpenContent and LeaveContent to save progress delta and Kobo-reported duration', async () => {
@@ -164,6 +168,7 @@ describe('KoboAnalyticsService', () => {
       },
       user,
       'kobo',
+      syncOptions,
     );
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       2,
@@ -178,6 +183,7 @@ describe('KoboAnalyticsService', () => {
       },
       user,
       'kobo',
+      syncOptions,
     );
   });
 
@@ -223,6 +229,7 @@ describe('KoboAnalyticsService', () => {
       expect.objectContaining({ sessionId: 'leave-one', progressDelta: 2 }),
       user,
       'kobo',
+      syncOptions,
     );
     expect(readingSessionService.save).toHaveBeenNthCalledWith(
       2,
@@ -230,6 +237,7 @@ describe('KoboAnalyticsService', () => {
       expect.objectContaining({ sessionId: 'leave-two', progressDelta: 5 }),
       user,
       'kobo',
+      syncOptions,
     );
   });
 
@@ -261,6 +269,7 @@ describe('KoboAnalyticsService', () => {
       expect.objectContaining({ sessionId: 'leave-after-bad-progress', progressDelta: null, endProgress: 20 }),
       user,
       'kobo',
+      syncOptions,
     );
   });
 
@@ -300,6 +309,7 @@ describe('KoboAnalyticsService', () => {
       },
       user,
       'kobo',
+      syncOptions,
     );
   });
 
@@ -327,8 +337,8 @@ describe('KoboAnalyticsService', () => {
       device,
     );
 
-    expect(readingSessionService.save).toHaveBeenNthCalledWith(1, 100, expect.objectContaining({ endProgress: null }), user, 'kobo');
-    expect(readingSessionService.save).toHaveBeenNthCalledWith(2, 100, expect.objectContaining({ endProgress: null }), user, 'kobo');
+    expect(readingSessionService.save).toHaveBeenNthCalledWith(1, 100, expect.objectContaining({ endProgress: null }), user, 'kobo', syncOptions);
+    expect(readingSessionService.save).toHaveBeenNthCalledWith(2, 100, expect.objectContaining({ endProgress: null }), user, 'kobo', syncOptions);
   });
 
   it('still processes later events when an earlier save throws', async () => {
@@ -408,7 +418,13 @@ describe('KoboAnalyticsService', () => {
 
     expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(7, entitlementId);
     expect(resolver.resolveBookFileId).toHaveBeenCalledWith(7, 2, 9);
-    expect(readingSessionService.save).toHaveBeenCalledWith(100, expect.objectContaining({ sessionId: 'uuid-volume', endProgress: 8 }), user, 'kobo');
+    expect(readingSessionService.save).toHaveBeenCalledWith(
+      100,
+      expect.objectContaining({ sessionId: 'uuid-volume', endProgress: 8 }),
+      user,
+      'kobo',
+      syncOptions,
+    );
   });
 
   it('skips LeaveContent without volumeid or SecondsRead', async () => {

@@ -11,7 +11,13 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_READING_SESSION_SAVED } fro
 import type { CreateManualReadingSessionDto } from './dto/create-manual-reading-session.dto';
 import type { ListBookReadingSessionsDto } from './dto/list-book-reading-sessions.dto';
 import type { SaveReadingSessionDto } from './dto/save-reading-session.dto';
-import { ReadingSessionRepository, type SaveReadingSessionResult } from './reading-session.repository';
+import {
+  ReadingSessionRepository,
+  type ReadingSessionSyncOptions,
+  type RecordCumulativeReadingSessionParams,
+  type RecordCumulativeReadingSessionResult,
+  type SaveReadingSessionResult,
+} from './reading-session.repository';
 
 @Injectable()
 export class ReadingSessionService {
@@ -27,7 +33,13 @@ export class ReadingSessionService {
     return resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
   }
 
-  async save(fileId: number, dto: SaveReadingSessionDto, user: RequestUser, source: ReadingSessionSource = 'web'): Promise<void> {
+  async save(
+    fileId: number,
+    dto: SaveReadingSessionDto,
+    user: RequestUser,
+    source: ReadingSessionSource = 'web',
+    sync?: ReadingSessionSyncOptions,
+  ): Promise<void> {
     const event = 'reading_session.save';
     const startedAtMs = Date.now();
     this.logger.log(
@@ -52,7 +64,7 @@ export class ReadingSessionService {
       // span to prevent the client from reporting more time than physically elapsed.
       const durationSeconds = Math.min(dto.durationSeconds, wallClockSeconds);
 
-      const result = await this.repo.saveSession(
+      const saveArgs = [
         user.id,
         fileId,
         dto.sessionId,
@@ -63,7 +75,8 @@ export class ReadingSessionService {
         dto.endProgress ?? null,
         source,
         this.resolveUserTimeZone(user),
-      );
+      ] as const;
+      const result = sync ? await this.repo.saveSession(...saveArgs, sync) : await this.repo.saveSession(...saveArgs);
 
       this.logger.log(
         `[${event}] [end] fileId=${fileId} userId=${user.id} sessionId=${dto.sessionId} durationMs=${Date.now() - startedAtMs} outcome=${result.kind}${result.kind === 'skipped' ? ` reason=${result.reason}` : ''} - reading session save completed`,
@@ -138,6 +151,26 @@ export class ReadingSessionService {
         bookFileId: params.bookFileId,
         durationSeconds: params.durationSeconds,
         startedAt: params.startedAt,
+        endedAt: params.endedAt,
+        progressDelta: params.progressDelta,
+        endProgress: params.endProgress,
+        timezone: params.timeZone,
+      });
+    }
+
+    return result;
+  }
+
+  async recordCumulativeSyncedSession(params: RecordCumulativeReadingSessionParams): Promise<RecordCumulativeReadingSessionResult> {
+    const result = await this.repo.recordCumulativeSyncedSession(params);
+
+    if (result.kind === 'saved' && params.bookFileId !== null) {
+      const startedAt = new Date(params.endedAt.getTime() - result.durationSeconds * 1000);
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
+        userId: params.userId,
+        bookFileId: params.bookFileId,
+        durationSeconds: result.durationSeconds,
+        startedAt,
         endedAt: params.endedAt,
         progressDelta: params.progressDelta,
         endProgress: params.endProgress,

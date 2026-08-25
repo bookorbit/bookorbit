@@ -6,6 +6,7 @@ import {
   readerDefaultPreferences,
   readerPreferences,
   readingProgress,
+  readingSessionSyncCursors,
   readingSessions,
   userReadingDailyStats,
 } from './reader';
@@ -58,8 +59,19 @@ describe('reader schema', () => {
     expect(indexNames).toContain('rs_user_started_at_idx');
     expect(indexNames).toContain('rs_book_file_started_at_idx');
     expect(indexNames).toContain('rs_user_book_file_idx');
+    expect(indexNames).toContain('rs_user_book_source_device_started_idx');
     expect(fkMap.get('user_id')?.onDelete).toBe('cascade');
     expect(fkMap.get('book_file_id')?.onDelete).toBe('cascade');
+  });
+
+  it('keeps cumulative sync cursors isolated by user, book, source, and device', () => {
+    const config = getTableConfig(readingSessionSyncCursors);
+    const pkColumns = config.primaryKeys.map((pk) => pk.columns.map((col) => col.name));
+    const fkMap = fkByColumn(readingSessionSyncCursors);
+
+    expect(pkColumns).toContainEqual(['user_id', 'book_id', 'source', 'source_device_key']);
+    expect(fkMap.get('user_id')?.onDelete).toBe('cascade');
+    expect(fkMap.get('book_id')?.onDelete).toBe('cascade');
   });
 
   it('stores user daily reading aggregates keyed by user, library, and day', () => {

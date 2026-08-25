@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { naturalCompare } from '../../common/utils/natural-sort.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 
 import type {
@@ -1635,6 +1636,25 @@ export class ScannerService implements OnApplicationBootstrap {
       } catch (err) {
         this.logger.warn(
           `[scanner.aggregate_audio_duration] [fail] bookId=${book.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - audio duration aggregation failed`,
+        );
+      }
+    }
+
+    // 3e: Rebuild chapters across every audio file. Steps 3a and 3b read chapters from one file, and
+    //     each file of a multi-file audiobook embeds only its own chapters starting at zero, so on
+    //     its own that leaves the later files with no chapters at all and the last chapter of the
+    //     first file stretched over the rest of the book. Runs for unchanged books too, which is
+    //     what repairs the ones scanned before chapters were merged; it settles after one pass.
+    if (audioContentFiles.length > 1) {
+      const orderedAudioPaths = [...audioContentFiles]
+        .sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)))
+        .map((file) => file.absolutePath);
+      const filesChanged = shouldExtractMetadata || changedAudioFiles.length > 0;
+      try {
+        await this.metadataService.extractMergedAudioChapters(book.id, orderedAudioPaths, { filesChanged });
+      } catch (err) {
+        this.logger.warn(
+          `[scanner.merge_audio_chapters] [fail] bookId=${book.id} files=${orderedAudioPaths.length} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - audio chapter merge failed`,
         );
       }
     }

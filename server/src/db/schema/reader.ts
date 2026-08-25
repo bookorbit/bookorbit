@@ -214,6 +214,7 @@ export const readingSessions = pgTable(
     sessionId: varchar('session_id', { length: 64 }).notNull(),
     // 'web' (browser reader) | 'koreader' (page-stats derivation) | 'manual' (user-entered) | 'kobo' (future)
     source: varchar('source', { length: 10 }).$type<ReadingSessionSource>(),
+    sourceDeviceKey: varchar('source_device_key', { length: 128 }),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
     // Server-computed from endedAt - startedAt; client-provided timestamps are untrusted for duration.
@@ -228,6 +229,7 @@ export const readingSessions = pgTable(
     index('rs_book_file_started_at_idx').on(t.bookFileId, t.startedAt),
     index('rs_user_book_file_idx').on(t.userId, t.bookFileId),
     index('rs_user_book_started_at_idx').on(t.userId, t.bookId, t.startedAt),
+    index('rs_user_book_source_device_started_idx').on(t.userId, t.bookId, t.source, t.sourceDeviceKey, t.startedAt),
     index('reading_sessions_book_id_idx').on(t.bookId),
     index('rs_attempt_started_at_idx').on(t.attemptId, t.startedAt),
     check('reading_sessions_source_chk', sql`${t.source} in ('web', 'koreader', 'manual', 'kobo')`),
@@ -239,6 +241,35 @@ export const readingSessions = pgTable(
 
 export type ReadingSession = typeof readingSessions.$inferSelect;
 export type NewReadingSession = typeof readingSessions.$inferInsert;
+
+export const readingSessionSyncCursors = pgTable(
+  'reading_session_sync_cursors',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    source: varchar('source', { length: 32 }).notNull(),
+    sourceDeviceKey: varchar('source_device_key', { length: 128 }).notNull(),
+    counter: integer('counter').notNull(),
+    generation: integer('generation').notNull().default(0),
+    lastModified: timestamp('last_modified', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.bookId, t.source, t.sourceDeviceKey] }),
+    index('rssc_book_id_idx').on(t.bookId),
+    check('rssc_counter_nonnegative_chk', sql`${t.counter} >= 0`),
+    check('rssc_generation_nonnegative_chk', sql`${t.generation} >= 0`),
+  ],
+);
+
+export type ReadingSessionSyncCursor = typeof readingSessionSyncCursors.$inferSelect;
 
 export const userReadingDailyStats = pgTable(
   'user_reading_daily_stats',

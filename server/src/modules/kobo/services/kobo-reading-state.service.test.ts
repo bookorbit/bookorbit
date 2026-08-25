@@ -63,6 +63,8 @@ describe('KoboReadingStateService', () => {
   const progressBridge = { koboBookmarkToCanonical: vi.fn(), cfiToKoboBookmark: vi.fn() };
   const settingsService = { getSettings: vi.fn() };
   const achievementEvents = { emit: vi.fn() };
+  const analyticsResolver = { resolveBookFileId: vi.fn() };
+  const readingSessions = { recordCumulativeSyncedSession: vi.fn() };
 
   function makeService(db: ReturnType<typeof makeDb>) {
     return new KoboReadingStateService(
@@ -73,6 +75,8 @@ describe('KoboReadingStateService', () => {
       progressBridge as never,
       settingsService as never,
       achievementEvents as never,
+      analyticsResolver as never,
+      readingSessions as never,
     );
   }
 
@@ -83,6 +87,8 @@ describe('KoboReadingStateService', () => {
     progressBridge.koboBookmarkToCanonical.mockResolvedValue(null);
     progressBridge.cfiToKoboBookmark.mockResolvedValue(null);
     settingsService.getSettings.mockResolvedValue({ twoWayProgressSync: false });
+    analyticsResolver.resolveBookFileId.mockResolvedValue({ kind: 'resolved', bookFileId: 53 });
+    readingSessions.recordCumulativeSyncedSession.mockResolvedValue({ kind: 'baseline' });
     bookIdentityService.ensureForBook.mockImplementation((_userId: number, bookId: number) => ({
       bookId,
       entitlementId: `entitlement-${bookId}`,
@@ -219,7 +225,7 @@ describe('KoboReadingStateService', () => {
     expect(achievementEvents.emit).not.toHaveBeenCalled();
   });
 
-  it('does not propagate or repeat side effects for an identical device echo', async () => {
+  it('does not repeat bookmark or status side effects for an identical device echo', async () => {
     const db = makeDb();
     const stateInsert = makeInsertChain();
     const bookmark = { LastModified: '2026-01-02T00:00:00.000Z', ProgressPercent: 42 };
@@ -254,7 +260,7 @@ describe('KoboReadingStateService', () => {
     );
 
     expect(db.execute).not.toHaveBeenCalled();
-    expect(db.select).not.toHaveBeenCalled();
+    expect(readingSessions.recordCumulativeSyncedSession).toHaveBeenCalledWith(expect.objectContaining({ counter: 5, sourceDeviceKey: '30' }));
     expect(progressBridge.koboBookmarkToCanonical).not.toHaveBeenCalled();
     expect(userBookStatusService.autoUpdate).not.toHaveBeenCalled();
     expect(achievementEvents.emit).not.toHaveBeenCalled();
@@ -630,5 +636,107 @@ describe('KoboReadingStateService', () => {
     expect(queries).toHaveLength(1);
     expect(queries[0]!.sql).toContain('"updated_at" = "reading_progress"."updated_at"');
     expect(queries[0]!.sql).toContain('"last_read_at" = "reading_progress"."last_read_at"');
+  });
+  describe('reading sessions derived from device reading time', () => {
+    const STATS_AT = '2026-08-20T19:30:00.000Z';
+
+    function makeStatsDb(previousStatistics: unknown, settings?: unknown) {
+      const db = makeDb();
+      db.insert.mockReturnValue(makeInsertChain());
+      db.query.books.findFirst.mockResolvedValue({ id: 46 });
+      db.query.koboReadingStates.findFirst.mockResolvedValue(previousStatistics === undefined ? null : { statistics: previousStatistics });
+      db.select.mockImplementation((columns: Record<string, unknown>) => {
+        const selection = Object.keys(columns ?? {}).join(',');
+        if (selection === 'settings') return makeSelectChain(settings === undefined ? [] : [{ settings }]);
+        return makeSelectChain([]);
+      });
+      return db;
+    }
+
+    function push(db: ReturnType<typeof makeDb>, statistics: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+      return makeService(db).upsertState(7, 46, { Statistics: statistics, ...extra }, 1, 99, false, 30);
+    }
+
+    it('passes the raw device counter to the per-device transactional recorder', async () => {
+      const db = makeStatsDb({ SpentReadingMinutes: 800 });
+
+      await push(db, { LastModified: STATS_AT, SpentReadingMinutes: 860 });
+
+      expect(readingSessions.recordCumulativeSyncedSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 7,
+          bookId: 46,
+          bookFileId: 53,
+          cursorSource: 'kobo-statistics',
+          sourceDeviceKey: '30',
+          sessionIdPrefix: 'kst:30:',
+          counter: 860,
+          endedAt: new Date(STATS_AT),
+          source: 'kobo',
+        }),
+      );
+    });
+
+    it('processes an identical global state so a second device can establish its own cursor', async () => {
+      const statistics = { LastModified: STATS_AT, SpentReadingMinutes: 860 };
+      const db = makeStatsDb(statistics);
+
+      await push(db, { ...statistics });
+
+      expect(readingSessions.recordCumulativeSyncedSession).toHaveBeenCalledWith(expect.objectContaining({ sourceDeviceKey: '30', counter: 860 }));
+    });
+
+    it('keeps the cursor retryable when the file cannot currently be resolved', async () => {
+      const db = makeStatsDb({ SpentReadingMinutes: 800 });
+      analyticsResolver.resolveBookFileId.mockResolvedValue({ kind: 'skipped', reason: 'no_epub_file' });
+
+      await push(db, { LastModified: STATS_AT, SpentReadingMinutes: 860 });
+
+      expect(readingSessions.recordCumulativeSyncedSession).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: null, counter: 860 }));
+    });
+
+    it('carries progress and the reporting user timezone', async () => {
+      const db = makeStatsDb({ SpentReadingMinutes: 800 }, { timezone: 'Europe/Oslo' });
+      db.query.koboReadingStates.findFirst.mockResolvedValue({
+        statistics: { SpentReadingMinutes: 800 },
+        currentBookmark: { LastModified: '2026-08-19T10:00:00.000Z', ProgressPercent: 22 },
+      });
+
+      await push(db, { LastModified: STATS_AT, SpentReadingMinutes: 860 }, { CurrentBookmark: { LastModified: STATS_AT, ProgressPercent: 29 } });
+
+      expect(readingSessions.recordCumulativeSyncedSession).toHaveBeenCalledWith(
+        expect.objectContaining({ progressDelta: 7, endProgress: 29, timeZone: 'Europe/Oslo' }),
+      );
+    });
+
+    it('holds a device clock running ahead to the present', async () => {
+      const db = makeStatsDb({ SpentReadingMinutes: 800 });
+      const before = Date.now();
+
+      await push(db, { LastModified: '2099-01-01T00:00:00.000Z', SpentReadingMinutes: 860 });
+
+      const call = readingSessions.recordCumulativeSyncedSession.mock.calls[0]![0] as { endedAt: Date };
+      expect(call.endedAt.getTime()).toBeGreaterThanOrEqual(before);
+      expect(call.endedAt.getTime()).toBeLessThanOrEqual(Date.now());
+    });
+
+    it('rejects a counter too large for the reading-session duration column', async () => {
+      const db = makeStatsDb({ SpentReadingMinutes: 1 });
+
+      await push(db, { LastModified: STATS_AT, SpentReadingMinutes: 40_000_000 });
+
+      expect(readingSessions.recordCumulativeSyncedSession).not.toHaveBeenCalled();
+    });
+
+    it('still acknowledges the push when transactional accounting fails', async () => {
+      const db = makeStatsDb({ SpentReadingMinutes: 800 });
+      readingSessions.recordCumulativeSyncedSession.mockRejectedValue(new Error('database is down'));
+      const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+      await expect(push(db, { LastModified: STATS_AT, SpentReadingMinutes: 860 })).resolves.toEqual(ACK('entitlement-46', 'Success'));
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[kobo.statistics_session] [fail]'));
+      warn.mockRestore();
+    });
   });
 });

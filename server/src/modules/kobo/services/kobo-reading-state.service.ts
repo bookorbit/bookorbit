@@ -6,17 +6,28 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
 import { UserBookStatusService } from '../../user-book-status/user-book-status.service';
+import { ReadingSessionService } from '../../reading-session/reading-session.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../../achievement/achievement-events.service';
+import {
+  KOBO_STATISTICS_CURSOR_SOURCE,
+  koboSourceDeviceKey,
+  koboStatisticsSessionId,
+  koboStatisticsSessionIdPrefix,
+} from '../kobo-statistics-session.util';
+import { KoboAnalyticsResolverService } from './kobo-analytics-resolver.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboProgressBridgeService } from './kobo-progress-bridge.service';
 import { KoboSettingsService } from './kobo-settings.service';
 import { advanceIsoTimestamp, maxIsoTimestamp } from '../../../common/utils/iso-timestamp.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../../common/utils/timezone.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type JsonObj = Record<string, unknown>;
 const PROGRESS_EPSILON = 0.0001;
+const STATISTICS_SESSION_EVENT = 'kobo.statistics_session';
+const MAX_STATISTICS_MINUTES = Math.floor(2_147_483_647 / 60);
 
 type KoboSectionResult = { Result: 'Success' | 'Ignored' };
 
@@ -76,6 +87,8 @@ export class KoboReadingStateService {
     private readonly progressBridge: KoboProgressBridgeService,
     private readonly settingsService: KoboSettingsService,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly analyticsResolver: KoboAnalyticsResolverService,
+    private readonly readingSessions: ReadingSessionService,
   ) {}
 
   async upsertState(
@@ -113,6 +126,7 @@ export class KoboReadingStateService {
     });
 
     const previousBookmark = this.asJsonObj(existing?.currentBookmark ?? null);
+    const previousStats = this.asJsonObj(existing?.statistics ?? null);
     const previousStatus = this.asJsonObj(existing?.statusInfo ?? null);
     const previousPercent = this.extractPercent(previousBookmark);
     const previousTimesStarted = typeof previousStatus?.TimesStartedReading === 'number' ? previousStatus.TimesStartedReading : null;
@@ -121,7 +135,7 @@ export class KoboReadingStateService {
     const mergedStats = mergeSubObject(incomingStats, existing?.statistics as JsonObj | null);
     const mergedStatus = mergeSubObject(incomingStatus, existing?.statusInfo as JsonObj | null);
     const bookmarkChanged = !isDeepStrictEqual(mergedBookmark, previousBookmark);
-    const statisticsChanged = !isDeepStrictEqual(mergedStats, this.asJsonObj(existing?.statistics ?? null));
+    const statisticsChanged = !isDeepStrictEqual(mergedStats, previousStats);
     const statusChanged = !isDeepStrictEqual(mergedStatus, previousStatus);
     const stateChanged = bookmarkChanged || statisticsChanged || statusChanged;
 
@@ -198,6 +212,20 @@ export class KoboReadingStateService {
       });
     }
 
+    // After the status update, so the attempt a first push opens is already there for the
+    // session to be filed against rather than landing with a null attemptId.
+    if (incomingStats) {
+      await this.recordStatisticsReadingSession({
+        userId,
+        bookId,
+        sourceDeviceId,
+        incomingStats,
+        previousPercent,
+        mergedPercent,
+        fallbackLastModified: lastModified,
+      });
+    }
+
     if (bookmarkChanged && mergedPercent !== null) {
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, {
         userId,
@@ -208,6 +236,93 @@ export class KoboReadingStateService {
     }
 
     return buildStateUpdateResponse(entitlementId, 'Success');
+  }
+
+  /**
+   * Turns the reading time a device reports alongside its bookmark into a reading session.
+   *
+   * Current Kobo firmware no longer emits the `LeaveContent` analytics events the reading log
+   * was built on, so `POST /v1/analytics/event` never arrives and every Kobo statistic reads
+   * zero however much the device is read. What the device does still send, on every state push,
+   * is its own `SpentReadingMinutes` - the counter it keeps as `content.TimeSpentReading` on
+   * device, and the only reading time these devices offer at all.
+   *
+   * Each device has an independent durable cursor. Session insertion, daily aggregation, and
+   * cursor advancement share one transaction so a failed write is retried from the same counter.
+   * Measured analytics sessions and counter-derived sessions are serialized by the same lock and
+   * reconciled by overlap, regardless of which endpoint arrives first.
+   *
+   * Failures are swallowed. A device retries the entire push when the response is not a clean
+   * acknowledgement, so a session that cannot be stored must not take the bookmark down with it.
+   */
+  private async recordStatisticsReadingSession(params: {
+    userId: number;
+    bookId: number;
+    sourceDeviceId: number;
+    incomingStats: JsonObj;
+    previousPercent: number | null;
+    mergedPercent: number | null;
+    fallbackLastModified: string;
+  }): Promise<void> {
+    const { userId, bookId, sourceDeviceId, incomingStats, previousPercent, mergedPercent } = params;
+
+    const currentMinutes = this.extractSpentReadingMinutes(incomingStats);
+    if (currentMinutes === null) return;
+
+    const startedAtMs = Date.now();
+    try {
+      const resolved = await this.analyticsResolver.resolveBookFileId(userId, sourceDeviceId, bookId);
+      const endedAt = this.resolveStatisticsEndedAt(incomingStats, params.fallbackLastModified);
+      const result = await this.readingSessions.recordCumulativeSyncedSession({
+        userId,
+        bookId,
+        bookFileId: resolved.kind === 'resolved' ? resolved.bookFileId : null,
+        cursorSource: KOBO_STATISTICS_CURSOR_SOURCE,
+        sourceDeviceKey: koboSourceDeviceKey(sourceDeviceId),
+        sessionIdPrefix: koboStatisticsSessionIdPrefix(sourceDeviceId),
+        buildSessionId: (bookFileId, generation, counter) => koboStatisticsSessionId(sourceDeviceId, bookFileId, generation, counter),
+        counter: currentMinutes,
+        endedAt,
+        progressDelta: this.resolveProgressDelta(previousPercent, mergedPercent),
+        endProgress: mergedPercent,
+        source: 'kobo',
+        timeZone: await this.findUserTimeZone(userId),
+      });
+
+      this.logger.log(
+        `[${STATISTICS_SESSION_EVENT}] [end] userId=${userId} bookId=${bookId} deviceId=${sourceDeviceId} bookFileId=${resolved.kind === 'resolved' ? resolved.bookFileId : 'none'} durationMs=${Date.now() - startedAtMs} spentReadingMinutes=${currentMinutes} outcome=${result.kind}${result.kind === 'skipped' ? ` reason=${result.reason}` : ''} - device reading-time counter processed`,
+      );
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[${STATISTICS_SESSION_EVENT}] [fail] userId=${userId} bookId=${bookId} durationMs=${Date.now() - startedAtMs} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - deriving a reading session from device reading time failed`,
+      );
+    }
+  }
+
+  /** Whole minutes only, so a fractional counter accrues across pushes rather than truncating on each. */
+  private extractSpentReadingMinutes(stats: JsonObj | null): number | null {
+    const value = stats?.SpentReadingMinutes;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > MAX_STATISTICS_MINUTES) return null;
+    return Math.floor(value);
+  }
+
+  /** The device's own clock for the counter, held to the present so a fast clock cannot book time into tomorrow. */
+  private resolveStatisticsEndedAt(stats: JsonObj | null, fallback: string): Date {
+    const modified = typeof stats?.LastModified === 'string' ? stats.LastModified : undefined;
+    const parsed = this.parseKoboTimestamp(modified) ?? this.parseKoboTimestamp(fallback) ?? new Date();
+    const now = new Date();
+    return parsed.getTime() > now.getTime() ? now : parsed;
+  }
+
+  private resolveProgressDelta(previousPercent: number | null, mergedPercent: number | null): number | null {
+    if (previousPercent === null || mergedPercent === null) return null;
+    return Math.round(Math.max(-100, Math.min(100, mergedPercent - previousPercent)) * 100) / 100;
+  }
+
+  private async findUserTimeZone(userId: number): Promise<string> {
+    const [row] = await this.db.select({ settings: schema.users.settings }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+    return resolveTimeZone((row?.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
   }
 
   private async autoUpdateReadStatus(

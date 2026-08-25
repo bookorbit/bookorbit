@@ -6,7 +6,7 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 import { execFile as execFileCallback, spawn } from 'child_process';
-import { extractAudioMetadata, parseAudioDuration } from './audio.extractor';
+import { extractAudioMetadata, parseAudioDuration, probeAudioChapters } from './audio.extractor';
 import { EventEmitter } from 'events';
 
 const mockExecFile = execFileCallback as unknown as Mock;
@@ -706,6 +706,103 @@ describe('parseAudioDuration', () => {
       ['-v', 'quiet', '-print_format', 'json', '-show_format', '/books/test.mp3'],
       expect.any(Function),
     );
+  });
+});
+
+// ── probeAudioChapters ────────────────────────────────────────────────────────
+
+describe('probeAudioChapters', () => {
+  beforeEach(() => resetMocks());
+
+  it('returns the embedded chapters and the file length in milliseconds', async () => {
+    makeExecFileSuccess(
+      JSON.stringify({
+        format: { duration: '360.5' },
+        chapters: [
+          { start_time: '0.000000', tags: { title: 'Chapter 1' } },
+          { start_time: '120.000000', tags: { title: 'Chapter 2' } },
+        ],
+      }),
+    );
+
+    const result = await probeAudioChapters('/books/Book/01.m4b');
+
+    expect(result).toEqual({
+      chapters: [
+        { title: 'Chapter 1', startMs: 0 },
+        { title: 'Chapter 2', startMs: 120_000 },
+      ],
+      durationMs: 360_500,
+    });
+  });
+
+  it('keeps sub-second precision that the per-file duration rounds away', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '119.994000' }, chapters: [] }));
+
+    const result = await probeAudioChapters('/books/Book/01.m4b');
+
+    expect(result.durationMs).toBe(119_994);
+  });
+
+  it('returns an empty chapter list for a file with no embedded chapters', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '60' }, chapters: [] }));
+
+    const result = await probeAudioChapters('/books/Book/02.mp3');
+
+    expect(result).toEqual({ chapters: [], durationMs: 60_000 });
+  });
+
+  it('reports an unknown length rather than guessing when duration is missing', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: {}, chapters: [{ start_time: '0.000000', tags: { title: 'Only' } }] }));
+
+    const result = await probeAudioChapters('/books/Book/03.m4b');
+
+    expect(result).toEqual({ chapters: [{ title: 'Only', startMs: 0 }], durationMs: null });
+  });
+
+  it('titles a chapter with an empty string when the file does not name it', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '10' }, chapters: [{ start_time: '0.000000' }] }));
+
+    const result = await probeAudioChapters('/books/Book/04.m4b');
+
+    expect(result.chapters).toEqual([{ title: '', startMs: 0 }]);
+  });
+
+  it('drops a chapter whose start time is not numeric', async () => {
+    makeExecFileSuccess(
+      JSON.stringify({
+        format: { duration: '10' },
+        chapters: [
+          { start_time: 'N/A', tags: { title: 'Broken' } },
+          { start_time: '5.000000', tags: { title: 'Fine' } },
+        ],
+      }),
+    );
+
+    const result = await probeAudioChapters('/books/Book/05.m4b');
+
+    expect(result.chapters).toEqual([{ title: 'Fine', startMs: 5_000 }]);
+  });
+
+  it('returns empty results when ffprobe throws', async () => {
+    makeExecFileError('read error');
+
+    const result = await probeAudioChapters('/books/Book/missing.m4b');
+
+    expect(result).toEqual({ chapters: [], durationMs: null });
+  });
+
+  it('asks ffprobe for chapters and format only, and never extracts a cover', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '10' }, chapters: [] }));
+
+    await probeAudioChapters('/books/Book/01.m4b');
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      'ffprobe',
+      ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', '/books/Book/01.m4b'],
+      expect.any(Function),
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });
 
