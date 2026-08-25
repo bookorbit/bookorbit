@@ -332,6 +332,11 @@ export class KoboReadingStateService {
       .set({ currentBookmark: merged, lastModifiedKobo: nowIso, priorityTimestamp: nowIso, updatedAt: new Date() })
       .where(and(eq(schema.koboReadingStates.userId, userId), eq(schema.koboReadingStates.bookId, bookId)));
     await this.stampProgressLocation(userId, primaryFile.fileId, point);
+    // A device whose snapshot row was already marked synced before this refresh computed a
+    // changed bookmark would otherwise never see it: incremental sync only resends rows with
+    // synced = false, and this hub-driven refresh is the one write path to currentBookmark
+    // that isn't already followed by an unsync call elsewhere.
+    await this.markSnapshotBookUnsyncedForAllDevices(userId, bookId);
 
     return { bookmark: merged, lastModifiedKobo: nowIso };
   }
@@ -499,6 +504,22 @@ export class KoboReadingStateService {
       WHERE snap.id = sb.snapshot_id
         AND snap.user_id = ${userId}
         AND snap.device_id <> ${sourceDeviceId}
+        AND sb.book_id = ${bookId}
+        AND sb.synced = true
+        AND sb.pending_delete = false
+        AND sb.removed_by_device = false
+    `);
+  }
+
+  /** Same as above with no device excluded, for a hub-driven refresh with no source device of its own. */
+  private async markSnapshotBookUnsyncedForAllDevices(userId: number, bookId: number): Promise<void> {
+    await this.db.execute(sql`
+      UPDATE ${schema.koboSnapshotBooks} AS sb
+      SET synced = false,
+          is_new = false
+      FROM ${schema.koboLibrarySnapshots} AS snap
+      WHERE snap.id = sb.snapshot_id
+        AND snap.user_id = ${userId}
         AND sb.book_id = ${bookId}
         AND sb.synced = true
         AND sb.pending_delete = false
