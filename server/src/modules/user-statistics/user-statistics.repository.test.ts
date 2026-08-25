@@ -477,4 +477,118 @@ describe('UserStatisticsRepository', () => {
       }),
     ]);
   });
+  describe('rebuildDailyStatsForUser', () => {
+    function makeRebuildTx(distinctResults: unknown[], sessionPages: unknown[], deletedRowCount = 0) {
+      const distinct = [...distinctResults];
+      const pages = [...sessionPages];
+      const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
+      const tx = {
+        // One pair per library: the advisory lock, then the delete whose count is reported.
+        execute: vi.fn().mockResolvedValue({ rowCount: deletedRowCount }),
+        selectDistinct: vi.fn((fields?: Record<string, unknown>) => makeChain(distinct.shift() ?? [], fields)),
+        select: vi.fn((fields?: Record<string, unknown>) => makeChain(pages.shift() ?? [], fields)),
+        insert: vi.fn().mockReturnValue({ values: dailyValues }),
+      };
+      const db = { transaction: vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx)) };
+      return { tx, db, dailyValues };
+    }
+
+    it('re-attributes history to the local day of the new timezone', async () => {
+      // The reported failure: a session at 00:49 UTC is the previous evening in Halifax, so a
+      // UTC-built row starts the streak a day late and leaves the real reading day empty.
+      const { db, tx, dailyValues } = makeRebuildTx(
+        [[{ libraryId: 3 }], [{ libraryId: 3 }]],
+        [
+          [
+            {
+              id: 11,
+              startedAt: new Date('2026-07-01T00:49:37.000Z'),
+              endedAt: new Date('2026-07-01T02:00:06.000Z'),
+              durationSeconds: 3941,
+              progressDelta: 4,
+            },
+          ],
+        ],
+        6,
+      );
+      const repo = new UserStatisticsRepository(db as never);
+
+      await expect(repo.rebuildDailyStatsForUser(5, 'America/Halifax')).resolves.toEqual({ deleted: 6, inserted: 1, libraries: 1 });
+
+      expect(dailyValues).toHaveBeenCalledWith([
+        expect.objectContaining({ userId: 5, libraryId: 3, day: '2026-06-30', readingSeconds: 3941, progressDelta: 4, sessionsCount: 1 }),
+      ]);
+      expect(tx.execute).toHaveBeenCalledTimes(2);
+    });
+
+    it('rebuilds libraries that only still hold rows, so stale days are dropped rather than kept', async () => {
+      const { db, tx, dailyValues } = makeRebuildTx([[{ libraryId: 9 }, { libraryId: 2 }], [{ libraryId: 2 }]], [[], []], 3);
+      const repo = new UserStatisticsRepository(db as never);
+
+      // Libraries are locked in ascending order so concurrent writers cannot deadlock on them.
+      await expect(repo.rebuildDailyStatsForUser(5, 'UTC')).resolves.toEqual({ deleted: 6, inserted: 0, libraries: 2 });
+      expect(tx.execute).toHaveBeenCalledTimes(4);
+      expect(dailyValues).not.toHaveBeenCalled();
+    });
+
+    it('accumulates across pages instead of stopping at the first batch', async () => {
+      const pageSize = 5_000;
+      const firstPage = Array.from({ length: pageSize }, (_, index) => ({
+        id: index + 1,
+        startedAt: new Date('2026-04-15T08:00:00.000Z'),
+        endedAt: new Date('2026-04-15T08:01:00.000Z'),
+        durationSeconds: 60,
+        progressDelta: null,
+      }));
+      const secondPage = [
+        {
+          id: pageSize + 1,
+          startedAt: new Date('2026-04-15T09:00:00.000Z'),
+          endedAt: new Date('2026-04-15T09:00:30.000Z'),
+          durationSeconds: 30,
+          progressDelta: null,
+        },
+      ];
+      const { db, tx, dailyValues } = makeRebuildTx([[{ libraryId: 1 }], []], [firstPage, secondPage]);
+      const repo = new UserStatisticsRepository(db as never);
+
+      await expect(repo.rebuildDailyStatsForUser(5, 'UTC')).resolves.toEqual({ deleted: 0, inserted: 1, libraries: 1 });
+
+      expect(tx.select).toHaveBeenCalledTimes(2);
+      expect(dailyValues).toHaveBeenCalledWith([
+        expect.objectContaining({ day: '2026-04-15', readingSeconds: pageSize * 60 + 30, sessionsCount: pageSize + 1 }),
+      ]);
+    });
+
+    it('does nothing for a user with no reading history at all', async () => {
+      const { db, tx, dailyValues } = makeRebuildTx([[], []], []);
+      const repo = new UserStatisticsRepository(db as never);
+
+      await expect(repo.rebuildDailyStatsForUser(5, 'Europe/Berlin')).resolves.toEqual({ deleted: 0, inserted: 0, libraries: 0 });
+      expect(tx.execute).not.toHaveBeenCalled();
+      expect(dailyValues).not.toHaveBeenCalled();
+    });
+
+    it('falls back to UTC rather than trusting an unusable timezone', async () => {
+      const { db, dailyValues } = makeRebuildTx(
+        [[{ libraryId: 1 }], []],
+        [
+          [
+            {
+              id: 1,
+              startedAt: new Date('2026-07-01T00:49:37.000Z'),
+              endedAt: new Date('2026-07-01T01:00:00.000Z'),
+              durationSeconds: 623,
+              progressDelta: null,
+            },
+          ],
+        ],
+      );
+      const repo = new UserStatisticsRepository(db as never);
+
+      await repo.rebuildDailyStatsForUser(5, 'Not/AZone');
+
+      expect(dailyValues).toHaveBeenCalledWith([expect.objectContaining({ day: '2026-07-01' })]);
+    });
+  });
 });

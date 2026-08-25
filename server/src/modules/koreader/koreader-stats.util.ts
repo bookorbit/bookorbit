@@ -20,8 +20,13 @@ export interface DerivedKoreaderSession {
   endProgress: number | null;
 }
 
+/** Everything one device's derived sessions share, across every book it has read. */
+export function buildDeviceSessionIdPrefix(deviceId: string): string {
+  return `kor:${deviceId.slice(0, 8)}:`;
+}
+
 export function buildSessionIdPrefix(deviceId: string, bookFileId: number): string {
-  return `kor:${deviceId.slice(0, 8)}:${bookFileId}:`;
+  return `${buildDeviceSessionIdPrefix(deviceId)}${bookFileId}:`;
 }
 
 export function buildSessionId(deviceId: string, bookFileId: number, clusterStartEpoch: number): string {

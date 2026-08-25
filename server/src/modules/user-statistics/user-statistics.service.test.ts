@@ -686,4 +686,27 @@ describe('UserStatisticsService', () => {
     await service.getProgressFunnel(userB, query);
     expect(repo.getProgressFunnelInRange).toHaveBeenCalledTimes(3);
   });
+  it('drops only the rebuilt user from the statistics cache', async () => {
+    const repo = {
+      getSummary: vi.fn().mockResolvedValue({ trackedBooks: 1, startedBooks: 1, inProgressBooks: 1, completedBooks: 0, meanProgressPercent: 10 }),
+      rebuildDailyStatsForUser: vi.fn().mockResolvedValue({ deleted: 4, inserted: 2, libraries: 1 }),
+    };
+    const service = new UserStatisticsService(repo as any);
+    const userA = { id: 1, isSuperuser: false } as any;
+    const userB = { id: 2, isSuperuser: false } as any;
+    const query = { libraryIds: [1] };
+
+    await service.getSummary(userA, query);
+    await service.getSummary(userB, query);
+    expect(repo.getSummary).toHaveBeenCalledTimes(2);
+
+    await expect(service.rebuildDailyStatsForUser(1, 'America/Halifax')).resolves.toEqual({ deleted: 4, inserted: 2, libraries: 1 });
+    expect(repo.rebuildDailyStatsForUser).toHaveBeenCalledWith(1, 'America/Halifax');
+
+    await service.getSummary(userA, query);
+    expect(repo.getSummary).toHaveBeenCalledTimes(3);
+
+    await service.getSummary(userB, query);
+    expect(repo.getSummary).toHaveBeenCalledTimes(3);
+  });
 });

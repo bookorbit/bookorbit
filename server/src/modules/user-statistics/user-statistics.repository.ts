@@ -18,6 +18,8 @@ import {
   aggregateReadingSessionDailyStats,
   getDayRangeForDateKeys,
   getReadingSessionDayKeys,
+  mergeReadingDailyStatsSegments,
+  sortReadingDailyStatsSegments,
   type ReadingDailyStatsSegment,
 } from '../../common/utils/reading-daily-stats.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
@@ -59,6 +61,9 @@ type SessionTimelineConflictRow = {
   endedAt: Date;
 };
 const RECENT_DAILY_AGGREGATION_DAYS = 2;
+/** A full-history rebuild pages sessions rather than loading a long reader's whole timeline at once. */
+const DAILY_STATS_REBUILD_PAGE_SIZE = 5_000;
+const DAILY_STATS_INSERT_CHUNK_SIZE = 1_000;
 
 @Injectable()
 export class UserStatisticsRepository {
@@ -893,6 +898,117 @@ export class UserStatisticsRepository {
       }
 
       return { deleted, inserted, since: sinceDay };
+    });
+  }
+
+  /** Everyone who has reading history to rebuild. */
+  async listUserIdsWithReadingHistory(): Promise<number[]> {
+    const [sessionUsers, statsUsers] = await Promise.all([
+      this.db.selectDistinct({ userId: readingSessions.userId }).from(readingSessions),
+      this.db.selectDistinct({ userId: userReadingDailyStats.userId }).from(userReadingDailyStats),
+    ]);
+
+    return [...new Set([...sessionUsers, ...statsUsers].map((row) => row.userId))].sort((a, b) => a - b);
+  }
+
+  /**
+   * The timezone one user's history should be rebuilt under, read at the moment of rebuilding.
+   *
+   * Deliberately not carried along from a listing taken earlier. A user who corrects their
+   * timezone while a bulk rebuild is walking the roster would otherwise have their own correct
+   * rebuild overwritten by the stale value that listing captured.
+   */
+  async getUserTimeZone(userId: number): Promise<string | null> {
+    const [row] = await this.db.select({ settings: users.settings }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!row) return null;
+    return resolveTimeZone((row.settings as { timezone?: unknown } | null)?.timezone, 'UTC');
+  }
+
+  /**
+   * Rebuilds every daily-stat row one user owns, under a single timezone.
+   *
+   * The rolling recompute above is enough while a timezone holds still, because it only ever
+   * revisits days that are still being written to. A user who corrects theirs invalidates all
+   * of their history at once: rows are keyed by local day, so every day boundary moves, and a
+   * streak broken by the old zone stays broken until the rows that built it are rebuilt.
+   *
+   * Sessions are paged rather than read whole. The day map is bounded by how long the user has
+   * been reading; their session list is not.
+   */
+  async rebuildDailyStatsForUser(userId: number, timeZone: string): Promise<{ deleted: number; inserted: number; libraries: number }> {
+    const resolvedTimeZone = resolveTimeZone(timeZone, 'UTC');
+
+    return this.db.transaction(async (tx) => {
+      const [statLibraries, sessionLibraries] = await Promise.all([
+        tx.selectDistinct({ libraryId: userReadingDailyStats.libraryId }).from(userReadingDailyStats).where(eq(userReadingDailyStats.userId, userId)),
+        tx
+          .selectDistinct({ libraryId: books.libraryId })
+          .from(readingSessions)
+          .innerJoin(books, eq(books.id, readingSessions.bookId))
+          .where(eq(readingSessions.userId, userId)),
+      ]);
+
+      // Libraries the user no longer has sessions in still hold rows, and dropping them is the
+      // point of a rebuild. Sorted so concurrent writers take the per-library locks in one order.
+      const libraryIds = [...new Set([...statLibraries, ...sessionLibraries].map((row) => row.libraryId))].sort((a, b) => a - b);
+
+      let deleted = 0;
+      let inserted = 0;
+
+      for (const libraryId of libraryIds) {
+        await this.lockDailyStats(tx, userId, libraryId);
+
+        const deleteResult = await tx.execute(sql`
+          delete from user_reading_daily_stats
+          where user_id = ${userId}
+            and library_id = ${libraryId}
+        `);
+        deleted += Number((deleteResult as { rowCount?: number }).rowCount ?? 0);
+
+        const byDay = new Map<string, ReadingDailyStatsSegment>();
+        let cursor = 0;
+        for (;;) {
+          const rows = await tx
+            .select({
+              id: readingSessions.id,
+              startedAt: readingSessions.startedAt,
+              endedAt: readingSessions.endedAt,
+              durationSeconds: readingSessions.durationSeconds,
+              progressDelta: readingSessions.progressDelta,
+            })
+            .from(readingSessions)
+            .innerJoin(books, eq(books.id, readingSessions.bookId))
+            .where(and(eq(readingSessions.userId, userId), eq(books.libraryId, libraryId), gt(readingSessions.id, cursor)))
+            .orderBy(readingSessions.id)
+            .limit(DAILY_STATS_REBUILD_PAGE_SIZE);
+
+          if (rows.length === 0) break;
+          cursor = rows[rows.length - 1]!.id;
+
+          mergeReadingDailyStatsSegments(
+            byDay,
+            aggregateReadingSessionDailyStats(
+              rows.map((row) => ({
+                startedAt: row.startedAt,
+                endedAt: row.endedAt,
+                durationSeconds: row.durationSeconds,
+                progressDelta: row.progressDelta ?? null,
+              })),
+              resolvedTimeZone,
+            ),
+          );
+
+          if (rows.length < DAILY_STATS_REBUILD_PAGE_SIZE) break;
+        }
+
+        const segments = sortReadingDailyStatsSegments(byDay);
+        for (let offset = 0; offset < segments.length; offset += DAILY_STATS_INSERT_CHUNK_SIZE) {
+          await this.insertDailyStatsSegments(tx, userId, libraryId, segments.slice(offset, offset + DAILY_STATS_INSERT_CHUNK_SIZE));
+        }
+        inserted += segments.length;
+      }
+
+      return { deleted, inserted, libraries: libraryIds.length };
     });
   }
 }

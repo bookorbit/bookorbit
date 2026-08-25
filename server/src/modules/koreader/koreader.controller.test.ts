@@ -76,7 +76,7 @@ describe('KoreaderController', () => {
 
     const progressDto = { document: 'abc', percentage: 0.5 } as never;
     await controller.saveProgress(user, progressDto);
-    expect(koreaderService.saveProgress).toHaveBeenCalledWith(7, progressDto);
+    expect(koreaderService.saveProgress).toHaveBeenCalledWith(user, progressDto);
 
     await expect(controller.getProgress(user, 'abc')).resolves.toEqual({ document: 'abc', percentage: 0.5 });
     expect(koreaderService.getProgress).toHaveBeenCalledWith(7, 'abc');

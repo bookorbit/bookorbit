@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import { MODULE_METADATA } from '@nestjs/common/constants';
 
+import { UserReadingStatsTimeZoneBackfillService } from './user-reading-stats-timezone-backfill.service';
 import { UserStatisticsAggregationJob } from './user-statistics-aggregation.job';
 import { UserStatisticsController } from './user-statistics.controller';
 import { UserStatisticsModule } from './user-statistics.module';
@@ -15,6 +16,8 @@ describe('UserStatisticsModule', () => {
       UserStatisticsService,
       UserStatisticsRepository,
       UserStatisticsAggregationJob,
+      UserReadingStatsTimeZoneBackfillService,
     ]);
+    expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, UserStatisticsModule)).toEqual([UserStatisticsService]);
   });
 });

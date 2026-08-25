@@ -1,7 +1,7 @@
 vi.mock('bcryptjs', () => ({ hash: vi.fn() }));
 vi.mock('crypto', () => ({ randomBytes: vi.fn() }));
 
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Permission } from '@bookorbit/types';
@@ -53,12 +53,17 @@ describe('UserService', () => {
   const appSettingsService = {
     getDefaultLibraryAccessLibraryIds: vi.fn(),
   };
+  const userStatistics = {
+    rebuildDailyStatsForUser: vi.fn(),
+  };
 
   let service: UserService;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any);
+    vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any, userStatistics as any);
 
     mockHash.mockResolvedValue('hashed-secret');
     mockRandomBytes.mockReturnValue(Buffer.from('abcd', 'hex'));
@@ -277,6 +282,78 @@ describe('UserService', () => {
     await service.updateMySettings(5, { settings });
 
     expect(userRepo.update).toHaveBeenCalledWith(5, { settings });
+  });
+
+  it('rebuilds daily reading stats when the timezone actually changes', async () => {
+    userRepo.findSettingsById.mockResolvedValue({ timezone: 'UTC' });
+    userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax' } });
+    userStatistics.rebuildDailyStatsForUser.mockResolvedValue({ deleted: 12, inserted: 9, libraries: 1 });
+
+    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+
+    expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'America/Halifax');
+  });
+
+  it('rebuilds again when the same timezone is submitted, which is the only retry a user has', async () => {
+    // The setting saves even when the rebuild fails, so a retry looks like no change at all.
+    userStatistics.rebuildDailyStatsForUser.mockResolvedValue({ deleted: 0, inserted: 0, libraries: 0 });
+    userRepo.findSettingsById.mockResolvedValue({ timezone: 'America/Halifax' });
+    userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax' } });
+
+    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+
+    expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'America/Halifax');
+  });
+
+  it('recovers from a failed rebuild when the user saves the timezone a second time', async () => {
+    userRepo.findSettingsById.mockResolvedValue({ timezone: 'UTC' });
+    userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax' } });
+    userStatistics.rebuildDailyStatsForUser.mockRejectedValueOnce(new Error('deadlock detected'));
+
+    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+
+    userStatistics.rebuildDailyStatsForUser.mockResolvedValue({ deleted: 4, inserted: 3, libraries: 1 });
+    userRepo.findSettingsById.mockResolvedValue({ timezone: 'America/Halifax' });
+
+    await service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } });
+
+    expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves stats alone for a settings write that does not touch the timezone', async () => {
+    userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax', theme: 'dark' } });
+
+    await service.updateMySettings(5, { settings: { theme: 'dark' } });
+
+    // Reading the stored settings is only worth a query when this write can replace the zone.
+    expect(userRepo.findSettingsById).not.toHaveBeenCalled();
+    expect(userStatistics.rebuildDailyStatsForUser).not.toHaveBeenCalled();
+  });
+
+  it('treats first-time and unusable timezones as a move away from the UTC default', async () => {
+    userStatistics.rebuildDailyStatsForUser.mockResolvedValue({ deleted: 0, inserted: 0, libraries: 0 });
+    userRepo.findSettingsById.mockResolvedValue({});
+    userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'Europe/Berlin' } });
+
+    await service.updateMySettings(5, { settings: { timezone: 'Europe/Berlin' } });
+    expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'Europe/Berlin');
+
+    userStatistics.rebuildDailyStatsForUser.mockClear();
+    userStatistics.rebuildDailyStatsForUser.mockResolvedValue({ deleted: 0, inserted: 0, libraries: 0 });
+    userRepo.findSettingsById.mockResolvedValue({ timezone: 'Europe/Berlin' });
+    userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'Not/AZone' } });
+
+    await service.updateMySettings(5, { settings: { timezone: 'Not/AZone' } });
+    expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'UTC');
+  });
+
+  it('still saves the setting when the stats rebuild fails', async () => {
+    userRepo.findSettingsById.mockResolvedValue({ timezone: 'UTC' });
+    const updated = { id: 5, settings: { timezone: 'America/Halifax' } };
+    userRepo.update.mockResolvedValue(updated);
+    userStatistics.rebuildDailyStatsForUser.mockRejectedValue(new Error('deadlock detected'));
+
+    await expect(service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } })).resolves.toEqual(updated);
   });
 
   it('caches an explicit achievement preference when settings are updated', async () => {
@@ -612,12 +689,15 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
   const appSettingsService = {
     getDefaultLibraryAccessLibraryIds: vi.fn(),
   };
+  const userStatistics = {
+    rebuildDailyStatsForUser: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.resetAllMocks();
     config.get.mockReturnValue('http://localhost:5173');
     appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
-    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any);
+    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any, userStatistics as any);
   });
 
   it('throws NotFoundException when user does not exist', async () => {
