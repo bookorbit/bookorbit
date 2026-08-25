@@ -30,11 +30,11 @@ const props = defineProps<{ file: BookDockFile }>()
 
 const emit = defineEmits<{
   close: []
-  discarded: []
+  discard: [BookDockFile]
   updated: [BookDockFile]
 }>()
 
-const { saved, saveError, saveMetadata, setTarget, discardFile, coverUrl } = useBookDockDetail()
+const { saved, saveError, saveMetadata, setTarget, coverUrl } = useBookDockDetail()
 const { libraries, fetchLibraries: fetchLibs } = useLibraries()
 
 const meta = computed(() => props.file.selectedMetadata ?? props.file.embeddedMetadata ?? ({} as BookDockMetadata))
@@ -198,9 +198,8 @@ function formatDate(iso: string): string {
   return formatDateTime(new Date(iso))
 }
 
-async function handleDiscard() {
-  await discardFile(props.file.id)
-  emit('discarded')
+function handleDiscard() {
+  emit('discard', props.file)
 }
 
 const {

@@ -54,6 +54,13 @@ export function getFormatGroup(format: string): ReaderFormatGroup {
   return FORMAT_TO_GROUP[format.toLowerCase()] ?? "epub";
 }
 
+/** Formats a given reader can open, so a caller can ask for "another file this same reader handles". */
+export function getOpenableFormatsForGroup(group: ReaderFormatGroup): string[] {
+  return Object.entries(FORMAT_TO_GROUP)
+    .filter(([format, formatGroup]) => formatGroup === group && READER_OPENABLE_FORMATS.has(format))
+    .map(([format]) => format);
+}
+
 export interface EpubReaderSettings {
   themeName: string; // matches one of the reader's built-in theme names
   isDark: boolean;
@@ -98,6 +105,8 @@ export interface CbxReaderSettings {
   forceTwoPage: boolean;
   widePageSingletonMode: "auto" | "disable";
   bgColor: "black" | "gray" | "white";
+  // Turning past the last page opens the next book in the series instead of stopping.
+  autoAdvance: boolean;
 }
 
 export interface AudioReaderSettings {
@@ -154,6 +163,7 @@ export const CBX_READER_DEFAULTS: CbxReaderSettings = {
   forceTwoPage: false,
   widePageSingletonMode: "auto",
   bgColor: "black",
+  autoAdvance: false,
 };
 
 export const AUDIO_READER_DEFAULTS: AudioReaderSettings = {

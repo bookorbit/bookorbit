@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, gte, inArray, isNotNull, lt, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -29,6 +29,7 @@ import {
   bookMetadata,
   books,
   genres,
+  readingAttempts,
   readingProgress,
   readingSessions,
   userBookStatus,
@@ -468,21 +469,9 @@ export class UserStatisticsRepository {
   ): Promise<UserCompletionTimelinePoint[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
-    const since = this.sinceDateForDays(days);
-
-    const firstCompletion = this.db
-      .select({
-        bookId: readingSessions.bookId,
-        firstCompletedAt: sql<Date>`min(${readingSessions.endedAt})`.as('first_completed_at'),
-      })
-      .from(readingSessions)
-      .innerJoin(books, eq(books.id, readingSessions.bookId))
-      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.endProgress, 99), libraryFilter))
-      .groupBy(readingSessions.bookId)
-      .as('first_completion');
-
-    const yearExpr = sql<number>`extract(year from ${firstCompletion.firstCompletedAt})::int`;
-    const monthExpr = sql<number>`extract(month from ${firstCompletion.firstCompletedAt})::int`;
+    const since = this.formatDayKey(this.sinceDateForDays(days));
+    const yearExpr = sql<number>`extract(year from ${readingAttempts.endedOn})::int`;
+    const monthExpr = sql<number>`extract(month from ${readingAttempts.endedOn})::int`;
 
     return this.db
       .select({
@@ -490,8 +479,18 @@ export class UserStatisticsRepository {
         month: monthExpr,
         count: sql<number>`count(*)::int`,
       })
-      .from(firstCompletion)
-      .where(sql`${firstCompletion.firstCompletedAt} >= ${since}`)
+      .from(readingAttempts)
+      .innerJoin(books, eq(books.id, readingAttempts.bookId))
+      .where(
+        and(
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNotNull(readingAttempts.endedOn),
+          isNull(readingAttempts.deletedAt),
+          gte(readingAttempts.endedOn, since),
+          libraryFilter,
+        ),
+      )
       .groupBy(yearExpr, monthExpr)
       .orderBy(yearExpr, monthExpr);
   }
@@ -546,36 +545,26 @@ export class UserStatisticsRepository {
   async getCompletionLatencyDays(userId: number, isSuperuser: boolean, filterLibraryIds?: number[], days = 1825): Promise<number[]> {
     const accessible = await this.getAccessibleLibraryIds(userId, isSuperuser);
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessible, filterLibraryIds));
-    const since = this.sinceDateForDays(days);
-
-    const completedInWindow = this.db
-      .select({
-        bookId: readingSessions.bookId,
-        completedAt: sql<Date>`min(${readingSessions.endedAt})`.as('completed_at'),
-      })
-      .from(readingSessions)
-      .innerJoin(books, eq(books.id, readingSessions.bookId))
-      .where(and(eq(readingSessions.userId, userId), gte(readingSessions.startedAt, since), gte(readingSessions.endProgress, 99), libraryFilter))
-      .groupBy(readingSessions.bookId)
-      .as('completed_in_window');
-
-    const startedAndCompleted = this.db
-      .select({
-        completedAt: completedInWindow.completedAt,
-        startedAt: sql<Date | null>`min(${readingSessions.startedAt})`.as('started_at'),
-      })
-      .from(readingSessions)
-      .innerJoin(completedInWindow, eq(completedInWindow.bookId, readingSessions.bookId))
-      .where(eq(readingSessions.userId, userId))
-      .groupBy(completedInWindow.bookId, completedInWindow.completedAt)
-      .as('started_and_completed');
+    const since = this.formatDayKey(this.sinceDateForDays(days));
 
     const rows = await this.db
       .select({
-        days: sql<number | string>`extract(epoch from (${startedAndCompleted.completedAt} - ${startedAndCompleted.startedAt})) / 86400`,
+        days: sql<number | string>`${readingAttempts.endedOn} - ${readingAttempts.startedOn}`,
       })
-      .from(startedAndCompleted)
-      .where(and(sql`${startedAndCompleted.startedAt} is not null`, sql`${startedAndCompleted.completedAt} >= ${startedAndCompleted.startedAt}`));
+      .from(readingAttempts)
+      .innerJoin(books, eq(books.id, readingAttempts.bookId))
+      .where(
+        and(
+          eq(readingAttempts.userId, userId),
+          eq(readingAttempts.outcome, 'completed'),
+          isNotNull(readingAttempts.startedOn),
+          isNotNull(readingAttempts.endedOn),
+          isNull(readingAttempts.deletedAt),
+          gte(readingAttempts.endedOn, since),
+          sql`${readingAttempts.endedOn} >= ${readingAttempts.startedOn}`,
+          libraryFilter,
+        ),
+      );
 
     return rows
       .map((row) => (typeof row.days === 'number' ? row.days : Number.parseFloat(String(row.days))))

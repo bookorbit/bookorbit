@@ -22,5 +22,9 @@ export function seriesIndexOrderBy(value: SQLWrapper, direction: SqlSortDirectio
 }
 
 export function compareSeriesIndexSql(column: SQLWrapper, operator: SeriesIndexComparisonOperator, value: string): SQL {
-  return sql`(${seriesIndexSortKey(column)}, ${column}::text COLLATE "C") ${sql.raw(operator)} (${seriesIndexSortKey(value)}, ${value}::text COLLATE "C")`;
+  // The compared value is a bound parameter, and Postgres cannot infer a type for one that appears
+  // bare in a null test (42P18). Only the literal side is cast: casting the column side instead
+  // would stop the sort key matching the expression index the series ordering relies on.
+  const literal = sql`${value}::text`;
+  return sql`(${seriesIndexSortKey(column)}, ${column}::text COLLATE "C") ${sql.raw(operator)} (${seriesIndexSortKey(literal)}, ${literal} COLLATE "C")`;
 }

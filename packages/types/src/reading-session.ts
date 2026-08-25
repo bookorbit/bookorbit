@@ -5,6 +5,7 @@ export type ReadingSessionSource = (typeof READING_SESSION_SOURCES)[number];
 
 export interface BookReadingSession {
   id: number;
+  bookFileId: number | null;
   startedAt: string;
   endedAt: string;
   durationSeconds: number;

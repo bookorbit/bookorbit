@@ -55,4 +55,12 @@ describe('BookDockFileRow metadata refetch action', () => {
 
     expect(wrapper.get('[data-testid="book-dock-row-retry"]').attributes('disabled')).toBeDefined()
   })
+
+  it('requests confirmation instead of deleting from the row', async () => {
+    const wrapper = mountRow('ready')
+
+    await wrapper.get('[data-testid="book-dock-row-discard"]').trigger('click')
+
+    expect(wrapper.emitted('discard')).toEqual([[expect.objectContaining({ id: 42 })]])
+  })
 })

@@ -39,6 +39,7 @@ import type { FoliateLocationContext, FoliateRenderer } from './epub/composables
 import type { EpubReaderSettings } from '@bookorbit/types'
 import { findMatchingCfiRange } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
+import { resolveReaderResumeTarget } from '@/lib/reading-checkpoint'
 
 const PdfV4ReaderView = defineAsyncComponent(() => import('./pdf-v4/PdfV4ReaderView.vue'))
 
@@ -304,8 +305,10 @@ onMounted(async () => {
     shouldApplyStyles.value = false
   }
 
+  const deepLinkCfi = typeof route.query.cfi === 'string' ? route.query.cfi : null
   const hadProgress = progress.percentage.value > 0
-  await open(bookId, fileId, fileFormat, progress.cfi.value, hadProgress ? progress.percentage.value / 100 : undefined, {
+  const resumeTarget = resolveReaderResumeTarget(deepLinkCfi ? undefined : route.query.checkpoint, progress.cfi.value, progress.percentage.value)
+  await open(bookId, fileId, fileFormat, resumeTarget.cfi, resumeTarget.fraction, {
     fixedLayoutSpread: state.value.fixedLayoutSpread,
   })
   setChapters(getChapters())
@@ -318,7 +321,6 @@ onMounted(async () => {
   }
   void hydrateSidebarLocationMeta()
 
-  const deepLinkCfi = typeof route.query.cfi === 'string' ? route.query.cfi : null
   if (deepLinkCfi) {
     try {
       await goTo(deepLinkCfi)
@@ -327,8 +329,9 @@ onMounted(async () => {
     }
   }
 
-  if (hadProgress) {
-    const pct = Math.round(progress.percentage.value)
+  const resumedPercentage = resumeTarget.checkpointPercentage ?? (hadProgress ? progress.percentage.value : null)
+  if (resumedPercentage !== null) {
+    const pct = Math.round(resumedPercentage)
     const label = chapterTitle.value || t('reader.chapterNumber', { number: sectionIndex.value + 1 })
     toast.info(t('reader.toast.resumed', { pct, label }), { duration: 2500 })
   }

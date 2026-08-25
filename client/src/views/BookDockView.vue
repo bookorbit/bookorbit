@@ -21,12 +21,29 @@ import BookDockFileSheet from '@/features/book-dock/components/BookDockFileSheet
 import BookDockFinalizeDialog from '@/features/book-dock/components/BookDockFinalizeDialog.vue'
 import BookDockBulkEditDialog from '@/features/book-dock/components/BookDockBulkEditDialog.vue'
 import BookDockSetDestinationDialog from '@/features/book-dock/components/BookDockSetDestinationDialog.vue'
+import BookDockDiscardDialog from '@/features/book-dock/components/BookDockDiscardDialog.vue'
 
 type ApplyFetchedResult = {
   total: number
   applied: number
   skipped: number
   skippedEdited: number
+}
+
+type BookDockSelectionPayload = {
+  fileIds?: number[]
+  selectAll?: boolean
+  excludedIds?: number[]
+  status?: string
+  needsReview?: boolean
+  search?: string
+}
+
+type PendingDiscard = {
+  selectionPayload: BookDockSelectionPayload
+  selectionCount: number
+  source: 'bulk' | 'row' | 'sheet'
+  fileId?: number
 }
 
 const { t } = useI18n()
@@ -46,6 +63,7 @@ const {
   toggleSelect,
   toggleSelectAll,
   clearSelection,
+  removeDeletedSelection,
   isSelected,
   selectAll,
   selectionCount,
@@ -64,6 +82,7 @@ const selectedFile = ref<BookDockFile | null>(null)
 const showFinalizeDialog = ref(false)
 const showBulkEditDialog = ref(false)
 const showSetDestinationDialog = ref(false)
+const pendingDiscard = ref<PendingDiscard | null>(null)
 const dragOver = ref(false)
 const newFilesDetected = ref(false)
 const namePreviewByFileId = ref<Record<number, string>>({})
@@ -104,11 +123,6 @@ function handleSelect(id: number, shiftKey: boolean) {
 
 function closeSheet() {
   selectedFile.value = null
-}
-
-function onDiscarded() {
-  selectedFile.value = null
-  refresh()
 }
 
 function refresh() {
@@ -183,9 +197,8 @@ function handleSort(field: SortField) {
   setSort(field)
 }
 
-async function handleRowDiscard(file: BookDockFile) {
-  await api(`/api/v1/book-dock/files/${file.id}`, { method: 'DELETE' })
-  refresh()
+function handleRowDiscard(file: BookDockFile) {
+  openSingleDiscard(file, 'row')
 }
 
 async function handleRowRetry(file: BookDockFile) {
@@ -204,14 +217,41 @@ function openFinalizeForFile(file: BookDockFile) {
   showFinalizeDialog.value = true
 }
 
-async function handleBulkDiscard() {
-  const payload = getSelectionPayload()
-  await api('/api/v1/book-dock/files/discard', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  clearSelection()
+function openBulkDiscardDialog() {
+  if (!hasSelection.value) return
+  pendingDiscard.value = {
+    selectionPayload: getSelectionPayload(),
+    selectionCount: selectionCount.value,
+    source: 'bulk',
+  }
+}
+
+function openSingleDiscard(file: BookDockFile, source: 'row' | 'sheet') {
+  pendingDiscard.value = {
+    selectionPayload: { fileIds: [file.id] },
+    selectionCount: 1,
+    source,
+    fileId: file.id,
+  }
+}
+
+function handleSheetDiscard(file: BookDockFile) {
+  openSingleDiscard(file, 'sheet')
+}
+
+function closeDiscardDialog() {
+  pendingDiscard.value = null
+}
+
+function handleDiscarded() {
+  const discarded = pendingDiscard.value
+  if (!discarded) return
+
+  if (discarded.source === 'bulk') clearSelection()
+  else if (discarded.fileId !== undefined) removeDeletedSelection(discarded.fileId)
+  if (discarded.source === 'sheet') selectedFile.value = null
+
+  pendingDiscard.value = null
   refresh()
 }
 
@@ -582,7 +622,8 @@ onUnmounted(() => {
             @finalize="openFinalize"
             @set-destination="openSetDestination"
             @bulk-edit="openBulkEdit"
-            @bulk-discard="handleBulkDiscard"
+            @deselect="clearSelection"
+            @bulk-discard="openBulkDiscardDialog"
             @apply-fetched="handleApplyFetched"
             @retry-fetch="handleRetryFetch"
           />
@@ -621,7 +662,7 @@ onUnmounted(() => {
     </main>
 
     <Teleport to="body">
-      <BookDockFileSheet v-if="selectedFile" :file="selectedFile" @close="closeSheet" @discarded="onDiscarded" @updated="onFileUpdated" />
+      <BookDockFileSheet v-if="selectedFile" :file="selectedFile" @close="closeSheet" @discard="handleSheetDiscard" @updated="onFileUpdated" />
     </Teleport>
 
     <BookDockFinalizeDialog
@@ -646,6 +687,14 @@ onUnmounted(() => {
       :selection-count="selectionCount"
       @close="showSetDestinationDialog = false"
       @updated="onDestinationSet"
+    />
+
+    <BookDockDiscardDialog
+      v-if="pendingDiscard"
+      :selection-payload="pendingDiscard.selectionPayload"
+      :selection-count="pendingDiscard.selectionCount"
+      @close="closeDiscardDialog"
+      @discarded="handleDiscarded"
     />
   </div>
 </template>

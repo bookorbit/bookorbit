@@ -90,9 +90,7 @@ describe('UserStatisticsRepository', () => {
       [],
       [{ hour: 9, format: 'EPUB', source: 'koreader', readingSeconds: 500, eventsCount: 3 }],
       [{ dayOfWeek: 2, source: 'manual', format: 'EPUB', readingSeconds: 900, eventsCount: 4 }],
-      [],
       [{ year: 2026, month: 4, count: 2 }],
-      [],
       [{ year: 2026, month: 4, count: 2 }],
     ]);
     const repo = new UserStatisticsRepository(db as never);
@@ -109,6 +107,44 @@ describe('UserStatisticsRepository', () => {
     ]);
     await expect(repo.getCompletionTimeline(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
     await expect(repo.getMonthlyCompletions(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
+  });
+
+  it('counts completed reading attempts when their sessions finish below 99 percent', async () => {
+    const calls: Array<{ text: string; params: unknown[] }> = [];
+    const fakeClient = {
+      query: vi.fn().mockImplementation((cfg: { text: string }, params: unknown[]) => {
+        calls.push({ text: cfg.text, params });
+        const count = cfg.text.includes('"reading_attempts"') ? 3 : 1;
+        return Promise.resolve({ rows: [[2026, 8, count]] });
+      }),
+    };
+    const db = drizzle({ client: fakeClient as never, schema });
+    const repo = new UserStatisticsRepository(db as never);
+
+    await expect(repo.getCompletionTimeline(5, true, undefined, 365)).resolves.toEqual([{ year: 2026, month: 8, count: 3 }]);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.text).toContain('"reading_attempts"');
+    expect(calls[0]!.text).not.toContain('"reading_sessions"."end_progress"');
+  });
+
+  it('uses completed reading attempt dates for completion latency', async () => {
+    const calls: Array<{ text: string; params: unknown[] }> = [];
+    const fakeClient = {
+      query: vi.fn().mockImplementation((cfg: { text: string }, params: unknown[]) => {
+        calls.push({ text: cfg.text, params });
+        return Promise.resolve({ rows: [[2]] });
+      }),
+    };
+    const db = drizzle({ client: fakeClient as never, schema });
+    const repo = new UserStatisticsRepository(db as never);
+
+    await expect(repo.getCompletionLatencyDays(5, true, undefined, 365)).resolves.toEqual([2]);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.text).toContain('"reading_attempts"');
+    expect(calls[0]!.text).toContain('"reading_attempts"."deleted_at" is null');
+    expect(calls[0]!.params).toContain('completed');
   });
 
   it('returns peak reading hour buckets in the provided timezone', async () => {
@@ -349,8 +385,6 @@ describe('UserStatisticsRepository', () => {
 
   it('normalizes completion latency, reading pace, survival, race, and archetype points', async () => {
     const db = makeDb([
-      [],
-      [],
       [{ days: '3.5' }, { days: -1 }, { days: 'not-a-number' }, { days: 7 }],
       [{ durationSeconds: 300, progressDelta: 1.25, source: 'kobo', format: 'PDF' }],
       [],

@@ -115,6 +115,40 @@ describe('useMetadataDiff', () => {
     expect(formPatch.goodreadsId).toBe('gr1')
   })
 
+  it('merges provider genres into the current list by default', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'goodreads',
+      providerId: 'gr1',
+      title: 'Goodreads Title',
+      genres: [' genre 1 ', 'Genre 2', 'GENRE 2', ''],
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('goodreads')
+    const { fields, toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+
+    toggleField('genres')
+
+    expect(fields.value.find((field) => field.key === 'genres')?.currentDisplay).toBe('Genre 1, Genre 2')
+    expect(buildPatch().formPatch.genres).toEqual(['Genre 1', 'Genre 2'])
+  })
+
+  it('can replace current genres explicitly', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'goodreads',
+      providerId: 'gr1',
+      title: 'Goodreads Title',
+      genres: ['Genre 2', 'genre 2', 'Genre 3'],
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('goodreads')
+    const { toggleField, buildPatch, setGenreWriteMode } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+
+    toggleField('genres')
+    setGenreWriteMode('replace')
+
+    expect(buildPatch().formPatch.genres).toEqual(['Genre 2', 'Genre 3'])
+  })
+
   it('shows and applies the Libro.fm ISBN as a provider ID', () => {
     const candidate: MetadataCandidate = {
       provider: 'librofm',

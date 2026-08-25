@@ -155,6 +155,12 @@ export function useBookDockFiles() {
     lastToggledId.value = null
   }
 
+  function removeDeletedSelection(id: number) {
+    selectedIds.value.delete(id)
+    excludedIds.value.delete(id)
+    if (lastToggledId.value === id) lastToggledId.value = null
+  }
+
   function isSelected(id: number): boolean {
     if (selectAll.value) return !excludedIds.value.has(id)
     return selectedIds.value.has(id)
@@ -204,6 +210,7 @@ export function useBookDockFiles() {
     toggleSelect,
     toggleSelectAll,
     clearSelection,
+    removeDeletedSelection,
     isSelected,
     selectAll,
     selectionCount,

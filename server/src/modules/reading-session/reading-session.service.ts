@@ -168,6 +168,7 @@ export class ReadingSessionService {
 
       return {
         id: created.id,
+        bookFileId,
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
         durationSeconds,

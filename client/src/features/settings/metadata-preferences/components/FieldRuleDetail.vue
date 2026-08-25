@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowRight, ChevronDown, ChevronUp, RotateCcw, TriangleAlert, X } from '@lucide/vue'
-import type { FieldPreference, MergeStrategy, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
+import type { FieldPreference, MetadataField, MetadataMergeStrategy, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import ProviderAddMenu from './ProviderAddMenu.vue'
@@ -11,6 +11,7 @@ import { resolvedProviders, skippedProviders, skipReasonFor } from '../lib/field
 const { t } = useI18n()
 
 const props = defineProps<{
+  field: MetadataField
   fieldLabel: string
   preference: FieldPreference
   statuses: ProviderStatus[]
@@ -26,7 +27,8 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const MERGE_ORDER: MergeStrategy[] = ['fillMissing', 'overwriteIfProvided', 'overwrite']
+const STANDARD_MERGE_ORDER: MetadataMergeStrategy[] = ['fillMissing', 'overwriteIfProvided', 'overwrite']
+const GENRE_MERGE_ORDER: MetadataMergeStrategy[] = ['fillMissing', 'mergeExisting', 'overwriteIfProvided', 'overwrite']
 
 const rows = computed(() =>
   props.preference.providers.map((key, index) => {
@@ -46,7 +48,7 @@ const skipped = computed(() => skippedProviders(props.preference.providers, prop
 const providerLabel = (key: MetadataProviderKey) => props.statuses.find((entry) => entry.key === key)?.label ?? key
 
 const mergeOptions = computed(() =>
-  MERGE_ORDER.map((value) => ({
+  (props.field === 'genres' ? GENRE_MERGE_ORDER : STANDARD_MERGE_ORDER).map((value) => ({
     value,
     label: t(`settings.metadata.mergeStrategy.${value}.label`),
     description: t(`settings.metadata.mergeStrategy.${value}.description`),
@@ -85,7 +87,7 @@ function addProvider(provider: MetadataProviderKey) {
   update({ providers: [...props.preference.providers, provider] })
 }
 
-function selectMerge(value: MergeStrategy) {
+function selectMerge(value: MetadataMergeStrategy) {
   update({ mergeStrategy: value })
 }
 

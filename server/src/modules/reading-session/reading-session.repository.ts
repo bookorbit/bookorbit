@@ -220,6 +220,7 @@ export class ReadingSessionRepository {
       this.db
         .select({
           id: readingSessions.id,
+          bookFileId: readingSessions.bookFileId,
           startedAt: readingSessions.startedAt,
           endedAt: readingSessions.endedAt,
           durationSeconds: readingSessions.durationSeconds,
@@ -337,6 +338,7 @@ export class ReadingSessionRepository {
 
     const items: BookReadingSession[] = rows.map((r) => ({
       id: r.id,
+      bookFileId: r.bookFileId ?? null,
       startedAt: (r.startedAt as Date).toISOString(),
       endedAt: (r.endedAt as Date).toISOString(),
       durationSeconds: r.durationSeconds,

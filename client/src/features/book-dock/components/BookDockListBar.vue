@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowUpDown, Check, FolderPlus, Keyboard, Loader2, PenLine, RefreshCw, Trash2, Wand2 } from '@lucide/vue'
+import { ArrowUpDown, Check, FolderPlus, Keyboard, Loader2, PenLine, RefreshCw, Trash2, Wand2, X } from '@lucide/vue'
 import { Permission, type BookDockSummary } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 import { formatNumber } from '@/i18n/formatters'
@@ -29,6 +29,7 @@ const emit = defineEmits<{
   finalize: []
   setDestination: []
   bulkEdit: []
+  deselect: []
   bulkDiscard: []
   applyFetched: []
   retryFetch: []
@@ -71,6 +72,9 @@ function emitSetDestination() {
 }
 function emitBulkEdit() {
   emit('bulkEdit')
+}
+function emitDeselect() {
+  emit('deselect')
 }
 function emitBulkDiscard() {
   emit('bulkDiscard')
@@ -173,6 +177,15 @@ function emitRetryFetch() {
           >
             <PenLine class="size-3" aria-hidden="true" />
             {{ t('bookDock.bulkEditAction') }}
+          </button>
+          <button
+            type="button"
+            data-testid="book-dock-deselect"
+            class="inline-flex h-7 items-center gap-1.5 rounded-lg bg-muted px-2.5 text-[11.5px] font-medium text-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            @click="emitDeselect"
+          >
+            <X class="size-3" aria-hidden="true" />
+            {{ t('bookDock.deselect') }}
           </button>
           <button
             type="button"

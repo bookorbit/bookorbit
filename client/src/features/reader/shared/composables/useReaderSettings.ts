@@ -150,6 +150,9 @@ function sanitizeCbxPartialSettings(settings: unknown): Partial<CbxReaderSetting
   if (settings.bgColor === 'black' || settings.bgColor === 'gray' || settings.bgColor === 'white') {
     out.bgColor = settings.bgColor
   }
+  if (typeof settings.autoAdvance === 'boolean') {
+    out.autoAdvance = settings.autoAdvance
+  }
 
   return out
 }

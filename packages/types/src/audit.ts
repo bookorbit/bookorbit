@@ -115,6 +115,10 @@ export enum AuditAction {
   EmailRecipientGroupDelete = "email.recipient_group.delete",
   EmailRecipientGroupMemberAdd = "email.recipient_group.member_add",
   EmailRecipientGroupMemberRemove = "email.recipient_group.member_remove",
+
+  MaintenanceMissingBooksClean = "maintenance.missing_books.clean",
+  MaintenanceBrokenCoversClean = "maintenance.broken_covers.clean",
+  MaintenanceOrphanedCoversClean = "maintenance.orphaned_covers.clean",
 }
 
 export enum AuditResource {

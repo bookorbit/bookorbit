@@ -229,6 +229,7 @@ const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
     </div>
 
     <ReadingLogTable
+      :book-id="book.id"
       :sessions="sessions"
       :total="total"
       :sort-by="sortBy"

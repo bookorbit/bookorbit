@@ -348,7 +348,7 @@ describe('ReadingSessionService - createManualSession', () => {
     );
     const { sessionId } = mockRepoExtended.insertManualSession.mock.calls[0][0] as { sessionId: string };
     expect(sessionId.startsWith('manual:')).toBe(true);
-    expect(result).toMatchObject({ id: 555, durationSeconds: 2700, format: 'epub', source: 'manual' });
+    expect(result).toMatchObject({ id: 555, bookFileId: 42, durationSeconds: 2700, format: 'epub', source: 'manual' });
   });
 
   it('computes progressDelta from the latest prior endProgress', async () => {
@@ -435,6 +435,7 @@ describe('ReadingSessionService - createManualSession', () => {
     const result = await svc.createManualSession(10, { startedAt: '2026-04-15T10:00:00.000Z', durationMinutes: 30 }, makeUser({ id: 5 }));
 
     expect(mockRepoExtended.insertManualSession).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: null }));
+    expect(result.bookFileId).toBeNull();
     expect(result.format).toBeNull();
   });
 

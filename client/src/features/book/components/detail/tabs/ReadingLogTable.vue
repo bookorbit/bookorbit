@@ -4,8 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2, X } from '@lucide/vue'
 import type { BookReadingSession, ReadingSessionSource } from '@bookorbit/types'
+import { buildReadingCheckpointRoute } from '@/lib/reading-checkpoint'
 
 const props = defineProps<{
+  bookId: number
   sessions: BookReadingSession[]
   total: number
   sortBy: string
@@ -79,9 +81,17 @@ function formatProgressDelta(progressDelta: number | null): string {
   return `${prefix}${progressDelta.toFixed(1)}%`
 }
 
+function formatEndProgress(endProgress: number | null): string {
+  return endProgress == null ? '-' : `${endProgress.toFixed(1)}%`
+}
+
 function formatPace(session: BookReadingSession): string {
   if (session.progressDelta == null || session.progressDelta <= 0 || session.durationSeconds === 0) return '-'
   return `${((session.progressDelta / session.durationSeconds) * 3600).toFixed(1)}%/hr`
+}
+
+function checkpointRoute(session: BookReadingSession) {
+  return buildReadingCheckpointRoute(props.bookId, session)
 }
 
 const PILL_BASE = 'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium'
@@ -304,7 +314,15 @@ const rows = computed<TableRow[]>(() => {
               <div>
                 <dt class="text-muted-foreground">{{ t('book.detail.readingLog.table.colEndProgressMobile') }}</dt>
                 <dd class="mt-0.5 font-medium text-foreground">
-                  {{ row.session.endProgress != null ? `${row.session.endProgress.toFixed(1)}%` : '-' }}
+                  <RouterLink
+                    v-if="checkpointRoute(row.session)"
+                    :to="checkpointRoute(row.session)!"
+                    class="rounded underline decoration-border underline-offset-2 transition-colors hover:decoration-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    :aria-label="t('book.detail.readingLog.table.jumpToProgress', { progress: row.session.endProgress?.toFixed(1) })"
+                  >
+                    {{ formatEndProgress(row.session.endProgress) }}
+                  </RouterLink>
+                  <template v-else>{{ formatEndProgress(row.session.endProgress) }}</template>
                 </dd>
               </div>
             </dl>
@@ -372,7 +390,15 @@ const rows = computed<TableRow[]>(() => {
                   {{ formatProgressDelta(row.session.progressDelta) }}
                 </td>
                 <td class="whitespace-nowrap px-4 py-1.5 text-foreground">
-                  {{ row.session.endProgress != null ? `${row.session.endProgress.toFixed(1)}%` : '-' }}
+                  <RouterLink
+                    v-if="checkpointRoute(row.session)"
+                    :to="checkpointRoute(row.session)!"
+                    class="rounded underline decoration-border underline-offset-2 transition-colors hover:decoration-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    :aria-label="t('book.detail.readingLog.table.jumpToProgress', { progress: row.session.endProgress?.toFixed(1) })"
+                  >
+                    {{ formatEndProgress(row.session.endProgress) }}
+                  </RouterLink>
+                  <template v-else>{{ formatEndProgress(row.session.endProgress) }}</template>
                 </td>
                 <td class="hidden whitespace-nowrap px-4 py-1.5 text-muted-foreground sm:table-cell">{{ formatPace(row.session) }}</td>
                 <td v-if="showSource" class="whitespace-nowrap px-4 py-1.5">

@@ -31,6 +31,30 @@ describe('UpdateGlobalPreferencesDto', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('accepts merge-with-existing for genres only', async () => {
+    const genreResult = await validateInput({
+      fields: {
+        genres: {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'mergeExisting',
+        },
+      },
+    });
+    const titleResult = await validateInput({
+      fields: {
+        title: {
+          enabled: true,
+          providers: [MetadataProviderKey.GOOGLE],
+          mergeStrategy: 'mergeExisting',
+        },
+      },
+    });
+
+    expect(genreResult.errors).toHaveLength(0);
+    expect(titleResult.errors).not.toHaveLength(0);
+  });
+
   it('rejects non-object fields payloads', async () => {
     const { errors } = await validateInput({ fields: [] as unknown[] });
 

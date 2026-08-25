@@ -1,14 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SQL, and, asc, count, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { SQL, and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
-import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
+import { compareSeriesIndexSql, seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookMetadata, books, bookSeries, bookSeriesMemberships, userBookStatus } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookMetadata, books, bookSeries, bookSeriesMemberships, userBookStatus } from '../../db/schema';
 import type { SeriesListSort, SortDirection } from './dto/list-series.dto';
 import type { SeriesBookSort } from './dto/list-series-books.dto';
 
@@ -22,6 +22,14 @@ type SeriesSummaryRow = {
   authors: string[];
   coverBookIds: number[];
   lastAddedAt: string | null;
+};
+
+export type SeriesNextBookRow = {
+  bookId: number;
+  title: string | null;
+  seriesIndex: string | null;
+  fileId: number;
+  format: string | null;
 };
 
 type SeriesDetailRow = {
@@ -264,6 +272,71 @@ export class SeriesRepository {
     ]);
 
     return { bookIds: dataRows.map((r) => r.id), total: Number(total) };
+  }
+
+  /**
+   * The next book of the series this user can open right now, resolved down to one file.
+   * Books with no readable file of the requested formats are skipped rather than dead-ended on.
+   */
+  async findNextReadableBook(params: {
+    seriesId: number;
+    bookId: number;
+    libraryIds: number[];
+    formats: string[];
+    contentFilters?: ContentFilterRules;
+  }): Promise<SeriesNextBookRow | null> {
+    if (params.formats.length === 0) return null;
+
+    const libraryFilter = this.buildLibraryFilter(params.libraryIds);
+
+    const [current] = await this.db
+      .select({ seriesIndex: bookSeriesMemberships.seriesIndex })
+      .from(bookSeriesMemberships)
+      .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
+      .where(and(eq(bookSeriesMemberships.seriesId, params.seriesId), eq(bookSeriesMemberships.bookId, params.bookId), libraryFilter))
+      .limit(1);
+
+    if (!current) return null;
+
+    // Mirrors the ascending series order, where unindexed books sort after every indexed one:
+    // an indexed book can be followed by an unindexed one, an unindexed one only by another.
+    const afterCurrent =
+      current.seriesIndex === null
+        ? and(isNull(bookSeriesMemberships.seriesIndex), gt(books.id, params.bookId))!
+        : or(
+            compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '>', current.seriesIndex),
+            and(compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '>=', current.seriesIndex), gt(books.id, params.bookId)),
+            isNull(bookSeriesMemberships.seriesIndex),
+          )!;
+
+    const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
+
+    const [row] = await this.db
+      .select({
+        bookId: books.id,
+        title: bookMetadata.title,
+        seriesIndex: bookSeriesMemberships.seriesIndex,
+        fileId: bookFiles.id,
+        format: bookFiles.format,
+      })
+      .from(books)
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(
+        bookFiles,
+        and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'content'), inArray(sql`lower(${bookFiles.format})`, params.formats))!,
+      )
+      .where(and(eq(bookSeriesMemberships.seriesId, params.seriesId), eq(books.status, 'present'), libraryFilter, afterCurrent, ...filterClauses))
+      .orderBy(
+        ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, 'ASC'),
+        asc(books.id),
+        sql`(${bookFiles.id} = ${books.primaryFileId}) DESC`,
+        sql`${bookFiles.sortOrder} ASC NULLS LAST`,
+        asc(bookFiles.id),
+      )
+      .limit(1);
+
+    return row ?? null;
   }
 
   private async fetchAuthorsForSeries(

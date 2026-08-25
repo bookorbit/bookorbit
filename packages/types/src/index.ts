@@ -20,6 +20,7 @@ export * from "./upload";
 export * from "./collection";
 export * from "./smart-scope";
 export * from "./library";
+export * from "./maintenance";
 export * from "./metadata-fetch";
 export * from "./pattern-resolver";
 export * from "./query";

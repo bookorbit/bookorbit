@@ -707,4 +707,93 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(response.json()).toMatchObject({ errorCode: 'READING_DATES_STATUS_CONFLICT' });
     expect((await listAttempts(book.bookId)).total).toBe(0);
   });
+
+  it('31. counts completed attempts in completion analytics regardless of session end progress', async () => {
+    const username = `attempt-stats-${randomUUID()}`;
+    const password = 'AttemptStats123!';
+    const [user] = await ctx.db
+      .insert(schema.users)
+      .values({
+        username,
+        name: 'Attempt Stats User',
+        passwordHash: await hash(password, 4),
+        isDefaultPassword: false,
+        provisioningMethod: 'local',
+      })
+      .returning({ id: schema.users.id });
+    await ctx.db.insert(schema.userLibraryAccess).values({ userId: user.id, libraryId, accessLevel: 'viewer' });
+
+    const attempts = ctx.app.get(ReadingAttemptService);
+    const endProgressValues = [99.7, 94.7, 86.8];
+    for (const [index, endProgress] of endProgressValues.entries()) {
+      const book = await createBook();
+      const endedAt = new Date();
+      endedAt.setUTCDate(endedAt.getUTCDate() - (index + 1) * 3);
+      const startedAt = new Date(endedAt);
+      startedAt.setUTCDate(startedAt.getUTCDate() - 2);
+      const startedOn = startedAt.toISOString().slice(0, 10);
+      const endedOn = endedAt.toISOString().slice(0, 10);
+      const attempt = await attempts.createHistorical(user.id, book.bookId, { startedOn, endedOn, outcome: 'completed' });
+
+      const sessionStartedAt = new Date(`${startedOn}T10:00:00.000Z`);
+      const sessionEndedAt = new Date(sessionStartedAt.getTime() + 60 * 60 * 1000);
+      await ctx.db.insert(schema.readingSessions).values({
+        userId: user.id,
+        bookFileId: book.fileId,
+        bookId: book.bookId,
+        attemptId: attempt.id,
+        sessionId: `attempt-stats-${randomUUID()}`,
+        source: 'koreader',
+        startedAt: sessionStartedAt,
+        endedAt: sessionEndedAt,
+        durationSeconds: 3600,
+        progressDelta: 10,
+        endProgress,
+      });
+    }
+
+    const excludedBook = await createBook();
+    const excluded = await attempts.createHistorical(user.id, excludedBook.bookId, {
+      startedOn: '2026-01-01',
+      endedOn: '2026-01-02',
+      outcome: 'completed',
+    });
+    await attempts.delete(user.id, excludedBook.bookId, excluded.id);
+    await attempts.createHistorical(user.id, excludedBook.bookId, {
+      startedOn: '2026-01-03',
+      endedOn: '2026-01-04',
+      outcome: 'skimmed',
+    });
+    await attempts.createHistorical(user.id, excludedBook.bookId, { startedOn: null, endedOn: null, outcome: 'completed' });
+
+    const login = await ctx.app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password } });
+    expect(login.statusCode).toBe(200);
+    const token = (login.json() as { accessToken: string }).accessToken;
+
+    const timelineResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/user-statistics/completion-timeline?days=365',
+      headers: auth(token),
+    });
+    expect(timelineResponse.statusCode).toBe(200);
+    const timeline = timelineResponse.json() as Array<{ count: number }>;
+    expect(timeline.reduce((sum, point) => sum + point.count, 0)).toBe(3);
+
+    const goalResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/user-statistics/goal-trajectory?days=365&goalBooks=12',
+      headers: auth(token),
+    });
+    expect(goalResponse.statusCode).toBe(200);
+    const goal = goalResponse.json() as { points: Array<{ actualCumulative: number }> };
+    expect(goal.points.at(-1)?.actualCumulative).toBe(3);
+
+    const latencyResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/v1/user-statistics/completion-latency?days=365',
+      headers: auth(token),
+    });
+    expect(latencyResponse.statusCode).toBe(200);
+    expect(latencyResponse.json()).toMatchObject({ totalCompletions: 3, medianDays: 2 });
+  });
 });

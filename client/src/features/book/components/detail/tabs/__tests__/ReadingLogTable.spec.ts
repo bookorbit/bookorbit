@@ -1,10 +1,11 @@
-import { mount } from '@vue/test-utils'
+import { mount, RouterLinkStub } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import ReadingLogTable from '../ReadingLogTable.vue'
 
 function makeSession(overrides = {}) {
   return {
     id: 1,
+    bookFileId: 17,
     startedAt: '2026-04-15T10:00:00.000Z',
     endedAt: '2026-04-15T10:30:00.000Z',
     durationSeconds: 1800,
@@ -19,6 +20,7 @@ function makeSession(overrides = {}) {
 function mountTable(props = {}) {
   return mount(ReadingLogTable, {
     props: {
+      bookId: 10,
       sessions: [makeSession()],
       total: 1,
       sortBy: 'startedAt',
@@ -29,6 +31,7 @@ function mountTable(props = {}) {
       hasMultipleFormats: false,
       ...props,
     },
+    global: { stubs: { RouterLink: RouterLinkStub } },
   })
 }
 
@@ -100,6 +103,41 @@ describe('ReadingLogTable', () => {
   it('shows endProgress with % suffix', () => {
     const wrapper = mountTable({ sessions: [makeSession({ endProgress: 42.0 })] })
     expect(wrapper.text()).toContain('42.0%')
+  })
+
+  it('links EPUB end progress to the originating file and checkpoint', () => {
+    const wrapper = mountTable({ sessions: [makeSession({ bookFileId: 17, endProgress: 42.25, format: 'EPUB' })] })
+    const links = wrapper.findAllComponents(RouterLinkStub)
+
+    expect(links).toHaveLength(2)
+    expect(links[0]!.props('to')).toEqual({
+      name: 'reader',
+      params: { bookId: 10, fileId: 17 },
+      query: { format: 'epub', checkpoint: '42.25' },
+    })
+    expect(links[0]!.attributes('aria-label')).toBe('Jump to 42.3%')
+  })
+
+  it.each([
+    ['missing file', { bookFileId: null }],
+    ['invalid file', { bookFileId: 0 }],
+    ['missing progress', { endProgress: null }],
+    ['non-finite progress', { endProgress: Number.NaN }],
+    ['progress below range', { endProgress: -0.1 }],
+    ['progress above range', { endProgress: 100.1 }],
+    ['missing format', { format: null }],
+    ['PDF format', { format: 'pdf' }],
+    ['comic format', { format: 'cbz' }],
+    ['audio format', { format: 'm4b' }],
+    ['unsupported format', { format: 'kepub' }],
+  ])('does not link end progress for %s', (_case, overrides) => {
+    const wrapper = mountTable({ sessions: [makeSession(overrides)] })
+    expect(wrapper.findAllComponents(RouterLinkStub)).toHaveLength(0)
+  })
+
+  it.each([0, 100])('links the %s%% boundary checkpoint', (endProgress) => {
+    const wrapper = mountTable({ sessions: [makeSession({ endProgress })] })
+    expect(wrapper.findAllComponents(RouterLinkStub)[0]!.props('to')).toMatchObject({ query: { checkpoint: String(endProgress) } })
   })
 
   it('shows "-" for null endProgress', () => {

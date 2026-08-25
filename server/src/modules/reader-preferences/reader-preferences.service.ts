@@ -62,6 +62,9 @@ const CBX_SETTINGS_SCHEMA = z
     forceTwoPage: z.boolean(),
     widePageSingletonMode: z.enum(['auto', 'disable']),
     bgColor: z.enum(['black', 'gray', 'white']),
+    // Optional, not defaulted: a default here is injected into per-book deltas too, which would
+    // pin every book the reader touches to the default and override the user's cbx default.
+    autoAdvance: z.boolean().optional(),
   })
   .strict();
 

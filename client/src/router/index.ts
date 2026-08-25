@@ -608,6 +608,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: () => t('titles.duplicateBooks') },
           },
           {
+            path: 'missing-resources',
+            name: 'tools-missing-resources',
+            component: () => import('@/features/tools/missing-resources/views/MissingResourcesView.vue'),
+            meta: { title: () => t('titles.missingResources') },
+          },
+          {
             path: ':pathMatch(.*)*',
             redirect: { name: 'tools-entity-manager' },
           },
@@ -654,6 +660,7 @@ export const routes: RouteRecordRaw[] = [
     name: 'reader',
     component: () => import('@/features/reader/ReaderView.vue'),
     meta: {
+      remountOnParamChange: true,
       title: (to) => `${t('titles.readPrefix')} · ${fallbackById('titles.book', numericParam(to, 'bookId'))}`,
     },
   },

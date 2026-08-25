@@ -3,7 +3,7 @@ import { computed, inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowLeft, RotateCcw, CheckCircle2, X, ZoomIn, Layers } from '@lucide/vue'
 import type { MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
-import type { DiffField, DiffFieldKey } from '../../../composables/useMetadataDiff'
+import type { DiffField, DiffFieldKey, GenreWriteMode } from '../../../composables/useMetadataDiff'
 import { hideOnError, providerBadgeStyle } from '../../../lib/metadata-fetch'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
@@ -17,11 +17,13 @@ const props = defineProps<{
   bookAuthorLine?: string | null
   candidateSeed?: string
   candidateAuthorLine?: string | null
+  genreWriteMode?: GenreWriteMode
 }>()
 
 const emit = defineEmits<{
   toggle: [DiffFieldKey]
   pickFromProvider: [key: DiffFieldKey, provider: MetadataProviderKey]
+  'update:genreWriteMode': [mode: GenreWriteMode]
 }>()
 
 const { t } = useI18n()
@@ -69,6 +71,14 @@ function handleToggle() {
 
 function handlePickFromProvider(provider: MetadataProviderKey) {
   emit('pickFromProvider', props.field.key, provider)
+}
+
+function mergeGenres() {
+  emit('update:genreWriteMode', 'merge')
+}
+
+function replaceGenres() {
+  emit('update:genreWriteMode', 'replace')
 }
 
 function toggleCurrentExpanded() {
@@ -256,6 +266,35 @@ watch(
       <span v-if="field.isLocked" class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
         {{ t('book.detail.editMetadata.diff.locked') }}
       </span>
+      <div
+        v-if="field.key === 'genres'"
+        class="ms-auto inline-flex rounded-md border border-input bg-muted p-0.5"
+        role="radiogroup"
+        :aria-label="t('book.detail.editMetadata.diff.genreWriteMode.label')"
+      >
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="genreWriteMode !== 'replace'"
+          :disabled="field.isLocked"
+          class="h-6 rounded px-2 text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+          :class="genreWriteMode !== 'replace' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+          @click="mergeGenres"
+        >
+          {{ t('book.detail.editMetadata.diff.genreWriteMode.merge') }}
+        </button>
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="genreWriteMode === 'replace'"
+          :disabled="field.isLocked"
+          class="h-6 rounded px-2 text-[10px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+          :class="genreWriteMode === 'replace' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+          @click="replaceGenres"
+        >
+          {{ t('book.detail.editMetadata.diff.genreWriteMode.replace') }}
+        </button>
+      </div>
     </div>
 
     <div class="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-1.5 sm:items-stretch">

@@ -94,16 +94,27 @@ const activeCandidate = computed(
     props.initialCandidate,
 )
 
-const { fields, picksPerProvider, toggleField, pickFieldFromProvider, clearPicksForProvider, copyAll, copyMissing, buildPatch, hasCopied } =
-  useMetadataDiff(
-    props.current,
-    representativeCandidates,
-    activeProvider,
-    computed(() => props.providers),
-    props.currentCoverUrl,
-    computed(() => props.providerIds),
-    computed(() => props.lockedFields ?? []),
-  )
+const {
+  fields,
+  picksPerProvider,
+  toggleField,
+  pickFieldFromProvider,
+  clearPicksForProvider,
+  copyAll,
+  copyMissing,
+  buildPatch,
+  hasCopied,
+  genreWriteMode,
+  setGenreWriteMode,
+} = useMetadataDiff(
+  props.current,
+  representativeCandidates,
+  activeProvider,
+  computed(() => props.providers),
+  props.currentCoverUrl,
+  computed(() => props.providerIds),
+  computed(() => props.lockedFields ?? []),
+)
 
 const activeProviderLabel = computed(() => getProviderLabel(activeProvider.value, props.providers))
 const resultsForActiveProvider = computed(() => props.filteredResults.filter((candidate) => candidate.provider === activeProvider.value))
@@ -374,8 +385,10 @@ onBeforeUnmount(() => {
         :book-author-line="bookAuthorLine"
         :candidate-seed="candidateSeed"
         :candidate-author-line="candidateAuthorLine"
+        :genre-write-mode="genreWriteMode"
         @toggle="toggleField"
         @pick-from-provider="handlePickFromProvider"
+        @update:genre-write-mode="setGenreWriteMode"
       />
       <p v-if="visibleFields.length === 0" class="py-8 text-center text-sm text-muted-foreground">
         {{ showUnchanged ? t('book.detail.editMetadata.diffPanel.noMetadata') : t('book.detail.editMetadata.diffPanel.noChangedFields') }}

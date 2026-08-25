@@ -326,7 +326,19 @@ describe('ReadingSessionRepository - listByBook', () => {
     const later = new Date('2026-04-15T10:30:00.000Z');
 
     const { db } = makeListDb({
-      rows: [{ id: 1, startedAt: now, endedAt: later, durationSeconds: 1800, progressDelta: 5, endProgress: 50, format: 'epub', source: 'web' }],
+      rows: [
+        {
+          id: 1,
+          bookFileId: 42,
+          startedAt: now,
+          endedAt: later,
+          durationSeconds: 1800,
+          progressDelta: 5,
+          endProgress: 50,
+          format: 'epub',
+          source: 'web',
+        },
+      ],
       count: [{ total: 1 }],
       stats: [
         {
@@ -352,6 +364,7 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.stats.paceDurationSeconds).toBe(1800);
     expect(result.stats.progressSummary).toEqual([{ day: '2026-04-15', endProgress: 50 }]);
     expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.bookFileId).toBe(42);
     expect(result.items[0]?.startedAt).toBe(now.toISOString());
     expect(result.items[0]?.source).toBe('web');
   });
@@ -427,7 +440,19 @@ describe('ReadingSessionRepository - listByBook', () => {
   it('maps null format and null source to null in items', async () => {
     const now = new Date('2026-04-15T10:00:00.000Z');
     const { db } = makeListDb({
-      rows: [{ id: 1, startedAt: now, endedAt: now, durationSeconds: 60, progressDelta: null, endProgress: null, format: null, source: null }],
+      rows: [
+        {
+          id: 1,
+          bookFileId: null,
+          startedAt: now,
+          endedAt: now,
+          durationSeconds: 60,
+          progressDelta: null,
+          endProgress: null,
+          format: null,
+          source: null,
+        },
+      ],
       count: [{ total: 1 }],
       stats: [{ totalSessions: 1, totalSeconds: 60, avgDurationSeconds: 60, firstSessionAt: null, lastSessionAt: null }],
     });
@@ -435,6 +460,7 @@ describe('ReadingSessionRepository - listByBook', () => {
 
     const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
 
+    expect(result.items[0]?.bookFileId).toBeNull();
     expect(result.items[0]?.format).toBeNull();
     expect(result.items[0]?.source).toBeNull();
   });

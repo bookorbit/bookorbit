@@ -4,11 +4,13 @@ import {
   COMMUNITY_RATING_PROVIDER_KEYS,
   FieldPreference,
   FieldPreferenceOverrides,
+  GENRE_MERGE_STRATEGIES,
   GENRE_MERGE_MODES,
   MAX_METADATA_GENRE_COUNT,
   MetadataFetchPreferences,
   MetadataFetchOptions,
   MetadataField,
+  MetadataMergeStrategy,
   MetadataProviderKey,
   MERGE_STRATEGIES,
   MergeStrategy,
@@ -25,7 +27,8 @@ const DEFAULT_PROVIDER_ORDER: MetadataProviderKey[] = [
 ];
 
 const DEFAULT_MERGE_STRATEGY: MergeStrategy = 'overwriteIfProvided';
-const MERGE_STRATEGY_SET: Set<MergeStrategy> = new Set(MERGE_STRATEGIES);
+const MERGE_STRATEGY_SET = new Set<MetadataMergeStrategy>(MERGE_STRATEGIES);
+const GENRE_MERGE_STRATEGY_SET = new Set<MetadataMergeStrategy>(GENRE_MERGE_STRATEGIES);
 const GENRE_MERGE_MODE_SET = new Set(GENRE_MERGE_MODES);
 
 const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
@@ -52,7 +55,10 @@ const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> =
     ],
   },
   authors: { providers: PROVIDERS_WITH_ITUNES },
-  genres: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.KOBO] },
+  genres: {
+    mergeStrategy: 'mergeExisting',
+    providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.KOBO],
+  },
   communityRating: { providers: [...COMMUNITY_RATING_PROVIDER_KEYS] },
 };
 
@@ -85,7 +91,7 @@ export class MetadataPreferenceResolver {
     const fields = {} as Record<MetadataField, FieldPreference>;
     for (const field of ALL_METADATA_FIELDS) {
       const chosen = (libraryOverrides && libraryOverrides[field]) ?? global?.fields?.[field];
-      fields[field] = this.normalizeFieldPreference(chosen, defaults.fields[field]);
+      fields[field] = this.normalizeFieldPreference(field, chosen, defaults.fields[field]);
     }
     const options = this.normalizeOptions(global?.options, defaults.options!);
     return { fields, options };
@@ -97,7 +103,7 @@ export class MetadataPreferenceResolver {
     const registered = new Set(registeredKeys);
     for (const field of ALL_METADATA_FIELDS) {
       const fallback = defaults.fields[field];
-      const fp = this.normalizeFieldPreference(preferences?.fields?.[field], fallback);
+      const fp = this.normalizeFieldPreference(field, preferences?.fields?.[field], fallback);
       if (!registeredKeys.length) {
         fields[field] = fp;
         continue;
@@ -114,7 +120,7 @@ export class MetadataPreferenceResolver {
     return { fields, options };
   }
 
-  private normalizeFieldPreference(value: unknown, fallback: FieldPreference): FieldPreference {
+  private normalizeFieldPreference(field: MetadataField, value: unknown, fallback: FieldPreference): FieldPreference {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       return { ...fallback, providers: [...fallback.providers] };
     }
@@ -125,8 +131,9 @@ export class MetadataPreferenceResolver {
       Array.isArray(candidate.providers) && candidate.providers.every((p) => typeof p === 'string')
         ? [...candidate.providers]
         : [...fallback.providers];
-    const mergeStrategy = MERGE_STRATEGY_SET.has(candidate.mergeStrategy as MergeStrategy)
-      ? (candidate.mergeStrategy as MergeStrategy)
+    const mergeStrategySet = field === 'genres' ? GENRE_MERGE_STRATEGY_SET : MERGE_STRATEGY_SET;
+    const mergeStrategy = mergeStrategySet.has(candidate.mergeStrategy as MetadataMergeStrategy)
+      ? (candidate.mergeStrategy as MetadataMergeStrategy)
       : fallback.mergeStrategy;
 
     return { enabled, providers, mergeStrategy };

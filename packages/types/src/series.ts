@@ -1,4 +1,5 @@
 import type { BooksPage } from "./book";
+import type { SeriesIndex } from "./series-index";
 
 export type SeriesSummary = {
   id: number;
@@ -30,4 +31,17 @@ export type SeriesDetail = {
 
 export type SeriesBooksPage = BooksPage & {
   seriesInfo: SeriesDetail;
+};
+
+/** A series book the reader can open next, already resolved down to the file it should open. */
+export type SeriesNextBook = {
+  bookId: number;
+  fileId: number;
+  format: string;
+  title: string | null;
+  seriesIndex: SeriesIndex | null;
+};
+
+export type SeriesNextBookResponse = {
+  next: SeriesNextBook | null;
 };

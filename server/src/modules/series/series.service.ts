@@ -1,12 +1,14 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesPage, SeriesSummary } from '@bookorbit/types';
+import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesNextBookResponse, SeriesPage, SeriesSummary } from '@bookorbit/types';
+import { READER_OPENABLE_FORMATS, getOpenableFormatsForGroup } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import type { RequestUser } from '../../common/types/request-user';
 import { MAX_SERIES_TOTAL_BOOKS, normalizeSeriesTotalBooks } from '../../common/utils/series-total-books.utils';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
+import { FindNextSeriesBookDto } from './dto/find-next-series-book.dto';
 import { ListSeriesBooksDto } from './dto/list-series-books.dto';
 import { ListSeriesDto } from './dto/list-series.dto';
 import { SeriesRepository } from './series.repository';
@@ -222,6 +224,36 @@ export class SeriesService {
       }
     }
     return gaps;
+  }
+
+  /**
+   * Backs the reader's end-of-book handoff. A neighbour the user cannot see, a book with no
+   * readable file, and a book outside any series all resolve to null rather than an error, so
+   * the reader can ask about every book it opens.
+   */
+  async findNextBook(user: RequestUser, seriesId: number, bookId: number, dto: FindNextSeriesBookDto): Promise<SeriesNextBookResponse> {
+    const libraryIds = await this.resolveLibraryIds(user);
+    if (libraryIds.length === 0) return { next: null };
+
+    const row = await this.seriesRepo.findNextReadableBook({
+      seriesId,
+      bookId,
+      libraryIds,
+      formats: dto.formatGroup ? getOpenableFormatsForGroup(dto.formatGroup) : [...READER_OPENABLE_FORMATS],
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
+
+    if (!row?.format) return { next: null };
+
+    return {
+      next: {
+        bookId: row.bookId,
+        fileId: row.fileId,
+        format: row.format,
+        title: row.title,
+        seriesIndex: row.seriesIndex,
+      },
+    };
   }
 
   private async resolveLibraryIds(user: RequestUser, scopedLibraryId?: number): Promise<number[]> {

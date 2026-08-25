@@ -74,6 +74,7 @@ describe('MetadataPreferenceResolver', () => {
 
     expect(defaults.fields.title.mergeStrategy).toBe('overwriteIfProvided');
     expect(defaults.fields.description.mergeStrategy).toBe('overwriteIfProvided');
+    expect(defaults.fields.genres.mergeStrategy).toBe('mergeExisting');
     expect(defaults.options).toEqual({
       genres: { mode: 'merge', blocklist: [], maxCount: null },
       saveProviderIds: true,
@@ -125,6 +126,22 @@ describe('MetadataPreferenceResolver', () => {
     const resolved = resolver.resolve(malformed, null);
 
     expect(resolved.fields.title).toEqual(defaults.fields.title);
+  });
+
+  it('keeps merge-with-existing scoped to genres', () => {
+    const defaults = resolver.getDefaultPreferences();
+    const preferences = {
+      fields: {
+        ...defaults.fields,
+        title: { ...defaults.fields.title, mergeStrategy: 'mergeExisting' },
+        genres: { ...defaults.fields.genres, mergeStrategy: 'mergeExisting' },
+      },
+    } as MetadataFetchPreferences;
+
+    const resolved = resolver.resolve(preferences, null);
+
+    expect(resolved.fields.title.mergeStrategy).toBe('overwriteIfProvided');
+    expect(resolved.fields.genres.mergeStrategy).toBe('mergeExisting');
   });
 
   it('normalizes malformed options to safe defaults', () => {

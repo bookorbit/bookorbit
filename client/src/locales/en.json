@@ -1436,6 +1436,11 @@
           "description": "Only write if field is currently empty",
           "short": "Fill gaps"
         },
+        "mergeExisting": {
+          "label": "Merge with existing",
+          "description": "Keep stored genres and append new provider genres",
+          "short": "Merge"
+        },
         "overwriteIfProvided": {
           "label": "Overwrite if provided",
           "description": "Write if provider returned a value",
@@ -1601,7 +1606,7 @@
             "overwriteTerm": "Overwrite:",
             "overwriteBody": "Replace whenever a provider has data."
           },
-          "summary": "Providers are tried top to bottom and the first one that returns a value wins. The merge strategy decides whether that value may replace what the book already has. Set defaults here, then override individual fields per library."
+          "summary": "Providers are tried top to bottom and the first one that returns a value wins. The merge strategy decides whether that value may replace what the book already has; genres can also append new unique values. Set defaults here, then override individual fields per library."
         },
         "libraryOverrides": {
           "title": "Library Overrides",
@@ -1985,6 +1990,8 @@
         "widePageDisable": "Disable",
         "forceTwoPage": "Force two-page on small screens",
         "forceTwoPageHint": "Bypass mobile auto-fallback when paginated two-page mode is selected",
+        "autoAdvance": "Auto-advance to next book",
+        "autoAdvanceHint": "Turn past the last page to open the next book in the series",
         "off": "Off",
         "on": "On",
         "display": "Display",
@@ -3557,7 +3564,10 @@
       "EmailRecipientGroupUpdate": "Update recipient group",
       "EmailRecipientGroupDelete": "Delete recipient group",
       "EmailRecipientGroupMemberAdd": "Add recipient to group",
-      "EmailRecipientGroupMemberRemove": "Remove recipient from group"
+      "EmailRecipientGroupMemberRemove": "Remove recipient from group",
+      "MaintenanceMissingBooksClean": "Cleaned missing books",
+      "MaintenanceBrokenCoversClean": "Cleaned broken covers",
+      "MaintenanceOrphanedCoversClean": "Cleaned orphaned cover folders"
     }
   },
   "auth": {
@@ -4485,6 +4495,11 @@
           "pickCoverSource": "Pick cover source",
           "pickFromProvider": "Pick from another provider",
           "pickSource": "Pick source",
+          "genreWriteMode": {
+            "label": "How to apply genres",
+            "merge": "Merge",
+            "replace": "Replace"
+          },
           "empty": "empty",
           "showLess": "Show less",
           "showMore": "Show more",
@@ -4725,6 +4740,7 @@
           "colProgressChangeMobile": "Delta",
           "colEndProgress": "End Progress",
           "colEndProgressMobile": "End",
+          "jumpToProgress": "Jump to {progress}%",
           "empty": "No reading sessions recorded yet.",
           "emptyHint": "Add a session to start building this book's reading history.",
           "colPace": "Pace",
@@ -4993,6 +5009,7 @@
     "apply": "Apply",
     "done": "Done",
     "discard": "Discard",
+    "deselect": "Deselect",
     "finalize": "Finalize",
     "rescan": "Rescan",
     "uploadAction": "Upload",
@@ -5002,6 +5019,12 @@
     "bulkEditAction": "Bulk Edit",
     "applyFetched": "Apply Fetched",
     "retryErrors": "Retry Errors",
+    "discardDialog": {
+      "title": "{count, plural, =0 {Discard no files?} one {Discard the selected file?} other {Discard the # selected files?}}",
+      "description": "{count, plural, =0 {No files are selected.} one {This permanently deletes the selected file from disk. This action cannot be undone.} other {This permanently deletes the # selected files from disk. This action cannot be undone.}}",
+      "confirm": "{count, plural, one {Delete file} other {Delete # files}}",
+      "failed": "The selected files could not be deleted. Try again."
+    },
     "commaSeparated": "comma-separated",
     "destinationLibrary": "Destination Library",
     "destinationFolder": "Destination Folder",
@@ -6979,6 +7002,9 @@
       "scrollMode": "Scroll mode",
       "scrollModeHint": "Use \"No gaps\" for webtoons and vertical strips.",
       "readingDirection": "Reading direction",
+      "autoAdvance": "Auto-advance",
+      "autoAdvanceHint": "Turning past the last page opens the next book in the series.",
+      "autoAdvancePagedOnly": "Auto-advance applies in paged mode only.",
       "pageView": "Page view",
       "twoPagePagedOnly": "Two pages are shown only in paged mode.",
       "spreadSection": "Two-page spread",
@@ -7024,6 +7050,14 @@
         "black": "Black",
         "gray": "Gray",
         "white": "White"
+      },
+      "nextIssue": {
+        "eyebrow": "Next in series",
+        "action": "Read next",
+        "open": "Read next: {title}",
+        "numbered": "#{index} {title}",
+        "untitled": "Untitled",
+        "autoAdvanceHint": "Turn the page again to continue"
       }
     },
     "audiobook": {
@@ -7373,7 +7407,8 @@
     "header": {
       "entityManager": "Entity Manager",
       "bulkRename": "Bulk Rename",
-      "duplicateBooks": "Duplicate Books"
+      "duplicateBooks": "Duplicate Books",
+      "missingResources": "Missing Resources"
     },
     "entityTypes": {
       "authors": "Authors",
@@ -7614,6 +7649,77 @@
       "mergeModal": {
         "title": "Merge Entities",
         "description": "Select which entity to keep. The others will be merged into it and removed."
+      }
+    },
+    "missingResources": {
+      "title": "Missing Resources",
+      "accessDenied": "You do not have permission to clean up missing resources.",
+      "categoriesLabel": "Cleanup category",
+      "untitled": "Untitled",
+      "clearSelection": "Clear selection",
+      "cleanSelected": "Clean {count} selected",
+      "selectAllMatching": "Select all {count} matching entries",
+      "allSelected": "All {count} matching entries are selected.",
+      "sweep": {
+        "title": "Cover check",
+        "description": "Checks every book that claims a cover against the files on disk, and looks for cover folders left behind by deleted books. Nothing is removed during the check.",
+        "run": "Run check",
+        "running": "Checking",
+        "progress": "Checked {processed} of {total} books",
+        "lastRun": "Last checked {at}",
+        "truncated": "Only the first results are listed. Clean these, then run the check again to see the rest."
+      },
+      "categories": {
+        "missing_books": "Missing books",
+        "broken_covers": "Broken covers",
+        "orphaned_cover_dirs": "Orphaned cover folders"
+      },
+      "found": {
+        "missing_books": "{count, plural, =0 {No books with missing files} one {One book with missing files} other {# books with missing files}}",
+        "broken_covers": "{count, plural, =0 {No broken cover references} one {One broken cover reference} other {# broken cover references}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {No orphaned cover folders} one {One orphaned cover folder} other {# orphaned cover folders}}"
+      },
+      "empty": {
+        "missing_books": "No missing books",
+        "broken_covers": "No broken cover references",
+        "orphaned_cover_dirs": "No orphaned cover folders",
+        "description": "Everything in this category is accounted for."
+      },
+      "needsSweep": {
+        "title": "Run the cover check first",
+        "description": "Cover results come from a disk check. Run it to see broken references and orphaned folders."
+      },
+      "coverSource": {
+        "extracted": "Extracted",
+        "custom": "Custom"
+      },
+      "table": {
+        "selectPage": "Select everything on this page",
+        "coverFolder": "Cover folder for book #{bookId}",
+        "fileCount": "{count, plural, one {# file} other {# files}}"
+      },
+      "confirm": {
+        "title": "Clean missing resources?",
+        "action": "Clean",
+        "missing_books": "{count, plural, one {Deletes the database record for one book whose files are gone. The book, its metadata, reading progress, and cover are removed. This cannot be undone.} other {Deletes the database records for # books whose files are gone. The books, their metadata, reading progress, and covers are removed. This cannot be undone.}}",
+        "broken_covers": "{count, plural, one {Clears the cover reference for one book so it shows as having no cover. Metadata is not otherwise changed.} other {Clears the cover references for # books so they show as having no cover. Metadata is not otherwise changed.}}",
+        "orphaned_cover_dirs": "{count, plural, one {Deletes one cover folder from disk. Its book is no longer in the database. This cannot be undone.} other {Deletes # cover folders from disk. Their books are no longer in the database. This cannot be undone.}}"
+      },
+      "cleaned": {
+        "missing_books": "{count, plural, =0 {Nothing to clean} one {Removed one missing book} other {Removed # missing books}}",
+        "broken_covers": "{count, plural, =0 {Nothing to clean} one {Cleared one broken cover reference} other {Cleared # broken cover references}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {Nothing to clean} one {Removed one orphaned cover folder} other {Removed # orphaned cover folders}}"
+      },
+      "pagination": {
+        "label": "Missing resource pages",
+        "page": "Page {page} of {total}"
+      },
+      "errors": {
+        "summary": "Could not load the missing resource summary.",
+        "sweepStart": "Could not start the cover check.",
+        "sweep": "The cover check failed.",
+        "list": "Could not load these entries.",
+        "clean": "Cleanup failed."
       }
     }
   },
@@ -7891,7 +7997,8 @@
       "restrictions": "Content Restrictions"
     },
     "smartScopes": "Smart Scopes",
-    "collections": "Collections"
+    "collections": "Collections",
+    "missingResources": "Missing Resources"
   },
   "countryCodes": {
     "AD": "Andorra",

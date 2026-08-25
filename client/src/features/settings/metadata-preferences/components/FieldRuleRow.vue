@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronRight, TriangleAlert } from '@lucide/vue'
-import type { FieldPreference, MergeStrategy, MetadataField, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
+import type { FieldPreference, MetadataField, MetadataMergeStrategy, MetadataProviderKey, ProviderStatus } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { Badge } from '@/components/ui/badge'
@@ -57,7 +57,7 @@ function onProvidersChange(providers: MetadataProviderKey[]) {
   update({ providers })
 }
 
-function onMergeChange(mergeStrategy: MergeStrategy) {
+function onMergeChange(mergeStrategy: MetadataMergeStrategy) {
   update({ mergeStrategy })
 }
 
@@ -125,7 +125,12 @@ function collapse() {
         </span>
       </div>
 
-      <MergeStrategySegmented :model-value="preference.mergeStrategy" :disabled="!preference.enabled || saving" @update:model-value="onMergeChange" />
+      <MergeStrategySegmented
+        :model-value="preference.mergeStrategy"
+        :disabled="!preference.enabled || saving"
+        :allow-merge-existing="field === 'genres'"
+        @update:model-value="onMergeChange"
+      />
 
       <div class="flex shrink-0 items-center justify-end gap-2">
         <Badge v-if="unsaved" variant="secondary" class="h-5 px-1.5 text-[10px] font-bold uppercase tracking-tight">

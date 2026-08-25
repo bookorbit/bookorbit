@@ -19,6 +19,14 @@ const props = withDefaults(
 
 const { effective, load, update, reset } = useReaderDefaultSettings<CbxReaderSettings>('cbx')
 
+function enableAutoAdvance() {
+  update({ autoAdvance: true })
+}
+
+function disableAutoAdvance() {
+  update({ autoAdvance: false })
+}
+
 function updateSpreadGapFromEvent(event: Event) {
   const target = event.target
   if (!(target instanceof HTMLInputElement)) return
@@ -294,6 +302,34 @@ onMounted(load)
               class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
               :class="effective.forceTwoPage ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
               @click="update({ forceTwoPage: true })"
+            >
+              {{ t('settings.reader.comics.on') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Auto-advance -->
+        <div class="settings-row">
+          <div>
+            <p class="settings-label">
+              {{ t('settings.reader.comics.autoAdvance') }}
+            </p>
+            <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:overflow-visible md:whitespace-normal">
+              {{ t('settings.reader.comics.autoAdvanceHint') }}
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-lg border border-border bg-muted/50 self-start">
+            <button
+              class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
+              :class="!effective.autoAdvance ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              @click="disableAutoAdvance"
+            >
+              {{ t('settings.reader.comics.off') }}
+            </button>
+            <button
+              class="h-8 px-3 rounded-md text-xs font-medium transition-colors"
+              :class="effective.autoAdvance ? 'bg-background shadow-xs text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              @click="enableAutoAdvance"
             >
               {{ t('settings.reader.comics.on') }}
             </button>

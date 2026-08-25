@@ -9,6 +9,7 @@ import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useCbz } from './composables/useCbz'
+import { useSeriesNextBook } from '../shared/composables/useSeriesNextBook'
 import { useCbzSettings } from './composables/useCbzSettings'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
 import { useFullscreen } from '../shared/composables/useFullscreen'
@@ -18,8 +19,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import ReaderSettingsSheet from '@/features/reader/shared/components/ReaderSettingsSheet.vue'
 import CbzSettingsPanel from './components/CbzSettingsPanel.vue'
+import NextIssueCard from './components/NextIssueCard.vue'
 
 const TWO_PAGE_BREAKPOINT = 900
+// A page turn that only just landed on the last page must not carry through into the next book:
+// wheel bursts and held keys arrive in quick succession, so the crossing needs a deliberate turn.
+const AUTO_ADVANCE_ARM_DELAY_MS = 500
 const MIN_ZOOM_SCALE = 0.5
 const MAX_ZOOM_SCALE = 3
 const ZOOM_STEP = 0.25
@@ -43,9 +48,22 @@ const { onActivity, elapsedMinutes } = useReadingSession(
   { trackingEnabled },
 )
 const progress = useReaderProgress(props.bookId, props.fileId, elapsedMinutes, 0, { trackingEnabled })
-const { pageCount, bookTitle, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
-const { fitMode, viewMode, scrollMode, direction, spreadAlignment, spreadGap, forceTwoPage, widePageSingletonMode, bgColor, bgValue, imgFitClass } =
-  useCbzSettings()
+const { pageCount, bookTitle, seriesId, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId)
+const {
+  fitMode,
+  viewMode,
+  scrollMode,
+  direction,
+  spreadAlignment,
+  spreadGap,
+  forceTwoPage,
+  widePageSingletonMode,
+  bgColor,
+  autoAdvance,
+  bgValue,
+  imgFitClass,
+} = useCbzSettings()
+const { nextBook, load: loadNextBook } = useSeriesNextBook('cbx')
 const bookSettings = useReaderSettings(props.fileId, 'cbz')
 
 const currentPage = ref(0)
@@ -78,6 +96,7 @@ const panelSettings = computed<CbxReaderSettings>(() => ({
   forceTwoPage: forceTwoPage.value,
   widePageSingletonMode: widePageSingletonMode.value,
   bgColor: bgColor.value,
+  autoAdvance: autoAdvance.value,
 }))
 
 // Persists here rather than via watches on the refs, so applySettings can restore
@@ -92,6 +111,7 @@ function applyPanelUpdate(partial: Partial<CbxReaderSettings>) {
   if (partial.forceTwoPage !== undefined) forceTwoPage.value = partial.forceTwoPage
   if (partial.widePageSingletonMode !== undefined) widePageSingletonMode.value = partial.widePageSingletonMode
   if (partial.bgColor !== undefined) bgColor.value = partial.bgColor
+  if (partial.autoAdvance !== undefined) autoAdvance.value = partial.autoAdvance
   bookSettings.updateBookSettings(partial)
 }
 
@@ -114,6 +134,7 @@ function applySettings(s: CbxReaderSettings) {
   forceTwoPage.value = s.forceTwoPage
   widePageSingletonMode.value = s.widePageSingletonMode
   bgColor.value = s.bgColor
+  autoAdvance.value = s.autoAdvance
 }
 
 function resetBookViewSettings() {
@@ -362,6 +383,41 @@ function onStripImageLoad(pageIndex: number, e: Event) {
   setPageRatio(pageIndex, target.naturalWidth, target.naturalHeight)
 }
 
+// ── Series handoff ─────────────────────────────────────────────────────────────
+// Peeking is a look inside one book, so it never crosses into another.
+const seriesFlowEnabled = computed(() => !props.peekMode)
+const isAtLastPage = computed(() => pageCount.value > 0 && !canGoNext.value)
+const showNextBookCard = computed(() => seriesFlowEnabled.value && nextBook.value !== null && !loading.value && error.value === null)
+const showNextBookOverlay = computed(() => showNextBookCard.value && scrollMode.value === 'paginated' && isAtLastPage.value)
+const canAutoAdvance = computed(() => autoAdvance.value && showNextBookCard.value && scrollMode.value === 'paginated')
+
+let lastPageReachedAt = 0
+let openingNextBook = false
+
+watch(isAtLastPage, (atLastPage) => {
+  lastPageReachedAt = atLastPage ? Date.now() : 0
+})
+
+function shouldAutoAdvance(): boolean {
+  if (!canAutoAdvance.value || !isAtLastPage.value) return false
+  return lastPageReachedAt > 0 && Date.now() - lastPageReachedAt >= AUTO_ADVANCE_ARM_DELAY_MS
+}
+
+async function openNextBook() {
+  const target = nextBook.value
+  if (!target || openingNextBook) return
+  openingNextBook = true
+
+  try {
+    // The route keeps its name and only its params change, so the leave guard never runs: the last
+    // page has to be written here or the book it just finished stays short of complete.
+    await flushPendingProgress()
+    await router.push({ name: 'reader', params: { bookId: target.bookId, fileId: target.fileId }, query: { format: target.format } })
+  } finally {
+    openingNextBook = false
+  }
+}
+
 // ── Navigation ─────────────────────────────────────────────────────────────────
 function goToPage(n: number) {
   if (pageCount.value <= 0) return
@@ -380,6 +436,10 @@ function goToPage(n: number) {
 
 function nextPage() {
   if (pageCount.value <= 0) return
+  if (!canGoNext.value) {
+    if (shouldAutoAdvance()) void openNextBook()
+    return
+  }
   if (isTwoPageEffective.value) {
     goToPage(spreadLayout.value.nextAnchor(currentPage.value))
     return
@@ -692,6 +752,8 @@ onMounted(async () => {
     currentPage.value = spreadLayout.value.anchorForPage(currentPage.value)
   }
 
+  if (seriesFlowEnabled.value) void loadNextBook(seriesId.value, props.bookId)
+
   readerReady = true
   if (scrollMode.value !== 'paginated') {
     await scrollContinuousToPage(currentPage.value, true)
@@ -897,6 +959,14 @@ onUnmounted(() => {
           />
         </div>
       </div>
+      <div v-if="showNextBookCard && nextBook" class="flex justify-center px-3 py-10">
+        <NextIssueCard :next-book="nextBook" @open="openNextBook" />
+      </div>
+    </div>
+
+    <!-- ── End of book: next in series ─────────────────────────────────────── -->
+    <div v-if="showNextBookOverlay && nextBook" class="absolute inset-x-0 bottom-16 z-40 flex justify-center px-3 sm:bottom-20">
+      <NextIssueCard :next-book="nextBook" :auto-advance="canAutoAdvance" @open="openNextBook" />
     </div>
 
     <!-- ── Footer ──────────────────────────────────────────────────────────── -->

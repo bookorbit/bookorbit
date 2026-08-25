@@ -8,6 +8,7 @@ import {
   MetadataFetchDiagnostics,
   MetadataFetchPreferences,
   MetadataField,
+  MetadataMergeStrategy,
   MetadataProviderKey,
   MetadataSeriesMembership,
   ProviderConfigurations,
@@ -19,7 +20,7 @@ import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-pre
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
-import { applyGenreFetchOptions, createGenreBlocklistTokenSet } from '../../common/utils/genre-fetch-options.utils';
+import { applyGenreFetchOptions, createGenreBlocklistTokenSet, mergeExistingGenres } from '../../common/utils/genre-fetch-options.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveCandidateAgreement } from './candidate-agreement';
@@ -330,19 +331,10 @@ export class MetadataFetchPipeline {
         );
         if (!genres.length) continue;
 
-        const existingValue = existing[field];
-        switch (mergeStrategy) {
-          case 'fillMissing':
-            if (this.isMissing(existingValue)) {
-              result.genres = genres;
-              if (sourceProvider) sources.genres = sourceProvider;
-            }
-            break;
-          case 'overwrite':
-          case 'overwriteIfProvided':
-            result.genres = genres;
-            if (sourceProvider) sources.genres = sourceProvider;
-            break;
+        const resolvedGenres = this.resolveGenreWrite(genres, existing[field], mergeStrategy, genreOptions?.maxCount);
+        if (resolvedGenres) {
+          result.genres = resolvedGenres;
+          if (sourceProvider) sources.genres = sourceProvider;
         }
         continue;
       }
@@ -363,7 +355,7 @@ export class MetadataFetchPipeline {
         const candidate = byProvider.get(providerKey);
         if (!candidate) continue;
 
-        let value = this.extractField(candidate, field);
+        const value = this.extractField(candidate, field);
         if (value === undefined || value === null) continue;
         if (mergeStrategy !== 'overwrite' && this.isEmptyProviderValue(value)) continue;
 
@@ -379,7 +371,12 @@ export class MetadataFetchPipeline {
           if (!Array.isArray(value)) continue;
           const genres = applyGenreFetchOptions(value, blockedGenreTokens, genreOptions?.maxCount);
           if (!genres.length) continue;
-          value = genres;
+          const resolvedGenres = this.resolveGenreWrite(genres, existing[field], mergeStrategy, genreOptions?.maxCount);
+          if (resolvedGenres) {
+            result.genres = resolvedGenres;
+            sources.genres = providerKey;
+          }
+          break;
         }
 
         const existingValue = existing[field];
@@ -396,6 +393,8 @@ export class MetadataFetchPipeline {
             (result as Record<string, unknown>)[field] = value;
             this.copyPublishedDateForYear(result, candidate, field);
             sources[field] = providerKey;
+            break;
+          case 'mergeExisting':
             break;
         }
         break;
@@ -558,6 +557,24 @@ export class MetadataFetchPipeline {
     }
 
     return { genres: applyGenreFetchOptions(merged, blockedGenreTokens, maxCount), sourceProvider };
+  }
+
+  private resolveGenreWrite(
+    fetchedGenres: string[],
+    existingValue: unknown,
+    mergeStrategy: MetadataMergeStrategy,
+    maxCount: number | null | undefined,
+  ): string[] | undefined {
+    if (mergeStrategy === 'fillMissing') return this.isMissing(existingValue) ? fetchedGenres : undefined;
+    if (mergeStrategy !== 'mergeExisting') return fetchedGenres;
+
+    const existingGenres = Array.isArray(existingValue) ? existingValue.filter((value): value is string => typeof value === 'string') : [];
+    const merged = mergeExistingGenres(existingGenres, fetchedGenres, maxCount);
+    return this.arraysEqual(merged, existingGenres) ? undefined : merged;
+  }
+
+  private arraysEqual(left: readonly string[], right: readonly string[]): boolean {
+    return left.length === right.length && left.every((value, index) => value === right[index]);
   }
 
   private isMissing(value: unknown): boolean {

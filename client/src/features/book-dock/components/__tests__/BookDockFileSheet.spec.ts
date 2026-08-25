@@ -18,7 +18,6 @@ vi.mock('../../composables/useBookDockDetail', () => ({
     saveError: ref(null),
     saveMetadata: mocks.saveMetadata,
     setTarget: vi.fn<(...args: unknown[]) => Promise<null>>().mockResolvedValue(null),
-    discardFile: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
     coverUrl: (id: number) => `/api/v1/book-dock/files/${id}/cover`,
   }),
 }))
@@ -247,5 +246,17 @@ describe('BookDockFileSheet metadata search defaults', () => {
         coverUrl: 'https://covers.example/dune.jpg',
       }),
     )
+  })
+
+  it('requests confirmation before discarding the file', async () => {
+    const dockFile = makeFile()
+    const wrapper = mountSheet(dockFile)
+    const discardButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Discard')
+
+    expect(discardButton).toBeDefined()
+    await discardButton!.trigger('click')
+
+    expect(wrapper.emitted('discard')).toEqual([[dockFile]])
+    expect(wrapper.emitted('close')).toBeUndefined()
   })
 })

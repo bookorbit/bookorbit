@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Permission } from '@bookorbit/types';
+import { isAudioFormat, Permission } from '@bookorbit/types';
 import type { ContentFilterRules, ReadStatus } from '@bookorbit/types';
 import { and, asc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -259,7 +259,8 @@ export class HardcoverRepository {
         startedAt: schema.userBookStatus.startedAt,
         finishedAt: schema.userBookStatus.finishedAt,
         rating: schema.userBookRatings.rating,
-        progress: maxProgressSq.maxProgress,
+        readingProgress: maxProgressSq.maxProgress,
+        audioProgress: schema.audiobookProgress.percentage,
         attemptsUpdatedAt: attemptsSq.updatedAt,
       })
       .from(schema.books)
@@ -267,6 +268,7 @@ export class HardcoverRepository {
       .leftJoin(schema.bookMetadata, eq(schema.bookMetadata.bookId, schema.books.id))
       .leftJoin(schema.userBookRatings, and(eq(schema.userBookRatings.bookId, schema.books.id), eq(schema.userBookRatings.userId, userId)))
       .leftJoin(maxProgressSq, eq(maxProgressSq.bookId, schema.books.id))
+      .leftJoin(schema.audiobookProgress, and(eq(schema.audiobookProgress.bookId, schema.books.id), eq(schema.audiobookProgress.userId, userId)))
       .leftJoin(firstAuthorSq, eq(firstAuthorSq.bookId, schema.books.id))
       .leftJoin(attemptsSq, eq(attemptsSq.bookId, schema.books.id))
       .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId));
@@ -280,7 +282,11 @@ export class HardcoverRepository {
         ? await filtered
         : await filtered.orderBy(asc(schema.bookMetadata.title), asc(schema.books.id)).limit(options.limit);
 
-    return rows as BookSyncData[];
+    return rows.map(({ readingProgress, audioProgress, ...row }) => ({
+      ...row,
+      status: row.status as string,
+      progress: row.format && isAudioFormat(row.format) ? audioProgress : readingProgress,
+    }));
   }
 
   async findReadingAttempts(userId: number, bookId: number) {

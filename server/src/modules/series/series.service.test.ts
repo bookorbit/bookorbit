@@ -12,6 +12,7 @@ describe('SeriesService', () => {
     findPage: vi.fn(),
     findDetail: vi.fn(),
     findBookIds: vi.fn(),
+    findNextReadableBook: vi.fn(),
     countSeries: vi.fn(),
   };
 
@@ -456,6 +457,60 @@ describe('SeriesService', () => {
     it('counts duplicate editions of one entry as a single owned position', async () => {
       // Two files for #1 plus #3: bookCount 3 matches the three index rows, so the total is trusted.
       expect(await gapsFor(['1', '1', '3'], 3, 4)).toEqual([2, 4]);
+    });
+  });
+  describe('findNextBook', () => {
+    const row = { bookId: 91, title: 'Issue 10', seriesIndex: '10', fileId: 501, format: 'cbr' };
+
+    it('resolves the next book down to the file the reader should open', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(row);
+
+      await expect(service.findNextBook(reqUser(), 42, 90, { formatGroup: 'cbx' })).resolves.toEqual({
+        next: { bookId: 91, fileId: 501, format: 'cbr', title: 'Issue 10', seriesIndex: '10' },
+      });
+    });
+
+    it('limits candidates to the formats the requesting reader can open', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(null);
+
+      await service.findNextBook(reqUser(), 42, 90, { formatGroup: 'cbx' });
+
+      const params = seriesRepo.findNextReadableBook.mock.calls[0]![0];
+      expect(params).toMatchObject({ seriesId: 42, bookId: 90, libraryIds: [1, 2] });
+      expect([...params.formats].sort()).toEqual(['cb7', 'cbr', 'cbz']);
+    });
+
+    it('allows every readable format when no group is requested', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(null);
+
+      await service.findNextBook(reqUser(), 42, 90, {});
+
+      const params = seriesRepo.findNextReadableBook.mock.calls[0]![0];
+      expect(params.formats).toEqual(expect.arrayContaining(['epub', 'pdf', 'cbz', 'm4b']));
+    });
+
+    it('applies the user content filters and exempts superusers', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(null);
+      const filtered = { ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES };
+
+      await service.findNextBook(filtered as any, 42, 90, { formatGroup: 'cbx' });
+      expect(seriesRepo.findNextReadableBook.mock.calls[0]![0].contentFilters).toBe(EMPTY_CONTENT_FILTER_RULES);
+
+      await service.findNextBook(reqUser(7, true), 42, 90, { formatGroup: 'cbx' });
+      expect(seriesRepo.findNextReadableBook.mock.calls[1]![0].contentFilters).toBeUndefined();
+    });
+
+    it('returns no next book without querying when the user has no library access', async () => {
+      libraryService.findAll.mockResolvedValue([]);
+
+      await expect(service.findNextBook(reqUser(), 42, 90, {})).resolves.toEqual({ next: null });
+      expect(seriesRepo.findNextReadableBook).not.toHaveBeenCalled();
+    });
+
+    it('returns no next book when the candidate file has no format', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue({ ...row, format: null });
+
+      await expect(service.findNextBook(reqUser(), 42, 90, {})).resolves.toEqual({ next: null });
     });
   });
 });

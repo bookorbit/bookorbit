@@ -41,6 +41,27 @@ export function applyGenreFetchOptions(
   return resolved;
 }
 
+export function mergeExistingGenres(
+  existingGenres: readonly string[] | undefined,
+  incomingGenres: readonly string[],
+  maxCount: number | null | undefined,
+): string[] {
+  const merged = applyGenreFetchOptions(existingGenres, new Set(), null);
+  const seen = new Set(merged.map((genre) => genre.toLowerCase()));
+
+  for (const raw of incomingGenres) {
+    const genre = raw.trim();
+    const token = genre.toLowerCase();
+    if (!genre || seen.has(token)) continue;
+    if (maxCount !== null && maxCount !== undefined && merged.length >= maxCount) break;
+
+    seen.add(token);
+    merged.push(genre);
+  }
+
+  return merged;
+}
+
 export function applyGenreFetchOptionsToCandidate<T extends { genres?: string[] }>(
   candidate: T,
   blockedTokens: ReadonlySet<string>,

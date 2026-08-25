@@ -184,6 +184,19 @@ describe('HardcoverRepository', () => {
     expect(mainSelect).toHaveProperty('format');
   });
 
+  it('uses audiobook progress for an audiobook sync snapshot', async () => {
+    const { repo, db } = makeRepository();
+    const chain: Record<string, unknown> = {};
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where', 'groupBy', 'as']) {
+      chain[method] = vi.fn().mockReturnValue(chain);
+    }
+    chain.then = (resolve: (rows: unknown[]) => void) => resolve([{ bookId: 42, format: 'm4b', readingProgress: null, audioProgress: 37.5 }]);
+    db.select.mockImplementation(() => chain);
+
+    await expect(repo.findSyncableBooks(7)).resolves.toEqual([{ bookId: 42, format: 'm4b', progress: 37.5 }]);
+    expect(chain.leftJoin).toHaveBeenCalledWith(schema.audiobookProgress, expect.anything());
+  });
+
   it('findSyncableBook returns a book from findSyncableBooks', async () => {
     const { repo } = makeRepository();
     const findSyncableBooksForUser = vi.spyOn(repo as any, 'findSyncableBooksForUser');

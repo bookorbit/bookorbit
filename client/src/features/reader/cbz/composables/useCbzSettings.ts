@@ -24,6 +24,7 @@ export function useCbzSettings() {
   const forceTwoPage = ref(false)
   const widePageSingletonMode = ref<WidePageSingletonMode>('auto')
   const bgColor = ref<BgColor>('black')
+  const autoAdvance = ref(false)
 
   const bgValue = computed(() => CBZ_BG_VALUES[bgColor.value])
 
@@ -52,6 +53,7 @@ export function useCbzSettings() {
     forceTwoPage,
     widePageSingletonMode,
     bgColor,
+    autoAdvance,
     bgValue,
     isTwoPage,
     imgFitClass,

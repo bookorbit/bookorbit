@@ -148,6 +148,62 @@ describe('HardcoverSyncService', () => {
       expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ hardcoverUserBookId: 55, hardcoverReadId: 77 }));
     });
 
+    it('syncs audiobook progress in seconds using the matched edition duration', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue({ ...readingBook, format: 'm4b' });
+      mockMatchService.matchBook.mockResolvedValue({
+        hardcoverBookId: 10,
+        hardcoverEditionId: 20,
+        editionPages: null,
+        editionAudioSeconds: 3600,
+        matchMethod: 'cached',
+      });
+      mockClient.query
+        .mockResolvedValueOnce({ insert_user_book: { user_book: { id: 55 }, error: null } })
+        .mockResolvedValueOnce({ update_user_book: { user_book: { id: 55 }, error: null } })
+        .mockResolvedValueOnce({ user_book_reads: [] })
+        .mockResolvedValueOnce({ insert_user_book_read: { user_book_read: { id: 77 }, error: null } });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        4,
+        1,
+        'tok',
+        expect.stringContaining('mutation InsertUserBookRead'),
+        expect.objectContaining({
+          object: expect.objectContaining({
+            progress_seconds: 1512,
+            edition_id: 20,
+          }),
+        }),
+      );
+      expect(mockClient.query.mock.calls[3]?.[3]?.object).not.toHaveProperty('progress_pages');
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ lastSyncedProgress: 42, syncError: null }));
+    });
+
+    it('fails audiobook progress sync when the matched edition has no duration', async () => {
+      const errorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue({ ...readingBook, format: 'm4b' });
+      mockMatchService.matchBook.mockResolvedValue({
+        hardcoverBookId: 10,
+        hardcoverEditionId: 20,
+        editionPages: null,
+        editionAudioSeconds: null,
+        matchMethod: 'cached',
+      });
+      mockClient.query
+        .mockResolvedValueOnce({ insert_user_book: { user_book: { id: 55 }, error: null } })
+        .mockResolvedValueOnce({ update_user_book: { user_book: { id: 55 }, error: null } });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('failed');
+
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith(expect.objectContaining({ syncError: 'missing_edition_audio_seconds' }));
+      expect(mockClient.query).not.toHaveBeenCalledWith(1, 'tok', expect.stringContaining('UserBookRead'), expect.anything());
+      errorSpy.mockRestore();
+    });
+
     it('fails when progress is present but the matched edition has no page count', async () => {
       const errorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
       mockSettingsService.getTokenForUser.mockResolvedValue('tok');
@@ -345,7 +401,7 @@ describe('HardcoverSyncService', () => {
         expect.objectContaining({ id: 899, object: expect.objectContaining({ progress_pages: 126 }) }),
       );
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[hardcover.sync_progress] [end] userId=1 bookId=1'));
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('progress=42 progressPages=126 - progress sent to Hardcover'));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('progress=42 progressPages=126 progressSeconds=null - progress sent to Hardcover'));
       logSpy.mockRestore();
     });
 
