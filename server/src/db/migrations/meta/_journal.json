@@ -544,8 +544,15 @@
     {
       "idx": 77,
       "version": "7",
-      "when": 1787615305280,
-      "tag": "0077_add_origin_country",
+      "when": 1787678883089,
+      "tag": "0077_add_notification_coalescing",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1787684508540,
+      "tag": "0078_add_origin_country",
       "breakpoints": true
     }
   ]

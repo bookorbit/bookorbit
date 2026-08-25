@@ -48,6 +48,12 @@ describe('FileRenameRepository', () => {
           innerJoin: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockResolvedValue([{ name: 'Frank Herbert' }, { name: 'Brian Herbert' }]),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockResolvedValue([{ name: 'Simon Vance' }]),
         }),
     };
 
@@ -79,6 +85,7 @@ describe('FileRenameRepository', () => {
         seriesIndex: '1',
       },
       authors: ['Frank Herbert', 'Brian Herbert'],
+      narrators: ['Simon Vance'],
     });
   });
 

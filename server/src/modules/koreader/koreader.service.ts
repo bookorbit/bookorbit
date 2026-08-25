@@ -4,9 +4,12 @@ import { createHash } from 'crypto';
 
 import { DEFAULT_KOREADER_DEVICE_PATTERN, type KoreaderBookSyncInfo, type KoreaderDeviceInfo, type KoreaderSyncStatus } from '@bookorbit/types';
 import { StatsCache } from '../../common/cache/stats-cache';
+import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { syncEstimateSessionId } from '../../common/utils/sync-estimate-session.utils';
 import { isSemverNewer } from '../../common/utils/semver.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { KoreaderRepository, type DeviceProgressUpsert } from './koreader.repository';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
@@ -16,10 +19,12 @@ import { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { isPagedReadingFormat, parseKoreaderPageNumber } from './koreader-progress-position.util';
 import { BookService } from '../book/book.service';
 import { PositionConverterService } from '../position-converter/position-converter.service';
+import { ReadingSessionService } from '../reading-session/reading-session.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED } from '../achievement/achievement-events.service';
 
 const BCRYPT_ROUNDS = 12;
 const SYNC_EVENT = 'koreader.sync';
+const SYNC_SESSION_EVENT = 'koreader.sync_session';
 const CREDENTIALS_EVENT = 'koreader.credentials';
 const DEVICE_REMOVE_EVENT = 'koreader.device_remove';
 const DEVICE_RETIRE_EVENT = 'koreader.device_retire';
@@ -42,6 +47,20 @@ const RESET_REFLOWABLE_POSITION = '/body/DocFragment[1]/body';
  * would stay held forever.
  */
 const RESET_CONVERGED_PERCENTAGE_FALLBACK = 0.01;
+/**
+ * Bounds on a reading session estimated from the gap between two sync pushes. Below the floor
+ * the gap is a page turn rather than a sitting; above the ceiling it is mostly idle time, and
+ * recording it whole would credit a night's sleep as reading.
+ */
+const MIN_SYNC_SESSION_SECONDS = 60;
+const MAX_SYNC_SESSION_SECONDS = 30 * 60;
+/**
+ * How long a device is still treated as reporting its own page timings after its last sweep.
+ * Bounded rather than permanent: a plugin that is removed, or quietly stops working, would
+ * otherwise leave that device unable to have its reading recorded ever again. An estimate that
+ * does turn out to overlap a later sweep's measured session is retired by that sweep.
+ */
+const PLUGIN_SWEEP_SILENCE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** `format` routes the incoming position to the cfi or the pageNumber column. */
 export interface KoreaderProgressBookFile {
@@ -49,6 +68,20 @@ export interface KoreaderProgressBookFile {
   bookId: number;
   libraryId: number;
   format: string | null;
+}
+
+/** What one applied sync push changed, for callers that have to reason about the move it made. */
+export interface KoreaderProgressApplyResult {
+  /** Whether shared reading progress moved; false when the push was held behind a reset. */
+  shared: boolean;
+  /** BookOrbit-scale position held before this push, across every device of this user. */
+  previousPercentage: number | null;
+  /** BookOrbit-scale position this push wrote. */
+  percentage: number;
+  /** When this same device last pushed a position for this file, before this push. */
+  deviceLastPushedAt: Date | null;
+  /** BookOrbit-scale position this same device last reported for this file, before this push. */
+  deviceLastPercentage: number | null;
 }
 
 export interface BulkProgressEntry {
@@ -72,6 +105,7 @@ export class KoreaderService {
     private readonly positionConverter: PositionConverterService,
     private readonly bookService: BookService,
     private readonly packageService: KoreaderPackageService,
+    private readonly readingSessions: ReadingSessionService,
   ) {}
 
   async createCredentials(userId: number, username: string, password: string) {
@@ -147,9 +181,10 @@ export class KoreaderService {
   }
 
   async saveProgress(
-    userId: number,
+    user: RequestUser,
     data: { document: string; percentage: number; progress?: string; device?: string; device_id?: string; timestamp?: number },
   ) {
+    const userId = user.id;
     const startedAt = Date.now();
     const device = data.device || DEFAULT_DEVICE;
     const deviceId = data.device_id || createHash('md5').update(`${device}:${userId}`).digest('hex').slice(0, 16); // codeql[js/weak-cryptographic-algorithm] - non-security device identifier
@@ -166,13 +201,15 @@ export class KoreaderService {
       throw new NotFoundException('Book not found for the given document hash');
     }
 
-    await this.applyProgressForResolvedFile(userId, bookFile, {
+    const applied = await this.applyProgressForResolvedFile(userId, bookFile, {
       percentage: data.percentage,
       progress: data.progress,
       device,
       deviceId,
       timestamp: data.timestamp,
     });
+
+    await this.recordSyncedReadingSession(user, bookFile, deviceId, applied);
 
     this.logger.log(
       `[${SYNC_EVENT}] [end] userId=${userId} bookFileId=${bookFile.id} device=${device} durationMs=${Date.now() - startedAt} percentage=${data.percentage} - save progress completed`,
@@ -186,10 +223,25 @@ export class KoreaderService {
     bookFile: KoreaderProgressBookFile,
     data: { percentage: number; progress?: string; device: string; deviceId: string; timestamp?: number },
     options?: { skipSharedProgress?: boolean },
-  ) {
+  ): Promise<KoreaderProgressApplyResult> {
     const chapterIndex = this.chapterService.parseChapterIndexFromProgress(data.progress ?? null);
 
     const previousDeviceProgress = await this.repo.getLatestDeviceProgress(bookFile.id, userId);
+    // No row at all means no row for this device either, and the newest one is this device's own
+    // whenever a single device syncs the book, so the second lookup is the multi-device case only.
+    const ownDeviceProgress = !previousDeviceProgress
+      ? null
+      : previousDeviceProgress.deviceId === data.deviceId
+        ? previousDeviceProgress
+        : await this.repo.getDeviceProgressForDevice(bookFile.id, userId, data.deviceId);
+
+    const result: KoreaderProgressApplyResult = {
+      shared: false,
+      previousPercentage: previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null,
+      percentage: toBookorbitPercentage(data.percentage),
+      deviceLastPushedAt: ownDeviceProgress?.updatedAt ?? null,
+      deviceLastPercentage: ownDeviceProgress?.percentage != null ? toBookorbitPercentage(ownDeviceProgress.percentage) : null,
+    };
 
     this.chapterExtractor.extractAndStoreChapters(bookFile.id).catch(() => {});
 
@@ -208,12 +260,90 @@ export class KoreaderService {
     // visible rather than letting activity accrue against a device the user cannot see.
     await this.repo.restoreDevice(userId, data.deviceId);
 
-    if (options?.skipSharedProgress) return;
+    if (options?.skipSharedProgress) return result;
 
-    if (!(await this.resolveResetHold(userId, bookFile, data))) return;
+    if (!(await this.resolveResetHold(userId, bookFile, data))) return result;
 
-    const previousPercentage = previousDeviceProgress?.percentage != null ? toBookorbitPercentage(previousDeviceProgress.percentage) : null;
-    await this.applySharedProgress(userId, bookFile, data, previousPercentage);
+    await this.applySharedProgress(userId, bookFile, data, result.previousPercentage);
+    result.shared = true;
+    return result;
+  }
+
+  /**
+   * Turns an advancing sync push into a reading session, for devices that can offer nothing
+   * better.
+   *
+   * The kosync protocol carries a position and nothing else: no page timings, no session
+   * boundaries, no idle detection. So the only evidence of reading time a plain KOReader
+   * install ever produces is the interval between two of its own pushes, and without this the
+   * reading log, the streak and every daily statistic show that device as having read nothing
+   * at all.
+   *
+   * The interval is capped rather than trusted. A device that goes quiet overnight and pushes
+   * again in the morning has not been reading the whole time, and the cap is what keeps a long
+   * idle gap from being recorded as a long read.
+   *
+   * Both the interval and the distance read come from this device's own previous row, so a
+   * second device syncing the same book in between cannot lend it either one.
+   *
+   * A device that has swept recently is excluded. It uploads KOReader's own page timings, which
+   * produce real sessions for the same reading, and estimating from its pushes as well would
+   * count that reading twice. The exclusion lapses once the device stops sweeping, so a removed
+   * or broken plugin does not silently retire the device from every statistic.
+   */
+  private async recordSyncedReadingSession(
+    user: RequestUser,
+    bookFile: KoreaderProgressBookFile,
+    deviceId: string,
+    applied: KoreaderProgressApplyResult,
+  ): Promise<void> {
+    if (!applied.shared || applied.deviceLastPushedAt === null || applied.deviceLastPercentage === null) return;
+
+    // Measured against this device's own last position, not the newest one across the shelf.
+    // Another device syncing a stale position in between makes it the newest row, and reading
+    // on from there would be scored as the whole distance between the two devices.
+    const progressDelta = applied.percentage - applied.deviceLastPercentage;
+    if (progressDelta <= 0) return;
+
+    const endedAt = new Date();
+    const elapsedSeconds = Math.floor((endedAt.getTime() - applied.deviceLastPushedAt.getTime()) / 1000);
+    if (elapsedSeconds < MIN_SYNC_SESSION_SECONDS) return;
+
+    const durationSeconds = Math.min(elapsedSeconds, MAX_SYNC_SESSION_SECONDS);
+    const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000);
+
+    const operationStartedAt = Date.now();
+
+    try {
+      if (await this.pluginRepo.hasSweepSince(user.id, deviceId, new Date(endedAt.getTime() - PLUGIN_SWEEP_SILENCE_MS))) return;
+
+      const sessionId = syncEstimateSessionId(deviceId, bookFile.id, applied.deviceLastPushedAt.getTime());
+
+      const result = await this.readingSessions.recordSyncedSession({
+        userId: user.id,
+        bookFileId: bookFile.id,
+        sessionId,
+        startedAt,
+        endedAt,
+        durationSeconds,
+        progressDelta,
+        endProgress: applied.percentage,
+        source: 'koreader',
+        timeZone: resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC'),
+      });
+
+      this.logger.log(
+        `[${SYNC_SESSION_EVENT}] [end] userId=${user.id} bookFileId=${bookFile.id} deviceId="${sanitizeLogValue(deviceId)}" durationMs=${Date.now() - operationStartedAt} durationSeconds=${durationSeconds} elapsedSeconds=${elapsedSeconds} outcome=${result.kind}${result.kind === 'skipped' ? ` reason=${result.reason}` : ''} - reading session estimated from sync progress`,
+      );
+    } catch (error) {
+      // A device retries the whole push on failure, so a session that cannot be stored must not
+      // take the position write down with it.
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const message = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+      this.logger.warn(
+        `[${SYNC_SESSION_EVENT}] [fail] userId=${user.id} bookFileId=${bookFile.id} deviceId="${sanitizeLogValue(deviceId)}" durationMs=${Date.now() - operationStartedAt} errorClass=${errorClass} error="${message}" - estimating a reading session from sync progress failed`,
+      );
+    }
   }
 
   /**

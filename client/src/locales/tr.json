@@ -1,1 +1,144 @@
-{}
+{
+  "common": {
+    "resetSortAria": "Sıralamayı varsayılana sıfırla",
+    "save": "Kaydet",
+    "cancel": "İptal Et",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "close": "Kapat",
+    "confirm": "Onayla",
+    "loading": "Yükleniyor...",
+    "search": "Ara",
+    "back": "Geri",
+    "next": "Sıradaki",
+    "previous": "Önceki",
+    "retry": "Tekrar Dene",
+    "yes": "Evet",
+    "no": "Hayır"
+  },
+  "settings": {
+    "privacySharing": {
+      "title": "Gizlilik & Paylaşım",
+      "subtitle": "Yöneticilerin okuma etkinliğinizin tanımlanabilir bir özetini görüp göremeyeceğini kontrol edin.",
+      "levelLegend": "Okuma içgörüleri paylaşım düzeyi",
+      "current": "Mevcut ayar",
+      "levels": {
+        "private": {
+          "title": "Özel",
+          "description": "Sadece sen okuma istatistiklerini görebilirsin."
+        },
+        "summary": {
+          "title": "Özeti paylaş",
+          "description": "Kitap adları, yazarlar, seriler veya seslendirenler olmaksızın toplu alışkanlıkları paylaşın."
+        },
+        "detailed": {
+          "title": "Detaylı analiz paylaş",
+          "description": "Ayrıca son ve en iyi kitapları, yazarları, serileri, türleri ve anlatıcıları paylaşın."
+        }
+      },
+      "fields": {
+        "frequency": "Okuma sıklığı ve aktif günler",
+        "completion": "Başlanan ve tamamlanan toplam kitap sayısı",
+        "formats": "Tür dağılımı",
+        "genres": "Geniş tür dağılımı",
+        "trend": "Genel okuma eğilimi",
+        "books": "Güncel, yeni ve en çok okunan kitaplar",
+        "authors": "En iyi yazarlar",
+        "series": "En iyi seriler",
+        "narrators": "En iyi anlatıcılar"
+      },
+      "confirm": {
+        "shareTitle": "{level} aktif edilsin mi?",
+        "shareDescription": "İzin sahibi olan yöneticiler aşağıdaki bilgileri görebileceklerdir.",
+        "stopTitle": "Okuma analizlerini paylaşmayı bırak?",
+        "stopDescription": "Yönetici erişimi derhal engellenecektir. Mevcut erişim kayıtları geçmişinizde kalmaya devam eder.",
+        "recordedNotice": "Her yönetici profili görüntülemesi kaydedilir ve erişim geçmişinizde görünür."
+      },
+      "preview": {
+        "title": "Paylaşılan profilinizi önizleyin",
+        "description": "Yetkili yöneticilerin erişimine açık olan mevcut bilgileri görüntüleyin.",
+        "action": "Önizlemeyi yükle",
+        "readingTime": "Okuma süresi",
+        "activeDays": "Aktif günler",
+        "started": "Başlanılan kitaplar",
+        "completed": "Bitirilen kitaplar",
+        "topBooks": "En iyi kitaplar"
+      },
+      "history": {
+        "title": "Profil erişim geçmişi",
+        "description": "Paylaşılan okuma profilinizin yakın zamandaki yönetici görüntülemeleri.",
+        "empty": "Hiçbir yönetici paylaşılan okuma profilinizi görüntülemedi."
+      }
+    },
+    "appearance": {
+      "theme": {
+        "accents": {
+          "fuchsia": "Fuşya",
+          "raspberry": "Ahududu",
+          "pink": "Pembe",
+          "white": "Beyaz",
+          "rosewater": "Gül Suyu",
+          "salmon": "Yavru Ağzı",
+          "coral": "Mercan",
+          "sand": "Kum",
+          "peach": "Şeftali",
+          "pear": "Armut",
+          "flax": "Keten",
+          "sprout": "Filiz",
+          "butter": "Tereyağı",
+          "aloe": "Aloe Vera",
+          "lemon": "Limon",
+          "foam": "Köpük",
+          "aqua": "Deniz Mavisi",
+          "celadon": "Seladon",
+          "sage": "Adaçayı",
+          "pistachio": "Antep Fıstığı",
+          "mint": "Nane",
+          "seafoam": "Deniz Köpüğü",
+          "baby-blue": "Bebek Mavisi",
+          "powder": "Pudra",
+          "sea-glass": "Deniz Camı",
+          "bluebell": "Cançiçeği",
+          "cornflower": "Peygamber Çiçeği",
+          "thistle": "Devedikeni",
+          "periwinkle": "Menekşe",
+          "wisteria": "Mor Salkım",
+          "lavender": "Lavanta",
+          "mauve": "Eflatun",
+          "orchid": "Orkide",
+          "rose-quartz": "Pembe Kuvars",
+          "blush": "Kırmızı"
+        },
+        "accentColor": {
+          "label": "Vurgu rengi"
+        },
+        "cornerRadius": {
+          "label": "Köşe yuvarlaklığı",
+          "hint": "Kartların ve arayüz öğelerinin yuvarlaklığı"
+        },
+        "surfaceBrightness": {
+          "label": "Yüzey parlaklığı",
+          "hint": "Karanlık mod yüzeylerini aydınlat",
+          "reset": "Sıfırla"
+        },
+        "libraryBackground": {
+          "title": "Kütüphane Arkaplanı",
+          "pattern": {
+            "label": "Arkaplan deseni",
+            "hint": "Kitap ızgarasının arkasında gözüken desen"
+          }
+        },
+        "backgroundGroups": {
+          "fundamental": "Temeller",
+          "structural": "Yapısal",
+          "ambient": "Ambiyans",
+          "refractive": "Kırılma"
+        }
+      },
+      "storage": {
+        "title": "Görünüş tercihlerini kaydetme yeri",
+        "active": "Aktif"
+      }
+    }
+  }
+}

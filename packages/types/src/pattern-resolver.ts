@@ -9,6 +9,7 @@ export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   title: "Neuromancer",
   subtitle: "20th Anniversary Edition",
   authors: "William Gibson",
+  narrators: "Robertson Dean",
   year: "1984",
   series: "Sprawl",
   seriesIndex: "01",
@@ -24,6 +25,7 @@ export const PATTERN_TOKENS = [
   { token: "title", description: "Book title" },
   { token: "subtitle", description: "Book subtitle" },
   { token: "authors", description: "Author(s), comma-separated" },
+  { token: "narrators", description: "Narrator(s), comma-separated" },
   { token: "year", description: "Publication year" },
   { token: "series", description: "Series name" },
   { token: "seriesIndex", description: "Series index (zero-padded)" },
@@ -90,6 +92,13 @@ export function applyModifier(value: string, modifier: string, fieldName: string
       }
       return target.charAt(0).toUpperCase();
     }
+    case "max3": {
+      const parts = value
+        .split(", ")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      return parts.length > 3 ? "" : parts.join(", ");
+    }
     case "upper":
       return value.toUpperCase();
     case "lower":
@@ -113,7 +122,11 @@ function resolveModifierPlaceholders(block: string, values: Record<string, strin
 
 function checkAllPlaceholdersPresent(block: string, values: Record<string, string>): boolean {
   const matches = [...block.matchAll(MODIFIER_PLACEHOLDER_REGEX)];
-  return matches.every((m) => values[m[1]]?.trim());
+  return matches.every(([, fieldName, modifier]) => {
+    const raw = values[fieldName] ?? "";
+    if (!raw.trim()) return false;
+    return (modifier ? applyModifier(raw, modifier, fieldName) : raw).trim().length > 0;
+  });
 }
 
 export function replacePlaceholders(pattern: string, values: Record<string, string>): string {

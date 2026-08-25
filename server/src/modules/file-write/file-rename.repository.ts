@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, libraries, libraryFolders } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookMetadata, bookNarrators, books, libraries, libraryFolders, narrators } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -35,6 +35,7 @@ export interface BookRenameData {
     seriesIndex: string | null;
   };
   authors: string[];
+  narrators: string[];
 }
 
 export interface BookFilePathUpdate {
@@ -81,12 +82,20 @@ export class FileRenameRepository {
 
     if (!row) return null;
 
-    const authorRows = await this.db
-      .select({ name: authors.name })
-      .from(bookAuthors)
-      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(eq(bookAuthors.bookId, bookId))
-      .orderBy(asc(bookAuthors.displayOrder));
+    const [authorRows, narratorRows] = await Promise.all([
+      this.db
+        .select({ name: authors.name })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(eq(bookAuthors.bookId, bookId))
+        .orderBy(asc(bookAuthors.displayOrder)),
+      this.db
+        .select({ name: narrators.name })
+        .from(bookNarrators)
+        .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+        .where(eq(bookNarrators.bookId, bookId))
+        .orderBy(asc(bookNarrators.displayOrder)),
+    ]);
 
     return {
       file: {
@@ -115,6 +124,7 @@ export class FileRenameRepository {
         seriesIndex: row.seriesIndex,
       },
       authors: authorRows.map((author) => author.name),
+      narrators: narratorRows.map((narrator) => narrator.name),
     };
   }
 

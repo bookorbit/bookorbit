@@ -6,6 +6,55 @@ import { htmlToPlainText } from '../../../../common/utils/html-to-text.utils';
 
 type ComicInfoObject = Record<string, unknown>;
 
+// ComicInfo elements are an xs:sequence, so a document only validates when they appear in this
+// order. Listed per v2.1; v2.0 is the same order minus the elements it does not define.
+const COMIC_INFO_ELEMENT_ORDER = [
+  'Title',
+  'Series',
+  'Number',
+  'Count',
+  'Volume',
+  'AlternateSeries',
+  'AlternateNumber',
+  'AlternateCount',
+  'Summary',
+  'Notes',
+  'Year',
+  'Month',
+  'Day',
+  'Writer',
+  'Penciller',
+  'Inker',
+  'Colorist',
+  'Letterer',
+  'CoverArtist',
+  'Editor',
+  'Translator',
+  'Publisher',
+  'Imprint',
+  'Genre',
+  'Tags',
+  'Web',
+  'PageCount',
+  'LanguageISO',
+  'Format',
+  'BlackAndWhite',
+  'Manga',
+  'Characters',
+  'Teams',
+  'Locations',
+  'ScanInformation',
+  'StoryArc',
+  'StoryArcNumber',
+  'SeriesGroup',
+  'AgeRating',
+  'Pages',
+  'CommunityRating',
+  'MainCharacterOrTeam',
+  'Review',
+  'GTIN',
+] as const;
+
 const PARSER = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -41,9 +90,11 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
   setComicInfoField(info, fieldMask, 'publisher', 'Publisher', payload.publisher);
   setComicInfoField(info, fieldMask, 'seriesName', 'Series', payload.seriesName);
   setIssueNumberField(info, fieldMask, payload);
-  setComicInfoField(info, fieldMask, 'comicVolumeName', 'Volume', payload.comicVolumeName);
+  // <Volume> is xs:int, but comicVolumeName holds a ComicVine volume name, which is usually a title
+  // ("Bone"). Emitting that makes strict readers discard the whole document, so keep only integers.
+  setComicInfoField(info, fieldMask, 'comicVolumeName', 'Volume', parseComicInfoInteger(payload.comicVolumeName));
   setComicInfoPublicationDate(info, fieldMask, payload);
-  setComicInfoField(info, fieldMask, 'pageCount', 'PageCount', payload.pageCount);
+  setComicInfoField(info, fieldMask, 'pageCount', 'PageCount', parseComicInfoInteger(payload.pageCount));
   setComicInfoField(info, fieldMask, 'language', 'LanguageISO', payload.language);
   setComicInfoField(info, fieldMask, 'authors', 'Writer', payload.authors?.length ? payload.authors.map((a) => a.name).join(', ') : null);
   setComicInfoField(info, fieldMask, 'genres', 'Genre', payload.genres?.length ? payload.genres.join(', ') : null);
@@ -86,8 +137,43 @@ export function buildComicInfoXml(existingXml: string | null, payload: BookWrite
     info['@_xmlns:xsd'] = 'http://www.w3.org/2001/XMLSchema';
   }
 
-  const xmlBody = BUILDER.build({ ComicInfo: info });
+  const xmlBody = BUILDER.build({ ComicInfo: orderComicInfoElements(info) });
   return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlBody}`;
+}
+
+function orderComicInfoElements(info: ComicInfoObject): ComicInfoObject {
+  const ordered: ComicInfoObject = {};
+
+  for (const [key, value] of Object.entries(info)) {
+    if (key.startsWith('@_')) ordered[key] = value;
+  }
+  for (const key of COMIC_INFO_ELEMENT_ORDER) {
+    if (key in info) ordered[key] = info[key];
+  }
+  for (const [key, value] of Object.entries(info)) {
+    if (!(key in ordered)) ordered[key] = value;
+  }
+
+  return ordered;
+}
+
+function parseComicInfoInteger(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isSafeInteger(value) ? value : null;
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!/^[+-]?\d+$/.test(trimmed)) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function setNumericComicInfoElement(info: ComicInfoObject, comicInfoKey: string, value: number | null): void {
+  if (value == null) {
+    delete info[comicInfoKey];
+    return;
+  }
+  info[comicInfoKey] = value;
 }
 
 function formatRating(val: number): string {
@@ -98,13 +184,13 @@ function setComicInfoPublicationDate(info: ComicInfoObject, fieldMask: Set<BookW
   const shouldWrite = fieldMask.has('publishedDate') || fieldMask.has('publishedYear');
   if (!shouldWrite) return;
   if (payload.publishedDate) {
-    info['Year'] = Number(payload.publishedDate.slice(0, 4));
-    info['Month'] = Number(payload.publishedDate.slice(5, 7));
-    info['Day'] = Number(payload.publishedDate.slice(8, 10));
+    setNumericComicInfoElement(info, 'Year', parseComicInfoInteger(payload.publishedDate.slice(0, 4)));
+    setNumericComicInfoElement(info, 'Month', parseComicInfoInteger(payload.publishedDate.slice(5, 7)));
+    setNumericComicInfoElement(info, 'Day', parseComicInfoInteger(payload.publishedDate.slice(8, 10)));
     return;
   }
   if (payload.publishedYear != null) {
-    info['Year'] = payload.publishedYear;
+    setNumericComicInfoElement(info, 'Year', parseComicInfoInteger(payload.publishedYear));
     delete info['Month'];
     delete info['Day'];
     return;

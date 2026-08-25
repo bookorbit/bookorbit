@@ -6,7 +6,7 @@ import { NotificationService } from './notification.service';
 describe('NotificationService', () => {
   let service: NotificationService;
   let repo: {
-    insertMany: ReturnType<typeof vi.fn>;
+    insertOrCollapse: ReturnType<typeof vi.fn>;
     findByUser: ReturnType<typeof vi.fn>;
     countUnread: ReturnType<typeof vi.fn>;
     setRead: ReturnType<typeof vi.fn>;
@@ -21,6 +21,8 @@ describe('NotificationService', () => {
   };
   let gateway: {
     emitNew: ReturnType<typeof vi.fn>;
+    emitUpdated: ReturnType<typeof vi.fn>;
+    emitRefresh: ReturnType<typeof vi.fn>;
     emitCountUpdate: ReturnType<typeof vi.fn>;
     emitRead: ReturnType<typeof vi.fn>;
     emitDismissed: ReturnType<typeof vi.fn>;
@@ -30,7 +32,7 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     repo = {
-      insertMany: vi.fn(),
+      insertOrCollapse: vi.fn(),
       findByUser: vi.fn(),
       countUnread: vi.fn(),
       setRead: vi.fn(),
@@ -45,6 +47,8 @@ describe('NotificationService', () => {
     };
     gateway = {
       emitNew: vi.fn(),
+      emitUpdated: vi.fn(),
+      emitRefresh: vi.fn(),
       emitCountUpdate: vi.fn(),
       emitRead: vi.fn(),
       emitDismissed: vi.fn(),
@@ -54,7 +58,7 @@ describe('NotificationService', () => {
     service = new NotificationService(repo as never, gateway as never);
   });
 
-  function makeInserted(userId: number, overrides?: Partial<{ id: number; type: string; title: string }>) {
+  function makeInserted(userId: number, overrides?: Partial<{ id: number; type: string; title: string; count: number }>) {
     return {
       id: overrides?.id ?? 1,
       userId,
@@ -64,7 +68,9 @@ describe('NotificationService', () => {
       actionUrl: null,
       meta: null,
       read: false,
+      count: overrides?.count ?? 1,
       createdAt: new Date('2024-01-01'),
+      updatedAt: new Date('2024-01-01'),
     };
   }
 
@@ -82,30 +88,30 @@ describe('NotificationService', () => {
   describe('notify()', () => {
     it('resolves user IDs for "user" scope', async () => {
       repo.findUserSettings.mockResolvedValue(new Map());
-      repo.insertMany.mockResolvedValue([makeInserted(42)]);
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(42)]);
 
       await service.notify(makePayload({ kind: 'user', userId: 42 }));
 
       expect(repo.findUserSettings).toHaveBeenCalledWith([42]);
-      expect(repo.insertMany).toHaveBeenCalled();
-      expect(repo.insertMany.mock.calls[0][0][0]).toMatchObject({ userId: 42 });
+      expect(repo.insertOrCollapse).toHaveBeenCalled();
+      expect(repo.insertOrCollapse.mock.calls[0][0][0]).toMatchObject({ userId: 42 });
     });
 
     it('resolves user IDs for "library" scope', async () => {
       repo.findUserIdsWithLibraryAccess.mockResolvedValue([10, 20]);
       repo.findUserSettings.mockResolvedValue(new Map());
-      repo.insertMany.mockResolvedValue([makeInserted(10), makeInserted(20, { id: 2 })]);
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(10), makeInserted(20, { id: 2 })]);
 
       await service.notify(makePayload({ kind: 'library', libraryId: 5 }));
 
       expect(repo.findUserIdsWithLibraryAccess).toHaveBeenCalledWith(5);
-      expect(repo.insertMany).toHaveBeenCalled();
+      expect(repo.insertOrCollapse).toHaveBeenCalled();
     });
 
     it('resolves user IDs for "permission" scope', async () => {
       repo.findUserIdsWithPermission.mockResolvedValue([30]);
       repo.findUserSettings.mockResolvedValue(new Map());
-      repo.insertMany.mockResolvedValue([makeInserted(30)]);
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(30)]);
 
       await service.notify(makePayload({ kind: 'permission', permission: Permission.NotificationAccess }));
 
@@ -115,12 +121,12 @@ describe('NotificationService', () => {
     it('resolves user IDs for "all" scope', async () => {
       repo.findAllActiveUserIds.mockResolvedValue([1, 2, 3]);
       repo.findUserSettings.mockResolvedValue(new Map());
-      repo.insertMany.mockResolvedValue([makeInserted(1), makeInserted(2, { id: 2 }), makeInserted(3, { id: 3 })]);
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(1), makeInserted(2, { id: 2 }), makeInserted(3, { id: 3 })]);
 
       await service.notify(makePayload({ kind: 'all' }));
 
       expect(repo.findAllActiveUserIds).toHaveBeenCalled();
-      expect(repo.insertMany.mock.calls[0][0]).toHaveLength(3);
+      expect(repo.insertOrCollapse.mock.calls[0][0]).toHaveLength(3);
     });
 
     it('skips when no target users resolved', async () => {
@@ -129,7 +135,7 @@ describe('NotificationService', () => {
       await service.notify(makePayload({ kind: 'all' }));
 
       expect(repo.findUserSettings).not.toHaveBeenCalled();
-      expect(repo.insertMany).not.toHaveBeenCalled();
+      expect(repo.insertOrCollapse).not.toHaveBeenCalled();
       expect(gateway.emitNew).not.toHaveBeenCalled();
     });
 
@@ -141,35 +147,35 @@ describe('NotificationService', () => {
           [20, {}],
         ]),
       );
-      repo.insertMany.mockResolvedValue([makeInserted(20)]);
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(20)]);
 
       await service.notify(makePayload({ kind: 'library', libraryId: 1 }));
 
-      const insertedRows = repo.insertMany.mock.calls[0][0];
+      const insertedRows = repo.insertOrCollapse.mock.calls[0][0];
       expect(insertedRows).toHaveLength(1);
       expect(insertedRows[0].userId).toBe(20);
     });
 
     it('defaults to enabled when no preferences set', async () => {
       repo.findUserSettings.mockResolvedValue(new Map([[42, {}]]));
-      repo.insertMany.mockResolvedValue([makeInserted(42)]);
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(42)]);
 
       await service.notify(makePayload({ kind: 'user', userId: 42 }));
 
-      expect(repo.insertMany).toHaveBeenCalled();
-      expect(repo.insertMany.mock.calls[0][0]).toHaveLength(1);
+      expect(repo.insertOrCollapse).toHaveBeenCalled();
+      expect(repo.insertOrCollapse.mock.calls[0][0]).toHaveLength(1);
     });
 
     it('inserts notifications and emits via gateway for each', async () => {
       repo.findAllActiveUserIds.mockResolvedValue([10, 20]);
       repo.findUserSettings.mockResolvedValue(new Map());
       const inserted = [makeInserted(10, { id: 1 }), makeInserted(20, { id: 2 })];
-      repo.insertMany.mockResolvedValue(inserted);
+      repo.insertOrCollapse.mockResolvedValue(inserted);
 
       await service.notify(makePayload({ kind: 'all' }, { message: 'Added 5 books', actionUrl: '/library/1', meta: { count: 5 } }));
 
-      expect(repo.insertMany).toHaveBeenCalledOnce();
-      const rows = repo.insertMany.mock.calls[0][0];
+      expect(repo.insertOrCollapse).toHaveBeenCalledOnce();
+      const rows = repo.insertOrCollapse.mock.calls[0][0];
       expect(rows[0]).toMatchObject({ userId: 10, type: 'scan_completed', title: 'Library scan completed' });
 
       expect(gateway.emitNew).toHaveBeenCalledTimes(2);
@@ -179,12 +185,12 @@ describe('NotificationService', () => {
 
     it('handles unknown notification type category - defaults to enabled', async () => {
       repo.findUserSettings.mockResolvedValue(new Map([[42, { notificationPreferences: { scanning: false } }]]));
-      repo.insertMany.mockResolvedValue([{ ...makeInserted(42), type: 'unknown_type' }]);
+      repo.insertOrCollapse.mockResolvedValue([{ ...makeInserted(42), type: 'unknown_type' }]);
 
       await service.notify(makePayload({ kind: 'user', userId: 42 }, { type: 'unknown_type' as never }));
 
-      expect(repo.insertMany).toHaveBeenCalled();
-      expect(repo.insertMany.mock.calls[0][0]).toHaveLength(1);
+      expect(repo.insertOrCollapse).toHaveBeenCalled();
+      expect(repo.insertOrCollapse.mock.calls[0][0]).toHaveLength(1);
     });
 
     it('catches and re-throws errors', async () => {
@@ -206,8 +212,114 @@ describe('NotificationService', () => {
 
       await service.notify(makePayload({ kind: 'user', userId: 42 }));
 
-      expect(repo.insertMany).not.toHaveBeenCalled();
+      expect(repo.insertOrCollapse).not.toHaveBeenCalled();
       expect(gateway.emitNew).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------- notification levels ----------
+
+  describe('notification levels', () => {
+    it('delivers a success at level "all"', async () => {
+      repo.findUserSettings.mockResolvedValue(new Map([[1, { notificationPreferences: { scanning: 'all' } }]]));
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(1)]);
+
+      await service.notify(makePayload({ kind: 'user', userId: 1 }, { type: 'scan_completed' }));
+
+      expect(repo.insertOrCollapse.mock.calls[0][0]).toHaveLength(1);
+    });
+
+    it('suppresses a success at level "problems" but still delivers the failure', async () => {
+      repo.findUserSettings.mockResolvedValue(new Map([[1, { notificationPreferences: { scanning: 'problems' } }]]));
+
+      await service.notify(makePayload({ kind: 'user', userId: 1 }, { type: 'scan_completed' }));
+      expect(repo.insertOrCollapse).not.toHaveBeenCalled();
+
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(1, { type: 'scan_failed' })]);
+      await service.notify(makePayload({ kind: 'user', userId: 1 }, { type: 'scan_failed' }));
+
+      expect(repo.insertOrCollapse.mock.calls[0][0]).toHaveLength(1);
+    });
+
+    it('treats a partial success as a problem so it survives level "problems"', async () => {
+      repo.findUserSettings.mockResolvedValue(new Map([[1, { notificationPreferences: { scanning: 'problems' } }]]));
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(1, { type: 'books_unavailable' })]);
+
+      await service.notify(makePayload({ kind: 'user', userId: 1 }, { type: 'books_unavailable' }));
+
+      expect(repo.insertOrCollapse.mock.calls[0][0]).toHaveLength(1);
+    });
+
+    it('suppresses everything at level "off"', async () => {
+      repo.findUserSettings.mockResolvedValue(new Map([[1, { notificationPreferences: { scanning: 'off' } }]]));
+
+      await service.notify(makePayload({ kind: 'user', userId: 1 }, { type: 'scan_failed' }));
+
+      expect(repo.insertOrCollapse).not.toHaveBeenCalled();
+    });
+
+    it('honours the legacy boolean shape without a migration', async () => {
+      repo.findUserSettings.mockResolvedValue(
+        new Map<number, Record<string, unknown>>([
+          [1, { notificationPreferences: { scanning: false } }],
+          [2, { notificationPreferences: { scanning: true } }],
+        ]),
+      );
+      repo.findUserIdsWithLibraryAccess.mockResolvedValue([1, 2]);
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(2)]);
+
+      await service.notify(makePayload({ kind: 'library', libraryId: 1 }, { type: 'scan_completed' }));
+
+      const rows = repo.insertOrCollapse.mock.calls[0][0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].userId).toBe(2);
+    });
+  });
+
+  // ---------- coalescing ----------
+
+  describe('coalescing', () => {
+    it('collapses a repeat into the existing row and emits an update, not a new notification', async () => {
+      repo.findUserSettings.mockResolvedValue(new Map([[1, {}]]));
+      repo.insertOrCollapse.mockResolvedValue([{ ...makeInserted(1, { count: 2 }) }]);
+
+      await service.notify(makePayload({ kind: 'user', userId: 1 }));
+
+      expect(repo.insertOrCollapse).toHaveBeenCalledOnce();
+      expect(gateway.emitNew).not.toHaveBeenCalled();
+      expect(gateway.emitUpdated).toHaveBeenCalledWith(1, expect.objectContaining({ count: 2 }));
+    });
+
+    it('groups by library so two libraries do not collapse into each other', async () => {
+      repo.findUserIdsWithLibraryAccess.mockResolvedValue([1]);
+      repo.findUserSettings.mockResolvedValue(new Map([[1, {}]]));
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(1)]);
+
+      await service.notify(makePayload({ kind: 'library', libraryId: 7 }));
+      await service.notify(makePayload({ kind: 'library', libraryId: 8 }));
+
+      expect(repo.insertOrCollapse.mock.calls[0][0][0].groupKey).toBe('scan_completed:library:7');
+      expect(repo.insertOrCollapse.mock.calls[1][0][0].groupKey).toBe('scan_completed:library:8');
+    });
+
+    it('groups per-item types by user so a bulk run collapses to one row', async () => {
+      repo.findUserSettings.mockResolvedValue(new Map([[3, {}]]));
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(3)]);
+
+      await service.notify(makePayload({ kind: 'user', userId: 3 }, { type: 'file_rename_completed' }));
+
+      expect(repo.insertOrCollapse.mock.calls[0][0][0].groupKey).toBe('file_rename_completed:user');
+    });
+
+    it('does not collapse distinct achievement or batch-summary notifications', async () => {
+      repo.findUserSettings.mockResolvedValue(new Map([[3, {}]]));
+      repo.insertOrCollapse.mockResolvedValue([makeInserted(3)]);
+
+      await service.notify(makePayload({ kind: 'user', userId: 3 }, { type: 'achievement_unlocked' }));
+      await service.notify(makePayload({ kind: 'user', userId: 3 }, { type: 'bulk_rename_completed' }));
+
+      expect(repo.insertOrCollapse.mock.calls[0][0][0].groupKey).toBeNull();
+      expect(repo.insertOrCollapse.mock.calls[1][0][0].groupKey).toBeNull();
     });
   });
 
@@ -223,7 +335,9 @@ describe('NotificationService', () => {
         actionUrl: '/lib/1',
         meta: { count: 3 },
         read: false,
+        count: 4,
         createdAt: new Date('2024-06-15T12:00:00Z'),
+        updatedAt: new Date('2024-06-15T18:00:00Z'),
       };
       repo.findByUser.mockResolvedValue({ items: [dbRow], total: 1 });
 
@@ -239,7 +353,9 @@ describe('NotificationService', () => {
         actionUrl: '/lib/1',
         meta: { count: 3 },
         read: false,
+        count: 4,
         createdAt: '2024-06-15T12:00:00.000Z',
+        updatedAt: '2024-06-15T18:00:00.000Z',
       });
     });
   });
@@ -346,16 +462,18 @@ describe('NotificationService', () => {
 
   describe('deleteOlderThan()', () => {
     it('calls repo with calculated cutoff date', async () => {
-      repo.deleteOlderThan.mockResolvedValue(10);
+      repo.deleteOlderThan.mockResolvedValue({ deleted: 10, userIds: [3, 7] });
       const now = new Date('2024-06-15T00:00:00Z');
       vi.setSystemTime(now);
 
-      const result = await service.deleteOlderThan(30);
+      const result = await service.runRetentionCleanup(30);
 
       expect(result).toBe(10);
       const cutoffArg = repo.deleteOlderThan.mock.calls[0][0] as Date;
       const expectedCutoff = new Date('2024-05-16T00:00:00Z');
       expect(cutoffArg.getTime()).toBe(expectedCutoff.getTime());
+      expect(gateway.emitRefresh).toHaveBeenCalledWith(3);
+      expect(gateway.emitRefresh).toHaveBeenCalledWith(7);
 
       vi.useRealTimers();
     });

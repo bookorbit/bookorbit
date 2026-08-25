@@ -70,6 +70,18 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
     this.server?.to(`user:${userId}`).emit('notification:new', notification);
   }
 
+  /**
+   * A collapsed occurrence. Separate from emitNew because the row was already unread and already
+   * counted; reusing emitNew would double-count the unread badge and the page total.
+   */
+  emitUpdated(userId: number, notification: NotificationItem): void {
+    this.server?.to(`user:${userId}`).emit('notification:updated', notification);
+  }
+
+  emitRefresh(userId: number): void {
+    this.server?.to(`user:${userId}`).emit('notification:refresh');
+  }
+
   emitCountUpdate(userId: number, count: number): void {
     this.server?.to(`user:${userId}`).emit('notification:unread-count', { count });
   }

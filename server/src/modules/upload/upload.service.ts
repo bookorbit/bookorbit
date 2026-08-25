@@ -6,7 +6,7 @@ import { Readable } from 'stream';
 import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -18,12 +18,13 @@ import { UploadValidatorService } from './upload-validator.service';
 import { UploadStorageService } from './upload-storage.service';
 import { UploadProcessorService } from './upload-processor.service';
 import { FileRenameService } from '../file-write/file-rename.service';
-import { resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
+import { isAudioFormat, resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
 import type { AddBookFileResult, UploadResult } from '@bookorbit/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
+import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
 import { computeFileHash } from '../scanner/lib/hash';
 import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
 
@@ -346,7 +347,7 @@ export class UploadService {
 
     if (pattern) {
       const stem = basename(filename, extname(filename));
-      const tokens = await this.buildPatternTokens(tempPath, format, stem, library.name);
+      const tokens = await this.buildUploadPatternTokens(tempPath, format, stem, library.name);
       if (library.organizationMode === 'book_per_file') {
         const resolvedFilename = resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform });
         if (resolvedFilename) {
@@ -385,9 +386,13 @@ export class UploadService {
     return { absolutePath, bookFolderPath, relPath };
   }
 
-  private async buildPatternTokens(tempPath: string, format: string, stem: string, libraryName?: string | null): Promise<Record<string, string>> {
-    const base: Record<string, string> = { originalFilename: stem, extension: format };
-    if (libraryName) base['library'] = libraryName;
+  private async buildUploadPatternTokens(
+    tempPath: string,
+    format: string,
+    stem: string,
+    libraryName?: string | null,
+  ): Promise<Record<string, string>> {
+    const fallback = buildPatternTokens({ metadata: {}, originalStem: stem, format, libraryName });
     const event = 'upload.pattern_tokens';
     const startedAt = Date.now();
 
@@ -402,6 +407,7 @@ export class UploadService {
         seriesIndex?: string | null;
         isbn13?: string | null;
         authors: { name: string }[];
+        narrators?: string[];
       } | null = null;
 
       if (format === 'epub') {
@@ -435,22 +441,20 @@ export class UploadService {
         if (pdf) {
           parsed = { title: pdf.title, publisher: pdf.publisher, authors: pdf.authors, seriesName: null, seriesIndex: null };
         }
+      } else if (isAudioFormat(format)) {
+        parsed = await extractAudioMetadata(tempPath);
       }
 
-      if (!parsed) return base;
+      if (!parsed) return fallback;
 
-      if (parsed.title) base['title'] = parsed.title;
-      if (parsed.subtitle) base['subtitle'] = parsed.subtitle;
-      if (parsed.publisher) base['publisher'] = parsed.publisher;
-      if (parsed.language) base['language'] = parsed.language;
-      if (parsed.isbn13) base['isbn'] = parsed.isbn13;
-      if (parsed.publishedYear) base['year'] = String(parsed.publishedYear);
-      if (parsed.seriesName) base['series'] = parsed.seriesName;
-      const seriesIndex = formatSeriesIndex(parsed.seriesIndex ?? null);
-      if (seriesIndex) base['seriesIndex'] = seriesIndex;
-      if (parsed.authors.length > 0) {
-        base['authors'] = parsed.authors.map((a) => a.name).join(', ');
-      }
+      return buildPatternTokens({
+        metadata: parsed,
+        authors: parsed.authors.map((author) => author.name),
+        narrators: parsed.narrators,
+        originalStem: stem,
+        format,
+        libraryName,
+      });
     } catch (err) {
       const { errorClass, errorMessage } = this.parseError(err);
       this.logger.warn(
@@ -458,7 +462,7 @@ export class UploadService {
       );
     }
 
-    return base;
+    return fallback;
   }
 
   private parseError(err: unknown): { errorClass: string; errorMessage: string } {

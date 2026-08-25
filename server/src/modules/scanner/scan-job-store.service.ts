@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { ScanTriggeredBy } from '@bookorbit/types';
 
 export interface ScanEntry {
   jobId: number;
   libraryId: number;
+  triggeredBy: ScanTriggeredBy;
   processed: number;
   total: number;
   added: number;
@@ -44,10 +46,11 @@ export class ScanJobStore {
     return this.pendingRescan.delete(libraryId);
   }
 
-  create(jobId: number, libraryId: number, total: number): ScanEntry {
+  create(jobId: number, libraryId: number, total: number, triggeredBy: ScanTriggeredBy): ScanEntry {
     const entry: ScanEntry = {
       jobId,
       libraryId,
+      triggeredBy,
       processed: 0,
       total,
       added: 0,

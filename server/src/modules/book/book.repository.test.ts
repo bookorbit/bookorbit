@@ -666,7 +666,7 @@ describe('BookRepository', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
-  it('merges metadata rows with ordered author names per book', async () => {
+  it('merges metadata rows with ordered author and narrator names per book', async () => {
     const metaRows = [
       {
         bookId: 10,
@@ -696,11 +696,16 @@ describe('BookRepository', () => {
       { bookId: 10, name: 'Coauthor' },
       { bookId: 11, name: 'Dan Simmons' },
     ];
+    const narratorRows = [
+      { bookId: 10, name: 'Simon Vance' },
+      { bookId: 10, name: 'Scott Brick' },
+    ];
 
     const metaChain = makeSelectChain('where', metaRows);
     const authorChain = makeSelectChain('orderBy', authorRows);
+    const narratorChain = makeSelectChain('orderBy', narratorRows);
     const db = {
-      select: vi.fn().mockReturnValueOnce(metaChain).mockReturnValueOnce(authorChain),
+      select: vi.fn().mockReturnValueOnce(metaChain).mockReturnValueOnce(authorChain).mockReturnValueOnce(narratorChain),
     };
 
     const repo = new BookRepository(db as never);
@@ -711,10 +716,12 @@ describe('BookRepository', () => {
       {
         ...metaRows[0],
         authors: ['Frank Herbert', 'Coauthor'],
+        narrators: ['Simon Vance', 'Scott Brick'],
       },
       {
         ...metaRows[1],
         authors: ['Dan Simmons'],
+        narrators: [],
       },
     ]);
   });

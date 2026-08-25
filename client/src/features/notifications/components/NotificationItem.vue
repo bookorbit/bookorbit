@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { X, FolderSync, BookOpen, PackageOpen, UserCheck, Mail, Tablet, ArrowRightLeft, FileDown, TriangleAlert, BookOpenCheck } from '@lucide/vue'
-import type { NotificationItem } from '@bookorbit/types'
+import { X, FolderSync, PackageOpen, Mail, ArrowRightLeft, FileDown, TriangleAlert, BookOpenCheck } from '@lucide/vue'
+import { NOTIFICATION_TYPE_META, NotificationSeverity, type NotificationItem, type NotificationTypeMeta } from '@bookorbit/types'
 import { useNotifications } from '../composables/useNotifications'
+import { NOTIFICATION_CATEGORY_ICONS } from '../lib/notification-category-groups'
 
 const props = defineProps<{ notification: NotificationItem }>()
 const emit = defineEmits<{ read: [id: number]; dismiss: [id: number] }>()
@@ -11,32 +12,17 @@ const emit = defineEmits<{ read: [id: number]; dismiss: [id: number] }>()
 const router = useRouter()
 const { formatRelativeTime } = useNotifications()
 
-const FAILED_TYPES = new Set([
-  'scan_failed',
-  'metadata_fetch_failed',
-  'author_enrichment_failed',
-  'email_failed',
-  'migration_failed',
-  'file_write_back_failed',
-  'file_rename_failed',
-])
-
-const WARNING_TYPES = new Set(['books_unavailable'])
-
-const ICON_MAP: Record<string, typeof FolderSync> = {
+// Only types whose icon should differ from their category's. Everything else falls back to the
+// category icon, so a new type can never render as the wrong thing by being forgotten here.
+const TYPE_ICON_OVERRIDES: Partial<Record<NotificationItem['type'], typeof FolderSync>> = {
   scan_completed: FolderSync,
   scan_failed: FolderSync,
   books_unavailable: TriangleAlert,
   books_restored: BookOpenCheck,
-  metadata_fetch_completed: BookOpen,
-  metadata_fetch_failed: BookOpen,
-  book_dock_ready: PackageOpen,
   book_dock_finalized: PackageOpen,
-  author_enrichment_completed: UserCheck,
-  author_enrichment_failed: UserCheck,
+  book_dock_finalized_with_errors: PackageOpen,
   email_sent: Mail,
   email_failed: Mail,
-  kobo_sync_completed: Tablet,
   migration_completed: ArrowRightLeft,
   migration_failed: ArrowRightLeft,
   file_write_back_completed: FileDown,
@@ -45,10 +31,14 @@ const ICON_MAP: Record<string, typeof FolderSync> = {
   file_rename_failed: FileDown,
 }
 
-const icon = computed(() => ICON_MAP[props.notification.type] ?? FolderSync)
-const isFailed = computed(() => FAILED_TYPES.has(props.notification.type))
-const isWarning = computed(() => WARNING_TYPES.has(props.notification.type))
-const relativeTime = computed(() => formatRelativeTime(props.notification.createdAt))
+const meta = computed(() => (NOTIFICATION_TYPE_META as Partial<Record<string, NotificationTypeMeta>>)[props.notification.type])
+const icon = computed(
+  () => TYPE_ICON_OVERRIDES[props.notification.type] ?? (meta.value ? NOTIFICATION_CATEGORY_ICONS[meta.value.category] : FolderSync),
+)
+const isFailed = computed(() => meta.value?.severity === NotificationSeverity.Error)
+const isWarning = computed(() => meta.value?.severity === NotificationSeverity.Warning)
+const relativeTime = computed(() => formatRelativeTime(props.notification.updatedAt))
+const occurrences = computed(() => props.notification.count)
 
 function handleClick() {
   if (!props.notification.read) {
@@ -98,7 +88,16 @@ function handleDismiss(e: Event) {
         <p class="truncate text-sm leading-tight" :class="notification.read ? 'text-foreground' : 'font-semibold text-foreground'">
           {{ notification.title }}
         </p>
-        <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime }}</span>
+        <div class="flex shrink-0 items-center gap-1.5">
+          <span
+            v-if="occurrences > 1"
+            class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground"
+            :aria-label="$t('notifications.occurrences', { count: occurrences })"
+          >
+            {{ $t('notifications.occurrencesShort', { count: occurrences }) }}
+          </span>
+          <span class="text-[11px] text-muted-foreground">{{ relativeTime }}</span>
+        </div>
       </div>
       <p v-if="notification.message" class="mt-1 text-xs text-muted-foreground truncate">
         {{ notification.message }}
@@ -106,7 +105,9 @@ function handleDismiss(e: Event) {
     </div>
 
     <button
-      class="mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+      type="button"
+      :aria-label="$t('notifications.dismiss')"
+      class="mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
       @click="handleDismiss"
     >
       <X :size="14" />

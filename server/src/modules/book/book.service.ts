@@ -20,7 +20,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { naturalCompare } from '../../common/utils/natural-sort.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
-import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
@@ -1372,23 +1372,15 @@ export class BookService {
     const pathExtension = extname(absolutePath).toLowerCase().slice(1);
     const extension = pathExtension || (format && format !== 'unknown' ? format : 'bin');
     const stem = basename(absolutePath, extname(absolutePath));
-    const tokens: Record<string, string> = { originalFilename: stem, extension };
 
-    if (!meta) return tokens;
-    if (meta.libraryName) tokens['library'] = meta.libraryName;
-    if (meta.title) tokens['title'] = meta.title;
-    if (meta.subtitle) tokens['subtitle'] = meta.subtitle;
-    if (meta.publisher) tokens['publisher'] = meta.publisher;
-    if (meta.language) tokens['language'] = meta.language;
-    if (meta.isbn13) tokens['isbn'] = meta.isbn13;
-    if (meta.publishedYear) tokens['year'] = String(meta.publishedYear);
-    if (meta.seriesName) tokens['series'] = meta.seriesName;
-
-    const seriesIndex = formatSeriesIndex(meta.seriesIndex);
-    if (seriesIndex) tokens['seriesIndex'] = seriesIndex;
-    if (meta.authors.length > 0) tokens['authors'] = meta.authors.join(', ');
-
-    return tokens;
+    return buildPatternTokens({
+      metadata: meta ?? {},
+      authors: meta?.authors,
+      narrators: meta?.narrators,
+      originalStem: stem,
+      format: extension,
+      libraryName: meta?.libraryName,
+    });
   }
 
   private async resolveDownloadFilenameForFile(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {

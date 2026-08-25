@@ -12,7 +12,7 @@ import { FileWatcherService } from '../scanner/file-watcher.service';
 import { LibraryRepository } from './library.repository';
 import type { BulkRenameBookData } from '../file-write/bulk-rename.repository';
 import { BulkRenameRepository } from '../file-write/bulk-rename.repository';
-import { buildTokens } from '../file-write/file-rename.utils';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 
 const CACHE_TTL_MS = 60_000;
 
@@ -262,7 +262,14 @@ export class BulkRenameService {
     try {
       const format = (book.format ?? extname(book.absolutePath).slice(1)).toLowerCase();
       const originalStem = basename(book.absolutePath, extname(book.absolutePath));
-      const tokens = buildTokens(book.metadata, book.authors, originalStem, format, book.libraryName);
+      const tokens = buildPatternTokens({
+        metadata: book.metadata,
+        authors: book.authors,
+        narrators: book.narrators,
+        originalStem,
+        format,
+        libraryName: book.libraryName,
+      });
       const resolvedRelPath = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
       if (!resolvedRelPath) {

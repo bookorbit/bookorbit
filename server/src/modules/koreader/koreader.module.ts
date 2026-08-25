@@ -10,6 +10,7 @@ import { BrowseCountsModule } from '../browse-counts/browse-counts.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
 import { OpdsModule } from '../opds/opds.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
+import { ReadingSessionModule } from '../reading-session/reading-session.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { UserModule } from '../user/user.module';
 import { UserBookNoteModule } from '../user-book-note/user-book-note.module';
@@ -48,6 +49,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
     DashboardModule,
     OpdsModule,
     PositionConverterModule,
+    ReadingSessionModule,
     RecommendationModule,
   ],
   controllers: [KoreaderController, KoreaderPluginController, KoreaderCatalogController],

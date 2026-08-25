@@ -14,6 +14,7 @@ const TOKEN_DESCRIPTION_KEYS: Record<PatternToken, string> = {
   title: 'settings.reader.fileNaming.tokenTitle',
   subtitle: 'settings.reader.fileNaming.tokenSubtitle',
   authors: 'settings.reader.fileNaming.tokenAuthors',
+  narrators: 'settings.reader.fileNaming.tokenNarrators',
   year: 'settings.reader.fileNaming.tokenYear',
   series: 'settings.reader.fileNaming.tokenSeries',
   seriesIndex: 'settings.reader.fileNaming.tokenSeriesIndex',
@@ -30,6 +31,7 @@ const MODIFIER_DESCRIPTION_KEYS: Record<PatternModifier, string> = {
   sort: 'settings.reader.fileNaming.modSort',
   initial: 'settings.reader.fileNaming.modInitial',
   fixed2: 'settings.reader.fileNaming.modFixed2',
+  max3: 'settings.reader.fileNaming.modMax3',
   upper: 'settings.reader.fileNaming.modUpper',
   lower: 'settings.reader.fileNaming.modLower',
 }

@@ -11,7 +11,7 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_READING_SESSION_SAVED } fro
 import type { CreateManualReadingSessionDto } from './dto/create-manual-reading-session.dto';
 import type { ListBookReadingSessionsDto } from './dto/list-book-reading-sessions.dto';
 import type { SaveReadingSessionDto } from './dto/save-reading-session.dto';
-import { ReadingSessionRepository } from './reading-session.repository';
+import { ReadingSessionRepository, type SaveReadingSessionResult } from './reading-session.repository';
 
 @Injectable()
 export class ReadingSessionService {
@@ -97,6 +97,82 @@ export class ReadingSessionService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Stores a session a device reported over a sync protocol rather than through the reader.
+   *
+   * Deliberately not `save()`: the caller resolved the file through the user's own accessible
+   * libraries and has already applied the position and the status change that came with it, so
+   * repeating the access check here would re-run one just done and the status update would run
+   * twice for a single push.
+   */
+  async recordSyncedSession(params: {
+    userId: number;
+    bookFileId: number;
+    sessionId: string;
+    startedAt: Date;
+    endedAt: Date;
+    durationSeconds: number;
+    progressDelta: number | null;
+    endProgress: number | null;
+    source: ReadingSessionSource;
+    timeZone: string;
+  }): Promise<SaveReadingSessionResult> {
+    const result = await this.repo.saveSession(
+      params.userId,
+      params.bookFileId,
+      params.sessionId,
+      params.startedAt,
+      params.endedAt,
+      params.durationSeconds,
+      params.progressDelta,
+      params.endProgress,
+      params.source,
+      params.timeZone,
+    );
+
+    if (result.kind === 'saved') {
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
+        userId: params.userId,
+        bookFileId: params.bookFileId,
+        durationSeconds: params.durationSeconds,
+        startedAt: params.startedAt,
+        endedAt: params.endedAt,
+        progressDelta: params.progressDelta,
+        endProgress: params.endProgress,
+        timezone: params.timeZone,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Retires the estimates a device made for reading the same device has since reported real
+   * page timings for. Prefixes are supplied by the caller, which owns both id formats.
+   */
+  async discardSupersededSyncEstimates(
+    user: RequestUser,
+    prefixes: { estimateSessionIdPrefix: string; measuredSessionIdPrefix: string },
+  ): Promise<{ deleted: number }> {
+    const event = 'reading_session.discard_sync_estimates';
+    const startedAtMs = Date.now();
+
+    const result = await this.repo.deleteSupersededSyncEstimates(
+      user.id,
+      prefixes.estimateSessionIdPrefix,
+      prefixes.measuredSessionIdPrefix,
+      this.resolveUserTimeZone(user),
+    );
+
+    if (result.deleted > 0) {
+      this.logger.log(
+        `[${event}] [end] userId=${user.id} durationMs=${Date.now() - startedAtMs} deleted=${result.deleted} - estimated sessions superseded by measured page timings`,
+      );
+    }
+
+    return result;
   }
 
   async createManualSession(bookId: number, dto: CreateManualReadingSessionDto, user: RequestUser): Promise<BookReadingSession> {

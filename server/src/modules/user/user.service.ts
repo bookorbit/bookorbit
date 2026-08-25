@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
@@ -6,6 +6,8 @@ import { Permission } from '@bookorbit/types';
 import type { ProvisioningMethod, UserAttentionResponse, UserListSummary, UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { ContentFilterRepository } from './content-filter.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSharedUserDto } from './dto/create-shared-user.dto';
@@ -17,12 +19,14 @@ import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
 import { UserRepository, type UserListQuery } from './user.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { UserStatisticsService } from '../user-statistics/user-statistics.service';
 
 /** The band is a to-do list, not a second roster. */
 const ATTENTION_BAND_LIMIT = 8;
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
   private readonly achievementEnabledCache = new Map<number, { enabled: boolean; expiresAt: number }>();
 
   constructor(
@@ -30,6 +34,7 @@ export class UserService {
     private readonly config: ConfigService,
     private readonly contentFilterRepo: ContentFilterRepository,
     private readonly appSettingsService: AppSettingsService,
+    private readonly userStatistics: UserStatisticsService,
   ) {}
 
   findByUsername(username: string) {
@@ -222,10 +227,65 @@ export class UserService {
   }
 
   async updateMySettings(userId: number, dto: UpdateMeSettingsDto) {
+    // Settings are merged server-side, so the stored row is the only place the outgoing
+    // timezone still exists. Read only when this write is the one that can replace it.
+    const touchesTimeZone = Object.prototype.hasOwnProperty.call(dto.settings, 'timezone');
+    const previousSettings = touchesTimeZone ? await this.userRepo.findSettingsById(userId) : null;
+
     const user = await this.userRepo.update(userId, { settings: dto.settings });
     if (!user) throw new NotFoundException('User not found');
     this.updateAchievementEnabledCache(userId, dto.settings);
+
+    if (touchesTimeZone) {
+      void this.rebuildReadingStatsForSubmittedTimeZone(userId, previousSettings, user.settings as Record<string, unknown> | null);
+    }
     return user;
+  }
+
+  /**
+   * Daily reading stats are stored per local day, so the timezone that produced a row is baked
+   * into it. The hourly aggregation only revisits the last couple of days, which leaves every
+   * older row attributed to the zone the user has just corrected, and a streak broken at the
+   * old day boundary stays broken. The rebuild is what makes the new setting retroactive.
+   *
+   * Submitting a timezone rebuilds even when it matches the stored one. The rebuild is
+   * idempotent, and skipping the unchanged case would make a failure permanent: the setting is
+   * saved either way, so saving it again is the only retry a user has, and that retry is
+   * exactly the case where nothing appears to have changed.
+   *
+   * A failure does not fail the save. The setting itself is already stored, and refusing the
+   * write would leave the user with neither the setting nor a way to ask for it again.
+   *
+   * Detached for the same reason the bootstrap backfill is: this walks the reader's whole
+   * history, and the response neither returns its result nor depends on it, so awaiting it
+   * would hold the request open for a long library and nothing else.
+   */
+  private async rebuildReadingStatsForSubmittedTimeZone(
+    userId: number,
+    previousSettings: Record<string, unknown> | null,
+    nextSettings: Record<string, unknown> | null,
+  ): Promise<void> {
+    const previousTimeZone = resolveTimeZone(previousSettings?.['timezone'], 'UTC');
+    const nextTimeZone = resolveTimeZone(nextSettings?.['timezone'], 'UTC');
+
+    const event = 'user.reading_stats_rebuild';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] userId=${userId} previousTimeZone="${sanitizeLogValue(previousTimeZone)}" timeZone="${sanitizeLogValue(nextTimeZone)}" - rebuilding daily reading stats after a timezone change`,
+    );
+
+    try {
+      const result = await this.userStatistics.rebuildDailyStatsForUser(userId, nextTimeZone);
+      this.logger.log(
+        `[${event}] [end] userId=${userId} timeZone="${sanitizeLogValue(nextTimeZone)}" durationMs=${Date.now() - startedAt} libraries=${result.libraries} deleted=${result.deleted} inserted=${result.inserted} - daily reading stats rebuilt`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const message = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+      this.logger.warn(
+        `[${event}] [fail] userId=${userId} timeZone="${sanitizeLogValue(nextTimeZone)}" durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${message}" - daily reading stats rebuild failed`,
+      );
+    }
   }
 
   async isAchievementEnabled(userId: number): Promise<boolean> {

@@ -1,5 +1,5 @@
 {
-  "id": "5f708b4a-dec1-445b-9863-b8a4302c8dcf",
+  "id": "6cbe2704-732a-4e70-9285-49bf6faa2f45",
   "prevId": "5632b98f-5fbc-433c-946e-d82d448c03ac",
   "version": "7",
   "dialect": "postgresql",
@@ -5744,12 +5744,6 @@
         "publisher": {
           "name": "publisher",
           "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "origin_country": {
-          "name": "origin_country",
-          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -12791,6 +12785,19 @@
           "notNull": true,
           "default": false
         },
+        "group_key": {
+          "name": "group_key",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -12854,6 +12861,64 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notifications_user_updated_at_idx": {
+          "name": "notifications_user_updated_at_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notifications_updated_at_idx": {
+          "name": "notifications_updated_at_idx",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "notifications_user_unread_group_key_idx": {
+          "name": "notifications_user_unread_group_key_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "group_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"notifications\".\"read\" = false and \"notifications\".\"group_key\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -37,7 +37,9 @@ function makeNotification(overrides: Partial<NotificationItem> = {}): Notificati
     actionUrl: null,
     meta: null,
     read: false,
+    count: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
 }
@@ -503,6 +505,94 @@ describe('useNotifications', () => {
       mockApi.mockReturnValueOnce(mockOk({ items: [makeNotification()], total: 1 }))
       await fetchNotifications(true)
       expect(hasMore.value).toBe(false)
+    })
+  })
+  describe('collapsed occurrences', () => {
+    function handlersFor(mockSocket: { on: { mock: { calls: unknown[][] } } }) {
+      const find = (event: string) => mockSocket.on.mock.calls.find(([name]: unknown[]) => name === event)?.[1] as (payload: never) => void
+      return { onNew: find('notification:new'), onUpdated: find('notification:updated'), onRefresh: find('notification:refresh') }
+    }
+
+    it('replaces the row in place without moving the unread badge or the page total', async () => {
+      const useNotifications = await loadModule()
+      const { subscribe, notifications, unreadCount, total } = useNotifications()
+      subscribe()
+
+      const { onNew, onUpdated } = handlersFor(mockSocket)
+      expect(onUpdated).toBeDefined()
+
+      onNew(makeNotification({ id: 7, title: 'Library scan completed' }) as never)
+      const unreadAfterNew = unreadCount.value
+      const totalAfterNew = total.value
+
+      onUpdated(makeNotification({ id: 7, title: 'Library scan completed', count: 12 }) as never)
+
+      expect(notifications.value.filter((n) => n.id === 7)).toHaveLength(1)
+      expect(notifications.value[0]!.count).toBe(12)
+      expect(unreadCount.value).toBe(unreadAfterNew)
+      expect(total.value).toBe(totalAfterNew)
+    })
+
+    it('surfaces the collapsed row to the top of the feed', async () => {
+      const useNotifications = await loadModule()
+      const { subscribe, notifications } = useNotifications()
+      subscribe()
+
+      const { onNew, onUpdated } = handlersFor(mockSocket)
+      onNew(makeNotification({ id: 1 }) as never)
+      onNew(makeNotification({ id: 2 }) as never)
+      expect(notifications.value[0]!.id).toBe(2)
+
+      onUpdated(makeNotification({ id: 1, count: 3 }) as never)
+
+      expect(notifications.value[0]!.id).toBe(1)
+      expect(notifications.value).toHaveLength(2)
+    })
+
+    it('surfaces an updated row that was outside the loaded page', async () => {
+      const useNotifications = await loadModule()
+      const { subscribe, notifications } = useNotifications()
+      subscribe()
+
+      const { onUpdated } = handlersFor(mockSocket)
+      onUpdated(makeNotification({ id: 999, count: 5 }) as never)
+
+      expect(notifications.value[0]!.id).toBe(999)
+      expect(notifications.value[0]!.count).toBe(5)
+    })
+
+    it('advances the pagination offset when an unloaded row moves into the page', async () => {
+      const useNotifications = await loadModule()
+      const { subscribe, fetchNotifications } = useNotifications()
+      mockApi.mockReturnValueOnce(
+        mockOk({
+          items: Array.from({ length: 20 }, (_, index) => makeNotification({ id: index + 1 })),
+          total: 30,
+        }),
+      )
+      await fetchNotifications(true)
+      subscribe()
+
+      handlersFor(mockSocket).onUpdated(makeNotification({ id: 25, count: 2 }) as never)
+      mockApi.mockReturnValueOnce(mockOk({ items: [], total: 30 }))
+      await fetchNotifications()
+
+      expect(mockApi).toHaveBeenLastCalledWith('/api/v1/notifications?limit=20&offset=21')
+    })
+
+    it('refreshes the page and unread count after retention cleanup', async () => {
+      const useNotifications = await loadModule()
+      const { subscribe, notifications, unreadCount } = useNotifications()
+      subscribe()
+      mockApi.mockReturnValueOnce(mockOk({ items: [makeNotification({ id: 4 })], total: 1 })).mockReturnValueOnce(mockOk({ count: 1 }))
+
+      const onRefresh = handlersFor(mockSocket).onRefresh
+      onRefresh(undefined as never)
+
+      await vi.waitFor(() => {
+        expect(notifications.value[0]?.id).toBe(4)
+        expect(unreadCount.value).toBe(1)
+      })
     })
   })
 })

@@ -470,7 +470,8 @@
         "book-covers": "Copertine di libri",
         "icons": "Icone",
         "layout": "Disposizione",
-        "behavior": "Comportamento"
+        "behavior": "Comportamento",
+        "language": "Lingua"
       }
     },
     "account": {
@@ -730,6 +731,7 @@
       "test": {
         "connected": "Connesso - {issuer}",
         "connectionFailed": "Connessione non riuscita",
+        "privateIssuerAddress": "L'URL dell'emittente si risolve a un indirizzo di rete privato o locale, quindi il server si è rifiutato di connettersi. Imposta OIDC_ALLOW_LOCAL_ISSUERS=true sul server BookOrbit per consentirlo.",
         "hide": "Nasconditi",
         "details": "Dettagli",
         "supported": "supportato",
@@ -781,10 +783,13 @@
         "updatesGroup": "Aggiornamenti",
         "importFromBooklore": "Importa da Booklore",
         "bookloreImportConfigured": "Importazione di Booklore configurata",
+        "importLibraryData": "Importa dati della libreria",
+        "migrationConfigured": "Origine della migrazione configurata",
         "migrationRunning": "Migrazione in corso",
         "migrationCompleted": "Migrazione completata",
         "migrationFailed": "La migrazione non è riuscita",
         "importDescription": "Importazione una tantum di libri, metadati e progressi di lettura da una precedente installazione di Booklore.",
+        "migrationDescription": "Importazione una tantum di libri, meta dati e progressi di lettura da una applicazione precedente.",
         "configuredDescription": "Fonte: {name}. Nessuna migrazione ancora eseguita: continua la configurazione per eseguire l'importazione.",
         "runningDescription": "Fase: {stage} - iniziata {started}",
         "completedDescription": "Da {name} - completato {date}",
@@ -826,6 +831,7 @@
       "migration": {
         "title": "Migrazione",
         "subtitle": "Importazione di Booklore una tantum: connetti l'origine, mappa gli utenti, esegui il test, avvia la migrazione ed esporta un report.",
+        "genericSubtitle": "Importazione della libreria una tantum: connetti l'origine, mappa gli utenti, esegui il test, avvia la migrazione ed esporta un report.",
         "progress": "Progresso",
         "stepSourceConnection": "Connessione alla sorgente",
         "stepUserPathMapping": "Mappatura utenti e percorsi",
@@ -919,13 +925,16 @@
         "reasonNoFilePathMatch": "Il percorso del file non corrisponde ad alcun libro in questa libreria",
         "reasonNoFileHashMatch": "L'hash del file non corrisponde ad alcun libro in questa libreria",
         "reasonNoIsbnMatch": "ISBN non corrisponde ad alcun libro in questa libreria",
+        "reasonNoAsinMatch": "L'ASIN non corrisponde ad alcun libro in questa libreria",
         "reasonInsufficientSourceData": "Metadati insufficienti per tentare la corrispondenza",
         "reasonAmbiguousIsbnMatch": "Più libri corrispondevano allo stesso ISBN",
+        "reasonAmbiguousAsinMatch": "Più libri corrispondevano allo stesso ASIN",
         "reasonAmbiguousFileHashMatch": "Più libri corrispondevano allo stesso hash del file",
         "reasonAmbiguousFilePathMatch": "Più libri corrispondevano allo stesso percorso file",
         "reasonAmbiguousTitleAuthorMatch": "Più libri corrispondevano allo stesso titolo e autore",
         "reasonUnknown": "Impossibile determinare il motivo",
         "strategyIsbn": "Corrispondente a ISBN",
+        "strategyAsin": "Abbinato via ASIN",
         "strategyFileHash": "Corrispondente all'hash del file",
         "strategyPathMapping": "Corrispondente al percorso del file mappato",
         "strategyTitleAuthor": "Corrispondenza per titolo e autore",
@@ -961,6 +970,7 @@
         "refresh": "Aggiorna",
         "sourceUser": "Utente di origine",
         "targetUser": "Utente di destinazione",
+        "doNotImport": "Non importare questo utente",
         "noSourceUsersLoaded": "Nessun utente di origine ancora caricato.",
         "noActiveTargetUsers": "Nessun utente target attivo trovato. Crea o riattiva un utente BookOrbit prima della mappatura.",
         "pathPrefixMappings": "Mappature dei prefissi del percorso",
@@ -1065,9 +1075,9 @@
         "syncMetadataToFiles": "Sincronizza i metadati sui file",
         "deleteLibrary": "Elimina libreria",
         "bookCount": "{count, plural, =0 {niente libri} one {# libro} other {# libri} many {# libri}}",
+        "folderCount": "{count, plural, =0 {nessuna cartella} one {# cartella} other {# cartelle} many {# cartelle}}",
         "fileMode": "Modalità file",
         "folderMode": "Modalità cartella",
-        "folderCount": "{count, plural, =0 {nessuna cartella} one {# cartella} other {# cartelle} many {# cartelle}}",
         "emptyTitle": "Nessuna libreria ancora",
         "emptyHint": "Aggiungi una libreria per iniziare a organizzare i tuoi libri.",
         "addFirstLibrary": "Aggiungi la tua prima libreria",
@@ -1092,7 +1102,50 @@
         "libraryDeleted": "\"{name}\" eliminato",
         "deleteFailed": "Impossibile eliminare la libreria",
         "refreshingCovers": "Copertine rinfrescanti {pct}% ({processed}/{total})",
-        "coversRefreshed": "Copertine aggiornate ({count} elaborate)"
+        "coversRefreshed": "Copertine aggiornate ({count} elaborate)",
+        "onDiskUnit": "{size} sul disco",
+        "noFilesIndexed": "Nessun file indicizzato",
+        "formatEntry": "{format} {count}",
+        "openLibrary": "Apri {name}",
+        "moreActions": "Altre azioni per {name}",
+        "statsFailed": "Impossibile caricare i conteggi delle librerie. Tutto il resto su questa pagina funziona ancora.",
+        "filterLabel": "Filtra librerie",
+        "filterPlaceholder": "Filtra per nome o percorso",
+        "filterClear": "Cancella filtro",
+        "sortLabel": "Ordina",
+        "noMatchesTitle": "Nessuna libreria corrisponde a quel filtro",
+        "noMatchesHint": "Nessuna corrispondenza per \"{query}\" per nome o percorso cartella.",
+        "neverScanned": "Mai scansionato",
+        "neverScannedHint": "Esegui una scansione per indicizzare le cartelle",
+        "scanFailedAt": "Non riuscito: {time}",
+        "scanningPercent": "Scansione al {pct}%",
+        "scanCounting": "Conteggio file",
+        "scanCounts": "{processed} di {total}",
+        "scanNoChange": "nessun cambiamento",
+        "outcomeSeparator": ", ",
+        "scanOutcome": "{trigger} - {outcome}",
+        "syncConfirmBody": "Questo sovrascriverà i metadati direttamente sul disco all'interno di ogni file supportato in {name}. Questa azione non può essere annullata.",
+        "columns": {
+          "library": "Biblioteca",
+          "contents": "Contenuti",
+          "onDisk": "Su disco",
+          "automation": "Automazione",
+          "lastScan": "Ultima scansione",
+          "actions": "Azioni"
+        },
+        "sort": {
+          "default": "Ordine predefinito",
+          "name": "Nome",
+          "books": "Libri",
+          "size": "Dimensione sul disco"
+        },
+        "detail": {
+          "allSupported": "Tutti i formati supportati",
+          "historyEmpty": "Questa biblioteca non è mai stata scansionata.",
+          "historyFailed": "Impossibile caricare la cronologia di scansione per questa libreria."
+        },
+        "scannedAt": "Scansionato alle {time}",
+        "detailRegion": "Dettagli per {name}"
       },
       "authorEnrichment": {
         "configuration": "Configurazione",
@@ -1119,7 +1172,25 @@
         "saveFailed": "Impossibile salvare le impostazioni di arricchimento dell'autore",
         "noEligibleAuthors": "Nessun autore idoneo trovato",
         "noAuthorsToEnrich": "Nessun autore da arricchire",
-        "queueFailed": "Impossibile mettere in coda il backfill dell'autore"
+        "queueFailed": "Impossibile mettere in coda il backfill dell'autore",
+        "fields": {
+          "description": "Biografia",
+          "photo": "Foto",
+          "birthDate": "Nato/a il",
+          "deathDate": "Deceduto/a il",
+          "website": "Sito web",
+          "genres": "Generi",
+          "influences": "Influenze"
+        },
+        "metadataPreferences": {
+          "title": "Fonti per i campi",
+          "hint": "Imposta l'ordine da cui ogni campo viene compilato. Il primo provider con un valore vince.",
+          "noProviders": "Nessun provider disponibile",
+          "saved": "Fonti per i campi salvate",
+          "saveFailed": "Impossibile salvare le fonti per i campi",
+          "limitedProviders": "{providers} fornisce solo biografie e foto.",
+          "addProvider": "Aggiungi {provider} come sorgente"
+        }
       },
       "scoreWeights": {
         "groupLabel": "Pesi del punteggio",
@@ -1128,6 +1199,10 @@
         "resetToDefaultsButton": "Ripristina le impostazioni predefinite",
         "recalculateAll": "Ricalcola tutto",
         "confirmReset": "Conferma il ripristino",
+        "resetDialog": {
+          "title": "Ripristinare ogni peso al suo valore predefinito?",
+          "description": "Tutti i 24 campi saranno ripristinati ai pesi di default di BookOrbit. Nulla viene salvato fino a quando non scegli Salva e riesegui i valori."
+        },
         "reset": "Ripristina",
         "recalculate": "Ricalcolare",
         "subtotal": "totale parziale: {count}",
@@ -1135,7 +1210,11 @@
         "saveFailed": "Impossibile salvare i pesi del punteggio",
         "recalcStarted": "Il ricalcolo del punteggio è iniziato in background",
         "recalcFailed": "Ricalcolo non riuscito",
-        "resetToDefaults": "I pesi vengono ripristinati ai valori predefiniti. Salva per applicare."
+        "resetToDefaults": "I pesi vengono ripristinati ai valori predefiniti. Salva per applicare.",
+        "howItWorks": {
+          "title": "Come funziona.",
+          "summary": "Ogni libro ottiene un punteggio su 100 in base a quanto sono completi i suoi metadati. Un peso è significativo solo accanto agli altri, quindi ogni campo sottostante mostra la parte di un punteggio finito di cui è responsabile. Raddoppiare ogni peso non cambia niente."
+        }
       },
       "tabs": {
         "users": "Utenti",

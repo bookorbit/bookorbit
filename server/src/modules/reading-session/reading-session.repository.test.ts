@@ -696,3 +696,94 @@ describe('ReadingSessionRepository - deleteSessionByBook', () => {
     expect(transaction).toHaveBeenCalledOnce();
   });
 });
+
+describe('ReadingSessionRepository - deleteSupersededSyncEstimates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function makeHarness(
+    supersededPages: Array<
+      Array<{ id: number; startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null; libraryId: number }>
+    >,
+    survivingByLibrary: Array<Array<{ startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null }>> = [],
+  ) {
+    const pages = [...supersededPages];
+    const remaining = [...survivingByLibrary];
+
+    // One chain serves both callers: the paged lookup takes .orderBy().limit(), the recompute
+    // awaits the .where() itself, so the chain is a thenable that also carries .orderBy.
+    const where = vi.fn(() => ({
+      orderBy: vi.fn().mockReturnValue({ limit: vi.fn(() => Promise.resolve(pages.shift() ?? [])) }),
+      then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+        Promise.resolve(remaining.shift() ?? []).then(resolve, reject),
+    }));
+    const select = vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where }) }) });
+
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
+    const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
+    const insert = vi.fn((table: unknown) => {
+      if (table === userReadingDailyStats) return { values: dailyValues };
+      throw new Error('Unexpected table in insert');
+    });
+
+    const tx = { execute: vi.fn().mockResolvedValue(undefined), select, delete: deleteFn, insert };
+    const transaction = vi.fn(async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx));
+    const repo = new ReadingSessionRepository({ transaction } as never);
+
+    return { repo, tx, deleteFn, dailyValues, transaction, select };
+  }
+
+  const estimate = (id: number, day: string, libraryId = 3) => ({
+    id,
+    startedAt: new Date(`${day}T10:00:00.000Z`),
+    endedAt: new Date(`${day}T10:30:00.000Z`),
+    durationSeconds: 1800,
+    progressDelta: 3,
+    libraryId,
+  });
+
+  it('keeps estimates that no measured session overlaps', async () => {
+    // A sweep that uploaded nothing, or only part of the history, must not erase the rest.
+    const { repo, deleteFn, dailyValues } = makeHarness([[]]);
+
+    await expect(repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:')).resolves.toEqual({ deleted: 0 });
+    expect(deleteFn).not.toHaveBeenCalled();
+    expect(dailyValues).not.toHaveBeenCalled();
+  });
+
+  it('deletes the overlapped estimates and rebuilds the days they were counted on', async () => {
+    const { repo, deleteFn, dailyValues } = makeHarness(
+      [[estimate(5, '2026-04-15')]],
+      // What survives that day: the measured session the plugin derived for the same reading.
+      [[{ startedAt: new Date('2026-04-15T10:02:00.000Z'), endedAt: new Date('2026-04-15T10:26:00.000Z'), durationSeconds: 1440, progressDelta: 3 }]],
+    );
+
+    await expect(repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:')).resolves.toEqual({ deleted: 1 });
+
+    expect(deleteFn).toHaveBeenCalledWith(readingSessions);
+    expect(dailyValues).toHaveBeenCalledWith([
+      expect.objectContaining({ day: '2026-04-15', readingSeconds: 1440, progressDelta: 3, sessionsCount: 1 }),
+    ]);
+  });
+
+  it('pages the selection rather than reading a whole history into memory', async () => {
+    const pageSize = 500;
+    const firstPage = Array.from({ length: pageSize }, (_, index) => estimate(index + 1, '2026-04-15'));
+    const { repo, deleteFn } = makeHarness([firstPage, [estimate(pageSize + 1, '2026-04-16')]], [[]]);
+
+    await expect(repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:')).resolves.toEqual({ deleted: pageSize + 1 });
+
+    // One delete per page, rather than one delete of everything gathered up front.
+    expect(deleteFn.mock.calls.filter((call) => call[0] === readingSessions)).toHaveLength(2);
+  });
+
+  it('does the whole retirement in one transaction', async () => {
+    const { repo, transaction } = makeHarness([[]]);
+
+    await repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:');
+
+    expect(transaction).toHaveBeenCalledOnce();
+  });
+});

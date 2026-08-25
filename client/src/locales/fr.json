@@ -48,7 +48,7 @@
         "narrators": "Meilleurs narrateurs"
       },
       "confirm": {
-        "shareTitle": "Autoriser {level} ?",
+        "shareTitle": "Activer {level} ?",
         "shareDescription": "Les administrateurs autorisés pourront voir les informations suivantes.",
         "stopTitle": "Arrêter de partager des informations sur la lecture ?",
         "stopDescription": "L'accès administrateur sera immédiatement bloqué. Les enregistrements d'accès existants restent dans votre historique.",
@@ -1075,9 +1075,9 @@
         "syncMetadataToFiles": "Synchroniser les métadonnées avec les fichiers",
         "deleteLibrary": "Supprimer la bibliothèque",
         "bookCount": "{count, plural, =0 {pas de livres} one {# livre} other {# livres} many {# livres}}",
+        "folderCount": "{count, plural, =0 {pas de dossiers} one {# dossier} other {# dossiers} many {# dossiers}}",
         "fileMode": "Mode fichier",
         "folderMode": "Mode dossier",
-        "folderCount": "{count, plural, =0 {pas de dossiers} one {# dossier} other {# dossiers} many {# dossiers}}",
         "emptyTitle": "Pas encore de bibliothèques",
         "emptyHint": "Ajoutez une bibliothèque pour commencer à organiser vos livres.",
         "addFirstLibrary": "Ajoutez votre première bibliothèque",
@@ -1599,6 +1599,7 @@
         "typography": "Typographie",
         "font": "Police",
         "fontHint": "Police utilisée pour le corps du texte",
+        "fontStyle": "Style de police",
         "builtInFonts": "Polices intégrées",
         "yourFonts": "Vos polices",
         "fontSize": "Taille de la police",
@@ -2107,7 +2108,13 @@
           "description": "Chaque compte BookOrbit ne peut avoir qu'un identifiant KOReader associé. Modifiez-le ici sans supprimer les données synchronisées.",
           "newPassword": "Nouveau mot de passe",
           "usernameInvalid": "Le nom d'utilisateur doit contenir entre 3 et 100 caractères.",
-          "passwordPlaceholder": "Laisser vide pour conserver le mot de passe actuel"
+          "passwordPlaceholder": "Laisser vide pour conserver le mot de passe actuel",
+          "passwordHint": "Laisser ce champ vide pour conserver le mot de passe actuel.",
+          "passwordInvalid": "Le mot de passe doit contenir entre 6 et 128 caractères.",
+          "showPassword": "Afficher le nouveau mot de passe",
+          "hidePassword": "Cacher le nouveau mot de passe",
+          "save": "Enregistrer les identifiants",
+          "saving": "Sauvegarde en cours..."
         },
         "creating": "Création...",
         "create": "Créer",
@@ -2125,6 +2132,7 @@
         "credentialsCreatedLabel": "Identifiants créés",
         "setup": "Configuration",
         "pluginServerUrl": "Serveur de plugins URL",
+        "syncUrl": "URL de synchronisation KOReader",
         "copied": "Copié",
         "copyUrl": "Copier URL",
         "preconfiguredPlugin": "Plugin BookOrbit préconfiguré",
@@ -2365,7 +2373,10 @@
     "nav": {
       "title": "Réglages",
       "ariaLabel": "Sections de réglages",
-      "searchPlaceholder": "Réglages de recherche"
+      "searchPlaceholder": "Réglages de recherche",
+      "groups": {
+        "library": "Galerie"
+      }
     }
   },
   "achievements": {

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, lt, lte, max, min, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, like, lt, lte, max, min, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -26,6 +26,7 @@ type Db = NodePgDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const MIN_READING_SESSION_SECONDS = 10;
+const ESTIMATE_CLEANUP_PAGE_SIZE = 500;
 
 export type SaveReadingSessionResult =
   | { kind: 'saved' }
@@ -377,6 +378,97 @@ export class ReadingSessionRepository {
       await this.recomputeDailyStats(tx, userId, libraryId, affectedDays, timeZone);
 
       return { found: true };
+    });
+  }
+
+  /**
+   * Drops the estimates a device made for reading it has since reported real page timings for.
+   *
+   * Scoped by overlap rather than by device, because a sweep is not proof that the measured
+   * history covers the estimated one. A device may upload no page stats at all, or only the
+   * window its local statistics database still holds, and deleting everything on the strength
+   * of "this device now has the plugin" would erase reading nothing replaced.
+   *
+   * Run on every sweep, not only the first. It is idempotent, it costs one indexed lookup when
+   * there is nothing to retire, and a sweep whose cleanup failed is retried by the next one
+   * rather than leaving the double count in place forever.
+   */
+  async deleteSupersededSyncEstimates(
+    userId: number,
+    estimateSessionIdPrefix: string,
+    measuredSessionIdPrefix: string,
+    timeZone = 'UTC',
+  ): Promise<{ deleted: number }> {
+    return this.db.transaction(async (tx) => {
+      const daysByLibrary = new Map<number, Set<string>>();
+      let deleted = 0;
+      let cursor = 0;
+
+      for (;;) {
+        const rows = await tx
+          .select({
+            id: readingSessions.id,
+            startedAt: readingSessions.startedAt,
+            endedAt: readingSessions.endedAt,
+            durationSeconds: readingSessions.durationSeconds,
+            progressDelta: readingSessions.progressDelta,
+            libraryId: books.libraryId,
+          })
+          .from(readingSessions)
+          .innerJoin(books, eq(books.id, readingSessions.bookId))
+          .where(
+            and(
+              eq(readingSessions.userId, userId),
+              like(readingSessions.sessionId, `${estimateSessionIdPrefix}%`),
+              gt(readingSessions.id, cursor),
+              sql`exists (
+                select 1
+                from reading_sessions measured
+                where measured.user_id = ${userId}
+                  and measured.session_id like ${`${measuredSessionIdPrefix}%`}
+                  and measured.started_at < ${readingSessions.endedAt}
+                  and measured.ended_at > ${readingSessions.startedAt}
+              )`,
+            ),
+          )
+          .orderBy(readingSessions.id)
+          .limit(ESTIMATE_CLEANUP_PAGE_SIZE);
+
+        if (rows.length === 0) break;
+        cursor = rows[rows.length - 1]!.id;
+
+        for (const row of rows) {
+          const days = daysByLibrary.get(row.libraryId) ?? new Set<string>();
+          for (const day of getReadingSessionDayKeys(
+            { startedAt: row.startedAt, endedAt: row.endedAt, durationSeconds: row.durationSeconds, progressDelta: row.progressDelta ?? null },
+            timeZone,
+          )) {
+            days.add(day);
+          }
+          daysByLibrary.set(row.libraryId, days);
+        }
+
+        // Deleted rows sit behind the cursor, so paging is unaffected by removing them.
+        await tx.delete(readingSessions).where(
+          and(
+            eq(readingSessions.userId, userId),
+            inArray(
+              readingSessions.id,
+              rows.map((row) => row.id),
+            ),
+          ),
+        );
+        deleted += rows.length;
+
+        if (rows.length < ESTIMATE_CLEANUP_PAGE_SIZE) break;
+      }
+
+      // Ascending so concurrent writers take the per-library locks in one order.
+      for (const libraryId of [...daysByLibrary.keys()].sort((a, b) => a - b)) {
+        await this.recomputeDailyStats(tx, userId, libraryId, [...daysByLibrary.get(libraryId)!], timeZone);
+      }
+
+      return { deleted };
     });
   }
 
