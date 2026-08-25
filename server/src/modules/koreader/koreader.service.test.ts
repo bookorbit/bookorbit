@@ -692,6 +692,28 @@ describe('KoreaderService', () => {
       expect(mockPositionConverter.xpointerPointToCfi).toHaveBeenCalledWith({ bookFileId: 44, pos: '/body/DocFragment[7]/body/p[3]/text().0' });
     });
 
+    it('logs the failure reason when the xpointer to cfi conversion fails', async () => {
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
+      mockPositionConverter.xpointerPointToCfi.mockResolvedValue({ status: 'failed', reason: 'unresolvable_structure' });
+
+      const written = await syncFormat('epub', '/body/DocFragment[7]/body/p[3]/text().0');
+
+      expect(written.cfi).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[koreader.progress_cfi_conversion] [fail] bookFileId=44 durationMs='));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('reason=unresolvable_structure'));
+    });
+
+    it('logs the thrown error when the xpointer to cfi conversion throws', async () => {
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
+      mockPositionConverter.xpointerPointToCfi.mockRejectedValue(new Error('epub dom worker crashed'));
+
+      const written = await syncFormat('epub', '/body/DocFragment[7]/body/p[3]/text().0');
+
+      expect(written.cfi).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[koreader.progress_cfi_conversion] [fail] bookFileId=44 durationMs='));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('errorClass=Error error="epub dom worker crashed"'));
+    });
+
     it('treats an unknown format as reflowable', async () => {
       const written = await syncFormat(null, '/body/DocFragment[7]');
 
