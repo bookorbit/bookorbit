@@ -237,7 +237,7 @@ export class UserService {
     this.updateAchievementEnabledCache(userId, dto.settings);
 
     if (touchesTimeZone) {
-      await this.rebuildReadingStatsForSubmittedTimeZone(userId, previousSettings, user.settings as Record<string, unknown> | null);
+      void this.rebuildReadingStatsForSubmittedTimeZone(userId, previousSettings, user.settings as Record<string, unknown> | null);
     }
     return user;
   }
@@ -255,6 +255,10 @@ export class UserService {
    *
    * A failure does not fail the save. The setting itself is already stored, and refusing the
    * write would leave the user with neither the setting nor a way to ask for it again.
+   *
+   * Detached for the same reason the bootstrap backfill is: this walks the reader's whole
+   * history, and the response neither returns its result nor depends on it, so awaiting it
+   * would hold the request open for a long library and nothing else.
    */
   private async rebuildReadingStatsForSubmittedTimeZone(
     userId: number,

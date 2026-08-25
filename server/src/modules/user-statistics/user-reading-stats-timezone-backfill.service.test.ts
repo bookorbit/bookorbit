@@ -101,4 +101,21 @@ describe('UserReadingStatsTimeZoneBackfillService', () => {
 
     expect(appSettings.setValue).not.toHaveBeenCalled();
   });
+
+  it('measures a failed pass from when it started, not from when it failed', async () => {
+    // The clock has to be read before run() is handed to catch(), or the failure log reports the
+    // moment it failed minus itself and every outright failure looks instant.
+    const error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    userStatistics.listUserIdsWithReadingHistory.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      throw new Error('database unavailable');
+    });
+
+    service.onApplicationBootstrap();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const message = String(error.mock.calls.at(-1)?.[0] ?? '');
+    expect(message).toContain('[fail]');
+    expect(Number(/durationMs=(\d+)/.exec(message)?.[1] ?? -1)).toBeGreaterThanOrEqual(20);
+  });
 });

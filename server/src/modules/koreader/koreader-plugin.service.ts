@@ -279,7 +279,7 @@ export class KoreaderPluginService {
       })
       .catch((error: unknown) => {
         this.logger.warn(
-          `[${SWEEP_EVENT}] [fail] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} errorClass=${error instanceof Error ? error.constructor.name : 'UnknownError'} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - discarding superseded sync estimates failed`,
+          `[${SWEEP_EVENT}] [fail] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} errorClass=${error instanceof Error ? error.constructor.name : 'UnknownError'} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - discarding superseded sync estimates failed`,
         );
       });
 

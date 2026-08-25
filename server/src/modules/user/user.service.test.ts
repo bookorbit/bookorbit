@@ -320,6 +320,28 @@ describe('UserService', () => {
     expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledTimes(2);
   });
 
+  it('answers the settings write without waiting for the rebuild to finish', async () => {
+    // The rebuild walks the reader's whole history and its result is never returned, so holding
+    // the response open for it only costs a long library its settings save.
+    userRepo.findSettingsById.mockResolvedValue({ timezone: 'UTC' });
+    userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax' } });
+
+    let finishRebuild!: () => void;
+    userStatistics.rebuildDailyStatsForUser.mockReturnValue(
+      new Promise((resolve) => {
+        finishRebuild = () => resolve({ deleted: 0, inserted: 0, libraries: 0 });
+      }),
+    );
+
+    await expect(service.updateMySettings(5, { settings: { timezone: 'America/Halifax' } })).resolves.toEqual({
+      id: 5,
+      settings: { timezone: 'America/Halifax' },
+    });
+
+    expect(userStatistics.rebuildDailyStatsForUser).toHaveBeenCalledWith(5, 'America/Halifax');
+    finishRebuild();
+  });
+
   it('leaves stats alone for a settings write that does not touch the timezone', async () => {
     userRepo.update.mockResolvedValue({ id: 5, settings: { timezone: 'America/Halifax', theme: 'dark' } });
 

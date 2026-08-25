@@ -477,6 +477,34 @@ describe('UserStatisticsRepository', () => {
       }),
     ]);
   });
+  it('takes the shared advisory locks in one global order', async () => {
+    // rebuildDailyStatsForUser locks ascending inside its own transaction. Walking the group map
+    // in query order can invert that for a user holding two libraries, and Postgres resolves the
+    // cycle by aborting one side: the rebuild logs and moves on, this pass loses the whole hour.
+    const txSelectQueue = [
+      [
+        { userId: 5, libraryId: 9, settings: { timezone: 'UTC' } },
+        { userId: 5, libraryId: 3, settings: { timezone: 'UTC' } },
+      ],
+      [],
+    ];
+    const tx = {
+      execute: vi.fn().mockResolvedValue({ rowCount: 0 }),
+      select: vi.fn((fields?: Record<string, unknown>) => makeChain(txSelectQueue.shift() ?? [], fields)),
+      insert: vi.fn().mockReturnValue({ values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) }) }),
+    };
+    const db = { transaction: vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx)) };
+    const repo = new UserStatisticsRepository(db as never);
+    const lock = vi.spyOn(repo as any, 'lockDailyStats').mockResolvedValue(undefined);
+
+    await repo.recomputeRecentDailyStats(2);
+
+    expect(lock.mock.calls.map((call) => [call[1], call[2]])).toEqual([
+      [5, 3],
+      [5, 9],
+    ]);
+  });
+
   describe('rebuildDailyStatsForUser', () => {
     function makeRebuildTx(distinctResults: unknown[], sessionPages: unknown[], deletedRowCount = 0) {
       const distinct = [...distinctResults];

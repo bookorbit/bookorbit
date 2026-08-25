@@ -312,6 +312,8 @@ export class KoreaderService {
     const durationSeconds = Math.min(elapsedSeconds, MAX_SYNC_SESSION_SECONDS);
     const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000);
 
+    const operationStartedAt = Date.now();
+
     try {
       if (await this.pluginRepo.hasSweepSince(user.id, deviceId, new Date(endedAt.getTime() - PLUGIN_SWEEP_SILENCE_MS))) return;
 
@@ -331,7 +333,7 @@ export class KoreaderService {
       });
 
       this.logger.log(
-        `[${SYNC_SESSION_EVENT}] [end] userId=${user.id} bookFileId=${bookFile.id} deviceId="${sanitizeLogValue(deviceId)}" durationSeconds=${durationSeconds} elapsedSeconds=${elapsedSeconds} outcome=${result.kind}${result.kind === 'skipped' ? ` reason=${result.reason}` : ''} - reading session estimated from sync progress`,
+        `[${SYNC_SESSION_EVENT}] [end] userId=${user.id} bookFileId=${bookFile.id} deviceId="${sanitizeLogValue(deviceId)}" durationMs=${Date.now() - operationStartedAt} durationSeconds=${durationSeconds} elapsedSeconds=${elapsedSeconds} outcome=${result.kind}${result.kind === 'skipped' ? ` reason=${result.reason}` : ''} - reading session estimated from sync progress`,
       );
     } catch (error) {
       // A device retries the whole push on failure, so a session that cannot be stored must not
@@ -339,7 +341,7 @@ export class KoreaderService {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
       const message = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
       this.logger.warn(
-        `[${SYNC_SESSION_EVENT}] [fail] userId=${user.id} bookFileId=${bookFile.id} deviceId="${sanitizeLogValue(deviceId)}" errorClass=${errorClass} error="${message}" - estimating a reading session from sync progress failed`,
+        `[${SYNC_SESSION_EVENT}] [fail] userId=${user.id} bookFileId=${bookFile.id} deviceId="${sanitizeLogValue(deviceId)}" durationMs=${Date.now() - operationStartedAt} errorClass=${errorClass} error="${message}" - estimating a reading session from sync progress failed`,
       );
     }
   }

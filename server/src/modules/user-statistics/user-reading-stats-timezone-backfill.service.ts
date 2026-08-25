@@ -31,7 +31,8 @@ export class UserReadingStatsTimeZoneBackfillService implements OnApplicationBoo
     // Detached: this walks every reader's whole history, and nothing it produces is needed to
     // serve a request. It contends with the hourly aggregation only through the per-library
     // advisory lock both take, and both derive the same rows from the same sessions.
-    void this.run().catch((error: unknown) => this.logFailure(error, Date.now()));
+    const startedAt = Date.now();
+    void this.run().catch((error: unknown) => this.logFailure(error, startedAt));
   }
 
   async run(): Promise<{ skipped: boolean; users: number; failed: number }> {

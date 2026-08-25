@@ -854,10 +854,15 @@ export class UserStatisticsRepository {
         groups.set(`${group.userId}:${group.libraryId}`, group);
       }
 
+      // Sorted so this pass and a concurrent per-user rebuild take the shared advisory locks in
+      // one order. Map insertion order follows the query results, which can invert against the
+      // rebuild's ascending order and deadlock a user holding more than one library.
+      const orderedGroups = [...groups.values()].sort((a, b) => a.userId - b.userId || a.libraryId - b.libraryId);
+
       let deleted = 0;
       let inserted = 0;
 
-      for (const group of groups.values()) {
+      for (const group of orderedGroups) {
         await this.lockDailyStats(tx, group.userId, group.libraryId);
 
         const deleteResult = await tx.execute(sql`
