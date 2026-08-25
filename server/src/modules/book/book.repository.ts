@@ -113,6 +113,7 @@ type PatternMetadataRow = {
   seriesIndex: string | null;
   isbn13: string | null;
   authors: string[];
+  narrators: string[];
 };
 
 function parseDateByBookId(value: JsonObj | null | undefined): Record<number, Date | null> {
@@ -1759,7 +1760,7 @@ export class BookRepository {
   async findPatternMetadataByBookIds(bookIds: number[]): Promise<PatternMetadataRow[]> {
     if (bookIds.length === 0) return [];
 
-    const [metaRows, authorRows] = await Promise.all([
+    const [metaRows, authorRows, narratorRows] = await Promise.all([
       this.db
         .select({
           bookId: books.id,
@@ -1785,16 +1786,32 @@ export class BookRepository {
         .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
         .where(inArray(bookAuthors.bookId, bookIds))
         .orderBy(bookAuthors.displayOrder),
+      this.db
+        .select({ bookId: bookNarrators.bookId, name: narrators.name })
+        .from(bookNarrators)
+        .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+        .where(inArray(bookNarrators.bookId, bookIds))
+        .orderBy(bookNarrators.displayOrder),
     ]);
 
-    const authorsByBookId = new Map<number, string[]>();
-    for (const row of authorRows) {
-      const list = authorsByBookId.get(row.bookId) ?? [];
-      list.push(row.name);
-      authorsByBookId.set(row.bookId, list);
-    }
+    const groupByBookId = (rows: { bookId: number; name: string }[]): Map<number, string[]> => {
+      const byBookId = new Map<number, string[]>();
+      for (const row of rows) {
+        const list = byBookId.get(row.bookId) ?? [];
+        list.push(row.name);
+        byBookId.set(row.bookId, list);
+      }
+      return byBookId;
+    };
 
-    return metaRows.map((row) => ({ ...row, authors: authorsByBookId.get(row.bookId) ?? [] }));
+    const authorsByBookId = groupByBookId(authorRows);
+    const narratorsByBookId = groupByBookId(narratorRows);
+
+    return metaRows.map((row) => ({
+      ...row,
+      authors: authorsByBookId.get(row.bookId) ?? [],
+      narrators: narratorsByBookId.get(row.bookId) ?? [],
+    }));
   }
 
   async findAllIds(): Promise<number[]> {

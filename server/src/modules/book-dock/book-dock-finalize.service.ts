@@ -36,7 +36,7 @@ import { SeriesMembershipService } from '../../common/services/series-membership
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
-import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, libraries, libraryFolders } from '../../db/schema';
@@ -744,7 +744,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       const pattern = libraryPattern ?? appPattern;
 
       if (pattern) {
-        const tokens = this.buildPatternTokens(meta, row.fileName, format, lib?.name);
+        const tokens = this.buildFilePatternTokens(meta, row.fileName, format, lib?.name);
         const resolved =
           lib?.organizationMode === 'book_per_file'
             ? resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform })
@@ -771,7 +771,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
 
     if (pattern) {
-      const tokens = this.buildPatternTokens(meta, row.fileName, format, library.name);
+      const tokens = this.buildFilePatternTokens(meta, row.fileName, format, library.name);
       const resolved =
         library.organizationMode === 'book_per_file'
           ? resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform })
@@ -785,25 +785,15 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     return join(folderPath, stem, row.fileName);
   }
 
-  private buildPatternTokens(meta: BookDockMetadata, fileName: string, format: string, libraryName?: string | null): Record<string, string> {
-    const stem = basename(fileName, extname(fileName));
-    const tokens: Record<string, string> = { originalFilename: stem, extension: format };
-
-    if (libraryName) tokens['library'] = libraryName;
-    if (meta.title) tokens['title'] = meta.title;
-    if (meta.subtitle) tokens['subtitle'] = meta.subtitle;
-    if (meta.publisher) tokens['publisher'] = meta.publisher;
-    if (meta.language) tokens['language'] = meta.language;
-    if (meta.isbn13) tokens['isbn'] = meta.isbn13;
-    if (meta.publishedYear) tokens['year'] = String(meta.publishedYear);
-    if (meta.seriesName) tokens['series'] = meta.seriesName;
-    const seriesIndex = formatSeriesIndex(meta.seriesIndex ?? null);
-    if (seriesIndex) tokens['seriesIndex'] = seriesIndex;
-    if (meta.authors && meta.authors.length > 0) {
-      tokens['authors'] = meta.authors.join(', ');
-    }
-
-    return tokens;
+  private buildFilePatternTokens(meta: BookDockMetadata, fileName: string, format: string, libraryName?: string | null): Record<string, string> {
+    return buildPatternTokens({
+      metadata: meta,
+      authors: meta.authors,
+      narrators: meta.narrators,
+      originalStem: basename(fileName, extname(fileName)),
+      format,
+      libraryName,
+    });
   }
 
   private async applyMetadata(bookId: number, row: BookDockFileRow): Promise<void> {

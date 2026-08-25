@@ -4,7 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, libraries, libraryFolders } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookMetadata, bookNarrators, books, libraries, libraryFolders, narrators } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -30,6 +30,7 @@ export interface BulkRenameBookData {
     seriesIndex: string | null;
   };
   authors: string[];
+  narrators: string[];
 }
 
 @Injectable()
@@ -67,25 +68,44 @@ export class BulkRenameRepository {
 
     if (rows.length === 0) return [];
 
-    const authorRows = await this.db
-      .select({
-        bookId: bookAuthors.bookId,
-        name: authors.name,
-      })
-      .from(bookAuthors)
-      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-      .where(inArray(bookAuthors.bookId, this.db.select({ id: books.id }).from(books).where(eq(books.libraryId, libraryId))))
-      .orderBy(asc(bookAuthors.bookId), asc(bookAuthors.displayOrder));
+    const libraryBookIds = this.db.select({ id: books.id }).from(books).where(eq(books.libraryId, libraryId));
 
-    const authorsByBook = new Map<number, string[]>();
-    for (const row of authorRows) {
-      const existing = authorsByBook.get(row.bookId);
-      if (existing) {
-        existing.push(row.name);
-      } else {
-        authorsByBook.set(row.bookId, [row.name]);
+    const [authorRows, narratorRows] = await Promise.all([
+      this.db
+        .select({
+          bookId: bookAuthors.bookId,
+          name: authors.name,
+        })
+        .from(bookAuthors)
+        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+        .where(inArray(bookAuthors.bookId, libraryBookIds))
+        .orderBy(asc(bookAuthors.bookId), asc(bookAuthors.displayOrder)),
+      this.db
+        .select({
+          bookId: bookNarrators.bookId,
+          name: narrators.name,
+        })
+        .from(bookNarrators)
+        .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+        .where(inArray(bookNarrators.bookId, libraryBookIds))
+        .orderBy(asc(bookNarrators.bookId), asc(bookNarrators.displayOrder)),
+    ]);
+
+    const groupByBook = (rows: { bookId: number; name: string }[]): Map<number, string[]> => {
+      const byBook = new Map<number, string[]>();
+      for (const row of rows) {
+        const existing = byBook.get(row.bookId);
+        if (existing) {
+          existing.push(row.name);
+        } else {
+          byBook.set(row.bookId, [row.name]);
+        }
       }
-    }
+      return byBook;
+    };
+
+    const authorsByBook = groupByBook(authorRows);
+    const narratorsByBook = groupByBook(narratorRows);
 
     return rows.map((row) => ({
       bookId: row.bookId,
@@ -109,6 +129,7 @@ export class BulkRenameRepository {
         seriesIndex: row.seriesIndex,
       },
       authors: authorsByBook.get(row.bookId) ?? [],
+      narrators: narratorsByBook.get(row.bookId) ?? [],
     }));
   }
 

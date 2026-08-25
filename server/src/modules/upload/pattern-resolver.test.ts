@@ -34,6 +34,11 @@ const DECIMAL_INDEX: Record<string, string> = {
   seriesIndex: '01.5',
 };
 
+const FULL_CAST: Record<string, string> = {
+  ...FULL,
+  narrators: 'Simon Vance, Scott Brick, Ilyana Kadushin, Euan Morton',
+};
+
 describe('sanitizePathSegment', () => {
   it('removes a large trailing run of dots and spaces in linear time', () => {
     expect(sanitizePathSegment(`book${'. '.repeat(100_000)}`)).toBe('book');
@@ -105,6 +110,24 @@ describe('applyModifier', () => {
     });
   });
 
+  describe('max3', () => {
+    it('passes a single value through', () => {
+      expect(applyModifier('Simon Vance', 'max3', 'narrators')).toBe('Simon Vance');
+    });
+
+    it('passes three values through', () => {
+      expect(applyModifier('A, B, C', 'max3', 'narrators')).toBe('A, B, C');
+    });
+
+    it('collapses to nothing above three values', () => {
+      expect(applyModifier('A, B, C, D', 'max3', 'narrators')).toBe('');
+    });
+
+    it('ignores empty entries when counting', () => {
+      expect(applyModifier('A, , B, , C', 'max3', 'narrators')).toBe('A, B, C');
+    });
+  });
+
   describe('unknown modifier', () => {
     it('returns the value unchanged', () => {
       expect(applyModifier('Patrick Rothfuss', 'nonexistent', 'authors')).toBe('Patrick Rothfuss');
@@ -149,6 +172,24 @@ describe('replacePlaceholders', () => {
     });
   });
 
+  describe('optional groups judge modifier output', () => {
+    it('takes the fallback when a modifier collapses to nothing', () => {
+      expect(replacePlaceholders('<{narrators:max3}|Full Cast>', FULL_CAST)).toBe('Full Cast');
+    });
+
+    it('keeps the primary branch while the modifier still yields text', () => {
+      expect(replacePlaceholders('<{narrators:max3}|Full Cast>', FULL)).toBe('Robertson Dean');
+    });
+
+    it('drops an unguarded group whose modifier collapses to nothing', () => {
+      expect(replacePlaceholders('{title}< - {narrators:max3}>', FULL_CAST)).toBe('Neuromancer');
+    });
+
+    it('still takes the fallback when the underlying value is absent', () => {
+      expect(replacePlaceholders('<{narrators:max3}|Full Cast>', PARTIAL)).toBe('Full Cast');
+    });
+  });
+
   describe('modifiers', () => {
     it('{authors:first} picks the first author', () => {
       expect(replacePlaceholders('{authors:first}', MULTI_AUTHOR)).toBe('Bruce Sterling');
@@ -172,6 +213,14 @@ describe('replacePlaceholders', () => {
 
     it('{title:initial} gives the first letter of the title', () => {
       expect(replacePlaceholders('{title:initial}', FULL)).toBe('N');
+    });
+
+    it('{narrators} joins every narrator', () => {
+      expect(replacePlaceholders('{narrators}', FULL_CAST)).toBe('Simon Vance, Scott Brick, Ilyana Kadushin, Euan Morton');
+    });
+
+    it('{narrators:first} picks the first narrator', () => {
+      expect(replacePlaceholders('{narrators:first}', FULL_CAST)).toBe('Simon Vance');
     });
 
     it('modifier on a missing token resolves to empty string', () => {

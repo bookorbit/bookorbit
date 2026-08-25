@@ -8,6 +8,7 @@ import type { ConfigType } from '@nestjs/config';
 import type { FastifyReply } from 'fastify';
 
 import { DEFAULT_KOREADER_DEVICE_PATTERN, resolveUploadPath } from '@bookorbit/types';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import type {
   KoreaderCatalogBookDetail,
   KoreaderCatalogBookListItem,
@@ -40,7 +41,6 @@ import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pag
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
-import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
 import { storageConfig } from '../../config/config';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
@@ -352,7 +352,6 @@ export class KoreaderCatalogService {
   }
 
   private mapManifestBook(row: OpdsManifestBookRow, pattern: string, sanitizeForCrossPlatform: boolean): KoreaderCatalogManifestBook {
-    const authorNames = row.authors.join(', ');
     const files = row.files.map<KoreaderCatalogManifestFile>((file) => {
       const extension = this.normalizeFormat(file.format);
       return {
@@ -365,20 +364,22 @@ export class KoreaderCatalogService {
         devicePath:
           resolveUploadPath(
             pattern,
-            {
-              title: row.title,
-              subtitle: row.subtitle ?? '',
-              authors: authorNames,
-              year: row.publishedYear ? String(row.publishedYear) : '',
-              series: row.seriesName ?? '',
-              seriesIndex: formatSeriesIndex(row.seriesIndex) ?? '',
-              language: row.language ?? '',
-              publisher: row.publisher ?? '',
-              isbn: row.isbn13 ?? row.isbn10 ?? '',
-              library: row.libraryName,
-              originalFilename: basename(file.filename ?? row.title, `.${extension}`),
-              extension,
-            },
+            buildPatternTokens({
+              metadata: {
+                title: row.title,
+                subtitle: row.subtitle,
+                publisher: row.publisher,
+                language: row.language,
+                isbn13: row.isbn13 ?? row.isbn10,
+                publishedYear: row.publishedYear,
+                seriesName: row.seriesName,
+                seriesIndex: row.seriesIndex,
+              },
+              authors: row.authors,
+              originalStem: basename(file.filename ?? row.title, `.${extension}`),
+              format: extension,
+              libraryName: row.libraryName,
+            }),
             extension,
             { sanitizeForCrossPlatform },
           ) ??
@@ -714,20 +715,22 @@ export class KoreaderCatalogService {
           devicePath:
             resolveUploadPath(
               filePattern,
-              {
-                title,
-                subtitle: detail.subtitle ?? '',
-                authors: detail.authors.map((author) => author.name).join(', '),
-                year: detail.publishedYear ? String(detail.publishedYear) : '',
-                series: detail.seriesName ?? '',
-                seriesIndex: formatSeriesIndex(detail.seriesIndex) ?? '',
-                language: detail.language ?? '',
-                publisher: detail.publisher ?? '',
-                isbn: detail.isbn13 ?? detail.isbn10 ?? '',
-                library: detail.libraryName,
-                originalFilename: basename(file.filename ?? title, `.${extension}`),
-                extension,
-              },
+              buildPatternTokens({
+                metadata: {
+                  title,
+                  subtitle: detail.subtitle,
+                  publisher: detail.publisher,
+                  language: detail.language,
+                  isbn13: detail.isbn13 ?? detail.isbn10,
+                  publishedYear: detail.publishedYear,
+                  seriesName: detail.seriesName,
+                  seriesIndex: detail.seriesIndex,
+                },
+                authors: detail.authors.map((author) => author.name),
+                originalStem: basename(file.filename ?? title, `.${extension}`),
+                format: extension,
+                libraryName: detail.libraryName,
+              }),
               extension,
               { sanitizeForCrossPlatform },
             ) ??

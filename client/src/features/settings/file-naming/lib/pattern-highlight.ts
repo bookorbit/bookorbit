@@ -23,7 +23,7 @@ export interface PatternPiece {
  * its switch and returns the value unchanged, so a typo silently produces a wrong path
  * rather than an error. Listing them here lets both the palette and the validator agree.
  */
-export const PATTERN_MODIFIERS = ['first', 'sort', 'initial', 'fixed2', 'upper', 'lower'] as const
+export const PATTERN_MODIFIERS = ['first', 'sort', 'initial', 'fixed2', 'max3', 'upper', 'lower'] as const
 export type PatternModifier = (typeof PATTERN_MODIFIERS)[number]
 
 const KNOWN_MODIFIERS = new Set<string>(PATTERN_MODIFIERS)

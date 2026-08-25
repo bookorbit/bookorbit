@@ -13,7 +13,7 @@ import { NotificationService } from '../notification/notification.service';
 import type { BookFilePathUpdate, BookRenameData } from './file-rename.repository';
 import { FileRenameRepository } from './file-rename.repository';
 import { FileLockService, bookOperationLockKey } from './file-lock.service';
-import { buildTokens } from './file-rename.utils';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 
 const FILE_RENAME_EVENT = 'file.rename';
 const FILE_RENAME_ROLLBACK_EVENT = 'file.rename_rollback';
@@ -110,7 +110,14 @@ export class FileRenameService implements OnModuleDestroy {
 
     const format = (data.file.format ?? extname(data.file.absolutePath).slice(1)).toLowerCase();
     const originalStem = basename(data.file.absolutePath, extname(data.file.absolutePath));
-    const tokens = buildTokens(data.metadata, data.authors, originalStem, format, data.libraryName);
+    const tokens = buildPatternTokens({
+      metadata: data.metadata,
+      authors: data.authors,
+      narrators: data.narrators,
+      originalStem,
+      format,
+      libraryName: data.libraryName,
+    });
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
     const resolvedRelPath = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
@@ -135,7 +142,14 @@ export class FileRenameService implements OnModuleDestroy {
         const fileExt = extname(file.absolutePath);
         const fileFormat = (file.format ?? fileExt.slice(1)).toLowerCase();
         const fileOriginalStem = basename(file.absolutePath, fileExt);
-        const fileTokens = buildTokens(data.metadata, data.authors, fileOriginalStem, fileFormat, data.libraryName);
+        const fileTokens = buildPatternTokens({
+          metadata: data.metadata,
+          authors: data.authors,
+          narrators: data.narrators,
+          originalStem: fileOriginalStem,
+          format: fileFormat,
+          libraryName: data.libraryName,
+        });
         const fileResolvedRelPath = resolveUploadPath(pattern, fileTokens, fileFormat, { sanitizeForCrossPlatform });
 
         let targetAbs: string;
