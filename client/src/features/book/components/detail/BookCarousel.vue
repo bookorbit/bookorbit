@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 
@@ -27,13 +27,23 @@ const props = withDefaults(
     currentBookId?: number | null
     showSeriesIndex?: boolean
     showHeader?: boolean
+    /** 'lg' is the book detail shelf, where the cover is the whole point. */
+    size?: 'md' | 'lg'
   }>(),
   {
     currentBookId: null,
     showSeriesIndex: false,
     showHeader: true,
+    size: 'md',
   },
 )
+
+/** Both ratios resolve to the same cover height, so a mixed shelf stays level. */
+const cardWidthClass = computed(() => {
+  const square = props.size === 'lg' ? 'w-46' : 'w-38'
+  const portrait = props.size === 'lg' ? 'w-31' : 'w-30'
+  return { square, portrait }
+})
 
 const router = useRouter()
 const { coverUrl } = useCoverVersions()
@@ -108,8 +118,8 @@ defineExpose({ scroll })
       </div>
     </div>
 
-    <div v-if="loading" class="flex gap-3 overflow-x-auto pb-2">
-      <div v-for="i in 10" :key="i" class="w-24 shrink-0">
+    <div v-if="loading" class="flex gap-6 overflow-x-auto pb-2">
+      <div v-for="i in 10" :key="i" class="shrink-0" :class="cardWidthClass.portrait">
         <div class="w-full rounded-sm bg-muted animate-shimmer" style="aspect-ratio: 2/3" />
       </div>
     </div>
@@ -120,7 +130,7 @@ defineExpose({ scroll })
         :key="book.id"
         :data-book-id="book.id"
         class="shrink-0 text-left group animate-fade-up"
-        :class="book.coverAspectRatio === '1/1' ? 'w-38' : 'w-30'"
+        :class="book.coverAspectRatio === '1/1' ? cardWidthClass.square : cardWidthClass.portrait"
         :style="{ animationDelay: `${index * 40}ms` }"
         @click="navigateToBook(book.id)"
       >

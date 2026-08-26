@@ -127,7 +127,7 @@ function moveMembership(index: number, offset: -1 | 1) {
         :search-fn="searchFn"
         :disabled="disabled"
         :placeholder="t('book.detail.seriesMembership.seriesPlaceholder')"
-        :class="'h-8 min-w-40 flex-1 rounded-lg border border-input bg-background px-3 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'"
+        :class="'h-8 min-w-24 flex-[3_1_12rem] rounded-lg border border-input bg-background px-3 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'"
         @update:model-value="updateSeriesName(index, $event)"
       />
       <div class="flex flex-wrap items-center gap-2">
@@ -136,7 +136,7 @@ function moveMembership(index: number, offset: -1 | 1) {
           type="text"
           inputmode="decimal"
           :maxlength="SERIES_INDEX_MAX_LENGTH"
-          class="h-8 min-w-16 max-w-22 flex-1 rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          class="h-8 min-w-14 max-w-16 flex-1 rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           :class="isSeriesIndexInvalid(membership.seriesIndex) ? 'border-destructive' : ''"
           :disabled="disabled"
           placeholder="#"
@@ -149,7 +149,7 @@ function moveMembership(index: number, offset: -1 | 1) {
           type="number"
           step="1"
           min="1"
-          class="h-8 min-w-16 max-w-22 flex-1 rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          class="h-8 min-w-14 max-w-16 flex-1 rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="disabled"
           :placeholder="t('book.detail.seriesMembership.totalPlaceholder')"
           :aria-label="t('book.detail.seriesMembership.totalLabel')"
@@ -158,8 +158,9 @@ function moveMembership(index: number, offset: -1 | 1) {
         />
         <div class="flex items-center gap-1">
           <button
+            v-if="visibleMemberships.length > 1"
             type="button"
-            class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             :disabled="disabled || index === 0"
             :title="t('book.detail.seriesMembership.moveUp')"
             @click="moveMembership(index, -1)"
@@ -167,8 +168,9 @@ function moveMembership(index: number, offset: -1 | 1) {
             <ArrowUp class="size-3.5" />
           </button>
           <button
+            v-if="visibleMemberships.length > 1"
             type="button"
-            class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
             :disabled="disabled || modelValue.length < 2 || index === visibleMemberships.length - 1"
             :title="t('book.detail.seriesMembership.moveDown')"
             @click="moveMembership(index, 1)"
@@ -177,7 +179,7 @@ function moveMembership(index: number, offset: -1 | 1) {
           </button>
           <button
             type="button"
-            class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
+            class="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
             :disabled="disabled || modelValue.length === 0"
             :title="t('book.detail.seriesMembership.removeSeries')"
             @click="removeMembership(index)"

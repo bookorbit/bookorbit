@@ -285,6 +285,7 @@ export class ReadingSessionService {
         endProgress,
         format,
         source: 'manual',
+        attemptId: created.attemptId,
       };
     } catch (error) {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';

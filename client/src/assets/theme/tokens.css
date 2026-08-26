@@ -50,6 +50,16 @@
 
   --star-highlight: oklch(0.76 0.18 90);
 
+  /* Metadata score ramp: red at 0, through orange and yellow, to green at 100. Consumers
+     interpolate between these four with color-mix in oklch, so the whole spectrum follows
+     from four tokens. Tuned per theme like every other text colour here: on a light card the
+     yellow middle has to sit darker than the red and green ends to clear AA, and on a dark
+     card it has to sit lighter. */
+  --score-red: oklch(0.55 0.19 25);
+  --score-orange: oklch(0.55 0.16 55);
+  --score-yellow: oklch(0.54 0.13 95);
+  --score-green: oklch(0.5 0.15 148);
+
   --border: oklch(0.878 var(--tint-c-surface) var(--tint-h));
   --input: oklch(0.878 var(--tint-c-surface) var(--tint-h));
   --ring: oklch(0.65 var(--tint-c-surface) var(--tint-h));
@@ -146,6 +156,30 @@
   --audit-collections: oklch(0.55 0.09 255);
   --audit-integrations: oklch(0.58 0.15 150);
   --audit-settings: oklch(0.55 0.15 25);
+
+  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
+     reason every other text colour is: one set of hex values for both themes left the brightest
+     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
+  --pill-format-default: oklch(0.55 0.02 260);
+  --pill-format-epub: oklch(0.55 0.14 150);
+  --pill-format-kepub: oklch(0.55 0.12 178);
+  --pill-format-mobi: oklch(0.55 0.18 275);
+  --pill-format-azw3: oklch(0.53 0.11 185);
+  --pill-format-azw: oklch(0.55 0.14 235);
+  --pill-format-fb2: oklch(0.55 0.17 355);
+  --pill-format-djvu: oklch(0.55 0.04 255);
+  --pill-format-txt: oklch(0.55 0.03 60);
+  --pill-format-pdf: oklch(0.55 0.17 25);
+  --pill-format-cbz: oklch(0.55 0.16 260);
+  --pill-format-cbr: oklch(0.58 0.15 55);
+  --pill-format-cb7: oklch(0.55 0.19 300);
+  --pill-format-cbx: oklch(0.55 0.17 325);
+  --pill-format-m4b: oklch(0.58 0.13 75);
+  --pill-format-m4a: oklch(0.58 0.13 95);
+  --pill-format-mp3: oklch(0.56 0.15 145);
+  --pill-format-opus: oklch(0.55 0.11 205);
+  --pill-format-ogg: oklch(0.56 0.15 130);
+  --pill-format-flac: oklch(0.55 0.13 165);
 }
 
 @media (min-width: 40rem) {
@@ -197,6 +231,13 @@
   --warning-foreground: oklch(0.145 0 0);
 
   --star-highlight: oklch(0.84 0.17 95);
+
+  /* Lifted the way the pills are, with the yellow middle highest so the ramp holds an even
+     weight across the spectrum on a dark card */
+  --score-red: oklch(0.72 0.18 25);
+  --score-orange: oklch(0.78 0.15 55);
+  --score-yellow: oklch(0.85 0.15 95);
+  --score-green: oklch(0.78 0.16 148);
 
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -267,4 +308,29 @@
   --audit-collections: oklch(0.72 0.09 255);
   --audit-integrations: oklch(0.75 0.13 150);
   --audit-settings: oklch(0.72 0.15 25);
+
+  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
+     reason every other text colour is: one set of hex values for both themes left the brightest
+     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
+
+  --pill-format-default: oklch(0.75 0.02 260);
+  --pill-format-epub: oklch(0.75 0.13 150);
+  --pill-format-kepub: oklch(0.75 0.11 178);
+  --pill-format-mobi: oklch(0.72 0.16 275);
+  --pill-format-azw3: oklch(0.76 0.11 185);
+  --pill-format-azw: oklch(0.72 0.13 235);
+  --pill-format-fb2: oklch(0.73 0.15 355);
+  --pill-format-djvu: oklch(0.75 0.04 255);
+  --pill-format-txt: oklch(0.76 0.03 60);
+  --pill-format-pdf: oklch(0.72 0.15 25);
+  --pill-format-cbz: oklch(0.72 0.14 260);
+  --pill-format-cbr: oklch(0.76 0.13 55);
+  --pill-format-cb7: oklch(0.72 0.17 300);
+  --pill-format-cbx: oklch(0.73 0.15 325);
+  --pill-format-m4b: oklch(0.79 0.13 75);
+  --pill-format-m4a: oklch(0.8 0.13 95);
+  --pill-format-mp3: oklch(0.78 0.15 145);
+  --pill-format-opus: oklch(0.76 0.11 205);
+  --pill-format-ogg: oklch(0.78 0.15 130);
+  --pill-format-flac: oklch(0.75 0.13 165);
 }

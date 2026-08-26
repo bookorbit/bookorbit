@@ -119,7 +119,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
 <template>
   <BookDetailLayout :book-id="bookId" :cover-tint="coverTint">
     <Transition name="content" mode="out-in">
-      <div v-if="detail" key="detail">
+      <div v-if="detail" key="detail" class="h-full">
         <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" @moved="handleMovedToLibrary" />
         <EditMetadataTab
           v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
@@ -162,18 +162,17 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
         <div v-else-if="tab === 'files'" class="space-y-3">
           <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-shimmer" />
         </div>
-        <div v-else-if="tab === 'reading-log'" class="space-y-4">
-          <div class="h-32 rounded-lg bg-muted animate-shimmer" />
-          <div class="flex gap-2">
-            <div v-for="i in 4" :key="i" class="h-8 w-24 rounded-md bg-muted animate-shimmer" />
+        <div
+          v-else-if="tab === 'reading-log'"
+          class="flex h-full min-h-0 flex-col gap-4 xl:grid xl:grid-cols-[17rem_minmax(0,1fr)_19.25rem] xl:grid-rows-[minmax(0,1fr)_13.5rem] xl:gap-x-5 xl:gap-y-4"
+        >
+          <div class="h-64 rounded-xl bg-muted animate-shimmer xl:col-start-1 xl:row-start-1 xl:h-auto" />
+          <div class="h-72 rounded-xl bg-muted animate-shimmer xl:col-start-2 xl:row-start-1 xl:h-auto" />
+          <div class="flex flex-col gap-4 xl:col-start-3 xl:row-start-1 xl:min-h-0">
+            <div class="h-40 rounded-xl bg-muted animate-shimmer xl:min-h-0 xl:flex-1" />
+            <div class="h-[9.375rem] shrink-0 rounded-xl bg-muted animate-shimmer" />
           </div>
-          <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <div class="h-64 rounded-lg bg-muted animate-shimmer lg:col-span-3" />
-            <div class="h-64 rounded-lg bg-muted animate-shimmer lg:col-span-2" />
-          </div>
-          <div class="space-y-2">
-            <div v-for="i in 5" :key="i" class="h-12 rounded-md bg-muted animate-shimmer" />
-          </div>
+          <div class="h-56 rounded-xl bg-muted animate-shimmer xl:col-span-full xl:row-start-2 xl:h-auto" />
         </div>
         <div v-else-if="tab === 'highlights'" class="space-y-4">
           <div class="flex gap-2">

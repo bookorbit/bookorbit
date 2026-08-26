@@ -19,7 +19,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
 import { compareSeriesIndexSql, seriesIndexSortKey, seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
 import * as schema from '../../db/schema';
-import { BookSortBuilder, customMetadataValueColumn, type BookSortContext } from './book-sort-builder.service';
+import { BookSortBuilder, customMetadataValueColumn, resolveRandomSortSeed, type BookSortContext } from './book-sort-builder.service';
 import {
   audiobookProgress,
   authors,
@@ -1057,7 +1057,7 @@ export class BookQueryBuilder {
     return node.rules.some((r) => BookQueryBuilder.hasSeriesSelectionFilter(r));
   }
 
-  static buildCollapseOrderBy(sort: SortSpec[], userId: number, customFieldTypes?: CustomMetadataFieldTypeMap): string {
+  static buildCollapseOrderBy(sort: SortSpec[], userId: number, customFieldTypes?: CustomMetadataFieldTypeMap, context?: BookSortContext): string {
     if (sort.length === 0) return 'sort_title ASC NULLS LAST, r.id ASC';
 
     if (!Number.isSafeInteger(userId)) throw new BadRequestException('Invalid userId for collapse order');
@@ -1143,9 +1143,8 @@ export class BookQueryBuilder {
           parts.push(`(SELECT ubs.started_at FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}) ${D} NULLS LAST`);
           break;
         case 'random': {
-          const daySeed = Math.floor(Date.now() / 86_400_000);
-          const scopedSeed = daySeed + userId;
-          parts.push(`md5(r.id::text || ':' || ${scopedSeed}::text) ${D}`);
+          const seed = Math.trunc(resolveRandomSortSeed(context, userId));
+          parts.push(`md5(r.id::text || ':' || ${seed}::text) ${D}`);
           parts.push(`r.id ${D}`);
           break;
         }

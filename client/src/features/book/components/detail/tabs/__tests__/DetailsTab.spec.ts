@@ -133,7 +133,7 @@ function mountDetails(book: BookDetail) {
 
 async function loadCoverImages(wrapper: ReturnType<typeof mountDetails>, naturalWidth = 1000, naturalHeight = 1000) {
   const imgs = wrapper.findAll(`img[alt="${wrapper.props('book').title}"]`)
-  expect(imgs.length).toBe(2)
+  expect(imgs.length).toBe(1)
 
   for (const img of imgs) {
     Object.defineProperty(img.element, 'naturalWidth', { configurable: true, value: naturalWidth })
@@ -200,14 +200,14 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const surfaces = wrapper.findAll('.book-cover-surface')
-    expect(surfaces.length).toBe(2)
+    expect(surfaces.length).toBe(1)
     expect(surfaces.every((surface) => surface.attributes('data-cover-spine') === 'strong')).toBe(true)
     expect(wrapper.findAll('.book-cover-spine-layer').length).toBe(0)
 
     await loadCoverImages(wrapper)
 
     const spineLayers = wrapper.findAll('.book-cover-spine-layer')
-    expect(spineLayers.length).toBe(2)
+    expect(spineLayers.length).toBe(1)
     expect(spineLayers[0]!.attributes('style')).toContain('translateY(-50%)')
   })
 
@@ -219,7 +219,7 @@ describe('DetailsTab cover surface', () => {
     await loadCoverImages(wrapper, 1200, 600)
 
     const surfaces = wrapper.findAll('.book-cover-surface')
-    expect(surfaces.length).toBe(2)
+    expect(surfaces.length).toBe(1)
     expect(surfaces.every((surface) => surface.attributes('style')?.includes('aspect-ratio: 2 / 1'))).toBe(true)
   })
 
@@ -245,7 +245,7 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const surfaces = wrapper.findAll('.book-cover-surface')
-    expect(surfaces.length).toBe(2)
+    expect(surfaces.length).toBe(1)
     expect(surfaces.every((surface) => surface.attributes('data-cover-spine') === 'off')).toBe(true)
 
     await loadCoverImages(wrapper)
@@ -444,7 +444,7 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const sendButtons = wrapper.findAll('button[aria-label="Send via Email"]')
-    expect(sendButtons).toHaveLength(2)
+    expect(sendButtons).toHaveLength(1)
 
     // Find the stubbed SendBookDialog
     const sendDialog = wrapper.findComponent({ name: 'SendBookDialog' })
@@ -464,7 +464,7 @@ describe('DetailsTab cover surface', () => {
     expect(sendButtons.length).toBe(0)
   })
 
-  it('offers reset in both overflow menus and refreshes supplemental reading state after confirmation', async () => {
+  it('offers reset in the overflow menu and refreshes supplemental reading state after confirmation', async () => {
     mocks.hasPermission.mockImplementation(
       (permission) => permission === 'library_edit_metadata' || permission === 'kobo_sync' || permission === 'koreader_sync',
     )
@@ -472,7 +472,7 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const resetButtons = wrapper.findAll('button').filter((button) => button.text().includes('Reset reading state'))
-    expect(resetButtons).toHaveLength(2)
+    expect(resetButtons).toHaveLength(1)
 
     const resetDialog = wrapper.findComponent({ name: 'ResetReadingStateDialog' })
     expect(resetDialog.exists()).toBe(true)

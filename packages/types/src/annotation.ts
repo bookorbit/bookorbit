@@ -81,6 +81,25 @@ export interface AnnotationItem {
   createdAt: string;
 }
 
+/**
+ * One chapter's worth of highlights, aggregated server-side. The book detail
+ * Highlights tab draws its chapter index and its position band from this, so it
+ * never has to hold every annotation row in memory to describe the whole book.
+ */
+export interface AnnotationChapterStat {
+  /** null for highlights that carry no chapter title. */
+  title: string | null;
+  count: number;
+  /** Composition of the chapter, ordered by count descending. */
+  colors: { color: string; count: number }[];
+  /** Spine index when a position carries one, otherwise null. */
+  chapterIndex: number | null;
+  /** Sort key through the book. Null when no position could be resolved. */
+  order: number | null;
+  /** Oldest highlight in the chapter, the tiebreak when `order` is null. */
+  firstCreatedAt: string;
+}
+
 export interface AnnotationStats {
   totalHighlights: number;
   colorBreakdown: { color: string; count: number }[];
@@ -88,6 +107,9 @@ export interface AnnotationStats {
   chaptersWithHighlights: number;
   highlightsWithNotes: number;
   chapters: string[];
+  chapterBreakdown: AnnotationChapterStat[];
+  /** Distinct days that carry at least one highlight, newest first. */
+  activity: { day: string; count: number; origins: { origin: AnnotationItem["origin"]; count: number }[] }[];
 }
 
 export interface AnnotationListResponse {

@@ -760,6 +760,7 @@ export class BookRepository {
     userId: number;
     customFieldTypes?: CustomMetadataFieldTypeMap;
     defaultCollectionId?: number;
+    randomSeed?: number;
   }): Promise<{
     rows: Array<{
       id: number;
@@ -824,7 +825,7 @@ export class BookRepository {
       throw new BadRequestException('Invalid default collection id');
     }
     const whereFragment = this.visibleWhere(where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     // The collectionOrder branch of the order by names sort_collection_position, so the column has
     // to exist even for the library and smart scope queries that can never sort on it.
     const collectionPosition =
@@ -1167,11 +1168,12 @@ export class BookRepository {
     userId: number;
     maxBuckets: number;
     customFieldTypes?: CustomMetadataFieldTypeMap;
+    randomSeed?: number;
   }): Promise<JumpBucketsResponse> {
     const source = collapsedDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
     const whereFragment = this.visibleWhere(opts.where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
     const result = await this.db.execute<DiscreteJumpBucketRawRow>(

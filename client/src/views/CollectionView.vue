@@ -19,6 +19,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
+import BookShuffleButton from '@/features/book/components/BookShuffleButton.vue'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
@@ -105,6 +106,8 @@ const {
   initialized: booksInitialized,
   error: booksError,
   sort: tableSort,
+  randomSortActive,
+  reshuffle,
   reset: resetBooks,
   contiguousPrefix,
   hasMorePrefix,
@@ -544,6 +547,7 @@ defineOptions({ name: 'CollectionView' })
               <TooltipContent>{{ t('views.bookView.resetSort') }}</TooltipContent>
             </Tooltip>
           </div>
+          <BookShuffleButton v-if="randomSortActive" desktop-only compact @shuffle="reshuffle" />
 
           <Tooltip>
             <TooltipTrigger as-child>
@@ -680,6 +684,7 @@ defineOptions({ name: 'CollectionView' })
           >
             <X :size="13" />
           </button>
+          <BookShuffleButton v-if="randomSortActive" @shuffle="reshuffle" />
           <button
             v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

@@ -1846,6 +1846,12 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
     }
   });
 
+  it('uses the supplied shuffle seed for the collapsed random sort', () => {
+    const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'random', dir: 'asc' }], 7, undefined, { randomSeed: 4242 });
+
+    expect(result).toContain(`md5(r.id::text || ':' || 4242::text) ASC`);
+  });
+
   it('joins multiple sort parts with comma', () => {
     const result = BookQueryBuilder.buildCollapseOrderBy(
       [

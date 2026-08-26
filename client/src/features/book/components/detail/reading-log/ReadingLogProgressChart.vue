@@ -2,10 +2,10 @@
 import { computed, onMounted, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
-import { TrendingUp } from '@lucide/vue'
 import type { BookReadingSession, BookReadingSessionStats } from '@bookorbit/types'
+import { formatDate } from '@/i18n/formatters'
 import { useThemeStore } from '@/stores/theme'
-import { getBookorbitThemeName, initChartThemes } from '@/lib/echarts'
+import { getBookorbitThemeName, initChartThemes, readCssColor } from '@/lib/echarts'
 
 const props = defineProps<{
   sessions: BookReadingSession[]
@@ -28,15 +28,15 @@ const hasData = computed(() => {
 })
 
 function formatDayLabel(day: string): string {
-  return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatDate(new Date(`${day}T00:00:00`), { month: 'short', day: 'numeric' })
 }
 
 function formatSessionLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return formatDate(new Date(iso), { hour: 'numeric', minute: '2-digit' })
 }
 
 function formatSessionTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return formatDate(new Date(iso), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 function formatDuration(seconds: number): string {
@@ -46,13 +46,12 @@ function formatDuration(seconds: number): string {
   return `${remainder}s`
 }
 
+/** A book read in one sitting has one point on a day axis and nothing to plot against it. */
 const useSessionTimeline = computed(() => {
   if (props.sessions.length < 2) return false
   const days = new Set(props.sessions.map((session) => new Date(session.startedAt).toDateString()))
   return days.size === 1
 })
-
-const chartSubtitle = computed(() => (useSessionTimeline.value ? 'Progress across each recorded session' : 'Minutes read and progress by day'))
 
 watchEffect(() => {
   const stats = props.stats
@@ -68,7 +67,7 @@ watchEffect(() => {
   let durationLabels: string[]
 
   if (useSessionTimeline.value) {
-    const timeline = [...props.sessions].sort((left, right) => new Date(left.startedAt).getTime() - new Date(right.startedAt).getTime())
+    const timeline = [...props.sessions].sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt))
     labels = timeline.map((session) => formatSessionLabel(session.startedAt))
     timestamps = timeline.map((session) => formatSessionTimestamp(session.startedAt))
     progress = timeline.map((session) => session.endProgress)
@@ -81,11 +80,13 @@ watchEffect(() => {
     const progressByDay = new Map(stats?.progressSummary.map((point) => [point.day, point.endProgress]) ?? [])
     const minutesByDay = new Map(stats?.dailySummary.map((day) => [day.day, day.totalMinutes]) ?? [])
     labels = days.map(formatDayLabel)
-    timestamps = days.map(formatDayLabel)
+    timestamps = labels
     progress = days.map((day) => progressByDay.get(day) ?? null)
     minutes = days.map((day) => minutesByDay.get(day) ?? 0)
-    durationLabels = minutes.map((value) => `${value} min`)
+    durationLabels = minutes.map((value) => `${value} ${t('book.detail.readingLog.journey.minutesUnit')}`)
   }
+
+  const primary = readCssColor('--primary')
 
   option.value = {
     tooltip: {
@@ -95,30 +96,24 @@ watchEffect(() => {
         const index = params[0]!.dataIndex
         const lines = params.flatMap((point) => {
           if (point.value == null) return []
-          return point.seriesName === 'Progress'
-            ? [`Progress: <strong>${point.value.toFixed(1)}%</strong>`]
-            : [`Reading: <strong>${durationLabels[index] ?? ''}</strong>`]
+          return point.seriesName === 'progress'
+            ? [`${t('book.detail.readingLog.journey.tooltipProgress')}: <strong>${point.value.toFixed(1)}%</strong>`]
+            : [`${t('book.detail.readingLog.journey.tooltipReading')}: <strong>${durationLabels[index] ?? ''}</strong>`]
         })
         return [timestamps[index] ?? '', ...lines].join('<br/>')
       },
     },
-    grid: { left: 36, right: 38, top: 18, bottom: 26, containLabel: false },
+    grid: { left: 34, right: 34, top: 12, bottom: 22, containLabel: false },
     xAxis: {
       type: 'category',
       data: labels,
       boundaryGap: true,
       axisTick: { show: false },
       axisLine: { lineStyle: { opacity: 0.35 } },
-      axisLabel: { fontSize: 10, hideOverlap: true, margin: 10 },
+      axisLabel: { fontSize: 10, hideOverlap: true, margin: 8 },
     },
     yAxis: [
-      {
-        type: 'value',
-        min: 0,
-        max: 100,
-        splitNumber: 4,
-        axisLabel: { fontSize: 10, formatter: (value: number) => `${value}%` },
-      },
+      { type: 'value', min: 0, max: 100, interval: 25, axisLabel: { fontSize: 10, formatter: (value: number) => `${value}%` } },
       {
         type: 'value',
         minInterval: 1,
@@ -128,22 +123,23 @@ watchEffect(() => {
     ],
     series: [
       {
-        name: 'Reading time',
+        name: 'reading',
         type: 'bar',
         yAxisIndex: 1,
         data: minutes,
-        barMaxWidth: 18,
-        itemStyle: { borderRadius: [4, 4, 0, 0], opacity: 0.42 },
+        barMaxWidth: 16,
+        itemStyle: { borderRadius: [3, 3, 0, 0], color: primary, opacity: 0.32 },
       },
       {
-        name: 'Progress',
+        name: 'progress',
         type: 'line',
         yAxisIndex: 0,
         data: progress,
-        showSymbol: true,
-        symbolSize: 6,
+        showSymbol: progress.filter((value) => value != null).length <= 60,
+        symbolSize: 5,
         connectNulls: true,
-        lineStyle: { width: 2.5 },
+        itemStyle: { color: primary },
+        lineStyle: { width: 2, color: primary },
         z: 3,
       },
     ],
@@ -152,25 +148,14 @@ watchEffect(() => {
 </script>
 
 <template>
-  <section
-    class="flex min-h-[260px] flex-col rounded-xl border border-border bg-card p-4 shadow-[var(--elevation-xs)]"
-    aria-labelledby="progress-journey-heading"
-  >
-    <div class="mb-3 flex items-start gap-2.5">
-      <div class="mt-0.5 rounded-md bg-primary/10 p-1.5 text-primary">
-        <TrendingUp class="size-4" />
-      </div>
-      <div>
-        <h2 id="progress-journey-heading" class="text-sm font-semibold text-foreground">{{ t('book.detail.readingLog.journey.title') }}</h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">{{ chartSubtitle }}</p>
-      </div>
-    </div>
-    <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }" style="min-height: 190px">
-      <VChart :theme="chartTheme" :option autoresize class="absolute inset-0" />
-    </div>
-    <div v-else class="flex flex-1 flex-col items-center justify-center py-10 text-center" style="min-height: 190px">
-      <p class="text-sm font-medium text-foreground">{{ t('book.detail.readingLog.journey.empty') }}</p>
-      <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.readingLog.journey.emptyHint') }}</p>
-    </div>
-  </section>
+  <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }">
+    <VChart :theme="chartTheme" :option autoresize class="absolute inset-0" />
+  </div>
+  <div v-else-if="loading" class="flex flex-1 items-end gap-1 px-2 pb-5 pt-2" aria-hidden="true">
+    <div v-for="bar in 18" :key="bar" class="flex-1 rounded-t bg-muted animate-shimmer" :style="{ height: `${18 + ((bar * 37) % 60)}%` }" />
+  </div>
+  <div v-else class="flex flex-1 flex-col items-center justify-center gap-1 py-6 text-center">
+    <p class="text-[13px] font-medium text-foreground">{{ t('book.detail.readingLog.journey.empty') }}</p>
+    <p class="max-w-[46ch] text-xs leading-relaxed text-muted-foreground">{{ t('book.detail.readingLog.journey.emptyHint') }}</p>
+  </div>
 </template>

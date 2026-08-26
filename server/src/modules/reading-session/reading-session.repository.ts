@@ -290,7 +290,7 @@ export class ReadingSessionRepository {
     });
   }
 
-  async insertManualSession(params: InsertManualSessionParams): Promise<{ id: number }> {
+  async insertManualSession(params: InsertManualSessionParams): Promise<{ id: number; attemptId: number | null }> {
     const { userId, bookId, libraryId, bookFileId, sessionId, startedAt, endedAt, durationSeconds, progressDelta, endProgress, timeZone } = params;
 
     return this.db.transaction(async (tx) => {
@@ -309,11 +309,11 @@ export class ReadingSessionRepository {
           progressDelta,
           endProgress,
         })
-        .returning({ id: readingSessions.id });
+        .returning({ id: readingSessions.id, attemptId: readingSessions.attemptId });
 
       await this.upsertDailyStats(tx, { userId, libraryId, startedAt, endedAt, durationSeconds, progressDelta, timeZone });
 
-      return { id: inserted.id };
+      return { id: inserted.id, attemptId: inserted.attemptId ?? null };
     });
   }
 
@@ -408,6 +408,7 @@ export class ReadingSessionRepository {
           endProgress: readingSessions.endProgress,
           format: sql<string | null>`nullif(${bookFiles.format}, '')`,
           source: readingSessions.source,
+          attemptId: readingSessions.attemptId,
         })
         .from(readingSessions)
         .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
@@ -488,6 +489,19 @@ export class ReadingSessionRepository {
       totalMinutes: Math.round((segment.readingSeconds / 60) * 10) / 10,
     }));
 
+    // summaryRows already covers every session in the window, so the two aggregates the client
+    // cannot derive from a single page cost nothing extra here.
+    let longestSessionSeconds = 0;
+    let longestSessionAt: string | null = null;
+    let backtrackCount = 0;
+    for (const row of summaryRows) {
+      if (row.durationSeconds > longestSessionSeconds) {
+        longestSessionSeconds = row.durationSeconds;
+        longestSessionAt = row.startedAt.toISOString();
+      }
+      if (row.progressDelta != null && row.progressDelta < -0.5) backtrackCount += 1;
+    }
+
     const progressByDay = new Map<string, { day: string; endProgress: number; endedAtMs: number }>();
     for (const row of summaryRows) {
       if (row.endProgress == null) continue;
@@ -514,6 +528,9 @@ export class ReadingSessionRepository {
       progressSummary,
       latestEndProgress,
       bySource,
+      longestSessionSeconds,
+      longestSessionAt,
+      backtrackCount,
     };
 
     const items: BookReadingSession[] = rows.map((r) => ({
@@ -526,6 +543,7 @@ export class ReadingSessionRepository {
       endProgress: r.endProgress ?? null,
       format: r.format ?? null,
       source: r.source ?? null,
+      attemptId: r.attemptId ?? null,
     }));
 
     return { items, total, page, pageSize, stats };

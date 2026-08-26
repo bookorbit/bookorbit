@@ -397,6 +397,8 @@ describe('AnnotationService', () => {
         originBreakdown: [{ origin: 'web', count: 3 }],
         chaptersWithHighlights: 2,
         highlightsWithNotes: 1,
+        chapterBreakdown: [],
+        activity: [],
         ...overrides,
       };
     }

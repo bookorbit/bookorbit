@@ -9,11 +9,18 @@ import BookCarousel from '@/features/book/components/detail/BookCarousel.vue'
 
 type Section = 'series' | 'author' | 'similar'
 
-const props = defineProps<{
-  bookId: number
-  seriesName: string | null
-  authorCount: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    bookId: number
+    seriesName: string | null
+    authorCount: number
+    /** Cover size for the shelf; 'lg' is the book detail layout. */
+    size?: 'md' | 'lg'
+    /** Drops the top rule and margin when the row sits in its own grid cell. */
+    flush?: boolean
+  }>(),
+  { size: 'md', flush: false },
+)
 
 const { t } = useI18n()
 
@@ -135,7 +142,7 @@ const hasAnyContent = computed(() => availablePills.value.length > 0 || Object.v
 </script>
 
 <template>
-  <div v-if="hasAnyContent" class="mt-8 pt-6 border-t border-border">
+  <div v-if="hasAnyContent" :class="flush ? 'flex h-full min-h-0 flex-col' : 'mt-8 pt-6 border-t border-border'">
     <div class="flex items-center justify-between mb-4">
       <div class="inline-flex items-center gap-1 rounded-lg bg-muted/55 p-1">
         <button
@@ -178,6 +185,7 @@ const hasAnyContent = computed(() => availablePills.value.length > 0 || Object.v
           </div>
         </div>
         <BookCarousel
+          :size="size"
           v-else-if="activeSection === 'series'"
           ref="seriesCarouselRef"
           :books="booksForSection('series')"
@@ -187,6 +195,7 @@ const hasAnyContent = computed(() => availablePills.value.length > 0 || Object.v
           :show-header="false"
         />
         <BookCarousel
+          :size="size"
           v-else-if="activeSection === 'author'"
           ref="authorCarouselRef"
           :books="booksForSection('author')"
@@ -194,6 +203,7 @@ const hasAnyContent = computed(() => availablePills.value.length > 0 || Object.v
           :show-header="false"
         />
         <BookCarousel
+          :size="size"
           v-else-if="activeSection === 'similar'"
           ref="similarCarouselRef"
           :books="booksForSection('similar')"

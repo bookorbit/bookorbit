@@ -235,7 +235,8 @@ export type GroupRule = {
  * - `rating` - from `user_book_ratings.rating` (per-user, correlated subquery)
  * - `format` - from `book_files.format` for the primary file (correlated subquery)
  * - `publishedDate` - uses full dates when available and falls back to published year
- * - `random` - day-seeded pseudorandom based on book id and user id
+ * - `random` - pseudorandom, seeded by `BookQuery.randomSeed` so one browsing session
+ *   keeps a stable order across pages while a new visit reshuffles
  *
  * Fields marked "per-user, correlated subquery" require an authenticated userId and
  * execute a subquery per result row; they are slower on large result sets.
@@ -383,4 +384,24 @@ export type BookQuery = {
   pagination: { page: number; size: number };
   collapseSeries?: boolean;
   q?: string;
+  /**
+   * Shuffle seed for the `random` sort field. Every page of one listing must send the same
+   * value or paging would draw from a different shuffle and repeat or skip books; a new value
+   * reshuffles. Ignored when no sort tier is `random`. Callers that omit it get a per-user
+   * order that only changes daily.
+   */
+  randomSeed?: number;
 };
+
+/** Upper bound for `BookQuery.randomSeed`, chosen so the seed always fits a signed 32-bit int. */
+export const MAX_RANDOM_SORT_SEED = 2_147_483_647;
+
+/** True when any sort tier shuffles, which is what makes `BookQuery.randomSeed` meaningful. */
+export function hasRandomSort(sort: SortSpec[] | undefined): boolean {
+  return sort?.some((spec) => spec.field === "random") ?? false;
+}
+
+/** A fresh shuffle seed. One per browsing session, reused for every page of that session. */
+export function createRandomSortSeed(): number {
+  return Math.floor(Math.random() * (MAX_RANDOM_SORT_SEED + 1));
+}

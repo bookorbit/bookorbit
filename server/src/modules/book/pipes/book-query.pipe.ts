@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { z } from 'zod';
 
-import { isSortField, type BookQuery, type JumpBucketsQuery, type SortField } from '@bookorbit/types';
+import { MAX_RANDOM_SORT_SEED, isSortField, type BookQuery, type JumpBucketsQuery, type SortField } from '@bookorbit/types';
 
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../../common/constants/pagination.constants';
 import { groupRuleSchema } from '../utils/group-rule.validator';
@@ -12,6 +12,7 @@ const bookQuerySchema = z.object({
   collapseSeries: z.boolean().optional(),
   filter: groupRuleSchema(5).optional(),
   q: z.string().max(200).optional(),
+  randomSeed: z.number().int().min(0).max(MAX_RANDOM_SORT_SEED).optional(),
   sort: z
     .array(
       z.object({

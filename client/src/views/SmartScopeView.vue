@@ -51,6 +51,7 @@ import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import FilterSummary from '@/features/book/components/FilterSummary.vue'
 import { sortFieldLabel } from '@/features/book/lib/filter-labels'
+import BookShuffleButton from '@/features/book/components/BookShuffleButton.vue'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
@@ -101,6 +102,8 @@ const {
   initialized: booksInitialized,
   error: booksError,
   sort: tableSort,
+  randomSortActive,
+  reshuffle,
   reset: resetBooks,
   contiguousPrefix,
   hasMorePrefix,
@@ -573,6 +576,7 @@ defineOptions({ name: 'SmartScopeView' })
             </TooltipTrigger>
             <TooltipContent>{{ filterExpanded ? 'Hide filter summary' : 'Show filter summary' }}</TooltipContent>
           </Tooltip>
+          <BookShuffleButton v-if="randomSortActive" desktop-only compact @shuffle="reshuffle" />
           <Tooltip>
             <TooltipTrigger as-child>
               <button
@@ -727,6 +731,7 @@ defineOptions({ name: 'SmartScopeView' })
             <component :is="filterExpanded ? ChevronUp : ChevronDown" :size="13" />
             <span>{{ filterExpanded ? 'Hide filter' : 'Show filter' }}</span>
           </button>
+          <BookShuffleButton v-if="randomSortActive" @shuffle="reshuffle" />
           <button
             v-if="hasPermission('library_download') && !isDemoRestrictedAccount"
             @click="openMetadataExport"

@@ -21,6 +21,7 @@ import {
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { foldActivityRows, foldChapterRows } from './annotation-stats.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
 import {
@@ -83,12 +84,29 @@ export interface PaginatedAnnotations {
   total: number;
 }
 
+export interface AnnotationChapterStatResult {
+  title: string | null;
+  count: number;
+  colors: { color: string; count: number }[];
+  chapterIndex: number | null;
+  order: number | null;
+  firstCreatedAt: string;
+}
+
+export interface AnnotationActivityResult {
+  day: string;
+  count: number;
+  origins: { origin: AnnotationRow['origin']; count: number }[];
+}
+
 export interface AnnotationStatsResult {
   totalHighlights: number;
   colorBreakdown: { color: string; count: number }[];
   originBreakdown: { origin: AnnotationRow['origin']; count: number }[];
   chaptersWithHighlights: number;
   highlightsWithNotes: number;
+  chapterBreakdown: AnnotationChapterStatResult[];
+  activity: AnnotationActivityResult[];
 }
 
 @Injectable()
@@ -182,7 +200,7 @@ export class AnnotationRepository {
     const conditions = this.buildConditions(bookId, userId, filters);
     const cfiJoin = and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi'));
 
-    const [aggregateResult, colorResult, originResult] = await Promise.all([
+    const [aggregateResult, colorResult, originResult, chapterResult, activityResult] = await Promise.all([
       this.db
         .select({
           totalHighlights: count(),
@@ -212,6 +230,31 @@ export class AnnotationRepository {
         .where(and(...conditions))
         .groupBy(annotations.origin)
         .orderBy(desc(count())),
+      this.db
+        .select({
+          title: annotations.chapterTitle,
+          color: annotations.color,
+          count: count(),
+          chapterIndex: sql<number | null>`min((${annotationPositions.extras} ->> 'chapterIndex')::int)`,
+          // The step after `/6` in an epub CFI addresses the spine itemref. Kept raw here and
+          // converted to a spine index in foldChapterRows, where it can be tested.
+          cfiSpineStep: sql<number | null>`min(nullif(substring(${annotationPositions.pos0} from 'epubcfi[(]/6/([0-9]+)'), '')::int)`,
+          firstCreatedAt: sql<Date>`min(${annotations.createdAt})`,
+        })
+        .from(annotations)
+        .leftJoin(annotationPositions, cfiJoin)
+        .where(and(...conditions))
+        .groupBy(annotations.chapterTitle, annotations.color),
+      this.db
+        .select({
+          day: sql<string>`to_char(${annotations.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`,
+          origin: annotations.origin,
+          count: count(),
+        })
+        .from(annotations)
+        .leftJoin(annotationPositions, cfiJoin)
+        .where(and(...conditions))
+        .groupBy(sql`1`, annotations.origin),
     ]);
 
     const agg = aggregateResult[0];
@@ -222,6 +265,8 @@ export class AnnotationRepository {
       highlightsWithNotes: agg?.highlightsWithNotes ?? 0,
       colorBreakdown: colorResult.map((r) => ({ color: r.color, count: r.count })),
       originBreakdown: originResult.map((r) => ({ origin: r.origin, count: r.count })),
+      chapterBreakdown: foldChapterRows(chapterResult),
+      activity: foldActivityRows(activityResult),
     };
   }
 

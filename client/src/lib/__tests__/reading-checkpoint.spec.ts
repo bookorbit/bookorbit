@@ -13,6 +13,7 @@ function makeSession(overrides: Partial<BookReadingSession> = {}): BookReadingSe
     endProgress: 42.25,
     format: 'epub',
     source: 'web',
+    attemptId: null,
     ...overrides,
   }
 }
