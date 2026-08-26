@@ -29,9 +29,10 @@ export function useReadingAttempts(bookIdRef: Ref<number>) {
     return new Map(ordered.map((attempt, index) => [attempt.id, index + 1]))
   })
 
-  async function load() {
+  /** `silent` keeps `loading` down so a revalidation behind rendered rows cannot skeleton them. */
+  async function load(opts?: { silent?: boolean }) {
     const bookId = bookIdRef.value
-    loading.value = true
+    if (!opts?.silent) loading.value = true
     error.value = null
     try {
       const res = await api(`/api/v1/books/${bookId}/reading-attempts?page=1&pageSize=${PAGE_SIZE}`)

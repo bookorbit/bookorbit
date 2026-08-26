@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, provide, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, provide, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { BookDetail, BookMetadataLockField } from '@bookorbit/types'
@@ -20,8 +20,12 @@ import { useCoverTint } from '@/features/book/composables/useCoverTint'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
-const ReadingLogTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/ReadingLogTab.vue'))
-const HighlightsTab = defineAsyncComponent(() => import('@/features/book/components/detail/tabs/HighlightsTab.vue'))
+const loadReadingLogTab = () => import('@/features/book/components/detail/tabs/ReadingLogTab.vue')
+const loadHighlightsTab = () => import('@/features/book/components/detail/tabs/HighlightsTab.vue')
+const ReadingLogTab = defineAsyncComponent(loadReadingLogTab)
+const HighlightsTab = defineAsyncComponent(loadHighlightsTab)
+
+const KEPT_ALIVE_TABS = ['ReadingLogTab', 'HighlightsTab']
 
 const { t } = useI18n()
 const route = useRoute()
@@ -97,6 +101,17 @@ onBookProgressChanged((event) => {
 
 watch(bookId, (id) => fetch(id), { immediate: true })
 
+// The two lazy tabs render nothing at all while their chunk arrives, so a cold click on either
+// blanks the pane. Warm both once the page is idle and the first click has a component to mount.
+onMounted(() => {
+  const warm = () => {
+    void loadReadingLogTab()
+    void loadHighlightsTab()
+  }
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 2000 })
+  else setTimeout(warm, 500)
+})
+
 function onMetadataSaved(updated: BookDetail) {
   detail.value = updated
 }
@@ -120,17 +135,24 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
   <BookDetailLayout :book-id="bookId" :cover-tint="coverTint">
     <Transition name="content" mode="out-in">
       <div v-if="detail" key="detail" class="h-full">
-        <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" @moved="handleMovedToLibrary" />
-        <EditMetadataTab
-          v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
-          :book="detail"
-          @saved="onMetadataSaved"
-          @locks-changed="onLocksChanged"
-          @cover-changed="onCoverChanged"
-        />
-        <FilesTab v-else-if="tab === 'files'" :book="detail" @refetch="fetch(detail.id)" />
-        <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" @saved="onMetadataSaved" />
-        <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
+        <!--
+          Only the two lazy tabs are cached. Both fetch on mount, so without this every return
+          replays blank -> skeleton -> content in under 120ms, which reads as a flash rather than
+          as loading. They revalidate silently on activation instead.
+        -->
+        <KeepAlive :include="KEPT_ALIVE_TABS">
+          <DetailsTab v-if="tab === 'details'" :book="detail" @saved="onMetadataSaved" @moved="handleMovedToLibrary" />
+          <EditMetadataTab
+            v-else-if="tab === 'edit' && hasPermission('library_edit_metadata')"
+            :book="detail"
+            @saved="onMetadataSaved"
+            @locks-changed="onLocksChanged"
+            @cover-changed="onCoverChanged"
+          />
+          <FilesTab v-else-if="tab === 'files'" :book="detail" @refetch="fetch(detail.id)" />
+          <ReadingLogTab v-else-if="tab === 'reading-log'" :book="detail" @saved="onMetadataSaved" />
+          <HighlightsTab v-else-if="tab === 'highlights'" :book="detail" />
+        </KeepAlive>
       </div>
 
       <div v-else-if="loading" key="loading">
@@ -162,26 +184,19 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
         <div v-else-if="tab === 'files'" class="space-y-3">
           <div v-for="i in 3" :key="i" class="h-16 rounded-md bg-muted animate-shimmer" />
         </div>
+        <!--
+          These two match the box the tab itself puts up while its own first load runs, so the
+          handover from "book loading" to "tab loading" changes the fill and never the layout.
+        -->
         <div
           v-else-if="tab === 'reading-log'"
           class="flex h-full min-h-0 flex-col gap-4 xl:grid xl:grid-cols-[17rem_minmax(0,1fr)_19.25rem] xl:grid-rows-[minmax(0,1fr)_13.5rem] xl:gap-x-5 xl:gap-y-4"
         >
-          <div class="h-64 rounded-xl bg-muted animate-shimmer xl:col-start-1 xl:row-start-1 xl:h-auto" />
-          <div class="h-72 rounded-xl bg-muted animate-shimmer xl:col-start-2 xl:row-start-1 xl:h-auto" />
-          <div class="flex flex-col gap-4 xl:col-start-3 xl:row-start-1 xl:min-h-0">
-            <div class="h-40 rounded-xl bg-muted animate-shimmer xl:min-h-0 xl:flex-1" />
-            <div class="h-[9.375rem] shrink-0 rounded-xl bg-muted animate-shimmer" />
-          </div>
-          <div class="h-56 rounded-xl bg-muted animate-shimmer xl:col-span-full xl:row-start-2 xl:h-auto" />
+          <div class="h-64 rounded-xl bg-muted animate-shimmer xl:col-start-1 xl:row-start-1 xl:row-span-2 xl:h-auto" />
+          <div class="min-h-80 rounded-xl bg-muted animate-shimmer xl:col-start-2 xl:col-span-2 xl:row-start-1 xl:row-span-2 xl:min-h-0" />
         </div>
-        <div v-else-if="tab === 'highlights'" class="space-y-4">
-          <div class="flex gap-2">
-            <div class="h-9 flex-1 rounded-md bg-muted animate-shimmer" />
-            <div v-for="i in 3" :key="i" class="h-9 w-9 rounded-full bg-muted animate-shimmer" />
-          </div>
-          <div class="space-y-3">
-            <div v-for="i in 3" :key="i" class="h-24 rounded-lg bg-muted animate-shimmer" />
-          </div>
+        <div v-else-if="tab === 'highlights'" class="flex h-full min-h-0 flex-col">
+          <div class="min-h-80 flex-1 rounded-xl bg-muted animate-shimmer xl:min-h-0" />
         </div>
       </div>
 

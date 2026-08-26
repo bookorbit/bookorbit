@@ -95,10 +95,14 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
   }
 
   let fetchSeq = 0
-  async function fetchHighlights() {
+  /**
+   * `silent` refetches without raising `loading`, so a revalidation behind an already-rendered
+   * stream cannot flip the tab through its empty state on the way back.
+   */
+  async function fetchHighlights(opts?: { silent?: boolean }) {
     const bookId = bookIdRef.value
     const seq = ++fetchSeq
-    loading.value = true
+    if (!opts?.silent) loading.value = true
     error.value = null
     try {
       const res = await api(`/api/v1/books/${bookId}/annotations?${buildParams(1).toString()}`)

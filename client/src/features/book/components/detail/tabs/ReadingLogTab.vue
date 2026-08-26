@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onActivated, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Ellipsis, RotateCcw } from '@lucide/vue'
 import { Permission, type BookDetail, type UserBookStatus } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useDeferredLoading } from '@/composables/useDeferredLoading'
 import { useBookReadingLog, type AddReadingSessionPayload } from '@/features/book/composables/useBookReadingLog'
 import { useReadingAttempts, type ReadingAttemptDraft } from '@/features/book/composables/useReadingAttempts'
 import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
@@ -17,6 +18,9 @@ import ReadingLogBand from '../reading-log/ReadingLogBand.vue'
 import ReadingLogEmptyStage from '../reading-log/ReadingLogEmptyStage.vue'
 import ReadingLogExportMenu from './ReadingLogExportMenu.vue'
 import AddSessionDialog from './AddSessionDialog.vue'
+
+// Named for the KeepAlive `include` list in BookDetailView.
+defineOptions({ name: 'ReadingLogTab' })
 
 const props = defineProps<{ book: BookDetail }>()
 
@@ -57,6 +61,19 @@ const {
   remove: removeAttempt,
 } = useReadingAttempts(bookIdRef)
 
+// The tab is kept alive, so returning to it shows the rows it already had rather than replaying
+// the load. A sync can land a session while another tab is open, so revalidate on the way back -
+// silently, because a skeleton over rows that are already correct is the flash this avoids.
+let activatedBefore = false
+onActivated(() => {
+  if (!activatedBefore) {
+    activatedBefore = true
+    return
+  }
+  void reload({ silent: true })
+  void reloadAttempts({ silent: true })
+})
+
 const { hasPermission } = usePermissions()
 const canManageReadingState = computed(() => hasPermission(Permission.LibraryEditMetadata))
 const {
@@ -92,6 +109,17 @@ const blank = computed(
   () =>
     !emptyStageDismissed.value && !loading.value && !attemptsLoading.value && (stats.value?.totalSessions ?? 0) === 0 && attempts.value.length === 0,
 )
+
+// The data decides which of two layouts the tab settles into, so until the first load lands there
+// is no shape to commit to. Latched, because a later filter reload must not throw the pane back
+// to the placeholder. The placeholder covers the same box either settled layout puts there, so
+// whichever way it resolves nothing moves.
+const resolved = ref(false)
+watch([loading, attemptsLoading], ([sessionsBusy, attemptsBusy]) => {
+  if (!sessionsBusy && !attemptsBusy) resolved.value = true
+})
+const firstLoadPending = computed(() => !resolved.value)
+const showFirstLoadSkeleton = useDeferredLoading(firstLoadPending)
 
 function buildDateFrom(quick: QuickFilter): string | undefined {
   const now = new Date()
@@ -218,22 +246,38 @@ const quickFilters = computed<{ label: string; value: QuickFilter }[]>(() => [
     <div
       class="flex flex-col gap-4 xl:grid xl:min-h-0 xl:flex-1 xl:gap-x-5 xl:gap-y-4"
       :class="
-        blank
+        blank && resolved
           ? 'xl:grid-cols-[17rem_minmax(0,1fr)] xl:grid-rows-[minmax(0,1fr)]'
           : 'xl:grid-cols-[17rem_minmax(0,1fr)_19.25rem] xl:grid-rows-[minmax(0,1fr)_13.5rem]'
       "
     >
       <ReadingLogVitals
         class="xl:col-start-1 xl:row-start-1"
+        :class="{ 'xl:row-span-2': !resolved }"
         :book="book"
         :stats="stats"
         :loading="loading"
-        :hide-add-session="blank"
+        :hide-add-session="blank || !resolved"
         @saved="handleVitalsSaved"
         @add-session="handleOpenAddSession"
       />
 
-      <ReadingLogEmptyStage v-if="blank" class="xl:col-start-2 xl:row-start-1" @add-session="handleOpenAddSession" @record-past="handleRecordPast" />
+      <div
+        v-if="!resolved"
+        class="min-h-80 rounded-xl border border-border bg-card xl:col-start-2 xl:col-span-2 xl:row-start-1 xl:row-span-2 xl:min-h-0"
+        aria-busy="true"
+      >
+        <div v-if="showFirstLoadSkeleton" class="flex flex-col gap-2 px-3 py-3" aria-hidden="true">
+          <div v-for="row in 6" :key="row" class="h-4 rounded bg-muted animate-shimmer" />
+        </div>
+      </div>
+
+      <ReadingLogEmptyStage
+        v-else-if="blank"
+        class="xl:col-start-2 xl:row-start-1"
+        @add-session="handleOpenAddSession"
+        @record-past="handleRecordPast"
+      />
 
       <template v-else>
         <ReadingLogLedger

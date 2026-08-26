@@ -42,11 +42,15 @@ export function useBookReadingLog(bookIdRef: Ref<number>) {
     return params
   }
 
-  async function fetchSessions(opts?: { append?: boolean }) {
+  /**
+   * `silent` refetches without raising `loading`, so a revalidation behind already-rendered rows
+   * cannot dim or skeleton them. Only a load with nothing on screen yet is worth announcing.
+   */
+  async function fetchSessions(opts?: { append?: boolean; silent?: boolean }) {
     const bookId = bookIdRef.value
     const append = opts?.append ?? false
     if (append) loadingMore.value = true
-    else loading.value = true
+    else if (!opts?.silent) loading.value = true
     error.value = null
     try {
       const res = await api(`/api/v1/books/${bookId}/sessions?${buildParams().toString()}`)
@@ -127,9 +131,9 @@ export function useBookReadingLog(bookIdRef: Ref<number>) {
     await fetchSessions()
   }
 
-  async function reload() {
+  async function reload(opts?: { silent?: boolean }) {
     page.value = 1
-    await fetchSessions()
+    await fetchSessions({ silent: opts?.silent })
   }
 
   async function exportAll(): Promise<BookReadingSession[]> {

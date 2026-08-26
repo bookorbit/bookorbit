@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { AnnotationItem, BookDetail } from '@bookorbit/types'
 import { READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { useBookHighlights } from '@/features/book/composables/useBookHighlights'
+import { useDeferredLoading } from '@/composables/useDeferredLoading'
 import { useDensity } from '@/features/annotations/composables/useDensity'
 import { HIGHLIGHT_GROUP_MODES, NO_CHAPTER_KEY, type HighlightGroup } from '@/features/book/lib/highlight-groups'
 import HighlightsRail from '@/features/book/components/detail/highlights/HighlightsRail.vue'
@@ -16,6 +17,9 @@ import HighlightInspector from '@/features/book/components/detail/highlights/Hig
 import HighlightsBand from '@/features/book/components/detail/highlights/HighlightsBand.vue'
 import HighlightsEmptyStage from '@/features/book/components/detail/highlights/HighlightsEmptyStage.vue'
 import HighlightsShortcutsDialog from '@/features/book/components/detail/highlights/HighlightsShortcutsDialog.vue'
+
+// Named for the KeepAlive `include` list in BookDetailView.
+defineOptions({ name: 'HighlightsTab' })
 
 const props = defineProps<{ book: BookDetail }>()
 
@@ -33,6 +37,17 @@ const editingNoteId = ref<number | null>(null)
 
 const bookTitle = computed(() => props.book.title ?? t('book.detail.highlights.untitled'))
 const blank = computed(() => !hl.loading.value && hl.total.value === 0 && !hl.hasActiveFilters.value)
+
+// Until the first load lands there is nothing to print but zeros, and a rail reading "0 highlights"
+// over an empty stream is a claim, not a loading state. Latched, because a later filter reload
+// must not throw the pane back to the placeholder, which covers the box either settled layout
+// puts there so neither resolution moves anything.
+const resolved = ref(false)
+watch(hl.loading, (busy) => {
+  if (!busy) resolved.value = true
+})
+const firstLoadPending = computed(() => !resolved.value)
+const showFirstLoadSkeleton = useDeferredLoading(firstLoadPending)
 const stackedDetail = computed(() => isStacked.value && hl.activeItem.value != null)
 
 const readableFile = computed(() => props.book.files.find((file) => file.format != null && READER_OPENABLE_FORMATS.has(file.format as never)) ?? null)
@@ -192,8 +207,29 @@ watch(
   },
 )
 
-onMounted(() => window.addEventListener('keydown', handleKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
+// The tab is kept alive, so a cached-but-hidden Highlights tab must stop swallowing j/k/? while
+// another tab is on screen. Mount and unmount stay bound too, for rendering outside a KeepAlive.
+function bindShortcuts() {
+  window.addEventListener('keydown', handleKeydown)
+}
+function unbindShortcuts() {
+  window.removeEventListener('keydown', handleKeydown)
+}
+onMounted(bindShortcuts)
+onBeforeUnmount(unbindShortcuts)
+onDeactivated(unbindShortcuts)
+
+let activatedBefore = false
+onActivated(() => {
+  bindShortcuts()
+  if (!activatedBefore) {
+    activatedBefore = true
+    return
+  }
+  // A sync can add highlights while another tab is open. Silent, because the stream already holds
+  // the right rows and a skeleton over them is the flash this avoids.
+  void hl.fetchHighlights({ silent: true })
+})
 </script>
 
 <template>
@@ -202,7 +238,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
       {{ hl.error.value }}
     </div>
 
-    <div v-if="blank" class="flex min-h-0 flex-1 flex-col">
+    <div v-if="!resolved" class="min-h-80 flex-1 rounded-xl border border-border bg-card xl:min-h-0" aria-busy="true">
+      <div v-if="showFirstLoadSkeleton" class="flex flex-col gap-2 px-3 py-3" aria-hidden="true">
+        <div v-for="row in 6" :key="row" class="h-4 rounded bg-muted animate-shimmer" />
+      </div>
+    </div>
+
+    <div v-else-if="blank" class="flex min-h-0 flex-1 flex-col">
       <HighlightsEmptyStage :book-title="bookTitle" :can-read="readableFile != null" @read="handleOpenReader" />
     </div>
 

@@ -273,24 +273,38 @@ const formatLine = computed(() =>
 
 const currentStatusOption = computed(() => STATUS_OPTIONS.find((option) => option.value === (localReadStatus.value ?? 'unread')))
 
+// A book with no sessions still answers with a stats object of zeros, so a null one means the
+// first load has not landed. Printing its zeros claims the book is unread until the real count
+// arrives; the dash the pace and last-read rows already use says "not known yet" instead.
+const statsPending = computed(() => props.stats === null)
+
 const ledgerRows = computed(() => [
   {
     key: 'total',
     label: t('book.detail.readingLog.vitals.totalTime'),
-    value: formatDuration(props.stats?.totalSeconds ?? 0),
+    value: statsPending.value ? '-' : formatDuration(props.stats?.totalSeconds ?? 0),
     withMomentum: true,
   },
-  { key: 'sessions', label: t('book.detail.readingLog.vitals.sessions'), value: formatNumber(props.stats?.totalSessions ?? 0), withMomentum: false },
+  {
+    key: 'sessions',
+    label: t('book.detail.readingLog.vitals.sessions'),
+    value: statsPending.value ? '-' : formatNumber(props.stats?.totalSessions ?? 0),
+    withMomentum: false,
+  },
   {
     key: 'average',
     label: t('book.detail.readingLog.vitals.avgSession'),
-    value: formatDuration(props.stats?.avgDurationSeconds ?? 0),
+    value: statsPending.value ? '-' : formatDuration(props.stats?.avgDurationSeconds ?? 0),
     withMomentum: false,
   },
   {
     key: 'activeDays',
     label: t('book.detail.readingLog.vitals.activeDays'),
-    value: spanDays.value > 0 ? t('book.detail.readingLog.vitals.activeDaysOf', { active: activeDays.value, total: spanDays.value }) : '0',
+    value: statsPending.value
+      ? '-'
+      : spanDays.value > 0
+        ? t('book.detail.readingLog.vitals.activeDaysOf', { active: activeDays.value, total: spanDays.value })
+        : '0',
     withMomentum: false,
   },
   {

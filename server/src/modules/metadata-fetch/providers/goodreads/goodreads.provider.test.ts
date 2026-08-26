@@ -343,10 +343,12 @@ describe('GoodreadsProvider', () => {
         return Promise.resolve({ ok: true, status: 202, text: () => Promise.resolve('<div id="challenge-container"></div>') });
       }) as never;
 
-      const searchPromise = provider.search({ title: 'B' });
+      // The rejection lands while the timers run, so the assertion has to be attached before then:
+      // a rejected promise nobody is holding is an unhandled rejection, which fails the whole run.
+      const rejects = expect(provider.search({ title: 'B' })).rejects.toBeInstanceOf(ProviderThrottleError);
       await vi.runAllTimersAsync();
 
-      await expect(searchPromise).rejects.toBeInstanceOf(ProviderThrottleError);
+      await rejects;
       const detailUrls = vi
         .mocked(global.fetch)
         .mock.calls.map(([url]) => fetchUrl(url))
