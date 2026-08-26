@@ -497,14 +497,34 @@ export class AuthService {
   async validateUser(userId: number, tokenVersion: number) {
     const user = await this.userService.findByIdWithPermissions(userId);
     if (!user || !user.active) throw new UnauthorizedException();
+    // Before the shared-link lookup, so a stale token is refused without a second query.
     if (user.tokenVersion !== tokenVersion) throw new UnauthorizedException();
-
-    if (user.provisioningMethod === 'shared') {
-      const hasActive = await this.magicLinkRepo.hasActiveByUserId(userId);
-      if (!hasActive) throw new UnauthorizedException();
-    }
+    if (!(await this.canActNow(user))) throw new UnauthorizedException();
 
     return user;
+  }
+
+  /**
+   * The user as an authenticated request would have resolved them, for a caller acting on their
+   * behalf rather than as them.
+   *
+   * Everything `validateUser` checks except the token version, which belongs to a token this
+   * caller does not hold. Null rather than a throw, because the refusal a delegated call should
+   * give is not the one a bad token gives, and only the caller knows which it is making.
+   */
+  async findActingUser(userId: number): Promise<RequestUser | null> {
+    const user = await this.userService.findByIdWithPermissions(userId);
+    if (!user || !user.active) return null;
+    return (await this.canActNow(user)) ? user : null;
+  }
+
+  /**
+   * A shared account exists only for as long as a live magic link points at it, so a revoked link
+   * has to close every door and not just the login form.
+   */
+  private async canActNow(user: RequestUser): Promise<boolean> {
+    if (user.provisioningMethod !== 'shared') return true;
+    return this.magicLinkRepo.hasActiveByUserId(user.id);
   }
 
   async revokeAllUserSessions(userId: number) {

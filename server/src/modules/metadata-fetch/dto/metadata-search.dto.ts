@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   Min,
   IsOptional,
@@ -14,7 +15,8 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-import { MetadataProviderKey } from '@bookorbit/types';
+import { CONCRETE_BOOK_MEDIA_KINDS, MetadataProviderKey } from '@bookorbit/types';
+import type { ConcreteBookMediaKind } from '@bookorbit/types';
 
 @ValidatorConstraint({ name: 'atLeastOneSearchTerm', async: false })
 class AtLeastOneSearchTermConstraint implements ValidatorConstraintInterface {
@@ -75,6 +77,14 @@ export class MetadataSearchDto {
   })
   @IsBoolean()
   isAudiobook?: boolean;
+
+  /**
+   * The medium being searched for. Narrows the provider set to the ones that serve it, so an
+   * e-book search is not answered with comic issues. `isAudiobook` follows from it when unset.
+   */
+  @IsOptional()
+  @IsIn(CONCRETE_BOOK_MEDIA_KINDS)
+  mediaKind?: ConcreteBookMediaKind;
 
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => {

@@ -24,6 +24,7 @@ export class LibroFmProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.LIBROFM;
   readonly label = 'Libro.fm';
   readonly identifiable = true as const;
+  readonly mediaKinds = ['audiobook'] as const;
 
   private readonly logger = new Logger(LibroFmProvider.name);
 

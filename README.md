@@ -115,6 +115,8 @@ The download is pre-configured with your server URL and credentials, so there is
 
 Full documentation is at **[bookorbit.app](https://bookorbit.app/what-is-bookorbit)**, covering libraries, metadata, readers, Kobo sync, OPDS, users and permissions, OIDC setup, and more.
 
+For setting up book requests, see the [book requests guide](docs/BOOK_REQUESTS.md): indexers,
+download clients, path mappings, automation, and the encryption key they all need.
 For a one-time import from Audiobookshelf, see the [Audiobookshelf migration guide](docs/AUDIOBOOKSHELF_MIGRATION.md).
 For a stopped-snapshot import from Calibre-Web Automated, see the
 [Calibre-Web Automated migration guide](docs/CALIBRE_WEB_AUTOMATED_MIGRATION.md).

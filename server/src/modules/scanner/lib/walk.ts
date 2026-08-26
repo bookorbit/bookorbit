@@ -33,12 +33,12 @@ const DIR_CONCURRENCY_LIMIT = 50;
 // but avoids broad matches like "Discography".
 const DISC_DIR_PATTERN = /^(?:cd|disc|disk|part|pt|side)(?:[\s_-]*(?:\d+|[A-Za-z]|[IVXLCM]+))$/i;
 
-function isDiscDirectory(name: string): boolean {
+export function isDiscDirectory(name: string): boolean {
   return DISC_DIR_PATTERN.test(name);
 }
 
 // Returns the filename stem (basename without the last extension).
-function stemOf(name: string): string {
+export function stemOf(name: string): string {
   const i = name.lastIndexOf('.');
   return i > 0 ? name.slice(0, i) : name;
 }

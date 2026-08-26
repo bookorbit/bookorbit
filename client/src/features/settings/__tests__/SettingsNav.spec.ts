@@ -12,9 +12,19 @@ const permState = {
 
 const routeState = { name: 'settings-appearance-theme' }
 
+const push = vi.fn<(to: { name: string }) => void>()
+
 vi.mock('vue-router', () => ({
   useRoute: () => ({ name: routeState.name }),
+  useRouter: () => ({ push }),
 }))
+
+const navStatus = vi.hoisted(() => ({ scanning: false }))
+
+vi.mock('../composables/useSettingsNavStatus', async () => {
+  const { computed: makeComputed } = await import('vue')
+  return { useSettingsNavStatus: () => ({ isLibraryScanning: makeComputed(() => navStatus.scanning) }) }
+})
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({
@@ -24,10 +34,11 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   }),
 }))
 
-function mountNav(opts?: { su?: boolean; perms?: string[]; demo?: boolean; routeName?: string }) {
+function mountNav(opts?: { su?: boolean; perms?: string[]; demo?: boolean; routeName?: string; scanning?: boolean }) {
   permState.isSuperuser = opts?.su ?? false
   permState.permissions = opts?.perms ?? []
   permState.demoRestricted = opts?.demo ?? false
+  navStatus.scanning = opts?.scanning ?? false
   routeState.name = opts?.routeName ?? 'settings-appearance-theme'
   return mount(SettingsNav, {
     global: { stubs: { RouterLink: RouterLinkStub } },
@@ -56,6 +67,7 @@ async function search(wrapper: Wrapper, term: string): Promise<string[]> {
 describe('SettingsNav', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    push.mockClear()
   })
 
   it('places an icon-only back action beside search', () => {
@@ -98,7 +110,7 @@ describe('SettingsNav', () => {
     })
 
     it('shows every group to a superuser', () => {
-      expect(groupLabels(mountNav({ su: true }))).toEqual(['You', 'Library', 'Devices & sync', 'Server'])
+      expect(groupLabels(mountNav({ su: true }))).toEqual(['You', 'Library', 'Devices', 'Accounts', 'Server'])
     })
 
     it('shows the library group to a user who can manage libraries', () => {
@@ -115,16 +127,26 @@ describe('SettingsNav', () => {
       expect(itemLabels(mountNav({ perms: ['manage_libraries'] }))).toContain('Libraries')
     })
 
-    it('shows metadata destinations with manage_metadata_config', () => {
+    it('collapses the metadata destinations behind a single row', () => {
       const labels = itemLabels(mountNav({ perms: ['manage_metadata_config'] }))
+      expect(labels).toContain('Metadata')
+      expect(labels).not.toContain('Providers')
+    })
+
+    it('shows metadata destinations with manage_metadata_config', () => {
+      const labels = childLabels(mountNav({ perms: ['manage_metadata_config'], routeName: 'settings-metadata-providers' }))
       expect(labels).toContain('Providers')
       expect(labels).toContain('Field Rules')
       expect(labels).toContain('Confidence Score')
     })
 
     it('keeps custom fields behind manage_libraries rather than metadata config', () => {
-      expect(itemLabels(mountNav({ perms: ['manage_metadata_config'] }))).not.toContain('Custom Fields')
-      expect(itemLabels(mountNav({ perms: ['manage_libraries'] }))).toContain('Custom Fields')
+      expect(childLabels(mountNav({ perms: ['manage_metadata_config'], routeName: 'settings-metadata-providers' }))).not.toContain('Custom Fields')
+      expect(childLabels(mountNav({ perms: ['manage_libraries'], routeName: 'settings-metadata-custom-fields' }))).toContain('Custom Fields')
+    })
+
+    it('drops the metadata row entirely when no child is reachable', () => {
+      expect(itemLabels(mountNav({ perms: ['manage_app_settings'] }))).not.toContain('Metadata')
     })
 
     it('shows file naming and maintenance with manage_app_settings', () => {
@@ -152,37 +174,43 @@ describe('SettingsNav', () => {
       expect(itemLabels(mountNav({ perms: ['email_send'] }))).toContain('Email')
     })
 
-    it('lists connected services as their own destinations', () => {
-      const labels = itemLabels(mountNav({ perms: ['hardcover_sync'] }))
-      expect(labels).toContain('Hardcover')
-      expect(labels).not.toContain('Readwise')
+    it('lists connected services under Accounts as their own destinations', () => {
+      const wrapper = mountNav({ perms: ['hardcover_sync'] })
+      expect(itemLabels(wrapper)).toContain('Hardcover')
+      expect(itemLabels(wrapper)).not.toContain('Readwise')
+      expect(groupLabels(wrapper)).toContain('Accounts')
     })
   })
 
   describe('server section', () => {
     it('shows users only with manage_users', () => {
-      expect(itemLabels(mountNav())).not.toContain('Users')
-      expect(itemLabels(mountNav({ perms: ['manage_users'] }))).toContain('Users')
+      expect(itemLabels(mountNav())).not.toContain('Users & Access')
+      expect(childLabels(mountNav({ perms: ['manage_users'], routeName: 'settings-admin-users' }))).toContain('Users')
     })
 
     it('shows account activity with view_user_activity', () => {
-      expect(itemLabels(mountNav({ perms: ['view_user_activity'] }))).toContain('Account Activity')
+      const labels = childLabels(mountNav({ perms: ['view_user_activity'], routeName: 'settings-admin-account-activity' }))
+      expect(labels).toContain('Account Activity')
     })
 
     it('keeps magic links and the audit log for superusers only', () => {
-      const adminLabels = itemLabels(mountNav({ perms: ['manage_app_settings'] }))
-      expect(adminLabels).not.toContain('Magic Links')
-      expect(adminLabels).not.toContain('Audit Log')
+      const admin = mountNav({ perms: ['manage_app_settings'], routeName: 'settings-admin-oidc' })
+      expect(childLabels(admin)).not.toContain('Magic Links')
+      expect(itemLabels(admin)).not.toContain('Audit Log')
 
-      const superuserLabels = itemLabels(mountNav({ su: true }))
-      expect(superuserLabels).toContain('Magic Links')
-      expect(superuserLabels).toContain('Audit Log')
+      const superuser = mountNav({ su: true, routeName: 'settings-admin-magic-links' })
+      expect(childLabels(superuser)).toContain('Magic Links')
+      expect(itemLabels(superuser)).toContain('Audit Log')
     })
 
     it('shows single sign-on and server fonts with manage_app_settings', () => {
-      const labels = itemLabels(mountNav({ perms: ['manage_app_settings'] }))
-      expect(labels).toContain('OIDC / SSO')
-      expect(labels).toContain('Server Fonts')
+      const wrapper = mountNav({ perms: ['manage_app_settings'], routeName: 'settings-admin-oidc' })
+      expect(childLabels(wrapper)).toContain('OIDC / SSO')
+      expect(itemLabels(wrapper)).toContain('Server Fonts')
+    })
+
+    it('drops the access row entirely when no child is reachable', () => {
+      expect(itemLabels(mountNav({ perms: ['manage_book_dock'] }))).not.toContain('Users & Access')
     })
 
     it('shows the book dock with manage_book_dock', () => {
@@ -220,10 +248,90 @@ describe('SettingsNav', () => {
       expect(activeBranch?.classes()).not.toContain('font-normal')
     })
 
-    it('points a parent row at its first child', () => {
-      const wrapper = mountNav()
-      const display = wrapper.findAllComponents(RouterLinkStub).find((link) => link.text() === 'Display')
-      expect(display?.props('to')).toEqual({ name: 'settings-appearance-theme' })
+    it('marks a collapsible row with a chevron and leaves a destination without one', () => {
+      const wrapper = mountNav({ perms: ['manage_libraries'] })
+      const rows = wrapper.findAll('[data-testid="settings-nav-item"]')
+      const metadata = rows.find((node) => node.text().includes('Metadata'))
+      const libraries = rows.find((node) => node.text().includes('Libraries'))
+
+      expect(metadata?.find('[data-testid="settings-nav-item-chevron"]').exists()).toBe(true)
+      expect(libraries?.find('[data-testid="settings-nav-item-chevron"]').exists()).toBe(false)
+    })
+
+    it('turns the chevron only while the branch is open', async () => {
+      const wrapper = mountNav({ routeName: 'settings-appearance-layout' })
+      const display = wrapper.findAll('[data-testid="settings-nav-item"]').find((node) => node.text().includes('Display'))
+      const chevron = () => display?.get('[data-testid="settings-nav-item-chevron"]')
+
+      expect(chevron()?.classes()).toContain('rotate-90')
+      await display?.trigger('click')
+      expect(chevron()?.classes()).not.toContain('rotate-90')
+    })
+
+    it('renders a grouping row as a disclosure button rather than a link', () => {
+      const wrapper = mountNav({ routeName: 'settings-reader-pdf' })
+      const display = wrapper.findAll('[data-testid="settings-nav-item"]').find((node) => node.text().includes('Display'))
+
+      expect(display?.element.tagName).toBe('BUTTON')
+      expect(display?.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.findAllComponents(RouterLinkStub).some((link) => link.text() === 'Display')).toBe(false)
+    })
+
+    it('opens a closed branch and jumps to its first page', async () => {
+      const wrapper = mountNav({ routeName: 'settings-reader-pdf' })
+      const display = wrapper.findAll('[data-testid="settings-nav-item"]').find((node) => node.text().includes('Display'))
+
+      await display?.trigger('click')
+
+      expect(push).toHaveBeenCalledWith({ name: 'settings-appearance-theme' })
+      expect(childLabels(wrapper)).toContain('Theme')
+    })
+
+    it('closes an open branch again without navigating away', async () => {
+      const wrapper = mountNav({ routeName: 'settings-appearance-layout' })
+      const display = wrapper.findAll('[data-testid="settings-nav-item"]').find((node) => node.text().includes('Display'))
+      expect(childLabels(wrapper)).toContain('Layout')
+
+      await display?.trigger('click')
+
+      expect(childLabels(wrapper)).not.toContain('Layout')
+      expect(display?.attributes('aria-expanded')).toBe('false')
+      expect(push).not.toHaveBeenCalled()
+    })
+
+    it('keeps a closed branch highlighted while its page is still open', async () => {
+      const wrapper = mountNav({ routeName: 'settings-appearance-layout' })
+      const display = wrapper.findAll('[data-testid="settings-nav-item"]').find((node) => node.text().includes('Display'))
+
+      await display?.trigger('click')
+
+      expect(display?.classes()).toContain('bg-sidebar-accent')
+    })
+
+    it('opens only one branch at a time', async () => {
+      const wrapper = mountNav({ routeName: 'settings-appearance-layout' })
+      const reader = wrapper.findAll('[data-testid="settings-nav-item"]').find((node) => node.text().includes('Reader'))
+
+      await reader?.trigger('click')
+
+      expect(childLabels(wrapper)).toContain('eBook')
+      expect(childLabels(wrapper)).not.toContain('Layout')
+    })
+  })
+
+  describe('live status', () => {
+    it('flags a running scan on the libraries row', () => {
+      const wrapper = mountNav({ perms: ['manage_libraries'], scanning: true })
+      const libraries = wrapper.findAll('[data-testid="settings-nav-item"]').find((node) => node.text().includes('Libraries'))
+      const status = libraries?.get('[data-testid="settings-nav-item-status"]')
+
+      expect(status?.text()).toBe('Scanning')
+      expect(status?.attributes('role')).toBe('status')
+    })
+
+    it('shows no status while nothing is scanning', () => {
+      const wrapper = mountNav({ perms: ['manage_libraries'] })
+      expect(wrapper.find('[data-testid="settings-nav-item-status"]').exists()).toBe(false)
     })
   })
 

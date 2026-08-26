@@ -1138,6 +1138,60 @@ describe('AuthService', () => {
     });
   });
 
+  /**
+   * The resolution a caller acting on somebody's behalf gets. Every rule `validateUser` applies
+   * except the token version, which belongs to a token the caller does not hold; the point of the
+   * shared helper is that a way in that is closed to a login stays closed to a delegated call.
+   */
+  describe('findActingUser', () => {
+    it('returns null when the user does not exist', async () => {
+      const { service, userService } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(null);
+
+      await expect(service.findActingUser(1)).resolves.toBeNull();
+    });
+
+    it('returns null when the user is deactivated', async () => {
+      const { service, userService } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ active: false }));
+
+      await expect(service.findActingUser(1)).resolves.toBeNull();
+    });
+
+    it('returns null for a shared user whose magic links were all revoked', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ provisioningMethod: 'shared' }));
+      magicLinkRepo.hasActiveByUserId.mockResolvedValue(false);
+
+      await expect(service.findActingUser(1)).resolves.toBeNull();
+    });
+
+    it('returns a shared user who still has a live magic link', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      const user = makeFullUser({ provisioningMethod: 'shared' });
+      userService.findByIdWithPermissions.mockResolvedValue(user);
+      magicLinkRepo.hasActiveByUserId.mockResolvedValue(true);
+
+      await expect(service.findActingUser(1)).resolves.toEqual(user);
+    });
+
+    it('never asks about magic links for an ordinary account', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ provisioningMethod: 'local' }));
+
+      await service.findActingUser(1);
+      expect(magicLinkRepo.hasActiveByUserId).not.toHaveBeenCalled();
+    });
+
+    it('ignores the token version, which belongs to a token this caller does not hold', async () => {
+      const { service, userService } = makeService();
+      const user = makeFullUser({ tokenVersion: 9 });
+      userService.findByIdWithPermissions.mockResolvedValue(user);
+
+      await expect(service.findActingUser(1)).resolves.toEqual(user);
+    });
+  });
+
   describe('forgotPassword', () => {
     it('throws ServiceUnavailableException when system mail is not configured', async () => {
       const { service, systemMailService } = makeService();

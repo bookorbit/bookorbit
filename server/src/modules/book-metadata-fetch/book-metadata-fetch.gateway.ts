@@ -10,10 +10,11 @@ import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.re
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
+import { wsCorsOrigin } from '../../common/utils/ws-cors.utils';
 
 export const BOOK_METADATA_FETCH_STATUS_EVENT = 'book-metadata-fetch:status';
 
-@WebSocketGateway({ namespace: '/book-metadata-fetch', cors: { origin: process.env.CLIENT_URL ?? 'http://localhost:5173' } })
+@WebSocketGateway({ namespace: '/book-metadata-fetch', cors: { origin: wsCorsOrigin() } })
 export class BookMetadataFetchGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(BookMetadataFetchGateway.name);

@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   Accent,
+  BookRequestPreferences,
   CoverSearchPreferences,
   DisplayPreferences,
   LocalePreferences,
@@ -93,13 +94,17 @@ const validCoverSearchPreferences: CoverSearchPreferences = {
   defaultProvider: 'itunes',
 };
 
+const validBookRequestPreferences: BookRequestPreferences = { defaultLanguage: 'de' };
+
 const repo = {
-  findByCategory:
-    vi.fn<
-      (
-        ...args: [number, string]
-      ) => Promise<{ data: ThemePreferences | DisplayPreferences | LocalePreferences | ServerFontPreferences | CoverSearchPreferences } | undefined>
-    >(),
+  findByCategory: vi.fn<
+    (...args: [number, string]) => Promise<
+      | {
+          data: ThemePreferences | DisplayPreferences | LocalePreferences | ServerFontPreferences | CoverSearchPreferences | BookRequestPreferences;
+        }
+      | undefined
+    >
+  >(),
   upsert: vi.fn<(...args: [number, string, Record<string, unknown>]) => Promise<void>>(),
   delete: vi.fn<(...args: [number, string]) => Promise<void>>(),
 };
@@ -165,6 +170,66 @@ describe('UserPreferencesService', () => {
 
   it('upsertCoverSearchPreferences rejects unknown fields', async () => {
     await expect(service.upsertCoverSearchPreferences(11, { ...validCoverSearchPreferences, unexpected: true })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('getBookRequestPreferences returns no language when nothing was saved', async () => {
+    await expect(service.getBookRequestPreferences(7)).resolves.toEqual({ defaultLanguage: null });
+    expect(repo.findByCategory).toHaveBeenCalledWith(7, 'book-requests');
+  });
+
+  it('getBookRequestPreferences returns the pinned language', async () => {
+    repo.findByCategory.mockResolvedValueOnce({ data: validBookRequestPreferences });
+
+    await expect(service.getBookRequestPreferences(7)).resolves.toEqual(validBookRequestPreferences);
+  });
+
+  it('getBookRequestPreferences falls back safely when stored data is malformed', async () => {
+    repo.findByCategory.mockResolvedValueOnce({ data: { defaultLanguage: 'klingon' } } as never);
+
+    await expect(service.getBookRequestPreferences(7)).resolves.toEqual({ defaultLanguage: null });
+  });
+
+  it('upsertBookRequestPreferences saves a pinned language', async () => {
+    await expect(service.upsertBookRequestPreferences(11, { ...validBookRequestPreferences })).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'book-requests', validBookRequestPreferences);
+  });
+
+  /**
+   * Destinations lived in this category under two different shapes before the instance default
+   * replaced them. Rows written by either build still exist, and both must keep their language
+   * rather than failing strict validation and reverting the whole category to the defaults.
+   */
+  it('getBookRequestPreferences drops a destination pinned before the instance default existed', async () => {
+    repo.findByCategory.mockResolvedValueOnce({ data: { defaultLibraryId: 4, defaultFolderId: 9, defaultLanguage: 'de' } } as never);
+
+    await expect(service.getBookRequestPreferences(7)).resolves.toEqual({ defaultLanguage: 'de' });
+  });
+
+  it('getBookRequestPreferences drops a per-medium destination too', async () => {
+    repo.findByCategory.mockResolvedValueOnce({
+      data: { destinations: { ebook: { libraryId: 4, folderId: 9 } }, defaultLanguage: 'de' },
+    } as never);
+
+    await expect(service.getBookRequestPreferences(7)).resolves.toEqual({ defaultLanguage: 'de' });
+  });
+
+  it('upsertBookRequestPreferences drops a destination a stale client still sends', async () => {
+    await expect(service.upsertBookRequestPreferences(11, { defaultLibraryId: 4, defaultLanguage: 'de' })).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'book-requests', { defaultLanguage: 'de' });
+  });
+
+  it('upsertBookRequestPreferences rejects a language no release could be matched against', async () => {
+    await expect(service.upsertBookRequestPreferences(11, { ...validBookRequestPreferences, defaultLanguage: 'klingon' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertBookRequestPreferences rejects unknown fields', async () => {
+    await expect(service.upsertBookRequestPreferences(11, { ...validBookRequestPreferences, unexpected: true })).rejects.toBeInstanceOf(
       BadRequestException,
     );
     expect(repo.upsert).not.toHaveBeenCalled();

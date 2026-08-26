@@ -24,6 +24,9 @@ export interface MetadataSearchParams {
   // Hint for providers to cap deep candidate exploration in non-interactive flows
   // (e.g. auto-fill/background refresh where there is no manual candidate picking).
   maxCandidatesPerProvider?: number;
+  // Interactive result lists can afford bounded cover checks. Bulk metadata pipelines must not
+  // multiply one provider lookup into many thumbnail requests.
+  validateCoverPlaceholders?: boolean;
   // Internal-only signal used by orchestration timeout/cancellation.
   signal?: AbortSignal;
 }

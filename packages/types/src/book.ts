@@ -13,15 +13,21 @@ import type { SeriesIndex } from "./series-index";
 export const BOOK_FORMATS = DEFAULT_FORMAT_PRIORITY;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
-const AUDIO_FORMATS = new Set<string>(["m4b", "mp3", "m4a", "opus", "ogg", "flac"]);
+/** Exported as an ordered list too, so a form offering these cannot drift from what matches them. */
+export const AUDIO_FORMAT_LIST = ["m4b", "mp3", "m4a", "opus", "ogg", "flac"] as const;
+const AUDIO_FORMATS = new Set<string>(AUDIO_FORMAT_LIST);
 export function isAudioFormat(format: string): boolean {
   return AUDIO_FORMATS.has(format.toLowerCase());
 }
 
-const COMIC_FORMATS = new Set<string>(["cbz", "cbr", "cb7", "cbx"]);
+export const COMIC_FORMAT_LIST = ["cbz", "cbr", "cb7", "cbx"] as const;
+const COMIC_FORMATS = new Set<string>(COMIC_FORMAT_LIST);
 export function isComicFormat(format: string): boolean {
   return COMIC_FORMATS.has(format.toLowerCase());
 }
+
+/** What BookOrbit accepts as an ebook, and what an ebook tier may therefore ask for. */
+export const EBOOK_FORMAT_LIST = ["epub", "kepub", "mobi", "azw3", "azw", "fb2", "pdf", "djvu"] as const;
 
 export const READ_STATUSES = ["unread", "want_to_read", "reading", "on_hold", "rereading", "read", "skimmed", "abandoned"] as const;
 export type ReadStatus = (typeof READ_STATUSES)[number];
@@ -80,7 +86,11 @@ export type BookFileRef = {
   sizeBytes: number | null;
 };
 
-export type BookMediaKind = "ebook" | "audiobook" | "comic" | "unknown";
+/** The kinds a real file can be. `BookMediaKind` adds the case where no format identifies one. */
+export const CONCRETE_BOOK_MEDIA_KINDS = ["ebook", "audiobook", "comic"] as const;
+export type ConcreteBookMediaKind = (typeof CONCRETE_BOOK_MEDIA_KINDS)[number];
+
+export type BookMediaKind = ConcreteBookMediaKind | "unknown";
 
 export type BookMediaProfile = {
   primaryMediaKind: BookMediaKind;

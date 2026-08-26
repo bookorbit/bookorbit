@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { MetadataProviderKey } from '@bookorbit/types';
+import { ConcreteBookMediaKind, MetadataProviderKey } from '@bookorbit/types';
 
 import { METADATA_PROVIDERS } from './constants';
 import { MetadataProvider } from './providers/metadata-provider';
@@ -27,5 +27,16 @@ export class ProviderRegistry {
 
   find(key: MetadataProviderKey): MetadataProvider | undefined {
     return this.providers.find((p) => p.key === key);
+  }
+
+  /**
+   * Narrows keys to the providers worth asking about for one medium. A provider that declares no
+   * media kinds serves all of them, so this drops specialists rather than keeping a whitelist.
+   */
+  keysForMediaKind(keys: MetadataProviderKey[], mediaKind: ConcreteBookMediaKind): MetadataProviderKey[] {
+    return keys.filter((key) => {
+      const mediaKinds = this.find(key)?.mediaKinds;
+      return !mediaKinds || mediaKinds.includes(mediaKind);
+    });
   }
 }

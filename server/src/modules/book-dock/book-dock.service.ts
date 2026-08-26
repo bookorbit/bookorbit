@@ -1,9 +1,9 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { unlink } from 'fs/promises';
+import { rmdir, unlink } from 'fs/promises';
 import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { BookDockFile, BookDockFilesPage, BookDockMetadata, BookDockSummary } from '@bookorbit/types';
+import type { BookDockFile, BookDockFilesPage, BookDockMetadata, BookDockSummary, BookDockUnitFile } from '@bookorbit/types';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { libraries, libraryFolders } from '../../db/schema';
@@ -15,7 +15,7 @@ import { BookDockGateway } from './book-dock.gateway';
 import { normalizeBookDockMetadata, normalizeBookDockMetadataSources } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWatcherService } from './book-dock-watcher.service';
-import type { BookDockFileRow } from '../../db/schema';
+import type { BookDockFileRow, BookDockUnitFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 const BULK_SELECTION_BATCH_SIZE = 500;
@@ -37,8 +37,12 @@ export class BookDockService {
 
   async listFiles(query: ListOptions): Promise<BookDockFilesPage> {
     const { items, total } = await this.repo.findAll(query);
+    // One query for the whole page rather than one per unit row, which at a page of 100 units
+    // would be 100 round trips for a list nobody has even expanded yet.
+    const unitFiles = await this.repo.findUnitFilesByDockFileIds(items.filter((row) => row.unitDirectory).map((row) => row.id));
+
     return {
-      items: items.map(toDto),
+      items: items.map((row) => toDto(row, unitFiles.get(row.id) ?? [])),
       total,
       page: query.page,
       size: query.limit,
@@ -47,7 +51,7 @@ export class BookDockService {
 
   async getFile(id: number, userId: number, canManageAll: boolean): Promise<BookDockFile> {
     const row = await this.findFileForUser(id, userId, canManageAll);
-    return toDto(row);
+    return toDto(row, row.unitDirectory ? await this.repo.findUnitFiles(row.id) : []);
   }
 
   async getCoverPath(id: number, userId: number, canManageAll: boolean): Promise<string> {
@@ -388,7 +392,13 @@ export class BookDockService {
     }
   }
 
+  /** A unit is N files plus the directory holding them, and deleting it takes all of them. */
   private async cleanupFiles(row: BookDockFileRow): Promise<void> {
+    if (row.unitDirectory) {
+      for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
+      // Non-recursive: anything still in there is unaccounted for, and worth leaving for a human.
+      await rmdir(row.unitDirectory).catch(() => {});
+    }
     await safeUnlink(row.absolutePath);
     if (row.coverPath) {
       await safeUnlink(row.coverPath);
@@ -522,7 +532,7 @@ export class BookDockService {
   }
 }
 
-function toDto(row: BookDockFileRow): BookDockFile {
+function toDto(row: BookDockFileRow, unitFiles: BookDockUnitFileRow[] = []): BookDockFile {
   return {
     id: row.id,
     fileName: row.fileName,
@@ -540,6 +550,13 @@ function toDto(row: BookDockFileRow): BookDockFile {
     metadataEditedAt: row.metadataEditedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    unitFiles: unitFiles.map((file) => ({
+      fileName: file.fileName,
+      fileSize: file.fileSize === null ? null : Number(file.fileSize),
+      format: file.format,
+      role: file.role as BookDockUnitFile['role'],
+      sortOrder: file.sortOrder,
+    })),
   };
 }
 

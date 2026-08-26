@@ -1,4 +1,4 @@
-import { SQL, and, inArray, notExists, exists, or, sql } from 'drizzle-orm';
+import { SQL, and, eq, inArray, notExists, exists, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules } from '@bookorbit/types';
@@ -20,6 +20,10 @@ type Db = NodePgDatabase<typeof schema>;
  * Exclude semantics (applied independently, after include):
  * - excludeTagIds: book must NOT have any of these tags.
  * - excludeGenreIds: book must NOT have any of these genres.
+ *
+ * Exemption (applied last, over the whole set):
+ * - exemptRequestsFromUserId: a book that fulfilled a request this user made passes regardless
+ *   of every rule above. Absent unless an administrator ticked it on that user.
  */
 export function buildContentFilterClauses(contentFilters: ContentFilterRules, db: Db): SQL[] {
   const clauses: SQL[] = [];
@@ -69,6 +73,27 @@ export function buildContentFilterClauses(contentFilters: ContentFilterRules, db
       .from(schema.bookGenres)
       .where(and(sql`${schema.bookGenres.bookId} = ${schema.books.id}`, inArray(schema.bookGenres.genreId, contentFilters.excludeGenreIds)));
     clauses.push(notExists(sq));
+  }
+
+  if (clauses.length === 0) return clauses;
+
+  // Exemption wraps the whole rule set rather than joining the include side, because a book the
+  // user asked for should also survive their exclude rules: an operator who ticks this is saying
+  // "what they request, they may read", and half an exemption would hide the book they requested
+  // behind the very rule that made them request it instead of browsing to it.
+  if (contentFilters.exemptRequestsFromUserId !== undefined) {
+    const requestedByUser = exists(
+      db
+        .select({ one: sql`1` })
+        .from(schema.bookRequests)
+        .where(
+          and(
+            sql`${schema.bookRequests.matchedBookId} = ${schema.books.id}`,
+            eq(schema.bookRequests.userId, contentFilters.exemptRequestsFromUserId),
+          ),
+        ),
+    );
+    return [or(requestedByUser, and(...clauses))!];
   }
 
   return clauses;

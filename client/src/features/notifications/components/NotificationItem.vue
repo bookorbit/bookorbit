@@ -44,11 +44,12 @@ function handleClick() {
   if (!props.notification.read) {
     emit('read', props.notification.id)
   }
-  if (props.notification.actionUrl) {
-    if (props.notification.actionUrl.startsWith('/')) {
-      router.push(props.notification.actionUrl)
+  const actionUrl = props.notification.actionUrl
+  if (actionUrl) {
+    if (actionUrl.startsWith('/')) {
+      router.push(actionUrl)
     } else {
-      window.open(props.notification.actionUrl, '_blank')
+      window.open(actionUrl, '_blank')
     }
   }
 }
@@ -60,57 +61,56 @@ function handleDismiss(e: Event) {
 </script>
 
 <template>
-  <div
-    class="group relative flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-left transition-all hover:shadow-sm"
-    :class="
-      notification.read
-        ? 'border-border/30 bg-muted/20 hover:border-border/50 hover:bg-muted/40'
-        : 'border-border/60 bg-card shadow-sm hover:bg-muted/30'
-    "
-    role="button"
-    tabindex="0"
-    @click="handleClick"
-    @keydown.enter="handleClick"
-    @keydown.space.prevent="handleClick"
-  >
-    <div class="relative mt-0.5 shrink-0">
-      <div
-        class="flex items-center justify-center rounded-lg p-1.5"
-        :class="isFailed ? 'bg-destructive/10' : isWarning ? 'bg-amber-500/10' : 'bg-green-500/10'"
-      >
-        <component :is="icon" :size="15" :class="isFailed ? 'text-destructive' : isWarning ? 'text-amber-500' : 'text-green-500'" />
-      </div>
-      <span v-if="!notification.read" class="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
-    </div>
-
-    <div class="min-w-0 flex-1">
-      <div class="flex items-start justify-between gap-2">
-        <p class="truncate text-sm leading-tight" :class="notification.read ? 'text-foreground' : 'font-semibold text-foreground'">
-          {{ notification.title }}
-        </p>
-        <div class="flex shrink-0 items-center gap-1.5">
-          <span
-            v-if="occurrences > 1"
-            class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground"
-            :aria-label="$t('notifications.occurrences', { count: occurrences })"
-          >
-            {{ $t('notifications.occurrencesShort', { count: occurrences }) }}
-          </span>
-          <span class="text-[11px] text-muted-foreground">{{ relativeTime }}</span>
+  <div class="group relative">
+    <button
+      type="button"
+      class="flex w-full cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 pr-10 text-left transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      :class="
+        notification.read
+          ? 'border-border/30 bg-muted/20 hover:border-border/50 hover:bg-muted/40'
+          : 'border-border/60 bg-card shadow-sm hover:bg-muted/30'
+      "
+      @click="handleClick"
+    >
+      <div class="relative mt-0.5 shrink-0">
+        <div
+          class="flex items-center justify-center rounded-lg p-1.5"
+          :class="isFailed ? 'bg-destructive/10' : isWarning ? 'bg-warning/10' : 'bg-success/10'"
+        >
+          <component :is="icon" :size="15" :class="isFailed ? 'text-destructive' : isWarning ? 'text-warning' : 'text-success'" />
         </div>
+        <span v-if="!notification.read" class="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
       </div>
-      <p v-if="notification.message" class="mt-1 text-xs text-muted-foreground truncate">
-        {{ notification.message }}
-      </p>
-    </div>
+
+      <div class="min-w-0 flex-1">
+        <div class="flex items-start justify-between gap-2">
+          <p class="truncate text-sm leading-tight" :class="notification.read ? 'text-foreground' : 'font-semibold text-foreground'">
+            {{ notification.title }}
+          </p>
+          <div class="flex shrink-0 items-center gap-1.5">
+            <span
+              v-if="occurrences > 1"
+              class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground"
+              :aria-label="$t('notifications.occurrences', { count: occurrences })"
+            >
+              {{ $t('notifications.occurrencesShort', { count: occurrences }) }}
+            </span>
+            <span class="text-[11px] text-muted-foreground">{{ relativeTime }}</span>
+          </div>
+        </div>
+        <p v-if="notification.message" class="mt-1 truncate text-xs text-muted-foreground">
+          {{ notification.message }}
+        </p>
+      </div>
+    </button>
 
     <button
       type="button"
       :aria-label="$t('notifications.dismiss')"
-      class="mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+      class="absolute right-2 top-2 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
       @click="handleDismiss"
     >
-      <X :size="14" />
+      <X :size="14" aria-hidden="true" />
     </button>
   </div>
 </template>

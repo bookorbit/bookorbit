@@ -99,6 +99,8 @@ export interface MetadataProviderInfo {
   label: string;
   identifiable: boolean;
   selectedByFieldRules?: boolean;
+  /** Zero-based priority for the effective Cover field rule. Absent when the provider is not used for covers. */
+  coverPriority?: number;
 }
 
 /**

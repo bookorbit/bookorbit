@@ -5,8 +5,9 @@ import { Server, Socket } from 'socket.io';
 
 import { AuthService } from '../auth/auth.service';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
+import { wsCorsOrigin } from '../../common/utils/ws-cors.utils';
 
-@WebSocketGateway({ namespace: '/book-dock', cors: { origin: process.env.CLIENT_URL ?? 'http://localhost:5173' } })
+@WebSocketGateway({ namespace: '/book-dock', cors: { origin: wsCorsOrigin() } })
 export class BookDockGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(BookDockGateway.name);

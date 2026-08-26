@@ -51,6 +51,15 @@ export const migrationConfig = registerAs('migration', () => ({
   importRoot: process.env.MIGRATION_IMPORT_ROOT?.trim() ? resolve(process.env.MIGRATION_IMPORT_ROOT) : undefined,
 }));
 
+/**
+ * Download-client and (from phase 3) indexer credentials. Unlike the email and migration keys,
+ * `RequestCredentialService` refuses to store a secret when this is unset rather than falling
+ * back to plaintext.
+ */
+export const bookRequestConfig = registerAs('bookRequest', () => ({
+  encryptionKey: process.env.BOOK_REQUEST_ENCRYPTION_KEY ?? '',
+}));
+
 export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({
   stateTtlMs: parsePositiveInteger(process.env.OIDC_STATE_TTL_SECS, 300) * 1000,
   discoveryCacheTtlMs: parsePositiveInteger(process.env.OIDC_DISCOVERY_CACHE_TTL_SECS, 3600) * 1000,

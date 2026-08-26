@@ -44,6 +44,12 @@ export const users = pgTable(
     provisioningMethod: varchar('provisioning_method', { length: 20 }).notNull().default('local'),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     lastAuthenticatedAt: timestamp('last_authenticated_at', { withTimezone: true }),
+    /**
+     * Lets a book that fulfilled this user's own request through their content filters. Off by
+     * default and settable only by an administrator, because for anyone without filters it is a
+     * no-op, and everyone it does affect is somebody an operator deliberately restricted.
+     */
+    seeOwnRequestedBooks: boolean('see_own_requested_books').notNull().default(false),
     readingInsightsSharingLevel: readingInsightsSharingLevelEnum('reading_insights_sharing_level').notNull().default('private'),
     readingInsightsConsentedAt: timestamp('reading_insights_consented_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -95,6 +95,7 @@ const ADMIN_ROUTES: Record<AdminTab, string> = {
 const SYSTEM_ROUTES: Record<SystemTab, string> = {
   'file-naming': 'settings-file-naming',
   'book-dock': 'settings-admin-book-dock',
+  requests: 'settings-admin-requests',
   maintenance: 'settings-maintenance',
   'audit-log': 'settings-admin-audit-log',
 }
@@ -444,6 +445,13 @@ export const routes: RouteRecordRaw[] = [
             meta: { maxWidth: 'max-w-3xl', title: () => t('titles.system.book-dock') },
           },
           {
+            path: 'admin/requests',
+            name: 'settings-admin-requests',
+            component: () => import('@/features/settings/RequestsSettings.vue'),
+            props: { embedded: true },
+            meta: { maxWidth: 'max-w-5xl', title: () => t('titles.system.requests') },
+          },
+          {
             path: 'admin/audit-log',
             name: 'settings-admin-audit-log',
             component: () => import('@/features/audit/AuditLogPage.vue'),
@@ -484,6 +492,28 @@ export const routes: RouteRecordRaw[] = [
         name: 'book-dock',
         component: () => import('@/views/BookDockView.vue'),
         meta: { title: () => t('titles.bookDock') },
+      },
+      // A request opens as a drawer over the list rather than as its own page, but it keeps its
+      // own URL: these are children so a hard load of /requests/:id renders the list underneath.
+      {
+        path: '/requests',
+        name: 'book-requests',
+        component: () => import('@/features/book-requests/BookRequestsPage.vue'),
+        meta: { title: () => t('titles.bookRequests') },
+        children: [
+          {
+            path: ':id',
+            name: 'book-request-detail',
+            component: () => import('@/features/book-requests/components/RequestDetailPanel.vue'),
+            meta: { title: () => t('titles.bookRequestDetail') },
+          },
+          {
+            path: ':id/releases',
+            name: 'book-request-releases',
+            component: () => import('@/features/book-requests/components/ReleasePickerPanel.vue'),
+            meta: { title: () => t('titles.bookRequestReleases') },
+          },
+        ],
       },
       {
         path: '/whats-new',

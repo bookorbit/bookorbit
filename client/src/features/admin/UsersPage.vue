@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, TriangleAlert, UserPlus, X } from '@lucide/vue'
-import { Permission, type AuthUser, type DefaultLibraryAccessConfig, type UserListSortField, type UserListState } from '@bookorbit/types'
+import { Permission, type DefaultLibraryAccessConfig, type UserListSortField, type UserListState } from '@bookorbit/types'
 
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
@@ -53,7 +53,7 @@ const {
 } = useUsers()
 
 const drawerOpen = ref(false)
-const editingUser = ref<Partial<AuthUser> | null>(null)
+const editingUser = ref<UserRow | null>(null)
 const resetUrl = ref<string | null>(null)
 const deleteConfirmUser = ref<UserRow | null>(null)
 const deleting = ref(false)
@@ -139,6 +139,16 @@ function openEdit(user: UserRow) {
 function openById(userId: number) {
   const match = users.value.find((user) => user.id === userId)
   if (match) openEdit(match)
+}
+
+const canDeleteEditingUser = computed(() => !!editingUser.value && canManage(editingUser.value))
+
+/** Deleting from inside the editor closes it first: the confirm is the page's, and so is the list. */
+function handleDrawerDelete() {
+  const user = editingUser.value
+  if (!user) return
+  drawerOpen.value = false
+  requestDeleteUser(user)
 }
 
 function closeDrawer() {
@@ -443,8 +453,10 @@ async function saveDefaultLibraryAccess() {
       :user="editingUser"
       :libraries="libraries"
       :default-library-ids="defaultLibraryIdsArray"
+      :can-delete="canDeleteEditingUser"
       @close="closeDrawer"
       @saved="onSaved"
+      @delete="handleDrawerDelete"
     />
     <ResetLinkModal v-if="resetUrl" :reset-url="resetUrl" @close="clearResetUrl" />
 

@@ -1,536 +1,506 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
-import { ref, watch, computed } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { X } from '@lucide/vue'
-import { api } from '@/lib/api'
-import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
-import type { AuthUser } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
-import ContentFilterChipInput from '@/components/ui/ContentFilterChipInput.vue'
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import {
+  ChevronLeft,
+  ChevronRight,
+  KeyRound,
+  Library as LibraryIcon,
+  ShieldCheck,
+  SlidersHorizontal,
+  TriangleAlert,
+  UserRound,
+  X,
+  type LucideIcon,
+} from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import Badge from '@/components/ui/badge/Badge.vue'
-import { useTagSearchWithIds, useGenreSearchWithIds } from './composables/useContentFilterSearch'
-import { PERMISSION_GROUPS, presetPermissions, type PermissionPreset } from './lib/permission-presets'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { formatDate, formatDateTime, formatNumber } from '@/i18n/formatters'
+import StatusPill from './components/StatusPill.vue'
+import UserPermissionsSection from './components/UserPermissionsSection.vue'
+import UserRestrictionsSection from './components/UserRestrictionsSection.vue'
+import { useUserForm, type UserFormSection, type UserFormTarget } from './composables/useUserForm'
 
-interface Library {
+interface LibraryOption {
   id: number
   name: string
-}
-
-interface NamedItem {
-  id: number
-  name: string
+  bookCount?: number
 }
 
 const props = defineProps<{
-  user: Partial<AuthUser> | null
-  libraries: Library[]
+  user: UserFormTarget | null
+  libraries: LibraryOption[]
   defaultLibraryIds?: number[]
+  canDelete?: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
   saved: [resetUrl?: string]
+  delete: []
 }>()
 
 const { t } = useI18n()
 
-const permissionGroups = computed(() =>
-  PERMISSION_GROUPS.map((group) => ({ ...group, label: t(`adminFeature.userForm.permissionGroups.${group.id}`) })),
-)
+const {
+  name,
+  username,
+  email,
+  active,
+  isSharedAccount,
+  selectedPermissionNames,
+  selectedLibraryIds,
+  includeTagItems,
+  excludeTagItems,
+  includeGenreItems,
+  excludeGenreItems,
+  seeOwnRequestedBooks,
+  contentFiltersEnabled,
+  loading,
+  error,
+  errorKey,
+  isEdit,
+  isSuperuserTarget,
+  grantedCount,
+  totalPermissions,
+  restrictionState,
+  changeCount,
+  toggleLibrary,
+  setLibraries,
+  togglePermission,
+  applyPreset,
+  setContentFiltersEnabled,
+  save,
+} = useUserForm(toRef(props, 'user'), toRef(props, 'defaultLibraryIds'))
 
-function permissionLabel(permission: Permission): string {
-  if (permission === Permission.ViewUserActivity) return t('adminFeature.accountActivity.permissionLabel')
-  return PERMISSION_LABELS[permission] ?? permission
-}
+/** Below this the sheet is too narrow to carry the rail, so sections become a drill-in list. */
+const isWide = useMediaQuery('(min-width: 768px)')
+const isNarrowViewport = useMediaQuery('(max-width: 639px)')
 
-const name = ref('')
-const username = ref('')
-const email = ref('')
-const active = ref(true)
-const isSharedAccount = ref(false)
-const selectedPermissionNames = ref<Set<string>>(new Set())
-const selectedLibraryIds = ref<Set<number>>(new Set())
-const error = ref<string | null>(null)
-const loading = ref(false)
-const libraryAccessOpen = ref(true)
-const permissionGroupOpen = ref<Record<string, boolean>>({})
-const contentFiltersOpen = ref(false)
+const open = ref(true)
+const activeSection = ref<UserFormSection | null>(null)
 
-const includeTagItems = ref<NamedItem[]>([])
-const excludeTagItems = ref<NamedItem[]>([])
-const includeGenreItems = ref<NamedItem[]>([])
-const excludeGenreItems = ref<NamedItem[]>([])
+const side = computed(() => (isNarrowViewport.value ? ('bottom' as const) : ('right' as const)))
+const sizeClass = computed(() => (isNarrowViewport.value ? 'h-full rounded-none' : 'w-full sm:max-w-[52.5rem]'))
 
-const currentTab = ref<'general' | 'access' | 'restrictions'>('general')
-const restrictionsEnabled = ref(false)
+const showSectionMenu = computed(() => !isWide.value && activeSection.value === null)
+const showBackButton = computed(() => !isWide.value && activeSection.value !== null)
 
-const { search: searchTags } = useTagSearchWithIds()
-const { search: searchGenres } = useGenreSearchWithIds()
-
-const isEdit = computed(() => !!props.user?.id)
-const isSuperuserTarget = computed(() => !!props.user?.isSuperuser)
-const isMobile = useMediaQuery('(max-width: 767px)')
-
-function toggleLibrary(libraryId: number) {
-  if (selectedLibraryIds.value.has(libraryId)) {
-    selectedLibraryIds.value.delete(libraryId)
-  } else {
-    selectedLibraryIds.value.add(libraryId)
-  }
-}
-
-const hasRestrictions = computed(() => {
-  return (
-    includeTagItems.value.length > 0 || excludeTagItems.value.length > 0 || includeGenreItems.value.length > 0 || excludeGenreItems.value.length > 0
-  )
+const headerTitle = computed(() => {
+  if (isEdit.value) return name.value || username.value || t('adminFeature.userForm.editUser')
+  return isSharedAccount.value ? t('adminFeature.userForm.createSharedAccount') : t('adminFeature.userForm.createUser')
 })
 
-function applyPreset(preset: PermissionPreset) {
-  selectedPermissionNames.value = new Set(presetPermissions(preset))
+const avatarInitial = computed(() => (name.value || username.value || '?').trim().charAt(0).toUpperCase())
+
+const signInMethod = computed(() => {
+  const method = props.user?.provisioningMethod ?? 'local'
+  if (method === 'oidc') return t('adminFeature.userForm.signInMethods.oidc')
+  if (method === 'shared') return t('adminFeature.userForm.signInMethods.shared')
+  return t('adminFeature.userForm.signInMethods.password')
+})
+
+const createdLabel = computed(() => (props.user?.createdAt ? formatDate(new Date(props.user.createdAt), { dateStyle: 'medium' }) : null))
+
+const lockedUntil = computed(() => {
+  const value = props.user?.lockedUntil
+  if (!value) return null
+  const until = new Date(value)
+  return until.getTime() > Date.now() ? until : null
+})
+
+const restrictionSummary = computed(() => {
+  switch (restrictionState.value) {
+    case 'both':
+      return t('adminFeature.userForm.sectionSummary.restrictionsBoth')
+    case 'content':
+      return t('adminFeature.userForm.sectionSummary.restrictionsContent')
+    case 'demo':
+      return t('adminFeature.userForm.sectionSummary.restrictionsDemo')
+    default:
+      return t('adminFeature.userForm.sectionSummary.restrictionsNone')
+  }
+})
+
+const profileSummary = computed(() => {
+  if (!isEdit.value) return t('adminFeature.userForm.sectionSummary.newAccount')
+  if (lockedUntil.value) return t('adminFeature.usersPage.lockedBadge')
+  return active.value ? t('adminFeature.userForm.active') : t('adminFeature.userForm.suspended')
+})
+
+interface SectionEntry {
+  id: UserFormSection
+  label: string
+  summary: string
+  icon: LucideIcon
 }
 
+const sections = computed<SectionEntry[]>(() => [
+  { id: 'profile', label: t('adminFeature.userForm.sections.profile'), summary: profileSummary.value, icon: UserRound },
+  {
+    id: 'libraries',
+    label: t('adminFeature.userForm.sections.libraries'),
+    summary: t('adminFeature.userForm.sectionSummary.libraries', {
+      selected: formatNumber(selectedLibraryIds.value.size),
+      total: formatNumber(props.libraries.length),
+    }),
+    icon: LibraryIcon,
+  },
+  {
+    id: 'permissions',
+    label: t('adminFeature.userForm.sections.permissions'),
+    summary: t('adminFeature.userForm.sectionSummary.permissions', { count: grantedCount.value }),
+    icon: KeyRound,
+  },
+  { id: 'restrictions', label: t('adminFeature.userForm.sections.restrictions'), summary: restrictionSummary.value, icon: SlidersHorizontal },
+])
+
+const activeSectionLabel = computed(() => sections.value.find((section) => section.id === activeSection.value)?.label ?? '')
+
+const allLibrariesSelected = computed(() => props.libraries.length > 0 && selectedLibraryIds.value.size === props.libraries.length)
+
+const libraryReach = computed(() => {
+  const counted = props.libraries.filter((library) => library.bookCount !== undefined)
+  if (counted.length === 0) return null
+  const total = counted.reduce((sum, library) => sum + (library.bookCount ?? 0), 0)
+  const selected = counted.filter((library) => selectedLibraryIds.value.has(library.id)).reduce((sum, library) => sum + (library.bookCount ?? 0), 0)
+  return { selected: formatNumber(selected), total: formatNumber(total) }
+})
+
+const errorMessage = computed(() => {
+  if (error.value) return error.value
+  if (!errorKey.value) return null
+  return t(`adminFeature.userForm.errors.${errorKey.value}`)
+})
+
 watch(
-  hasRestrictions,
-  (val) => {
-    if (val) restrictionsEnabled.value = true
+  isWide,
+  (wide) => {
+    if (wide && activeSection.value === null) activeSection.value = 'profile'
   },
   { immediate: true },
 )
 
 watch(
   () => props.user,
-  async (u) => {
-    name.value = u?.name ?? ''
-    username.value = u?.username ?? ''
-    email.value = u?.email ?? ''
-    active.value = u?.active ?? true
-    isSharedAccount.value = u?.provisioningMethod === 'shared'
-    selectedPermissionNames.value = new Set(u?.permissions?.filter((p) => p !== '*') ?? [])
-    selectedLibraryIds.value = u?.id ? new Set() : new Set(props.defaultLibraryIds ?? [])
-    error.value = null
-    includeTagItems.value = []
-    excludeTagItems.value = []
-    includeGenreItems.value = []
-    excludeGenreItems.value = []
-
-    if (u?.id) {
-      const [libRes, filtersRes] = await Promise.all([
-        api(`/api/v1/users/${u.id}/libraries`),
-        !u.isSuperuser ? api(`/api/v1/users/${u.id}/content-filters`) : Promise.resolve(null),
-      ])
-      if (libRes.ok) {
-        const ids: number[] = await libRes.json()
-        selectedLibraryIds.value = new Set(ids)
-      }
-      if (filtersRes?.ok) {
-        const filters = await filtersRes.json()
-        includeTagItems.value = filters.includeTags ?? []
-        excludeTagItems.value = filters.excludeTags ?? []
-        includeGenreItems.value = filters.includeGenres ?? []
-        excludeGenreItems.value = filters.excludeGenres ?? []
-      }
-    }
-
-    libraryAccessOpen.value = !isMobile.value
-    permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.id, !isMobile.value]))
-    contentFiltersOpen.value = false
-    currentTab.value = 'general'
-  },
-  { immediate: true },
-)
-
-watch(
-  () => props.defaultLibraryIds,
-  (ids) => {
-    if (!isEdit.value) selectedLibraryIds.value = new Set(ids ?? [])
+  () => {
+    activeSection.value = isWide.value ? 'profile' : null
   },
 )
 
-watch(isMobile, (mobile) => {
-  libraryAccessOpen.value = !mobile
-  permissionGroupOpen.value = Object.fromEntries(PERMISSION_GROUPS.map((group) => [group.id, !mobile]))
-})
-
-function togglePermission(permName: string) {
-  if (selectedPermissionNames.value.has(permName)) {
-    selectedPermissionNames.value.delete(permName)
-  } else {
-    selectedPermissionNames.value.add(permName)
-  }
+function selectSection(section: UserFormSection) {
+  activeSection.value = section
 }
 
-async function handleSubmit() {
-  error.value = null
-  loading.value = true
-  try {
-    const trimmedEmail = email.value.trim()
-
-    if (isEdit.value) {
-      const res = await api(`/api/v1/users/${props.user!.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.value, email: trimmedEmail || undefined, active: active.value }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        error.value = err.message ?? t('adminFeature.userForm.errors.updateUser')
-        return
-      }
-
-      const permRes = await api(`/api/v1/users/${props.user!.id}/permissions`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissionNames: [...selectedPermissionNames.value] }),
-      })
-      if (!permRes.ok) {
-        const err = await permRes.json().catch(() => ({}))
-        error.value = err.message ?? t('adminFeature.userForm.errors.updatePermissions')
-        return
-      }
-
-      const libRes = await api(`/api/v1/users/${props.user!.id}/libraries`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ libraryIds: [...selectedLibraryIds.value] }),
-      })
-      if (!libRes.ok) {
-        const err = await libRes.json().catch(() => ({}))
-        error.value = err.message ?? t('adminFeature.userForm.errors.updateLibraryAccess')
-        return
-      }
-
-      if (!isSuperuserTarget.value) {
-        const cfRes = await api(`/api/v1/users/${props.user!.id}/content-filters`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            includeTagIds: includeTagItems.value.map((i) => i.id),
-            excludeTagIds: excludeTagItems.value.map((i) => i.id),
-            includeGenreIds: includeGenreItems.value.map((i) => i.id),
-            excludeGenreIds: excludeGenreItems.value.map((i) => i.id),
-          }),
-        })
-        if (!cfRes.ok) {
-          const err = await cfRes.json().catch(() => ({}))
-          error.value = err.message ?? t('adminFeature.userForm.errors.updateContentFilters')
-          return
-        }
-      }
-    } else {
-      if (!isSharedAccount.value && !trimmedEmail) {
-        error.value = t('adminFeature.userForm.errors.emailRequired')
-        return
-      }
-
-      if (isSharedAccount.value) {
-        const res = await api('/api/v1/users/shared', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: name.value,
-            username: username.value,
-            email: trimmedEmail || undefined,
-            permissionNames: [...selectedPermissionNames.value],
-            libraryIds: [...selectedLibraryIds.value],
-          }),
-        })
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          error.value = err.message ?? t('adminFeature.userForm.errors.createSharedAccount')
-          return
-        }
-        emit('saved')
-        return
-      }
-
-      const res = await api('/api/v1/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.value,
-          username: username.value,
-          email: trimmedEmail,
-          permissionNames: [...selectedPermissionNames.value],
-          libraryIds: [...selectedLibraryIds.value],
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        error.value = err.message ?? t('adminFeature.userForm.errors.createUser')
-        return
-      }
-      const data = await res.json()
-      emit('saved', data.resetUrl)
-      return
-    }
-
-    emit('saved')
-  } finally {
-    loading.value = false
-  }
-}
-function selectSection(tab: 'general' | 'access' | 'restrictions') {
-  currentTab.value = tab
+function backToSections() {
+  activeSection.value = null
 }
 
-function enableRestrictions() {
-  restrictionsEnabled.value = true
-}
-
-function disableRestrictions() {
-  restrictionsEnabled.value = false
+function handleOpenChange(value: boolean) {
+  if (!value) emit('close')
 }
 
 function handleClose() {
+  open.value = false
   emit('close')
 }
 
-function applyStandardPermissions() {
-  applyPreset('standard')
+function handleDelete() {
+  emit('delete')
 }
 
-function applyAdminPermissions() {
-  applyPreset('admin')
+function toggleAllLibraries() {
+  setLibraries(allLibrariesSelected.value ? [] : props.libraries.map((library) => library.id))
 }
 
-function clearPermissions() {
-  applyPreset('clear')
+async function handleSubmit() {
+  const result = await save()
+  if (!result.ok) {
+    if (result.section) activeSection.value = result.section
+    return
+  }
+  emit('saved', result.resetUrl)
 }
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[60] flex" @click.self="emit('close')">
-    <div class="fixed inset-0 bg-black/40" @click="handleClose" />
-    <div class="relative ml-auto flex h-full w-full max-w-md flex-col bg-card shadow-xl">
-      <div class="flex items-center justify-between px-6 pt-5 pb-4">
-        <div class="flex items-center gap-3">
-          <h2 class="text-base font-semibold text-foreground">
-            {{
-              isEdit
-                ? name || username || t('adminFeature.userForm.editUser')
-                : isSharedAccount
-                  ? t('adminFeature.userForm.createSharedAccount')
-                  : t('adminFeature.userForm.createUser')
-            }}
-          </h2>
-          <Badge
-            v-if="isSharedAccount"
-            variant="secondary"
-            class="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
-            >{{ t('adminFeature.userForm.sharedBadge') }}</Badge
-          >
-          <div v-if="isEdit" class="flex items-center gap-2">
-            <ToggleSwitch v-model="active" />
-            <span class="text-xs text-muted-foreground">{{ active ? t('adminFeature.userForm.active') : t('adminFeature.userForm.suspended') }}</span>
-          </div>
-        </div>
-        <Button variant="ghost" size="icon-sm" @click="handleClose">
-          <X :size="16" />
+  <Sheet :open="open" @update:open="handleOpenChange">
+    <SheetContent :side="side" hide-close class="gap-0 p-0" :class="sizeClass">
+      <SheetTitle class="sr-only">{{ headerTitle }}</SheetTitle>
+      <SheetDescription class="sr-only">{{ t('adminFeature.userForm.drawerDescription') }}</SheetDescription>
+
+      <header class="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
+        <Button v-if="showBackButton" variant="ghost" size="icon-sm" type="button" :aria-label="t('common.back')" @click="backToSections">
+          <ChevronLeft :size="18" aria-hidden="true" />
         </Button>
-      </div>
-
-      <div class="px-6 border-b border-border flex gap-6">
-        <button
-          type="button"
-          v-for="tab in ['general', 'access', 'restrictions'] as const"
-          :key="tab"
-          class="pb-3 text-sm font-medium border-b-2 transition-colors capitalize"
-          :class="currentTab === tab ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-          @click="selectSection(tab)"
+        <span
+          v-else-if="isEdit"
+          aria-hidden="true"
+          class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary"
         >
-          {{ t(`adminFeature.userForm.tabs.${tab}`) }}
-        </button>
-      </div>
+          {{ avatarInitial }}
+        </span>
 
-      <form @submit.prevent="handleSubmit" class="flex-1 overflow-y-auto px-6 py-6 space-y-5">
-        <div v-if="currentTab === 'general'" class="space-y-5">
-          <div v-if="!isEdit" class="rounded-md border border-border px-4 py-3">
-            <label class="flex items-start gap-3 cursor-pointer">
-              <input id="isShared" v-model="isSharedAccount" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-input" />
-              <div>
-                <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.sharedAccount') }}</p>
-                <p class="text-xs text-muted-foreground mt-0.5">{{ t('adminFeature.userForm.sharedAccountHint') }}</p>
-              </div>
-            </label>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <h2 class="truncate text-base font-semibold text-foreground">{{ showBackButton ? activeSectionLabel : headerTitle }}</h2>
+            <StatusPill v-if="isEdit && !showBackButton" :tone="active ? 'success' : 'danger'" class="shrink-0">
+              {{ active ? t('adminFeature.userForm.active') : t('adminFeature.userForm.suspended') }}
+            </StatusPill>
+            <Badge v-if="isSharedAccount && !showBackButton" variant="secondary" class="shrink-0">
+              {{ t('adminFeature.userForm.sharedBadge') }}
+            </Badge>
           </div>
-          <div v-else-if="isSharedAccount" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">{{ t('adminFeature.userForm.sharedAccount') }}</p>
-            <p class="text-xs text-muted-foreground mt-0.5">{{ t('adminFeature.userForm.sharedAccountManageHint') }}</p>
-          </div>
-
-          <div v-if="!isEdit" class="space-y-1.5">
-            <label class="settings-label">{{ t('adminFeature.userForm.username') }}</label>
-            <input
-              v-model="username"
-              type="text"
-              required
-              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div class="space-y-1.5">
-            <label class="settings-label">{{ t('adminFeature.userForm.fullName') }}</label>
-            <input
-              v-model="name"
-              type="text"
-              required
-              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div class="space-y-1.5">
-            <label class="settings-label">
-              {{ t('adminFeature.userForm.email') }}
-              <span v-if="isSharedAccount && !isEdit" class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.optional') }}</span>
-            </label>
-            <input
-              v-model="email"
-              type="email"
-              :required="!isEdit && !isSharedAccount"
-              class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
+          <p v-if="showBackButton" class="mt-0.5 truncate text-xs text-muted-foreground">{{ headerTitle }}</p>
+          <p v-else-if="isEdit" class="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            <span class="truncate font-mono">@{{ username }}</span>
+            <template v-if="email">
+              <span aria-hidden="true">&middot;</span>
+              <span class="truncate">{{ email }}</span>
+            </template>
+            <template v-if="isWide">
+              <span aria-hidden="true">&middot;</span>
+              <span class="shrink-0">{{ signInMethod }}</span>
+            </template>
+          </p>
+          <p v-else class="mt-0.5 text-xs text-muted-foreground">{{ t('adminFeature.userForm.createHint') }}</p>
         </div>
 
-        <div v-if="currentTab === 'access'" class="space-y-6">
-          <div v-if="libraries.length > 0" class="space-y-3">
-            <label class="settings-label">{{ t('adminFeature.userForm.libraryAccess') }}</label>
-            <div class="space-y-1.5 rounded-md border border-border p-3">
-              <label v-for="lib in libraries" :key="lib.id" class="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  :checked="selectedLibraryIds.has(lib.id)"
-                  @change="toggleLibrary(lib.id)"
-                  class="h-4 w-4 rounded border-input"
+        <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('common.close')" @click="handleClose">
+          <X :size="16" aria-hidden="true" />
+        </Button>
+      </header>
+
+      <div class="flex min-h-0 flex-1">
+        <nav v-if="isWide" :aria-label="t('adminFeature.userForm.sectionsLabel')" class="w-52 shrink-0 border-e border-border bg-card p-2.5">
+          <ul class="space-y-0.5">
+            <li v-for="section in sections" :key="section.id">
+              <button
+                type="button"
+                class="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors"
+                :class="activeSection === section.id ? 'bg-primary/10' : 'hover:bg-muted'"
+                :aria-current="activeSection === section.id ? 'true' : undefined"
+                @click="selectSection(section.id)"
+              >
+                <component
+                  :is="section.icon"
+                  :size="15"
+                  class="mt-0.5 shrink-0"
+                  :class="activeSection === section.id ? 'text-primary' : 'text-muted-foreground'"
+                  aria-hidden="true"
                 />
-                <span class="text-sm text-foreground">{{ lib.name }}</span>
+                <span class="min-w-0">
+                  <span class="block truncate text-sm font-medium" :class="activeSection === section.id ? 'text-primary' : 'text-foreground'">
+                    {{ section.label }}
+                  </span>
+                  <span class="mt-0.5 block truncate text-xs text-muted-foreground">{{ section.summary }}</span>
+                </span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+
+        <div class="@container min-w-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <ul v-if="showSectionMenu" class="space-y-2">
+            <li v-for="section in sections" :key="section.id">
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-3 text-start"
+                @click="selectSection(section.id)"
+              >
+                <component :is="section.icon" :size="17" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium text-foreground">{{ section.label }}</span>
+                  <span class="mt-0.5 block truncate text-xs text-muted-foreground">{{ section.summary }}</span>
+                </span>
+                <ChevronRight :size="16" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+              </button>
+            </li>
+          </ul>
+
+          <section v-else-if="activeSection === 'profile'" class="space-y-5">
+            <label v-if="!isEdit" class="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+              <input v-model="isSharedAccount" type="checkbox" class="mt-0.5 size-4 shrink-0 rounded border-input accent-primary" />
+              <span>
+                <span class="block text-sm font-medium text-foreground">{{ t('adminFeature.userForm.sharedAccount') }}</span>
+                <span class="settings-hint block">{{ t('adminFeature.userForm.sharedAccountHint') }}</span>
+              </span>
+            </label>
+
+            <div class="grid gap-3 @lg:grid-cols-2">
+              <div class="space-y-1.5">
+                <label for="user-form-name" class="settings-label block">{{ t('adminFeature.userForm.fullName') }}</label>
+                <input
+                  id="user-form-name"
+                  v-model="name"
+                  type="text"
+                  required
+                  class="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label for="user-form-username" class="settings-label block">{{ t('adminFeature.userForm.username') }}</label>
+                <input
+                  id="user-form-username"
+                  v-model="username"
+                  type="text"
+                  required
+                  :readonly="isEdit"
+                  class="h-9 w-full rounded-lg border border-input px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  :class="isEdit ? 'bg-muted text-muted-foreground' : 'bg-background text-foreground'"
+                />
+                <p v-if="isEdit" class="settings-hint">{{ t('adminFeature.userForm.usernameFixedHint') }}</p>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="user-form-email" class="settings-label block">
+                {{ t('adminFeature.userForm.email') }}
+                <span v-if="isSharedAccount && !isEdit" class="font-normal text-muted-foreground">{{ t('adminFeature.userForm.optional') }}</span>
               </label>
-            </div>
-            <p v-if="selectedLibraryIds.size === 0" class="text-xs text-muted-foreground">{{ t('adminFeature.userForm.noLibrariesSelected') }}</p>
-          </div>
-
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <label class="settings-label">{{ t('adminFeature.userForm.permissions') }}</label>
-              <div class="flex items-center gap-2">
-                <Button variant="ghost" size="sm" type="button" @click="applyStandardPermissions">
-                  {{ t('adminFeature.userForm.presetStandard') }}
-                </Button>
-                <span class="text-border">•</span>
-                <Button variant="ghost" size="sm" type="button" @click="applyAdminPermissions">
-                  {{ t('adminFeature.userForm.presetAdmin') }}
-                </Button>
-                <span class="text-border">•</span>
-                <Button variant="ghost" size="sm" type="button" @click="clearPermissions">
-                  {{ t('adminFeature.userForm.presetClearAll') }}
-                </Button>
-              </div>
+              <input
+                id="user-form-email"
+                v-model="email"
+                type="email"
+                :required="!isEdit && !isSharedAccount"
+                class="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <p class="settings-hint">{{ t('adminFeature.userForm.emailHint') }}</p>
             </div>
 
-            <div class="space-y-5">
-              <div v-for="group in permissionGroups" :key="group.id" class="space-y-2">
-                <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ group.label }}</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <label v-for="permName in group.permissions" :key="permName" class="flex cursor-pointer items-start gap-2">
-                    <input
-                      type="checkbox"
-                      :checked="selectedPermissionNames.has(permName)"
-                      @change="togglePermission(permName)"
-                      class="mt-0.5 h-4 w-4 rounded border-input"
-                    />
-                    <span class="text-sm text-foreground leading-tight">{{ permissionLabel(permName) }}</span>
-                  </label>
+            <div v-if="isEdit">
+              <h3 class="settings-group-label">{{ t('adminFeature.userForm.account') }}</h3>
+              <dl class="divide-y divide-border rounded-lg border border-border bg-card">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                  <dt id="user-form-status" class="w-24 shrink-0 text-xs text-muted-foreground">{{ t('adminFeature.userForm.status') }}</dt>
+                  <dd class="flex items-center gap-2.5">
+                    <ToggleSwitch v-model="active" aria-labelledby="user-form-status" />
+                    <span class="text-sm text-foreground">{{
+                      active ? t('adminFeature.userForm.active') : t('adminFeature.userForm.suspended')
+                    }}</span>
+                  </dd>
+                  <dd class="settings-hint w-full @lg:ms-auto @lg:mt-0 @lg:w-auto">{{ t('adminFeature.userForm.statusHint') }}</dd>
                 </div>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                  <dt class="w-24 shrink-0 text-xs text-muted-foreground">{{ t('adminFeature.userForm.signInMethod') }}</dt>
+                  <dd class="text-sm text-foreground">{{ signInMethod }}</dd>
+                </div>
+                <div v-if="createdLabel" class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                  <dt class="w-24 shrink-0 text-xs text-muted-foreground">{{ t('adminFeature.userForm.created') }}</dt>
+                  <dd class="text-sm text-foreground">{{ createdLabel }}</dd>
+                </div>
+                <div v-if="lockedUntil" class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5">
+                  <dt class="w-24 shrink-0 text-xs text-muted-foreground">{{ t('adminFeature.usersPage.lockedBadge') }}</dt>
+                  <dd class="text-sm text-foreground">{{ t('adminFeature.userForm.lockedUntil', { time: formatDateTime(lockedUntil) }) }}</dd>
+                  <dd class="settings-hint w-full @lg:ms-auto @lg:mt-0 @lg:w-auto">{{ t('adminFeature.userForm.lockedHint') }}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div v-else-if="isSharedAccount" class="flex gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+              <ShieldCheck :size="16" class="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <p class="settings-hint">{{ t('adminFeature.userForm.sharedAccountManageHint') }}</p>
+            </div>
+
+            <div v-if="isEdit && canDelete">
+              <h3 class="settings-group-label">{{ t('adminFeature.userForm.dangerZone') }}</h3>
+              <div class="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-card px-3 py-2.5">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-foreground">{{ t('adminFeature.usersPage.deleteUserAction') }}</p>
+                  <p class="settings-hint">{{ t('adminFeature.userForm.deleteUserHint') }}</p>
+                </div>
+                <Button variant="destructive-outline" size="sm" type="button" @click="handleDelete">{{ t('common.delete') }}</Button>
               </div>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <div v-if="currentTab === 'restrictions'" class="space-y-5">
-          <div v-if="isSuperuserTarget" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-            <p class="text-sm text-amber-600 dark:text-amber-400 font-medium">{{ t('adminFeature.userForm.superuserTarget') }}</p>
-            <p class="text-xs text-muted-foreground mt-0.5">{{ t('adminFeature.userForm.superuserTargetHint') }}</p>
-          </div>
-          <template v-else>
-            <div
-              v-if="!restrictionsEnabled"
-              class="rounded-md border border-dashed border-border px-4 py-8 text-center flex flex-col items-center gap-3"
-            >
-              <div class="space-y-1">
-                <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.noRestrictions') }}</p>
-                <p class="text-xs text-muted-foreground">{{ t('adminFeature.userForm.noRestrictionsHint') }}</p>
+          <section v-else-if="activeSection === 'libraries'" class="space-y-3">
+            <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+              <div class="min-w-0">
+                <h3 class="settings-label">{{ t('adminFeature.userForm.libraryAccess') }}</h3>
+                <p class="settings-hint">{{ t('adminFeature.userForm.libraryAccessHint') }}</p>
               </div>
-              <Button variant="secondary" size="sm" type="button" @click="enableRestrictions">
-                {{ t('adminFeature.userForm.addRestrictions') }}
+              <Button v-if="libraries.length > 0" variant="outline" size="sm" type="button" class="shrink-0" @click="toggleAllLibraries">
+                {{ allLibrariesSelected ? t('adminFeature.userForm.clearAll') : t('adminFeature.userForm.selectAll') }}
               </Button>
             </div>
-            <div v-else class="space-y-5">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-foreground">{{ t('adminFeature.userForm.contentRestrictions') }}</p>
-                <Button variant="destructive-ghost" size="sm" type="button" v-if="!hasRestrictions" @click="disableRestrictions">
-                  {{ t('adminFeature.userForm.remove') }}
-                </Button>
-              </div>
 
-              <div class="space-y-1.5">
-                <label class="text-xs font-medium text-foreground"
-                  >{{ t('adminFeature.userForm.includeTags') }}
-                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.includeTagsHint') }}</span></label
+            <p
+              v-if="libraries.length === 0"
+              class="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground"
+            >
+              {{ t('adminFeature.usersPage.defaultLibraryAccess.noLibraries') }}
+            </p>
+            <template v-else>
+              <div class="grid gap-2 @lg:grid-cols-2">
+                <label
+                  v-for="library in libraries"
+                  :key="library.id"
+                  class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-ring"
                 >
-                <ContentFilterChipInput
-                  v-model="includeTagItems"
-                  :placeholder="t('adminFeature.userForm.searchTagsPlaceholder')"
-                  :search-fn="searchTags"
-                />
+                  <input
+                    type="checkbox"
+                    :checked="selectedLibraryIds.has(library.id)"
+                    class="size-4 shrink-0 rounded border-input accent-primary"
+                    @change="toggleLibrary(library.id)"
+                  />
+                  <span class="min-w-0 flex-1 truncate text-sm text-foreground">{{ library.name }}</span>
+                  <span v-if="library.bookCount !== undefined" class="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {{ t('adminFeature.userForm.libraryBookCount', { count: library.bookCount }) }}
+                  </span>
+                </label>
               </div>
-              <div class="space-y-1.5">
-                <label class="text-xs font-medium text-foreground"
-                  >{{ t('adminFeature.userForm.excludeTags') }}
-                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.excludeTagsHint') }}</span></label
-                >
-                <ContentFilterChipInput
-                  v-model="excludeTagItems"
-                  :placeholder="t('adminFeature.userForm.searchTagsPlaceholder')"
-                  :search-fn="searchTags"
-                />
-              </div>
-              <div class="space-y-1.5">
-                <label class="text-xs font-medium text-foreground"
-                  >{{ t('adminFeature.userForm.includeGenres') }}
-                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.includeGenresHint') }}</span></label
-                >
-                <ContentFilterChipInput
-                  v-model="includeGenreItems"
-                  :placeholder="t('adminFeature.userForm.searchGenresPlaceholder')"
-                  :search-fn="searchGenres"
-                />
-              </div>
-              <div class="space-y-1.5">
-                <label class="text-xs font-medium text-foreground"
-                  >{{ t('adminFeature.userForm.excludeGenres') }}
-                  <span class="text-muted-foreground font-normal">{{ t('adminFeature.userForm.excludeGenresHint') }}</span></label
-                >
-                <ContentFilterChipInput
-                  v-model="excludeGenreItems"
-                  :placeholder="t('adminFeature.userForm.searchGenresPlaceholder')"
-                  :search-fn="searchGenres"
-                />
-              </div>
-            </div>
-          </template>
+              <p v-if="selectedLibraryIds.size === 0" class="flex items-center gap-2 text-xs text-[var(--pill-warning)]">
+                <TriangleAlert :size="14" aria-hidden="true" />
+                {{ t('adminFeature.userForm.noLibrariesSelected') }}
+              </p>
+              <p v-else-if="libraryReach" class="settings-hint">{{ t('adminFeature.userForm.libraryReach', libraryReach) }}</p>
+            </template>
+          </section>
+
+          <UserPermissionsSection
+            v-else-if="activeSection === 'permissions'"
+            :selected="selectedPermissionNames"
+            :granted="grantedCount"
+            :total="totalPermissions"
+            @toggle="togglePermission"
+            @preset="applyPreset"
+          />
+
+          <UserRestrictionsSection
+            v-else-if="activeSection === 'restrictions'"
+            v-model:include-tags="includeTagItems"
+            v-model:exclude-tags="excludeTagItems"
+            v-model:include-genres="includeGenreItems"
+            v-model:exclude-genres="excludeGenreItems"
+            v-model:see-own-requested-books="seeOwnRequestedBooks"
+            :is-edit="isEdit"
+            :is-superuser-target="isSuperuserTarget"
+            :selected="selectedPermissionNames"
+            :content-filters-enabled="contentFiltersEnabled"
+            @toggle="togglePermission"
+            @update:content-filters-enabled="setContentFiltersEnabled"
+          />
         </div>
-
-        <div v-if="error" class="text-sm text-destructive">{{ error }}</div>
-      </form>
-
-      <div class="border-t border-border px-6 py-4 flex gap-3 justify-end mt-auto bg-card">
-        <Button variant="outline" size="sm" @click="handleClose" type="button">
-          {{ t('common.cancel') }}
-        </Button>
-        <Button size="sm" @click="handleSubmit" type="button" :disabled="loading">
-          {{ loading ? t('adminFeature.userForm.saving') : t('common.save') }}
-        </Button>
       </div>
-    </div>
-  </div>
+
+      <footer class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-border px-4 py-3 sm:px-5">
+        <p v-if="errorMessage" role="alert" class="min-w-0 flex-1 basis-full text-sm text-destructive md:basis-auto">{{ errorMessage }}</p>
+        <p v-else-if="changeCount > 0" class="flex min-w-0 flex-1 basis-full items-center gap-2 text-xs text-[var(--pill-warning)] md:basis-auto">
+          <TriangleAlert :size="14" class="shrink-0" aria-hidden="true" />
+          <span class="truncate">{{ t('adminFeature.userForm.unsavedChanges', { count: changeCount }) }}</span>
+        </p>
+        <span v-else class="hidden flex-1 md:block" />
+        <div class="flex w-full gap-2 md:ms-auto md:w-auto">
+          <Button variant="outline" size="sm" type="button" class="flex-1 md:flex-none" @click="handleClose">{{ t('common.cancel') }}</Button>
+          <Button size="sm" type="button" class="flex-1 md:flex-none" :disabled="loading" @click="handleSubmit">
+            {{ loading ? t('adminFeature.userForm.saving') : t('common.save') }}
+          </Button>
+        </div>
+      </footer>
+    </SheetContent>
+  </Sheet>
 </template>

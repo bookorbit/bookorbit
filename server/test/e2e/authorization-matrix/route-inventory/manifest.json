@@ -1,14 +1,14 @@
 {
-  "totalRoutes": 376,
+  "totalRoutes": 451,
   "byPermission": {
-    "(none)": 166,
+    "(none)": 167,
     "Permission.ManageMetadataConfig": 34,
     "Permission.EmailSend": 30,
-    "Permission.LibraryEditMetadata": 33,
-    "Permission.BookDockAccess": 16,
-    "Permission.ManageAppSettings": 22,
-    "Permission.ManageLibraries": 14,
-    "Permission.ManageUsers": 11,
+    "Permission.LibraryEditMetadata": 34,
+    "Permission.BookDockAccess": 17,
+    "Permission.ManageAppSettings": 39,
+    "Permission.ManageLibraries": 17,
+    "Permission.ManageUsers": 13,
     "Permission.ManageEmail": 8,
     "Permission.KoboSync": 7,
     "Permission.NotificationAccess": 6,
@@ -17,17 +17,20 @@
     "Permission.OpdsAccess": 4,
     "Permission.ViewAuditLog": 1,
     "Permission.ViewUserActivity": 6,
-    "Permission.LibraryDeleteBooks": 1,
+    "Permission.LibraryDeleteBooks": 10,
     "Permission.LibraryDownload": 1,
     "Permission.LibraryUpload": 2,
     "Permission.ManageBookDock": 3,
     "Permission.ManageIcons": 1,
     "Permission.HardcoverSync": 1,
     "Permission.ReadwiseSync": 1,
-    "Permission.StorygraphSync": 1
+    "Permission.StorygraphSync": 1,
+    "Permission.BookRequestAccess": 24,
+    "Permission.ManageBookRequests": 20,
+    "Permission.BookRequestSelfFulfill": 11
   },
   "byLibraryAccess": {
-    "'viewer'": 3,
+    "'viewer'": 4,
     "'editor'": 1
   },
   "routeChunks": [

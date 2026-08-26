@@ -69,7 +69,8 @@ export async function ensureSafeRemoteHost(hostname: string, options?: SafeRemot
   }
 }
 
-function isPrivateOrLocalAddress(address: string): boolean {
+/** Exported so the one lookup a connection actually uses can apply the same policy. */
+export function isPrivateOrLocalAddress(address: string): boolean {
   const normalized = address.toLowerCase();
   const mappedV4Prefix = '::ffff:';
   const maybeV4 = normalized.startsWith(mappedV4Prefix) ? normalized.slice(mappedV4Prefix.length) : normalized;

@@ -12,17 +12,21 @@ import {
   CARD_OVERLAY_KEYS,
   COVER_SEARCH_DEFAULT_PROVIDERS,
   COVER_SIZE_SCOPES,
+  DEFAULT_BOOK_REQUEST_PREFERENCES,
+  RETIRED_BOOK_REQUEST_PREFERENCE_FIELDS,
   DEFAULT_COVER_SEARCH_PROVIDER,
   FONT_FAMILY_NAME_MAX_LENGTH,
   GRID_CARD_LABEL_FIELDS,
   MAX_SERVER_FONTS,
   RADIUS_IDS,
+  REQUEST_LANGUAGE_CODES,
   SERIES_CARD_COVER_MODES,
   SUPPORTED_LOCALES,
   SURFACE_OPACITY_MAX,
   SURFACE_OPACITY_MIN,
   TABLE_DENSITIES,
   THEME_IDS,
+  type BookRequestPreferences,
   type DisplayPreferences,
   type CoverSearchPreferences,
   type LocalePreferences,
@@ -94,6 +98,39 @@ const COVER_SEARCH_PREFERENCES_SCHEMA = z
 const COVER_SEARCH_DEFAULTS: CoverSearchPreferences = {
   defaultProvider: DEFAULT_COVER_SEARCH_PROVIDER,
 };
+
+/**
+ * Destinations used to live here: first one pair for every medium, then one pair per medium. Both
+ * are now answered by the instance default, so anything stored under either shape is dropped on
+ * the way in rather than rejected. The object is strict and a strict parse failure falls back to
+ * the defaults, which would take the user's pinned language down with it.
+ */
+function dropRetiredFields(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  const record = { ...(value as Record<string, unknown>) };
+  for (const field of RETIRED_BOOK_REQUEST_PREFERENCE_FIELDS) delete record[field];
+  return record;
+}
+
+const BOOK_REQUEST_PREFERENCES_SCHEMA = z.preprocess(
+  dropRetiredFields,
+  z
+    .object({
+      /**
+       * Defaulted rather than required, so a row stored before this field existed still parses.
+       *
+       * Restricted to codes the release matcher can actually compare: a language it does not know
+       * is a hard filter nothing satisfies, so storing one would reject every release rather than
+       * leaving the field open.
+       */
+      defaultLanguage: z
+        .string()
+        .refine((value) => REQUEST_LANGUAGE_CODES.includes(value), { message: 'must be a language the release matcher can compare' })
+        .nullable()
+        .default(null),
+    })
+    .strict(),
+);
 
 const LOCALE_PREFERENCES_SCHEMA = z
   .object({
@@ -256,6 +293,24 @@ export class UserPreferencesService {
     }
 
     await this.repo.upsert(userId, 'cover-search', result.data);
+  }
+
+  async getBookRequestPreferences(userId: number): Promise<BookRequestPreferences> {
+    const row = await this.repo.findByCategory(userId, 'book-requests');
+    const result = BOOK_REQUEST_PREFERENCES_SCHEMA.safeParse(row?.data);
+    return result.success ? result.data : { ...DEFAULT_BOOK_REQUEST_PREFERENCES };
+  }
+
+  async upsertBookRequestPreferences(userId: number, data: Record<string, unknown>): Promise<void> {
+    const result = BOOK_REQUEST_PREFERENCES_SCHEMA.safeParse(data);
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : 'settings';
+      const issueMessage = firstIssue?.message ?? 'Invalid settings payload';
+      throw new BadRequestException(`Invalid book request preferences at "${issuePath}": ${issueMessage}`);
+    }
+
+    await this.repo.upsert(userId, 'book-requests', result.data);
   }
 
   async upsertThemePreferences(userId: number, data: Record<string, unknown>): Promise<void> {

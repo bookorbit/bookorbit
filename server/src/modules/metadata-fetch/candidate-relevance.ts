@@ -2,7 +2,7 @@ import { MetadataCandidate } from '@bookorbit/types';
 
 import { candidateHasNormalizedIsbn, normalizeMetadataIsbn } from './isbn-match';
 import { MetadataSearchParams } from './providers/metadata-search-params';
-import { normalizeTitleText, scoreTitleMatch, shareSignificantToken } from './title-match';
+import { normalizeTitleText, scoreTitleMatch, shareSignificantToken } from '../../common/text-match/title-match';
 
 const DEFAULT_LIMIT = 5;
 

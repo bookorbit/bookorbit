@@ -45,6 +45,8 @@ interface RouteInventoryRoute {
   httpMethod: string;
   path: string;
   permissions: string[];
+  /** `any` means one of `permissions` is enough; absent means every one of them is required. */
+  permissionMode?: 'any';
   libraryAccess: string[];
   isPublic: boolean;
   allowDefault: boolean;
@@ -78,6 +80,7 @@ interface Personas {
   allPermsUser: TestUserSession;
   permsNoLibraryUser: TestUserSession;
   manageUsersAdmin: TestUserSession;
+  appSettingsAdmin: TestUserSession;
   metadataEditor: TestUserSession;
   opdsOwner: TestUserSession;
   opdsIntruder: TestUserSession;
@@ -95,6 +98,7 @@ interface Personas {
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const routeInventory = loadRouteInventory();
+const uncoveredRoutes = loadUncoveredRoutes();
 
 const supportedMethods = new Set<SupportedHttpMethod>(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -115,6 +119,16 @@ function loadRouteInventory(): RouteInventory {
     byLibraryAccess: manifest.byLibraryAccess,
     routes,
   };
+}
+
+/**
+ * Routes the hand-maintained inventory does not describe yet, and which every other test in this
+ * file therefore never probes. A frozen baseline rather than an allow-list: it may shrink as
+ * entries are written, never grow, so a route added from today on has to be inventoried.
+ */
+function loadUncoveredRoutes(): string[] {
+  const file = join(currentDir, 'e2e/authorization-matrix/route-inventory/uncovered-routes.json');
+  return JSON.parse(readFileSync(file, 'utf8')) as string[];
 }
 
 function liveRouteLabels(app: NestFastifyApplication): string[] {
@@ -199,6 +213,7 @@ describe('Authorization matrix (e2e)', () => {
       allPermsUser: await createUserAndLogin(ctx, { permissions: allPermissions }),
       permsNoLibraryUser: await createUserAndLogin(ctx, { permissions: allPermissions }),
       manageUsersAdmin: await createUserAndLogin(ctx, { permissions: [Permission.ManageUsers] }),
+      appSettingsAdmin: await createUserAndLogin(ctx, { permissions: [Permission.ManageAppSettings] }),
       metadataEditor: await createUserAndLogin(ctx, { permissions: [Permission.LibraryEditMetadata] }),
       opdsOwner: await createUserAndLogin(ctx, { permissions: [Permission.OpdsAccess] }),
       opdsIntruder: await createUserAndLogin(ctx, { permissions: [Permission.OpdsAccess] }),
@@ -485,6 +500,27 @@ describe('Authorization matrix (e2e)', () => {
       expect(liveLabels).toEqual(inventoryLabels);
     });
 
+    /**
+     * The inventory is hand-maintained and every other test in this file reads *from* it, so a
+     * route it does not list is a route this suite silently never probes. Five guarded
+     * book-request endpoints sat unprobed until this assertion existed.
+     *
+     * The inventory does not describe the whole application yet, so the gap is frozen in
+     * `uncovered-routes.json` rather than pretended away: a route that is in neither the inventory
+     * nor that baseline fails here, which is what makes omitting a new endpoint impossible. The
+     * baseline is held to shrinking only, and to naming routes that still exist.
+     */
+    it('keeps every route the application serves either inventoried or in the frozen gap baseline', () => {
+      const inventoryLabels = new Set(routeInventory.routes.filter((route) => isSupportedMethod(route.httpMethod)).map(routeLabel));
+      const baseline = new Set(uncoveredRoutes);
+      const live = liveRouteLabels(ctx.app);
+      const liveLabels = new Set(live);
+
+      expect(live.filter((label) => !inventoryLabels.has(label) && !baseline.has(label))).toEqual([]);
+      expect([...baseline].filter((label) => inventoryLabels.has(label))).toEqual([]);
+      expect([...baseline].filter((label) => !liveLabels.has(label))).toEqual([]);
+    });
+
     it('serves the authenticated random scroller through the batch route', async () => {
       const response = await ctx.app.inject({
         method: 'POST',
@@ -540,6 +576,17 @@ describe('Authorization matrix (e2e)', () => {
       assertNoFailures('permission denial matrix', failures);
     }, 180_000);
 
+    it('allows a settings operator to read book-request source status without request access', async () => {
+      const response = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/book-requests/source-status',
+        headers: authHeader(personas.appSettingsAdmin.accessToken),
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ configured: expect.any(Number), enabled: expect.any(Number) });
+    });
+
     it('proves allow-path for each permission without missing-permission errors', async () => {
       const permissionRoutes = routeInventory.routes.filter(
         (route) => !route.isPublic && route.permissions.length > 0 && isSupportedMethod(route.httpMethod),
@@ -548,7 +595,11 @@ describe('Authorization matrix (e2e)', () => {
         .map((raw) => toPermission(raw))
         .filter((permission): permission is Permission => permission !== null)
         .sort();
-      const enumPermissions = [...Object.values(Permission)].sort();
+      // Permissions that grant a capability *within* a route rather than gating the route itself,
+      // so they legitimately never appear on a guard. Every entry needs a service-level test
+      // proving the capability is actually enforced; keep this list as short as it can be.
+      const serviceEnforcedPermissions: Permission[] = [Permission.BookRequestAutoApprove];
+      const enumPermissions = [...Object.values(Permission)].filter((permission) => !serviceEnforcedPermissions.includes(permission)).sort();
       expect(inventoryPermissions).toEqual(enumPermissions);
 
       const probes: Record<
@@ -680,11 +731,27 @@ describe('Authorization matrix (e2e)', () => {
           path: '/notifications',
           token: 'allPerms',
         },
+        [Permission.BookRequestAccess]: {
+          method: 'GET',
+          path: '/book-requests/summary',
+          token: 'allPerms',
+        },
+        [Permission.ManageBookRequests]: {
+          method: 'GET',
+          path: '/admin/book-requests',
+          token: 'allPerms',
+        },
+        [Permission.BookRequestSelfFulfill]: {
+          method: 'GET',
+          path: '/book-request-fulfilment/download-clients',
+          token: 'allPerms',
+        },
       };
 
       const failures: MatrixFailure[] = [];
 
       for (const permission of Object.values(Permission)) {
+        if (serviceEnforcedPermissions.includes(permission)) continue;
         const probe = probes[permission];
         const inventoryRoute = routeInventory.routes.find((route) => route.httpMethod === probe.method && route.path === probe.path);
         expect(inventoryRoute).toBeTruthy();
@@ -725,7 +792,13 @@ describe('Authorization matrix (e2e)', () => {
         (route) => !route.isPublic && route.libraryAccess.length > 0 && isSupportedMethod(route.httpMethod),
       );
       expect(guardedRoutes.map(routeLabel).sort()).toEqual(
-        ['GET /libraries/:id', 'POST /libraries/:id/books', 'GET /libraries/:id/stats', 'POST /libraries/:id/write-metadata-to-files'].sort(),
+        [
+          'GET /libraries/:id',
+          'POST /libraries/:id/books',
+          'GET /libraries/:id/stats',
+          'POST /libraries/:id/write-metadata-to-files',
+          'GET /scanner/libraries/:id/scan-history',
+        ].sort(),
       );
 
       for (const route of guardedRoutes) {

@@ -5,7 +5,16 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
-import { bookDockFiles, bookFiles, books, type NewBookDockFileRow, type BookDockFileRow } from '../../db/schema';
+import {
+  bookDockFiles,
+  bookDockUnitFiles,
+  bookFiles,
+  books,
+  type BookDockFileRow,
+  type BookDockUnitFileRow,
+  type NewBookDockFileRow,
+  type NewBookDockUnitFileRow,
+} from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -16,6 +25,15 @@ const SORT_COLUMNS = {
   status: bookDockFiles.status,
   fileSize: bookDockFiles.fileSize,
 } as const;
+
+/**
+ * Sidecars carry no sort order, so they sort after the content files rather than before them.
+ *
+ * The direction sits inside the fragment on purpose: wrapping it as `asc(sql\`... nulls last\`)`
+ * renders `sort_order nulls last asc`, which Postgres rejects outright. Exported so the SQL it
+ * produces can be read in a test rather than assumed.
+ */
+export const UNIT_FILE_ORDER = [sql`${bookDockUnitFiles.sortOrder} asc nulls last`, asc(bookDockUnitFiles.id)] as const;
 
 /** Below this, a provider match is treated as a guess the user should confirm. */
 export const NEEDS_REVIEW_CONFIDENCE_BELOW = 70;
@@ -115,6 +133,57 @@ export class BookDockRepository {
 
   async create(data: NewBookDockFileRow): Promise<BookDockFileRow> {
     const [row] = await this.db.insert(bookDockFiles).values(data).returning();
+    return row;
+  }
+
+  /**
+   * The anchor row and its children in one transaction. A unit that exists in the list without
+   * knowing which files it is made of would be finalized as a single file, which is the exact
+   * truncation this whole feature exists to stop.
+   */
+  async createUnit(data: NewBookDockFileRow, files: Array<Omit<NewBookDockUnitFileRow, 'dockFileId'>>): Promise<BookDockFileRow> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.insert(bookDockFiles).values(data).returning();
+      if (files.length > 0) {
+        await tx.insert(bookDockUnitFiles).values(files.map((file) => ({ ...file, dockFileId: row.id })));
+      }
+      return row;
+    });
+  }
+
+  async findUnitFiles(dockFileId: number): Promise<BookDockUnitFileRow[]> {
+    return this.db
+      .select()
+      .from(bookDockUnitFiles)
+      .where(eq(bookDockUnitFiles.dockFileId, dockFileId))
+      .orderBy(...UNIT_FILE_ORDER);
+  }
+
+  /** One query for a page of rows, so rendering a list of units is not an N+1. */
+  async findUnitFilesByDockFileIds(dockFileIds: number[]): Promise<Map<number, BookDockUnitFileRow[]>> {
+    const byDockFile = new Map<number, BookDockUnitFileRow[]>();
+    if (dockFileIds.length === 0) return byDockFile;
+
+    const rows = await this.db
+      .select()
+      .from(bookDockUnitFiles)
+      .where(inArray(bookDockUnitFiles.dockFileId, dockFileIds))
+      .orderBy(...UNIT_FILE_ORDER);
+
+    for (const row of rows) {
+      const existing = byDockFile.get(row.dockFileId);
+      if (existing) existing.push(row);
+      else byDockFile.set(row.dockFileId, [row]);
+    }
+    return byDockFile;
+  }
+
+  /**
+   * Whether a directory is already owned by a unit row. The watcher asks this of the first path
+   * segment below the dock root, which is why it can be an equality lookup on a unique column.
+   */
+  async findByUnitDirectory(unitDirectory: string): Promise<BookDockFileRow | undefined> {
+    const [row] = await this.db.select().from(bookDockFiles).where(eq(bookDockFiles.unitDirectory, unitDirectory)).limit(1);
     return row;
   }
 

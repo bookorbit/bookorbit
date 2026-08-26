@@ -14,6 +14,13 @@ const backgroundClass = computed(() => BACKGROUND_OPTIONS.find((b) => b.id === t
 
 const BOOK_ROUTE_NAMES = new Set(['book-detail'])
 
+/**
+ * The request drawer is a child route of the list, so the list has to stay mounted while the URL
+ * moves under it. Keying on the path would remount it, re-fetch the rows and run the page
+ * transition every time a drawer opened.
+ */
+const REQUEST_ROUTE_NAMES = new Set(['book-requests', 'book-request-detail', 'book-request-releases'])
+
 // Grid views are kept alive so scroll position and virtual list state survive
 // round-trips to the book detail / metadata editor page.
 const GRID_VIEW_NAMES = [
@@ -32,6 +39,7 @@ const GRID_VIEW_NAMES = [
 const viewKey = computed(() => {
   const name = String(route.name)
   if (BOOK_ROUTE_NAMES.has(name)) return name
+  if (REQUEST_ROUTE_NAMES.has(name)) return 'requests'
   if (name.startsWith('settings-')) return 'settings'
   if (name.startsWith('tools-')) return 'tools'
   return route.path

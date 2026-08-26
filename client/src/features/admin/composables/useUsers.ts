@@ -25,7 +25,7 @@ export interface UserRow extends AuthUser {
   provisioningMethod: ProvisioningMethod
 }
 
-export type UserLibrary = Pick<Library, 'id' | 'name'>
+export type UserLibrary = Pick<Library, 'id' | 'name' | 'bookCount'>
 
 const EMPTY_SUMMARY: UserListSummary = { total: 0, admins: 0, active: 0, inactive: 0, attention: 0 }
 

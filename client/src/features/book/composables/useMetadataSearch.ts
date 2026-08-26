@@ -2,6 +2,7 @@ import { computed, onUnmounted, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { METADATA_PROVIDER_STATUS_EVENT } from '@bookorbit/types'
 import type {
+  ConcreteBookMediaKind,
   MetadataCandidate,
   MetadataProviderInfo,
   MetadataProviderKey,
@@ -15,6 +16,8 @@ export interface SearchParams {
   isbn?: string
   bookId?: number
   isAudiobook?: boolean
+  /** Narrows the search to the providers that serve one medium; the server derives isAudiobook from it. */
+  mediaKind?: ConcreteBookMediaKind
 }
 
 export function useMetadataSearch() {
@@ -62,6 +65,7 @@ export function useMetadataSearch() {
     if (params.isbn) query.set('isbn', params.isbn)
     if (params.bookId != null) query.set('bookId', String(params.bookId))
     if (params.isAudiobook != null) query.set('isAudiobook', String(params.isAudiobook))
+    if (params.mediaKind) query.set('mediaKind', params.mediaKind)
     const onlyProvider = providers.value.length === 1 ? providers.value[0] : undefined
     const requestedProviders = selectedProviders.value.length ? selectedProviders.value : onlyProvider ? [onlyProvider.key] : []
     if (requestedProviders.length) query.set('providers', requestedProviders.join(','))
@@ -154,6 +158,21 @@ export function useMetadataSearch() {
     return sortResults(filtered)
   })
 
+  const coverProviderOrder = computed(() =>
+    providers.value
+      .filter((provider) => provider.coverPriority !== undefined)
+      .sort((a, b) => a.coverPriority! - b.coverPriority!)
+      .map((provider) => provider.key),
+  )
+
+  const resultProviderOrder = computed(() => {
+    const available = new Set(providers.value.map((provider) => provider.key))
+    return [
+      ...PROVIDER_ORDER.filter((provider) => available.has(provider)),
+      ...providers.value.map((provider) => provider.key).filter((provider) => !PROVIDER_ORDER.includes(provider)),
+    ]
+  })
+
   function toggleProvider(key: MetadataProviderKey) {
     const idx = selectedProviders.value.indexOf(key)
     if (idx === -1) selectedProviders.value.push(key)
@@ -184,6 +203,8 @@ export function useMetadataSearch() {
 
   return {
     filteredResults,
+    coverProviderOrder,
+    resultProviderOrder,
     providerCounts,
     providerStatuses,
     interruptedProviders,

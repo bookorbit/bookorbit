@@ -1,6 +1,7 @@
 import type { Mocked } from 'vitest';
 import {
   EMPTY_CONTENT_FILTER_RULES,
+  type BookRequestPreferences,
   type CoverSearchPreferences,
   type DisplayPreferences,
   type LocalePreferences,
@@ -81,10 +82,12 @@ describe('UserPreferencesController', () => {
       getDisplayPreferences: vi.fn(),
       getLocalePreferences: vi.fn(),
       getCoverSearchPreferences: vi.fn(),
+      getBookRequestPreferences: vi.fn(),
       upsertThemePreferences: vi.fn(),
       upsertDisplayPreferences: vi.fn(),
       upsertLocalePreferences: vi.fn(),
       upsertCoverSearchPreferences: vi.fn(),
+      upsertBookRequestPreferences: vi.fn(),
     } as unknown as Mocked<UserPreferencesService>;
 
     controller = new UserPreferencesController(service);
@@ -160,6 +163,21 @@ describe('UserPreferencesController', () => {
 
     await expect(controller.upsertCoverSearchPreferences(dto, makeUser({ id: 42 }))).resolves.toBeUndefined();
     expect(service.upsertCoverSearchPreferences).toHaveBeenCalledWith(42, validCoverSearchPreferences);
+  });
+
+  it('GET /book-requests returns the pinned request destination', async () => {
+    const preferences: BookRequestPreferences = { defaultLibraryId: 4, defaultFolderId: 9 };
+    service.getBookRequestPreferences.mockResolvedValueOnce(preferences);
+
+    await expect(controller.getBookRequestPreferences(makeUser({ id: 11 }))).resolves.toEqual({ settings: preferences });
+    expect(service.getBookRequestPreferences).toHaveBeenCalledWith(11);
+  });
+
+  it('PUT /book-requests forwards the current user id and settings', async () => {
+    const dto = { settings: { defaultLibraryId: 4, defaultFolderId: null } };
+
+    await expect(controller.upsertBookRequestPreferences(dto, makeUser({ id: 42 }))).resolves.toBeUndefined();
+    expect(service.upsertBookRequestPreferences).toHaveBeenCalledWith(42, dto.settings);
   });
 
   it('GET /locale returns null settings when no saved preferences exist', async () => {

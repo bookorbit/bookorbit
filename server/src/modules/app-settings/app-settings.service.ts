@@ -2,6 +2,10 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { ConfigService, type ConfigType } from '@nestjs/config';
 
 import {
+  type BookRequestImportFormats,
+  BOOK_REQUEST_AUTOMATION_SETTING_KEYS,
+  BOOK_REQUEST_IMPORT_FORMATS,
+  DEFAULT_BOOK_REQUEST_AUTOMATION_SETTINGS,
   type DefaultLibraryAccessConfig,
   DEFAULT_DOWNLOAD_PATTERN,
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
@@ -62,6 +66,12 @@ export class AppSettingsService {
   async getValue(key: string): Promise<string | null> {
     const row = await this.repo.findByKey(key);
     return row?.value ?? null;
+  }
+
+  /** One round trip for a group of related settings, rather than a query per key. */
+  async getValues(keys: string[]): Promise<Map<string, string>> {
+    const rows = await this.repo.findMany(keys);
+    return new Map(rows.map((row) => [row.key, row.value]));
   }
 
   async setValue(key: string, value: string): Promise<void> {
@@ -141,6 +151,20 @@ export class AppSettingsService {
     const row = await this.repo.findByKey(APP_SETTING_KEYS.OIDC_CONFIG);
     const stored = parseSafe<Partial<OidcFullConfig>>(APP_SETTING_KEYS.OIDC_CONFIG, row?.value, {}, this.logger);
     return mergeOidcConfig(DEFAULT_OIDC_CONFIG, stored);
+  }
+
+  /**
+   * How many formats of one book to keep when a release carried several.
+   *
+   * Read here rather than through the book-request module's own settings service because the dock
+   * is where placement happens, and a folder dropped in by hand has no request behind it at all.
+   * Falls back to the shipped default, so a hand-edited row cannot stall a finalize.
+   */
+  async getBookRequestImportFormats(): Promise<BookRequestImportFormats> {
+    const row = await this.repo.findByKey(BOOK_REQUEST_AUTOMATION_SETTING_KEYS.IMPORT_FORMATS);
+    return BOOK_REQUEST_IMPORT_FORMATS.includes(row?.value as BookRequestImportFormats)
+      ? (row!.value as BookRequestImportFormats)
+      : DEFAULT_BOOK_REQUEST_AUTOMATION_SETTINGS.importFormats;
   }
 
   async getUploadPattern(): Promise<string> {

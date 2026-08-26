@@ -1,14 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
-import { MetadataProviderKey } from '@bookorbit/types';
+import { ConcreteBookMediaKind, MetadataProviderKey } from '@bookorbit/types';
 
 import { ProviderRegistry } from './provider-registry';
 import { MetadataProvider } from './providers/metadata-provider';
 
-function createProvider(key: MetadataProviderKey, label = key): MetadataProvider {
+function createProvider(key: MetadataProviderKey, label = key, mediaKinds?: readonly ConcreteBookMediaKind[]): MetadataProvider {
   return {
     key,
     label,
     identifiable: false,
+    ...(mediaKinds ? { mediaKinds } : {}),
     search: vi.fn().mockResolvedValue([]),
   };
 }
@@ -45,6 +46,40 @@ describe('ProviderRegistry', () => {
     expect(() => registry.select([MetadataProviderKey.GOOGLE, MetadataProviderKey.HARDCOVER, MetadataProviderKey.AMAZON])).toThrow(
       new BadRequestException('Unknown providers: hardcover, amazon'),
     );
+  });
+
+  it('keeps providers that declare no media kinds, so a new provider is never scoped out silently', () => {
+    const registry = new ProviderRegistry([
+      createProvider(MetadataProviderKey.GOOGLE),
+      createProvider(MetadataProviderKey.COMICVINE, 'ComicVine', ['comic']),
+      createProvider(MetadataProviderKey.AUDIBLE, 'Audible', ['audiobook']),
+    ]);
+
+    expect(registry.keysForMediaKind([MetadataProviderKey.GOOGLE, MetadataProviderKey.COMICVINE, MetadataProviderKey.AUDIBLE], 'ebook')).toEqual([
+      MetadataProviderKey.GOOGLE,
+    ]);
+  });
+
+  it('keeps a specialist only for the medium it serves', () => {
+    const registry = new ProviderRegistry([
+      createProvider(MetadataProviderKey.GOOGLE),
+      createProvider(MetadataProviderKey.COMICVINE, 'ComicVine', ['comic']),
+      createProvider(MetadataProviderKey.AUDIBLE, 'Audible', ['audiobook']),
+    ]);
+    const keys = [MetadataProviderKey.GOOGLE, MetadataProviderKey.COMICVINE, MetadataProviderKey.AUDIBLE];
+
+    expect(registry.keysForMediaKind(keys, 'comic')).toEqual([MetadataProviderKey.GOOGLE, MetadataProviderKey.COMICVINE]);
+    expect(registry.keysForMediaKind(keys, 'audiobook')).toEqual([MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE]);
+  });
+
+  it('leaves an unregistered key alone rather than masking it as a scoped-out provider', () => {
+    const registry = new ProviderRegistry([createProvider(MetadataProviderKey.GOOGLE)]);
+
+    // select() is what rejects an unknown key; swallowing it here would turn that error into an empty search.
+    expect(registry.keysForMediaKind([MetadataProviderKey.GOOGLE, MetadataProviderKey.HARDCOVER], 'ebook')).toEqual([
+      MetadataProviderKey.GOOGLE,
+      MetadataProviderKey.HARDCOVER,
+    ]);
   });
 
   it('finds a provider by key', () => {

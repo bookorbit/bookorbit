@@ -1,12 +1,9 @@
-import { randomUUID } from 'crypto';
-
 import { getSevenZip } from '../../../common/sevenzip';
 
 export type SevenZipInstance = Awaited<ReturnType<typeof getSevenZip>>;
 
-export function createSevenZipTempId(prefix: string): string {
-  return `${prefix}_${randomUUID()}`;
-}
+/** Re-exported so the callers here keep one import; the helper itself is shared. */
+export { createSevenZipTempId } from '../../../common/sevenzip';
 
 export function cleanupSevenZipArtifacts(sevenZip: SevenZipInstance, archivePath: string, outDir: string): void {
   try {
