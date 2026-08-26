@@ -52,13 +52,15 @@ export interface ParsedCbzMetadata {
   comicvineId: string | null;
   lubimyczytacId: string | null;
   aladinId: string | null;
+  mangabakaId: string | null;
+  mangabakaSeriesId: string | null;
   itunesId: string | null;
   comicMetadata: ParsedCbzComicMetadata | null;
 }
 
 // ── Parsers ───────────────────────────────────────────────────────────────────
 
-const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', parseTagValue: false });
+const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
 function splitDelimited(value: string | null | undefined): string[] {
   if (!value) return [];
@@ -227,6 +229,8 @@ function parseComicInfoXml(xmlBuf: Buffer): ParsedCbzMetadata | null {
       comicvineId,
       lubimyczytacId: managedNotes.get('lubimyczytacId') ?? null,
       aladinId: managedNotes.get('aladinId') ?? null,
+      mangabakaId: managedNotes.get('mangabakaId') ?? null,
+      mangabakaSeriesId: managedNotes.get('mangabakaSeriesId') ?? null,
       itunesId: null,
       comicMetadata: hasComicFields
         ? {
@@ -299,6 +303,8 @@ function parseComicBookInfoJson(comment: string): ParsedCbzMetadata | null {
       comicvineId: null,
       lubimyczytacId: null,
       aladinId: null,
+      mangabakaId: null,
+      mangabakaSeriesId: null,
       itunesId: null,
       comicMetadata: null,
     };

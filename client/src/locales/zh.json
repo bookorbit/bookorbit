@@ -1345,7 +1345,8 @@
           "comicvine": "来自ComicVine的漫画书元数据。需要免费的 API 密钥从 comicvine.gamespot.com。",
           "ranobedb": "来自RanobeDB的日光新元数据。无需设置。",
           "lubimyczytac": "Polish book catalog (lubimyczytac.pl). Scrapes public book pages. 无需设置。",
-          "aladin": "来自Aladin的韩文书元数据(从二分之一到二分之一)。需要从 aladin.co.kr 的TTB 密钥。"
+          "aladin": "来自Aladin的韩文书元数据(从二分之一到二分之一)。需要从 aladin.co.kr 的TTB 密钥。",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books 需要一个 API 密钥才能启用",
@@ -1402,6 +1403,10 @@
           "storeProviderIds": {
             "label": "在书籍上存储提供商ID",
             "hint": "当获取元数据时，在书卷记录上保存返回的提供商ID(ISBN、ASIN、Goodread ID等)以获取更准确的未来查询。"
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -4039,7 +4044,24 @@
           "searchPrompt": "在上方搜索，然后点击结果开始比较元数据。"
         },
         "writeAndRename": "写入文件并重命名",
-        "writeAndRenameShort": "写入并重命名"
+        "writeAndRenameShort": "写入并重命名",
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        }
       },
       "files": {
         "title": "预订文件",

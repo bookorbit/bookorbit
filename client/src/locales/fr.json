@@ -1348,7 +1348,8 @@
           "comicvine": "Métadonnées de bande dessinée de ComicVine. Une clé API gratuite est requise sur comicvine.gamespot.com.",
           "ranobedb": "Métadonnées du light novel japonais de RanobeDB. Aucune configuration requise.",
           "lubimyczytac": "Catalogue de livres polonais (lubimyczytac.pl). Gratte les pages des livres publics. Aucune configuration requise.",
-          "aladin": "Métadonnées du livre coréen d'Aladin (알라딘). Une clé TTB d'aladin.co.kr est requise."
+          "aladin": "Métadonnées du livre coréen d'Aladin (알라딘). Une clé TTB d'aladin.co.kr est requise.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books nécessite une clé API avant de pouvoir être activé",
@@ -1393,18 +1394,16 @@
         "advanced": {
           "title": "Comportement de récupération avancé",
           "combineGenres": {
-            "label": "Combiner les genres de tous les fournisseurs sélectionnés",
-            "hint": "Collecter et rassembler les genres de chaque fournisseur attribués au champ Genres plutôt que de s'arrêter au premier résultat."
-          },
-          "maxGenres": {
-            "label": "Maximum de genres par livre",
-            "hint": "Appliqué après les exclusions et la suppression des doublons. Laisser vide pour illimité. Ceci affectera les futures récupérations de métadonnées.",
-            "unlimited": "Illimité",
-            "error": "Entrez un nombre entier de 1 à {max} ou laissez le champ vide."
+            "label": "Combinez les genres de tous les fournisseurs sélectionnés",
+            "hint": "Collectez et dédupliquez les genres de chaque fournisseur attribué au champ Genres, plutôt que de vous arrêter au premier résultat."
           },
           "storeProviderIds": {
             "label": "Stocker les identifiants des fournisseurs sur les livres",
-            "hint": "Lors de la récupération des métadonnées enregistrer les identifiants de fournisseurs correspondants (ISBN, ASIN, Goodreads ID, etc.) dans l'enregistrement du livre pour des recherches futures plus précises."
+            "hint": "Lors de la récupération des métadonnées, enregistrez les identifiants de fournisseur renvoyés (ISBN, ASIN, Goodreads ID, etc.) dans l'enregistrement du livre pour des recherches futures plus précises."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3986,7 +3985,24 @@
           "searchPrompt": "Recherchez ci-dessus, puis cliquez sur un résultat pour commencer à comparer les métadonnées."
         },
         "writeAndRename": "Écrire dans un fichier et renommer",
-        "writeAndRenameShort": "Écrire et renommer"
+        "writeAndRenameShort": "Écrire et renommer",
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        }
       },
       "files": {
         "title": "Fichiers de livres",

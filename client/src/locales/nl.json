@@ -1190,7 +1190,8 @@
           "comicvine": "Stripboekmetadata van ComicVine. Een gratis API-sleutel is vereist van comicvine.gamespot.com.",
           "ranobedb": "Japanse light novel-metadata van RanobeDB. Geen configuratie nodig.",
           "lubimyczytac": "Poolse boekcatalogus (lubimyczytac.pl). Haalt gegevens van openbare boekpagina's. Geen configuratie nodig.",
-          "aladin": "Koreaanse boekmetadata van Aladin (알라딘). Een TTB-sleutel van aladin.co.kr is vereist."
+          "aladin": "Koreaanse boekmetadata van Aladin (알라딘). Een TTB-sleutel van aladin.co.kr is vereist.",
+          "mangabaka": "Manga- en light novel-metadata van MangaBaka. Geen configuratie nodig."
         },
         "blocked": {
           "google": "Google Books vereist een API-sleutel voordat het kan worden ingeschakeld",
@@ -1241,6 +1242,10 @@
           "storeProviderIds": {
             "label": "Provider-ID's op boeken opslaan",
             "hint": "Sla bij het ophalen van metadata de teruggegeven provider-ID's (ISBN, ASIN, Goodreads-ID, enz.) op in het boekrecord voor nauwkeurigere toekomstige zoekopdrachten."
+          },
+          "richTitleFormat": {
+            "label": "Uitgebreid titelformaat voor mangavolumes",
+            "hint": "Volumetitels opmaken als \"Serie, Bd. NN: Ondertitel, Hst. NNNN\" in plaats van het eenvoudigere \"Serie, Bd. NN - Hst. NNN\". Alleen van toepassing op MangaBaka."
           }
         },
         "library": {
@@ -3398,6 +3403,23 @@
           "noResults": "Geen resultaten gevonden",
           "noResultsHint": "Probeer de titel of auteur aan te passen",
           "searchPrompt": "Zoek hierboven en klik op een resultaat om metadata te vergelijken."
+        },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Totaal Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
         },
         "writeAndRename": "Naar bestand schrijven en hernoemen",
         "writeAndRenameShort": "Schrijven en hernoemen"

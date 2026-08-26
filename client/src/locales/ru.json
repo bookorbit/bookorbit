@@ -1311,7 +1311,8 @@
           "audnexus": "Метаданные аудиокниги, управляемые сообществом. Установка не требуется.",
           "comicvine": "Метаданные книги комиксов от ComicVine. Требуется бесплатный ключ API с comicvine.gamespot.com.",
           "ranobedb": "Японские светлые метаданные из RanobeDB. Установка не требуется.",
-          "lubimyczytac": "Каталог польских книг (lubimyczytac.pl). Страницы публичных книг не требуются."
+          "lubimyczytac": "Каталог польских книг (lubimyczytac.pl). Страницы публичных книг не требуются.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Книги Google требуют ключ API перед включением",
@@ -1365,6 +1366,10 @@
           },
           "storeProviderIds": {
             "label": "ID провайдера магазина в книгах"
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3849,7 +3854,24 @@
           "searchPrompt": "Поиск выше, затем нажмите на результат, чтобы начать сравнение метаданных."
         },
         "writeAndRename": "Записать в файл и переименовать",
-        "writeAndRenameShort": "Запись и переименование"
+        "writeAndRenameShort": "Запись и переименование",
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        }
       },
       "files": {
         "title": "Книжные файлы",

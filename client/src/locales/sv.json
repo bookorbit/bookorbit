@@ -1267,7 +1267,8 @@
           "audnexus": "Gemenskapsdriven ljudbok metadata. Ingen installation krävs.",
           "comicvine": "Comic bok metadata från ComicVine. En gratis API-nyckel krävs från comicvine.gamespot.com.",
           "ranobedb": "Japansk ljusroman metadata från RanobeDB. Ingen installation krävs.",
-          "lubimyczytac": "Polsk bokkatalog (lubimyczytac.pl). Scrapes offentliga boksidor. Ingen installation krävs."
+          "lubimyczytac": "Polsk bokkatalog (lubimyczytac.pl). Scrapes offentliga boksidor. Ingen installation krävs.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books kräver en API-nyckel innan den kan aktiveras",
@@ -1318,6 +1319,10 @@
           "storeProviderIds": {
             "label": "Lagra leverantörs-ID på böcker",
             "hint": "När du hämtar metadata, spara de returnerade leverantörs-ID (ISBN, ASIN, Goodreads ID, etc.) på bokprotokollet för mer exakta framtida sökningar."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3796,7 +3801,24 @@
           "searchPrompt": "Sök ovan, klicka sedan på ett resultat för att börja jämföra metadata."
         },
         "writeAndRename": "Skriv till fil och byt namn",
-        "writeAndRenameShort": "Skriv och byt namn"
+        "writeAndRenameShort": "Skriv och byt namn",
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        }
       },
       "files": {
         "title": "Boka filer",

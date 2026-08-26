@@ -1380,7 +1380,8 @@
           "comicvine": "Metadati dei fumetti da ComicVine. È richiesta una chiave API gratuita da comicvine.gamespot.com.",
           "ranobedb": "Metadati delle light novel giapponesi da RanobeDB. Nessuna configurazione richiesta.",
           "lubimyczytac": "Catalogo dei libri polacchi (lubimyczytac.pl). Raschia le pagine dei libri pubblici. Nessuna configurazione richiesta.",
-          "aladin": "Metadati del libro coreano da Aladin (알라딘). È necessaria una chiave TTB di aladin.co.kr."
+          "aladin": "Metadati del libro coreano da Aladin (알라딘). È necessaria una chiave TTB di aladin.co.kr.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books richiede una chiave API prima di poter essere abilitato",
@@ -1431,6 +1432,10 @@
           "storeProviderIds": {
             "label": "Memorizza gli ID dei fornitori sui libri",
             "hint": "Quando recuperi i metadati, salva gli ID fornitore restituiti (ISBN, ASIN, Goodreads ID e così via) nel record del libro per ricerche future più accurate."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3851,7 +3856,24 @@
           "searchPrompt": "Cerca sopra, quindi fai clic su un risultato per iniziare a confrontare i metadati."
         },
         "writeAndRename": "Scrivi su file e rinomina",
-        "writeAndRenameShort": "Scrivi e rinomina"
+        "writeAndRenameShort": "Scrivi e rinomina",
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        }
       },
       "files": {
         "title": "File di libri",

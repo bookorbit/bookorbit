@@ -28,6 +28,7 @@ import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { MetadataSearchParams } from './providers/metadata-search-params';
+import { extractChapterNumber } from './providers/mangabaka/mangabaka-title-utils';
 
 export type ResolvedMetadataFields = Partial<Record<MetadataField, string | string[] | number | null>> & {
   coverUrl?: string;
@@ -37,6 +38,7 @@ export type ResolvedMetadataFields = Partial<Record<MetadataField, string | stri
   chapters?: AudiobookChapter[];
   comicMetadata?: ComicMetadataFields;
   communityRatings?: BookCommunityRating[];
+  mangabakaSeriesId?: string | null;
 };
 
 export interface ExistingMetadataFields extends Partial<Record<MetadataField, unknown>> {
@@ -133,8 +135,17 @@ export class MetadataFetchPipeline {
     const searchParams = providerSelection.activeProviders.some((provider) => AUDIOBOOK_PROVIDER_KEYS.has(provider))
       ? { ...params, includeAudiobookProviders: true }
       : params;
+
+    // Thread rich title format preference and chapter inclusion flag for MangaBaka.
+    if (preferences.options?.richTitleFormat !== undefined) {
+      (searchParams as MetadataSearchParams).richTitleFormat = preferences.options.richTitleFormat;
+    }
+    // Include chapter in MangaBaka title when the query contains a chapter marker.
+    if (params.title && extractChapterNumber(params.title) !== undefined) {
+      (searchParams as MetadataSearchParams).includeChapter = true;
+    }
     const candidates = providerSelection.activeProviders.length
-      ? await firstValueFrom(this.fetchService.searchCandidates(searchParams, providerSelection.activeProviders).pipe(toArray()), {
+      ? await firstValueFrom(this.fetchService.search(searchParams, providerSelection.activeProviders).pipe(toArray()), {
           defaultValue: [] as MetadataCandidate[],
         })
       : [];
@@ -418,6 +429,13 @@ export class MetadataFetchPipeline {
           (!options?.preserveExisting || this.isMissing(existing.hardcoverEditionId))
         ) {
           result.hardcoverEditionId = candidate.hardcoverEditionId;
+        }
+        if (
+          candidate.provider === MetadataProviderKey.MANGABAKA &&
+          candidate.mangabakaSeriesId &&
+          (!options?.preserveExisting || this.isMissing((existing as Record<string, unknown>).mangabakaSeriesId))
+        ) {
+          (result as Record<string, unknown>).mangabakaSeriesId = candidate.mangabakaSeriesId;
         }
       }
     }

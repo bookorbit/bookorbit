@@ -216,6 +216,7 @@ export type BookDetail = {
   communityRatings: BookCommunityRating[];
   coverSource: "extracted" | "custom" | null;
   hardcoverEditionId: string | null;
+  mangabakaSeriesId: string | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
   genres: string[];
@@ -269,6 +270,8 @@ export type BookMetadataRefreshPreviewFields = {
   ranobedbId?: string | null;
   lubimyczytacId?: string | null;
   aladinId?: string | null;
+  mangabakaId?: string | null;
+  mangabakaSeriesId?: string | null;
   audioMetadata?: {
     narrators?: string[];
     durationSeconds?: number | null;

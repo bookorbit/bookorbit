@@ -23,23 +23,23 @@ const defaults = (): MetadataScoreWeights => ({ ...DEFAULT_METADATA_SCORE_WEIGHT
 
 describe('score weight totals', () => {
   it('sums only the fields that actually score', () => {
-    expect(totalMetadataScoreWeight(defaults())).toBe(78)
+    expect(totalMetadataScoreWeight(defaults())).toBe(80)
   })
 
   it('leaves a zeroed field out of the denominator entirely', () => {
     const weights = { ...defaults(), description: 0 }
-    // 78 - 8, not 78: the field leaves the formula rather than contributing nothing.
-    expect(totalMetadataScoreWeight(weights)).toBe(70)
+    // 80 - 8, not 80: the field leaves the formula rather than contributing nothing.
+    expect(totalMetadataScoreWeight(weights)).toBe(72)
   })
 
   it('ignores negative weights the same way the server does', () => {
-    expect(totalMetadataScoreWeight({ ...defaults(), title: -5 })).toBe(68)
+    expect(totalMetadataScoreWeight({ ...defaults(), title: -5 })).toBe(70)
   })
 })
 
 describe('fieldShare', () => {
   it('reports a weight as its share of the total', () => {
-    expect(fieldShare(defaults(), 'title')).toBeCloseTo((10 / 78) * 100, 5)
+    expect(fieldShare(defaults(), 'title')).toBeCloseTo((10 / 80) * 100, 5)
   })
 
   it('gives a switched-off field no share', () => {
@@ -74,8 +74,8 @@ describe('groups', () => {
     expect(scoreComposition(weights).some((segment) => segment.group === 'providers')).toBe(false)
   })
 
-  it('counts the eight provider IDs as more of the score than genres', () => {
-    expect(groupPoints(defaults(), 'providers')).toBe(8)
+  it('counts the ten provider IDs as more of the score than genres', () => {
+    expect(groupPoints(defaults(), 'providers')).toBe(10)
     expect(groupShare(defaults(), 'providers')).toBeGreaterThan(fieldShare(defaults(), 'genres'))
   })
 })
@@ -133,7 +133,7 @@ describe('changedFields and counts', () => {
   })
 
   it('counts scoring fields, not all fields', () => {
-    expect(scoringFieldCount(defaults())).toBe(21)
+    expect(scoringFieldCount(defaults())).toBe(23)
   })
 })
 

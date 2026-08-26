@@ -1245,6 +1245,8 @@ describe('BookDockFinalizeService', () => {
           ranobedbId: 'ranobedb-id',
           lubimyczytacId: 'lubimyczytac-id',
           aladinId: 'aladin-id',
+          mangabakaId: 'mangabaka-id',
+          mangabakaSeriesId: null,
           comicMetadata: { issueNumber: '1', pencillers: ['Artist'] },
         } as BookDockMetadata,
       }),
@@ -1269,11 +1271,13 @@ describe('BookDockFinalizeService', () => {
         ranobedbId: 'ranobedb-id',
         lubimyczytacId: 'lubimyczytac-id',
         aladinId: 'aladin-id',
+        mangabakaId: 'mangabaka-id',
+        mangabakaSeriesId: null,
       }),
     );
     expect(seriesMemberships.replaceForBook).toHaveBeenCalledWith(19, [
-      { seriesName: 'Dune', seriesIndex: '1' },
-      { seriesName: 'Dune Chronicles', seriesIndex: '1' },
+      { seriesName: 'Dune', seriesIndex: 1 },
+      { seriesName: 'Dune Chronicles', seriesIndex: 1 },
     ]);
     expect(bookReadService.replaceCommunityRatings).toHaveBeenCalledWith(19, [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }]);
     expect(metadataService.upsertComicMetadata).toHaveBeenCalledWith(19, { issueNumber: '1', pencillers: ['Artist'] });

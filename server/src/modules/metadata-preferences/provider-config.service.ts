@@ -48,6 +48,7 @@ const DEFAULT_CONFIG: ProviderConfigurations = {
   kobo: { enabled: false, country: 'us', language: 'en' },
   lubimyczytac: { enabled: false },
   aladin: { enabled: false, ttbKey: '' },
+  mangabaka: { enabled: false },
 };
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -152,6 +153,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKey, string> = {
   [MetadataProviderKey.KOBO]: 'Kobo',
   [MetadataProviderKey.LUBIMYCZYTAC]: 'LubimyCzytac',
   [MetadataProviderKey.ALADIN]: 'Aladin',
+  [MetadataProviderKey.MANGABAKA]: 'MangaBaka',
 };
 
 type ProviderEnableRule = {
@@ -205,6 +207,7 @@ export class ProviderConfigService {
       kobo: { ...DEFAULT_CONFIG.kobo },
       lubimyczytac: { ...DEFAULT_CONFIG.lubimyczytac },
       aladin: { ...DEFAULT_CONFIG.aladin },
+      mangabaka: { ...DEFAULT_CONFIG.mangabaka },
     };
   }
 
@@ -225,6 +228,7 @@ export class ProviderConfigService {
       kobo: mergeKoboConfig(base.kobo, next.kobo),
       lubimyczytac: mergeSimpleConfig(base.lubimyczytac, next.lubimyczytac),
       aladin: mergeAladinConfig(base.aladin, next.aladin),
+      mangabaka: mergeSimpleConfig(base.mangabaka, next.mangabaka),
     };
   }
 
@@ -478,6 +482,12 @@ export class ProviderConfigService {
         enabled: cfg.aladin.enabled,
         configured: !!this.getEnableRule('aladin')?.canEnable(cfg),
         hint: !this.getEnableRule('aladin')?.canEnable(cfg) ? this.getEnableRule('aladin')?.setupHint : undefined,
+      },
+      {
+        key: MetadataProviderKey.MANGABAKA,
+        label: PROVIDER_LABELS[MetadataProviderKey.MANGABAKA],
+        enabled: cfg.mangabaka.enabled,
+        configured: true,
       },
     ];
   }

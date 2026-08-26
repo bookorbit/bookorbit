@@ -223,6 +223,18 @@ describe('Book DTO validation', () => {
     expect((await errorsFor(UpdateBookMetadataDto, { aladinId: 'a'.repeat(21) })).length).toBeGreaterThan(0);
   });
 
+  it('accepts mangabakaId and enforces its length bound', async () => {
+    expect((await errorsFor(UpdateBookMetadataDto, { mangabakaId: '12345' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { mangabakaId: null })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { mangabakaId: 'a'.repeat(51) })).length).toBeGreaterThan(0);
+  });
+
+  it('accepts mangabakaSeriesId and enforces its length bound', async () => {
+    expect((await errorsFor(UpdateBookMetadataDto, { mangabakaSeriesId: '12345' })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { mangabakaSeriesId: null })).length).toBe(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { mangabakaSeriesId: 'a'.repeat(51) })).length).toBeGreaterThan(0);
+  });
+
   it('accepts librofmId and enforces its length bound', async () => {
     expect((await errorsFor(UpdateBookMetadataDto, { librofmId: '9781234567890' })).length).toBe(0);
     expect((await errorsFor(UpdateBookMetadataDto, { librofmId: null })).length).toBe(0);
