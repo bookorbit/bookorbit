@@ -1,11 +1,21 @@
 <script setup lang="ts">
-withDefaults(
+import { computed } from 'vue'
+
+const props = withDefaults(
   defineProps<{
     variant?: 'count' | 'progress' | 'dot'
+    /** `accent` marks a count that stands for outstanding work, not just a total. */
+    tone?: 'default' | 'accent'
     label?: string
   }>(),
-  { variant: 'count' },
+  { variant: 'count', tone: 'default', label: undefined },
 )
+
+const inkClass = computed(() => {
+  if (props.tone === 'accent') return 'font-bold text-primary'
+  if (props.variant === 'progress') return 'font-semibold text-primary'
+  return 'font-semibold text-sidebar-count-foreground group-data-[active=true]/item:text-primary'
+})
 </script>
 
 <template>
@@ -18,8 +28,8 @@ withDefaults(
   />
   <span
     v-else
-    class="ml-auto shrink-0 rounded-md bg-(--shell-accent-tint) px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors duration-150 group-data-[collapsible=icon]:hidden"
-    :class="variant === 'progress' ? 'text-primary' : 'text-muted-foreground group-data-[active=true]/item:text-primary'"
+    class="ml-auto shrink-0 rounded-md bg-(--shell-accent-tint) px-1.5 py-0.5 text-[11px] tabular-nums transition-colors duration-150 group-data-[collapsible=icon]:hidden"
+    :class="inkClass"
     :aria-label="label"
     :title="label"
   >

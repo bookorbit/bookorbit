@@ -239,7 +239,9 @@ onUnmounted(() => stopLibraryUploadListener())
             @navigate="handleNavigate"
           >
             <template #badge>
-              <SidebarBadge v-if="entry.badge !== null" :label="entry.badge.label">{{ formatCompactNumber(entry.badge.value) }}</SidebarBadge>
+              <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
+                formatCompactNumber(entry.badge.value)
+              }}</SidebarBadge>
             </template>
           </SidebarNavItem>
         </SidebarZone>

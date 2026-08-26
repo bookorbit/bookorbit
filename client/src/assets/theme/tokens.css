@@ -77,6 +77,9 @@
 
   --sidebar: oklch(0.965 var(--tint-c-surface) var(--tint-h));
   --sidebar-foreground: oklch(0.145 var(--tint-c-surface) var(--tint-h));
+  /* Count chips sit one step above --muted-foreground: they are secondary, but they carry a
+     number the eye scans, so they are tuned per theme rather than faded from the row label. */
+  --sidebar-count-foreground: oklch(0.42 0.001 var(--tint-h));
   --sidebar-primary: oklch(0.21 var(--tint-c-surface) var(--tint-h));
   --sidebar-primary-foreground: oklch(0.985 0.004 var(--tint-h));
   --sidebar-accent: oklch(0.955 var(--tint-c-surface) var(--tint-h));
@@ -322,6 +325,7 @@
 
   --sidebar: oklch(calc(0.18 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));
   --sidebar-foreground: oklch(0.985 0.001 var(--tint-h));
+  --sidebar-count-foreground: oklch(0.8 0.001 var(--tint-h));
   --sidebar-primary: oklch(0.91 var(--tint-c-surface) var(--tint-h));
   --sidebar-primary-foreground: oklch(0.18 var(--tint-c-surface) var(--tint-h));
   --sidebar-accent: oklch(calc(0.245 + var(--bg-lift)) var(--tint-c-surface) var(--tint-h));

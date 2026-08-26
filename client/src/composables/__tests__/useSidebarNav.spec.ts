@@ -133,7 +133,7 @@ describe('sidebar nav registry', () => {
   it('exposes the Book Dock badge only when items are queued', () => {
     const context = makeContext({ permissions: ['book_dock_access'], bookDockTotal: 3 })
 
-    expect(resolveNavEntry(entry('book-dock'), context, makeRoute('dashboard'), 'Book Dock').badge).toEqual({ value: 3 })
+    expect(resolveNavEntry(entry('book-dock'), context, makeRoute('dashboard'), 'Book Dock').badge).toEqual({ value: 3, tone: 'accent' })
     expect(resolveNavEntry(entry('book-dock'), makeContext(), makeRoute('dashboard'), 'Book Dock').badge).toBeNull()
   })
 
@@ -147,6 +147,7 @@ describe('sidebar nav registry', () => {
     expect(resolveNavEntry(entry('book-requests'), context, makeRoute('dashboard'), 'Requests').badge).toEqual({
       value: 6,
       label: '6 active requests of yours',
+      tone: 'accent',
     })
     expect(resolveNavEntry(entry('book-requests'), makeContext(), makeRoute('dashboard'), 'Requests').badge).toBeNull()
   })
@@ -161,7 +162,7 @@ describe('sidebar nav registry', () => {
     const { zones } = useSidebarNav(() => 2)
     const requests = zones.value.flatMap((zone) => zone.entries).find((candidate) => candidate.id === 'book-requests')
 
-    expect(requests?.badge).toEqual({ value: 2, label: expectedLabel })
+    expect(requests?.badge).toEqual({ value: 2, label: expectedLabel, tone: 'accent' })
   })
 
   it.each([

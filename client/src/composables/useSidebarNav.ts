@@ -21,6 +21,8 @@ interface NavContext {
 export interface SidebarNavBadge {
   value: number
   label?: string
+  /** `accent` colours the chip: the number is work waiting on the user, not a library total. */
+  tone?: 'default' | 'accent'
 }
 
 export interface SidebarNavEntry {
@@ -94,7 +96,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     to: { name: 'book-dock' },
     isActive: (route) => route.name === 'book-dock',
     permission: 'book_dock_access',
-    badge: (context) => (context.bookDockTotal > 0 ? { value: context.bookDockTotal } : null),
+    badge: (context) => (context.bookDockTotal > 0 ? { value: context.bookDockTotal, tone: 'accent' } : null),
     tourId: 'book-dock-btn',
   },
   {
@@ -107,7 +109,7 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     isActive: (route) => routeNameStartsWith(route, 'book-request'),
     permission: 'book_request_access',
     badge: (context) =>
-      context.outstandingRequestTotal > 0 ? { value: context.outstandingRequestTotal, label: context.outstandingRequestLabel } : null,
+      context.outstandingRequestTotal > 0 ? { value: context.outstandingRequestTotal, label: context.outstandingRequestLabel, tone: 'accent' } : null,
   },
   {
     id: 'tools',
