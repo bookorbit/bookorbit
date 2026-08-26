@@ -3801,24 +3801,7 @@
           "searchPrompt": "Sök ovan, klicka sedan på ett resultat för att börja jämföra metadata."
         },
         "writeAndRename": "Skriv till fil och byt namn",
-        "writeAndRenameShort": "Skriv och byt namn",
-        "mangabakaDrillDown": {
-          "sectionTitle": "MangaBaka Volumes",
-          "seriesLabel": "MangaBaka series",
-          "browseVolumes": "Browse Volumes",
-          "loadingCollections": "Loading collections...",
-          "noCollections": "No collections found for this series.",
-          "loadingVolumes": "Loading volumes...",
-          "noVolumes": "No volumes found.",
-          "volumeLabel": "Vol. {n}",
-          "volumeLabelUnknown": "Vol. ?",
-          "totalVolumeLabel": "Total Vol. {n}",
-          "coverAlt": "Volume {index} cover for {series}",
-          "volumeSelectLabel": "Select {title} ({volume})",
-          "loadError": "Couldn't load data. Please try again.",
-          "retry": "Retry",
-          "selectVolume": "Select this volume"
-        }
+        "writeAndRenameShort": "Skriv och byt namn"
       },
       "files": {
         "title": "Boka filer",

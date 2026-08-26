@@ -4044,24 +4044,7 @@
           "searchPrompt": "在上方搜索，然后点击结果开始比较元数据。"
         },
         "writeAndRename": "写入文件并重命名",
-        "writeAndRenameShort": "写入并重命名",
-        "mangabakaDrillDown": {
-          "sectionTitle": "MangaBaka Volumes",
-          "seriesLabel": "MangaBaka series",
-          "browseVolumes": "Browse Volumes",
-          "loadingCollections": "Loading collections...",
-          "noCollections": "No collections found for this series.",
-          "loadingVolumes": "Loading volumes...",
-          "noVolumes": "No volumes found.",
-          "volumeLabel": "Vol. {n}",
-          "volumeLabelUnknown": "Vol. ?",
-          "totalVolumeLabel": "Total Vol. {n}",
-          "coverAlt": "Volume {index} cover for {series}",
-          "volumeSelectLabel": "Select {title} ({volume})",
-          "loadError": "Couldn't load data. Please try again.",
-          "retry": "Retry",
-          "selectVolume": "Select this volume"
-        }
+        "writeAndRenameShort": "写入并重命名"
       },
       "files": {
         "title": "预订文件",

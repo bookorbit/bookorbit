@@ -3776,24 +3776,7 @@
           "searchPrompt": "Vyhledejte výše a poté klikněte na výsledek a začněte porovnávat metadata."
         },
         "writeAndRename": "Zapsat do souboru a přejmenovat",
-        "writeAndRenameShort": "Zapsat a přejmenovat",
-        "mangabakaDrillDown": {
-          "sectionTitle": "MangaBaka Volumes",
-          "seriesLabel": "MangaBaka series",
-          "browseVolumes": "Browse Volumes",
-          "loadingCollections": "Loading collections...",
-          "noCollections": "No collections found for this series.",
-          "loadingVolumes": "Loading volumes...",
-          "noVolumes": "No volumes found.",
-          "volumeLabel": "Vol. {n}",
-          "volumeLabelUnknown": "Vol. ?",
-          "totalVolumeLabel": "Total Vol. {n}",
-          "coverAlt": "Volume {index} cover for {series}",
-          "volumeSelectLabel": "Select {title} ({volume})",
-          "loadError": "Couldn't load data. Please try again.",
-          "retry": "Retry",
-          "selectVolume": "Select this volume"
-        }
+        "writeAndRenameShort": "Zapsat a přejmenovat"
       },
       "files": {
         "title": "Objednat soubory",

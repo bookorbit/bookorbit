@@ -3856,24 +3856,7 @@
           "searchPrompt": "Cerca sopra, quindi fai clic su un risultato per iniziare a confrontare i metadati."
         },
         "writeAndRename": "Scrivi su file e rinomina",
-        "writeAndRenameShort": "Scrivi e rinomina",
-        "mangabakaDrillDown": {
-          "sectionTitle": "MangaBaka Volumes",
-          "seriesLabel": "MangaBaka series",
-          "browseVolumes": "Browse Volumes",
-          "loadingCollections": "Loading collections...",
-          "noCollections": "No collections found for this series.",
-          "loadingVolumes": "Loading volumes...",
-          "noVolumes": "No volumes found.",
-          "volumeLabel": "Vol. {n}",
-          "volumeLabelUnknown": "Vol. ?",
-          "totalVolumeLabel": "Total Vol. {n}",
-          "coverAlt": "Volume {index} cover for {series}",
-          "volumeSelectLabel": "Select {title} ({volume})",
-          "loadError": "Couldn't load data. Please try again.",
-          "retry": "Retry",
-          "selectVolume": "Select this volume"
-        }
+        "writeAndRenameShort": "Scrivi e rinomina"
       },
       "files": {
         "title": "File di libri",

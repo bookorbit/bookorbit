@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Search, BookOpen, Loader2, PencilLine } from '@lucide/vue'
-import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
+import { Search, BookOpen, Loader2, PencilLine, TriangleAlert } from '@lucide/vue'
+import type { MetadataCandidate, MetadataProviderInfo, MetadataProviderKey, MetadataProviderSearchOutcome } from '@bookorbit/types'
 import MetadataResultCard from './MetadataResultCard.vue'
-import MangabakaSeriesDrillDown from './MangabakaSeriesDrillDown.vue'
-import { useMangabakaDrillDown } from '../../../composables/useMangabakaDrillDown'
 import { providerActivePillStyle } from '../../../lib/metadata-fetch'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 
@@ -17,7 +15,14 @@ const props = defineProps<{
   selectedProviders: MetadataProviderKey[]
   isStreaming: boolean
   hasSearched: boolean
+  interruptedProviders: { provider: MetadataProviderKey; outcome: MetadataProviderSearchOutcome }[]
 }>()
+
+const INTERRUPTION_MESSAGE_KEYS: Record<MetadataProviderSearchOutcome, string> = {
+  timeout: 'book.detail.editMetadata.searchPanel.providerTimedOut',
+  throttled: 'book.detail.editMetadata.searchPanel.providerThrottled',
+  failed: 'book.detail.editMetadata.searchPanel.providerFailed',
+}
 
 const emit = defineEmits<{
   search: [{ title: string; author: string; isbn: string }]
@@ -29,7 +34,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
-const drillDown = useMangabakaDrillDown()
 
 const form = reactive({
   title: props.searchDefaults.title ?? '',
@@ -57,6 +61,15 @@ const customProviderSelection = computed(
   () => props.providers.length > 0 && !allProvidersSelected.value && !(hasFieldRuleScopeOption.value && fieldRuleProvidersSelected.value),
 )
 
+const interruptionMessages = computed(() =>
+  props.interruptedProviders.map(({ provider, outcome }) => ({
+    provider,
+    message: t(INTERRUPTION_MESSAGE_KEYS[outcome], {
+      provider: props.providers.find((p) => p.key === provider)?.label ?? provider,
+    }),
+  })),
+)
+
 watch(
   () => props.hasSearched,
   (hasSearched) => {
@@ -67,27 +80,9 @@ watch(
   { immediate: true },
 )
 
-watch(
-  () => form.title,
-  (title) => {
-    drillDown.highlightedVolume.value = parseVolumeNumber(title)
-  },
-  { immediate: true },
-)
-
-const mangabakaResults = computed(() => props.filteredResults.filter((candidate) => candidate.provider === 'mangabaka'))
-const topMangabakaSeries = computed(() => mangabakaResults.value.slice(0, 3))
-
-function parseVolumeNumber(title: string | undefined): number | null {
-  const match = (title ?? '').match(/(?:vol\.?|volume|t)\s*(\d{1,3})/i)
-  if (match && match[1]) return parseInt(match[1], 10)
-  return null
-}
-
 function runSearch() {
   if (!canSearch.value) return
   isFormCollapsed.value = true
-  drillDown.reset()
   emit('search', {
     title: form.title.trim(),
     author: form.author.trim(),
@@ -256,18 +251,28 @@ function sameProviderSelection(keys: MetadataProviderKey[]) {
         </div>
       </div>
 
-      <!-- Nothing found -->
+      <!-- Nothing found: say whether the search actually finished -->
       <div
         v-else-if="!isStreaming && !filteredResults.length && hasSearched"
         role="status"
         class="py-12 flex flex-col items-center gap-3 text-muted-foreground"
       >
         <div class="size-10 rounded-full bg-muted flex items-center justify-center">
-          <BookOpen class="size-5" />
+          <TriangleAlert v-if="interruptionMessages.length" class="size-5" />
+          <BookOpen v-else class="size-5" />
         </div>
         <div class="text-center">
-          <p class="text-sm font-medium text-foreground">{{ t('book.detail.editMetadata.searchPanel.noResults') }}</p>
-          <p class="text-xs text-muted-foreground mt-0.5">{{ t('book.detail.editMetadata.searchPanel.noResultsHint') }}</p>
+          <template v-if="interruptionMessages.length">
+            <p class="text-sm font-medium text-foreground">{{ t('book.detail.editMetadata.searchPanel.searchInterrupted') }}</p>
+            <p v-for="entry in interruptionMessages" :key="entry.provider" class="text-xs text-muted-foreground mt-0.5">
+              {{ entry.message }}
+            </p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('book.detail.editMetadata.searchPanel.searchInterruptedHint') }}</p>
+          </template>
+          <template v-else>
+            <p class="text-sm font-medium text-foreground">{{ t('book.detail.editMetadata.searchPanel.noResults') }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">{{ t('book.detail.editMetadata.searchPanel.noResultsHint') }}</p>
+          </template>
         </div>
       </div>
 
@@ -277,27 +282,21 @@ function sameProviderSelection(keys: MetadataProviderKey[]) {
       </div>
 
       <!-- Results grid -->
-      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <MetadataResultCard
-          v-for="(candidate, i) in filteredResults"
-          :key="`${candidate.provider}-${candidate.providerId}-${i}`"
-          :candidate="candidate"
-          :providers="providers"
-          @select="handleSelectCandidate"
-        />
-      </div>
-
-      <!-- MangaBaka volume browser -->
-      <div v-if="topMangabakaSeries.length" class="border-t border-border mt-4 pt-4">
-        <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          {{ t('book.detail.editMetadata.mangabakaDrillDown.sectionTitle') }}
-        </p>
-        <div class="space-y-2">
-          <MangabakaSeriesDrillDown
-            v-for="candidate in topMangabakaSeries"
-            :key="candidate.providerId"
-            :series-candidate="candidate"
-            :drill-down="drillDown"
+      <div v-else>
+        <div
+          v-if="interruptionMessages.length"
+          role="status"
+          class="mb-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+        >
+          <p class="font-medium text-foreground">{{ t('book.detail.editMetadata.searchPanel.searchIncomplete') }}</p>
+          <p v-for="entry in interruptionMessages" :key="entry.provider">{{ entry.message }}</p>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <MetadataResultCard
+            v-for="(candidate, i) in filteredResults"
+            :key="`${candidate.provider}-${candidate.providerId}-${i}`"
+            :candidate="candidate"
+            :providers="providers"
             @select="handleSelectCandidate"
           />
         </div>
