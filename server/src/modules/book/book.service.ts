@@ -394,6 +394,7 @@ export class BookService {
     if (r.authors !== undefined) preview.authors = r.authors as string[];
     if (r.genres !== undefined) preview.genres = r.genres as string[];
     if (r.publisher !== undefined) preview.publisher = r.publisher as string | null;
+    if (r.originCountry !== undefined) preview.originCountry = r.originCountry as string | null;
     if (r.publishedDate !== undefined) preview.publishedDate = r.publishedDate as string | null;
     if (r.publishedYear !== undefined) preview.publishedYear = r.publishedYear as number | null;
     if (r.language !== undefined) preview.language = r.language as string | null;
@@ -1686,6 +1687,7 @@ export class BookService {
     if (dto.subtitle !== undefined) scalarFields.subtitle = dto.subtitle ?? null;
     if (dto.description !== undefined) scalarFields.description = dto.description ?? null;
     if (dto.publisher !== undefined) scalarFields.publisher = normalizeMetadataText(dto.publisher);
+    if (dto.originCountry !== undefined) scalarFields.originCountry = normalizeMetadataText(dto.originCountry);
     if (dto.publishedDate !== undefined) {
       const publishedDate = this.normalizeUpdatePublishedDate(dto.publishedDate);
       scalarFields.publishedDate = publishedDate;
@@ -2693,6 +2695,7 @@ export class BookService {
         description: meta?.description,
         authors: authorRows.map((a) => a.name),
         publisher: meta?.publisher,
+        originCountry: meta?.originCountry,
         publishedYear: meta?.publishedYear,
         language: meta?.language,
         pageCount: meta?.pageCount,
@@ -2734,6 +2737,7 @@ export class BookService {
       if (r.authors !== undefined) dto.authors = r.authors as string[];
       if (r.genres !== undefined) dto.genres = r.genres as string[];
       if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
+      if (r.originCountry !== undefined) dto.originCountry = r.originCountry as string | null;
       if (r.publishedDate !== undefined) dto.publishedDate = r.publishedDate as string | null;
       if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;
       if (r.language !== undefined) dto.language = r.language as string | null;
@@ -3066,6 +3070,7 @@ export class BookService {
       isbn10: meta?.isbn10 ?? null,
       isbn13: meta?.isbn13 ?? null,
       publisher: meta?.publisher ?? null,
+      originCountry: meta?.originCountry ?? null,
       publishedDate: meta?.publishedDate ?? null,
       publishedYear: meta?.publishedYear ?? null,
       language: meta?.language ?? null,

@@ -60,6 +60,11 @@ export class StatisticsController {
     return this.statisticsService.getPublicationYearTimeline(user, query);
   }
 
+  @Get('country-distribution')
+  getCountryDistribution(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
+    return this.statisticsService.getCountryDistribution(user, query);
+  }
+
   @Get('top-authors')
   getTopAuthors(@CurrentUser() user: RequestUser, @Query() query: StatisticsFilterQueryDto) {
     return this.statisticsService.getTopAuthors(user, query);

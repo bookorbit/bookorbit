@@ -153,6 +153,12 @@ export const STATISTICS_CHART_META: Record<StatisticsChartId, StatisticsChartMet
     size: '4x1',
     category: 'library',
   },
+  'country-distribution': {
+    label: 'Country Distribution',
+    icon: Globe,
+    size: '2x1',
+    category: 'library',
+  },
   'reading-heatmap': {
     label: 'Reading Heatmap',
     icon: Calendar,

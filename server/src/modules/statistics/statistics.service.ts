@@ -280,6 +280,19 @@ export class StatisticsService {
     });
   }
 
+  async getCountryDistribution(user: RequestUser, query: StatisticsFilterQueryDto): Promise<StatisticsResult<any>> {
+    return this.withStatisticsCache(
+      'country-distribution',
+      user,
+      query,
+      async () => {
+        const { items } = await this.repo.countryDistribution(user.id, user.isSuperuser, user.contentFilters, query.libraryIds, query.readStatus);
+        return { items, unknownCount: 0 };
+      },
+      { readStatus: query.readStatus ?? 'all' }, // Invalida o cache se o status mudar
+    );
+  }
+
   async getMetadataFreshnessGauge(user: RequestUser, query: StatisticsFilterQueryDto): Promise<MetadataFreshnessGauge> {
     return this.withStatisticsCache('metadata-freshness-gauge', user, query, async () => {
       const row = await this.repo.metadataFreshnessGauge(user.id, user.isSuperuser, user.contentFilters, query.libraryIds);

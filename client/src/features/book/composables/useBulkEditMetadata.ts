@@ -136,7 +136,7 @@ function applyOptimisticUpdates(fields: BulkEditFields, ids: number[], books: Re
     if (fields.seriesMemberships !== undefined) {
       const primary = fields.seriesMemberships[0]
       updated.seriesName = primary?.seriesName ?? null
-      updated.seriesIndex = primary?.seriesIndex ?? null
+      updated.seriesIndex = primary?.seriesIndex != null ? String(primary?.seriesIndex) : null
     }
     if (fields.publisher !== undefined) {
       updated.publisher = fields.publisher.value

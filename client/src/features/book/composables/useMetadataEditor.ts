@@ -23,6 +23,7 @@ const ROOT_FIELDS = [
   'subtitle',
   'description',
   'publisher',
+  'originCountry',
   'publishedDate',
   'publishedYear',
   'language',
@@ -82,7 +83,11 @@ export function normalizeSeriesMemberships(values: readonly EditableSeriesMember
     const key = seriesName.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ seriesName, seriesIndex: value.seriesIndex ?? null, expectedBookCount: value.expectedBookCount ?? null })
+    out.push({
+      seriesName,
+      seriesIndex: value.seriesIndex !== null && String(value.seriesIndex).trim() !== '' ? String(value.seriesIndex).trim() : null,
+      expectedBookCount: value.expectedBookCount ?? null,
+    })
   }
   return out
 }
@@ -93,12 +98,20 @@ function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[]
     return normalizeSeriesMemberships(
       memberships.map((membership) => ({
         seriesName: membership.seriesName,
-        seriesIndex: membership.seriesIndex,
+        seriesIndex: membership.seriesIndex != null ? String(membership.seriesIndex) : null,
         expectedBookCount: membership.expectedBookCount ?? null,
       })),
     )
   }
-  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null }] : []
+  return book.seriesName
+    ? [
+        {
+          seriesName: book.seriesName,
+          seriesIndex: book.seriesIndex != null ? String(book.seriesIndex) : null,
+          expectedBookCount: null,
+        },
+      ]
+    : []
 }
 
 function changedCustomMetadataPayload(
@@ -111,15 +124,8 @@ function changedCustomMetadataPayload(
     .map((field) => ({ fieldId: field.fieldId, value: field.value }))
 }
 
-/**
- * A failed save, kept structured rather than pre-rendered: `detail` is the server's own English
- * description of what it rejected, which no catalog can translate, while everything else has to
- * resolve to a translated message in the component.
- */
 export type MetadataSaveFailure = {
-  /** Server-supplied description, or null when the response carried none. */
   detail: string | null
-  /** HTTP status, or null when the request failed before producing a response. */
   status: number | null
 }
 
@@ -132,6 +138,7 @@ export function useMetadataEditor() {
     subtitle: null as string | null,
     description: null as string | null,
     publisher: null as string | null,
+    originCountry: null as string | null,
     publishedDate: null as string | null,
     publishedYear: null as number | null,
     language: null as string | null,
@@ -188,13 +195,14 @@ export function useMetadataEditor() {
     form.subtitle = book.subtitle
     form.description = book.description
     form.publisher = book.publisher
+    form.originCountry = book.originCountry ? book.originCountry.toUpperCase() : null
     form.publishedDate = book.publishedDate
     form.publishedYear = book.publishedYear
     form.language = book.language
     form.pageCount = book.pageCount
     form.communityRatings = [...book.communityRatings]
     form.seriesName = book.seriesName
-    form.seriesIndex = book.seriesIndex
+    form.seriesIndex = book.seriesIndex != null ? String(book.seriesIndex) : null
     form.seriesMemberships = seriesMembershipsFromBook(book)
     form.isbn10 = book.isbn10
     form.isbn13 = book.isbn13
@@ -268,7 +276,11 @@ export function useMetadataEditor() {
     }
 
     const currentCommunityRatings = form.communityRatings.map(({ provider, rating, ratingCount }) => ({ provider, rating, ratingCount }))
-    const previousCommunityRatings = previous.communityRatings.map(({ provider, rating, ratingCount }) => ({ provider, rating, ratingCount }))
+    const previousCommunityRatings = previous.communityRatings.map(({ provider, rating, ratingCount }) => ({
+      provider,
+      rating,
+      ratingCount,
+    }))
     if (JSON.stringify(currentCommunityRatings) !== JSON.stringify(previousCommunityRatings)) {
       payload.communityRatings = currentCommunityRatings
     }

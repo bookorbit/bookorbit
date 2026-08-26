@@ -64,7 +64,18 @@ const emit = defineEmits<{
   fileRenamed: []
 }>()
 
-const { t } = useI18n()
+const { t, locale, tm } = useI18n()
+
+const sortedCountries = computed(() => {
+  const rawCountries = tm('countryCodes') as Record<string, string>
+  if (!rawCountries) return []
+
+  const collator = new Intl.Collator(locale.value, { sensitivity: 'base', usage: 'sort' })
+
+  return Object.entries(rawCountries)
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => collator.compare(a.name, b.name))
+})
 
 const DIRECT_PATCH_FIELDS = [
   'title',
@@ -73,6 +84,7 @@ const DIRECT_PATCH_FIELDS = [
   'authors',
   'genres',
   'publisher',
+  'originCountry',
   'language',
   'pageCount',
   'seriesName',
@@ -270,9 +282,6 @@ watch(
   { immediate: true },
 )
 
-// The server names the field it rejected ("amazonId must be shorter than..."), which is the only
-// text that tells the user what to fix. It is untranslated, so it is preferred over the generic
-// catalog message rather than replacing it.
 const saveErrorMessage = computed(() => {
   const failure = error.value
   if (!failure) return null
@@ -457,8 +466,6 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
     return 0
   }
 
-  // Providers do not report series length in this patch, so carry the current value across
-  // rather than letting an applied suggestion silently clear a total someone entered.
   const totalsByName = new Map(form.seriesMemberships.map((m) => [m.seriesName.trim().toLowerCase(), m.expectedBookCount ?? null]))
 
   setSeriesMemberships(
@@ -701,6 +708,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     authors: preview.authors,
     genres: preview.genres,
     publisher: preview.publisher,
+    originCountry: preview.originCountry,
     publishedDate: preview.publishedDate,
     publishedYear: preview.publishedYear,
     language: preview.language,
@@ -1056,6 +1064,167 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               >
                 <input v-model="form.subtitle" :class="FIELD_CONTROL_CLASS" :disabled="isLocked('subtitle')" />
               </MetadataFieldLabel>
+
+              <!-- Language | Country | Published Date | Year | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
+              <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
+                <MetadataFieldLabel
+                  class="col-span-2 sm:w-32 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.languageLabel')"
+                  field="language"
+                  :locked="isLocked('language')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <InputWithSuggestions
+                    v-model="form.language"
+                    :search-fn="searchLanguage"
+                    :disabled="isLocked('language')"
+                    :maxlength="10"
+                    :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-48 sm:shrink-0"
+                  :label="t('settings.metadata.fields.originCountry')"
+                  field="originCountry"
+                  :locked="isLocked('originCountry')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <select
+                    v-model="form.originCountry"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('originCountry')"
+                  >
+                    <option :value="null">--</option>
+                    <option v-for="country in sortedCountries" :key="country.code" :value="country.code">
+                      {{ country.name }}
+                    </option>
+                  </select>
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-40 sm:shrink-0"
+                  :label="t('bookDock.field.publishedDate')"
+                  field="publishedYear"
+                  :locked="isLocked('publishedYear')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.publishedDate ?? ''"
+                    type="date"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('publishedYear')"
+                    @input="setPublishedDateField"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-28 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.yearLabel')"
+                  field="publishedYear"
+                  :locked="isLocked('publishedYear')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.publishedYear ?? ''"
+                    type="number"
+                    min="1"
+                    max="2100"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('publishedYear')"
+                    @input="setIntField('publishedYear', $event)"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-28 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.pageCountLabel')"
+                  field="pageCount"
+                  :locked="isLocked('pageCount')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.pageCount ?? ''"
+                    type="number"
+                    min="1"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('pageCount')"
+                    @input="setIntField('pageCount', $event)"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:flex-1 sm:min-w-22.5"
+                  :label="t('book.detail.editMetadata.isbn13Label')"
+                  field="isbn13"
+                  :locked="isLocked('isbn13')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    v-model="form.isbn13"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    maxlength="13"
+                    :disabled="isLocked('isbn13')"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:flex-1 sm:min-w-21.25"
+                  :label="t('book.detail.editMetadata.isbn10Label')"
+                  field="isbn10"
+                  :locked="isLocked('isbn10')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    v-model="form.isbn10"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    maxlength="10"
+                    :disabled="isLocked('isbn10')"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  v-if="isPrimaryAudio"
+                  class="sm:w-30 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.durationLabel')"
+                  field="durationSeconds"
+                  :locked="isLocked('durationSeconds')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.durationSeconds ?? ''"
+                    type="number"
+                    min="1"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('durationSeconds')"
+                    @input="setIntField('durationSeconds', $event)"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  v-if="isPrimaryAudio"
+                  class="sm:w-20 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.abridgedLabel')"
+                  field="abridged"
+                  :locked="isLocked('abridged')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <div
+                    class="flex h-8 items-center rounded-lg border border-input bg-background px-3 pr-12"
+                    :class="isLocked('abridged') ? 'opacity-50 cursor-not-allowed' : ''"
+                  >
+                    <input
+                      id="abridged-check"
+                      v-model="form.abridged"
+                      type="checkbox"
+                      class="h-4 w-4 rounded border-input accent-primary"
+                      :aria-label="t('book.detail.editMetadata.abridgedLabel')"
+                      :disabled="isLocked('abridged')"
+                    />
+                  </div>
+                </MetadataFieldLabel>
+              </div>
 
               <MetadataFieldLabel
                 :label="t('book.detail.editMetadata.authorsLabel')"

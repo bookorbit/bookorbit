@@ -31,7 +31,8 @@ export type StatisticsChartId =
   | "acquisition-lag-scatter"
   | "largest-books"
   | "top-series"
-  | "publication-year-timeline";
+  | "publication-year-timeline"
+  | "country-distribution";
 
 export type StatisticsGranularity = "monthly" | "yearly";
 export type StatisticsDateRange = "last-year" | "last-5-years" | "all-time";
@@ -75,6 +76,7 @@ export const DEFAULT_LIBRARY_CHART_ORDER: StatisticsChartId[] = [
   "top-series",
   "books-added-over-time",
   "publication-year-timeline",
+  "country-distribution",
 ];
 
 export const DEFAULT_USER_CHART_ORDER: StatisticsChartId[] = [

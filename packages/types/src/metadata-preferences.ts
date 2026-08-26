@@ -7,6 +7,7 @@ export type MetadataField =
   | "cover"
   | "authors"
   | "publisher"
+  | "originCountry"
   | "publishedYear"
   | "language"
   | "pageCount"
@@ -25,6 +26,7 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
   "cover",
   "authors",
   "publisher",
+  "originCountry",
   "publishedYear",
   "language",
   "pageCount",

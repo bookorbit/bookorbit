@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsArray, IsInt, IsOptional } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class StatisticsFilterQueryDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class StatisticsFilterQueryDto {
   @IsArray()
   @IsInt({ each: true })
   libraryIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  readStatus?: string;
 }
