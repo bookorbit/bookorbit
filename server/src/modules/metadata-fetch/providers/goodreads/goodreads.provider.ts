@@ -6,9 +6,9 @@ import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
 import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
-import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
+import { PROVIDER_BUDGETS_MS, PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_RETRY, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { buildRequestSignal, sleep } from '../provider-utils';
+import { buildRequestSignal, createSearchDeadline, SearchDeadline, sleep } from '../provider-utils';
 import { mapGoodreadsApolloState, mapGoodreadsAutocompleteItem } from './goodreads.mapper';
 import { GoodreadsAutocompleteItem, GoodreadsNextData } from './goodreads.types';
 
@@ -24,6 +24,21 @@ const JSON_HEADERS: HeadersInit = {
 };
 type GoodreadsFetchOp = 'search' | 'search-autocomplete' | 'search-by-isbn' | 'lookup';
 
+/** `blocked` gates every page until the challenge clears; `unavailable` is specific to one request. */
+type GoodreadsFetchOutcome = 'ok' | 'blocked' | 'unavailable';
+
+interface GoodreadsHtmlFetch {
+  html: string | null;
+  outcome: GoodreadsFetchOutcome;
+  retryable?: boolean;
+}
+
+interface GoodreadsFetchContext {
+  deadline: SearchDeadline;
+  query?: string;
+  providerId?: string;
+}
+
 @Injectable()
 export class GoodreadsProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.GOODREADS;
@@ -37,40 +52,55 @@ export class GoodreadsProvider implements IdentifiableProvider {
   async search(params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const { enabled } = await this.providerConfig.getConfig().then((c) => c.goodreads);
     if (!enabled) return [];
-    const targets = params.isbn
-      ? await this.findIdByIsbn(params.isbn, params.signal).then((id): GoodreadsSearchTarget[] => (id ? [{ id }] : []))
-      : await this.searchTargets(params, params.signal);
 
-    // Detail pages are frequently gated behind the AWS WAF challenge. Try the
-    // detail scrape first (richest metadata), but once a detail page cannot be
-    // loaded at all, stop hitting it for the rest of the batch and build
-    // candidates from the autocomplete payload we already hold. A page that
-    // loads but fails to parse does not disable detail mode, so a single odd
-    // book never downgrades the whole batch.
-    const results: MetadataCandidate[] = [];
-    let detailReachable = true;
-    for (const target of targets.slice(0, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS)) {
-      let candidate: MetadataCandidate | null = null;
-      if (detailReachable) {
-        if (results.length > 0) await sleep(PROVIDER_DELAYS_MS.GOODREADS_BETWEEN_REQUESTS, params.signal);
-        const detail = await this.fetchBook(target.id, params.signal);
-        candidate = detail.candidate;
-        if (!detail.reachable && target.item) detailReachable = false;
+    // The budget is what makes retrying transient failures safe: it cancels whatever is still in
+    // flight and leaves the caller holding the candidates already assembled, instead of letting a
+    // run of retries push the whole search past the hard provider timeout and lose everything.
+    const deadline = createSearchDeadline(PROVIDER_BUDGETS_MS.GOODREADS_SEARCH, params.signal);
+    try {
+      const targets = params.isbn
+        ? await this.findIdByIsbn(params.isbn, deadline).then((id): GoodreadsSearchTarget[] => (id ? [{ id }] : []))
+        : await this.searchTargets(params, deadline);
+
+      // Try the detail scrape first, since it is the only source of a full description. A page that
+      // loads but fails to parse, or one that is briefly unavailable, only costs this one book.
+      const results: MetadataCandidate[] = [];
+      for (const target of targets.slice(0, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS)) {
+        let candidate: MetadataCandidate | null = null;
+        if (!deadline.expired()) {
+          if (results.length > 0) await sleep(PROVIDER_DELAYS_MS.GOODREADS_BETWEEN_REQUESTS, deadline.signal).catch(() => undefined);
+          // The pause between requests spends budget, so re-check before committing to a fetch.
+          if (!deadline.expired()) {
+            const detail = await this.fetchBook(target.id, deadline);
+            candidate = detail.candidate;
+            if (detail.outcome === 'blocked') throw blockedError();
+          }
+        }
+        if (!candidate && target.item) candidate = mapGoodreadsAutocompleteItem(target.item, target.id);
+        if (candidate) results.push(candidate);
       }
-      if (!candidate && target.item) candidate = mapGoodreadsAutocompleteItem(target.item, target.id);
-      if (candidate) results.push(candidate);
-    }
 
-    return results;
+      return results;
+    } finally {
+      deadline.dispose();
+    }
   }
 
   async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
     const { enabled } = await this.providerConfig.getConfig().then((c) => c.goodreads);
     if (!enabled) return null;
-    return (await this.fetchBook(providerId, signal)).candidate;
+
+    const deadline = createSearchDeadline(PROVIDER_BUDGETS_MS.GOODREADS_SEARCH, signal);
+    try {
+      const { candidate, outcome } = await this.fetchBook(providerId, deadline);
+      if (outcome === 'blocked') throw blockedError();
+      return candidate;
+    } finally {
+      deadline.dispose();
+    }
   }
 
-  private async searchTargets(params: MetadataSearchParams, signal?: AbortSignal): Promise<GoodreadsSearchTarget[]> {
+  private async searchTargets(params: MetadataSearchParams, deadline: SearchDeadline): Promise<GoodreadsSearchTarget[]> {
     const query = [params.title, params.author].filter(Boolean).join(' ');
     if (!query.trim()) return [];
 
@@ -78,27 +108,29 @@ export class GoodreadsProvider implements IdentifiableProvider {
     // Prefer the JSON autocomplete endpoint, then fall back to HTML scraping.
     const autocompleteItems: GoodreadsAutocompleteItem[] = [];
     for (const autocompleteQuery of buildAutocompleteQueries(params)) {
+      if (deadline.expired()) break;
       const autocompleteUrl = `https://www.goodreads.com/book/auto_complete?format=json&q=${encodeURIComponent(autocompleteQuery)}`;
       const autocomplete = await this.fetchJson<GoodreadsAutocompleteItem[]>(
         autocompleteUrl,
         'search-autocomplete',
         autocompleteQuery,
         undefined,
-        signal,
+        deadline.signal,
       );
       if (Array.isArray(autocomplete)) autocompleteItems.push(...autocomplete);
     }
     const autocompleteTargets = rankAutocompleteItems(autocompleteItems, params, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS);
     if (autocompleteTargets.length > 0) return autocompleteTargets;
+    if (deadline.expired()) return [];
 
     const searchUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(query)}&search_type=books`;
-    const html = await this.fetchHtml(searchUrl, 'search', query, undefined, signal);
+    const { html } = await this.fetchHtml(searchUrl, 'search', { query, deadline });
     const ids = html ? extractBookIds(html, params.title, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS) : [];
     return ids.map((id) => ({ id }));
   }
 
-  private async findIdByIsbn(isbn: string, signal?: AbortSignal): Promise<string | null> {
-    const html = await this.fetchHtml(`https://www.goodreads.com/book/isbn/${isbn}`, 'search-by-isbn', isbn, undefined, signal);
+  private async findIdByIsbn(isbn: string, deadline: SearchDeadline): Promise<string | null> {
+    const { html } = await this.fetchHtml(`https://www.goodreads.com/book/isbn/${isbn}`, 'search-by-isbn', { query: isbn, deadline });
     if (!html) return null;
     return (
       html.match(/property="og:url"\s+content="[^"]*\/book\/show\/(\d+)/)?.[1] ??
@@ -107,56 +139,80 @@ export class GoodreadsProvider implements IdentifiableProvider {
     );
   }
 
-  // `reachable` reports whether the detail page itself loaded, independent of
-  // whether it parsed into a candidate. The caller uses it to tell a WAF block
-  // apart from a book that simply did not map.
-  private async fetchBook(bookId: string, signal?: AbortSignal): Promise<{ candidate: MetadataCandidate | null; reachable: boolean }> {
+  // `outcome` reports why the detail page did not yield a candidate, independent of whether it
+  // parsed. The caller uses it to tell a bot challenge, which gates every page until it is solved,
+  // apart from a page that was briefly unavailable or simply did not map.
+  private async fetchBook(
+    bookId: string,
+    deadline: SearchDeadline,
+  ): Promise<{ candidate: MetadataCandidate | null; outcome: GoodreadsFetchOutcome }> {
     const url = `https://www.goodreads.com/book/show/${bookId}`;
-    const html = await this.fetchHtml(url, 'lookup', undefined, bookId, signal);
-    if (!html) return { candidate: null, reachable: false };
+    const { html, outcome } = await this.fetchHtml(url, 'lookup', { providerId: bookId, deadline });
+    if (!html) return { candidate: null, outcome };
     const nextData = extractNextData(html);
     const state = nextData?.props?.pageProps?.apolloState;
-    if (!state) return { candidate: null, reachable: true };
-    return { candidate: mapGoodreadsApolloState(state, bookId), reachable: true };
+    if (!state) return { candidate: null, outcome: 'ok' };
+    return { candidate: mapGoodreadsApolloState(state, bookId), outcome: 'ok' };
   }
 
-  private async fetchHtml(url: string, op: GoodreadsFetchOp, query?: string, providerId?: string, signal?: AbortSignal): Promise<string | null> {
-    const safeQuery = query ? sanitizeLogValue(query) : undefined;
-    const safeProviderId = providerId ? sanitizeLogValue(providerId) : undefined;
+  /**
+   * Retries a page Goodreads reports as temporarily unavailable. Its rate limiter answers with a
+   * bare 503 that clears within seconds, so the same URL usually succeeds on a second or third try;
+   * a bot challenge or a missing page is returned as-is, since neither improves by asking again.
+   */
+  private async fetchHtml(url: string, op: GoodreadsFetchOp, context: GoodreadsFetchContext): Promise<GoodreadsHtmlFetch> {
+    const backoffs = PROVIDER_RETRY.GOODREADS_TRANSIENT_BACKOFF_MS;
+    let last: GoodreadsHtmlFetch = { html: null, outcome: 'unavailable' };
+
+    for (let attempt = 0; attempt < PROVIDER_RETRY.GOODREADS_TRANSIENT_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        const backoff = backoffs[Math.min(attempt - 1, backoffs.length - 1)];
+        if (context.deadline.expired()) break;
+        await sleep(backoff, context.deadline.signal).catch(() => undefined);
+        if (context.deadline.expired()) break;
+      }
+
+      last = await this.attemptHtml(url, op, context, attempt + 1);
+      if (last.outcome !== 'unavailable' || !last.retryable) return last;
+    }
+
+    return last;
+  }
+
+  private async attemptHtml(url: string, op: GoodreadsFetchOp, context: GoodreadsFetchContext, attempt: number): Promise<GoodreadsHtmlFetch> {
+    const safeQuery = context.query ? sanitizeLogValue(context.query) : undefined;
+    const safeProviderId = context.providerId ? sanitizeLogValue(context.providerId) : undefined;
+    const suffix = `${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''}${attempt > 1 ? ` attempt=${attempt}` : ''}`;
     const startedAt = Date.now();
-    this.logger.log(
-      `[goodreads] [start] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''}`,
-    );
+    this.logger.log(`[goodreads] [start] op=${op}${suffix}`);
     try {
-      const res = await fetchWithThrottle(url, { headers: HEADERS, signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.SCRAPE, signal) });
+      const res = await fetchWithThrottle(url, {
+        headers: HEADERS,
+        signal: buildRequestSignal(PROVIDER_TIMEOUT_MS.SCRAPE, context.deadline.signal),
+      });
       if (!res.ok) {
+        const retryable = isTransientStatus(res.status);
         this.logger.warn(
-          `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="non-ok response"`,
+          `[goodreads] [fail] op=${op}${suffix} status=${res.status} durationMs=${Date.now() - startedAt} message="${retryable ? 'temporarily unavailable' : 'non-ok response'}"`,
         );
-        return null;
+        return { html: null, outcome: isDurableBlockStatus(res.status) ? 'blocked' : 'unavailable', retryable };
       }
       const html = await res.text();
       if (isWafChallenge(res.status, html)) {
-        this.logger.warn(
-          `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt} message="bot challenge"`,
-        );
-        return null;
+        this.logger.warn(`[goodreads] [fail] op=${op}${suffix} status=${res.status} durationMs=${Date.now() - startedAt} message="bot challenge"`);
+        return { html: null, outcome: 'blocked' };
       }
-      this.logger.log(
-        `[goodreads] [end] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
-      );
-      return html;
+      this.logger.log(`[goodreads] [end] op=${op}${suffix} status=${res.status} durationMs=${Date.now() - startedAt}`);
+      return { html, outcome: 'ok' };
     } catch (err) {
       if (err instanceof ProviderThrottleError) {
-        this.logger.warn(
-          `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} durationMs=${Date.now() - startedAt} message="throttled"`,
-        );
+        this.logger.warn(`[goodreads] [fail] op=${op}${suffix} durationMs=${Date.now() - startedAt} message="throttled"`);
         throw err;
       }
       this.logger.warn(
-        `[goodreads] [fail] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
+        `[goodreads] [fail] op=${op}${suffix} durationMs=${Date.now() - startedAt} message="${err instanceof Error ? err.message : String(err)}"`,
       );
-      return null;
+      return { html: null, outcome: 'unavailable' };
     }
   }
 
@@ -211,6 +267,25 @@ function extractNextData(html: string): GoodreadsNextData | null {
 // real page. A plain fetch cannot solve it, so treat it as a failed fetch.
 function isWafChallenge(status: number, html: string): boolean {
   return status === 202 || /awsWafCookieDomainList|AwsWafIntegration|id="challenge-container"|challenge\.js/.test(html);
+}
+
+// Goodreads sheds load with a bare 503 and no Retry-After. 429 never reaches here: fetchWithThrottle
+// turns it into a ProviderThrottleError so the shared cooldown owns it.
+function isTransientStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function isDurableBlockStatus(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+/**
+ * A bot challenge gates every page until it is solved, and a plain fetch cannot solve it. Carrying
+ * on would spend a whole bulk run hammering a wall, which is also what keeps the challenge up, so
+ * hand it to the shared cooldown and let the other providers answer until it lifts.
+ */
+function blockedError(): ProviderThrottleError {
+  return new ProviderThrottleError(undefined, 'bot challenge');
 }
 
 function buildAutocompleteQueries(params: MetadataSearchParams): string[] {

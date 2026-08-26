@@ -22,6 +22,18 @@ export const PROVIDER_LIMITS = {
  */
 export const PROVIDER_BUDGETS_MS = {
   COMICVINE_SEARCH: PROVIDER_TIMEOUT_MS.SCRAPE - 1_500,
+  GOODREADS_SEARCH: PROVIDER_TIMEOUT_MS.SCRAPE - 1_500,
+} as const;
+
+/**
+ * Goodreads rate-limits book pages with a bare 503 that carries no Retry-After and clears within a
+ * few seconds, so it is a per-request hiccup rather than a provider-wide cooldown. Retrying inside
+ * the search budget recovers most of them; a fixed longer delay would pay the same cost on every
+ * request instead of only the failing ones.
+ */
+export const PROVIDER_RETRY = {
+  GOODREADS_TRANSIENT_ATTEMPTS: 3,
+  GOODREADS_TRANSIENT_BACKOFF_MS: [1_200, 2_500],
 } as const;
 
 export const PROVIDER_DELAYS_MS = {

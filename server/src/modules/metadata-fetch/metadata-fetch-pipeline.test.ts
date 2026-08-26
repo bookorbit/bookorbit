@@ -1365,6 +1365,34 @@ describe('MetadataFetchPipeline', () => {
     expect(resolved.description).toBe('First description');
   });
 
+  // A WAF-blocked Goodreads detail page used to leave the goodreads-first description rule holding
+  // the ellipsised autocomplete snippet, which then overwrote a full description from further down
+  // the provider order.
+  it('falls through to the next provider when the leading provider yields no description', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.description = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'overwriteIfProvided',
+      };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOODREADS }, { key: MetadataProviderKey.GOOGLE }] as never);
+    fetchService.searchCandidates.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOODREADS, 'gr1', { pageCount: 404 }),
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { description: 'The whole blurb, all the way to the end.' }),
+      ),
+    );
+
+    const resolved = await pipeline.run({ title: 'Query' }, {});
+
+    expect(resolved.description).toBe('The whole blurb, all the way to the end.');
+  });
+
   it('passes through series memberships when series name and index resolve from the same provider', async () => {
     const prefs = createPreferences((fields) => {
       fields.seriesName = {
