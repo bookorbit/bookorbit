@@ -3323,7 +3323,16 @@
         "noMatch": "Nenhum destaque corresponde aos seus filtros.",
         "resetFilters": "Restaurar filtros",
         "trashEmpty": "A lixeira está vazia",
-        "noAnnotations": "Nenhuma anotação ainda. Os destaques criados na web ou em seu e-reader aparecerão aqui."
+        "noAnnotations": "Nenhuma anotação ainda. Os destaques criados na web ou em seu e-reader aparecerão aqui.",
+        "noMatchHint": "Tente uma frase mais curta, ou limpe os filtros de cores e livros.",
+        "noAnnotationsBody": "Tudo o que você marca, em qualquer livro e em qualquer dispositivo, coleciona aqui.",
+        "readHere": "Leia aqui",
+        "readHereBody": "Selecione o texto no leitor e selecione uma cor.",
+        "syncKobo": "Sincronizar com o Kobo",
+        "syncKoboBody": "Marcas feitas no dispositivo chegarão com a próxima sincronização.",
+        "syncKoreader": "Sincronizar com o KOReader",
+        "syncKoreaderBody": "O plugin faz upload de anotações com suas posições exatas.",
+        "goToLibrary": "Ir para a biblioteca"
       },
       "toast": {
         "movedToTrash": "Movido para a lixeira",
@@ -3333,8 +3342,70 @@
         "bulkTrashed": "{count, plural, =0 {Nenhuma anotação movida para a lixeira} one {Movida # anotação para a lixeira} many {Movidas # anotações para a lixeira} other {Movidas # anotações para a lixeira}}",
         "bulkRestored": "{count, plural, =0 {Nenhuma anotação restaurada} one {Restaurada # anotação} many {Restauradas # anotações} other {Restauradas # anotações}}",
         "bulkRecolored": "{count, plural, =0 {Nenhuma anotação recolorida} one {Recolorida # anotação} many {Recoloridas # anotações} other {Recoloridas # anotações}}",
-        "bulkRestyled": "{count, plural, =0 {Estilo não alterado} one {Alterado o estilo de # anotação} many {Alterado o estilo de # anotações} other {Alterado o estilo de # anotações}}"
-      }
+        "bulkRestyled": "{count, plural, =0 {Estilo não alterado} one {Alterado o estilo de # anotação} many {Alterado o estilo de # anotações} other {Alterado o estilo de # anotações}}",
+        "noteSaved": "Nota salva"
+      },
+      "railTitle": "{marks} marcas · {books} livros",
+      "lastTwelveMonths": "Últimos 12 meses",
+      "colour": "Colorido",
+      "whereFrom": "De onde eles vieram",
+      "theShelf": "A prateleira",
+      "devices": "Dispositivos",
+      "allBooks": "Todos os {count} livros",
+      "behindCount": "{count, plural, one {# missing} other {# missing}}",
+      "busiestWeek": "Semana de compra",
+      "longestQuiet": "Escopo de silêncio mais longo",
+      "mostMarked": "Mais marcados",
+      "weekCount": "{count, plural, one {# semana} other {# semanas}}",
+      "anchorsUnplaced": "{count, plural, one {# âncora não pôde ser colocado} other {# âncoras não puderam ser colocados}}",
+      "reviewThem": "Revisar",
+      "anchorLost": "Âncora perdida",
+      "anchorRepaired": "Reparado",
+      "notes": "Anotações",
+      "review": "Revisão",
+      "viewLabel": "Grupo e ordenação",
+      "views": {
+        "newest": "Mais recente primeiro",
+        "oldest": "Mais antigos primeiro",
+        "book": "Por Livro",
+        "color": "Por cor",
+        "source": "Por fonte"
+      },
+      "matchCount": "{shown} de {total}",
+      "moreActions": "Mais ações",
+      "loadMore": "{count, plural, one {Move # book} many {Move # books} other {Move # books}}",
+      "openBook": "Abrir o livro",
+      "noteLabel": "Nota",
+      "yourNote": "Sua nota",
+      "notePlaceholder": "Diga por que isso importa.",
+      "openAtThisPage": "Abrir nesta página",
+      "positionAndSync": "Posição e sincronização",
+      "loadFailed": "Não foi possível carregar seus destaques. Tente novamente daqui a pouco.",
+      "chips": {
+        "dateBetween": "{from} até {to}",
+        "dateFrom": "De {from}",
+        "dateUntil": "Até {to}"
+      },
+      "activitySummary": "{count, plural, one {# destaque entre {from} e {to}} other {# destaques entre {from} e {to}}}",
+      "book": "Livro",
+      "needsReview": "Requer revisão"
+    },
+    "sources": {
+      "web": "Web",
+      "koreader": "KOReader",
+      "kobo": "Kobo"
+    },
+    "colors": {
+      "yellow": "Amarelo",
+      "green": "Verde",
+      "blue": "Azul",
+      "pink": "Rosa",
+      "orange": "Laranja",
+      "red": "Vermelho",
+      "olive": "Oliva",
+      "cyan": "Ciano",
+      "purple": "Roxo",
+      "gray": "Cinza"
     }
   },
   "audit": {
@@ -3706,7 +3777,15 @@
       "deleteAuthor": "Excluir Autor"
     },
     "filters": {
-      "allLibraries": "Todas as Bibliotecas"
+      "allLibraries": "Todas as Bibliotecas",
+      "chips": {
+        "groupLabel": "Filtrar autores",
+        "all": "Tudo",
+        "noPortrait": "Sem retratos",
+        "multipleBooks": "2+ livros",
+        "recentlyAdded": "Adicionado esta semana",
+        "noSortName": "Sem nome da ordenação"
+      }
     },
     "header": {
       "never": "Nunca",
@@ -3853,6 +3932,16 @@
         "deleteSuccess": "Autor excluído; {books} livros afetados",
         "deleteFailed": "Falha ao excluir o autor"
       }
+    },
+    "portrait": {
+      "fromTheirBook": "Capa de um de seus livros; nenhum retrato no arquivo"
+    },
+    "index": {
+      "bookCount": "{count, plural, =0 {sem livros} one {# livro} other {# livros}}",
+      "rowLabel": "{name}, {count, plural, =0 {sem livros} one {# livro} other {# livros}}",
+      "actionsFor": "Ações para {name}",
+      "refreshing": "Atualizando metadados do {name}",
+      "deleting": "Excluindo {name}"
     }
   },
   "book": {
@@ -3902,7 +3991,13 @@
       "action": "Baixar",
       "audiobookZip": "Audiolivro (ZIP)",
       "allFormatsZip": "Todos os formatos (ZIP)",
-      "primaryOnlyZip": "Apenas primário (ZIP)"
+      "primaryOnlyZip": "Apenas primário (ZIP)",
+      "preparing": "Preparando o download...",
+      "preparingExport": "Preparando {count, plural, one {# livro} other {# livros}} para baixar...",
+      "progressPercent": "Baixando {percent} do {total}",
+      "progressBytes": "Baixando {transferred}",
+      "failed": "Falha no download",
+      "exportFailed": "Falha na exportação"
     },
     "sort": {
       "moveUp": "Mover para cima",
@@ -4855,6 +4950,17 @@
           "regroup": "Reagrupar a transmissão",
           "copy": "Copiar orçamento",
           "reader": "Abrir no leitor"
+        },
+        "railTitle": "{marks} marcas · {chapters} capítulos",
+        "whenMarked": "Quando eles foram marcados",
+        "chapters": "Capítulos",
+        "noChapter": "Sem Capítulo",
+        "views": {
+          "position": "Ordem de leitura",
+          "newest": "Mais recente primeiro",
+          "oldest": "Mais antigos primeiro",
+          "colour": "Por cor",
+          "source": "Por fonte"
         }
       },
       "readingLog": {
@@ -5751,7 +5857,17 @@
         "columnsHint": "Use o painel de visibilidade de colunas no cabeçalho da tabela para mostrar ou ocultar colunas.",
         "coverShape": "Formato da capa",
         "circle": "Círculo",
-        "square": "Quadrado"
+        "square": "Quadrado",
+        "rowDensity": "Altura da linha",
+        "densityCompact": "Compacta",
+        "densityComfortable": "Cosy",
+        "densityRoomy": "Espaçosa",
+        "coverFallback": "Usar capas de livros para retratos ausentes"
+      },
+      "viewModes": {
+        "grid": "Exibição em grade",
+        "list": "Exibição em lista",
+        "table": "Visualização em tabela"
       }
     },
     "iconPicker": {
@@ -7459,7 +7575,10 @@
       "ownedOfExpected": "{owned} da {expected} na biblioteca"
     },
     "gaps": {
-      "label": "Possíveis lacunas:"
+      "label": "Possíveis lacunas:",
+      "missingCount": "{count, plural, one {# missing} other {# missing}}",
+      "missingList": "{list} Faltando",
+      "previewMore": "{shown} {count}"
     },
     "filters": {
       "title": "Filtros de Séries",
@@ -7489,7 +7608,10 @@
         "bookCount": "Contagem de Livros",
         "recentAdditions": "Adições Recentes",
         "readingProgress": "Progresso de Leitura"
-      }
+      },
+      "clearSearch": "Limpar busca",
+      "noMatchHint": "Tente outra biblioteca ou limpe o que é definido.",
+      "emptyHint": "As séries aparecem quando seus livros carregam metadados da série."
     },
     "detail": {
       "pageTitle": "Série",
@@ -7530,6 +7652,66 @@
         "ascending": "Crescente",
         "descending": "Decrescente"
       }
+    },
+    "authorsPlus": "{authors} +{count}",
+    "track": {
+      "readCount": "{count, plural, one {# field} other {# fields}}",
+      "readingCount": "{count, plural, one {# livro} many {# livros} other {# livros}}",
+      "unreadCount": "{count, plural, one {# field} other {# fields}}",
+      "missingCount": "{count, plural, one {# missing} other {# missing}}",
+      "slotMissing": "{number} não está na biblioteca",
+      "untitled": "Sem título"
+    },
+    "legend": {
+      "read": "Lido",
+      "reading": "Lendo",
+      "unread": "Na biblioteca",
+      "missing": "Ausente"
+    },
+    "status": {
+      "label": "Filtrar séries por status de leitura",
+      "all": "Tudo",
+      "reading": "Lendo",
+      "unread": "Não Lido",
+      "complete": "Concluído",
+      "gaps": "Lacunas",
+      "read": "Lido",
+      "inProgress": "Em progresso",
+      "hasGaps": "Possui lacunas",
+      "notStarted": "Não iniciado"
+    },
+    "index": {
+      "columnSeries": "Séries",
+      "columnVolumes": "Volumes",
+      "columnRead": "Lido",
+      "columnNext": "A seguir",
+      "columnAdded": "Adicionado",
+      "percent": "{value} %",
+      "captionReading": "{base} · {count, plural, one {# in progress} other {# in progress}}",
+      "finished": "Leia o fim para o fim",
+      "reading": "Lendo",
+      "next": "Próximo",
+      "start": "Iniciar"
+    },
+    "grouping": {
+      "label": "Agrupar por",
+      "none": "Sem agrupamento",
+      "letter": "Por letra",
+      "library": "Por biblioteca",
+      "status": "Por estado"
+    },
+    "libraries": {
+      "more": "+{count}"
+    },
+    "card": {
+      "oneVolume": "Volume único",
+      "oneVolumeShort": "1 vol",
+      "volumeCount": "{count, plural, one {# arquivo} other {# arquivos}}",
+      "readSummary": "{base} · {read} lido",
+      "publishedOf": "{owned} de {total} publicado",
+      "complete": "Concluído",
+      "moreVolumes": "{count, plural, one {# arquivo} other {# arquivos}}",
+      "label": "{name}, {read} de {total} volumes lidos"
     }
   },
   "smartScope": {

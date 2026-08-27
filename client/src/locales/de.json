@@ -2674,7 +2674,19 @@
         "deviceRemoved": "Gerät entfernt",
         "removeDeviceFailed": "Entfernen des Geräts fehlgeschlagen",
         "removeDeviceConfirmTitle": "{device} entfernen?",
-        "removeDeviceConfirmBody": "Dies löscht dauerhaft den synchronisierten Fortschritt, die Leseaktivität und alle nicht zugeordneten Bucheinträge dieses Geräts, die von keinem anderen Gerät mehr gemeldet werden. Wenn das Gerät später erneut synchronisiert, erscheint es wieder als neuer Eintrag."
+        "removeDeviceConfirmBody": "Dies löscht dauerhaft den synchronisierten Fortschritt, die Leseaktivität und alle nicht zugeordneten Bucheinträge dieses Geräts, die von keinem anderen Gerät mehr gemeldet werden. Wenn das Gerät später erneut synchronisiert, erscheint es wieder als neuer Eintrag.",
+        "retire": "Archivieren",
+        "retiring": "Archiviert...",
+        "restore": "Wiederherstellen",
+        "restoring": "Wiederherstellen...",
+        "deleteSyncedData": "Daten löschen",
+        "deletingSyncedData": "Lösche...",
+        "deviceRetired": "Gerät Archiviert",
+        "deviceRestored": "Gerät wiederhergestellt",
+        "retireDeviceFailed": "Gerät kann nicht archiviert werden",
+        "restoreDeviceFailed": "Gerät konnte nicht wiederhergestellt werden",
+        "retiredDevices": "{count, plural, one {# Gerät Archiviert} other {# Geräte Archiviert}}",
+        "retiredOnLabel": "Archiviert"
       },
       "opds": {
         "title": "OPDS",
@@ -2741,6 +2753,14 @@
         "book-dock": "Book Dock",
         "maintenance": "Wartung",
         "audit-log": "Prüfprotokoll"
+      }
+    },
+    "nav": {
+      "title": "Einstellungen",
+      "descriptions": {
+        "appearanceLayout": "Standard Bibliotheksansicht, Dichte und Abstand.",
+        "appearanceBehavior": "Wie die Bibliothek reagiert, wie Sie suchen und sortieren.",
+        "appearanceLanguage": "Interface-Sprache und regionale Formate."
       }
     }
   },
@@ -3025,7 +3045,45 @@
       },
       "pagination": {
         "label": "Benutzer-Seitennavigation",
-        "page": "Seite {page} von {totalPages}"
+        "page": "Seite {page} von {totalPages}",
+        "showing": "{shown} von {total} Konten anzeigen"
+      },
+      "editUserAria": "{name} bearbeiten",
+      "resetPasswordAria": "Passwort für {name} zurücksetzen",
+      "deleteUserAria": "{name} löschen",
+      "moreActionsAria": "Weitere Aktionen für {name}",
+      "headerSummary": "{count, plural, =0 {Keine Konten} one {# Konto} other {# Konten}} · {admins} mit Administratorzugriff",
+      "noEmail": "Keine Adresse",
+      "editAccount": "Account bearbeiten",
+      "cardMeta": "{access} · {libraries} · {lastActive}",
+      "accessTier": {
+        "superuser": "Superuser",
+        "admin": "Administrator",
+        "standard": "Standard",
+        "custom": "Benutzerdefiniert",
+        "none": "Kein Zugriff"
+      },
+      "libraries": {
+        "all": "Alle {total}",
+        "some": "{granted} von {total}"
+      },
+      "statusLocked": "Gesperrt",
+      "status": {
+        "never": "Nie",
+        "neverSignedIn": "Nie angemeldet",
+        "defaultPassword": "Standardpasswort",
+        "contentFiltered": "Inhalt gefiltert",
+        "unlocksIn": "Freigeschaltet {when}"
+      },
+      "attention": {
+        "title": "Erfordert Aufmerksamkeit",
+        "count": "{count, plural, one {# Konto} other {# Konten}}",
+        "filter": "{count, plural, one {# benötigt Aufmerksamkeit} other {# benötigen Aufmerksamkeit}}",
+        "more": "{count} weitere nicht hier angezeigt",
+        "reason": {
+          "locked": "{name} ist nach zu vielen fehlgeschlagenen Anmeldungen gesperrt",
+          "neverSignedIn": "{name} hat sich noch nie angemeldet"
+        }
       }
     }
   },
@@ -3162,7 +3220,15 @@
         "bulkRestored": "{count, plural, =0 {Keine Markierungen wiederhergestellt} one {# Markierung wiederhergestellt} other {# Markierungen wiederhergestellt}}",
         "bulkRecolored": "{count, plural, =0 {Farbe für keine Markierung geändert} one {Farbe für # Markierung geändert} other {Farbe für # Markierungen geändert}}",
         "bulkRestyled": "{count, plural, =0 {Stil für keine Markierung geändert} one {Stil für # Markierung geändert} other {Stil für # Markierungen geändert}}"
-      }
+      },
+      "views": {
+        "color": "Nach Farbe",
+        "source": "Nach Quelle"
+      },
+      "matchCount": "{shown} von {total}",
+      "moreActions": "Weitere Aktionen",
+      "loadMore": "{count, plural, one {Lade 1 mehr} other {Lade # mehr}}",
+      "openBook": "Buch öffnen"
     }
   },
   "audit": {

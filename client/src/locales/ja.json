@@ -1050,6 +1050,7 @@
         "scanStartFailed": "\"{name}\" のスキャンを開始できませんでした",
         "refreshCoversFailed": "\"{name}\" のカバーを更新できませんでした",
         "scanStartedAll": "すべてのライブラリのスキャンが開始されました",
+        "librariesFailedToStart": "{count, plural, =0 {開始に失敗したライブラリはありません} one {# ライブラリの開始に失敗しました} other {# ライブラリの開始に失敗しました}}",
         "scansStartFailed": "スキャンの開始に失敗しました",
         "libraryCreated": "ライブラリ \"{name}\" を作成しました",
         "libraryUpdated": "ライブラリ \"{name}\" が更新されました",
@@ -2723,7 +2724,8 @@
         "failedToDelete": "削除に失敗",
         "bulkTrashed": "{count, plural, =0 {アノテーションをゴミ箱に移動しました} one {アノテーションをゴミ箱に移動しました} other {アノテーションをゴミ箱に移動しました}}",
         "bulkRestored": "{count, plural, =0 {ノーアノテーション} one {リストアされた#アノテーション} other {リストアされた#アノテーション}}",
-        "bulkRecolored": "{count, plural, =0 {ノーアノテーションを再着色しました} one {recolored # annotation} other {recolored # annotations}}"
+        "bulkRecolored": "{count, plural, =0 {ノーアノテーションを再着色しました} one {recolored # annotation} other {recolored # annotations}}",
+        "bulkRestyled": "{count, plural, =0 {リセットされたアノテーションはありません} one {リセットされた # アノテーション} other {リセットされた # アノテーション}}"
       }
     }
   },
@@ -5087,6 +5089,7 @@
       "template": "テンプレート",
       "default": "デフォルト",
       "send": "送信",
+      "queued": "{count, plural, =0 {キューに入れられたメールはありません} one {1 つのメールがキューに入れられました} other {# 件のメールがキューに入れられました}}",
       "failed": "送信に失敗しました"
     }
   },
@@ -6585,6 +6588,7 @@
       },
       "confirmDialog": {
         "title": "一括リネームを確認",
+        "body": "{count, plural, =0 {ディスク上の # 本の名前を変更します。衝突やエラーのあるファイルはスキップされます。この操作は元に戻せません。} one {ディスク上の # 本の名前を変更します。衝突やエラーのあるファイルはスキップされます。この操作は元に戻せません。} other {ディスク上の # 冊のブックの名前が変更されます。衝突またはエラーのあるファイルはスキップされます。この操作は元に戻せません。}}",
         "renameButton": "{count, plural, =0 {リネーム # 本} one {リネーム # 本} other {リネーム # 本}}"
       }
     },

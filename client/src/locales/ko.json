@@ -4376,6 +4376,7 @@
         "saveInProgress": "진행도 저장",
         "writeManualLibraryDisabled": "파일에 메타데이터를 기록하고 디스크에서 이름을 변경합니다. 이 라이브러리에서는 자동 다시 쓰기 기능이 비활성화되어 있습니다.",
         "writeManualTooltip": "{fields}을(를) {target} 내부에 작성하고 디스크에서 이름을 변경합니다.",
+        "applyResult": "{skipped}, {updated}",
         "skippedLockedFields": "{count, plural, =0 {잠긴 필드 0개 건너뜀} one {잠긴 필드 #개 건너뜀} other {잠긴 필드 #개 건너뜀}}",
         "updatedFields": "{count, plural, =0 {0개 필드 업데이트됨} one {1개 필드 업데이트됨} other {#개 필드 업데이트됨}}",
         "wroteFieldsToFile": "{fields}을(를) 파일에 작성했습니다.",
@@ -6542,6 +6543,7 @@
       "title": "중복 타겟 매칭 해결",
       "explanation": "각 타겟 도서별로 보존할 소스 도서 하나를 선택하세요. 가장 유력한 매칭이 하나일 경우, 추천 선택지는 미리 선택되어 있습니다.",
       "remainingGroups": "남은 그룹:",
+      "ofCount": "(전체 {total}개)",
       "targetBookId": "타겟 도서 #{id}",
       "recommended": "추천",
       "resolveButton": "{count, plural, =0 {#개 중복 해결} one {#개 중복 해결} other {#개 중복 해결}}",
@@ -6622,7 +6624,8 @@
       "unresolvedBooksExplanation": "이 책들은 소스에는 존재하지만, 사용자의 라이브러리에 있는 어떤 책과도 일치하는 항목을 찾을 수 없었습니다.",
       "mappedUsers": "매핑된 사용자 ({count})",
       "mappedUsersExplanation": "사용자별 총계는 마이그레이션 계획과 함께 캐시된 모의 테스트 미리보기에서 가져옵니다.",
-      "coverFailures": "{count}개의 표지를 가져오지 못했습니다. 상세 실패 내역은 저장되지 않습니다."
+      "coverFailures": "{count}개의 표지를 가져오지 못했습니다. 상세 실패 내역은 저장되지 않습니다.",
+      "userPreviewCounts": "{statuses}개 상태, {progress}개 진행 항목, {sessions}개 독서 세션, {bookmarks}개 북마크, {annotations}개 메모, {collections}개 컬렉션 항목"
     },
     "unresolvedReason": {
       "noTitleAuthorMatch": "제목이나 저자가 일치하는 책을 찾을 수 없음",
@@ -7535,6 +7538,7 @@
       },
       "deleteDialog": {
         "title": "중복 도서를 영구적으로 삭제하시겠습니까?",
+        "description": "{count, plural, =0 {선택된 책 #권과 파일이 영구적으로 삭제됩니다.} one {선택된 책 #권과 파일이 영구적으로 삭제됩니다.} other {선택된 책 #권과 파일이 영구적으로 삭제됩니다.}}",
         "warning": "메타데이터, 컬렉션, 독서 데이터 및 기기 상태는 유지되는 책으로 전송되지 않습니다. 다른 사용자의 관련 데이터도 제거됩니다.",
         "confirm": "{count, plural, =0 {책 #권 삭제} one {책 #권 삭제} other {책 #권 삭제}}",
         "success": "{count, plural, =0 {삭제된 책이 없습니다.} one {중복 도서 #권이 삭제되었습니다.} other {중복 도서 #권이 삭제되었습니다.}}"

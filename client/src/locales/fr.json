@@ -3323,7 +3323,16 @@
         "noMatch": "Aucun passage surligné ne correspond à vos filtres.",
         "resetFilters": "Réinitialiser les filtres",
         "trashEmpty": "La corbeille est vide",
-        "noAnnotations": "Aucun passage surligné pour l'instant. Vos futurs passages surlignés et notes apparaîtront ici."
+        "noAnnotations": "Aucun passage surligné pour l'instant. Vos futurs passages surlignés et notes apparaîtront ici.",
+        "noMatchHint": "Essayez une expression plus courte, ou effacez les filtres de couleur et de livre.",
+        "noAnnotationsBody": "Tout ce que vous marquez, dans n'importe quel livre et sur n'importe quel appareil, se retrouve ici.",
+        "readHere": "Lisez ici",
+        "readHereBody": "Sélectionnez du texte dans le lecteur et choisissez une couleur.",
+        "syncKobo": "Synchroniser une Kobo",
+        "syncKoboBody": "Les marques faites sur l'appareil arrivent à la synchronisation suivante.",
+        "syncKoreader": "Synchroniser KOReader",
+        "syncKoreaderBody": "Le plugin envoie les annotations avec leur position.",
+        "goToLibrary": "Aller à la bibliothèque"
       },
       "toast": {
         "movedToTrash": "Déplacé vers la corbeille",
@@ -3333,8 +3342,70 @@
         "bulkTrashed": "{count, plural, =0 {Aucune annotation déplacée vers la corbeille} one {Déplacé # annotation à la corbeille} other {Déplacé # annotations à la corbeille} many {Déplacé # annotations à la corbeille}}",
         "bulkRestored": "{count, plural, =0 {Restauré sans annotations} one {Restauré # annotation} other {Restauré # annotations} many {Restauré # annotations}}",
         "bulkRecolored": "{count, plural, =0 {Recoloré sans annotations} one {Recoloré # annotation} other {Recoloré # annotations} many {Recoloré # annotations}}",
-        "bulkRestyled": "{count, plural, =0 {Aucune annotation restylée} one {# annotation restylée} other {# annotations restylées} many {# annotations restylées}}"
-      }
+        "bulkRestyled": "{count, plural, =0 {Aucune annotation restylée} one {# annotation restylée} other {# annotations restylées} many {# annotations restylées}}",
+        "noteSaved": "Remarque enregistrée"
+      },
+      "railTitle": "{marks} marques · {books} livres",
+      "lastTwelveMonths": "12 derniers mois",
+      "colour": "Couleur",
+      "whereFrom": "Provenance",
+      "theShelf": "L'étagère",
+      "devices": "Appareils",
+      "allBooks": "Les {count} livres",
+      "behindCount": "{count, plural, one {# en retard} other {# en retard} many {# en retard}}",
+      "busiestWeek": "Semaine la plus chargée",
+      "longestQuiet": "Plus longue période creuse",
+      "mostMarked": "Le plus marqué",
+      "weekCount": "{count, plural, one {# semaine} other {# semaines} many {# semaines}}",
+      "anchorsUnplaced": "{count, plural, one {# ancre n'a pas pu être placée} other {# ancres n'ont pas pu être placées} many {# ancres n'ont pas pu être placées}}",
+      "reviewThem": "Les vérifier",
+      "anchorLost": "Ancre perdue",
+      "anchorRepaired": "Réparée",
+      "notes": "Remarques",
+      "review": "À vérifier",
+      "viewLabel": "Grouper et trier",
+      "views": {
+        "newest": "Plus récents d'abord",
+        "oldest": "Plus anciens d'abord",
+        "book": "Par livre",
+        "color": "Par couleur",
+        "source": "Par provenance"
+      },
+      "matchCount": "{shown} sur {total}",
+      "moreActions": "Plus d'actions",
+      "loadMore": "{count, plural, one {En charger 1 de plus} other {En charger # de plus} many {En charger # de plus}}",
+      "openBook": "Ouvrir le livre",
+      "noteLabel": "Remarque",
+      "yourNote": "Votre remarque",
+      "notePlaceholder": "Dites pourquoi cela comptait.",
+      "openAtThisPage": "Ouvrir à cette page",
+      "positionAndSync": "Position et synchronisation",
+      "loadFailed": "Impossible de charger vos passages surlignés. Réessayez dans un instant.",
+      "chips": {
+        "dateBetween": "de {from} à {to}",
+        "dateFrom": "À partir de {from}",
+        "dateUntil": "Jusqu'à {to}"
+      },
+      "activitySummary": "{count, plural, one {# passage surligné entre {from} et {to}} other {# passages surlignés entre {from} et {to}} many {# passages surlignés entre {from} et {to}}}",
+      "book": "Livre",
+      "needsReview": "À vérifier"
+    },
+    "sources": {
+      "web": "Web",
+      "koreader": "KOReader",
+      "kobo": "Kobo"
+    },
+    "colors": {
+      "yellow": "Jaune",
+      "green": "Vert",
+      "blue": "Bleu",
+      "pink": "Rose",
+      "orange": "Orange",
+      "red": "Rouge",
+      "olive": "Olive",
+      "cyan": "Cyan",
+      "purple": "Violet",
+      "gray": "Gris"
     }
   },
   "audit": {
@@ -3706,7 +3777,15 @@
       "deleteAuthor": "Supprimer l'auteur"
     },
     "filters": {
-      "allLibraries": "Toutes les bibliothèques"
+      "allLibraries": "Toutes les bibliothèques",
+      "chips": {
+        "groupLabel": "Filtrer les auteurs",
+        "all": "Tous",
+        "noPortrait": "Sans portrait",
+        "multipleBooks": "2 livres et plus",
+        "recentlyAdded": "Ajoutés cette semaine",
+        "noSortName": "Sans nom de tri"
+      }
     },
     "header": {
       "never": "Jamais",
@@ -3853,6 +3932,16 @@
         "deleteSuccess": "Auteur supprimé ; {books} livres concernés",
         "deleteFailed": "Échec de la suppression de l'auteur"
       }
+    },
+    "portrait": {
+      "fromTheirBook": "Couverture d'un de ses livres ; aucun portrait disponible"
+    },
+    "index": {
+      "bookCount": "{count, plural, =0 {pas de livres} one {# livre} other {# livres} many {# livres}}",
+      "rowLabel": "{name}, {count, plural, =0 {pas de livres} one {# livre} other {# livres} many {# livres}}",
+      "actionsFor": "Actions pour {name}",
+      "refreshing": "Actualisation des métadonnées de {name}",
+      "deleting": "Suppression de {name}"
     }
   },
   "book": {
@@ -4090,7 +4179,7 @@
       "reset": "Réinitialiser",
       "tableDensity": "Densité du tableau",
       "density": {
-        "compact": "Compacte",
+        "compact": "Compact",
         "comfortable": "Confortable",
         "roomy": "Spacieux"
       },
@@ -4598,10 +4687,10 @@
         "viewSyncLog": "Afficher le journal de synchronisation",
         "noWriteHistory": "Pas encore d'écriture d'historique.",
         "fieldsWritten": "{count, plural, =0 {pas de champs} one {un champ} other {# champs} many {# champs}}",
-        "track": "Suivre {number}",
+        "track": "Piste {number}",
         "primary": "Principal",
         "read": "Lire",
-        "play": "Jouer",
+        "play": "Écouter",
         "peek": "Aperçu",
         "download": "Télécharger",
         "moreActions": "Plus de propositions",
@@ -4630,6 +4719,66 @@
         "backToFolder": "Revenir au dossier",
         "copyPath": "Copier le chemin complet",
         "pathCopied": "Chemin copié dans le presse-papiers",
+        "resume": "Reprendre",
+        "audiobook": "Livre audio",
+        "writeTarget": "Cible d'écriture",
+        "enabled": "Activée",
+        "disabled": "Désactivée",
+        "notSet": "non défini",
+        "sortAdded": "Ajout",
+        "formatCount": "{count, plural, one {# format} other {# formats} many {# formats}}",
+        "trackCount": "{count, plural, one {# piste} other {# pistes} many {# pistes}}",
+        "formatsInFolder": "{count, plural, one {# format ici} other {# formats ici} many {# formats ici}}",
+        "compositionAria": "Répartition de la taille du dossier par format",
+        "percentRead": "{percent} lu",
+        "trackOf": "Piste {track} sur {total}",
+        "groups": {
+          "ebook": "Ebook",
+          "document": "Document",
+          "comic": "Bande dessinée",
+          "audio": "Audio",
+          "extras": "Suppléments"
+        },
+        "roles": {
+          "primary": "Principal",
+          "content": "Autre version",
+          "supplement": "Complément",
+          "cover": "Couverture"
+        },
+        "reader": {
+          "none": "Aucun lecteur",
+          "ebook": "Lecteur d'ebooks",
+          "document": "Lecteur PDF",
+          "comic": "Lecteur de bandes dessinées",
+          "audio": "Lecteur audio"
+        },
+        "spec": {
+          "format": "Format",
+          "role": "Rôle",
+          "size": "Taille",
+          "length": "Durée",
+          "added": "Ajouté le",
+          "indexed": "Indexé",
+          "opensIn": "S'ouvre dans",
+          "writeBack": "Réécriture",
+          "track": "Piste",
+          "targetFile": "Fichier cible",
+          "notWritten": "Non réécrit"
+        },
+        "duration": {
+          "hoursMinutes": "{hours} h {minutes} min",
+          "minutes": "{minutes} min",
+          "minutesSeconds": "{minutes} min {seconds} s",
+          "seconds": "{seconds} s"
+        },
+        "positionHeading": "Votre position dans cet exemplaire",
+        "copiesStarted": "{started} exemplaires commencés sur {total}",
+        "nothingStarted": "Rien de commencé",
+        "throughFile": "{percent} de ce fichier lu",
+        "notOpened": "Jamais ouvert",
+        "lastRead": "Dernière lecture {time}",
+        "noPosition": "Aucune position de lecture enregistrée",
+        "trackPositionHeading": "Position de cette piste",
         "totalRuntime": "{duration} totale",
         "startsAt": "Commence à {time}",
         "trackLength": "{duration} totale",
@@ -4680,7 +4829,133 @@
           "hint": "Sélectionnez du texte pendant la lecture pour créer des passages surlignés"
         },
         "uncategorized": "Non classé",
-        "paginationUnit": "passages surlignés"
+        "paginationUnit": "passages surlignés",
+        "rail": {
+          "title": "Marques",
+          "unit": "{count, plural, one {passage surligné} other {passages surlignés} many {passages surlignés}}",
+          "withNotes": "portent une remarque",
+          "chaptersMarked": "chapitres marqués",
+          "ofChaptersMarked": "sur {total} chapitres marqués",
+          "colour": "Couleur",
+          "showOnly": "Afficher seulement {colour}",
+          "source": "Provenance",
+          "health": "État des positions",
+          "needsAttention": "{count, plural, one {# à vérifier} other {# à vérifier} many {# à vérifier}}",
+          "anchorLost": "{count, plural, one {une a perdu son ancre quand le fichier a changé} other {# ont perdu leur ancre quand le fichier a changé} many {# ont perdu leur ancre quand le fichier a changé}}",
+          "reAnchored": "{count, plural, one {une a été réancrée automatiquement} other {# ont été réancrées automatiquement} many {# ont été réancrées automatiquement}}",
+          "reviewPositions": "Vérifier les positions",
+          "span": "Étendue",
+          "firstMark": "Première marque",
+          "lastMark": "Dernière marque",
+          "markingDays": "Jours de marquage",
+          "exportCount": "Exporter {count}"
+        },
+        "row": {
+          "select": "Sélectionner ce passage surligné",
+          "showMore": "Afficher plus",
+          "showLess": "Afficher moins",
+          "note": "Remarque",
+          "addNote": "Ajouter une remarque",
+          "page": "p. {page}",
+          "anchorLost": "Ancre perdue",
+          "reAnchored": "Réancrée"
+        },
+        "stream": {
+          "title": "Le flux",
+          "searchPlaceholder": "Rechercher parmi {count} passages surlignés et remarques",
+          "all": "Tout",
+          "notes": "Remarques",
+          "review": "À vérifier",
+          "density": "Basculer entre lignes confortables et compactes",
+          "matchCount": "{shown} sur {total} correspondent",
+          "textChip": "texte « {query} »",
+          "marks": "{count, plural, one {# marque} other {# marques} many {# marques}}",
+          "loadingMore": "Chargement en cours"
+        },
+        "bulk": {
+          "selected": "{count} sélectionnés",
+          "selectAll": "Sélectionner les {count}",
+          "recolour": "Recolorer la sélection",
+          "recolourTo": "Recolorer en {colour}",
+          "clear": "Effacer la sélection"
+        },
+        "index": {
+          "title": "Index",
+          "groupBy": "Grouper le flux par",
+          "byChapter": "Chapitres",
+          "byColour": "Couleurs",
+          "byDay": "Jours"
+        },
+        "activity": {
+          "title": "Activité de marquage",
+          "days": "{count, plural, one {# jour} other {# jours} many {# jours}}",
+          "showAll": "Afficher les {count} jours",
+          "showFewer": "Afficher moins"
+        },
+        "inspector": {
+          "title": "Détail du passage surligné",
+          "back": "Retour à l'index",
+          "counter": "Marque {position} sur {total}",
+          "previous": "Marque précédente",
+          "next": "Marque suivante",
+          "notePrompt": "Pourquoi celui-ci comptait-il ? Les remarques sont consultables et suivent l'export.",
+          "style": "Style",
+          "position": "Position et synchronisation",
+          "openHere": "Ouvrir ici"
+        },
+        "band": {
+          "title": "Où sont les marques",
+          "subtitle": "chaque chapitre marqué dans l'ordre de lecture, avec la couleur que vous avez choisie",
+          "barTitle": "{chapter}, {count} marques",
+          "start": "Début",
+          "densest": "Le plus dense",
+          "marks": "{count, plural, one {# marque} other {# marques} many {# marques}}",
+          "longestGap": "Plus longue portion sans marque",
+          "chapters": "{count, plural, one {# chapitre} other {# chapitres} many {# chapitres}}",
+          "end": "Fin"
+        },
+        "emptyStage": {
+          "title": "Aucun passage surligné dans {title}",
+          "body": "Les passages surlignés arrivent de trois endroits, et cette page les rassemble tous sur une seule colonne.",
+          "openReader": "Ouvrir le lecteur",
+          "web": {
+            "title": "Lisez ici",
+            "body": "Sélectionnez du texte dans le lecteur intégré et choisissez une couleur."
+          },
+          "kobo": {
+            "title": "Synchroniser une Kobo",
+            "body": "Les passages surlignés faits sur l'appareil arrivent à la synchronisation suivante."
+          },
+          "koreader": {
+            "title": "Synchroniser KOReader",
+            "body": "Le plugin envoie les annotations avec leur position exacte."
+          }
+        },
+        "shortcuts": {
+          "title": "Clavier",
+          "description": "Raccourcis clavier de la liste des passages surlignés.",
+          "move": "Marque suivante / précédente",
+          "open": "Ouvrir l'inspecteur",
+          "back": "Retour à l'index",
+          "search": "Rechercher",
+          "note": "Écrire une remarque",
+          "recolour": "Recolorer",
+          "select": "Sélectionner cette marque",
+          "regroup": "Regrouper le flux",
+          "copy": "Copier la citation",
+          "reader": "Ouvrir dans le lecteur"
+        },
+        "railTitle": "{marks} marques · {chapters} chapitres",
+        "whenMarked": "Quand elles ont été marquées",
+        "chapters": "Chapitres",
+        "noChapter": "Sans chapitre",
+        "views": {
+          "position": "Dans l'ordre de lecture",
+          "newest": "Plus récents d'abord",
+          "oldest": "Plus anciens d'abord",
+          "colour": "Par couleur",
+          "source": "Par provenance"
+        }
       },
       "readingLog": {
         "resetReadingState": "Réinitialiser le statut de lecture",
@@ -4716,7 +4991,84 @@
           "colReached": "Atteint",
           "colSource": "Source",
           "colFormat": "Format",
-          "gapDays": "{count, plural, one {# jour sans lire} other {# jours sans lire}}"
+          "gapDays": "{count, plural, one {# jour sans lire} other {# jours sans lire}}",
+          "attemptBegan": "Début de la tentative {index}",
+          "attemptOutsideAny": "Hors de toute tentative",
+          "empty": "Aucune session enregistrée",
+          "emptyHint": "Ouvrez le livre dans le lecteur, synchronisez un appareil ou ajoutez une session à la main."
+        },
+        "attempts": {
+          "title": "Tentatives",
+          "none": "aucune",
+          "ordinal": "Tentative {index}",
+          "addPast": "Ajouter une tentative passée",
+          "reread": "Relire",
+          "rereadPrompt": "Démarrer une nouvelle tentative de lecture ?",
+          "rereadResetProgress": "Remet la position de lecture au début. Les appareils synchronisés peuvent recevoir cette remise à zéro.",
+          "rereadConfirm": "Démarrer la relecture",
+          "fieldStarted": "Début",
+          "fieldEnded": "Fin",
+          "fieldOutcome": "Issue",
+          "outcome": {
+            "completed": "Terminée",
+            "skimmed": "Parcourue",
+            "abandoned": "Abandonnée",
+            "inProgress": "En cours"
+          },
+          "spanRange": "de {from} à {to}",
+          "spanSince": "depuis {from}",
+          "spanEnded": "terminée {to}",
+          "spanUnknown": "Aucune date enregistrée",
+          "sessionCount": "{count, plural, one {# session} other {# sessions} many {# sessions}}",
+          "endBeforeStart": "La date de fin doit être égale ou postérieure à la date de début.",
+          "editAria": "Modifier cette tentative",
+          "deleteAria": "Supprimer cette tentative",
+          "cancelDeleteAria": "Annuler la suppression de cette tentative",
+          "confirmDeleteAria": "Confirmer la suppression de cette tentative",
+          "empty": "Aucune tentative enregistrée",
+          "emptyHint": "Démarrez une relecture, ou ajoutez une tentative terminée avant l'existence de cette bibliothèque."
+        },
+        "records": {
+          "title": "Records",
+          "longestSession": "Session la plus longue",
+          "bestDay": "Meilleure journée",
+          "longestStreak": "Plus longue série",
+          "streakDays": "{count, plural, one {# jour} other {# jours} many {# jours}}",
+          "pace": "Rythme de lecture",
+          "jumpedBack": "Retours en arrière",
+          "jumpedBackTimes": "{count, plural, one {# fois} other {# fois} many {# fois}}",
+          "firstOpened": "Première ouverture",
+          "empty": "Les records apparaîtront dès que ce livre aura des sessions."
+        },
+        "band": {
+          "curve": "Courbe",
+          "trace": "Tracé",
+          "switchAria": "Type de graphique",
+          "curveTitle": "Progression dans le temps",
+          "traceTitle": "Où vous en étiez dans le livre",
+          "curveSubDays": "{active} jours actifs sur {total}",
+          "curveSubSitting": "d'une traite, session par session",
+          "traceSub": "chaque barre est le passage couvert par une session",
+          "traceSubWithBacktracks": "{count, plural, one {chaque barre est une session, # retour en arrière} other {chaque barre est une session, # retours en arrière} many {chaque barre est une session, # retours en arrière}}",
+          "legendPosition": "Position atteinte",
+          "legendMinutes": "Minutes lues",
+          "legendBacktrack": "Retours en arrière",
+          "traceEmpty": "Aucun tracé",
+          "traceEmptyHint": "Dès qu'il y aura des sessions, ceci montrera le passage du livre couvert par chacune, et les endroits où vous êtes revenu en arrière.",
+          "tooltipCovered": "De {from} % à {to} %",
+          "tooltipMinutes": "{minutes} min"
+        },
+        "emptyStage": {
+          "title": "Rien d'enregistré pour ce livre",
+          "description": "Un journal de lecture se construit à partir des sessions. BookOrbit en enregistre une chaque fois que vous lisez dans le lecteur web, et récupère le reste depuis les appareils que vous synchronisez.",
+          "readerTitle": "Lisez ici",
+          "readerBody": "Chaque minute passée dans le lecteur BookOrbit est enregistrée automatiquement.",
+          "koreaderTitle": "Synchroniser KOReader",
+          "koreaderBody": "Le plugin renvoie chaque séance, avec la page que vous avez atteinte.",
+          "koboTitle": "Synchroniser une Kobo",
+          "koboBody": "Branchez l'appareil et BookOrbit lit son propre compteur de temps de lecture.",
+          "addSession": "Ajouter une session à la main",
+          "recordPast": "Enregistrer une lecture passée"
         },
         "moreActionsAria": "Plus d'actions de journal de lecture",
         "export": {
@@ -4820,7 +5172,7 @@
         },
         "table": {
           "title": "Séances",
-          "sourceWeb": "Internet",
+          "sourceWeb": "Web",
           "sourceManual": "Manuel",
           "colDate": "Date",
           "colDateMobile": "Date",
@@ -5499,7 +5851,16 @@
         "columnsHint": "Utilisez le panneau de visibilité des colonnes dans l'en-tête du tableau pour afficher ou masquer les colonnes.",
         "coverShape": "Forme de la couverture",
         "circle": "Rond",
-        "square": "Carré"
+        "square": "Carré",
+        "rowDensity": "Hauteur des lignes",
+        "densityCompact": "Compact",
+        "densityComfortable": "Confortable",
+        "densityRoomy": "Spacieux",
+        "coverFallback": "Utiliser les couvertures de livres à défaut de portrait"
+      },
+      "viewModes": {
+        "grid": "Vue en grille",
+        "list": "Vue en liste"
       }
     },
     "iconPicker": {
@@ -7841,6 +8202,9 @@
       "sort": "Trier",
       "sortOn": "Sur",
       "resetSort": "Réinitialiser le tri par défaut",
+      "shuffle": "Mélanger",
+      "shuffleAria": "Mélanger l'ordre des livres",
+      "shuffleHint": "Tirer un nouvel ordre aléatoire",
       "filters": "Filtres",
       "clear": "Effacer",
       "clearAllFilters": "Supprimer tous les filtres",
