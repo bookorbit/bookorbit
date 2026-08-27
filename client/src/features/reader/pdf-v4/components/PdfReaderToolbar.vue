@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Hand,
+  Highlighter,
   Maximize,
   Minimize,
   Minus,
@@ -26,6 +27,7 @@ const props = defineProps<{
   zoomPercent: number
   sidebarOpen: boolean
   searchOpen: boolean
+  highlightsOpen: boolean
   settingsOpen: boolean
   panActive: boolean
   fullscreen: boolean
@@ -43,6 +45,7 @@ const emit = defineEmits<{
   zoomIn: []
   toggleSidebar: []
   toggleSearch: []
+  toggleHighlights: []
   togglePan: []
   selectTool: []
   toggleFullscreen: []
@@ -86,9 +89,12 @@ function handleZoomIn() {
 function handleToggleSidebar() {
   emit('toggleSidebar')
 }
-
 function handleToggleSearch() {
   emit('toggleSearch')
+}
+
+function handleToggleHighlights() {
+  emit('toggleHighlights')
 }
 
 function handleTogglePan() {
@@ -156,6 +162,20 @@ function handleStartReading() {
           </button>
         </TooltipTrigger>
         <TooltipContent>Search document</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            class="viewer-btn"
+            :class="props.highlightsOpen ? '!bg-muted !text-foreground' : ''"
+            aria-label="Highlights"
+            @click="handleToggleHighlights"
+          >
+            <Highlighter :size="17" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Highlights</TooltipContent>
       </Tooltip>
     </div>
 

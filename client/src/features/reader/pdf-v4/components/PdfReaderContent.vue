@@ -11,7 +11,7 @@ import { ScrollStrategy, useScroll, useScrollCapability } from '@embedpdf/plugin
 import { useSelectionCapability } from '@embedpdf/plugin-selection/vue'
 import { SpreadMode, useSpread } from '@embedpdf/plugin-spread/vue'
 import { ZoomMode, useZoom, type ZoomLevel } from '@embedpdf/plugin-zoom/vue'
-import type { PdfReaderSettings } from '@bookorbit/types'
+import type { AnnotationItem, PdfReaderSettings } from '@bookorbit/types'
 import { useFullscreen } from '../../shared/composables/useFullscreen'
 import PdfDocumentViewport from './PdfDocumentViewport.vue'
 import PdfPasswordPrompt from './PdfPasswordPrompt.vue'
@@ -20,11 +20,16 @@ import PdfReaderSidebar, { type PdfSidebarTab } from './PdfReaderSidebar.vue'
 import PdfReaderToolbar from './PdfReaderToolbar.vue'
 import { fromRotation, safeExternalPdfUrl } from '../pdf-viewer-utils'
 import { usePdfFullscreenChrome } from '../composables/usePdfFullscreenChrome'
+import { usePdfHighlights } from '../composables/usePdfHighlights'
 import { usePdfPagination } from '../composables/usePdfPagination'
 import { usePdfResponsiveSpread } from '../composables/usePdfResponsiveSpread'
+import NoteDialog from '../../shared/components/NoteDialog.vue'
+import PdfSelectionPopup from './PdfSelectionPopup.vue'
 
 const props = defineProps<{
   documentId: string
+  bookId: number
+  fileId: number
   initialPage: number
   settings: PdfReaderSettings
   peekMode?: boolean
@@ -67,6 +72,7 @@ const currentZoomMode = computed<PdfReaderSettings['zoomMode']>(() => {
 const currentRotation = computed(() => fromRotation(rotation.value))
 const externalHost = computed(() => pendingExternalUrl.value?.hostname ?? '')
 const searchOpen = computed(() => sidebarOpen.value && sidebarTab.value === 'search')
+const highlightsOpen = computed(() => sidebarOpen.value && sidebarTab.value === 'highlights')
 const hasOpenUi = computed(() => sidebarOpen.value || settingsOpen.value || pendingExternalUrl.value !== null)
 const {
   pinned: headerPinned,
@@ -90,6 +96,12 @@ const {
   onActivity: revealHeader,
 })
 const { apply: applyResponsiveSpread } = usePdfResponsiveSpread(viewerSurface, currentSpreadPreference, spread)
+const highlights = usePdfHighlights({
+  bookId: props.bookId,
+  fileId: props.fileId,
+  documentId: () => props.documentId,
+  getSurface: () => viewerSurface.value,
+})
 
 function handleBack() {
   emit('back')
@@ -121,6 +133,15 @@ function handleToggleSearch() {
   sidebarOpen.value = true
 }
 
+function handleToggleHighlights() {
+  if (sidebarOpen.value && sidebarTab.value === 'highlights') {
+    sidebarOpen.value = false
+    return
+  }
+  sidebarTab.value = 'highlights'
+  sidebarOpen.value = true
+}
+
 function handleSidebarClose() {
   sidebarOpen.value = false
 }
@@ -143,6 +164,39 @@ function handleSettingsOpen(open: boolean) {
 
 function handleStartReading() {
   emit('startReading')
+}
+
+function handleHighlightAction(color: string, style: string) {
+  void highlights.applyHighlight(color, style)
+}
+
+function handleHighlightNote() {
+  highlights.openNoteDialog()
+}
+
+function handleHighlightNoteText(value: string) {
+  highlights.noteText.value = value
+}
+
+function handleHighlightSaveNote(note: string) {
+  void highlights.saveNote(note)
+}
+
+function handleHighlightCancelNote() {
+  highlights.cancelNoteDialog()
+}
+
+function handleHighlightDismiss() {
+  highlights.dismissPopup()
+}
+
+function handleNavigateHighlight(annotation: AnnotationItem) {
+  highlights.navigateTo(annotation)
+  if (window.innerWidth < 768) sidebarOpen.value = false
+}
+
+function handleDeleteHighlight(id: number) {
+  void highlights.deleteAnnotation(id)
 }
 
 function handleScrollMode(mode: PdfReaderSettings['scrollMode']) {
@@ -359,6 +413,7 @@ onUnmounted(() => {
       :zoom-percent="zoomPercent"
       :sidebar-open="sidebarOpen"
       :search-open="searchOpen"
+      :highlights-open="highlightsOpen"
       :settings-open="settingsOpen"
       :pan-active="isPanning"
       :fullscreen="isFullscreen"
@@ -373,6 +428,7 @@ onUnmounted(() => {
       @zoom-in="handleZoomIn"
       @toggle-sidebar="handleToggleSidebar"
       @toggle-search="handleToggleSearch"
+      @toggle-highlights="handleToggleHighlights"
       @toggle-pan="handleTogglePan"
       @select-tool="handleSelectTool"
       @toggle-fullscreen="toggleFullscreen"
@@ -403,8 +459,11 @@ onUnmounted(() => {
         :document-id="props.documentId"
         :active-tab="sidebarTab"
         :header-visible="headerVisible"
+        :annotations="highlights.annotations.value"
         @close="handleSidebarClose"
         @update:active-tab="handleSidebarTab"
+        @navigate-highlight="handleNavigateHighlight"
+        @delete-highlight="handleDeleteHighlight"
       />
 
       <div
@@ -466,6 +525,17 @@ onUnmounted(() => {
             <PdfDocumentViewport v-else-if="isLoaded" :document-id="props.documentId" />
           </template>
         </DocumentContent>
+        <PdfSelectionPopup
+          :visible="highlights.popupVisible.value"
+          :position="highlights.popupPosition.value"
+          :show-below="highlights.popupShowBelow.value"
+          :selected-text="highlights.selectedText.value"
+          :overlapping-annotation-id="highlights.overlappingAnnotationId.value"
+          @highlight="handleHighlightAction"
+          @note="handleHighlightNote"
+          @delete-annotation="handleDeleteHighlight"
+          @dismiss="handleHighlightDismiss"
+        />
       </div>
     </div>
 
@@ -492,5 +562,14 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <NoteDialog
+      v-if="highlights.showNoteDialog.value"
+      :selectedText="highlights.selectedText.value"
+      :modelValue="highlights.noteText.value"
+      @update:modelValue="handleHighlightNoteText"
+      @save="handleHighlightSaveNote"
+      @cancel="handleHighlightCancelNote"
+    />
   </div>
 </template>

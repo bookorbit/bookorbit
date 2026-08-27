@@ -19,6 +19,7 @@ function mountToolbar(overrides: Partial<InstanceType<typeof PdfReaderToolbar>['
       zoomPercent: 100,
       sidebarOpen: false,
       searchOpen: false,
+      highlightsOpen: false,
       settingsOpen: false,
       panActive: true,
       fullscreen: false,

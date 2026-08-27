@@ -120,7 +120,7 @@ describe('PdfReaderSidebar', () => {
   })
 
   it('debounces full-document searches and cancels superseded work', async () => {
-    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true } })
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
     const input = wrapper.get('input[type="search"]')
     mocks.searchScope.stopSearch.mockClear()
 
@@ -139,7 +139,7 @@ describe('PdfReaderSidebar', () => {
   })
 
   it('does not search for a single character', async () => {
-    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true } })
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
     mocks.searchScope.stopSearch.mockClear()
 
     await wrapper.get('input[type="search"]').setValue('a')
@@ -151,7 +151,7 @@ describe('PdfReaderSidebar', () => {
   })
 
   it('lets the plugin restart an active search once when flags change', async () => {
-    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true } })
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
 
     await wrapper.get('input[type="checkbox"]').setValue(true)
 
@@ -166,7 +166,7 @@ describe('PdfReaderSidebar', () => {
       total: 1,
       active: true,
     }
-    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true } })
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
 
     expect(wrapper.get('aside').classes()).toContain('overflow-hidden')
     expect(wrapper.get('[data-testid="search-results"]').classes()).toContain('overflow-x-hidden')
@@ -187,7 +187,7 @@ describe('PdfReaderSidebar', () => {
       onProgress: (callback: (progress: { page: number }) => void) => callback({ page: 4 }),
     })
 
-    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true } })
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
     await vi.advanceTimersByTimeAsync(250)
 
     expect(wrapper.text()).toContain('Searching page 5 of 10')
@@ -201,7 +201,7 @@ describe('PdfReaderSidebar', () => {
       activeResultIndex: 0,
       active: true,
     }
-    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true } })
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
     const input = wrapper.get('input[type="search"]')
 
     await input.trigger('keydown', { key: 'Enter' })
@@ -214,7 +214,7 @@ describe('PdfReaderSidebar', () => {
 
   it('clears the query, cancels search work, and restores input focus', async () => {
     const wrapper = mount(PdfReaderSidebar, {
-      props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true },
+      props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] },
       attachTo: document.body,
     })
     const input = wrapper.get('input[type="search"]')

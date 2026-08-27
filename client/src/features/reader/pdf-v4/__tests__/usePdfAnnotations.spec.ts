@@ -1,0 +1,123 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AnnotationItem, AnnotationPdfPosition } from '@bookorbit/types'
+import { usePdfAnnotations } from '../composables/usePdfAnnotations'
+
+interface ApiResponse {
+  ok: boolean
+  json: () => Promise<unknown>
+}
+
+const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<ApiResponse>>())
+
+vi.mock('@/lib/api', () => ({
+  api: apiMock,
+}))
+
+const PDF_POSITION: AnnotationPdfPosition = {
+  page: 2,
+  rect: { x: 10, y: 20, width: 30, height: 8 },
+  rects: [{ x: 10, y: 20, width: 30, height: 8 }],
+}
+
+function makeAnnotation(id: number): AnnotationItem {
+  return {
+    id,
+    bookId: 9,
+    cfi: null,
+    jumpFileId: 33,
+    pageno: 3,
+    text: `Selection ${id}`,
+    color: '#FACC15',
+    style: 'highlight',
+    note: null,
+    chapterTitle: null,
+    origin: 'web',
+    positionStatus: 'exact',
+    chapterIndex: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    pdf: PDF_POSITION,
+  }
+}
+
+function response(ok: boolean, payload: unknown = null): ApiResponse {
+  return { ok, json: async () => payload }
+}
+
+describe('usePdfAnnotations', () => {
+  beforeEach(() => {
+    apiMock.mockReset()
+  })
+
+  it('loads annotations for the book', async () => {
+    apiMock.mockResolvedValueOnce(response(true, [makeAnnotation(1)]))
+    const store = usePdfAnnotations(9)
+
+    await store.load()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/books/9/annotations')
+    expect(store.annotations.value).toHaveLength(1)
+    expect(store.loadError.value).toBeNull()
+  })
+
+  it('records a load error without throwing', async () => {
+    apiMock.mockResolvedValueOnce(response(false))
+    const store = usePdfAnnotations(9)
+
+    await store.load()
+
+    expect(store.loadError.value).toBe('Failed to load')
+  })
+
+  it('posts a pdf position and appends the created annotation', async () => {
+    const created = makeAnnotation(42)
+    apiMock.mockResolvedValueOnce(response(true, created))
+    const store = usePdfAnnotations(9)
+
+    const result = await store.create({ pdf: PDF_POSITION, bookFileId: 33, text: 'Selection 42', color: '#FACC15', style: 'highlight', note: null })
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/books/9/annotations',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ pdf: PDF_POSITION, bookFileId: 33, text: 'Selection 42', color: '#FACC15', style: 'highlight', note: null }),
+      }),
+    )
+    expect(result).toEqual(created)
+    expect(store.annotations.value).toContainEqual(created)
+  })
+
+  it('patches an existing annotation in place', async () => {
+    const store = usePdfAnnotations(9)
+    store.annotations.value = [makeAnnotation(1)]
+    apiMock.mockResolvedValueOnce(response(true, { ...makeAnnotation(1), color: '#38BDF8', style: 'underline' }))
+
+    const result = await store.update(1, { color: '#38BDF8', style: 'underline' })
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/books/9/annotations/1', expect.objectContaining({ method: 'PATCH' }))
+    expect(result?.color).toBe('#38BDF8')
+    expect(store.annotations.value[0].color).toBe('#38BDF8')
+  })
+
+  it('removes an annotation when the delete succeeds', async () => {
+    const store = usePdfAnnotations(9)
+    store.annotations.value = [makeAnnotation(1), makeAnnotation(2)]
+    apiMock.mockResolvedValueOnce(response(true))
+
+    const removed = await store.remove(1)
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/books/9/annotations/1', expect.objectContaining({ method: 'DELETE' }))
+    expect(removed).toBe(true)
+    expect(store.annotations.value.map((a) => a.id)).toEqual([2])
+  })
+
+  it('keeps the annotation when the delete fails', async () => {
+    const store = usePdfAnnotations(9)
+    store.annotations.value = [makeAnnotation(1)]
+    apiMock.mockResolvedValueOnce(response(false))
+
+    const removed = await store.remove(1)
+
+    expect(removed).toBe(false)
+    expect(store.annotations.value).toHaveLength(1)
+  })
+})

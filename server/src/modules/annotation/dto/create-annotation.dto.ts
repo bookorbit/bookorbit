@@ -1,13 +1,81 @@
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsDefined,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  IsString,
+  MaxLength,
+  Min,
+  Validate,
+  ValidateNested,
+  ValidatorConstraint,
+  type ValidationArguments,
+  type ValidatorConstraintInterface,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 import { ANNOTATION_STYLES } from '../annotation.constants';
 
+export class CreateAnnotationRectDto {
+  @IsNumber()
+  x!: number;
+
+  @IsNumber()
+  y!: number;
+
+  @IsNumber()
+  width!: number;
+
+  @IsNumber()
+  height!: number;
+}
+
+export class CreateAnnotationPdfDto {
+  @IsInt()
+  @Min(0)
+  page!: number;
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => CreateAnnotationRectDto)
+  rect!: CreateAnnotationRectDto;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => CreateAnnotationRectDto)
+  rects!: CreateAnnotationRectDto[];
+}
+
+@ValidatorConstraint({ name: 'exactlyOneAnnotationLocation', async: false })
+class ExactlyOneLocationConstraint implements ValidatorConstraintInterface {
+  validate(_value: unknown, args: ValidationArguments): boolean {
+    const dto = args.object as CreateAnnotationDto;
+    const hasCfi = dto.cfi !== undefined && dto.cfi !== null;
+    const hasPdf = dto.pdf !== undefined && dto.pdf !== null;
+    return hasCfi !== hasPdf;
+  }
+
+  defaultMessage(): string {
+    return 'Provide exactly one of cfi or pdf';
+  }
+}
+
 export class CreateAnnotationDto {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(2000)
-  cfi!: string;
+  cfi?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateAnnotationPdfDto)
+  pdf?: CreateAnnotationPdfDto;
 
   @IsOptional()
   @Type(() => Number)
@@ -15,6 +83,9 @@ export class CreateAnnotationDto {
   @Min(1)
   bookFileId?: number;
 
+  // Anchored to an always-present property so the class-level check runs even
+  // when cfi/pdf are absent (an @IsOptional property short-circuits its own validators).
+  @Validate(ExactlyOneLocationConstraint)
   @IsString()
   @IsNotEmpty()
   text!: string;

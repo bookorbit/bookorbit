@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { BookOpen, ChevronLeft, ChevronRight, FileText, LoaderCircle, Search, X } from '@lucide/vue'
+import { BookOpen, ChevronLeft, ChevronRight, FileText, Highlighter, LoaderCircle, Search, StickyNote, Trash2, X } from '@lucide/vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 import { MatchFlag, type SearchResult } from '@embedpdf/models'
@@ -10,18 +10,22 @@ import { useScroll } from '@embedpdf/plugin-scroll/vue'
 import { useSearch } from '@embedpdf/plugin-search/vue'
 import { ThumbImg, ThumbnailsPane } from '@embedpdf/plugin-thumbnail/vue'
 import { flattenPdfBookmarks, type FlatPdfBookmark } from '../pdf-viewer-utils'
+import { ANNOTATION_COLOR_FILTER_OPTIONS, type AnnotationItem } from '@bookorbit/types'
 
-export type PdfSidebarTab = 'thumbnails' | 'contents' | 'search'
+export type PdfSidebarTab = 'thumbnails' | 'contents' | 'search' | 'highlights'
 
 const props = defineProps<{
   documentId: string
   activeTab: PdfSidebarTab
   headerVisible: boolean
+  annotations: AnnotationItem[]
 }>()
 
 const emit = defineEmits<{
   close: []
   'update:activeTab': [tab: PdfSidebarTab]
+  navigateHighlight: [annotation: AnnotationItem]
+  deleteHighlight: [id: number]
 }>()
 
 const { state: scrollState, provides: scroll } = useScroll(() => props.documentId)
@@ -60,6 +64,58 @@ function selectContents() {
 
 function selectSearch() {
   emit('update:activeTab', 'search')
+}
+
+const highlightQuery = ref('')
+const highlightColorFilter = ref('all')
+const highlightNotesOnly = ref(false)
+
+const HIGHLIGHT_COLOR_LABELS: Record<string, string> = Object.fromEntries(
+  ANNOTATION_COLOR_FILTER_OPTIONS.map((color) => [color.hex.toUpperCase(), color.label]),
+)
+
+function getHighlightColorLabel(color: string): string {
+  return HIGHLIGHT_COLOR_LABELS[color.trim().toUpperCase()] ?? color
+}
+
+const highlightColorOptions = computed(() =>
+  Array.from(new Set(props.annotations.map((annotation) => annotation.color)))
+    .map((hex) => ({ hex, label: getHighlightColorLabel(hex) }))
+    .sort((a, b) => a.label.localeCompare(b.label)),
+)
+
+const filteredHighlights = computed(() => {
+  const query = highlightQuery.value.trim().toLowerCase()
+  return props.annotations
+    .filter((annotation) => {
+      if (highlightColorFilter.value !== 'all' && annotation.color !== highlightColorFilter.value) return false
+      if (highlightNotesOnly.value && !annotation.note?.trim()) return false
+      if (!query) return true
+      return `${annotation.text} ${annotation.note ?? ''}`.toLowerCase().includes(query)
+    })
+    .sort((a, b) => {
+      const pageA = a.pdf?.page ?? a.pageno ?? 0
+      const pageB = b.pdf?.page ?? b.pageno ?? 0
+      if (pageA !== pageB) return pageA - pageB
+      return (a.pdf?.rect.y ?? 0) - (b.pdf?.rect.y ?? 0)
+    })
+})
+
+function highlightPageLabel(annotation: AnnotationItem): number | null {
+  if (annotation.pdf) return annotation.pdf.page + 1
+  return annotation.pageno
+}
+
+function selectHighlights() {
+  emit('update:activeTab', 'highlights')
+}
+
+function handleNavigateHighlight(annotation: AnnotationItem) {
+  emit('navigateHighlight', annotation)
+}
+
+function handleDeleteHighlight(id: number) {
+  emit('deleteHighlight', id)
 }
 
 function handleThumbnail(pageIndex: number) {
@@ -217,7 +273,7 @@ onUnmounted(() => search.value?.stopSearch())
       class="pointer-events-auto flex h-full w-[18rem] max-w-[88vw] flex-col overflow-hidden border-r border-border bg-card text-card-foreground shadow-2xl sm:w-[19rem]"
     >
       <div class="flex h-11 shrink-0 items-center border-b border-border px-2">
-        <div class="grid min-w-0 flex-1 grid-cols-3">
+        <div class="grid min-w-0 flex-1 grid-cols-4">
           <button
             class="relative flex min-w-0 items-center justify-center gap-1 px-1 py-2.5 text-[13px] transition-colors"
             :class="props.activeTab === 'thumbnails' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
@@ -244,6 +300,15 @@ onUnmounted(() => search.value?.stopSearch())
             <Search :size="15" />
             <span>Search</span>
             <span v-if="props.activeTab === 'search'" class="absolute inset-x-0 bottom-0 h-0.5 rounded-t-full bg-primary" />
+          </button>
+          <button
+            class="relative flex min-w-0 items-center justify-center gap-1 px-1 py-2.5 text-[13px] transition-colors"
+            :class="props.activeTab === 'highlights' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+            @click="selectHighlights"
+          >
+            <Highlighter :size="15" />
+            <span>Notes</span>
+            <span v-if="props.activeTab === 'highlights'" class="absolute inset-x-0 bottom-0 h-0.5 rounded-t-full bg-primary" />
           </button>
         </div>
         <button class="viewer-btn ml-1" aria-label="Close navigation" @click="handleClose">
@@ -293,7 +358,7 @@ onUnmounted(() => search.value?.stopSearch())
         </button>
       </div>
 
-      <div v-else class="flex min-h-0 flex-1 flex-col">
+      <div v-else-if="props.activeTab === 'search'" class="flex min-h-0 flex-1 flex-col">
         <div class="shrink-0 border-b border-border p-3">
           <div class="relative">
             <Search :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -371,6 +436,67 @@ onUnmounted(() => search.value?.stopSearch())
           </button>
         </RecycleScroller>
         <span class="sr-only" aria-live="polite">{{ searchState.total }} search results</span>
+      </div>
+
+      <div v-else class="flex min-h-0 flex-1 flex-col">
+        <div class="shrink-0 space-y-2 border-b border-border p-3">
+          <div class="relative">
+            <Search :size="15" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              v-model="highlightQuery"
+              type="search"
+              placeholder="Search highlights"
+              class="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <select
+              v-model="highlightColorFilter"
+              class="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
+            >
+              <option value="all">All colors</option>
+              <option v-for="option in highlightColorOptions" :key="option.hex" :value="option.hex">{{ option.label }}</option>
+            </select>
+            <label class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <input v-model="highlightNotesOnly" type="checkbox" class="accent-primary" />
+              Notes only
+            </label>
+          </div>
+        </div>
+
+        <p v-if="filteredHighlights.length === 0" class="px-4 py-8 text-center text-xs text-muted-foreground">
+          {{ props.annotations.length === 0 ? 'No highlights yet' : 'No highlights match your filters' }}
+        </p>
+        <div v-else class="min-h-0 flex-1 overflow-y-auto p-2">
+          <div
+            v-for="annotation in filteredHighlights"
+            :key="annotation.id"
+            class="group mb-1.5 rounded-md border border-border bg-background p-2 text-left transition-colors hover:border-muted-foreground/50"
+          >
+            <button class="flex w-full min-w-0 gap-2 text-left" @click="handleNavigateHighlight(annotation)">
+              <span class="mt-0.5 h-4 w-1.5 shrink-0 rounded-full" :style="{ background: annotation.color }" />
+              <span class="min-w-0 flex-1">
+                <span class="line-clamp-3 break-words text-xs text-foreground">{{ annotation.text }}</span>
+                <span v-if="annotation.note" class="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
+                  <StickyNote :size="12" class="mt-0.5 shrink-0" />
+                  <span class="line-clamp-2 break-words italic">{{ annotation.note }}</span>
+                </span>
+                <span v-if="highlightPageLabel(annotation) != null" class="mt-1 block text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Page {{ highlightPageLabel(annotation) }}
+                </span>
+              </span>
+            </button>
+            <div class="mt-1 flex justify-end">
+              <button
+                class="flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                aria-label="Delete highlight"
+                @click="handleDeleteHighlight(annotation.id)"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
   </div>
