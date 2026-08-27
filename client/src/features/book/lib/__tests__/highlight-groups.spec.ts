@@ -29,6 +29,7 @@ function stats(overrides: Partial<AnnotationStats> = {}): AnnotationStats {
     originBreakdown: [],
     chaptersWithHighlights: 0,
     highlightsWithNotes: 0,
+    highlightsNeedingReview: 0,
     chapters: [],
     chapterBreakdown: [],
     activity: [],

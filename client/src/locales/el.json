@@ -3096,18 +3096,8 @@
       "refreshMetadata": "Ανανέωση Μεταδεδομένων",
       "deleteAuthor": "Διαγραφή Συγγραφέα"
     },
-    "listRow": {
-      "noRecentAdditions": "Καμία πρόσφατη προσθήκη"
-    },
     "filters": {
-      "title": "Φίλτρα Συγγραφέων",
-      "clearAll": "Εκκαθάριση όλων",
-      "allLibraries": "Όλες Οι Βιβλιοθήκες",
-      "allAuthors": "Όλοι οι συγγραφείς",
-      "hasPhoto": "Έχει φωτογραφία",
-      "missingPhoto": "Λείπει φωτογραφία",
-      "minBooks": "Ελάχιστα βιβλία",
-      "anyPlaceholder": "Οποιαδήποτε"
+      "allLibraries": "Όλες Οι Βιβλιοθήκες"
     },
     "header": {
       "never": "Ποτέ",

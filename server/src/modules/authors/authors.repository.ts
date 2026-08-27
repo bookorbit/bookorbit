@@ -23,6 +23,16 @@ type AuthorSummaryRow = {
   lastAddedAt: Date | null;
 };
 
+/** The list query alone resolves a cover fallback; detail and enrichment do not need one. */
+export type AuthorListItemRow = AuthorSummaryRow & {
+  coverBookId: number | null;
+};
+
+export type AuthorLetterCountRow = {
+  letter: string;
+  count: number;
+};
+
 type AuthorBookIdRow = {
   id: number;
 };
@@ -62,13 +72,17 @@ export class AuthorsRepository {
     order: SortDirection;
     libraryIds: number[];
     hasPhoto?: boolean;
+    hasSortName?: boolean;
+    addedWithinDays?: number;
     minBookCount?: number;
     contentFilters?: ContentFilterRules;
-  }): Promise<{ items: AuthorSummaryRow[]; total: number; page: number; size: number }> {
+  }): Promise<{ items: AuthorListItemRow[]; total: number; page: number; size: number }> {
     const where = this.buildAuthorWhere({
       q: params.q,
       libraryIds: params.libraryIds,
       hasPhoto: params.hasPhoto,
+      hasSortName: params.hasSortName,
+      addedWithinDays: params.addedWithinDays,
       contentFilters: params.contentFilters,
     });
     const bookCountExpr = sql<number>`count(distinct ${books.id})`;
@@ -99,6 +113,7 @@ export class AuthorsRepository {
         description: authors.description,
         bookCount: sql<number>`count(distinct ${books.id})::int`,
         lastAddedAt: lastAddedExpr,
+        coverBookId: this.coverBookIdExpr(params.libraryIds),
       })
       .from(authors)
       .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
@@ -406,7 +421,124 @@ export class AuthorsRepository {
     });
   }
 
-  private buildAuthorWhere(params: { q?: string; libraryIds: number[]; hasPhoto?: boolean; contentFilters?: ContentFilterRules }): SQL {
+  /**
+   * The most recently added book of theirs that actually carries cover art, scoped to
+   * the libraries the caller can see. Correlated per row rather than joined, so it costs
+   * one index lookup per author on the page instead of widening the grouped join.
+   */
+  private coverBookIdExpr(libraryIds: number[]): SQL<number | null> {
+    return sql<number | null>`(
+      SELECT cb.id
+      FROM ${bookAuthors} cba
+      JOIN ${books} cb ON cb.id = cba.book_id
+      JOIN ${bookMetadata} cm ON cm.book_id = cb.id
+      WHERE cba.author_id = ${authors.id}
+        AND cb.library_id IN (${sql.join(
+          libraryIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})
+        AND cm.cover_source IS NOT NULL
+      ORDER BY cb.added_at DESC, cb.id DESC
+      LIMIT 1
+    )`;
+  }
+
+  /**
+   * Counts per A-Z bucket for the jump rail, under the same filters as the list. One
+   * grouped query, so the rail stays correct for a library the page has not scrolled
+   * through yet. Anything not starting A-Z buckets to "#".
+   */
+  async findLetterCounts(params: {
+    q?: string;
+    /** Must match the field the list is ordered by, or the rail points at the wrong rows. */
+    sort: Extract<AuthorListSort, 'name' | 'sortName'>;
+    order: SortDirection;
+    libraryIds: number[];
+    hasPhoto?: boolean;
+    hasSortName?: boolean;
+    addedWithinDays?: number;
+    minBookCount?: number;
+    contentFilters?: ContentFilterRules;
+  }): Promise<AuthorLetterCountRow[]> {
+    if (params.libraryIds.length === 0) return [];
+
+    const where = this.buildAuthorWhere({
+      q: params.q,
+      libraryIds: params.libraryIds,
+      hasPhoto: params.hasPhoto,
+      hasSortName: params.hasSortName,
+      addedWithinDays: params.addedWithinDays,
+      contentFilters: params.contentFilters,
+    });
+    const having = params.minBookCount !== undefined ? sql`count(distinct ${books.id}) >= ${params.minBookCount}` : undefined;
+
+    const perAuthor = this.db
+      .select({ letter: this.letterBucketExpr(params.sort).as('letter') })
+      .from(authors)
+      .innerJoin(bookAuthors, eq(bookAuthors.authorId, authors.id))
+      .innerJoin(books, eq(books.id, bookAuthors.bookId))
+      .where(where)
+      .groupBy(authors.id, authors.sortName, authors.name)
+      .having(having)
+      .as('per_author');
+
+    const rows = await this.db
+      .select({ letter: perAuthor.letter, count: sql<number>`count(*)::int` })
+      .from(perAuthor)
+      .groupBy(perAuthor.letter)
+      .orderBy(params.order === 'asc' ? asc(perAuthor.letter) : desc(perAuthor.letter));
+
+    return rows.map((row) => ({ letter: row.letter, count: Number(row.count) }));
+  }
+
+  /**
+   * First character of whichever key the list is ordered by, folded to unaccented
+   * uppercase so "Sjon" and "Sjón" share a bucket. Sorting by display name and
+   * bucketing by sort name would put "Ben Aaronovitch" under A in a list ordered by B.
+   */
+  private letterBucketExpr(sort: 'name' | 'sortName'): SQL<string> {
+    const key = sort === 'sortName' ? sql`COALESCE(NULLIF(BTRIM(${authors.sortName}), ''), ${authors.name})` : sql`${authors.name}`;
+    const initial = sql`UPPER(LEFT(public.bookorbit_unaccent(BTRIM(${key})), 1))`;
+    return sql<string>`CASE WHEN ${initial} BETWEEN 'A' AND 'Z' THEN ${initial} ELSE '#' END`;
+  }
+
+  /**
+   * Points `has_photo` back at the image store. Two statements whatever the library
+   * size, so it is cheap enough to run on every boot. Returns how many rows moved in
+   * each direction, which is what makes the drift visible in the log.
+   *
+   * `sql.param` is required: interpolating the array directly expands it to
+   * `ANY(($1, $2, ...))`, which Postgres rejects, and the failure is invisible here
+   * because a stale flag must not stop the app from booting.
+   */
+  async reconcileHasPhoto(idsWithImage: number[]): Promise<{ marked: number; cleared: number }> {
+    const marked = idsWithImage.length
+      ? await this.db
+          .update(authors)
+          .set({ hasPhoto: true })
+          .where(and(eq(authors.hasPhoto, false), sql`${authors.id} = ANY(${sql.param(idsWithImage)}::int[])`))
+          .returning({ id: authors.id })
+      : [];
+
+    const cleared = idsWithImage.length
+      ? await this.db
+          .update(authors)
+          .set({ hasPhoto: false })
+          .where(and(eq(authors.hasPhoto, true), sql`NOT (${authors.id} = ANY(${sql.param(idsWithImage)}::int[]))`))
+          .returning({ id: authors.id })
+      : await this.db.update(authors).set({ hasPhoto: false }).where(eq(authors.hasPhoto, true)).returning({ id: authors.id });
+
+    return { marked: marked.length, cleared: cleared.length };
+  }
+
+  private buildAuthorWhere(params: {
+    q?: string;
+    libraryIds: number[];
+    hasPhoto?: boolean;
+    hasSortName?: boolean;
+    addedWithinDays?: number;
+    contentFilters?: ContentFilterRules;
+  }): SQL {
     const clauses: SQL[] = [inArray(books.libraryId, params.libraryIds)];
     if (params.contentFilters) {
       clauses.push(...buildContentFilterClauses(params.contentFilters, this.db));
@@ -417,6 +549,14 @@ export class AuthorsRepository {
     }
     if (params.hasPhoto !== undefined) {
       clauses.push(eq(authors.hasPhoto, params.hasPhoto));
+    }
+    if (params.hasSortName !== undefined) {
+      // An empty string is a missing sort name as far as the UI is concerned.
+      const missing = sql`(${authors.sortName} IS NULL OR BTRIM(${authors.sortName}) = '')`;
+      clauses.push(params.hasSortName ? (sql`NOT ${missing}` as SQL) : (missing as SQL));
+    }
+    if (params.addedWithinDays !== undefined) {
+      clauses.push(sql`${books.addedAt} >= NOW() - MAKE_INTERVAL(days => ${params.addedWithinDays})` as SQL);
     }
     return and(...clauses)!;
   }

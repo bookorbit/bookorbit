@@ -7,6 +7,7 @@ import type {
   AuthorMetadataProviderInfo,
   AuthorSummary,
   AuthorsPage,
+  JumpBucketsResponse,
   BooksPage,
   MergeAuthorsResult,
 } from '@bookorbit/types';
@@ -27,7 +28,7 @@ import { AuthorDetailRow, AuthorsRepository } from './authors.repository';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
-import { ListAuthorsDto } from './dto/list-authors.dto';
+import { ListAuthorLettersDto, ListAuthorsDto } from './dto/list-authors.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
@@ -73,6 +74,8 @@ export class AuthorsService {
       order: dto.order ?? 'asc',
       libraryIds,
       hasPhoto: dto.hasPhoto,
+      hasSortName: dto.hasSortName,
+      addedWithinDays: dto.addedWithinDays,
       minBookCount: dto.minBookCount,
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
@@ -82,6 +85,39 @@ export class AuthorsService {
       ...page,
       items: await this.withAuthorImageUrls(mapped),
     };
+  }
+
+  /**
+   * A-Z jump buckets under the current filters, in the same shape the book views use so
+   * the existing rail renders them unchanged. `index` is the offset of the bucket's first
+   * author in the sorted list, which is what the rail jumps to. One grouped query, so the
+   * rail is correct for the whole filtered set and not only the pages already loaded.
+   */
+  async findJumpBuckets(user: RequestUser, dto: ListAuthorLettersDto): Promise<JumpBucketsResponse> {
+    const empty: JumpBucketsResponse = { buckets: [], total: 0, kind: 'letter', granularity: null };
+    const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
+    if (libraryIds.length === 0) return empty;
+
+    const counts = await this.authorsRepo.findLetterCounts({
+      q: dto.q,
+      sort: dto.sort === 'sortName' ? 'sortName' : 'name',
+      order: dto.order ?? 'asc',
+      libraryIds,
+      hasPhoto: dto.hasPhoto,
+      hasSortName: dto.hasSortName,
+      addedWithinDays: dto.addedWithinDays,
+      minBookCount: dto.minBookCount,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
+
+    let offset = 0;
+    const buckets = counts.map((row) => {
+      const bucket = { key: row.letter, label: row.letter, index: offset, isUnknown: row.letter === '#' };
+      offset += row.count;
+      return bucket;
+    });
+
+    return { buckets, total: offset, kind: 'letter', granularity: null };
   }
 
   /** Total authors the user can browse; matches the unfiltered total of {@link findAll}. */
@@ -573,6 +609,7 @@ export class AuthorsService {
     description: string | null;
     bookCount: number;
     lastAddedAt: Date | null;
+    coverBookId?: number | null;
   }): AuthorSummary {
     return {
       id: row.id,
@@ -581,6 +618,7 @@ export class AuthorsService {
       description: row.description,
       bookCount: row.bookCount,
       lastAddedAt: row.lastAddedAt ? row.lastAddedAt.toISOString() : null,
+      coverBookId: row.coverBookId ?? null,
     };
   }
 

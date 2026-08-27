@@ -2955,19 +2955,8 @@
       "refreshMetadata": "Päivitä Metatiedot",
       "deleteAuthor": "Poista Tekijä"
     },
-    "listRow": {
-      "noRecentAdditions": "Ei viimeaikaisia lisäyksiä",
-      "portraitAlt": "{name} muotokuva"
-    },
     "filters": {
-      "title": "Kirjoittajan Suodattimet",
-      "clearAll": "Tyhjennä kaikki",
-      "allLibraries": "Kaikki Kirjastot",
-      "allAuthors": "Kaikki kirjoittajat",
-      "hasPhoto": "On kuva",
-      "missingPhoto": "Puuttuva kuva",
-      "minBooks": "Minimi kirjat",
-      "anyPlaceholder": "Kaikki"
+      "allLibraries": "Kaikki Kirjastot"
     },
     "header": {
       "never": "Ei Koskaan",

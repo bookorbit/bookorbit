@@ -3328,7 +3328,16 @@
         "noMatch": "No highlights match your filters.",
         "resetFilters": "Reset filters",
         "trashEmpty": "Trash is empty",
-        "noAnnotations": "No annotations yet. Highlights you create on the web or your e-reader appear here."
+        "noAnnotations": "No annotations yet. Highlights you create on the web or your e-reader appear here.",
+        "noMatchHint": "Try a shorter phrase, or clear the colour and book filters.",
+        "noAnnotationsBody": "Everything you mark, in any book and on any device, collects here.",
+        "readHere": "Read here",
+        "readHereBody": "Select text in the reader and pick a colour.",
+        "syncKobo": "Sync a Kobo",
+        "syncKoboBody": "Marks made on the device arrive on the next sync.",
+        "syncKoreader": "Sync KOReader",
+        "syncKoreaderBody": "The plugin uploads annotations with their positions.",
+        "goToLibrary": "Go to the library"
       },
       "toast": {
         "movedToTrash": "Moved to trash",
@@ -3338,8 +3347,70 @@
         "bulkTrashed": "{count, plural, =0 {Moved no annotations to trash} one {Moved # annotation to trash} other {Moved # annotations to trash}}",
         "bulkRestored": "{count, plural, =0 {Restored no annotations} one {Restored # annotation} other {Restored # annotations}}",
         "bulkRecolored": "{count, plural, =0 {Recolored no annotations} one {Recolored # annotation} other {Recolored # annotations}}",
-        "bulkRestyled": "{count, plural, =0 {Restyled no annotations} one {Restyled # annotation} other {Restyled # annotations}}"
-      }
+        "bulkRestyled": "{count, plural, =0 {Restyled no annotations} one {Restyled # annotation} other {Restyled # annotations}}",
+        "noteSaved": "Note saved"
+      },
+      "railTitle": "{marks} marks · {books} books",
+      "lastTwelveMonths": "Last 12 months",
+      "colour": "Colour",
+      "whereFrom": "Where they came from",
+      "theShelf": "The shelf",
+      "devices": "Devices",
+      "allBooks": "All {count} books",
+      "behindCount": "{count, plural, one {# behind} other {# behind}}",
+      "busiestWeek": "Busiest week",
+      "longestQuiet": "Longest quiet stretch",
+      "mostMarked": "Most marked",
+      "weekCount": "{count, plural, one {# week} other {# weeks}}",
+      "anchorsUnplaced": "{count, plural, one {# anchor could not be placed} other {# anchors could not be placed}}",
+      "reviewThem": "Review them",
+      "anchorLost": "Anchor lost",
+      "anchorRepaired": "Repaired",
+      "notes": "Notes",
+      "review": "Review",
+      "viewLabel": "Group and sort",
+      "views": {
+        "newest": "Newest first",
+        "oldest": "Oldest first",
+        "book": "By book",
+        "color": "By colour",
+        "source": "By source"
+      },
+      "matchCount": "{shown} of {total}",
+      "moreActions": "More actions",
+      "loadMore": "{count, plural, one {Load 1 more} other {Load # more}}",
+      "openBook": "Open book",
+      "noteLabel": "Note",
+      "yourNote": "Your note",
+      "notePlaceholder": "Say why this mattered.",
+      "openAtThisPage": "Open at this page",
+      "positionAndSync": "Position & sync",
+      "loadFailed": "Could not load your highlights. Try again in a moment.",
+      "chips": {
+        "dateBetween": "{from} to {to}",
+        "dateFrom": "From {from}",
+        "dateUntil": "Until {to}"
+      },
+      "activitySummary": "{count, plural, one {# highlight between {from} and {to}} other {# highlights between {from} and {to}}}",
+      "book": "Book",
+      "needsReview": "Needs review"
+    },
+    "sources": {
+      "web": "Web",
+      "koreader": "KOReader",
+      "kobo": "Kobo"
+    },
+    "colors": {
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "pink": "Pink",
+      "orange": "Orange",
+      "red": "Red",
+      "olive": "Olive",
+      "cyan": "Cyan",
+      "purple": "Purple",
+      "gray": "Gray"
     }
   },
   "audit": {
@@ -3710,19 +3781,16 @@
       "refreshMetadata": "Refresh Metadata",
       "deleteAuthor": "Delete Author"
     },
-    "listRow": {
-      "noRecentAdditions": "No recent additions",
-      "portraitAlt": "{name} portrait"
-    },
     "filters": {
-      "title": "Author Filters",
-      "clearAll": "Clear all",
       "allLibraries": "All Libraries",
-      "allAuthors": "All authors",
-      "hasPhoto": "Has photo",
-      "missingPhoto": "Missing photo",
-      "minBooks": "Min books",
-      "anyPlaceholder": "Any"
+      "chips": {
+        "groupLabel": "Filter authors",
+        "all": "All",
+        "noPortrait": "No portrait",
+        "multipleBooks": "2+ books",
+        "recentlyAdded": "Added this week",
+        "noSortName": "No sort name"
+      }
     },
     "header": {
       "never": "Never",
@@ -3869,6 +3937,16 @@
         "deleteSuccess": "Deleted author; affected {books} books",
         "deleteFailed": "Failed to delete author"
       }
+    },
+    "portrait": {
+      "fromTheirBook": "Cover of one of their books; no portrait on file"
+    },
+    "index": {
+      "bookCount": "{count, plural, =0 {no books} one {# book} other {# books}}",
+      "rowLabel": "{name}, {count, plural, =0 {no books} one {# book} other {# books}}",
+      "actionsFor": "Actions for {name}",
+      "refreshing": "Refreshing metadata for {name}",
+      "deleting": "Deleting {name}"
     }
   },
   "book": {
@@ -4871,6 +4949,17 @@
           "regroup": "Regroup the stream",
           "copy": "Copy the quote",
           "reader": "Open in the reader"
+        },
+        "railTitle": "{marks} marks · {chapters} chapters",
+        "whenMarked": "When they were marked",
+        "chapters": "Chapters",
+        "noChapter": "No chapter",
+        "views": {
+          "position": "In reading order",
+          "newest": "Newest first",
+          "oldest": "Oldest first",
+          "colour": "By colour",
+          "source": "By source"
         }
       },
       "readingLog": {
@@ -5767,7 +5856,17 @@
         "columnsHint": "Use the column visibility panel in the table header to show or hide columns.",
         "coverShape": "Cover shape",
         "circle": "Circle",
-        "square": "Square"
+        "square": "Square",
+        "rowDensity": "Row height",
+        "densityCompact": "Compact",
+        "densityComfortable": "Cosy",
+        "densityRoomy": "Roomy",
+        "coverFallback": "Use book covers for missing portraits"
+      },
+      "viewModes": {
+        "grid": "Grid view",
+        "list": "List view",
+        "table": "Table view"
       }
     },
     "iconPicker": {
@@ -7475,7 +7574,10 @@
       "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
-      "label": "Possible gaps:"
+      "label": "Possible gaps:",
+      "missingCount": "{count, plural, one {# missing} other {# missing}}",
+      "missingList": "Missing {list}",
+      "previewMore": "{shown} +{count}"
     },
     "filters": {
       "title": "Series Filters",
@@ -7505,7 +7607,10 @@
         "bookCount": "Book Count",
         "recentAdditions": "Recent Additions",
         "readingProgress": "Reading Progress"
-      }
+      },
+      "clearSearch": "Clear search",
+      "noMatchHint": "Try another library, or clear what is set.",
+      "emptyHint": "Series appear once your books carry series metadata."
     },
     "detail": {
       "pageTitle": "Series",
@@ -7546,6 +7651,66 @@
         "ascending": "Ascending",
         "descending": "Descending"
       }
+    },
+    "authorsPlus": "{authors} +{count}",
+    "track": {
+      "readCount": "{count, plural, one {# read} other {# read}}",
+      "readingCount": "{count, plural, one {# in progress} other {# in progress}}",
+      "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+      "missingCount": "{count, plural, one {# missing} other {# missing}}",
+      "slotMissing": "{number} not in library",
+      "untitled": "Untitled"
+    },
+    "legend": {
+      "read": "Read",
+      "reading": "Reading",
+      "unread": "In library",
+      "missing": "Missing"
+    },
+    "status": {
+      "label": "Filter series by reading status",
+      "all": "All",
+      "reading": "Reading",
+      "unread": "Unread",
+      "complete": "Complete",
+      "gaps": "Gaps",
+      "read": "Read",
+      "inProgress": "In progress",
+      "hasGaps": "Has gaps",
+      "notStarted": "Not started"
+    },
+    "index": {
+      "columnSeries": "Series",
+      "columnVolumes": "Volumes",
+      "columnRead": "Read",
+      "columnNext": "Up next",
+      "columnAdded": "Added",
+      "percent": "{value}%",
+      "captionReading": "{base} · {count, plural, one {# in progress} other {# in progress}}",
+      "finished": "Read end to end",
+      "reading": "Reading",
+      "next": "Next",
+      "start": "Start"
+    },
+    "grouping": {
+      "label": "Group by",
+      "none": "No grouping",
+      "letter": "By letter",
+      "library": "By library",
+      "status": "By status"
+    },
+    "libraries": {
+      "more": "+{count}"
+    },
+    "card": {
+      "oneVolume": "One volume",
+      "oneVolumeShort": "1 vol",
+      "volumeCount": "{count, plural, one {# volume} other {# volumes}}",
+      "readSummary": "{base} · {read} read",
+      "publishedOf": "{owned} of {total} published",
+      "complete": "Complete",
+      "moreVolumes": "{count, plural, one {# more volume} other {# more volumes}}",
+      "label": "{name}, {read} of {total} volumes read"
     }
   },
   "smartScope": {

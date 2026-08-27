@@ -3058,19 +3058,8 @@
       "refreshMetadata": "Обновить метаданные",
       "deleteAuthor": "Удалить автора"
     },
-    "listRow": {
-      "noRecentAdditions": "Нет недавних дополнений",
-      "portraitAlt": "{name} портрет"
-    },
     "filters": {
-      "title": "Фильтры автора",
-      "clearAll": "Очистить все",
-      "allLibraries": "Все библиотеки",
-      "allAuthors": "Все авторы",
-      "hasPhoto": "Есть фото",
-      "missingPhoto": "Отсутствует фото",
-      "minBooks": "Мин. книг",
-      "anyPlaceholder": "Любая"
+      "allLibraries": "Все библиотеки"
     },
     "header": {
       "never": "Никогда",

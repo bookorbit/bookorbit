@@ -156,6 +156,9 @@ const authorCoverSize = ref(normalizePositiveInteger(storage.get('authorCoverSiz
 const authorCoverShape = ref<AuthorCoverShape>(normalizeAuthorCoverShape(storage.get('authorCoverShape', 'circle')))
 const tableZebraStriping = ref(storage.get<boolean>('tableZebraStriping', false) === true)
 const tableDensity = ref<TableDensity>(normalizeTableDensity(storage.get('tableDensity', 'comfortable')))
+const authorRowDensity = ref<TableDensity>(normalizeTableDensity(storage.get('authorRowDensity', 'comfortable')))
+// Off by default: a book cover under a person's name reads as their photograph.
+const authorCoverFallback = ref(storage.get<boolean>('authorCoverFallback', false) === true)
 const bookSpineOverlay = ref<BookSpineOverlay>(normalizeBookSpineOverlay(storage.get('bookSpineOverlay', DEFAULT_BOOK_SPINE_OVERLAY)))
 const showSpineOnComics = ref(storage.get<boolean>('showSpineOnComics', false) === true)
 const bookShadowStrength = ref<BookShadowStrength>(normalizeBookShadowStrength(storage.get('bookShadowStrength', DEFAULT_BOOK_SHADOW_STRENGTH)))
@@ -185,6 +188,8 @@ watch(authorCoverSize, (v) => storage.set('authorCoverSize', v))
 watch(authorCoverShape, (v) => storage.set('authorCoverShape', normalizeAuthorCoverShape(v)))
 watch(tableZebraStriping, (v) => storage.set('tableZebraStriping', v))
 watch(tableDensity, (v) => storage.set('tableDensity', normalizeTableDensity(v)))
+watch(authorRowDensity, (v) => storage.set('authorRowDensity', normalizeTableDensity(v)))
+watch(authorCoverFallback, (v) => storage.set('authorCoverFallback', v))
 watch(bookSpineOverlay, (value) => storage.set('bookSpineOverlay', normalizeBookSpineOverlay(value)))
 watch(showSpineOnComics, (v) => storage.set('showSpineOnComics', v))
 watch(bookShadowStrength, (value) => storage.set('bookShadowStrength', normalizeBookShadowStrength(value)))
@@ -210,6 +215,8 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     smartScopeFilterExpanded: smartScopeFilterExpanded.value === true,
     authorCoverSize: normalizePositiveInteger(authorCoverSize.value, 120, 100, 400),
     authorCoverShape: normalizeAuthorCoverShape(authorCoverShape.value),
+    authorRowDensity: normalizeTableDensity(authorRowDensity.value),
+    authorCoverFallback: authorCoverFallback.value === true,
     tableZebraStriping: tableZebraStriping.value === true,
     tableDensity: normalizeTableDensity(tableDensity.value),
     bookSpineOverlay: normalizeBookSpineOverlay(bookSpineOverlay.value),
@@ -244,6 +251,8 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
   if (typeof obj.smartScopeFilterExpanded === 'boolean') out.smartScopeFilterExpanded = obj.smartScopeFilterExpanded
   if (typeof obj.authorCoverSize === 'number') out.authorCoverSize = normalizePositiveInteger(obj.authorCoverSize, 120, 100, 400)
   if (AUTHOR_COVER_SHAPES.includes(obj.authorCoverShape as AuthorCoverShape)) out.authorCoverShape = obj.authorCoverShape as AuthorCoverShape
+  if (TABLE_DENSITIES.includes(obj.authorRowDensity as TableDensity)) out.authorRowDensity = obj.authorRowDensity as TableDensity
+  if (typeof obj.authorCoverFallback === 'boolean') out.authorCoverFallback = obj.authorCoverFallback
   if (typeof obj.tableZebraStriping === 'boolean') out.tableZebraStriping = obj.tableZebraStriping
   if (TABLE_DENSITIES.includes(obj.tableDensity as TableDensity)) out.tableDensity = obj.tableDensity as TableDensity
   if (BOOK_SPINE_OVERLAYS.includes(obj.bookSpineOverlay as BookSpineOverlay)) out.bookSpineOverlay = obj.bookSpineOverlay as BookSpineOverlay
@@ -289,6 +298,8 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.smartScopeFilterExpanded !== undefined) smartScopeFilterExpanded.value = prefs.smartScopeFilterExpanded
   if (prefs.authorCoverSize !== undefined) authorCoverSize.value = prefs.authorCoverSize
   if (prefs.authorCoverShape !== undefined) authorCoverShape.value = prefs.authorCoverShape
+  if (prefs.authorRowDensity !== undefined) authorRowDensity.value = prefs.authorRowDensity
+  if (prefs.authorCoverFallback !== undefined) authorCoverFallback.value = prefs.authorCoverFallback
   if (prefs.tableZebraStriping !== undefined) tableZebraStriping.value = prefs.tableZebraStriping
   if (prefs.tableDensity !== undefined) tableDensity.value = prefs.tableDensity
   if (prefs.bookSpineOverlay !== undefined) bookSpineOverlay.value = prefs.bookSpineOverlay
@@ -317,6 +328,8 @@ export function useDisplaySettings() {
     smartScopeFilterExpanded,
     authorCoverSize,
     authorCoverShape,
+    authorRowDensity,
+    authorCoverFallback,
     tableZebraStriping,
     tableDensity,
     bookSpineOverlay,

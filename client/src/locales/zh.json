@@ -3229,19 +3229,8 @@
       "refreshMetadata": "刷新元数据",
       "deleteAuthor": "删除作者"
     },
-    "listRow": {
-      "noRecentAdditions": "没有最近的添加",
-      "portraitAlt": "{name} 的头像"
-    },
     "filters": {
-      "title": "作者过滤器",
-      "clearAll": "全部清除",
-      "allLibraries": "所有库",
-      "allAuthors": "所有作者",
-      "hasPhoto": "有照片",
-      "missingPhoto": "缺少照片",
-      "minBooks": "最小书",
-      "anyPlaceholder": "任何"
+      "allLibraries": "所有库"
     },
     "header": {
       "never": "从不使用",

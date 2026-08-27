@@ -1,8 +1,6 @@
 import type { AnnotationChapterStat, AnnotationItem, AnnotationStats } from '@bookorbit/types'
 
-export type HighlightGroupMode = 'chapter' | 'colour' | 'day'
-
-export const HIGHLIGHT_GROUP_MODES: HighlightGroupMode[] = ['chapter', 'colour', 'day']
+export type HighlightGroupMode = 'chapter' | 'colour' | 'day' | 'source'
 
 export interface HighlightGroup {
   /** Stable key for `v-for` and for scroll targets. */
@@ -14,6 +12,8 @@ export interface HighlightGroup {
   index: number | null
   /** Colour hex when grouping by colour, so the rule can carry a swatch. */
   colour: string | null
+  /** Origin when grouping by source, so the rule can carry its pill hue. */
+  origin: AnnotationItem['origin'] | null
   /** Total across the whole book, from the server aggregate, not from the loaded page. */
   total: number
   /** Colour composition of the group, for the index bars. */
@@ -49,7 +49,49 @@ function chapterKey(title: string | null): string {
 export function buildHighlightGroups(items: AnnotationItem[], stats: AnnotationStats | null, mode: HighlightGroupMode): HighlightGroup[] {
   if (mode === 'colour') return buildColourGroups(items, stats)
   if (mode === 'day') return buildDayGroups(items)
+  if (mode === 'source') return buildSourceGroups(items, stats)
   return buildChapterGroups(items, stats?.chapterBreakdown ?? [])
+}
+
+/** Mirrors the colour builder: totals from the aggregate, loaded rows hung off them. */
+function buildSourceGroups(items: AnnotationItem[], stats: AnnotationStats | null): HighlightGroup[] {
+  const groups = new Map<string, HighlightGroup>()
+
+  for (const entry of stats?.originBreakdown ?? []) {
+    groups.set(entry.origin, {
+      key: entry.origin,
+      mode: 'source',
+      label: entry.origin,
+      index: null,
+      colour: null,
+      origin: entry.origin,
+      total: entry.count,
+      colours: [],
+      items: [],
+    })
+  }
+
+  for (const item of items) {
+    let group = groups.get(item.origin)
+    if (!group) {
+      group = {
+        key: item.origin,
+        mode: 'source',
+        label: item.origin,
+        index: null,
+        colour: null,
+        origin: item.origin,
+        total: 0,
+        colours: [],
+        items: [],
+      }
+      groups.set(item.origin, group)
+    }
+    group.items.push(item)
+    if (group.total === 0) group.total = group.items.length
+  }
+
+  return [...groups.values()]
 }
 
 function buildChapterGroups(items: AnnotationItem[], breakdown: AnnotationChapterStat[]): HighlightGroup[] {
@@ -62,6 +104,7 @@ function buildChapterGroups(items: AnnotationItem[], breakdown: AnnotationChapte
       label: chapter.title,
       index: chapter.chapterIndex == null ? null : chapter.chapterIndex + 1,
       colour: null,
+      origin: null,
       total: chapter.count,
       colours: chapter.colors,
       items: [],
@@ -74,7 +117,7 @@ function buildChapterGroups(items: AnnotationItem[], breakdown: AnnotationChapte
     const key = chapterKey(item.chapterTitle)
     let group = groups.get(key)
     if (!group) {
-      group = { key, mode: 'chapter', label: item.chapterTitle, index: null, colour: null, total: 0, colours: [], items: [] }
+      group = { key, mode: 'chapter', label: item.chapterTitle, index: null, colour: null, origin: null, total: 0, colours: [], items: [] }
       groups.set(key, group)
     }
     group.items.push(item)
@@ -94,6 +137,7 @@ function buildColourGroups(items: AnnotationItem[], stats: AnnotationStats | nul
       label: entry.color,
       index: null,
       colour: entry.color,
+      origin: null,
       total: entry.count,
       colours: [entry],
       items: [],
@@ -103,7 +147,7 @@ function buildColourGroups(items: AnnotationItem[], stats: AnnotationStats | nul
   for (const item of items) {
     let group = groups.get(item.color)
     if (!group) {
-      group = { key: item.color, mode: 'colour', label: item.color, index: null, colour: item.color, total: 0, colours: [], items: [] }
+      group = { key: item.color, mode: 'colour', label: item.color, index: null, colour: item.color, origin: null, total: 0, colours: [], items: [] }
       groups.set(item.color, group)
     }
     group.items.push(item)
@@ -125,7 +169,7 @@ function buildDayGroups(items: AnnotationItem[]): HighlightGroup[] {
     const key = highlightDay(item)
     let group = groups.get(key)
     if (!group) {
-      group = { key, mode: 'day', label: key, index: null, colour: null, total: 0, colours: [], items: [] }
+      group = { key, mode: 'day', label: key, index: null, colour: null, origin: null, total: 0, colours: [], items: [] }
       groups.set(key, group)
     }
     group.items.push(item)

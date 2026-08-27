@@ -421,6 +421,11 @@ export const annotations = pgTable(
     index('annotations_user_book_active_idx')
       .on(t.userId, t.bookId)
       .where(sql`${t.deletedAt} is null`),
+    // The annotations hub is an infinite stream ordered newest-first over everything a
+    // user owns, so its default query sorts the whole set without this.
+    index('annotations_user_created_active_idx')
+      .on(t.userId, t.createdAt.desc(), t.id.desc())
+      .where(sql`${t.deletedAt} is null`),
     check('annotations_style_chk', sql`${t.style} in ('highlight', 'underline', 'strikethrough', 'squiggly', 'invert')`),
     check('annotations_origin_chk', sql`${t.origin} in ('web', 'koreader', 'kobo')`),
   ],

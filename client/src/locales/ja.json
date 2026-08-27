@@ -3080,19 +3080,8 @@
       "refreshMetadata": "メタデータを更新",
       "deleteAuthor": "投稿者を削除"
     },
-    "listRow": {
-      "noRecentAdditions": "最近の追加はありません",
-      "portraitAlt": "{name} 縦向き画像"
-    },
     "filters": {
-      "title": "投稿者フィルター",
-      "clearAll": "すべてクリア",
-      "allLibraries": "すべてのライブラリ",
-      "allAuthors": "すべての著者",
-      "hasPhoto": "写真あり",
-      "missingPhoto": "不足している写真",
-      "minBooks": "最小の本",
-      "anyPlaceholder": "任意の"
+      "allLibraries": "すべてのライブラリ"
     },
     "header": {
       "never": "一切なし",

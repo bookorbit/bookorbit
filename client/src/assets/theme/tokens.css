@@ -50,6 +50,14 @@
 
   --star-highlight: oklch(0.76 0.18 90);
 
+  /* Series volume track. Kept apart from --success / --warning / --destructive because those are
+     tuned to clear AA as text: as fills these only have to separate from each other and from the
+     card, so light mode wants a brighter amber and a distinctly darker neutral than the text set. */
+  --volume-read: oklch(0.6 0.16 148);
+  --volume-reading: oklch(0.74 0.15 72);
+  --volume-unread: oklch(0.855 var(--tint-c-surface) var(--tint-h));
+  --volume-missing: oklch(0.58 0.22 27);
+
   /* Metadata score ramp: red at 0, through orange and yellow, to green at 100. Consumers
      interpolate between these four with color-mix in oklch, so the whole spectrum follows
      from four tokens. Tuned per theme like every other text colour here: on a light card the
@@ -231,6 +239,11 @@
   --warning-foreground: oklch(0.145 0 0);
 
   --star-highlight: oklch(0.84 0.17 95);
+
+  --volume-read: oklch(0.7 0.16 148);
+  --volume-reading: oklch(0.78 0.14 75);
+  --volume-unread: oklch(0.315 var(--tint-c-surface) var(--tint-h));
+  --volume-missing: oklch(0.7 0.19 25);
 
   /* Lifted the way the pills are, with the yellow middle highest so the ramp holds an even
      weight across the spectrum on a dark card */

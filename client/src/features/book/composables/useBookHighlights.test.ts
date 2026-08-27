@@ -32,6 +32,7 @@ function makeListResponse(overrides?: Record<string, unknown>) {
       colorBreakdown: [{ color: '#FACC15', count: 1 }],
       chaptersWithHighlights: 1,
       highlightsWithNotes: 0,
+      highlightsNeedingReview: 0,
       chapters: ['Chapter 1'],
       chapterBreakdown: [
         {
@@ -117,20 +118,25 @@ describe('useBookHighlights', () => {
     expect(mockFetch.mock.calls[0]?.[0]).toContain('colors=%23FACC15')
   })
 
-  it('maps the merged sort key to sortBy/sortDir', async () => {
+  it('drives the grouping and the request sort from one view key', async () => {
     mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
     const bookId = ref(5)
-    const { sortBy, sortDir, sortKey } = useBookHighlights(bookId)
+    const { view, groupMode } = useBookHighlights(bookId)
 
     await nextTick()
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
-    expect(sortKey.value).toBe('position')
-    sortKey.value = 'newest'
-    expect(sortBy.value).toBe('createdAt')
-    expect(sortDir.value).toBe('desc')
-    sortKey.value = 'oldest'
-    expect(sortDir.value).toBe('asc')
+    expect(view.value).toBe('position')
+    expect(groupMode.value).toBe('chapter')
+
+    view.value = 'newest'
+    expect(groupMode.value).toBe('day')
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('sortBy=createdAt'))
+    expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('sortDir=desc')
+
+    view.value = 'colour'
+    expect(groupMode.value).toBe('colour')
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('sortBy=position'))
   })
 
   it('appends the next window instead of replacing the loaded one', async () => {
@@ -378,20 +384,19 @@ describe('useBookHighlights', () => {
     expect(dateTo.value).toBe('')
   })
 
-  it('maps the position sort key back to sortBy/sortDir', async () => {
+  it('sends the notes and review refinements to the server, not to the loaded window', async () => {
     mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
     const bookId = ref(5)
-    const { sortKey, sortBy, sortDir } = useBookHighlights(bookId)
+    const { toggleNotesOnly, toggleNeedsReviewOnly } = useBookHighlights(bookId)
 
     await nextTick()
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
-    sortKey.value = 'newest'
-    expect(sortBy.value).toBe('createdAt')
+    toggleNotesOnly()
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('hasNote=true'))
 
-    sortKey.value = 'position'
-    expect(sortBy.value).toBe('position')
-    expect(sortDir.value).toBe('asc')
+    toggleNeedsReviewOnly()
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('needsReview=true'))
   })
 
   it('refetches exactly once from the top when a filter changes after loading more', async () => {

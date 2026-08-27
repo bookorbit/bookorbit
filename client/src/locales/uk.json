@@ -3066,19 +3066,8 @@
       "refreshMetadata": "Оновити метадані",
       "deleteAuthor": "Видалити автора"
     },
-    "listRow": {
-      "noRecentAdditions": "Немає останніх доповнень",
-      "portraitAlt": "Портрет {name}"
-    },
     "filters": {
-      "title": "Фільтри автора",
-      "clearAll": "Очистити все",
-      "allLibraries": "Всі бібліотеки",
-      "allAuthors": "Усі автори",
-      "hasPhoto": "Має фото",
-      "missingPhoto": "Відсутнє фото",
-      "minBooks": "Мін книг",
-      "anyPlaceholder": "Будь-яке"
+      "allLibraries": "Всі бібліотеки"
     },
     "header": {
       "never": "Ніколи",

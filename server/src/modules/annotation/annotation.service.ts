@@ -122,6 +122,8 @@ export class AnnotationService {
       chapter: query.chapter || undefined,
       dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
       dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
+      hasNote: query.hasNote || undefined,
+      needsReview: query.needsReview || undefined,
     };
   }
 

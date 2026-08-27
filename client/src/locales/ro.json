@@ -3143,18 +3143,8 @@
       "refreshMetadata": "Reîmprospătare metadate",
       "deleteAuthor": "Șterge Autor"
     },
-    "listRow": {
-      "noRecentAdditions": "Nici o completare recentă"
-    },
     "filters": {
-      "title": "Filtre autor",
-      "clearAll": "Șterge tot",
-      "allLibraries": "Toate bibliotecile",
-      "allAuthors": "Toți autorii",
-      "hasPhoto": "Are fotografie",
-      "missingPhoto": "Fotografie lipsă",
-      "minBooks": "Cărți minime",
-      "anyPlaceholder": "Oricare"
+      "allLibraries": "Toate bibliotecile"
     },
     "header": {
       "never": "Niciodată",

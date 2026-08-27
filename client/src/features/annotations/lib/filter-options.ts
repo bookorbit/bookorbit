@@ -26,15 +26,6 @@ export const ORIGIN_OPTIONS: FilterOption[] = [
   { value: 'kobo', label: 'Kobo' },
 ]
 
-export type SortKey = 'newest' | 'oldest' | 'book-asc' | 'book-desc'
-
-export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'book-asc', label: 'Book A to Z' },
-  { value: 'book-desc', label: 'Book Z to A' },
-]
-
 function labelFor(options: FilterOption[], value: string): string {
   return options.find((option) => option.value === value)?.label ?? value
 }

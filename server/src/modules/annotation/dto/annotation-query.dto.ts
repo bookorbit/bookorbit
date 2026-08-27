@@ -1,5 +1,5 @@
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 const SORT_BY_OPTIONS = ['position', 'createdAt'] as const;
 const SORT_DIR_OPTIONS = ['asc', 'desc'] as const;
@@ -48,4 +48,16 @@ export class AnnotationQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  /** Only annotations that carry a note. */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  hasNote?: boolean;
+
+  /** Only annotations whose canonical position is not `exact`. */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  needsReview?: boolean;
 }

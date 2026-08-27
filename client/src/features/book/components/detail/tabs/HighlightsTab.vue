@@ -3,23 +3,20 @@ import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, 
 import { useMediaQuery } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import type { AnnotationItem, BookDetail } from '@bookorbit/types'
-import { READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import { useBookHighlights } from '@/features/book/composables/useBookHighlights'
+import { toast } from 'vue-sonner'
+import { ANNOTATION_HIGHLIGHT_COLORS, READER_OPENABLE_FORMATS, type AnnotationItem, type BookDetail } from '@bookorbit/types'
+import { formatDate } from '@/i18n/formatters'
 import { useDeferredLoading } from '@/composables/useDeferredLoading'
+import AnnotationStream from '@/features/annotations/components/shared/AnnotationStream.vue'
+import AnnotationEntry from '@/features/annotations/components/shared/AnnotationEntry.vue'
+import AnnotationEntryDetail from '@/features/annotations/components/shared/AnnotationEntryDetail.vue'
+import { buildHubChips } from '@/features/annotations/lib/hub-chips'
+import type { StreamGroup } from '@/features/annotations/lib/stream-groups'
 import { useDensity } from '@/features/annotations/composables/useDensity'
-import { HIGHLIGHT_GROUP_MODES, NO_CHAPTER_KEY, type HighlightGroup } from '@/features/book/lib/highlight-groups'
-import HighlightsRail from '@/features/book/components/detail/highlights/HighlightsRail.vue'
-import HighlightsStream from '@/features/book/components/detail/highlights/HighlightsStream.vue'
-import HighlightsIndex from '@/features/book/components/detail/highlights/HighlightsIndex.vue'
-import HighlightsActivity from '@/features/book/components/detail/highlights/HighlightsActivity.vue'
-import HighlightInspector from '@/features/book/components/detail/highlights/HighlightInspector.vue'
-import HighlightsBand from '@/features/book/components/detail/highlights/HighlightsBand.vue'
+import { useBookHighlights } from '@/features/book/composables/useBookHighlights'
+import { HIGHLIGHT_VIEW_KEYS, type HighlightViewKey } from '@/features/book/lib/highlight-views'
+import HighlightsSideRail from '@/features/book/components/detail/highlights/HighlightsSideRail.vue'
 import HighlightsEmptyStage from '@/features/book/components/detail/highlights/HighlightsEmptyStage.vue'
-import HighlightsShortcutsDialog from '@/features/book/components/detail/highlights/HighlightsShortcutsDialog.vue'
-
-// Named for the KeepAlive `include` list in BookDetailView.
-defineOptions({ name: 'HighlightsTab' })
 
 const props = defineProps<{ book: BookDetail }>()
 
@@ -29,40 +26,79 @@ const bookIdRef = computed(() => props.book.id)
 const hl = useBookHighlights(bookIdRef)
 const { density } = useDensity()
 
-/** Below xl the three columns stack, so the inspector takes over the stream the way the Files
- *  tab swaps its tree for a file: a detail panel below a 55-row list is a panel nobody finds. */
-const isStacked = useMediaQuery('(max-width: 1279px)')
-const shortcutsOpen = ref(false)
-const editingNoteId = ref<number | null>(null)
+/**
+ * Same rule as the library hub: the source margin only earns a column when there is room for
+ * it and a cursor to scan with, and a 1366px tablet is still a finger.
+ */
+const stacked = useMediaQuery('(max-width: 1535px), (pointer: coarse)')
+const compact = computed(() => density.value === 'compact')
 
-const bookTitle = computed(() => props.book.title ?? t('book.detail.highlights.untitled'))
-const blank = computed(() => !hl.loading.value && hl.total.value === 0 && !hl.hasActiveFilters.value)
-
-// Until the first load lands there is nothing to print but zeros, and a rail reading "0 highlights"
-// over an empty stream is a claim, not a loading state. Latched, because a later filter reload
-// must not throw the pane back to the placeholder, which covers the box either settled layout
-// puts there so neither resolution moves anything.
+/** Held until the first load settles, so the tab never flashes its empty state on the way in. */
 const resolved = ref(false)
 watch(hl.loading, (busy) => {
   if (!busy) resolved.value = true
 })
-const firstLoadPending = computed(() => !resolved.value)
-const showFirstLoadSkeleton = useDeferredLoading(firstLoadPending)
-const stackedDetail = computed(() => isStacked.value && hl.activeItem.value != null)
+const showFirstLoadSkeleton = useDeferredLoading(computed(() => !resolved.value))
 
+const bookTitle = computed(() => props.book.title ?? t('book.detail.highlights.untitled'))
+const blank = computed(() => resolved.value && hl.total.value === 0 && !hl.hasActiveFilters.value)
 const readableFile = computed(() => props.book.files.find((file) => file.format != null && READER_OPENABLE_FORMATS.has(file.format as never)) ?? null)
-const jumpableIds = computed(() => {
-  const ids = new Set<number>()
-  for (const item of hl.items.value) if (item.jumpFileId != null) ids.add(item.id)
-  return ids
+
+const viewOptions = computed(() => HIGHLIGHT_VIEW_KEYS.map((key) => ({ value: key, label: t(`book.detail.highlights.views.${key}`) })))
+
+/** The book's own axes, translated here where the vocabulary lives. */
+const groups = computed<StreamGroup[]>(() =>
+  hl.streamGroups.value.map((group) => {
+    if (group.mode === 'colour') {
+      const match = ANNOTATION_HIGHLIGHT_COLORS.find((color) => color.hex === group.key)
+      return {
+        key: group.key,
+        label: match ? t(`annotations.colors.${match.name}`) : group.key,
+        swatch: group.key,
+        count: group.total,
+        items: group.items,
+      }
+    }
+    if (group.mode === 'source') {
+      return {
+        key: group.key,
+        label: t(`annotations.sources.${group.key}`),
+        swatch: `var(--pill-${group.key})`,
+        count: group.total,
+        items: group.items,
+      }
+    }
+    if (group.mode === 'day') {
+      const first = group.items[0]
+      return {
+        key: group.key,
+        label: first ? formatDate(new Date(first.createdAt), { day: 'numeric', month: 'long', year: 'numeric' }) : group.key,
+        count: group.total,
+        items: group.items,
+      }
+    }
+    return { key: group.key, label: group.label ?? t('book.detail.highlights.noChapter'), count: group.total, items: group.items }
+  }),
+)
+
+const chips = computed(() => {
+  const built = buildHubChips(
+    { colors: hl.colors.value, styleFilter: 'all', originFilter: 'all', dateFrom: hl.dateFrom.value, dateTo: hl.dateTo.value },
+    t,
+    (value) => formatDate(new Date(`${value}T00:00:00`), { day: 'numeric', month: 'short', year: 'numeric' }),
+  )
+  if (hl.chapter.value) built.push({ id: 'chapter', label: hl.chapter.value })
+  return built
 })
 
-const activeGroupKey = computed(() => {
-  const active = hl.activeItem.value
-  if (!active) return null
-  if (hl.groupMode.value === 'colour') return active.color
-  return active.chapterTitle ?? NO_CHAPTER_KEY
-})
+function handleOpen(id: number) {
+  if (hl.activeId.value === id) hl.closeInspector()
+  else hl.openInspector(id)
+}
+
+function handleViewChange(value: string) {
+  hl.view.value = value as HighlightViewKey
+}
 
 function handleJump(annotation: AnnotationItem) {
   if (!annotation.jumpFileId) return
@@ -80,82 +116,58 @@ function handleOpenReader() {
   void router.push({ name: 'reader', params: { bookId: props.book.id, fileId: file.id } })
 }
 
-function handleOpen(id: number) {
-  hl.openInspector(id)
+function handleToggleDensity() {
+  density.value = compact.value ? 'comfortable' : 'compact'
 }
 
-function handleCloseInspector() {
-  hl.closeInspector()
-  editingNoteId.value = null
+function handleRemoveChip(id: string) {
+  if (id === 'chapter') hl.setChapterFilter(null)
+  else hl.removeFilterChip(id)
 }
 
-function handleStep(delta: number) {
-  hl.stepInspector(delta)
-}
-
-function handleEditNote(id: number) {
-  hl.openInspector(id)
-  editingNoteId.value = id
-}
-
-function handleCancelNote() {
-  editingNoteId.value = null
-}
-
-async function handleUpdateNote(id: number, note: string | null) {
-  await hl.updateNote(id, note)
-  editingNoteId.value = null
-}
-
-function handleRestyle(id: number) {
-  hl.openInspector(id)
-}
-
-async function handleTrash(id: number) {
-  await hl.deleteHighlight(id)
-}
-
-function handleSelectGroup(group: HighlightGroup) {
-  if (group.mode === 'colour') {
-    hl.toggleColorFilter(group.key)
-    return
-  }
-  if (group.mode === 'chapter') {
-    hl.setChapterFilter(group.label)
-    return
-  }
-  const first = group.items[0]
-  if (first) hl.openInspector(first.id)
+function handleReviewPositions() {
+  hl.onlyNeedsReview.value = true
 }
 
 function handleSelectChapter(title: string | null) {
   hl.setChapterFilter(title)
 }
 
-function handleToggleDensity() {
-  density.value = density.value === 'comfortable' ? 'compact' : 'comfortable'
+async function handleTrash(id: number) {
+  await hl.deleteHighlight(id)
 }
 
-function handleShowShortcuts() {
-  shortcutsOpen.value = true
+async function handleUpdateNote(id: number, note: string | null) {
+  await hl.updateNote(id, note)
+  toast.success(t('annotations.hub.toast.noteSaved'))
 }
 
-function handleSelectAll() {
-  hl.selectAllOnPage()
+function handleUpdateColor(id: number, color: string) {
+  void hl.updateColor(id, color)
+}
+
+function handleUpdateStyle(id: number, style: string) {
+  void hl.updateStyle(id, style)
 }
 
 async function handleBulkColor(color: string) {
   const affected = await hl.bulkRestyle([...hl.selectedIds.value], { color })
-  if (affected > 0) hl.clearSelection()
+  if (affected > 0) {
+    hl.clearSelection()
+    toast.success(t('annotations.hub.toast.bulkRecolored', { count: affected }))
+  }
 }
 
 async function handleBulkTrash() {
   const affected = await hl.bulkTrash([...hl.selectedIds.value])
-  if (affected > 0) hl.clearSelection()
+  if (affected > 0) {
+    hl.clearSelection()
+    toast.success(t('annotations.hub.toast.bulkTrashed', { count: affected }))
+  }
 }
 
-function handleReviewPositions() {
-  hl.onlyNeedsReview.value = true
+function handleExport(format: 'md' | 'csv' | 'json') {
+  window.open(`/api/v1/annotations/export?format=${format}&bookId=${props.book.id}`, '_blank')
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -169,52 +181,34 @@ function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') (event.target as HTMLElement).blur()
     return
   }
-  switch (event.key) {
-    case 'j':
-      hl.stepInspector(1)
-      event.preventDefault()
-      break
-    case 'k':
-      hl.stepInspector(-1)
-      event.preventDefault()
-      break
-    case 'Escape':
-      if (shortcutsOpen.value) shortcutsOpen.value = false
-      else handleCloseInspector()
-      break
-    case '?':
-      shortcutsOpen.value = true
-      event.preventDefault()
-      break
-    case 'g': {
-      const next = (HIGHLIGHT_GROUP_MODES.indexOf(hl.groupMode.value) + 1) % HIGHLIGHT_GROUP_MODES.length
-      hl.groupMode.value = HIGHLIGHT_GROUP_MODES[next] ?? 'chapter'
-      event.preventDefault()
-      break
-    }
-    case 'x':
-      if (hl.activeId.value != null) hl.toggleSelected(hl.activeId.value)
-      break
-    default:
-      break
+  if (event.key === 'j') {
+    hl.stepInspector(1)
+    event.preventDefault()
+  } else if (event.key === 'k') {
+    hl.stepInspector(-1)
+    event.preventDefault()
+  } else if (event.key === 'Escape') {
+    hl.closeInspector()
+  } else if (event.key === 'x' && hl.activeId.value != null) {
+    hl.toggleSelected(hl.activeId.value)
   }
 }
 
-watch(
-  () => hl.activeId.value,
-  (id) => {
-    if (id == null) editingNoteId.value = null
-  },
-)
-
-// The tab is kept alive, so a cached-but-hidden Highlights tab must stop swallowing j/k/? while
-// another tab is on screen. Mount and unmount stay bound too, for rendering outside a KeepAlive.
 function bindShortcuts() {
   window.addEventListener('keydown', handleKeydown)
 }
+
 function unbindShortcuts() {
   window.removeEventListener('keydown', handleKeydown)
 }
+
+watch(
+  () => hl.items.value,
+  (items) => {
+    if (hl.activeId.value != null && !items.some((item) => item.id === hl.activeId.value)) hl.closeInspector()
+  },
+)
+
 onMounted(bindShortcuts)
 onBeforeUnmount(unbindShortcuts)
 onDeactivated(unbindShortcuts)
@@ -238,10 +232,10 @@ onActivated(() => {
       {{ hl.error.value }}
     </div>
 
-    <div v-if="!resolved" class="min-h-80 flex-1 rounded-xl border border-border bg-card xl:min-h-0" aria-busy="true">
-      <div v-if="showFirstLoadSkeleton" class="flex flex-col gap-2 px-3 py-3" aria-hidden="true">
-        <div v-for="row in 6" :key="row" class="h-4 rounded bg-muted animate-shimmer" />
-      </div>
+    <!-- One placeholder spanning the columns both settled layouts fill, so nothing moves. -->
+    <div v-else-if="showFirstLoadSkeleton" class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
+      <div class="h-full min-h-[24rem] animate-shimmer rounded-xl bg-muted" />
+      <div class="hidden h-full min-h-[24rem] animate-shimmer rounded-xl bg-muted xl:block" />
     </div>
 
     <div v-else-if="blank" class="flex min-h-0 flex-1 flex-col">
@@ -249,111 +243,99 @@ onActivated(() => {
     </div>
 
     <!--
-      A+ Ledger. Below xl the tab is a single scrolling column. From xl the pane owns the height:
-      the rail, the stream and the index fill row one, and the position band takes row two. The
-      side columns hug their content so a lightly marked book does not print two empty boxes.
+      Two surfaces, the same as /annotations. The reading column owns the height; the rail
+      hugs its content so a lightly marked book does not print an empty box.
     -->
-    <div
-      v-else
-      class="flex flex-col gap-4 xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-[17rem_minmax(0,1fr)_19.25rem] xl:grid-rows-[minmax(0,1fr)_7.25rem] xl:gap-x-[18px] xl:gap-y-[14px]"
-    >
-      <HighlightsRail
-        v-show="!stackedDetail"
-        class="order-3 xl:order-none xl:col-start-1 xl:row-start-1 xl:max-h-full xl:self-start"
-        :stats="hl.stats.value"
-        :total="hl.total.value"
-        :chapter-count="null"
-        :selected-colors="hl.colors.value"
-        :items="hl.items.value"
-        :book-title="bookTitle"
-        @toggle-color="hl.toggleColorFilter"
-        @review-positions="handleReviewPositions"
-      />
-
-      <HighlightsStream
+    <div v-else class="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
+      <AnnotationStream
         v-model:search="hl.search.value"
-        v-model:sort-key="hl.sortKey.value"
-        v-model:only-notes="hl.onlyNotes.value"
-        v-model:only-needs-review="hl.onlyNeedsReview.value"
         v-model:colors="hl.colors.value"
         v-model:date-from="hl.dateFrom.value"
         v-model:date-to="hl.dateTo.value"
-        v-show="!stackedDetail"
-        class="order-1 max-h-[34rem] xl:order-none xl:col-start-2 xl:row-start-1 xl:max-h-none"
-        :groups="hl.streamGroups.value"
+        class="order-1"
+        :groups="groups"
+        :loaded-count="hl.items.value.length"
         :total="hl.total.value"
+        :view="hl.view.value"
+        :view-options="viewOptions"
+        :show-book="false"
+        :chapter-in-rule="hl.groupMode.value === 'chapter'"
+        :stacked="stacked"
+        :compact="compact"
         :loading="hl.loading.value"
         :loading-more="hl.loadingMore.value"
         :has-more="hl.hasMore.value"
-        :notes-count="hl.stats.value?.highlightsWithNotes ?? 0"
+        :trashed="false"
+        :notes-only="hl.onlyNotes.value"
+        :needs-review-only="hl.onlyNeedsReview.value"
+        :note-count="hl.noteCount.value"
         :review-count="hl.needsReviewCount.value"
-        :selected-ids="hl.selectedIds.value"
-        :active-id="hl.activeId.value"
-        :density="density"
-        :jumpable-ids="jumpableIds"
-        :has-active-filters="hl.hasActiveFilters.value"
-        :filter-count="hl.popoverFilterCount.value"
-        @open="handleOpen"
-        @toggle-select="hl.toggleSelected"
-        @jump="handleJump"
-        @edit-note="handleEditNote"
-        @restyle="handleRestyle"
-        @trash="handleTrash"
-        @load-more="hl.loadMore"
+        :filtered="hl.hasActiveFilters.value"
+        :chips="chips"
+        :selection-count="hl.selectedIds.value.size"
+        @update:view="handleViewChange"
+        @toggle-notes="hl.toggleNotesOnly"
+        @toggle-review="hl.toggleNeedsReviewOnly"
         @toggle-density="handleToggleDensity"
-        @show-shortcuts="handleShowShortcuts"
-        @select-all="handleSelectAll"
+        @remove-chip="handleRemoveChip"
+        @reset-filters="hl.resetAllFilters"
+        @load-more="hl.loadMore"
+        @export="handleExport"
+        @select-all="hl.selectAllOnPage"
         @clear-selection="hl.clearSelection"
         @bulk-color="handleBulkColor"
         @bulk-trash="handleBulkTrash"
-        @clear-filters="hl.clearPopoverFilters"
-        @reset-all="hl.resetAllFilters"
-      />
-
-      <div
-        class="order-2 flex min-h-0 flex-col gap-[14px] xl:order-none xl:col-start-3 xl:row-start-1 xl:max-h-full"
-        :class="hl.activeItem.value ? 'xl:self-stretch' : 'xl:self-start'"
       >
-        <HighlightInspector
-          v-if="hl.activeItem.value"
-          class="xl:min-h-0 xl:max-h-none xl:flex-1"
-          :annotation="hl.activeItem.value"
-          :position="hl.activeIndex.value + 1"
-          :total="hl.items.value.length"
-          :saving="hl.savingIds.value.has(hl.activeItem.value.id)"
-          :can-jump="jumpableIds.has(hl.activeItem.value.id)"
-          :editing-note="editingNoteId === hl.activeItem.value.id"
-          @close="handleCloseInspector"
-          @step="handleStep"
-          @jump="handleJump"
-          @update-note="handleUpdateNote"
-          @update-color="hl.updateColor"
-          @update-style="hl.updateStyle"
-          @trash="handleTrash"
-          @edit-note="handleEditNote"
-          @cancel-note="handleCancelNote"
-        />
-        <template v-if="!hl.activeItem.value">
-          <HighlightsIndex
-            v-model:mode="hl.groupMode.value"
-            class="max-h-80 xl:min-h-0 xl:max-h-none xl:flex-1"
-            :groups="hl.groups.value"
-            :active-key="activeGroupKey"
-            @select="handleSelectGroup"
-          />
-          <HighlightsActivity :stats="hl.stats.value" />
+        <template #entry="{ item, showDay, showBook, showChapter }">
+          <AnnotationEntry
+            :key="item.id"
+            :annotation="item"
+            :stacked="stacked"
+            :selected="hl.selectedIds.value.has(item.id)"
+            :selecting="hl.selectedIds.value.size > 0"
+            :active="hl.activeId.value === item.id"
+            :compact="compact"
+            :trashed="false"
+            :show-day="showDay"
+            :show-book="showBook"
+            :show-chapter="showChapter"
+            :narrow-margin="true"
+            :location-label="item.pageno == null ? null : t('annotations.listItem.pageNumber', { page: item.pageno })"
+            @toggle-select="hl.toggleSelected"
+            @open="handleOpen"
+            @jump="handleJump"
+            @trash="handleTrash"
+          >
+            <template #detail>
+              <AnnotationEntryDetail
+                v-if="hl.activeItem.value"
+                :annotation="hl.activeItem.value"
+                :can-jump="hl.activeItem.value.jumpFileId != null"
+                :trashed="false"
+                @close="hl.closeInspector"
+                @jump="handleJump"
+                @trash="handleTrash"
+                @update-note="handleUpdateNote"
+                @update-color="handleUpdateColor"
+                @update-style="handleUpdateStyle"
+              />
+            </template>
+          </AnnotationEntry>
         </template>
-      </div>
+      </AnnotationStream>
 
-      <HighlightsBand
-        v-show="!stackedDetail"
-        class="order-4 h-32 xl:order-none xl:col-span-full xl:row-start-2 xl:h-auto"
+      <HighlightsSideRail
+        v-if="hl.stats.value"
+        class="order-2 max-h-full"
         :stats="hl.stats.value"
-        :active-chapter="hl.activeItem.value?.chapterTitle ?? (hl.chapter.value || null)"
-        @select="handleSelectChapter"
+        :chapter-groups="hl.chapterGroups.value"
+        :selected-colors="hl.colors.value"
+        :selected-chapter="hl.chapter.value"
+        :book-title="bookTitle"
+        @toggle-color="hl.toggleColorFilter"
+        @select-chapter="handleSelectChapter"
+        @review-positions="handleReviewPositions"
       />
     </div>
-
-    <HighlightsShortcutsDialog v-model:open="shortcutsOpen" />
   </div>
 </template>

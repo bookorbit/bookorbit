@@ -34,6 +34,10 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-star-highlight: var(--star-highlight);
+  --color-volume-read: var(--volume-read);
+  --color-volume-reading: var(--volume-reading);
+  --color-volume-unread: var(--volume-unread);
+  --color-volume-missing: var(--volume-missing);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

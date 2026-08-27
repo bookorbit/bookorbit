@@ -11,10 +11,10 @@ const DEFAULT_STATE: AnnotationsHubState = {
   styleFilter: 'all',
   originFilter: 'all',
   notesOnly: false,
+  needsReviewOnly: false,
   dateFrom: '',
   dateTo: '',
-  sortKey: 'newest',
-  page: 1,
+  view: 'newest',
 }
 
 describe('annotationsStateFromQuery', () => {
@@ -27,10 +27,10 @@ describe('annotationsStateFromQuery', () => {
       style: 'underline',
       origin: 'koreader',
       notes: '1',
+      review: '1',
       from: '2026-01-10',
       to: '2026-01-12',
-      sort: 'oldest',
-      page: '3',
+      view: 'oldest',
     })
 
     expect(state).toEqual({
@@ -41,16 +41,16 @@ describe('annotationsStateFromQuery', () => {
       styleFilter: 'underline',
       originFilter: 'koreader',
       notesOnly: true,
+      needsReviewOnly: true,
       dateFrom: '2026-01-10',
       dateTo: '2026-01-12',
-      sortKey: 'oldest',
-      page: 3,
+      view: 'oldest',
     })
   })
 
-  it('drops defaults, malformed numbers, and unknown sort keys', () => {
-    expect(annotationsStateFromQuery({ status: 'active', bookId: 'abc', sort: 'bogus', page: '1', notes: '0' })).toEqual({})
-    expect(annotationsStateFromQuery({ page: '0', bookId: '-2' })).toEqual({})
+  it('drops defaults, malformed numbers, and unknown view keys', () => {
+    expect(annotationsStateFromQuery({ status: 'active', bookId: 'abc', view: 'bogus', notes: '0', review: '0' })).toEqual({})
+    expect(annotationsStateFromQuery({ bookId: '-2' })).toEqual({})
     expect(annotationsStateFromQuery({})).toEqual({})
   })
 
@@ -73,8 +73,7 @@ describe('annotationsQueryFromState', () => {
         bookFilter: 42,
         colors: ['#FACC15'],
         notesOnly: true,
-        sortKey: 'book-asc',
-        page: 2,
+        view: 'book',
       }),
     ).toEqual({
       status: 'trashed',
@@ -82,8 +81,7 @@ describe('annotationsQueryFromState', () => {
       bookId: '42',
       colors: '#FACC15',
       notes: '1',
-      sort: 'book-asc',
-      page: '2',
+      view: 'book',
     })
   })
 
@@ -94,16 +92,14 @@ describe('annotationsQueryFromState', () => {
       styleFilter: 'invert',
       dateFrom: '2026-01-01',
       dateTo: '2026-02-01',
-      sortKey: 'book-desc',
-      page: 5,
+      view: 'color',
     }
     expect(annotationsStateFromQuery(annotationsQueryFromState(state) as LocationQuery)).toEqual({
       originFilter: 'web',
       styleFilter: 'invert',
       dateFrom: '2026-01-01',
       dateTo: '2026-02-01',
-      sortKey: 'book-desc',
-      page: 5,
+      view: 'color',
     })
   })
 })

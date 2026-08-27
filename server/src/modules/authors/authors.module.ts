@@ -11,6 +11,7 @@ import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { NotificationModule } from '../notification/notification.module';
 import { AuthorImageStorageService } from './author-image-storage.service';
+import { AuthorPhotoFlagBackfillService } from './author-photo-flag-backfill.service';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { AuthorEnrichmentExecutorService } from './author-enrichment-executor.service';
 import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
@@ -71,6 +72,7 @@ const AUTHOR_PROVIDER_CLASSES = [AudnexusAuthorMetadataProvider, GoodreadsAuthor
     AuthorEnrichmentRepository,
     AuthorsService,
     AuthorsRepository,
+    AuthorPhotoFlagBackfillService,
   ],
   exports: [AuthorsService, AuthorsRepository, AuthorImageStorageService, AuthorEnrichmentOrchestratorService, AuthorMetadataPreferencesService],
 })

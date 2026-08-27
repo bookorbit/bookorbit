@@ -58,11 +58,13 @@ export interface HubFilters {
   dateFrom?: Date;
   dateTo?: Date;
   hasNote?: boolean;
+  /** Only highlights whose canonical position is not `exact`. */
+  needsReview?: boolean;
   status: 'active' | 'trashed';
 }
 
 export interface HubSort {
-  by: 'createdAt' | 'book';
+  by: 'createdAt' | 'book' | 'color' | 'origin';
   dir: 'asc' | 'desc';
 }
 
@@ -72,6 +74,9 @@ export interface AnnotationFilters {
   chapter?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  hasNote?: boolean;
+  /** Only annotations whose canonical position is not `exact`. */
+  needsReview?: boolean;
 }
 
 export interface AnnotationSort {
@@ -105,6 +110,7 @@ export interface AnnotationStatsResult {
   originBreakdown: { origin: AnnotationRow['origin']; count: number }[];
   chaptersWithHighlights: number;
   highlightsWithNotes: number;
+  highlightsNeedingReview: number;
   chapterBreakdown: AnnotationChapterStatResult[];
   activity: AnnotationActivityResult[];
 }
@@ -199,8 +205,10 @@ export class AnnotationRepository {
   async getStats(bookId: number, userId: number, filters: AnnotationFilters): Promise<AnnotationStatsResult> {
     const conditions = this.buildConditions(bookId, userId, filters);
     const cfiJoin = and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi'));
+    // The review chip's own total, so it does not collapse to the filtered count once on.
+    const reviewConditions = this.buildConditions(bookId, userId, { ...filters, needsReview: undefined });
 
-    const [aggregateResult, colorResult, originResult, chapterResult, activityResult] = await Promise.all([
+    const [aggregateResult, colorResult, originResult, chapterResult, activityResult, reviewResult] = await Promise.all([
       this.db
         .select({
           totalHighlights: count(),
@@ -255,6 +263,11 @@ export class AnnotationRepository {
         .leftJoin(annotationPositions, cfiJoin)
         .where(and(...conditions))
         .groupBy(sql`1`, annotations.origin),
+      this.db
+        .select({ total: count() })
+        .from(annotations)
+        .innerJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
+        .where(and(...reviewConditions, sql`${annotationPositions.status} <> 'exact'`)),
     ]);
 
     const agg = aggregateResult[0];
@@ -263,6 +276,7 @@ export class AnnotationRepository {
       totalHighlights: agg?.totalHighlights ?? 0,
       chaptersWithHighlights: agg?.chaptersWithHighlights ?? 0,
       highlightsWithNotes: agg?.highlightsWithNotes ?? 0,
+      highlightsNeedingReview: Number(reviewResult[0]?.total ?? 0),
       colorBreakdown: colorResult.map((r) => ({ color: r.color, count: r.count })),
       originBreakdown: originResult.map((r) => ({ origin: r.origin, count: r.count })),
       chapterBreakdown: foldChapterRows(chapterResult),
@@ -363,10 +377,18 @@ export class AnnotationRepository {
   async findHubPaginated(userId: number, filters: HubFilters, sort: HubSort, page: number, pageSize: number) {
     const conditions = this.buildHubConditions(userId, filters);
     const direction = sort.dir === 'desc' ? desc : asc;
+    // The hub groups a page at a time, so a grouped run only ever lands whole when the
+    // rows arrive already ordered by the grouping key. Every non-date sort therefore
+    // falls back to newest-first inside the group.
+    const withinGroup = [desc(annotations.createdAt), desc(annotations.id)];
     const orderBy =
       sort.by === 'book'
-        ? [direction(bookMetadata.title), desc(annotations.createdAt), desc(annotations.id)]
-        : [direction(annotations.createdAt), direction(annotations.id)];
+        ? [direction(bookMetadata.title), ...withinGroup]
+        : sort.by === 'color'
+          ? [direction(annotations.color), ...withinGroup]
+          : sort.by === 'origin'
+            ? [direction(annotations.origin), ...withinGroup]
+            : [direction(annotations.createdAt), direction(annotations.id)];
     const offset = (page - 1) * pageSize;
 
     const [items, totalResult] = await Promise.all([
@@ -440,13 +462,91 @@ export class AnnotationRepository {
     return row;
   }
 
+  /** Library-wide colour composition, ordered heaviest first for the hub's colour band. */
+  async getHubColorBreakdown(userId: number, filters: HubFilters) {
+    return this.db
+      .select({ color: annotations.color, count: count() })
+      .from(annotations)
+      .where(and(...this.buildHubConditions(userId, filters)))
+      .groupBy(annotations.color)
+      .orderBy(desc(count()), asc(annotations.color));
+  }
+
+  /**
+   * Highlights whose canonical position is not `exact`. A row with no cfi position at all
+   * is not counted: nothing was ever resolved for it, so there is nothing to review.
+   */
+  async countHubNeedsReview(userId: number, filters: HubFilters): Promise<number> {
+    // Deliberately drops `needsReview`: this is the count the chip shows, and it has to
+    // keep reading 132 while the filter it toggles is on.
+    const rest: HubFilters = { ...filters, needsReview: undefined };
+    const [row] = await this.db
+      .select({ total: count() })
+      .from(annotations)
+      .innerJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
+      .where(and(...this.buildHubConditions(userId, rest), sql`${annotationPositions.status} <> 'exact'`));
+    return Number(row?.total ?? 0);
+  }
+
+  /** The whole trash, deliberately ignoring the caller's status filter. */
+  async countHubTrashed(userId: number): Promise<number> {
+    const [row] = await this.db
+      .select({ total: count() })
+      .from(annotations)
+      .where(and(eq(annotations.userId, userId), isNotNull(annotations.deletedAt)));
+    return Number(row?.total ?? 0);
+  }
+
+  /**
+   * Weekly marking activity, bucketed on Monday in UTC to match the day buckets the book
+   * tab already uses. Grouping by `(week, origin)` in one pass gives the totals and the
+   * stacked composition together.
+   */
+  async getHubActivityWeeks(userId: number, filters: HubFilters, since: Date) {
+    return this.db
+      .select({
+        weekStart: sql<string>`to_char(date_trunc('week', ${annotations.createdAt} at time zone 'UTC'), 'YYYY-MM-DD')`,
+        origin: annotations.origin,
+        count: count(),
+      })
+      .from(annotations)
+      .where(and(...this.buildHubConditions(userId, filters), gte(annotations.createdAt, since)))
+      .groupBy(sql`1`, annotations.origin)
+      .orderBy(sql`1`);
+  }
+
+  /**
+   * Every device that has ever exchanged annotations, collapsed to one row each. `behind`
+   * counts rows the device has not acknowledged at the canonical version, which is what
+   * makes "did my Kobo's highlights arrive" a question this page can answer at all.
+   */
+  async getHubDeviceSummary(userId: number) {
+    return this.db
+      .select({
+        source: annotationSyncState.source,
+        deviceId: annotationSyncState.deviceId,
+        annotations: count(),
+        behind: sql<number>`count(*) filter (where ${annotationSyncState.lastAppliedVersion} < ${annotations.version} and ${annotations.deletedAt} is null)`,
+        lastSyncedAt: max(annotationSyncState.lastSyncedAt),
+      })
+      .from(annotationSyncState)
+      .innerJoin(annotations, eq(annotations.id, annotationSyncState.annotationId))
+      .where(eq(annotationSyncState.userId, userId))
+      .groupBy(annotationSyncState.source, annotationSyncState.deviceId)
+      .orderBy(desc(max(annotationSyncState.lastSyncedAt)));
+  }
+
   private bookFacetAuthorSql() {
     return sql<
       string | null
     >`(select string_agg(${authors.name}, ', ' order by ${bookAuthors.displayOrder}) from ${bookAuthors} inner join ${authors} on ${authors.id} = ${bookAuthors.authorId} where ${bookAuthors.bookId} = ${annotations.bookId})`;
   }
 
-  async findHubBookFacets(userId: number, params: { status: 'active' | 'trashed'; q?: string; limit: number }) {
+  /**
+   * `recent` is what the filter combobox wants: the books you just marked, first.
+   * `count` is what the hub's shelf wants: the books you have marked most.
+   */
+  async findHubBookFacets(userId: number, params: { status: 'active' | 'trashed'; q?: string; limit: number; order?: 'recent' | 'count' }) {
     const conditions: SQL[] = [
       eq(annotations.userId, userId),
       params.status === 'trashed' ? isNotNull(annotations.deletedAt) : isNull(annotations.deletedAt),
@@ -472,7 +572,7 @@ export class AnnotationRepository {
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
       .where(and(...conditions))
       .groupBy(annotations.bookId, bookMetadata.title)
-      .orderBy(desc(max(annotations.createdAt)), asc(bookMetadata.title))
+      .orderBy(...(params.order === 'count' ? [desc(count()), asc(bookMetadata.title)] : [desc(max(annotations.createdAt)), asc(bookMetadata.title)]))
       .limit(params.limit);
   }
 
@@ -537,6 +637,13 @@ export class AnnotationRepository {
       conditions.push(or(accentInsensitiveIlike(annotations.text, pattern), accentInsensitiveIlike(annotations.note, pattern))!);
     }
     if (filters.hasNote) conditions.push(sql`${annotations.note} is not null and ${annotations.note} <> ''`);
+    // An EXISTS rather than a join: buildHubConditions is shared with the aggregates,
+    // and a join there would multiply the counts it is asked for.
+    if (filters.needsReview) {
+      conditions.push(
+        sql`exists (select 1 from ${annotationPositions} where ${annotationPositions.annotationId} = ${annotations.id} and ${annotationPositions.format} = 'cfi' and ${annotationPositions.status} <> 'exact')`,
+      );
+    }
     if (filters.dateFrom) conditions.push(gte(annotations.createdAt, filters.dateFrom));
     if (filters.dateTo) conditions.push(lte(annotations.createdAt, filters.dateTo));
     return conditions;
@@ -572,6 +679,16 @@ export class AnnotationRepository {
     }
     if (filters.dateTo) {
       conditions.push(lte(annotations.createdAt, filters.dateTo));
+    }
+    if (filters.hasNote) {
+      conditions.push(sql`${annotations.note} is not null and ${annotations.note} <> ''`);
+    }
+    // EXISTS rather than a join: these conditions also feed getStats, where a join would
+    // multiply every aggregate it is asked for.
+    if (filters.needsReview) {
+      conditions.push(
+        sql`exists (select 1 from ${annotationPositions} where ${annotationPositions.annotationId} = ${annotations.id} and ${annotationPositions.format} = 'cfi' and ${annotationPositions.status} <> 'exact')`,
+      );
     }
 
     return conditions;

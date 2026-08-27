@@ -558,8 +558,15 @@
     {
       "idx": 79,
       "version": "7",
-      "when": 1787783245169,
-      "tag": "0079_add_mangabaka_columns",
+      "when": 1787777420432,
+      "tag": "0079_add_annotations_user_created_active_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1787839890879,
+      "tag": "0080_add_mangabaka_columns",
       "breakpoints": true
     }
   ]

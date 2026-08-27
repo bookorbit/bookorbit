@@ -2990,19 +2990,8 @@
       "refreshMetadata": "Obnovit metadata",
       "deleteAuthor": "Odstranit autora"
     },
-    "listRow": {
-      "noRecentAdditions": "Žádné nedávné příspěvky",
-      "portraitAlt": "Portrét {name}"
-    },
     "filters": {
-      "title": "Filtry autorů",
-      "clearAll": "Vymazat vše",
-      "allLibraries": "Všechny knihovny",
-      "allAuthors": "Všichni autoři",
-      "hasPhoto": "Má fotku",
-      "missingPhoto": "Chybějící fotka",
-      "minBooks": "Minerální knihy",
-      "anyPlaceholder": "Jakýkoliv"
+      "allLibraries": "Všechny knihovny"
     },
     "header": {
       "never": "Nikdy",

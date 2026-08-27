@@ -6,6 +6,7 @@ import { CheckSquare, LayoutGrid, List, SlidersHorizontal, Square, Table2 } from
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import type { TableDensity } from '@bookorbit/types'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
 import ViewHeaderDesktopSearch from '@/components/view-header/ViewHeaderDesktopSearch.vue'
 import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
@@ -23,6 +24,10 @@ withDefaults(
     gridGap: number
     showJumpRailToggle?: boolean
     showJumpRails?: boolean
+    jumpRailModes?: BookViewMode[]
+    rowDensity?: TableDensity
+    showCoverFallbackToggle?: boolean
+    coverFallback?: boolean
     viewMode: BookViewMode
     selectionMode?: boolean
     showSelection?: boolean
@@ -36,9 +41,13 @@ withDefaults(
     gridGapStep?: number
     searchable?: boolean
     searchQuery?: string
+    /** Views search different things; the default placeholder describes books. */
+    searchPlaceholder?: string
     allowedViewModes?: BookViewMode[]
     mobileSearchInMenu?: boolean
     mobileDisplayInMenu?: boolean
+    /** Views with no covers and no grid have nothing for the cover-size and gap sliders to do. */
+    showDisplayControls?: boolean
   }>(),
   {
     coverSizeMin: 100,
@@ -52,6 +61,7 @@ withDefaults(
     allowedViewModes: () => ['grid', 'list', 'table'] as BookViewMode[],
     mobileSearchInMenu: true,
     mobileDisplayInMenu: true,
+    showDisplayControls: true,
   },
 )
 
@@ -59,6 +69,8 @@ const emit = defineEmits<{
   'update:coverSize': [value: number]
   'update:gridGap': [value: number]
   'update:showJumpRails': [value: boolean]
+  'update:rowDensity': [value: TableDensity]
+  'update:coverFallback': [value: boolean]
   'update:viewMode': [value: BookViewMode]
   'toggle-selection': []
   'update:coverShape': [value: 'square' | 'circle']
@@ -84,7 +96,12 @@ function handleShowJumpRailsUpdate(value: boolean) {
     </div>
 
     <div class="flex shrink-0 items-center gap-2">
-      <ViewHeaderDesktopSearch v-if="searchable" :search-query="searchQuery" @update:search-query="emit('update:searchQuery', $event)" />
+      <ViewHeaderDesktopSearch
+        v-if="searchable"
+        :search-query="searchQuery"
+        :placeholder="searchPlaceholder"
+        @update:search-query="emit('update:searchQuery', $event)"
+      />
 
       <slot name="toolbar" />
       <slot name="actions" />
@@ -115,6 +132,8 @@ function handleShowJumpRailsUpdate(value: boolean) {
           size="icon"
           class="h-8 w-8 rounded-lg"
           :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
+          :aria-label="t('components.viewHeader.viewModes.grid')"
+          :aria-pressed="viewMode === 'grid'"
           @click="emit('update:viewMode', 'grid')"
         >
           <LayoutGrid :size="14" />
@@ -125,6 +144,8 @@ function handleShowJumpRailsUpdate(value: boolean) {
           size="icon"
           class="h-8 w-8 rounded-lg"
           :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
+          :aria-label="t('components.viewHeader.viewModes.list')"
+          :aria-pressed="viewMode === 'list'"
           @click="emit('update:viewMode', 'list')"
         >
           <List :size="14" />
@@ -135,18 +156,21 @@ function handleShowJumpRailsUpdate(value: boolean) {
           size="icon"
           class="h-8 w-8 rounded-lg"
           :class="viewMode === 'table' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
+          :aria-label="t('components.viewHeader.viewModes.table')"
+          :aria-pressed="viewMode === 'table'"
           @click="emit('update:viewMode', 'table')"
         >
           <Table2 :size="14" />
         </Button>
       </div>
 
-      <Popover>
+      <Popover v-if="showDisplayControls">
         <PopoverTrigger as-child>
           <Button
             variant="ghost"
             size="icon"
             class="hidden h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/5 hover:text-foreground md:flex"
+            :aria-label="t('components.viewHeader.display')"
           >
             <SlidersHorizontal :size="14" />
           </Button>
@@ -158,6 +182,10 @@ function handleShowJumpRailsUpdate(value: boolean) {
             :grid-gap="gridGap"
             :show-jump-rail-toggle="showJumpRailToggle"
             :show-jump-rails="showJumpRails"
+            :jump-rail-modes="jumpRailModes"
+            :row-density="rowDensity"
+            :show-cover-fallback-toggle="showCoverFallbackToggle"
+            :cover-fallback="coverFallback"
             :cover-shape="coverShape"
             :cover-size-min="coverSizeMin"
             :cover-size-max="coverSizeMax"
@@ -168,6 +196,8 @@ function handleShowJumpRailsUpdate(value: boolean) {
             @update:cover-size="emit('update:coverSize', $event)"
             @update:grid-gap="emit('update:gridGap', $event)"
             @update:show-jump-rails="handleShowJumpRailsUpdate"
+            @update:row-density="emit('update:rowDensity', $event)"
+            @update:cover-fallback="emit('update:coverFallback', $event)"
             @update:cover-shape="emit('update:coverShape', $event)"
           >
             <template #columns>
@@ -186,7 +216,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
         :show-view-mode-toggle="showViewModeToggle"
         :searchable="searchable"
         :mobile-search-in-menu="mobileSearchInMenu"
-        :show-display-action="mobileDisplayInMenu"
+        :show-display-action="mobileDisplayInMenu && showDisplayControls"
         :allowed-view-modes="allowedViewModes"
         @update:view-mode="emit('update:viewMode', $event)"
         @open-display="mobileDisplayOpen = true"
@@ -213,6 +243,10 @@ function handleShowJumpRailsUpdate(value: boolean) {
           :grid-gap="gridGap"
           :show-jump-rail-toggle="showJumpRailToggle"
           :show-jump-rails="showJumpRails"
+          :jump-rail-modes="jumpRailModes"
+          :row-density="rowDensity"
+          :show-cover-fallback-toggle="showCoverFallbackToggle"
+          :cover-fallback="coverFallback"
           :cover-shape="coverShape"
           :cover-size-min="coverSizeMin"
           :cover-size-max="coverSizeMax"
@@ -223,6 +257,8 @@ function handleShowJumpRailsUpdate(value: boolean) {
           @update:cover-size="emit('update:coverSize', $event)"
           @update:grid-gap="emit('update:gridGap', $event)"
           @update:show-jump-rails="handleShowJumpRailsUpdate"
+          @update:row-density="emit('update:rowDensity', $event)"
+          @update:cover-fallback="emit('update:coverFallback', $event)"
           @update:cover-shape="emit('update:coverShape', $event)"
         >
           <template #columns>
@@ -239,6 +275,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
     v-if="searchable && mobileSearchInMenu"
     :open="mobileSearchOpen"
     :search-query="searchQuery"
+    :placeholder="searchPlaceholder"
     @update:open="mobileSearchOpen = $event"
     @update:search-query="emit('update:searchQuery', $event)"
   />

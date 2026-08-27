@@ -3007,19 +3007,8 @@
       "refreshMetadata": "Uppdatera metadata",
       "deleteAuthor": "Ta bort författare"
     },
-    "listRow": {
-      "noRecentAdditions": "Inga senaste tillägg",
-      "portraitAlt": "{name} porträtt"
-    },
     "filters": {
-      "title": "Författare Filter",
-      "clearAll": "Rensa alla",
-      "allLibraries": "Alla bibliotek",
-      "allAuthors": "Alla författare",
-      "hasPhoto": "Har foto",
-      "missingPhoto": "Fotot saknas",
-      "minBooks": "Minsta böcker",
-      "anyPlaceholder": "Valfri"
+      "allLibraries": "Alla bibliotek"
     },
     "header": {
       "never": "Aldrig",

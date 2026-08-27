@@ -2,6 +2,42 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 import { SeriesService } from './series.service';
+import type { SeriesMemberRow } from './series.repository';
+
+const EMPTY_FACETS = { all: 0, notStarted: 0, inProgress: 0, complete: 0, hasGaps: 0 };
+
+function summaryRow(
+  overrides: Partial<{
+    id: number;
+    name: string;
+    bookCount: number;
+    readCount: number;
+    readingCount: number;
+    expectedBookCount: number | null;
+    authors: string[];
+    coverBookIds: number[];
+    lastAddedAt: string | null;
+    members: SeriesMemberRow[];
+    membersTruncated: boolean;
+    libraryNames: string[];
+  }>,
+) {
+  return {
+    id: 1,
+    name: 'Series',
+    bookCount: 1,
+    readCount: 0,
+    readingCount: 0,
+    expectedBookCount: null,
+    authors: [],
+    coverBookIds: [],
+    lastAddedAt: null,
+    members: [],
+    membersTruncated: false,
+    libraryNames: [],
+    ...overrides,
+  };
+}
 
 function reqUser(id = 7, superuser = false) {
   return { id, isSuperuser: superuser, permissions: [], contentFilters: undefined } as any;
@@ -54,24 +90,32 @@ describe('SeriesService', () => {
     it('returns empty page when user has no library access', async () => {
       libraryService.findAll.mockResolvedValue([]);
       const result = await service.findAll(reqUser(), { page: 0, size: 50 });
-      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50 });
+      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50, facets: EMPTY_FACETS });
       expect(seriesRepo.findPage).not.toHaveBeenCalled();
     });
 
     it('delegates to repository with correct params', async () => {
       seriesRepo.findPage.mockResolvedValue({
         items: [
-          {
+          summaryRow({
             id: 42,
             name: 'Harry Potter',
             bookCount: 7,
             readCount: 3,
+            readingCount: 1,
             authors: ['J.K. Rowling'],
             coverBookIds: [1, 2, 3, 4],
             lastAddedAt: '2024-01-01 00:00:00',
-          },
+            members: [
+              { bookId: 1, seriesIndex: '1', title: 'Stone', status: 'read' },
+              { bookId: 2, seriesIndex: '2', title: 'Chamber', status: 'read' },
+              { bookId: 3, seriesIndex: '3', title: 'Azkaban', status: 'read' },
+              { bookId: 4, seriesIndex: '5', title: 'Phoenix', status: 'reading' },
+            ],
+          }),
         ],
         total: 1,
+        facets: { ...EMPTY_FACETS, all: 1, inProgress: 1 },
         page: 0,
         size: 50,
       });
@@ -90,17 +134,103 @@ describe('SeriesService', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0]!.name).toBe('Harry Potter');
       expect(result.items[0]!.lastAddedAt).toBe('2024-01-01 00:00:00');
+      expect(result.facets).toEqual({ ...EMPTY_FACETS, all: 1, inProgress: 1 });
+    });
+
+    it('builds a volume ladder that names the holes between the numbers it holds', async () => {
+      seriesRepo.findPage.mockResolvedValue({
+        items: [
+          summaryRow({
+            id: 7,
+            name: 'Absolute Batman',
+            bookCount: 3,
+            readCount: 2,
+            members: [
+              { bookId: 11, seriesIndex: '1', title: 'One', status: 'read' },
+              { bookId: 12, seriesIndex: '2', title: 'Two', status: 'read' },
+              { bookId: 13, seriesIndex: '5', title: 'Five', status: null },
+            ],
+          }),
+        ],
+        total: 1,
+        facets: { ...EMPTY_FACETS, all: 1, hasGaps: 1 },
+        page: 0,
+        size: 50,
+      });
+
+      const item = (await service.findAll(reqUser(), {})).items[0]!;
+
+      expect(item.volumes.map((v) => v.status)).toEqual(['read', 'read', 'missing', 'missing', 'unread']);
+      expect(item.gaps).toEqual([3, 4]);
+      expect(item.gapCount).toBe(2);
+      expect(item.nextBookId).toBe(13);
+      expect(item.nextIndex).toBe('5');
+    });
+
+    it('collapses two copies of one volume onto a single rung, keeping the furthest read', async () => {
+      seriesRepo.findPage.mockResolvedValue({
+        items: [
+          summaryRow({
+            id: 8,
+            name: 'Two editions',
+            bookCount: 4,
+            readCount: 1,
+            members: [
+              { bookId: 21, seriesIndex: '1', title: 'One ebook', status: null },
+              { bookId: 22, seriesIndex: '1', title: 'One audio', status: 'read' },
+              { bookId: 23, seriesIndex: '2', title: 'Two ebook', status: 'reading' },
+              { bookId: 24, seriesIndex: '2', title: 'Two audio', status: null },
+            ],
+          }),
+        ],
+        total: 1,
+        facets: { ...EMPTY_FACETS, all: 1 },
+        page: 0,
+        size: 50,
+      });
+
+      const item = (await service.findAll(reqUser(), {})).items[0]!;
+
+      expect(item.volumes).toHaveLength(2);
+      expect(item.volumes.map((v) => v.status)).toEqual(['read', 'reading']);
+      expect(item.gapCount).toBe(0);
+    });
+
+    it('draws no ladder for a series too long to read in full, rather than a wrong one', async () => {
+      seriesRepo.findPage.mockResolvedValue({
+        items: [
+          summaryRow({
+            id: 9,
+            name: 'Enormous',
+            bookCount: 900,
+            readCount: 0,
+            membersTruncated: true,
+            members: [{ bookId: 31, seriesIndex: '1', title: 'One', status: null }],
+          }),
+        ],
+        total: 1,
+        facets: { ...EMPTY_FACETS, all: 1 },
+        page: 0,
+        size: 50,
+      });
+
+      const item = (await service.findAll(reqUser(), {})).items[0]!;
+
+      expect(item.volumes).toEqual([]);
+      expect(item.volumesTruncated).toBe(true);
+      expect(item.gapCount).toBe(0);
+      expect(item.nextBookId).toBe(31);
     });
 
     it('scopes to specific library when libraryId provided', async () => {
-      seriesRepo.findPage.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
+      seriesRepo.findPage.mockResolvedValue({ items: [], total: 0, facets: EMPTY_FACETS, page: 0, size: 50 });
       await service.findAll(reqUser(), { libraryId: 2 });
       expect(seriesRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2], contentFilters: undefined }));
     });
 
     it('returns empty when scoped library is inaccessible', async () => {
       const result = await service.findAll(reqUser(), { libraryId: 99 });
-      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50 });
+      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50, facets: EMPTY_FACETS });
     });
 
     it('rejects deep pagination', async () => {
@@ -109,8 +239,9 @@ describe('SeriesService', () => {
 
     it('converts null lastAddedAt to null', async () => {
       seriesRepo.findPage.mockResolvedValue({
-        items: [{ id: 42, name: 'Test', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+        items: [summaryRow({ id: 42, name: 'Test', bookCount: 1, readCount: 0, lastAddedAt: null })],
         total: 1,
+        facets: { ...EMPTY_FACETS, all: 1 },
         page: 0,
         size: 50,
       });

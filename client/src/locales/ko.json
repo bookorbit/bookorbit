@@ -3695,19 +3695,8 @@
       "refreshMetadata": "메타데이터 갱신",
       "deleteAuthor": "저자 삭제"
     },
-    "listRow": {
-      "noRecentAdditions": "최근 추가된 항목 없음",
-      "portraitAlt": "{name} 초상화"
-    },
     "filters": {
-      "title": "저자 필터",
-      "clearAll": "전체 초기화",
-      "allLibraries": "모든 라이브러리",
-      "allAuthors": "모든 저자",
-      "hasPhoto": "이미지 있음",
-      "missingPhoto": "이미지 없음",
-      "minBooks": "최소 권수",
-      "anyPlaceholder": "없음"
+      "allLibraries": "모든 라이브러리"
     },
     "header": {
       "never": "없음",

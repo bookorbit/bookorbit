@@ -3007,19 +3007,8 @@
       "refreshMetadata": "Opdater Metadata",
       "deleteAuthor": "Slet Forfatter"
     },
-    "listRow": {
-      "noRecentAdditions": "Ingen seneste tilføjelser",
-      "portraitAlt": "{name} portræt"
-    },
     "filters": {
-      "title": "Forfatter Filtre",
-      "clearAll": "Ryd alle",
-      "allLibraries": "Alle Biblioteker",
-      "allAuthors": "Alle forfattere",
-      "hasPhoto": "Har foto",
-      "missingPhoto": "Manglende foto",
-      "minBooks": "Min. bøger",
-      "anyPlaceholder": "Alle"
+      "allLibraries": "Alle Biblioteker"
     },
     "header": {
       "never": "Aldrig",

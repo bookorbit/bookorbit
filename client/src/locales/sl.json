@@ -3232,19 +3232,8 @@
       "refreshMetadata": "Osveži metapodatke",
       "deleteAuthor": "Izbriši avtorja"
     },
-    "listRow": {
-      "noRecentAdditions": "Ni nedavnih dodatkov",
-      "portraitAlt": "Portret avtorja {name}"
-    },
     "filters": {
-      "title": "Filtri avtorjev",
-      "clearAll": "Počisti vse",
-      "allLibraries": "Vse knjižnice",
-      "allAuthors": "Vsi avtorji",
-      "hasPhoto": "Ima fotografijo",
-      "missingPhoto": "Manjka fotografija",
-      "minBooks": "Najm. knjig",
-      "anyPlaceholder": "Katerakoli"
+      "allLibraries": "Vse knjižnice"
     },
     "header": {
       "never": "Nikoli",

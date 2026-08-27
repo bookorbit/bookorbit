@@ -2693,19 +2693,8 @@
       "refreshMetadata": "Metadata vernieuwen",
       "deleteAuthor": "Auteur verwijderen"
     },
-    "listRow": {
-      "noRecentAdditions": "Geen recente toevoegingen",
-      "portraitAlt": "Portret van {name}"
-    },
     "filters": {
-      "title": "Auteurfilters",
-      "clearAll": "Alles wissen",
-      "allLibraries": "Alle bibliotheken",
-      "allAuthors": "Alle auteurs",
-      "hasPhoto": "Met foto",
-      "missingPhoto": "Zonder foto",
-      "minBooks": "Min. boeken",
-      "anyPlaceholder": "Alle"
+      "allLibraries": "Alle bibliotheken"
     },
     "header": {
       "never": "Nooit",

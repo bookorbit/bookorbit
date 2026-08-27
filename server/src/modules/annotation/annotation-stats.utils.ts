@@ -1,3 +1,5 @@
+import type { AnnotationHubActivityWeek } from '@bookorbit/types';
+
 import type { AnnotationRow } from '../../db/schema';
 import type { AnnotationActivityResult, AnnotationChapterStatResult } from './annotation.repository';
 
@@ -112,4 +114,58 @@ export function foldActivityRows(rows: ActivityStatRow[]): AnnotationActivityRes
   }
 
   return days.sort((a, b) => b.day.localeCompare(a.day));
+}
+
+export interface ActivityWeekRow {
+  weekStart: string;
+  origin: AnnotationRow['origin'];
+  count: number;
+}
+
+/**
+ * Collapses the `(week, origin)` grouping into one entry per week, oldest first, because
+ * the hub's sparkline reads left to right through the year. Weeks with no marks are not
+ * rows at all; the caller pads the axis.
+ */
+export function foldActivityWeeks(rows: ActivityWeekRow[]): AnnotationHubActivityWeek[] {
+  const byWeek = new Map<string, AnnotationHubActivityWeek>();
+
+  for (const row of rows) {
+    const existing = byWeek.get(row.weekStart);
+    if (!existing) {
+      byWeek.set(row.weekStart, { weekStart: row.weekStart, count: row.count, origins: [{ origin: row.origin, count: row.count }] });
+      continue;
+    }
+    existing.count += row.count;
+    existing.origins.push({ origin: row.origin, count: row.count });
+  }
+
+  const weeks = [...byWeek.values()];
+  for (const week of weeks) {
+    week.origins.sort((a, b) => b.count - a.count || a.origin.localeCompare(b.origin));
+  }
+  return weeks.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Longest run of consecutive empty weeks between the first mark in the window and now.
+ * Measured from the first week that carries a mark rather than from the window edge, so a
+ * library that only started last month does not report eleven quiet months.
+ */
+export function longestQuietWeeks(weeks: AnnotationHubActivityWeek[], now: Date): number {
+  if (weeks.length === 0) return 0;
+  const first = Date.parse(`${weeks[0]!.weekStart}T00:00:00.000Z`);
+  if (Number.isNaN(first)) return 0;
+
+  let longest = 0;
+  let previous = first;
+  for (const week of weeks.slice(1)) {
+    const current = Date.parse(`${week.weekStart}T00:00:00.000Z`);
+    if (Number.isNaN(current)) continue;
+    longest = Math.max(longest, Math.round((current - previous) / WEEK_MS) - 1);
+    previous = current;
+  }
+  return Math.max(longest, Math.floor((now.getTime() - previous) / WEEK_MS));
 }

@@ -1,4 +1,14 @@
-import { foldActivityRows, foldChapterRows, spinePosition, type ActivityStatRow, type ChapterStatRow } from './annotation-stats.utils';
+import type { AnnotationHubActivityWeek } from '@bookorbit/types';
+
+import {
+  foldActivityRows,
+  foldActivityWeeks,
+  foldChapterRows,
+  longestQuietWeeks,
+  spinePosition,
+  type ActivityStatRow,
+  type ChapterStatRow,
+} from './annotation-stats.utils';
 
 function chapterRow(overrides: Partial<ChapterStatRow> = {}): ChapterStatRow {
   return {
@@ -149,5 +159,52 @@ describe('foldActivityRows', () => {
 
   it('returns nothing for a book with no highlights', () => {
     expect(foldActivityRows([])).toEqual([]);
+  });
+});
+
+describe('foldActivityWeeks', () => {
+  it('collapses the (week, origin) grouping into one entry per week, oldest first', () => {
+    const weeks = foldActivityWeeks([
+      { weekStart: '2026-08-17', origin: 'web', count: 4 },
+      { weekStart: '2026-08-03', origin: 'kobo', count: 2 },
+      { weekStart: '2026-08-17', origin: 'kobo', count: 6 },
+    ]);
+
+    expect(weeks.map((week) => week.weekStart)).toEqual(['2026-08-03', '2026-08-17']);
+    expect(weeks[1]!.count).toBe(10);
+    // Heaviest origin first, so a stacked bar draws its dominant source at the base.
+    expect(weeks[1]!.origins).toEqual([
+      { origin: 'kobo', count: 6 },
+      { origin: 'web', count: 4 },
+    ]);
+  });
+
+  it('returns nothing for an empty grouping', () => {
+    expect(foldActivityWeeks([])).toEqual([]);
+  });
+});
+
+describe('longestQuietWeeks', () => {
+  const week = (weekStart: string, count = 1): AnnotationHubActivityWeek => ({ weekStart, count, origins: [] });
+
+  it('counts the empty weeks between two marked ones', () => {
+    // 03 Aug then 24 Aug leaves the 10th and the 17th empty.
+    const weeks = [week('2026-08-03'), week('2026-08-24')];
+    expect(longestQuietWeeks(weeks, new Date('2026-08-25T00:00:00.000Z'))).toBe(2);
+  });
+
+  it('counts the run since the last mark when that is the longest', () => {
+    const weeks = [week('2026-06-01'), week('2026-06-08')];
+    expect(longestQuietWeeks(weeks, new Date('2026-07-06T00:00:00.000Z'))).toBe(4);
+  });
+
+  it('measures from the first mark, not the window edge', () => {
+    // A library that only started last week must not report a quiet year.
+    const weeks = [week('2026-08-17'), week('2026-08-24')];
+    expect(longestQuietWeeks(weeks, new Date('2026-08-25T00:00:00.000Z'))).toBe(0);
+  });
+
+  it('is zero when nothing was ever marked', () => {
+    expect(longestQuietWeeks([], new Date('2026-08-25T00:00:00.000Z'))).toBe(0);
   });
 });

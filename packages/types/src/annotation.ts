@@ -106,6 +106,11 @@ export interface AnnotationStats {
   originBreakdown: { origin: AnnotationItem["origin"]; count: number }[];
   chaptersWithHighlights: number;
   highlightsWithNotes: number;
+  /**
+   * Highlights whose canonical position is not `exact`. Counted with the review filter
+   * itself removed, so the chip that toggles it keeps showing the real total while on.
+   */
+  highlightsNeedingReview: number;
   chapters: string[];
   chapterBreakdown: AnnotationChapterStat[];
   /** Distinct days that carry at least one highlight, newest first. */
@@ -131,6 +136,63 @@ export interface AnnotationHubStats {
   books: number;
   withNotes: number;
   originBreakdown: { origin: AnnotationItem["origin"]; count: number }[];
+}
+
+/**
+ * How the hub stream is grouped. The mode drives the server sort as well as the
+ * rules drawn between rows, because grouping a page of an infinite list only
+ * lands on whole groups when the server already ordered by the same key.
+ */
+export const ANNOTATION_HUB_GROUP_MODES = ["month", "book", "color", "source"] as const;
+export type AnnotationHubGroupMode = (typeof ANNOTATION_HUB_GROUP_MODES)[number];
+
+/** One device that has ever exchanged annotations, summarised across the whole library. */
+export interface AnnotationHubDeviceSummary {
+  source: "koreader" | "kobo";
+  deviceId: string;
+  deviceName: string | null;
+  /** Annotations this device has a sync row for. */
+  annotations: number;
+  /** How many of those are behind the canonical version. */
+  behind: number;
+  lastSyncedAt: string;
+}
+
+/** One week of marking activity, for the hub's twelve-month sparkline. */
+export interface AnnotationHubActivityWeek {
+  /** Monday of the week, as `yyyy-mm-dd` in UTC. */
+  weekStart: string;
+  count: number;
+  origins: { origin: AnnotationItem["origin"]; count: number }[];
+}
+
+/**
+ * The library-wide facets behind the hub's side rail. Split out from the paginated
+ * list because the list is an infinite stream: recomputing six aggregates over every
+ * annotation a user owns on each page of scrolling is the one thing this page cannot
+ * afford. It reloads when the filters change, not when more rows arrive.
+ */
+export interface AnnotationHubOverview {
+  total: number;
+  books: number;
+  withNotes: number;
+  /** Highlights whose canonical position is not `exact`, so they cannot open at the right page. */
+  needsReview: number;
+  /** Always the whole trash, independent of the current status filter. */
+  trashed: number;
+  originBreakdown: { origin: AnnotationItem["origin"]; count: number }[];
+  colorBreakdown: { color: string; count: number }[];
+  /** Books ranked by mark count, not by recency the way the filter combobox is. */
+  shelf: AnnotationHubBookFacet[];
+  weeks: AnnotationHubActivityWeek[];
+  busiestWeek: AnnotationHubActivityWeek | null;
+  /**
+   * Longest run of consecutive empty weeks inside the covered window. Counted in weeks
+   * rather than days because the activity is bucketed weekly: reporting days here would
+   * claim a precision the aggregate does not have.
+   */
+  longestQuietWeeks: number;
+  devices: AnnotationHubDeviceSummary[];
 }
 
 export interface AnnotationHubResponse {

@@ -52,6 +52,7 @@ describe('AuthorsService', () => {
     findByIdForEnrichment: vi.fn(),
     updateAuthorDescriptionIfEmpty: vi.fn(),
     countAuthors: vi.fn(),
+    findLetterCounts: vi.fn(),
   };
 
   const bookReadService = {
@@ -722,5 +723,74 @@ describe('AuthorsService', () => {
 
     expect(result).toEqual({ processed: 2, failed: 1, updated: 1 });
     expect(progress).toHaveBeenCalledTimes(2);
+  });
+
+  describe('findJumpBuckets', () => {
+    it('turns letter counts into running offsets the rail can scroll to', async () => {
+      authorsRepo.findLetterCounts.mockResolvedValue([
+        { letter: 'A', count: 42 },
+        { letter: 'B', count: 14 },
+        { letter: 'C', count: 35 },
+      ]);
+
+      const response = await service.findJumpBuckets(reqUser(), {});
+
+      expect(response.kind).toBe('letter');
+      expect(response.granularity).toBeNull();
+      expect(response.total).toBe(91);
+      expect(response.buckets).toEqual([
+        { key: 'A', label: 'A', index: 0, isUnknown: false },
+        { key: 'B', label: 'B', index: 42, isUnknown: false },
+        { key: 'C', label: 'C', index: 56, isUnknown: false },
+      ]);
+    });
+
+    it('marks the non-alphabetic bucket as unknown', async () => {
+      authorsRepo.findLetterCounts.mockResolvedValue([
+        { letter: '#', count: 3 },
+        { letter: 'A', count: 5 },
+      ]);
+
+      const response = await service.findJumpBuckets(reqUser(), {});
+
+      expect(response.buckets[0]).toEqual({ key: '#', label: '#', index: 0, isUnknown: true });
+      expect(response.buckets[1]?.index).toBe(3);
+    });
+
+    it('buckets by the same field the list is ordered by', async () => {
+      authorsRepo.findLetterCounts.mockResolvedValue([]);
+
+      await service.findJumpBuckets(reqUser(), { sort: 'sortName', order: 'desc' });
+
+      expect(authorsRepo.findLetterCounts).toHaveBeenCalledWith(expect.objectContaining({ sort: 'sortName', order: 'desc' }));
+    });
+
+    it('falls back to the display-name bucketing when no sort is given', async () => {
+      authorsRepo.findLetterCounts.mockResolvedValue([]);
+
+      await service.findJumpBuckets(reqUser(), {});
+
+      expect(authorsRepo.findLetterCounts).toHaveBeenCalledWith(expect.objectContaining({ sort: 'name', order: 'asc' }));
+    });
+
+    it('returns an empty rail when the user has no accessible libraries', async () => {
+      libraryService.findAll.mockResolvedValue([]);
+      libraryService.findAccessibleLibraryIds.mockResolvedValue([]);
+
+      const response = await service.findJumpBuckets(reqUser(), {});
+
+      expect(response).toEqual({ buckets: [], total: 0, kind: 'letter', granularity: null });
+      expect(authorsRepo.findLetterCounts).not.toHaveBeenCalled();
+    });
+
+    it('passes the list filters through so the rail matches what is on screen', async () => {
+      authorsRepo.findLetterCounts.mockResolvedValue([]);
+
+      await service.findJumpBuckets(reqUser(), { q: 'wei', hasPhoto: false, hasSortName: false, addedWithinDays: 7, minBookCount: 2 });
+
+      expect(authorsRepo.findLetterCounts).toHaveBeenCalledWith(
+        expect.objectContaining({ q: 'wei', hasPhoto: false, hasSortName: false, addedWithinDays: 7, minBookCount: 2 }),
+      );
+    });
   });
 });

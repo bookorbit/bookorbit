@@ -4,9 +4,8 @@ import { api } from '@/lib/api'
 import { buildFilterChips } from '@/features/annotations/lib/filter-chips'
 import { useAnnotationSelection } from '@/features/annotations/composables/useAnnotationSelection'
 import { useAnnotationMutations } from '@/features/annotations/composables/useAnnotationMutations'
-import { buildHighlightGroups, withLoadedItems, type HighlightGroupMode } from '@/features/book/lib/highlight-groups'
-
-export type BookSortKey = 'position' | 'newest' | 'oldest'
+import { buildHighlightGroups, withLoadedItems } from '@/features/book/lib/highlight-groups'
+import { HIGHLIGHT_VIEWS, type HighlightViewKey } from '@/features/book/lib/highlight-views'
 
 const SEARCH_RELOAD_DEBOUNCE_MS = 300
 /** The server caps pageSize at 100. A window this size covers most books in one request. */
@@ -21,14 +20,12 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
   const loadingMore = ref(false)
   const error = ref<string | null>(null)
 
-  const sortBy = ref<'position' | 'createdAt'>('position')
-  const sortDir = ref<'asc' | 'desc'>('asc')
+  const view = ref<HighlightViewKey>('position')
   const colors = ref<string[]>([])
   const search = ref('')
   const chapter = ref('')
   const dateFrom = ref('')
   const dateTo = ref('')
-  const groupMode = ref<HighlightGroupMode>('chapter')
   const onlyNotes = ref(false)
   const onlyNeedsReview = ref(false)
   const activeId = ref<number | null>(null)
@@ -39,58 +36,46 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
 
   const chapters = computed(() => stats.value?.chapters ?? [])
   const hasMore = computed(() => items.value.length < total.value)
+  const spec = computed(() => HIGHLIGHT_VIEWS[view.value])
+  const groupMode = computed(() => spec.value.group)
 
-  /**
-   * Client-only refinements of the loaded window. Both are cheap boolean reads on rows already
-   * in memory, and neither exists as a server filter, so they deliberately do not reload.
-   */
-  const visibleItems = computed(() => {
-    let visible = items.value
-    if (onlyNotes.value) visible = visible.filter((item) => item.note != null && item.note !== '')
-    if (onlyNeedsReview.value) visible = visible.filter((item) => item.positionStatus === 'failed' || item.positionStatus === 'repaired')
-    return visible
-  })
-
-  const groups = computed(() => buildHighlightGroups(visibleItems.value, stats.value, groupMode.value))
+  const groups = computed(() => buildHighlightGroups(items.value, stats.value, groupMode.value))
   const streamGroups = computed(() => withLoadedItems(groups.value))
-  const needsReviewCount = computed(() => items.value.filter((item) => item.positionStatus === 'failed' || item.positionStatus === 'repaired').length)
+  /** Always chapter-shaped: the rail shows the book's index whatever axis the stream is on. */
+  const chapterGroups = computed(() => buildHighlightGroups(items.value, stats.value, 'chapter'))
+  /** From the aggregate, which is counted with the review filter itself removed. */
+  const needsReviewCount = computed(() => stats.value?.highlightsNeedingReview ?? 0)
+  const noteCount = computed(() => stats.value?.highlightsWithNotes ?? 0)
   const activeItem = computed(() => items.value.find((item) => item.id === activeId.value) ?? null)
   const activeIndex = computed(() => (activeId.value == null ? -1 : items.value.findIndex((item) => item.id === activeId.value)))
-
-  const sortKey = computed<BookSortKey>({
-    get() {
-      if (sortBy.value === 'position') return 'position'
-      return sortDir.value === 'desc' ? 'newest' : 'oldest'
-    },
-    set(value) {
-      if (value === 'position') {
-        sortBy.value = 'position'
-        sortDir.value = 'asc'
-      } else {
-        sortBy.value = 'createdAt'
-        sortDir.value = value === 'newest' ? 'desc' : 'asc'
-      }
-    },
-  })
 
   const activeFilterChips = computed(() => buildFilterChips({ colors: colors.value, dateFrom: dateFrom.value, dateTo: dateTo.value }))
   const popoverFilterCount = computed(() => activeFilterChips.value.length)
   const hasActiveFilters = computed(
-    () => search.value.trim() !== '' || colors.value.length > 0 || Boolean(chapter.value) || dateFrom.value !== '' || dateTo.value !== '',
+    () =>
+      search.value.trim() !== '' ||
+      colors.value.length > 0 ||
+      Boolean(chapter.value) ||
+      onlyNotes.value ||
+      onlyNeedsReview.value ||
+      dateFrom.value !== '' ||
+      dateTo.value !== '',
   )
 
   function buildParams(page: number): URLSearchParams {
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(PAGE_SIZE),
-      sortBy: sortBy.value,
-      sortDir: sortDir.value,
+      sortBy: spec.value.sortBy,
+      sortDir: spec.value.sortDir,
     })
     if (colors.value.length > 0) params.set('colors', colors.value.join(','))
     if (search.value.trim()) params.set('search', search.value.trim())
     if (chapter.value) params.set('chapter', chapter.value)
     if (dateFrom.value) params.set('dateFrom', dateFrom.value)
     if (dateTo.value) params.set('dateTo', dateTo.value)
+    if (onlyNotes.value) params.set('hasNote', 'true')
+    if (onlyNeedsReview.value) params.set('needsReview', 'true')
     return params
   }
 
@@ -196,6 +181,14 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
     if (id === 'date') clearDates()
   }
 
+  function toggleNotesOnly() {
+    onlyNotes.value = !onlyNotes.value
+  }
+
+  function toggleNeedsReviewOnly() {
+    onlyNeedsReview.value = !onlyNeedsReview.value
+  }
+
   function toggleColorFilter(color: string) {
     colors.value = colors.value.includes(color) ? colors.value.filter((value) => value !== color) : [...colors.value, color]
   }
@@ -279,7 +272,7 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
   }
 
   function stepInspector(delta: number) {
-    const list = visibleItems.value
+    const list = items.value
     if (list.length === 0) return
     const current = activeId.value == null ? -1 : list.findIndex((item) => item.id === activeId.value)
     const next = Math.min(list.length - 1, Math.max(0, current + delta))
@@ -287,7 +280,7 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
     if (target) activeId.value = target.id
   }
 
-  watch([colors, chapter, dateFrom, dateTo, sortBy, sortDir], () => {
+  watch([colors, chapter, dateFrom, dateTo, view, onlyNotes, onlyNeedsReview], () => {
     if (hydratingBook.value) return
     reloadFromFilterChange()
   })
@@ -310,8 +303,7 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
       onlyNotes.value = false
       onlyNeedsReview.value = false
       activeId.value = null
-      sortBy.value = 'position'
-      sortDir.value = 'asc'
+      view.value = 'position'
       void fetchHighlights()
       void nextTick(() => {
         hydratingBook.value = false
@@ -322,19 +314,17 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
 
   return {
     items,
-    visibleItems,
     total,
     stats,
     groups,
     streamGroups,
+    chapterGroups,
     groupMode,
+    view,
     loading,
     loadingMore,
     hasMore,
     error,
-    sortBy,
-    sortDir,
-    sortKey,
     colors,
     search,
     chapter,
@@ -343,7 +333,10 @@ export function useBookHighlights(bookIdRef: Ref<number>) {
     dateTo,
     onlyNotes,
     onlyNeedsReview,
+    toggleNotesOnly,
+    toggleNeedsReviewOnly,
     needsReviewCount,
+    noteCount,
     activeId,
     activeItem,
     activeIndex,

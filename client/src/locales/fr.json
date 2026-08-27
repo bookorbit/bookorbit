@@ -3178,19 +3178,8 @@
       "refreshMetadata": "Actualiser les métadonnées",
       "deleteAuthor": "Supprimer l'auteur"
     },
-    "listRow": {
-      "noRecentAdditions": "Aucun ajout récent",
-      "portraitAlt": "{name}portrait"
-    },
     "filters": {
-      "title": "Filtres d'auteur",
-      "clearAll": "Tout effacer",
-      "allLibraries": "Toutes les bibliothèques",
-      "allAuthors": "Tous les auteurs",
-      "hasPhoto": "A une photo",
-      "missingPhoto": "Photo manquante",
-      "minBooks": "Min. livres",
-      "anyPlaceholder": "N'importe lequel"
+      "allLibraries": "Toutes les bibliothèques"
     },
     "header": {
       "never": "Jamais",
