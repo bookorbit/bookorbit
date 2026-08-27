@@ -4,7 +4,7 @@ import { AlertTriangle, ExternalLink, LoaderCircle } from '@lucide/vue'
 import type { DocumentState } from '@embedpdf/core'
 import { PdfErrorCode } from '@embedpdf/models'
 import { useAnnotationCapability } from '@embedpdf/plugin-annotation/vue'
-import { DocumentContent } from '@embedpdf/plugin-document-manager/vue'
+import { DocumentContent, useActiveDocument } from '@embedpdf/plugin-document-manager/vue'
 import { usePan } from '@embedpdf/plugin-pan/vue'
 import { useRotate } from '@embedpdf/plugin-rotate/vue'
 import { ScrollStrategy, useScroll, useScrollCapability } from '@embedpdf/plugin-scroll/vue'
@@ -18,7 +18,7 @@ import PdfPasswordPrompt from './PdfPasswordPrompt.vue'
 import PdfReaderSettingsPanel from './PdfReaderSettingsPanel.vue'
 import PdfReaderSidebar, { type PdfSidebarTab } from './PdfReaderSidebar.vue'
 import PdfReaderToolbar from './PdfReaderToolbar.vue'
-import { fromRotation, safeExternalPdfUrl } from '../pdf-viewer-utils'
+import { clampScaleForPageArea, fromRotation, largestPageArea, safeExternalPdfUrl } from '../pdf-viewer-utils'
 import { usePdfFullscreenChrome } from '../composables/usePdfFullscreenChrome'
 import { usePdfPagination } from '../composables/usePdfPagination'
 import { usePdfResponsiveSpread } from '../composables/usePdfResponsiveSpread'
@@ -56,6 +56,32 @@ const restoredInitialPage = ref(false)
 const viewerSurface = ref<HTMLElement | null>(null)
 const currentScrollMode = ref<PdfReaderSettings['scrollMode']>(props.settings.scrollMode)
 const currentSpreadPreference = ref<PdfReaderSettings['spread']>(props.settings.spread)
+const { activeDocument } = useActiveDocument()
+
+// Oversized pages (large scanned spreads) blow past the rasterizer budget at
+// high zoom and render nothing at all, so every custom scale is clamped
+// against the largest page in the document.
+const maxPageArea = computed(() => {
+  const pages = activeDocument.value?.document?.pages
+  return pages?.length ? largestPageArea(pages) : 0
+})
+
+function clampScale(scale: number) {
+  return clampScaleForPageArea(scale, maxPageArea.value, window.devicePixelRatio)
+}
+
+// A stored scale from a previous session can exceed the budget for this page
+// size, which would leave the reader blank on open with no error to explain it.
+watch(maxPageArea, (area) => {
+  if (!area || !zoom.value) return
+  const current = zoomState.value.currentZoomLevel
+  if (typeof current !== 'number') return
+  const clamped = clampScale(current)
+  if (clamped >= current) return
+  zoom.value.requestZoom(clamped)
+  emit('settingsChange', { zoomMode: 'custom', customScale: clamped })
+})
+
 let previewingZoom = false
 const zoomPercent = computed(() => Math.round(zoomState.value.currentZoomLevel * 100))
 const currentZoomMode = computed<PdfReaderSettings['zoomMode']>(() => {
@@ -163,14 +189,14 @@ function handleZoom(mode: PdfReaderSettings['zoomMode'], scale?: number) {
   let value: ZoomLevel = ZoomMode.FitPage
   if (mode === 'fit-width') value = ZoomMode.FitWidth
   if (mode === 'automatic') value = ZoomMode.Automatic
-  if (mode === 'custom') value = scale ?? zoomState.value.currentZoomLevel
+  if (mode === 'custom') value = clampScale(scale ?? zoomState.value.currentZoomLevel)
   zoom.value?.requestZoom(value)
 }
 
 function handleZoomPreview(scale: number) {
   previewingZoom = true
   try {
-    zoom.value?.requestZoom(scale)
+    zoom.value?.requestZoom(clampScale(scale))
   } finally {
     previewingZoom = false
   }

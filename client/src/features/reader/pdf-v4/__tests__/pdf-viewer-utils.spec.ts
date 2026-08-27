@@ -4,7 +4,18 @@ import { ScrollStrategy } from '@embedpdf/plugin-scroll'
 import { SpreadMode } from '@embedpdf/plugin-spread'
 import { ZoomMode } from '@embedpdf/plugin-zoom'
 import type { PdfReaderSettings } from '@bookorbit/types'
-import { flattenPdfBookmarks, fromRotation, safeExternalPdfUrl, toRotation, toScrollStrategy, toSpreadMode, toZoomLevel } from '../pdf-viewer-utils'
+import {
+  MAX_PAGE_DEVICE_PIXELS,
+  clampScaleForPageArea,
+  flattenPdfBookmarks,
+  fromRotation,
+  largestPageArea,
+  safeExternalPdfUrl,
+  toRotation,
+  toScrollStrategy,
+  toSpreadMode,
+  toZoomLevel,
+} from '../pdf-viewer-utils'
 
 const settings: PdfReaderSettings = {
   scrollMode: 'vertical',
@@ -67,5 +78,50 @@ describe('safeExternalPdfUrl', () => {
     expect(safeExternalPdfUrl('http://example.com')?.protocol).toBe('http:')
     expect(safeExternalPdfUrl('javascript:alert(1)')).toBeNull()
     expect(safeExternalPdfUrl('mailto:test@example.com')).toBeNull()
+  })
+})
+
+describe('largestPageArea', () => {
+  it('returns the area of the biggest page', () => {
+    expect(
+      largestPageArea([
+        { size: { width: 595, height: 842 } },
+        { size: { width: 3600, height: 1914 } },
+        { size: { width: 612, height: 792 } },
+      ]),
+    ).toBe(3600 * 1914)
+  })
+
+  it('returns 0 for an empty document', () => {
+    expect(largestPageArea([])).toBe(0)
+  })
+})
+
+describe('clampScaleForPageArea', () => {
+  const a4 = 595 * 842
+  const oversizedSpread = 3600 * 1914
+
+  it('leaves ordinary pages untouched at full zoom', () => {
+    expect(clampScaleForPageArea(1, a4, 2)).toBe(1)
+    expect(clampScaleForPageArea(4, a4, 1)).toBe(4)
+  })
+
+  it('reduces the scale when an oversized page exceeds the budget', () => {
+    const clamped = clampScaleForPageArea(1, oversizedSpread, 2)
+    expect(clamped).toBeLessThan(1)
+    expect(oversizedSpread * clamped * clamped * 4).toBeCloseTo(MAX_PAGE_DEVICE_PIXELS, 0)
+  })
+
+  it('accounts for device pixel ratio', () => {
+    expect(clampScaleForPageArea(1, oversizedSpread, 1)).toBeGreaterThan(clampScaleForPageArea(1, oversizedSpread, 2))
+  })
+
+  it('passes the scale through when the page area is unknown', () => {
+    expect(clampScaleForPageArea(1, 0, 2)).toBe(1)
+    expect(clampScaleForPageArea(1, Number.NaN, 2)).toBe(1)
+  })
+
+  it('falls back to a ratio of 1 for an invalid device pixel ratio', () => {
+    expect(clampScaleForPageArea(1, oversizedSpread, 0)).toBe(clampScaleForPageArea(1, oversizedSpread, 1))
   })
 })
