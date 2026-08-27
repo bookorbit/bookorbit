@@ -68,7 +68,7 @@ export class OpenAiEmbeddingClient {
     if (!Array.isArray(raw) || raw.length < EMBEDDING_DIMENSIONS || raw.some((v) => typeof v !== 'number' || !Number.isFinite(v))) {
       const dims = Array.isArray(raw) ? raw.length : 'none';
       this.logger.warn(
-        `[${EVENT}] [fail] model=${sanitizeLogValue(model)} durationMs=${Date.now() - startedAt} errorClass=EmbeddingShapeError error="unexpected embedding response dims=${dims}" - openai embedding failed`,
+        `[${EVENT}] [fail] model=${sanitizeLogValue(model)} durationMs=${Date.now() - startedAt} errorClass=EmbeddingShapeError error="unexpected embedding response dims=${sanitizeLogValue(dims)}" - openai embedding failed`,
       );
       throw new BadGatewayException(`unexpected embedding response dims=${dims}`);
     }
