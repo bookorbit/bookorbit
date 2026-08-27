@@ -7,23 +7,23 @@ const props = withDefaults(defineProps<{ format: string | null; size?: 'sm' | 'm
 const sizeClass = computed(
   () =>
     ({
-      sm: 'h-7 w-[1.4rem] pb-[3px] text-[7px]',
+      sm: 'h-[2.375rem] w-[1.9375rem] pb-[4px] text-[9.5px]',
       md: 'h-[2.125rem] w-7 pb-1 text-[8px]',
       lg: 'h-[4.125rem] w-[3.375rem] pb-[9px] text-[13px]',
     })[props.size],
 )
 
 /** The dog-eared corner is drawn, not an image, so it inherits the format colour at any size. */
-const cornerClass = computed(() => (props.size === 'lg' ? 'size-[15px]' : props.size === 'sm' ? 'size-1.5' : 'size-2'))
+const cornerClass = computed(() => (props.size === 'lg' ? 'size-[15px]' : props.size === 'sm' ? 'size-2.5' : 'size-2'))
 
 const glyphStyle = computed(() => {
   const color = formatColorVar(props.format)
-  const notch = props.size === 'lg' ? '15px' : '8px'
+  const notch = props.size === 'lg' ? '15px' : props.size === 'sm' ? '10px' : '8px'
   return {
     color,
     backgroundColor: `color-mix(in oklch, ${color} 22%, transparent)`,
     clipPath: `polygon(0 0, calc(100% - ${notch}) 0, 100% ${notch}, 100% 100%, 0 100%)`,
-    borderRadius: props.size === 'lg' ? '5px 0 5px 5px' : '3px 0 3px 3px',
+    borderRadius: props.size === 'lg' ? '5px 0 5px 5px' : props.size === 'sm' ? '4px 0 4px 4px' : '3px 0 3px 3px',
   }
 })
 </script>
