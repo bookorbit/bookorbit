@@ -59,6 +59,13 @@ export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({
   tokenExchangeTimeoutMs: parsePositiveInteger(process.env.OIDC_TOKEN_EXCHANGE_TIMEOUT_MS, 10_000),
 }));
 
+export const embeddingConfig = registerAs('embedding', () => ({
+  apiBaseUrl: process.env.EMBEDDING_API_BASE_URL?.trim() || undefined,
+  apiKey: process.env.EMBEDDING_API_KEY?.trim() || undefined,
+  model: process.env.EMBEDDING_MODEL?.trim() || undefined,
+  timeoutMs: parsePositiveInteger(process.env.EMBEDDING_API_TIMEOUT_MS, 30_000),
+}));
+
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1) {

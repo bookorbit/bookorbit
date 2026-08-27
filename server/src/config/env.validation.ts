@@ -86,6 +86,12 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.trim())
     .optional(),
+  EMBEDDING_API_BASE_URL: z.string().url().optional(),
+  EMBEDDING_API_KEY: z.string().optional(),
+  EMBEDDING_MODEL: z
+    .string()
+    .transform((val) => val.trim())
+    .optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>) {

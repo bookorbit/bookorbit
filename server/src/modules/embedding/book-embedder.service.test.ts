@@ -24,11 +24,16 @@ function makeService() {
   const vectorizer = {
     buildVector: vi.fn(),
   };
+  const openAiClient = {
+    isEnabled: vi.fn().mockReturnValue(false),
+    embed: vi.fn(),
+  };
 
   return {
-    service: new BookEmbedderService(embedderRepository as never, vectorizer as never),
+    service: new BookEmbedderService(embedderRepository as never, vectorizer as never, openAiClient as never),
     embedderRepository,
     vectorizer,
+    openAiClient,
   };
 }
 
@@ -68,6 +73,47 @@ describe('BookEmbedderService', () => {
     expect(embedderRepository.saveEmbedding).toHaveBeenCalledWith(7, embedding);
     expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('[book.embedding] [end] bookId=7'));
     expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('authorCount=1 genreCount=1 tagCount=1'));
+  });
+
+  it('uses the openai client and persists its vector when the client is enabled', async () => {
+    const { service, embedderRepository, vectorizer, openAiClient } = makeService();
+    vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    const sourceData = makeSourceData();
+    const embedding = Array(256).fill(0.01);
+
+    embedderRepository.findSourceData.mockResolvedValue(sourceData);
+    openAiClient.isEnabled.mockReturnValue(true);
+    openAiClient.embed.mockResolvedValue(embedding);
+    embedderRepository.saveEmbedding.mockResolvedValue(undefined);
+
+    await expect(service.embedBook(11)).resolves.toEqual(embedding);
+
+    expect(openAiClient.embed).toHaveBeenCalledWith(expect.stringContaining('Title: The Last Wish'));
+    expect(vectorizer.buildVector).not.toHaveBeenCalled();
+    expect(embedderRepository.saveEmbedding).toHaveBeenCalledWith(11, embedding);
+  });
+
+  it('returns null without calling the client when enabled but source fields are all empty', async () => {
+    const { service, embedderRepository, vectorizer, openAiClient } = makeService();
+    vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    const sourceData = makeSourceData({
+      title: null,
+      seriesName: null,
+      publisher: null,
+      description: null,
+      authors: [],
+      genres: [],
+      tags: [],
+    });
+
+    embedderRepository.findSourceData.mockResolvedValue(sourceData);
+    openAiClient.isEnabled.mockReturnValue(true);
+
+    await expect(service.embedBook(12)).resolves.toBeNull();
+
+    expect(openAiClient.embed).not.toHaveBeenCalled();
+    expect(vectorizer.buildVector).not.toHaveBeenCalled();
+    expect(embedderRepository.saveEmbedding).not.toHaveBeenCalled();
   });
 
   it('logs fail and rethrows when reading source data fails', async () => {
