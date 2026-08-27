@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { BadGatewayException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 
 import { embeddingConfig } from '../../config/config';
@@ -56,11 +56,30 @@ describe('OpenAiEmbeddingClient', () => {
     expect(result.length).toBe(256);
   });
 
-  it('rejects when the response has fewer than 256 dimensions', async () => {
+  it('rejects with BadGatewayException when the response has fewer than 256 dimensions', async () => {
     const client = new OpenAiEmbeddingClient(makeConfig());
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ data: [{ embedding: Array(128).fill(0) }] }));
 
+    await expect(client.embed('t')).rejects.toBeInstanceOf(BadGatewayException);
     await expect(client.embed('t')).rejects.toThrow('dims=128');
+  });
+
+  it('rejects with ServiceUnavailableException when the request fails', async () => {
+    const client = new OpenAiEmbeddingClient(makeConfig());
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'));
+
+    await expect(client.embed('t')).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('rejects with BadGatewayException on a non-ok response', async () => {
+    const client = new OpenAiEmbeddingClient(makeConfig());
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 502,
+      text: () => Promise.resolve('upstream error'),
+    } as unknown as Response);
+
+    await expect(client.embed('t')).rejects.toBeInstanceOf(BadGatewayException);
   });
 
   it('omits the Authorization header when no api key is set', async () => {

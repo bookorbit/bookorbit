@@ -92,6 +92,7 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.trim())
     .optional(),
+  EMBEDDING_API_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>) {

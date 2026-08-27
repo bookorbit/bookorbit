@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 
 import { embeddingConfig } from '../../config/config';
@@ -40,7 +40,7 @@ export class OpenAiEmbeddingClient {
           error instanceof Error ? error.message : String(error),
         )}" - openai embedding failed`,
       );
-      throw error;
+      throw new ServiceUnavailableException(`embedding provider request failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     if (!res.ok) {
@@ -50,17 +50,27 @@ export class OpenAiEmbeddingClient {
           body,
         )}" - openai embedding failed`,
       );
-      throw new Error(`embedding request failed status=${res.status}`);
+      throw new BadGatewayException(`embedding request failed status=${res.status}`);
     }
 
-    const json = (await res.json()) as { data?: Array<{ embedding?: unknown }> };
+    let json: { data?: Array<{ embedding?: unknown }> };
+    try {
+      json = (await res.json()) as { data?: Array<{ embedding?: unknown }> };
+    } catch (error) {
+      this.logger.warn(
+        `[${EVENT}] [fail] model=${sanitizeLogValue(model)} durationMs=${Date.now() - startedAt} errorClass=EmbeddingParseError error="${sanitizeLogValue(
+          error instanceof Error ? error.message : String(error),
+        )}" - openai embedding failed`,
+      );
+      throw new BadGatewayException('embedding response was not valid JSON');
+    }
     const raw = json?.data?.[0]?.embedding;
     if (!Array.isArray(raw) || raw.length < EMBEDDING_DIMENSIONS || raw.some((v) => typeof v !== 'number' || !Number.isFinite(v))) {
       const dims = Array.isArray(raw) ? raw.length : 'none';
       this.logger.warn(
         `[${EVENT}] [fail] model=${sanitizeLogValue(model)} durationMs=${Date.now() - startedAt} errorClass=EmbeddingShapeError error="unexpected embedding response dims=${dims}" - openai embedding failed`,
       );
-      throw new Error(`unexpected embedding response dims=${dims}`);
+      throw new BadGatewayException(`unexpected embedding response dims=${dims}`);
     }
 
     const embedding = (raw as number[]).slice(0, EMBEDDING_DIMENSIONS);

@@ -143,4 +143,14 @@ describe('validateEnv', () => {
   it('rejects a relative migration import root', () => {
     expect(() => validateEnv({ ...BASE_ENV, MIGRATION_IMPORT_ROOT: './imports' })).toThrow('MIGRATION_IMPORT_ROOT must be an absolute path');
   });
+
+  it('accepts a positive integer EMBEDDING_API_TIMEOUT_MS', () => {
+    expect(() => validateEnv({ ...BASE_ENV, EMBEDDING_API_TIMEOUT_MS: '5000' })).not.toThrow();
+  });
+
+  it('rejects non-positive or fractional EMBEDDING_API_TIMEOUT_MS values', () => {
+    for (const value of ['0', '-1', '1.5', 'abc']) {
+      expect(() => validateEnv({ ...BASE_ENV, EMBEDDING_API_TIMEOUT_MS: value })).toThrow();
+    }
+  });
 });
