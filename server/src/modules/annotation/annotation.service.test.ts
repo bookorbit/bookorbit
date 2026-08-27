@@ -62,6 +62,7 @@ function makeService() {
     getStats: vi.fn(),
     getDistinctChapters: vi.fn(),
     create: vi.fn(),
+    createPdf: vi.fn(),
     update: vi.fn(),
     softDelete: vi.fn(),
   };
@@ -73,7 +74,7 @@ function makeService() {
   };
   const conversionService = { ensureCfiPositionsForBook: vi.fn().mockResolvedValue(0) };
   const service = new AnnotationService(annotationRepo as never, bookService as never, achievementEvents as never, conversionService as never);
-  return { service, annotationRepo, bookService, conversionService };
+  return { service, annotationRepo, bookService, conversionService, achievementEvents };
 }
 
 describe('AnnotationService', () => {
@@ -220,6 +221,50 @@ describe('AnnotationService', () => {
       bookService.verifyBookAccess.mockRejectedValue(new ForbiddenException());
 
       await expect(service.createAnnotation(5, makeUser(), { cfi: 'epubcfi(/6/4)', text: 'text' })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('creates a pdf annotation via createPdf with serialized geometry and derived pageno', async () => {
+      const { service, annotationRepo } = makeService();
+      const row = makeAnnotationRow({
+        cfi: null,
+        cfiStatus: null,
+        jumpFileId: 50,
+        pageno: 4,
+        pdfPos0: JSON.stringify({ page: 3, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] }),
+        pdfStatus: 'exact',
+      });
+      annotationRepo.createPdf.mockResolvedValue(row);
+
+      const dto: CreateAnnotationDto = {
+        pdf: { page: 3, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+        bookFileId: 50,
+        text: 'selected text',
+        color: '#38BDF8',
+        style: 'highlight',
+      };
+
+      const result = await service.createAnnotation(5, makeUser(), dto);
+
+      expect(annotationRepo.create).not.toHaveBeenCalled();
+      expect(annotationRepo.createPdf).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1, bookId: 5, bookFileId: 50, text: 'selected text', color: '#38BDF8' }),
+        { page: 3, pos0: JSON.stringify({ page: 3, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] }) },
+      );
+      expect(result.cfi).toBeNull();
+      expect(result.pageno).toBe(4);
+      expect(result.pdf).toEqual({ page: 3, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] });
+    });
+
+    it('emits the annotation-created achievement event for pdf annotations', async () => {
+      const { service, annotationRepo, achievementEvents } = makeService();
+      annotationRepo.createPdf.mockResolvedValue(makeAnnotationRow({ id: 77, cfi: null }));
+
+      await service.createAnnotation(5, makeUser(), {
+        pdf: { page: 0, rect: { x: 0, y: 0, width: 1, height: 1 }, rects: [{ x: 0, y: 0, width: 1, height: 1 }] },
+        text: 'text',
+      });
+
+      expect(achievementEvents.emit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: 1, bookId: 5, annotationId: 77 }));
     });
   });
 
@@ -371,6 +416,36 @@ describe('AnnotationService', () => {
       expect(dto.note).toBe('a note');
       expect(dto.chapterTitle).toBe('Intro');
       expect(dto.createdAt).toEqual(new Date('2026-03-01T00:00:00Z'));
+    });
+
+    it('parses pdf geometry and derives positionStatus for a pdf row', () => {
+      const geometry = { page: 2, rect: { x: 10, y: 20, width: 30, height: 8 }, rects: [{ x: 10, y: 20, width: 30, height: 8 }] };
+      const row = makeAnnotationRow({
+        cfi: null,
+        cfiStatus: null,
+        pageno: 3,
+        pdfPos0: JSON.stringify(geometry),
+        pdfStatus: 'exact',
+      });
+
+      const dto = AnnotationResponseDto.from(row as never);
+
+      expect(dto.cfi).toBeNull();
+      expect(dto.pdf).toEqual(geometry);
+      expect(dto.positionStatus).toBe('exact');
+    });
+
+    it('returns null pdf and null positionStatus when no position exists', () => {
+      const row = makeAnnotationRow({ cfi: null, cfiStatus: null, pdfPos0: null, pdfStatus: null });
+      const dto = AnnotationResponseDto.from(row as never);
+      expect(dto.pdf).toBeNull();
+      expect(dto.positionStatus).toBeNull();
+    });
+
+    it('ignores malformed pdf geometry json', () => {
+      const row = makeAnnotationRow({ cfi: null, cfiStatus: null, pdfPos0: 'not-json', pdfStatus: 'exact' });
+      const dto = AnnotationResponseDto.from(row as never);
+      expect(dto.pdf).toBeNull();
     });
 
     it('coerces undefined note to null', () => {

@@ -74,17 +74,21 @@ export class AnnotationService {
 
   async createAnnotation(bookId: number, user: RequestUser, dto: CreateAnnotationDto): Promise<AnnotationResponseDto> {
     await this.bookService.verifyBookAccess(bookId, user);
-    const row = await this.annotationRepo.create({
+    const base = {
       userId: user.id,
       bookId,
-      cfi: dto.cfi,
-      bookFileId: dto.bookFileId ?? null,
       text: dto.text,
       color: dto.color ?? DEFAULT_ANNOTATION_COLOR,
       style: dto.style ?? DEFAULT_ANNOTATION_STYLE,
       note: dto.note ?? null,
       chapterTitle: dto.chapterTitle ?? null,
-    });
+    };
+    const row = dto.pdf
+      ? await this.annotationRepo.createPdf(
+          { ...base, bookFileId: dto.bookFileId ?? null },
+          { page: dto.pdf.page, pos0: JSON.stringify({ page: dto.pdf.page, rect: dto.pdf.rect, rects: dto.pdf.rects }) },
+        )
+      : await this.annotationRepo.create({ ...base, cfi: dto.cfi!, bookFileId: dto.bookFileId ?? null });
     this.achievementEvents.emit(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
       userId: user.id,
       bookId,

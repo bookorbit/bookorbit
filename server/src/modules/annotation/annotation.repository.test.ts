@@ -140,6 +140,28 @@ describe('AnnotationRepository', () => {
     });
   });
 
+  describe('createPdf', () => {
+    it('inserts the annotation and a pdf position with pageno extras in a transaction', async () => {
+      const row = makeRow({ cfi: null, cfiStatus: null });
+      const db = makeDb([row], []);
+      const repo = new AnnotationRepository(db as never);
+      const pos0 = JSON.stringify({ page: 3, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] });
+
+      const result = await repo.createPdf(
+        { userId: 10, bookId: 5, bookFileId: 42, text: 'selected text', color: 'yellow', style: 'highlight', note: null, chapterTitle: null },
+        { page: 3, pos0 },
+      );
+
+      expect(db.transaction).toHaveBeenCalled();
+      expect(db.insert).toHaveBeenCalledTimes(2);
+      const annotationValues = db._queries[0].values.mock.calls[0][0] as Record<string, unknown>;
+      expect(annotationValues).not.toHaveProperty('bookFileId');
+      const positionValues = db._queries[1].values.mock.calls[0][0] as Record<string, unknown>;
+      expect(positionValues).toMatchObject({ annotationId: 1, format: 'pdf', pos0, status: 'exact', bookFileId: 42, extras: { pageno: 4 } });
+      expect(result).toMatchObject({ cfi: null, pageno: 4, jumpFileId: 42, pdfPos0: pos0, pdfStatus: 'exact' });
+    });
+  });
+
   describe('update', () => {
     it('bumps the version and re-reads the row with its position', async () => {
       const updated = makeRow({ note: 'updated', version: 2 });

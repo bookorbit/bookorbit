@@ -40,6 +40,35 @@ describe('Annotation DTO validation', () => {
     expect((await errorsFor(CreateAnnotationDto, { cfi: 'x', text: 'ok', chapterTitle: 'x'.repeat(501) })).length).toBeGreaterThan(0);
   });
 
+  it('accepts a pdf create payload without a cfi', async () => {
+    const errors = await errorsFor(CreateAnnotationDto, {
+      pdf: { page: 3, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+      bookFileId: 12,
+      text: 'Selected text',
+      color: '#FACC15',
+    });
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects a create payload missing both cfi and pdf', async () => {
+    expect((await errorsFor(CreateAnnotationDto, { text: 'ok' })).length).toBeGreaterThan(0);
+  });
+
+  it('rejects a pdf create payload with an empty rects array or negative page', async () => {
+    expect(
+      (await errorsFor(CreateAnnotationDto, { pdf: { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [] }, text: 'ok' })).length,
+    ).toBeGreaterThan(0);
+    expect(
+      (
+        await errorsFor(CreateAnnotationDto, {
+          pdf: { page: -1, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+          text: 'ok',
+        })
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
   it('accepts update payload with nullable note and optional style', async () => {
     const nullNoteErrors = await errorsFor(UpdateAnnotationDto, { note: null, style: 'highlight' });
     const normalErrors = await errorsFor(UpdateAnnotationDto, { note: 'updated', color: '#38BDF8' });

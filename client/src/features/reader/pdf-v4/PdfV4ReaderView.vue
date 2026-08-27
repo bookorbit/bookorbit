@@ -110,6 +110,7 @@ function buildPlugins(settings: PdfReaderSettings): PluginBatchRegistrations {
     createPluginRegistration(HistoryPluginPackage),
     createPluginRegistration(AnnotationPluginPackage, {
       autoOpenLinks: false,
+      autoCommit: false,
       locked: { type: LockModeType.All },
     }),
     createPluginRegistration(ThumbnailPluginPackage, {
@@ -298,6 +299,8 @@ onUnmounted(() => {
         <PdfReaderContent
           v-else
           :document-id="activeDocumentId"
+          :book-id="props.bookId"
+          :file-id="props.fileId"
           :initial-page="initialPage"
           :settings="effectiveSettings"
           :peek-mode="props.peekMode"
