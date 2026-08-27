@@ -301,6 +301,8 @@ function sameProviderSelection(keys: MetadataProviderKey[]) {
           />
         </div>
       </div>
+
+      <slot name="results-extra" />
     </div>
   </div>
 </template>

@@ -176,9 +176,11 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             @clear-filter="handleClearProviderFilter"
             @select-field-rules="handleSelectFieldRules"
             @select="handleSelect"
-          />
-
-          <MangabakaVolumeBrowser v-if="view === 'search'" :candidates="filteredResults" :query-title="lastSearchTitle" @select="handleSelect" />
+          >
+            <template #results-extra>
+              <MangabakaVolumeBrowser :candidates="filteredResults" :query-title="lastSearchTitle" @select="handleSelect" />
+            </template>
+          </MetadataSearchPanel>
 
           <MetadataDiffPanel
             v-else-if="view === 'diff' && selectedCandidate"
