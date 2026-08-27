@@ -23,6 +23,7 @@ import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/u
 import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
+import { ScannerRepository } from '../scanner/scanner.repository';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
@@ -278,6 +279,7 @@ export class BookService {
     @Optional() private readonly fileWriteService: FileWriteService,
     @Optional() private readonly fileRenameService: FileRenameService,
     @Optional() private readonly achievementEvents: AchievementEventsService,
+    @Optional() private readonly scannerRepo?: ScannerRepository,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
     @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
   ) {
@@ -1548,7 +1550,9 @@ export class BookService {
         return row ? [row] : [];
       });
       const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
+      const scanFolders = await this.bookRepo.findScanInvalidationFolders(deletedBookIds);
       await this.bookRepo.deleteByIds(bookIds);
+      await this.invalidateScanStateForDeletedBooks(scanFolders);
       const deleteTargets = [
         ...rows.map((row) => ({
           path: join(this.appDataPath, 'covers', String(row.id)),
@@ -1587,6 +1591,19 @@ export class BookService {
         `[${event}] [fail] count=${bookIds.length} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books failed`,
       );
       throw err;
+    }
+  }
+
+  private async invalidateScanStateForDeletedBooks(folders: Array<{ libraryFolderId: number; folderPath: string }>): Promise<void> {
+    if (!this.scannerRepo || folders.length === 0) return;
+    try {
+      await this.scannerRepo.invalidateDirScanState(folders);
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[book.delete_books] [fail] folderCount=${folders.length} errorClass=${errorClass} error="${errorMessage}" - dir scan state invalidation failed`,
+      );
     }
   }
 

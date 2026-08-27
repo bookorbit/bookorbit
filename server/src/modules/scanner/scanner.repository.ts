@@ -4,6 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { scanStateInvalidationPaths } from './lib/scan-state-paths';
 import {
   authors,
   bookAuthors,
@@ -661,5 +662,37 @@ export class ScannerRepository {
 
   async clearDirScanState(libraryFolderId: number): Promise<void> {
     await this.db.delete(schema.libraryDirScanState).where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
+  }
+
+  /**
+   * Invalidate the incremental scan state for deleted books so a later rescan
+   * re-reads their directories and re-creates the records instead of skipping
+   * them on an unchanged mtime. Each entry names a deleted book's folder (or
+   * loose file) and the library folder that owns its scan state.
+   */
+  async invalidateDirScanState(folders: Array<{ libraryFolderId: number; folderPath: string }>): Promise<void> {
+    if (folders.length === 0) return;
+
+    const dirsByFolder = new Map<number, Set<string>>();
+    for (const { libraryFolderId, folderPath } of folders) {
+      let dirs = dirsByFolder.get(libraryFolderId);
+      if (!dirs) dirsByFolder.set(libraryFolderId, (dirs = new Set()));
+      for (const dirPath of scanStateInvalidationPaths(folderPath)) dirs.add(dirPath);
+    }
+
+    for (const [libraryFolderId, dirs] of dirsByFolder) {
+      const paths = [...dirs];
+      const CHUNK = 500;
+      for (let i = 0; i < paths.length; i += CHUNK) {
+        await this.db
+          .delete(schema.libraryDirScanState)
+          .where(
+            and(
+              eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId),
+              inArray(schema.libraryDirScanState.dirPath, paths.slice(i, i + CHUNK)),
+            ),
+          );
+      }
+    }
   }
 }

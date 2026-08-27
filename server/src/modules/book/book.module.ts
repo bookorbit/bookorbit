@@ -5,6 +5,7 @@ import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
+import { ScannerModule } from '../scanner/scanner.module';
 import { BookMetadataLockModule } from '../book-metadata-lock/book-metadata-lock.module';
 import { CustomMetadataModule } from '../custom-metadata/custom-metadata.module';
 import { MetadataModule } from '../metadata/metadata.module';
@@ -25,6 +26,7 @@ import { ReadingAttemptController } from './reading-attempt.controller';
 @Module({
   imports: [
     forwardRef(() => LibraryModule),
+    forwardRef(() => ScannerModule),
     BookMetadataLockModule,
     CustomMetadataModule,
     MetadataModule,

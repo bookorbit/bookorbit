@@ -111,6 +111,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     findPatternMetadataByBookIds: vi.fn(),
     findLibraryIdsByBookIds: vi.fn(),
     findDeletionAuditBooksByIds: vi.fn(),
+    findScanInvalidationFolders: vi.fn().mockResolvedValue([]),
     findPrimaryFilesByBookIds: vi.fn(),
     findAllFilesByBookIds: vi.fn(),
     findTagsByBookIds: vi.fn(),
@@ -203,6 +204,9 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
   const achievementEvents = {
     emit: vi.fn(),
   };
+  const scannerRepo = {
+    invalidateDirScanState: vi.fn().mockResolvedValue(undefined),
+  };
   const narratorService = {
     replaceForBook: vi.fn().mockResolvedValue(undefined),
   };
@@ -274,6 +278,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     fileWriteService as never,
     fileRenameService as never,
     achievementEvents as never,
+    scannerRepo as never,
   );
 
   return {
@@ -292,6 +297,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     fileWriteService,
     fileRenameService,
     achievementEvents,
+    scannerRepo,
     narratorService,
     comicMetadataService,
     customMetadataService,
@@ -2282,6 +2288,42 @@ describe('BookService', () => {
       expect(result.books[0]).toEqual({ id: 1, title: 'Book 1' });
       expect(result.books[24]).toEqual({ id: 25, title: 'Book 25' });
       expect(result.omitted).toBe(5);
+    });
+
+    it('invalidates directory scan state for deleted book folders', async () => {
+      const { service, bookRepo, scannerRepo } = makeService();
+      const user = makeUser();
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
+      bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
+      bookRepo.findScanInvalidationFolders.mockResolvedValue([{ libraryFolderId: 10, folderPath: '/tmp/library/Dune' }]);
+      bookRepo.deleteByIds.mockResolvedValue(undefined);
+
+      await service.deleteBooks([3], user);
+
+      expect(bookRepo.findScanInvalidationFolders).toHaveBeenCalledWith([3]);
+      expect(scannerRepo.invalidateDirScanState).toHaveBeenCalledWith([{ libraryFolderId: 10, folderPath: '/tmp/library/Dune' }]);
+    });
+
+    it('does not fail deletion when scan state invalidation throws', async () => {
+      const { service, bookRepo, scannerRepo } = makeService();
+      const user = makeUser();
+      const warnSpy = vi.spyOn((service as unknown as { logger: { warn: (message: string) => void } }).logger, 'warn').mockImplementation();
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
+      bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
+      bookRepo.findScanInvalidationFolders.mockResolvedValue([{ libraryFolderId: 10, folderPath: '/tmp/library/Dune' }]);
+      bookRepo.deleteByIds.mockResolvedValue(undefined);
+      scannerRepo.invalidateDirScanState.mockRejectedValue(new Error('db down'));
+
+      await expect(service.deleteBooks([3], user)).resolves.toEqual({
+        total: 1,
+        books: [{ id: 3, title: 'Dune' }],
+        omitted: 0,
+      });
+      expect(warnSpy).toHaveBeenCalled();
     });
 
     it('returns queued=0 when embed-all is already running', async () => {

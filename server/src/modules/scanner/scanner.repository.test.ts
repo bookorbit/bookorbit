@@ -375,6 +375,22 @@ describe('ScannerRepository', () => {
     expect(db.delete).toHaveBeenCalledTimes(1);
   });
 
+  it('invalidateDirScanState is a no-op for an empty folder list', async () => {
+    const { repo, db } = makeRepo();
+    await repo.invalidateDirScanState([]);
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
+  it('invalidates scan state per library folder for deleted book folders', async () => {
+    const { repo, db } = makeRepo();
+    await repo.invalidateDirScanState([
+      { libraryFolderId: 7, folderPath: '/books/Series/Book' },
+      { libraryFolderId: 7, folderPath: '/books/Loose.epub' },
+      { libraryFolderId: 9, folderPath: '/other/Book' },
+    ]);
+    expect(db.delete).toHaveBeenCalledTimes(2);
+  });
+
   it('findRecentScanJobs reads the newest jobs for one library', async () => {
     const { repo, queues, db } = makeRepo();
     queues.select.push([{ id: 2 }, { id: 1 }]);
