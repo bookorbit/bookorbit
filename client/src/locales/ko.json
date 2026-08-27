@@ -1432,7 +1432,7 @@
         },
         "mergeExisting": {
           "label": "기존 항목과 병합",
-          "description": "저장된 장르를 유지하고 신규 공급자 장르를 추가합니다",
+          "description": "기존 장르를 유지하고 새로운 제공자 장르를 추가합니다",
           "short": "병합"
         },
         "overwriteIfProvided": {
@@ -1984,6 +1984,8 @@
         "widePageDisable": "비활성화",
         "forceTwoPage": "작은 화면에서 2페이지 보기 강제 적용",
         "forceTwoPageHint": "2 페이지 모드가 선택되었을 때 모바일 환경에서의 자동 비활성화 우회 여부",
+        "autoAdvance": "자동으로 다음 책으로 넘어가기",
+        "autoAdvanceHint": "마지막 페이지를 넘겨 시리즈의 다음 책으로 넘어가세요",
         "off": "끄기",
         "on": "켜기",
         "display": "디스플레이",
@@ -2121,6 +2123,7 @@
         "modSort": "성, 이름으로 형식화",
         "modInitial": "첫 글자만",
         "modFixed2": "소수점 둘째 자리까지",
+        "modMax3": "최대 3개의 값 또는 비워두기",
         "folderOnlyPrefix": "패턴을",
         "folderOnlySuffix": "로 끝낸다면 이는 폴더까지만 나타냈음을 의미합니다. 원래 파일 이름은 해당 폴더 내에 보존됩니다.",
         "conditionalLogic": "조건 로직",
@@ -2176,6 +2179,7 @@
         "tokenTitle": "책 제목",
         "tokenSubtitle": "책 부제목",
         "tokenAuthors": "저자 목록(쉼표로 구분)",
+        "tokenNarrators": "내레이터(쉼표로 구분)",
         "tokenYear": "출판 연도",
         "tokenSeries": "시리즈 이름",
         "tokenSeriesIndex": "시리즈 번호(0으로 패딩됨)",
@@ -3556,7 +3560,10 @@
       "EmailRecipientGroupUpdate": "수신자 그룹 업데이트",
       "EmailRecipientGroupDelete": "수신자 그룹 삭제",
       "EmailRecipientGroupMemberAdd": "그룹에 수신자 추가",
-      "EmailRecipientGroupMemberRemove": "그룹에서 수신자 제거"
+      "EmailRecipientGroupMemberRemove": "그룹에서 수신자 제거",
+      "MaintenanceMissingBooksClean": "누락된 도서 정리",
+      "MaintenanceBrokenCoversClean": "비정상 표지 정리",
+      "MaintenanceOrphanedCoversClean": "미사용 표지 폴더 정리"
     }
   },
   "auth": {
@@ -4369,6 +4376,7 @@
         "saveInProgress": "진행도 저장",
         "writeManualLibraryDisabled": "파일에 메타데이터를 기록하고 디스크에서 이름을 변경합니다. 이 라이브러리에서는 자동 다시 쓰기 기능이 비활성화되어 있습니다.",
         "writeManualTooltip": "{fields}을(를) {target} 내부에 작성하고 디스크에서 이름을 변경합니다.",
+        "applyResult": "{skipped}, {updated}",
         "skippedLockedFields": "{count, plural, =0 {잠긴 필드 0개 건너뜀} one {잠긴 필드 #개 건너뜀} other {잠긴 필드 #개 건너뜀}}",
         "updatedFields": "{count, plural, =0 {0개 필드 업데이트됨} one {1개 필드 업데이트됨} other {#개 필드 업데이트됨}}",
         "wroteFieldsToFile": "{fields}을(를) 파일에 작성했습니다.",
@@ -4778,7 +4786,7 @@
         "moveDown": "아래로 이동",
         "removeSeries": "시리즈 제거",
         "seriesIndexLabel": "시리즈 번호",
-        "invalidSeriesIndex": "5.10과 같이 소수점이 최대 한 자리인 숫자를 입력하십시오.",
+        "invalidSeriesIndex": "5.10과 같이 소수점을 하나만 넣어 숫자를 입력해주세요.",
         "totalLabel": "시리즈 도서 수",
         "totalPlaceholder": "/",
         "totalHint": "이 시리즈의 총 도서 수입니다. 이 시리즈를 보유한 모든 사용자에게 공유됩니다."
@@ -5008,10 +5016,10 @@
     "applyFetched": "가져온 데이터 적용",
     "retryErrors": "실패한 항목 재시도",
     "discardDialog": {
-      "title": "{count, plural, =0 {삭제할 파일이 없습니까?} one {선택한 파일을 삭제하시겠습니까?} other {선택한 #개 파일을 삭제하시겠습니까?}}",
+      "title": "{count, plural, =0 {0개 파일을 삭제하시겠습니까?} one {선택한 파일을 삭제하시겠습니까?} other {선택한 파일 #개를 삭제하시겠습니까?}}",
       "description": "{count, plural, =0 {선택한 파일이 없습니다.} one {선택한 파일을 디스크에서 삭제합니다. 이 작업은 되돌릴 수 없습니다.} other {선택한 #개 파일을 디스크에서 삭제합니다. 이 작업은 되돌릴 수 없습니다.}}",
       "confirm": "{count, plural, one {파일 삭제} other {#개 파일 삭제}}",
-      "failed": "선택한 파일을 삭제하지 못했습니다. 다시 시도하십시오."
+      "failed": "선택한 파일을 삭제하지 못했습니다. 다시 시도해 주세요."
     },
     "commaSeparated": "쉼표로 구분된 항목",
     "destinationLibrary": "목적지 라이브러리",
@@ -5019,7 +5027,7 @@
     "nFailed": "{count}개 실패",
     "updatedOfFiles": "총 {total}개 파일 중 {updated}개 업데이트됨",
     "errorStatus": "오류 {status}",
-    "invalidSeriesIndex": "5.10과 같이 소수점이 최대 한 자리인 숫자를 입력하십시오.",
+    "invalidSeriesIndex": "5.10과 같이 소수점을 하나만 넣어 숫자를 입력해주세요.",
     "tab": {
       "all": "모두",
       "pending": "대기 중",
@@ -6546,6 +6554,7 @@
       "title": "중복 타겟 매칭 해결",
       "explanation": "각 타겟 도서별로 보존할 소스 도서 하나를 선택하세요. 가장 유력한 매칭이 하나일 경우, 추천 선택지는 미리 선택되어 있습니다.",
       "remainingGroups": "남은 그룹:",
+      "ofCount": "(전체 {total}개)",
       "targetBookId": "타겟 도서 #{id}",
       "recommended": "추천",
       "resolveButton": "{count, plural, =0 {#개 중복 해결} one {#개 중복 해결} other {#개 중복 해결}}",
@@ -6626,7 +6635,8 @@
       "unresolvedBooksExplanation": "이 책들은 소스에는 존재하지만, 사용자의 라이브러리에 있는 어떤 책과도 일치하는 항목을 찾을 수 없었습니다.",
       "mappedUsers": "매핑된 사용자 ({count})",
       "mappedUsersExplanation": "사용자별 총계는 마이그레이션 계획과 함께 캐시된 모의 테스트 미리보기에서 가져옵니다.",
-      "coverFailures": "{count}개의 표지를 가져오지 못했습니다. 상세 실패 내역은 저장되지 않습니다."
+      "coverFailures": "{count}개의 표지를 가져오지 못했습니다. 상세 실패 내역은 저장되지 않습니다.",
+      "userPreviewCounts": "{statuses}개 상태, {progress}개 진행 항목, {sessions}개 독서 세션, {bookmarks}개 북마크, {annotations}개 메모, {collections}개 컬렉션 항목"
     },
     "unresolvedReason": {
       "noTitleAuthorMatch": "제목이나 저자가 일치하는 책을 찾을 수 없음",
@@ -6722,6 +6732,9 @@
     "clear": "지우기",
     "empty": "아직 알림이 없습니다",
     "loadMore": "알림 더보기",
+    "dismiss": "알림 해제",
+    "occurrences": "{count}회 발생함",
+    "occurrencesShort": "{count}회",
     "preferences": {
       "title": "알림",
       "subtitle": "받아보길 원하는 알림의 카테고리를 선택하세요.",
@@ -6740,6 +6753,20 @@
         "app": "앱 업데이트"
       },
       "enabledCount": "{total} / {enabled} 활성화됨",
+      "levels": {
+        "off": {
+          "short": "끄기",
+          "description": "관련 정보를 더 이상 알리지 않습니다."
+        },
+        "problems": {
+          "short": "문제점만",
+          "description": "작업 실패 시 또는 주의가 필요한 사항이 발생했을 때 알립니다."
+        },
+        "all": {
+          "short": "모두",
+          "description": "성공했을 때를 포함하여 항상 정보를 알립니다."
+        }
+      },
       "categories": {
         "scanning": {
           "label": "라이브러리 스캐닝",
@@ -6988,6 +7015,9 @@
       "scrollMode": "스크롤 모드",
       "scrollModeHint": "웹툰 및 세로형 배치에는 \"간격 없음\"을 사용하세요.",
       "readingDirection": "읽기 방향",
+      "autoAdvance": "자동 넘어가기",
+      "autoAdvanceHint": "마지막 페이지를 넘겨 시리즈의 다음 책으로 넘어가세요.",
+      "autoAdvancePagedOnly": "자동 넘어가기 기능은 페이지 모드에서만 적용됩니다.",
       "pageView": "페이지 보기",
       "twoPagePagedOnly": "두 페이지 보기는 페이지 모드에서만 표시됩니다.",
       "spreadSection": "페이지 쌍",
@@ -7033,6 +7063,14 @@
         "black": "검은색",
         "gray": "회색",
         "white": "흰색"
+      },
+      "nextIssue": {
+        "eyebrow": "시리즈의 다음 작품",
+        "action": "다음 책 읽기",
+        "open": "다음 책 읽기: {title}",
+        "numbered": "#{index} {title}",
+        "untitled": "제목 없음",
+        "autoAdvanceHint": "계속하려면 페이지를 다시 한 번 넘기세요"
       }
     },
     "audiobook": {
@@ -7379,7 +7417,8 @@
     "header": {
       "entityManager": "개체 관리자",
       "bulkRename": "일괄 이름 변경",
-      "duplicateBooks": "중복 도서"
+      "duplicateBooks": "중복 도서",
+      "missingResources": "누락된 리소스"
     },
     "entityTypes": {
       "authors": "저자",
@@ -7510,6 +7549,7 @@
       },
       "deleteDialog": {
         "title": "중복 도서를 영구적으로 삭제하시겠습니까?",
+        "description": "{count, plural, =0 {선택된 책 #권과 파일이 영구적으로 삭제됩니다.} one {선택된 책 #권과 파일이 영구적으로 삭제됩니다.} other {선택된 책 #권과 파일이 영구적으로 삭제됩니다.}}",
         "warning": "메타데이터, 컬렉션, 독서 데이터 및 기기 상태는 유지되는 책으로 전송되지 않습니다. 다른 사용자의 관련 데이터도 제거됩니다.",
         "confirm": "{count, plural, =0 {책 #권 삭제} one {책 #권 삭제} other {책 #권 삭제}}",
         "success": "{count, plural, =0 {삭제된 책이 없습니다.} one {중복 도서 #권이 삭제되었습니다.} other {중복 도서 #권이 삭제되었습니다.}}"
@@ -7619,6 +7659,77 @@
       "mergeModal": {
         "title": "개체 병합",
         "description": "유지할 개체를 선택하세요. 나머지 개체들은 선택된 개체에 병합된 후 제거됩니다."
+      }
+    },
+    "missingResources": {
+      "title": "누락된 리소스",
+      "accessDenied": "현재 사용자에게는 누락된 리소스를 정리할 권한이 없습니다.",
+      "categoriesLabel": "카테고리 정리",
+      "untitled": "제목 없음",
+      "clearSelection": "선택 항목 지우기",
+      "cleanSelected": "선택 항목 {count}개 지우기",
+      "selectAllMatching": "일치하는 항목 {count}개 모두 선택",
+      "allSelected": "총 {count}개의 일치 항목이 선택되었습니다.",
+      "sweep": {
+        "title": "표지 검사",
+        "description": "디스크 파일과 대조하여 표지가 설정된 도서를 확인하고, 이미 삭제된 도서의 표지가 남아있는 폴더를 탐색합니다. 검사 과정에서는 파일이 삭제되지 않습니다.",
+        "run": "검사 시작",
+        "running": "검사 중",
+        "progress": "총 {total}개 도서 중 {processed}개 검사 완료",
+        "lastRun": "마지막 검사일시{at}",
+        "truncated": "첫 번째 결과만 표시되었습니다. 이 항목들을 정리한 후 검사를 다시 실행하여 나머지를 확인하세요."
+      },
+      "categories": {
+        "missing_books": "누락된 책",
+        "broken_covers": "비정상 표지",
+        "orphaned_cover_dirs": "미사용 표지 폴더"
+      },
+      "found": {
+        "missing_books": "{count, plural, =0 {누락된 파일이 있는 책 없음} one {책 1권의 파일이 누락됨} other {책 #권의 파일이 누락됨}}",
+        "broken_covers": "{count, plural, =0 {비정상적인 표지 참조 없음} one {비정상적인 표지 참조 1건} other {비정상적인 표지 참조 #건}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {미사용 표지 폴더 없음} one {미사용 표지 폴더 1개} other {미사용 표지 폴더 #개}}"
+      },
+      "empty": {
+        "missing_books": "누락된 책 없음",
+        "broken_covers": "비정상 표지 없음",
+        "orphaned_cover_dirs": "미사용 표지 없음",
+        "description": "이 카테고리의 모든 모든 항목이 확인되었습니다."
+      },
+      "needsSweep": {
+        "title": "표지 검사를 먼저 진행해주세요",
+        "description": "표지 결과는 디스크 검사를 통해 확인됩니다. 검사를 실행하여 끊어진 참조와 미사용 폴더를 확인하세요."
+      },
+      "coverSource": {
+        "extracted": "추출됨",
+        "custom": "커스텀"
+      },
+      "table": {
+        "selectPage": "이 페이지의 모든 항목 선택",
+        "coverFolder": "책 #{bookId}의 표지 폴더",
+        "fileCount": "{count, plural, one {#개 파일} other {#개 파일}}"
+      },
+      "confirm": {
+        "title": "누락된 리소스들을 정리하시겠습니까?",
+        "action": "지우기",
+        "missing_books": "{count, plural, one {파일이 손실된 도서 1권의 데이터베이스 기록을 삭제합니다. 해당 도서와 메타데이터, 독서 진행도, 표지가 모두 제거됩니다. 이 작업은 되돌릴 수 없습니다.} other {파일이 손실된 도서 #권의 데이터베이스 기록을 삭제합니다. 해당 도서와 메타데이터, 독서 진도, 표지가 모두 제거됩니다. 이 작업은 되돌릴 수 없습니다.}}",
+        "broken_covers": "{count, plural, one {도서 1권의 표지 참조를 지워 표지가 없는 것으로 표시합니다. 이 외의 메타데이터는 변경되지 않습니다.} other {도서 #권의 표지 참조를 지워 표지가 없는 것으로 표시합니다. 이 외의 메타데이터는 변경되지 않습니다.}}",
+        "orphaned_cover_dirs": "{count, plural, one {디스크에서 표지 폴더 1개를 삭제합니다. 해당 도서는 더 이상 데이터베이스에 존재하지 않습니다. 이 작업은 되돌릴 수 없습니다.} other {디스크에서 표지 폴더 #개를 삭제합니다. 해당 도서는 더 이상 데이터베이스에 존재하지 않습니다. 이 작업은 되돌릴 수 없습니다.}}"
+      },
+      "cleaned": {
+        "missing_books": "{count, plural, =0 {정리한 항목 없음} one {누락된 책 1권 제거됨} other {누락된 책 #권 제거됨}}",
+        "broken_covers": "{count, plural, =0 {정리한 항목 없음} one {비정상 표지 참조 1건 정리됨} other {비정상 표지 참조 #건 정리됨}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {정리한 항목 없음} one {미사용 표지 폴더 1개 제거됨} other {미사용 표지 폴더 #개 제거됨}}"
+      },
+      "pagination": {
+        "label": "누락된 리소스 페이지",
+        "page": "페이지 {page} / {total}"
+      },
+      "errors": {
+        "summary": "누락된 리소스 요약을 불러오지 못했습니다.",
+        "sweepStart": "표지 검사를 시작하지 못했습니다.",
+        "sweep": "표지 검사에 실패했습니다.",
+        "list": "선택한 항목들을 불러올 수 없습니다.",
+        "clean": "정리에 실패했습니다."
       }
     }
   },
@@ -7896,6 +8007,7 @@
       "restrictions": "콘텐츠 제한"
     },
     "smartScopes": "스마트 스코프",
-    "collections": "컬렉션"
+    "collections": "컬렉션",
+    "missingResources": "누락된 리소스"
   }
 }

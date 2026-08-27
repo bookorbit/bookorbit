@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue'
+import { computed, nextTick, ref, toRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useMediaQuery } from '@vueuse/core'
-import { ArrowUpDown, CircleCheck, FilePlus, Files, Folder, TriangleAlert } from '@lucide/vue'
-import type { BookDetail, WriteLogEntry } from '@bookorbit/types'
+import { useElementSize } from '@vueuse/core'
+import { FilePlus, Files, X } from '@lucide/vue'
+import type { BookDetail } from '@bookorbit/types'
 import { Permission } from '@bookorbit/types'
-import { formatBytes } from '@/lib/formatting'
 import { api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/clipboard'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useBookDownload } from '@/features/book/composables/useBookDownload'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookFileTree, type SortKey, type TreeFile } from '@/features/book/composables/useBookFileTree'
-import FileTreeRail from '../files/FileTreeRail.vue'
-import FileInspector from '../files/FileInspector.vue'
+import FilesHeroBar from '../files/FilesHeroBar.vue'
+import FileListCard from '../files/FileListCard.vue'
+import FileDetailCard from '../files/FileDetailCard.vue'
+import WriteBackCard from '../files/WriteBackCard.vue'
 import AddBookFileModal from './AddBookFileModal.vue'
 
 const props = defineProps<{ book: BookDetail }>()
@@ -35,8 +35,6 @@ const {
   runtimeSeconds,
   formatShares,
   selectedFile,
-  siblingFiles,
-  startedCount,
   folderSegments,
   sortKey,
   sortDirection,
@@ -50,33 +48,36 @@ const canEdit = computed(() => hasPermission('library_edit_metadata'))
 const canDelete = computed(() => hasPermission('library_delete_books'))
 
 /**
- * Below lg the two panes cannot sit side by side, so the tab becomes master-detail: the folder
- * first, the inspector in its place once a file is picked, with a back control to return.
+ * The rail turns into a sheet on the CSS side at 40rem of *tab* width, so the decision to open one
+ * has to be measured the same way. A viewport media query disagrees with the stylesheet the moment
+ * the sidebar is involved: an 834px tablet still shows it, leaving the tab under 40rem while the
+ * viewport is nowhere near a phone, and the rail would have had no way to open at all.
  */
-const isCompact = useMediaQuery('(max-width: 1023px)')
-/**
- * Whether the inspector can hold every section at a fixed height. Width alone is the wrong test:
- * a 1600x900 window is wide enough for the two-pane split and 200px too short for the sections,
- * so it clipped them instead of scrolling.
- */
-const paneFitsInspector = useMediaQuery('(min-width: 1536px) and (min-height: 1000px)')
-const compactShowsInspector = ref(false)
+const SHEET_MAX_TAB_WIDTH = 640
+const tabRoot = ref<HTMLElement | null>(null)
+const { width: tabWidth } = useElementSize(tabRoot)
+const isPhone = computed(() => tabWidth.value > 0 && tabWidth.value < SHEET_MAX_TAB_WIDTH)
+const sheetOpen = ref(false)
+const sheetCloseButton = ref<HTMLButtonElement | null>(null)
+/** Where the keyboard was before the sheet took over, so closing it puts focus back. */
+let sheetOpener: HTMLElement | null = null
+
+async function openSheet() {
+  sheetOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  sheetOpen.value = true
+  await nextTick()
+  requestAnimationFrame(() => sheetCloseButton.value?.focus())
+}
 
 watch(
   () => props.book.id,
   () => {
-    compactShowsInspector.value = false
+    sheetOpen.value = false
   },
 )
-
-function handleSelect(id: number) {
-  selectFile(id)
-  compactShowsInspector.value = true
-}
-
-function handleBack() {
-  compactShowsInspector.value = false
-}
+watch(isPhone, (phone) => {
+  if (!phone) sheetOpen.value = false
+})
 
 const sortOptions = computed<{ key: SortKey; label: string }[]>(() => [
   { key: 'name', label: t('book.detail.files.sort.name') },
@@ -85,18 +86,35 @@ const sortOptions = computed<{ key: SortKey; label: string }[]>(() => [
   { key: 'date', label: t('book.detail.files.sortAdded') },
 ])
 
-const activeSortLabel = computed(() => sortOptions.value.find((option) => option.key === sortKey.value)?.label ?? '')
-
-function handleSort(key: SortKey) {
-  toggleSort(key)
-}
-
-function formatRuntime(seconds: number | null): string | null {
+const runtimeLabel = computed(() => {
+  const seconds = runtimeSeconds.value
   if (seconds == null) return null
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   if (hours > 0) return t('book.detail.files.duration.hoursMinutes', { hours, minutes })
   return t('book.detail.files.duration.minutes', { minutes: Math.max(minutes, 1) })
+})
+
+const isWriteTarget = computed(() => {
+  const format = selectedFile.value?.formatKey
+  if (!format) return false
+  return (props.book.fileWriteStatus?.writableFormats ?? []).includes(format as never)
+})
+
+function handleSort(key: SortKey) {
+  toggleSort(key)
+}
+
+function handleSelect(id: number) {
+  selectFile(id)
+  if (isPhone.value) void openSheet()
+}
+
+function closeSheet() {
+  if (!sheetOpen.value) return
+  sheetOpen.value = false
+  sheetOpener?.focus()
+  sheetOpener = null
 }
 
 function openFile(file: TreeFile, mode?: 'peek') {
@@ -111,6 +129,10 @@ function downloadFile(file: TreeFile) {
   void downloadBookFile(file.id)
 }
 
+function goToMetadata() {
+  router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
+}
+
 const copiedPathFileId = ref<number | null>(null)
 
 async function copyPath(file: TreeFile) {
@@ -120,27 +142,6 @@ async function copyPath(file: TreeFile) {
     if (copiedPathFileId.value === file.id) copiedPathFileId.value = null
   }, 2000)
 }
-
-const writeLog = ref<WriteLogEntry[]>([])
-
-async function loadWriteLog(bookId: number) {
-  writeLog.value = []
-  if (!props.book.lastWrittenAt) return
-  try {
-    const response = await api(`/api/v1/books/${bookId}/write-log`)
-    if (!response.ok) return
-    const data = (await response.json()) as { entries: WriteLogEntry[] }
-    if (bookId === props.book.id) writeLog.value = data.entries
-  } catch {
-    writeLog.value = []
-  }
-}
-
-watch(() => props.book.id, loadWriteLog, { immediate: true })
-watch(
-  () => props.book.lastWrittenAt,
-  () => loadWriteLog(props.book.id),
-)
 
 // Modals
 const addFileModalOpen = ref(false)
@@ -212,7 +213,7 @@ async function confirmDelete() {
     const response = await api(`/api/v1/books/files/${target.id}`, { method: 'DELETE' })
     if (!response.ok) throw new Error(t('book.detail.files.deleteFailed'))
     deleteTarget.value = null
-    compactShowsInspector.value = false
+    sheetOpen.value = false
     emit('refetch')
   } catch (error) {
     deleteError.value = error instanceof Error ? error.message : t('book.detail.files.deleteFailed')
@@ -223,148 +224,101 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3.5 lg:h-full lg:min-h-0">
-    <!-- Command bar -->
-    <div class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
-      <Folder class="hidden size-[15px] shrink-0 text-muted-foreground sm:block" aria-hidden="true" />
-      <nav class="flex min-w-0 flex-1 items-center gap-1.5 text-[11.5px] text-muted-foreground" :aria-label="t('book.detail.files.folderAria')">
-        <span class="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10.5px] sm:inline" :title="folderSegments.root">{{
-          t('book.detail.files.libraryRoot')
-        }}</span>
-        <template v-for="(segment, index) in folderSegments.relative" :key="`${segment}-${index}`">
-          <span class="shrink-0 opacity-40" aria-hidden="true">/</span>
-          <span class="min-w-[3ch] truncate" :class="index === folderSegments.relative.length - 1 ? 'font-semibold text-foreground' : ''">{{
-            segment
-          }}</span>
-        </template>
-      </nav>
-
-      <div class="flex shrink-0 items-center gap-2">
-        <span
-          class="inline-flex h-[18px] items-center gap-1 rounded px-1.5 text-[9.5px] font-bold uppercase tracking-wider"
-          :class="book.status === 'missing' ? 'bg-destructive/15 text-destructive' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'"
-        >
-          <TriangleAlert v-if="book.status === 'missing'" class="size-2.5" />
-          <CircleCheck v-else class="size-2.5" />
-          {{ book.status === 'missing' ? t('book.detail.files.missing') : t('book.detail.files.onDisk') }}
-        </span>
-        <span class="hidden rounded bg-muted px-1.5 py-0.5 text-[10.5px] font-semibold text-muted-foreground md:inline">{{
-          t('book.detail.files.fileCount', { count: files.length })
-        }}</span>
-        <span class="hidden rounded bg-muted px-1.5 py-0.5 text-[10.5px] font-semibold text-muted-foreground lg:inline">{{
-          formatBytes(totalBytes)
-        }}</span>
-        <span v-if="runtimeSeconds" class="hidden rounded bg-muted px-1.5 py-0.5 text-[10.5px] font-semibold text-muted-foreground xl:inline">{{
-          formatRuntime(runtimeSeconds)
-        }}</span>
-
-        <div class="hidden items-center rounded-lg border border-border xl:flex" role="group" :aria-label="t('book.detail.files.sortAria')">
-          <button
-            v-for="option in sortOptions"
-            :key="option.key"
-            class="h-8 border-r border-border px-2.5 text-xs font-semibold transition-colors last:border-r-0 first:rounded-l-[7px] last:rounded-r-[7px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            :class="sortKey === option.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
-            :aria-pressed="sortKey === option.key"
-            @click="handleSort(option.key)"
-          >
-            {{ option.label }}{{ sortKey === option.key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : '' }}
-          </button>
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <button
-              class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring xl:hidden"
-              :aria-label="t('book.detail.files.sortAria')"
-            >
-              <ArrowUpDown class="size-3.5" />
-              <span class="hidden sm:inline">{{ activeSortLabel }}</span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem v-for="option in sortOptions" :key="option.key" @click="handleSort(option.key)">
-              {{ option.label }}{{ sortKey === option.key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : '' }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <button
-          v-if="canUpload"
-          class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          @click="openAddFileModal"
-        >
-          <FilePlus class="size-3.5" />
-          <span class="hidden sm:inline">{{ t('book.detail.files.addFile') }}</span>
-        </button>
-      </div>
-    </div>
+  <div ref="tabRoot" class="files-tab flex flex-col gap-3.5 lg:h-full lg:min-h-0">
+    <FilesHeroBar
+      :book="book"
+      :file-count="files.length"
+      :total-bytes="totalBytes"
+      :runtime-label="runtimeLabel"
+      :format-shares="formatShares"
+      :folder-segments="folderSegments.relative"
+      :can-upload="canUpload"
+      :sort-key="sortKey"
+      :sort-direction="sortDirection"
+      :sort-options="sortOptions"
+      @sort="handleSort"
+      @add-file="openAddFileModal"
+    />
 
     <!-- Empty state -->
     <section
       v-if="files.length === 0"
-      class="flex flex-col items-center justify-center lg:flex-1 rounded-xl border border-border bg-card px-4 py-16 text-center"
+      class="flex flex-col items-center justify-center rounded-xl border border-border bg-card px-4 py-16 text-center lg:flex-1"
     >
       <Files class="size-5 text-muted-foreground" aria-hidden="true" />
       <p class="mt-3 text-sm font-semibold">{{ t('book.detail.files.empty.title') }}</p>
       <p class="mt-1 text-sm text-muted-foreground">{{ t('book.detail.files.empty.description') }}</p>
       <button
         v-if="canUpload"
-        class="mt-4 inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        class="mt-4 inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         @click="openAddFileModal"
       >
-        <FilePlus class="size-3.5" />
+        <FilePlus class="size-3.5" aria-hidden="true" />
         {{ t('book.detail.files.addFile') }}
       </button>
     </section>
 
-    <!--
-      From lg the folder and the inspector sit side by side. The rail is sized in rem rather than a
-      fraction so it stays legible as the pane grows, and the inspector takes every pixel left.
-    -->
-    <div
-      v-else
-      class="grid grid-cols-1 gap-3.5 lg:min-h-0 lg:flex-1 lg:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)] xl:gap-5 2xl:grid-cols-[25rem_minmax(0,1fr)]"
-    >
-      <FileTreeRail
-        v-show="!isCompact || !compactShowsInspector"
+    <div v-else class="files-body relative lg:min-h-0 lg:flex-1">
+      <FileListCard
+        class="files-list"
         :groups="groups"
-        :format-shares="formatShares"
-        :folder-name="folderSegments.relative.at(-1) ?? '/'"
-        :folder-path="folderSegments.relative.join('/')"
-        :total-bytes="totalBytes"
         :selected-id="selectedFile?.id ?? null"
-        :file-count="files.length"
-        @select="handleSelect"
-      />
-
-      <FileInspector
-        v-if="selectedFile"
-        v-show="!isCompact || compactShowsInspector"
-        :book="book"
-        :file="selectedFile"
-        :siblings="siblingFiles"
-        :all-files="files"
-        :audio-files="audioFiles"
-        :is-multi-track-audio="isMultiTrackAudio"
-        :runtime-seconds="runtimeSeconds"
-        :started-count="startedCount"
-        :file-count="files.length"
-        :format-count="formatShares.length"
-        :folder-relative="folderSegments.relative"
-        :write-log="writeLog"
+        :runtime-label="runtimeLabel"
         :can-download="canDownload"
         :can-edit="canEdit"
         :can-delete="canDelete"
-        :show-back="isCompact"
-        :fits-without-scroll="paneFitsInspector"
-        @select="selectFile"
+        @select="handleSelect"
         @open="openFile"
         @download="downloadFile"
         @rename="openRenameModal"
         @remove="openDeleteModal"
         @copy-path="copyPath"
-        @back="handleBack"
       />
+
+      <Teleport to="body" :disabled="!isPhone">
+        <button v-if="sheetOpen" class="files-scrim" :aria-label="t('book.detail.files.closeDetails')" @click="closeSheet" />
+
+        <div
+          v-if="selectedFile"
+          class="files-rail"
+          :data-sheet="isPhone ? '1' : '0'"
+          :data-open="sheetOpen ? '1' : '0'"
+          :role="sheetOpen ? 'dialog' : undefined"
+          :aria-modal="sheetOpen ? 'true' : undefined"
+          :aria-label="sheetOpen ? t('book.detail.files.fileDetails') : undefined"
+          @keydown.esc="closeSheet"
+        >
+          <div class="sheet-head">
+            <span class="sheet-grabber" aria-hidden="true" />
+            <button
+              ref="sheetCloseButton"
+              class="sheet-close inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :aria-label="t('book.detail.files.closeDetails')"
+              @click="closeSheet"
+            >
+              <X class="size-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <FileDetailCard
+            :file="selectedFile"
+            :audio-files="audioFiles"
+            :is-multi-track-audio="isMultiTrackAudio"
+            :runtime-seconds="runtimeSeconds"
+            :is-write-target="isWriteTarget"
+            :can-download="canDownload"
+            :can-edit="canEdit"
+            :can-delete="canDelete"
+            @open="openFile"
+            @download="downloadFile"
+            @rename="openRenameModal"
+            @remove="openDeleteModal"
+            @copy-path="copyPath"
+          />
+
+          <WriteBackCard :book="book" :can-edit="canEdit" @edit-metadata="goToMetadata" />
+        </div>
+      </Teleport>
     </div>
 
     <p v-if="copiedPathFileId != null" role="status" class="sr-only">{{ t('book.detail.files.pathCopied') }}</p>
@@ -436,3 +390,161 @@ async function confirmDelete() {
 
   <AddBookFileModal v-if="addFileModalOpen" :book-id="book.id" @close="closeAddFileModal" @uploaded="onFilesAdded" />
 </template>
+
+<style scoped>
+/*
+ * The tab is the container every child measures itself against, so the layout answers "how much
+ * room does this pane have", not "how wide is the window". A collapsed sidebar and a wide screen
+ * are the same thing to it, and so are an `md` tablet and a phone.
+ */
+.files-tab {
+  container-type: inline-size;
+  container-name: filestab;
+}
+
+.files-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.875rem;
+}
+
+.files-list {
+  min-height: 0;
+}
+
+.files-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  min-height: 0;
+}
+
+.sheet-head {
+  display: none;
+}
+
+/* Two lanes as soon as the pane can hold a list and a rail without squeezing either. */
+@container filestab (min-width: 62.5rem) {
+  .files-body {
+    grid-template-columns: minmax(0, 1fr) 24rem;
+    align-items: start;
+    min-height: 0;
+  }
+
+  .files-rail {
+    overflow-y: auto;
+    max-height: 100%;
+  }
+}
+
+@container filestab (min-width: 75rem) {
+  .files-body {
+    grid-template-columns: minmax(0, 1fr) 27rem;
+  }
+}
+
+@container filestab (min-width: 87.5rem) {
+  .files-body {
+    grid-template-columns: minmax(0, 1fr) 30rem;
+  }
+}
+
+/* Between those, the rail sits under the list, two cards abreast while they still fit. */
+@container filestab (min-width: 45rem) and (max-width: 62.4375rem) {
+  .files-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
+/*
+ * A phone shows the files; detail arrives over them and gives the screen back. Teleported to the
+ * body so "bottom" means the bottom of the screen: anchored to the pane it landed at the foot of a
+ * scrolling document, which on a phone is nowhere near what you can see.
+ */
+.files-scrim {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: oklch(0 0 0 / 45%);
+  animation: files-scrim-in 140ms ease-out;
+}
+
+.files-rail[data-sheet='1'] {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 61;
+  max-height: 78dvh;
+  overflow-y: auto;
+  border-radius: 1rem 1rem 0 0;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 0.5rem 0.75rem calc(1rem + env(safe-area-inset-bottom));
+  box-shadow: var(--elevation-lg);
+  transform: translateY(100%);
+  visibility: hidden;
+  transition:
+    transform 180ms ease-out,
+    visibility 0s linear 180ms;
+}
+
+.files-rail[data-sheet='1'][data-open='1'] {
+  transform: translateY(0);
+  visibility: visible;
+  transition:
+    transform 180ms ease-out,
+    visibility 0s;
+}
+
+.files-rail[data-sheet='1'] .sheet-head {
+  display: flex;
+  align-items: center;
+  padding-bottom: 0.25rem;
+}
+
+.files-rail[data-sheet='1'] .sheet-grabber {
+  position: absolute;
+  inset-inline: 0;
+  margin-inline: auto;
+  top: 0.5rem;
+  width: 2.25rem;
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.files-rail[data-sheet='1'] .sheet-close {
+  margin-inline-start: auto;
+}
+
+/* Inside a sheet the cards are the sheet, so they drop their own frame. */
+.files-rail[data-sheet='1'] > section {
+  border: 0;
+  background: transparent;
+}
+
+.files-rail[data-sheet='1'] > section > :first-child,
+.files-rail[data-sheet='1'] > section > :last-child {
+  padding-inline: 0.25rem;
+}
+
+@keyframes files-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .files-rail,
+  .files-scrim {
+    transition: none;
+    animation: none;
+  }
+}
+</style>

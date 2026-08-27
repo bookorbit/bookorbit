@@ -272,6 +272,77 @@ describe('MetadataService', () => {
     expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/11/cover_extracted.png', Buffer.from('image-bytes'));
   });
 
+  // The Kobo CoverImageId is versioned from coverUpdatedAt, so it must move whenever the served
+  // image does, and stay put when it does not (issue #943).
+  describe('coverUpdatedAt stamping', () => {
+    function stubEpubCoverExtraction(cover: Buffer): void {
+      mockExtractEpubMetadata.mockResolvedValueOnce({
+        title: 'Refreshable book',
+        subtitle: null,
+        description: null,
+        isbn10: null,
+        isbn13: null,
+        publisher: null,
+        publishedYear: null,
+        language: null,
+        seriesName: null,
+        seriesIndex: null,
+        authors: [],
+        narrators: [],
+        genres: [],
+        tags: [],
+        rating: null,
+        pageCount: null,
+        googleBooksId: null,
+        goodreadsId: null,
+        amazonId: null,
+        hardcoverId: null,
+        hardcoverEditionId: null,
+        openLibraryId: null,
+        ranobedbId: null,
+        itunesId: null,
+        coverBuffer: null,
+      });
+      mockExtractEpubCover.mockResolvedValueOnce(cover);
+    }
+
+    it('stamps coverUpdatedAt when an overwriting extraction replaces the cover', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      mockReaddir.mockResolvedValue(['cover_extracted.png']);
+
+      await service.saveExtractedCoverBytes(21, Buffer.from('image-bytes'));
+
+      expect(db.update).toHaveBeenCalledWith(bookMetadata);
+      expect(updateSet).toHaveBeenCalledWith({ coverUpdatedAt: expect.any(Date) });
+    });
+
+    it('stamps coverUpdatedAt when first-writer-wins matches no row but the image still changed', async () => {
+      const { db, updateSet, selectLimit } = makeDb();
+      const service = makeService(db);
+      selectLimit.mockResolvedValue([{ coverSource: 'extracted' }]);
+      mockReaddir.mockResolvedValue(['cover_extracted.png', 'thumbnail.jpg']);
+      stubEpubCoverExtraction(Buffer.from('fresher-image-bytes'));
+
+      await expect(service.refreshCoverForBook(23, '/book.epub', 'epub')).resolves.toBe(true);
+
+      expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/23/cover_extracted.png', Buffer.from('fresher-image-bytes'));
+      expect(updateSet).toHaveBeenCalledWith({ coverUpdatedAt: expect.any(Date) });
+    });
+
+    it('leaves coverUpdatedAt alone when a DB-owned custom cover still wins', async () => {
+      const { db, updateSet, selectLimit } = makeDb();
+      const service = makeService(db);
+      selectLimit.mockResolvedValue([{ coverSource: 'custom' }]);
+      mockReaddir.mockResolvedValue(['cover_custom.jpg', 'cover_extracted.png', 'thumbnail.jpg']);
+      stubEpubCoverExtraction(Buffer.from('image-bytes'));
+
+      await expect(service.refreshCoverForBook(24, '/book.epub', 'epub')).resolves.toBe(true);
+
+      expect(updateSet).not.toHaveBeenCalledWith(expect.objectContaining({ coverUpdatedAt: expect.anything() }));
+    });
+  });
+
   it('saveExtractedCoverBytes removes stale custom files unless the DB owns a custom cover', async () => {
     const { db } = makeDb();
     const service = makeService(db);

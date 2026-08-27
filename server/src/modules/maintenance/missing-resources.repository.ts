@@ -132,7 +132,7 @@ export class MissingResourcesRepository {
     if (bookIds.length === 0) return 0;
     const result = await this.db
       .update(bookMetadata)
-      .set({ coverSource: null, updatedAt: new Date() })
+      .set({ coverSource: null, coverUpdatedAt: new Date(), updatedAt: new Date() })
       .where(and(isNotNull(bookMetadata.coverSource), inArray(bookMetadata.bookId, bookIds)));
     return result.rowCount ?? 0;
   }

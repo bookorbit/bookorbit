@@ -1,11 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { DownloadProgress } from '../download'
+
 const mocks = vi.hoisted(() => ({ api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>() }))
 
 vi.mock('@/lib/api', () => ({ api: mocks.api }))
 
 function setStandalone(value: boolean | undefined) {
   Object.defineProperty(navigator, 'standalone', { value, configurable: true, writable: true })
+}
+
+/** A Response whose body arrives as the given chunks, one `read()` at a time. */
+function streamingResponse(chunks: Uint8Array[], headers: Record<string, string>) {
+  let index = 0
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers(headers),
+    body: {
+      getReader: () => ({
+        read: async () => (index < chunks.length ? { done: false, value: chunks[index++] } : { done: true, value: undefined }),
+      }),
+    },
+    blob: async () => new Blob(chunks as BlobPart[], { type: headers['Content-Type'] ?? '' }),
+  } as unknown as Response
 }
 
 describe('downloadFromUrl', () => {
@@ -34,6 +52,16 @@ describe('downloadFromUrl', () => {
     expect(mocks.api).not.toHaveBeenCalled()
     expect(clickSpy).toHaveBeenCalledTimes(1)
     expect(removeSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays silent on the link path, where the browser owns the download indicator', async () => {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const onProgress = vi.fn<(progress: DownloadProgress) => void>()
+
+    const { downloadFromUrl } = await import('../download')
+    await downloadFromUrl('/api/v1/books/files/42/download', 'book', onProgress)
+
+    expect(onProgress).not.toHaveBeenCalled()
   })
 
   it('hands an iOS home-screen web app a blob so the app is never navigated away', async () => {
@@ -98,6 +126,105 @@ describe('downloadFromUrl', () => {
     expect(revokeSpy).not.toHaveBeenCalled()
     vi.advanceTimersByTime(60_000)
     expect(revokeSpy).toHaveBeenCalledWith('blob:test-url')
+  })
+})
+
+describe('downloadFromUrl progress on the buffered iOS path', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    mocks.api.mockReset()
+    setStandalone(true)
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-url')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('announces the wait before the request resolves, so a slow first byte is not silent', async () => {
+    let release: ((response: Response) => void) | undefined
+    mocks.api.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        release = resolve
+      }),
+    )
+    const seen: DownloadProgress[] = []
+
+    const { downloadFromUrl } = await import('../download')
+    const pending = downloadFromUrl('/api/v1/books/files/42/download', 'book', (p) => seen.push({ ...p }))
+    await Promise.resolve()
+
+    expect(seen).toEqual([{ loaded: 0, total: null }])
+
+    release?.(streamingResponse([new Uint8Array([1])], { 'Content-Length': '1' }))
+    await pending
+  })
+
+  it('reports cumulative bytes against the declared length as the body arrives', async () => {
+    mocks.api.mockResolvedValue(
+      streamingResponse([new Uint8Array(40), new Uint8Array(35), new Uint8Array(25)], {
+        'Content-Length': '100',
+        'Content-Type': 'application/epub+zip',
+      }),
+    )
+    const seen: DownloadProgress[] = []
+
+    const { downloadFromUrl } = await import('../download')
+    await downloadFromUrl('/api/v1/books/files/42/download', 'book', (p) => seen.push({ ...p }))
+
+    expect(seen).toEqual([
+      { loaded: 0, total: null },
+      { loaded: 0, total: 100 },
+      { loaded: 40, total: 100 },
+      { loaded: 75, total: 100 },
+      { loaded: 100, total: 100 },
+    ])
+  })
+
+  it('reassembles the streamed chunks into the original bytes and content type', async () => {
+    const chunks = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5])]
+    mocks.api.mockResolvedValue(streamingResponse(chunks, { 'Content-Length': '5', 'Content-Type': 'application/epub+zip' }))
+    let handed: Blob | undefined
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+      handed = blob as Blob
+      return 'blob:test-url'
+    })
+
+    const { downloadFromUrl } = await import('../download')
+    await downloadFromUrl('/api/v1/books/files/42/download', 'book', () => {})
+
+    expect(handed?.type).toBe('application/epub+zip')
+    expect(new Uint8Array(await handed!.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4, 5]))
+  })
+
+  it('leaves the total null when the response declares no usable length', async () => {
+    mocks.api.mockResolvedValue(streamingResponse([new Uint8Array(8)], { 'Content-Length': '0' }))
+    const seen: DownloadProgress[] = []
+
+    const { downloadFromUrl } = await import('../download')
+    await downloadFromUrl('/api/v1/books/files/42/download', 'book', (p) => seen.push({ ...p }))
+
+    expect(seen.every((p) => p.total === null)).toBe(true)
+    expect(seen.at(-1)).toEqual({ loaded: 8, total: null })
+  })
+
+  it('still downloads when the response exposes no readable body', async () => {
+    mocks.api.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'Content-Length': '4', 'Content-Type': 'application/epub+zip' }),
+      blob: async () => new Blob(['epub'], { type: 'application/epub+zip' }),
+    } as unknown as Response)
+    const appendSpy = vi.spyOn(document.body, 'append')
+    const seen: DownloadProgress[] = []
+
+    const { downloadFromUrl } = await import('../download')
+    await downloadFromUrl('/api/v1/books/files/42/download', 'book', (p) => seen.push({ ...p }))
+
+    const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
+    expect(anchor.href).toBe('blob:test-url')
+    expect(seen.at(-1)).toEqual({ loaded: 0, total: 4 })
   })
 })
 

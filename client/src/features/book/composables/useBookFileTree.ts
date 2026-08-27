@@ -169,17 +169,6 @@ export function useBookFileTree(book: Ref<BookDetail>) {
     return list.find((file) => file.id === selectedFileId.value) ?? list.find((file) => file.role === 'primary') ?? list[0] ?? null
   })
 
-  /** Every other file worth switching to: a thirty-five track audiobook counts once, not thirty-five times. */
-  const siblingFiles = computed<TreeFile[]>(() => {
-    const current = selectedFile.value
-    if (!current) return []
-    const rest = flatFiles.value.filter((file) => file.id !== current.id && !(isMultiTrackAudio.value && file.isAudio))
-    if (isMultiTrackAudio.value && !current.isAudio && audioFiles.value[0]) rest.push(audioFiles.value[0])
-    return rest
-  })
-
-  const startedCount = computed(() => files.value.filter((file) => (file.progress?.percentage ?? 0) > 0).length)
-
   /** Library root split off the front, so a row never repeats ninety characters of absolute path. */
   const folderSegments = computed(() => {
     const segments = (book.value.folderPath ?? '').split('/').filter(Boolean)
@@ -233,21 +222,16 @@ export function useBookFileTree(book: Ref<BookDetail>) {
   return {
     files,
     groups,
-    flatFiles,
     audioFiles,
     isMultiTrackAudio,
     totalBytes,
     runtimeSeconds,
     formatShares,
     selectedFile,
-    selectedFileId,
-    siblingFiles,
-    startedCount,
     folderSegments,
     sortKey,
     sortDirection,
     selectFile,
     toggleSort,
-    reloadProgress: loadProgress,
   }
 }

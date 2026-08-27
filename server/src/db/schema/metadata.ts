@@ -81,6 +81,9 @@ export const bookMetadata = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    // Moves only when the served cover image changes, so a Kobo device is not handed a fresh
+    // CoverImageId for a picture it already stores locally. See buildVersionedCoverImageId().
+    coverUpdatedAt: timestamp('cover_updated_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
       .notNull()

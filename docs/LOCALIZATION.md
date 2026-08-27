@@ -99,7 +99,7 @@ After an English source change reaches `main`:
 2. Translators update target strings in Crowdin.
 3. The scheduled or manually dispatched `Crowdin Translation Sync` workflow verifies that Crowdin's source keys match `en.json`.
 4. The workflow requests only translated strings, removes the empty values Crowdin emits for untranslated nested JSON entries, and validates the resulting sparse catalogs.
-5. Before writing, the workflow rejects exports that omit an existing translation.
+5. Before writing, the workflow normalizes punctuation the catalogs prohibit, omits messages that fail validation, and rejects an export that drops far more translations than translator churn explains.
 6. Only after validation and retention checks pass, the workflow updates `l10n_main` and opens a pull request to `main`.
 7. CI verifies that the pull request changes only the twenty-four target catalogs and runs the normal client checks.
 8. A maintainer reviews and squash-merges the pull request.
@@ -109,9 +109,16 @@ Deleting that branch is required, not tidiness. It guarantees that every later e
 
 Translation pull requests retain the configured `i18n(client)` title and commit format. The `i18n` commit type produces a patch release and an Internationalization release-note section. `CROWDIN_PR_TOKEN` must contain a fine-grained GitHub token with repository contents and pull-request write access. A separate token is required because pull requests created with the workflow's default `GITHUB_TOKEN` do not trigger normal pull-request workflows.
 
-The retention check compares presence, never message content. Exports request only translated strings, so Crowdin omits a key as soon as it stops carrying a translation, and every key already present in a target catalog must come back in the export. A translation that legitimately matches the English source, such as `Error` in Spanish or a product name left untranslated, is a real translation and never counts as a loss. Reading it as one would reject the routine corrections that translators make to short labels, abbreviations, and loanwords.
+The retention check compares presence, never message content. Exports request only translated strings, so Crowdin omits a key as soon as it stops carrying a translation. A translation that legitimately matches the English source, such as `Error` in Spanish or a product name left untranslated, is a real translation and never counts as a loss. Reading it as one would reject the routine corrections that translators make to short labels, abbreviations, and loanwords.
 
-An intentional removal requires a manual workflow dispatch with its exact `locale:message.key` value in `allowed_translation_losses`. Separate multiple acknowledgements with commas. Unknown, misspelled, duplicate, and unused acknowledgements fail the run, so this input cannot act as a broad bypass. Scheduled runs never acknowledge translation loss automatically.
+The check guards against a truncated or empty export, not against churn. Single translations leave Crowdin constantly: a reviewer unapproves a string, or an English edit invalidates the translation attached to it. A locale may lose up to twenty-five keys, or one percent of its translated keys where that is larger, before the run fails. Losses below that limit are listed in the pull request body and the English source renders for them. Failing on each one blocked every other locale over a single message and needed a hand-typed acknowledgement that a scheduled run cannot supply, which is why the export stalled repeatedly.
+
+A message this workflow omits, because it carries HTML or breaks its ICU contract, is reported as a rejection rather than counted as a loss. Two mechanical defects are repaired instead of rejected, and both disappear on their own once Crowdin carries a clean message:
+
+- A Unicode em dash becomes the hyphen the English source uses, so the translation survives and the catalogs stay free of the character.
+- A plural branch the target locale needs and Crowdin omitted is filled from the message's own `other` branch. A translator types the whole ICU message by hand, so a locale with more categories than English loses every plural to one missing branch: Romanian arrived with `one` and `other` for all 156 of its plurals and rendered English for every one of them. The filled branch reads in the translator's language rather than English, and it is still worth fixing properly in Crowdin, because a copied branch cannot carry the form the category actually needs.
+
+A manual workflow dispatch may pass exact `locale:message.key` values in `allowed_translation_losses`, separated by commas, to exclude known removals from the limit. Unknown, misspelled, and duplicate acknowledgements fail the run, so this input cannot act as a broad bypass.
 
 ## Adding a New Language
 

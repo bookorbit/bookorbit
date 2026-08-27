@@ -889,6 +889,9 @@ export class MetadataService {
     }
 
     if (!preserveCustom) {
+      // The extracted cover and its thumbnail were just rewritten, so the served image moved even
+      // when the first-writer-wins update above matched no row.
+      await this.db.update(bookMetadata).set({ coverUpdatedAt: now }).where(eq(bookMetadata.bookId, bookId));
       await this.db.update(books).set({ updatedAt: now }).where(eq(books.id, bookId));
     }
   }

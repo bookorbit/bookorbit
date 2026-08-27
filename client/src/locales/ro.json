@@ -70,6 +70,8 @@
         "empty": "Niciun administrator nu a vizualizat profilul de lectură partajat.",
         "paginationLabel": "Pagini istoric acces la profil"
       },
+      "durationMinutes": "{count, plural, one {# minut} few {# minute} other {# de minute}}",
+      "durationHours": "{count, plural, one {# oră} few {# ore} other {# de ore}}",
       "unknownTitle": "Carte fără titlu",
       "errors": {
         "load": "Încărcarea setărilor de partajare a eșuat.",
@@ -420,11 +422,13 @@
       "icons": {
         "title": "Pictograme personalizate",
         "uploadIcons": "Încărcare pictograme",
+        "uploadedCount": "{count, plural, =0 {nici o pictogramă încărcată} one {# pictogramă încărcată} few {# pictograme încărcate} other {# de pictograme încărcate}}",
         "searchPlaceholder": "Caută pictograme",
         "sort": {
           "newest": "Cele mai noi",
           "name": "Nume"
         },
+        "selectedCount": "{count, plural, one {# a selectat} few {# a selectat} other {# de a selectat}}",
         "clear": "Curăță",
         "deleteSelected": "Ştergeţi selecţia",
         "loading": "Se încarcă pictogramele...",
@@ -436,13 +440,20 @@
         "notUsedYet": "Nu este folosit încă",
         "rename": "Redenumire",
         "replace": "Înlocuiește",
+        "usage": {
+          "libraries": "{count, plural, =0 {Nici o bibliotecă} one {# bibliotecă} few {# biblioteci} other {# de biblioteci}}",
+          "collections": "{count, plural, =0 {nicio colecţie} one {# colecţie} few {# colecţii} other {# de colecţii}}",
+          "smartScopes": "{count, plural, =0 {Nici un scop inteligent} one {# scop inteligent} few {# scopuri inteligente} other {# de scopuri inteligente}}"
+        },
         "confirm": {
-          "deleteOne": "Ștergeți \"{name}\"? Utilizările existente vor reveni la pictograma lor implicită."
+          "deleteOne": "Ștergeți \"{name}\"? Utilizările existente vor reveni la pictograma lor implicită.",
+          "deleteMany": "{count, plural, =0 {Nu ștergeți nicio pictogramă?} one {Ștergeți # pictogramă? Utilizările existente vor reveni la pictograma lor implicită.} few {Ştergeţi # pictograme? Utilizările existente vor reveni la pictograma lor implicită.} other {Ştergeţi # de pictograme? Utilizările existente vor reveni la pictograma lor implicită.}}"
         },
         "toasts": {
           "saved": "Pictogramă salvată",
           "updated": "Pictogramă actualizată",
           "deleted": "Iconiță ștearsă",
+          "bulkDeleted": "{count, plural, =0 {Nu s-au șters iconițe} one {S-a șters # iconiță} few {# iconițe} other {# de iconițe}}",
           "bulkDeletePartial": "S-a șters {deleted}, {failed} a eșuat"
         },
         "errors": {
@@ -607,6 +618,7 @@
       "expiresOn": "Expiră {date}",
       "revokedOn": "{date} revocat",
       "expiredOn": "A expirat {date}",
+      "usesCount": "{count, plural, =0 {nu folosește} one {una folosește} few {# folosește} other {# de folosește}}",
       "copied": "Copiat!",
       "copyLink": "Copiază link-ul",
       "pause": "Întrerupeți",
@@ -783,6 +795,7 @@
         "viewDetails": "Vezi detalii",
         "refreshRecommendationIndex": "Reîmprospătează indicele recomandării",
         "refreshRecommendationHint": "Actualizați motorul de recomandări cu ultimele modificări ale bibliotecii. Acest proces se derulează în fundal.",
+        "booksQueuedForProcessing": "{count, plural, =0 {nu există cărţi în coada de aşteptare pentru procesare} one {# carte în aşteptare pentru procesare} few {# cărţi în aşteptare pentru procesare} other {# de cărţi în aşteptare pentru procesare}}",
         "run": "Rulează",
         "running": "Rulează...",
         "backfillAchievements": "Realizări de rezervă",
@@ -794,6 +807,7 @@
         "updateChecksEnabled": "Verificări actualizări activate",
         "updateChecksDisabled": "Verificarea actualizărilor dezactivată",
         "updateSettingFailed": "Actualizarea setărilor a eșuat",
+        "booksQueuedForEmbedding": "{count, plural, =0 {nu există cărţi în coada de aşteptare pentru a fi încorporate} one {# carte în aşteptare pentru a fi încorporată} few {# cărţi în aşteptare pentru a fi încorporate} other {# de cărţi în aşteptare pentru a fi încorporate}}",
         "failed": "Eșuat",
         "unknownError": "Eroare necunoscută",
         "rebuildEmbeddingsFailed": "Nu s-a reușit reconstruirea încorporărilor: {error}",
@@ -976,6 +990,7 @@
         "ofCount": "de {count}",
         "targetBookNum": "Agendă țintă #{id}",
         "recommended": "Recomandat",
+        "resolveDuplicatesButton": "{count, plural, =0 {Rezolvă # duplicat} one {Rezolvă # duplicat} few {Rezolvă # duplicate} other {Rezolvă # de duplicate}}",
         "preflightChecks": "Verificări înainte de zbor",
         "allChecksPassed": "Toate verificările au trecut - sunt gata să migreze",
         "checkSourceValidated": "Sursă validată",
@@ -1051,6 +1066,8 @@
         "refreshCovers": "Reîmprospătare coperte",
         "syncMetadataToFiles": "Sincronizare metadate în fișiere",
         "deleteLibrary": "Șterge biblioteca",
+        "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
+        "folderCount": "{count, plural, =0 {nici un folder} one {# folder} few {# foldere} other {# de foldere}}",
         "fileMode": "Mod fișier",
         "folderMode": "Mod dosar",
         "emptyTitle": "Încă nu există biblioteci",
@@ -1239,12 +1256,14 @@
           "eligible": "~{count} eligibile"
         },
         "trigger": {
+          "queued": "{count, plural, one {În aşteptare # carte} few {# cărţi în aşteptare} other {# de cărţi în aşteptare}}",
           "noneFound": "Nu au fost găsite cărți eligibile"
         },
         "lastRun": {
           "justNow": "chiar acum",
           "minutesAgo": "{count}m în urmă",
           "yesterday": "ieri",
+          "daysAgo": "{count, plural, one {# zile în urmă} few {# zile în urmă} other {# de zile în urmă}}",
           "label": "Ultima rulare: {when}",
           "labelQueued": "Ultima rulare: {when} - {count} cărți",
           "labelNoneEligible": "Ultima rulare: {when} - nu există cărți eligibile"
@@ -1266,7 +1285,8 @@
           },
           "missingFields": {
             "label": "Câmpuri lipsă",
-            "hint": "Preia daca oricare dintre campurile selectate este goala."
+            "hint": "Preia daca oricare dintre campurile selectate este goala.",
+            "summary": "{count, plural, one {Lipsește câmpul #} few {Lipsește # câmpuri} other {Lipsește # de câmpuri}}"
           }
         },
         "library": {
@@ -1374,6 +1394,7 @@
         },
         "library": {
           "primary": "Primar:",
+          "overrideCount": "{count, plural, one {# Suprascrie} few {# Suprascrie} other {# de Suprascrie}}",
           "unsavedSuffix": "(nesalvat)",
           "unsavedChanges": "Modificări nesalvate",
           "globalDefaults": "Implicite globale",
@@ -1433,6 +1454,7 @@
         "duplicate": "Acest gen este deja blocat.",
         "add": "Adăugare",
         "filterPlaceholder": "Lista de filtre",
+        "entryCount": "{count, plural, one {# intrare} few {# intrări} other {# de intrări}}",
         "filteredCount": "{shown} {total}",
         "noFilterMatch": "Niciun gen blocat nu se potrivește cu filtrul curent.",
         "emptyTitle": "Niciun gen blocat",
@@ -1445,6 +1467,7 @@
         "labelTooLong": "Eticheta trebuie să aibă cel mult 255 de caractere",
         "labelDuplicate": "Un câmp cu această etichetă există deja",
         "type": "Tip",
+        "usage": "{count, plural, one {Folosit de # carte} few {Folosit de # cărţi} other {Folosit de # de cărţi}}",
         "newField": {
           "title": "Câmp nou",
           "hint": "Definiți un câmp personalizat pentru metadate și alegeți bibliotecile care îl folosesc."
@@ -1466,6 +1489,7 @@
         "unsaved": "nesalvate",
         "archive": "Arhivează",
         "archivedFields": "Câmpuri arhivate",
+        "archivedSummary": "{count, plural, one {# câmp arhivat - restaurează sau șterge definitiv.} few {# câmpuri arhivate - restaurează sau șterge definitiv.} other {# de câmpuri arhivate - restaurează sau șterge definitiv.}}",
         "archivedAt": "{when} arhivat",
         "restore": "Restaurează",
         "deleteForever": "Șterge pentru totdeauna",
@@ -1671,6 +1695,7 @@
         "fontsUsed": "{count} / {max} utilizat",
         "noFontsYet": "Nici un font încărcat încă",
         "noFontsHint": "Trageți un fișier font de mai sus pentru a începe.",
+        "fileCount": "{count, plural, =0 {nici un fişier} one {# fişier} few {# fişiere} other {# de fişiere}}",
         "pangram": "Rapida vulpe maro sare peste câinele leneş",
         "renameFamily": "Redenumire familie",
         "deleteFamily": "Şterge familie",
@@ -1895,6 +1920,7 @@
           "never": "Niciodată",
           "none": "Niciunul",
           "unknown": "Necunoscut",
+          "failureCount": "{count, plural, one {# eșec} few {# eșec} other {# de eșec}}",
           "noActivityRecorded": "Nu a fost înregistrată nici o activitate de sincronizare Kobo.",
           "lastSuccess": "Ultimul succes {time}",
           "lastFailure": "Ultimul eșec {time}",
@@ -1928,6 +1954,7 @@
           "chip": {
             "morePending": "Mai multe în așteptare",
             "noUpdatesPending": "Nicio actualizare în așteptare",
+            "bookCount": "{count, plural, one {# carte} few {# cărţi} other {# de cărţi}}",
             "deletedAnnotations": "{count} adnotări șterse",
             "deviceAlreadyCurrent": "Dispozitivul este deja curent",
             "freshHighlightData": "Date evidențiere noi",
@@ -1939,21 +1966,31 @@
           "readingPositionSyncedTitle": "Poziție de lectură sincronizată: {title}",
           "readingPositionSynced": "Poziție de lectură sincronizată",
           "labelWithTitle": "{label}: {title}",
+          "updateCount": "{count, plural, one {# actualizează} few {# actualizări} other {# de actualizări}}",
           "directionToKobo": "BookOrbit -> Kobo",
           "directionToBookOrbit": "Kobo -> BookOrbit",
           "twoWaySyncEnabled": "Sincronizare în două direcții activată",
           "deviceProgressSaved": "Progresul dispozitivului salvat",
           "summary": {
             "noLibraryUpdatesPending": "Nu sunt în așteptare actualizări ale bibliotecii pentru acest dispozitiv",
+            "libraryUpdatesPrepared": "{count, plural, one {# actualizare bibliotecă pregătită pentru dispozitiv} few {# actualizări ale bibliotecii pregătite pentru dispozitiv} other {# de actualizări ale bibliotecii pregătite pentru dispozitiv}}",
             "bookDownloadedBy": "{title} a fost descărcat de {device}",
+            "booksDownloaded": "{count, plural, one {# carte descărcată} few {# cărţi descărcate} other {# de cărţi descărcate}}",
+            "progressUpdatesSyncedFor": "{count, plural, one {# actualizare de progres sincronizată pentru {title}} few {# actualizări de progres sincronizate pentru {title}} other {# de actualizări de progres sincronizate pentru {title}}}",
+            "progressUpdatesSynced": "{count, plural, one {# actualizare de progres sincronizată} few {# actualizări de progres sincronizate} other {# de actualizări de progres sincronizate}}",
             "newReadingPositionFor": "Kobo a raportat o nouă poziție în lectură pentru {title}",
             "newReadingPosition": "Kobo a raportat o nouă poziție în lectură",
             "noHighlightChangesNeededFor": "Nu sunt necesare modificări evidențiate pentru {title}",
             "noHighlightChangesNeeded": "Nu sunt necesare modificări evidențiate",
+            "highlightsSentToKoboFor": "{count, plural, one {# de evidențiere trimise către Kobo pentru {title}} few {# atracții trimise către Kobo pentru {title}} other {# de atracții trimise către Kobo pentru {title}}}",
+            "highlightsSentToKobo": "{count, plural, one {# de evidențiere trimise către Kobo} few {# repere trimise către Kobo} other {# de repere trimise către Kobo}}",
             "noKoboHighlightChangesFor": "Niciun Kobo nu evidențiază modificări pentru {title}",
-            "noKoboHighlightChanges": "Niciun Kobo nu evidențiază modificări"
+            "noKoboHighlightChanges": "Niciun Kobo nu evidențiază modificări",
+            "highlightsImportedFromKoboFor": "{count, plural, one {# evidenţiază importul din Kobo pentru {title}} few {# repere importate din Kobo pentru {title}} other {# de repere importate din Kobo pentru {title}}}",
+            "highlightsImportedFromKobo": "{count, plural, one {# subliniază importul din Kobo} few {# repere importate din Kobo} other {# de repere importate din Kobo}}"
           },
           "timeRange": "{from} la {to}",
+          "eventsGrouped": "{count, plural, one {# eveniment grupat} few {# evenimente grupate} other {# de evenimente grupate}}",
           "removedDevice": "Dispozitiv eliminat",
           "loadMoreFailed": "Nu s-a putut încărca mai mult istoric",
           "historyRefreshed": "Istoricul sincronizării Kobo reîmprospătat",
@@ -2070,7 +2107,9 @@
         "progressSyncHint": "Permite dispozitivelor KOReader să sincronizeze progresul, citirea activităţii, sublinierilor şi adnotării şterg cu BookOrbit.",
         "lastSync": "Ultima sincronizare",
         "syncedBooks": "Cărți sincronizate",
+        "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
         "devices": "Dispozitive",
+        "deviceCount": "{count, plural, =0 {Nu există dispozitive} one {# dispozitiv} few {# dispozitive} other {# de dispozitive}}",
         "credentialsCreatedLabel": "Acreditări create",
         "setup": "Configurare",
         "pluginServerUrl": "URL server plugin",
@@ -2098,6 +2137,7 @@
         "highlights": "Evidențieri",
         "syncedTotals": "Totaluri sincronizate",
         "trashedHighlights": "Evidențe șterse",
+        "pendingDeletes": "{count, plural, =0 {Nu s-au şters momente principale în aşteptarea acceptării plugin-ului KOReader.} one {# Evidenţiere ştearsă în aşteptarea acceptării plugin-ului KOReader.} few {# au şters repere în aşteptarea acceptării plugin-ului KOReader.} other {# de au şters repere în aşteptarea acceptării plugin-ului KOReader.}}",
         "setupGuide": "Ghid de configurare",
         "setupSteps": "Etapele configurării KOReader",
         "setupStepsHint": "Utilizați plugin-ul BookOrbit pentru navigarea catalogului, descărcări, progres, citire evenimente și evidențieri. Utilizați plugin-ul stoc doar pentru progres.",
@@ -2169,6 +2209,7 @@
             "unlinkFailed": "Deconectarea cărții a eșuat",
             "unmatchedDismissed": "Carte neegalată respinsă",
             "dismissFailed": "Nu a reuşit să respingă cartea neegalată",
+            "allDismissed": "{count, plural, =0 {Nu ai găsit cărţi de neegalat} one {Respingeţi # o carte de neegalat} few {Respingeţi # cărţi nepotrivite} other {Respingeţi # de cărţi nepotrivite}}",
             "dismissAllFailed": "Nu s-a reușit respingerea tuturor cărților care nu se potrivesc"
           },
           "modal": {
@@ -2243,6 +2284,7 @@
         "deviceRestored": "Dispozitiv restaurat",
         "retireDeviceFailed": "Dispozitivul nu a reușit să se retragă",
         "restoreDeviceFailed": "Restaurarea dispozitivului a eșuat",
+        "retiredDevices": "{count, plural, one {# dispozitiv retras} few {# dispozitive retrase} other {# de dispozitive retrase}}",
         "retiredOnLabel": "Ocupat"
       },
       "opds": {
@@ -2453,6 +2495,8 @@
       "auditNotice": "Accesul la acest profil este înregistrat și vizibil pentru utilizator.",
       "period": "Perioada de raportare",
       "periodDays": "Ultimul {count} zile",
+      "durationMinutes": "{count, plural, one {# minut} few {# minute} other {# de minute}}",
+      "durationHours": "{count, plural, one {# oră} few {# ore} other {# de ore}}",
       "metrics": {
         "sessions": "Sesiuni",
         "readingTime": "Timp de lectură",
@@ -2589,6 +2633,7 @@
         "actions": "Acțiuni"
       },
       "adminBadge": "Admin",
+      "permissionCount": "{count, plural, =0 {nu există permisiuni} one {o permisiune} few {# permisiuni} other {# de permisiuni}}",
       "filteredBadge": "Filtrate",
       "contentRestrictionsActive": "Restricții de conținut active",
       "statusActive": "Activ",
@@ -2673,6 +2718,7 @@
       "noBooksFound": "Nicio carte găsită"
     },
     "bulk": {
+      "countSelected": "{count, plural, one {# a selectat} few {# a selectat} other {# de a selectat}}",
       "pageSelected": "Pagină selectată",
       "selectPage": "Selectați pagina",
       "clear": "Curăță",
@@ -2758,6 +2804,8 @@
     "hub": {
       "title": "Adnotări",
       "totalCount": "{count} total",
+      "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
+      "noteCount": "{count, plural, =0 {nici o notiță} one {# notă} few {# note} other {# de note}}",
       "export": "Exportă",
       "exportMarkdown": "Markdown",
       "exportCsv": "CSV",
@@ -2781,7 +2829,11 @@
         "movedToTrash": "Mutat la gunoi",
         "annotationRestored": "Annotare restaurată",
         "annotationDeletedForever": "Adnotare ștearsă pentru totdeauna",
-        "failedToDelete": "Ștergerea a eșuat"
+        "failedToDelete": "Ștergerea a eșuat",
+        "bulkTrashed": "{count, plural, =0 {Nu s-a mutat nicio adnotare la gunoi} one {A mutat # adnotare la gunoi} few {Ai mutat # adnotări la gunoi} other {Ai mutat # de adnotări la gunoi}}",
+        "bulkRestored": "{count, plural, =0 {Nu a fost restaurat nicio adnotare} one {Restaurat # adnotare} few {Restaurat # adnotări} other {Restaurat # de adnotări}}",
+        "bulkRecolored": "{count, plural, =0 {Nu ai primit nici o adnotare} one {A fost ocupat cu # adnotare} few {A primit # adnotări} other {A primit # de adnotări}}",
+        "bulkRestyled": "{count, plural, =0 {Restabilire nici o adnotare} one {Restabilit # adnotare} few {Restabilit # adnotări} other {Restabilit # de adnotări}}"
       }
     }
   },
@@ -2814,6 +2866,8 @@
     "sevenDays": "7 zile",
     "thirtyDays": "30 de zile",
     "userId": "Utilizator #{id}",
+    "targetAdditional": "și {count, plural, one {# mai ținta} few {# mai multe ținte} other {# de mai multe ținte}}",
+    "bookImpact": "{count, plural, one {# carte} few {# cărţi} other {# de cărţi}}",
     "entryDetailsLabel": "Detalii pentru evenimentul de audit #{id}",
     "detailEventId": "ID eveniment",
     "detailOccurredAt": "A apărut",
@@ -2832,6 +2886,7 @@
     "deletedBooks": "Cărți șterse",
     "deletedBookDetail": "{title} (carte #{id})",
     "untitledBook": "Fără titlu",
+    "deletedBooksOmitted": "{count, plural, one {# carte adiţională omisă} few {# cărţi adiţionale omise} other {# de cărţi adiţionale omise}}",
     "showing": "Afișare {from}-{to} {total}",
     "prev": "Anterior",
     "chips": {
@@ -3045,7 +3100,8 @@
       "registeredNotice": "Cont creat. Conectați-vă pentru a continua. Un administrator trebuie să acorde permisiuni înainte de a putea accesa biblioteca.",
       "errors": {
         "invalidCredentials": "Nume de utilizator sau parolă nevalide",
-        "tooManyAttempts": "Prea multe încercări de autentificare. Vă rugăm să aşteptaţi un minut şi să încercaţi din nou."
+        "tooManyAttempts": "Prea multe încercări de autentificare. Vă rugăm să aşteptaţi un minut şi să încercaţi din nou.",
+        "accountLocked": "Parola dvs. este corectă, dar acest cont este blocat temporar după prea multe încercări de conectare eșuate. Încearcă din nou în {minutes, plural, one {# minut} few {# minute} other {# de minute}}sau resetează-ți parola pentru a o debloca acum."
       }
     },
     "oidc": {
@@ -3201,7 +3257,8 @@
         "refreshingMetadata": "Reîmprospătare metadate...",
         "deleteSelected": "Ştergeţi selecţia",
         "deleting": "Ștergere...",
-        "exitSelection": "Ieșiți din selecție"
+        "exitSelection": "Ieșiți din selecție",
+        "confirmDeleteCount": "{count, plural, =0 {Ștergeți # autor?} one {Ștergeți # autor?} few {Ștergeți # autori?} other {Ștergeți # de autori?}}"
       },
       "toast": {
         "refreshed": "Rescrierea metadatelor autorului",
@@ -3209,6 +3266,7 @@
         "refreshFailed": "Reîmprospătarea metadatelor autorului a eșuat",
         "bulkRefreshSuccess": "Actualizați metadatele pentru {updated} autor(i)",
         "bulkRefreshFailed": "Reîmprospătarea autorilor selectați a eșuat",
+        "deleteSuccess": "{count, plural, =0 {Şters # autor; afectate {books} cărţi} one {Şters # autor; afectate {books} cărţi} few {Şters # autori; afectate {books} cărţi} other {Şters # de autori; afectate {books} cărţi}}",
         "deleteFailed": "Ștergerea autorului (autorilor) a eșuat"
       }
     },
@@ -3234,6 +3292,7 @@
       "merge": {
         "searchPlaceholder": "Caută autori pentru a fuziona în acest autor",
         "searching": "Căutare...",
+        "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
         "merging": "Fuzionare...",
         "mergeSelected": "Îmbinare selectată",
         "confirmLabel": "Îmbinare"
@@ -3288,6 +3347,7 @@
     "unknownFormat": "necunoscut",
     "collapsedSeries": {
       "label": "Serii",
+      "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
       "readCount": "{count} citite"
     },
     "card": {
@@ -3465,6 +3525,7 @@
       "description": "Acest lucru va şterge definitiv cartea şi toate metadatele sale, fişierele, progresul citirii şi semnele de carte. Acest lucru nu poate fi anulat."
     },
     "bulkEdit": {
+      "title": "{count, plural, =0 {Editare metadate - # carte} one {Editare metadate - # carte} few {Editare metadate - # cărţi} other {Editare metadate - # de cărţi}}",
       "instructions": "Comutați câmpurile pentru a edita, apoi configurați valorile. Numai câmpurile togled vor fi modificate.",
       "invalidYear": "Introduceți un an valid (doar numere)",
       "clearWarning": "Acest lucru va elimina toate {field} din cărțile selectate.",
@@ -3504,6 +3565,8 @@
       "estimatedSize": "Dimensiune estimată:",
       "fileLabel": "Fișier: {fileName}",
       "exportAction": "Exportă",
+      "selectedRowsSummary": "{count, plural, =0 {# rând selectat} one {# rând selectat} few {# rânduri selectate} other {# de rânduri selectate}}",
+      "matchingRowsSummary": "{count, plural, =0 {# rândul potrivit} one {# rândul potrivit} few {# se potrivesc cu rândurile} other {# de se potrivesc cu rândurile}}",
       "prepareFailed": "Nu s-a putut pregăti exportul",
       "exportStarted": "Exportul metadatelor a început: {fileName}",
       "exportFailed": "Exportarea metadatelor a eșuat"
@@ -3570,6 +3633,7 @@
       "titleFor": "Vizualizare rapidă pentru {title}",
       "description": "Previzualizați detaliile cărții și executați acțiuni rapide.",
       "openIn": "Deschide în {provider}",
+      "pages": "{count, plural, =0 {# pagină} one {# pagină} few {# pagini} other {# de pagini}}",
       "primaryFile": "Fişier principal",
       "fileNumber": "Fișier #{id}",
       "showLess": "Arată mai puțin",
@@ -3584,6 +3648,7 @@
       "openBookDetails": "Detalii carte deschisă",
       "openSeries": "Serie deschisă",
       "metadataRefreshFailed": "Reîmprospătarea metadatelor a eșuat",
+      "booksSelected": "{count, plural, =0 {# carte selectată} one {# carte selectată} few {# cărţi selectate} other {# de cărţi selectate}}",
       "loadingMoreBooks": "Se încarcă mai multe cărți",
       "sort": "Sortează",
       "failedCount": "{count} a eșuat",
@@ -3596,6 +3661,7 @@
       "selectedStatus": "{count} selectate",
       "filtered": "Filtrate",
       "loadedStatus": "{loaded} {total} încărcat",
+      "bookCount": "{count, plural, =0 {# carte} one {# carte} few {# cărţi} other {# de cărţi}}",
       "keyboardShortcutsTitle": "Scurtături tastatură (?)",
       "showKeyboardShortcuts": "Arată scurtăturile pentru tastatură",
       "copyHint": "Copiere celulă: Ctrl/Cmd+C · rând de copiere: Ctrl/Cmd+Shift+C"
@@ -3628,6 +3694,7 @@
         "moreInSeries": "Mai multe în seria {series}"
       },
       "writeRename": {
+        "written": "{count, plural, =0 {niciun câmp scris} one {Scris (un câmp)} few {Scris (# câmpuri)} other {Scris (# de câmpuri)}}",
         "writeFailed": "Scriere eșuată",
         "skipped": "Sărit",
         "renamedTo": "Redenumit în {name}",
@@ -3648,9 +3715,11 @@
           "hint": "epub, pdf, mobi, cbz, m4b și multe altele - până la {size} MB în fiecare"
         },
         "addMore": "Adăugați mai multe fișiere",
+        "fileCount": "{count, plural, =0 {nici un fişier} one {un fişier} few {# fişiere} other {# de fişiere}}",
         "clearAll": "Șterge tot",
         "done": "Terminat",
         "retry": "Reîncercați",
+        "filesAdded": "{count, plural, =0 {nici un fişier adăugat} one {Un fişier adăugat} few {# fişiere adăugate} other {# de fişiere adăugate}}",
         "uploadedFailed": "{done} încărcat, {failed} a eșuat",
         "uploadingProgress": "{done} de {total} încărcare...",
         "renameAfter": "Redenumiţi toate fişierele de carte după încărcare",
@@ -3779,6 +3848,7 @@
         "resetHoldReleaseFailed": "Nu s-a putut folosi această poziție. Încercați din nou."
       },
       "editMetadata": {
+        "fieldCount": "{count, plural, =0 {nici un câmp} one {un câmp} few {# câmpuri} other {# de câmpuri}}",
         "bookFilesTarget": "fişiere de carte",
         "formatFilesTarget": "{formats} fișiere",
         "noPrimaryFile": "Nici un fişier primar disponibil",
@@ -3790,6 +3860,8 @@
         "writeManualLibraryDisabled": "Scrie metadate în fișier și redenumesc pe disc; scrierea automată este dezactivată pentru această bibliotecă",
         "writeManualTooltip": "Scrie {fields} la {target} și redenumește pe disc",
         "applyResult": "{skipped}, {updated}",
+        "skippedLockedFields": "{count, plural, =0 {Nu a trecut nici un câmp blocat} one {A sărit peste un câmp blocat} few {Au sărit # câmpuri blocate} other {Au sărit # de câmpuri blocate}}",
+        "updatedFields": "{count, plural, =0 {Nici un câmp nu a fost actualizat} one {a actualizat un câmp} few {# câmpuri actualizate} other {# de câmpuri actualizate}}",
         "wroteFieldsToFile": "{fields} la fișier",
         "fileWriteFailed": "Scrierea fișierului a eșuat",
         "fileWriteSkippedReason": "Fişier de scris omis: {reason}",
@@ -3803,6 +3875,7 @@
         "saveFailed": "Modificările nu au putut fi salvate",
         "saveFailedWithStatus": "Nu s-au putut salva modificările (HTTP {status})",
         "loadFromFileFailed": "Încărcarea metadatelor din fișier a eșuat",
+        "loadedFieldsFromFile": "{count, plural, =0 {Nu s-au încărcat câmpuri din fişierul} one {Încărcat un câmp din fişierul} few {Încărcat # câmpuri din fişierul} other {Încărcat # de câmpuri din fişierul}}",
         "noMetadataInFile": "Nu s-au găsit metadate în fișier",
         "loadFromFile": "Incarca din fisier",
         "loadFromFileTooltip": "Încarcă metadate din fișierul principal al cărții",
@@ -3862,6 +3935,7 @@
         "diffPanel": {
           "untitled": "Fără titlu",
           "noFieldsSelected": "Niciun câmp selectat",
+          "fieldsSelected": "{count, plural, =0 {nici un câmp selectat} one {un câmp selectat} few {# câmpuri selectate} other {# de câmpuri selectate}}",
           "results": "Rezultate",
           "providerMatches": "{provider} meciuri",
           "selectedOf": "{selected} {total} selectat",
@@ -3939,6 +4013,7 @@
       },
       "files": {
         "title": "Fişiere de carte",
+        "fileCount": "{count, plural, =0 {nici un fişier} one {# fişier} few {# fişiere} other {# de fişiere}}",
         "synced": "Sincronizat {time}",
         "sortAria": "Sortează fișierele",
         "syncHistory": "Istoricul sincronizării",
@@ -3964,6 +4039,7 @@
         "hideLog": "Ascundere jurnal",
         "viewSyncLog": "Vezi jurnalul de sincronizare",
         "noWriteHistory": "Nici un istoric de scriere încă.",
+        "fieldsWritten": "{count, plural, =0 {nici un câmp} one {un câmp} few {# câmpuri} other {# de câmpuri}}",
         "track": "Urmărire {number}",
         "primary": "Primară",
         "read": "Citește",
@@ -4003,6 +4079,11 @@
           "position": "Poziție",
           "newest": "Cele mai noi",
           "oldest": "Cel mai vechi primul"
+        },
+        "summary": {
+          "highlights": "{count, plural, =0 {Nu ai evidenţiat} one {o subliniere} few {# evidenţiază} other {# de evidenţiază}}",
+          "notes": "{count, plural, =0 {nici o notiță} one {o notiță} few {# notițe} other {# de notițe}}",
+          "chapters": "{count, plural, =0 {Nici un capitol} one {Un capitol} few {# capitole} other {# de capitole}}"
         },
         "filterByChapter": "Filtrare după capitol",
         "allChapters": "Toate capitolele",
@@ -4056,7 +4137,9 @@
           "relative": {
             "seconds": "{count}s acum",
             "minutes": "{count}m în urmă",
-            "days": "{count}d acum"
+            "days": "{count}d acum",
+            "months": "{count, plural, =0 {# lună în urmă} one {# lună în urmă} few {# luni în urmă} other {# de luni în urmă}}",
+            "years": "{count, plural, =0 {# an în urmă} one {# în urmă cu} few {# ani în urmă} other {# de ani în urmă}}"
           },
           "noSessions": "Nici o sesiune",
           "dateErrors": {
@@ -4250,6 +4333,7 @@
         "unread": "Necitit"
       },
       "series": {
+        "bookCount": "{count, plural, =0 {(fără cărți)} one {(# carte)} few {(# cărți)} other {(# de cărți)}}",
         "readOfCount": "{read} of {total} read"
       },
       "text": {
@@ -4257,14 +4341,18 @@
       }
     },
     "move": {
+      "title": "{count, plural, one {Mută # carte} few {Mută # cărţi} other {Mută # de cărţi}}",
       "subtitle": "Fișierele se mută pe disc în biblioteca de destinație. Acest lucru se poate schimba și cine poate vedea aceste cărți.",
       "searchPlaceholder": "Caută biblioteci",
       "currentLibrary": "Actuală",
+      "folderCount": "{count, plural, one {# dosar} few {# dosare} other {# de dosare}}",
       "continue": "Continuă",
       "back": "Înapoi",
+      "confirm": "{count, plural, one {Mută # carte} few {Mută # cărţi} other {Mută # de cărţi}}",
       "action": "Mutare în bibliotecă",
       "review": {
         "ready": "{count} gata",
+        "collisions": "{count, plural, one {# conflict de nume} few {# conflicte de nume} other {# de conflicte de nume}}",
         "ineligible": "{count} nu se poate muta",
         "alreadyThere": "{count} există deja",
         "collisionsHeading": "Conflicte de nume",
@@ -4339,6 +4427,7 @@
       "confirm": "Confirmă anularea",
       "keepRunning": "Continuă să rulezi"
     },
+    "viewFailed": "{count, plural, one {Vizualizarea uneia a eșuat} few {Vizualizarea # a eșuat} other {Vizualizarea # de a eșuat}}",
     "card": {
       "fetchingMetadata": "Preluare metadate",
       "enrichingAuthors": "Autori de îmbogățire",
@@ -4463,17 +4552,21 @@
       "results": "Rezultate"
     },
     "bulkEdit": {
+      "title": "{count, plural, =0 {Editare în bloc nici un fişier} one {Editează # fişierul} few {Editează în bloc # fişiere} other {Editează în bloc # de fişiere}}",
       "resultTitle": "Rezultate editare în bloc",
       "instructions": "Comutați câmpurile pe care doriți să le actualizați. Numai câmpurile activate vor fi aplicate.",
       "mergeArrays": "Îmbinați array-uri (adăugați la valorile existente în loc să înlocuiți)",
       "failed": "Editarea în bloc a eșuat"
     },
     "setDestination": {
+      "title": "{count, plural, =0 {Setează destinaţia pentru niciun fişier} one {Setează destinaţia pentru # fişier} few {Setează destinaţia pentru # fişiere} other {Setează destinaţia pentru # de fişiere}}",
       "resultTitle": "Destinație actualizată",
       "failed": "Setarea destinației a eșuat"
     },
     "finalizeDialog": {
+      "title": "{count, plural, =0 {Finalizează nici un fişier} one {Finalizează fişierul #} few {Finalizează # fişiere} other {Finalizează # de fişiere}}",
       "resultTitle": "Finalizează rezultatele",
+      "needDestination": "{count, plural, =0 {{without} din # fişiere selectate au nevoie de o destinaţie} one {{without} din # fişierul selectat are nevoie de o destinaţie} few {{without} din # fişiere selectate au nevoie de o destinaţie} other {{without} din # de fişiere selectate au nevoie de o destinaţie}}",
       "allHaveDestination": "Toate fișierele selectate au deja o destinație setată",
       "defaultDestinationLibrary": "Biblioteca implicită de destinație",
       "defaultDestinationFolder": "Dosar destinație implicit",
@@ -4482,8 +4575,14 @@
       "start": "Pornire",
       "filesFinalized": "{succeeded} de {total} fișiere finalizate",
       "checking": "Se verifică fișierele selectate...",
+      "readyCount": "{count, plural, =0 {nici un fişier gata} one {# fişier gata} few {# fişiere gata} other {# de fişiere gata}}",
+      "duplicateCount": "{count, plural, =0 {Nici unul din bibliotecile deja} one {# este deja în bibliotecă} few {# este deja în bibliotecă} other {# de este deja în bibliotecă}}",
+      "conflictCount": "{count, plural, =0 {nici un fişier de conflict} one {# Numele de fișier} few {# nume de fișier} other {# de nume de fișier}}",
+      "missingDestinationCount": "{count, plural, =0 {Nu lipsesc destinaţiile} one {# destinaţie lipsă} few {# destinaţii lipsă} other {# de destinaţii lipsă}}",
+      "blockedCount": "{count, plural, =0 {nici un fişier nu este blocat} one {# fişierul a fost blocat} few {# fişiere blocate} other {# de fişiere blocate}}",
       "moreDuplicates": "+{count} mai mult în bibliotecă",
       "discardDuplicates": "Renunțați la duplicate",
+      "failedCount": "{count, plural, =0 {nici un fişier nu a reuşit} one {# fişier a eşuat} few {# fişiere au eşuat} other {# de fişiere au eşuat}}",
       "view": "Vizualizare",
       "viewExisting": "Vizualizare existentă",
       "hide": "Ascunde",
@@ -4520,9 +4619,11 @@
         "applied": "Aplicat",
         "refetch": "Re-accesare metadate",
         "clickToZoom": "Faceți clic pe o copertă pentru a mări",
+        "changedFields": "{count, plural, one {Câmp #} few {# câmpuri} other {# de câmpuri}}",
         "needMore": "Ai nevoie să cauți furnizori sau să editezi alte câmpuri?"
       },
       "selection": {
+        "fileToLibrary": "{count, plural, =0 {Fişier în bibliotecă} one {Fişierul # până la bibliotecă} few {Fişierul # până la bibliotecă} other {Fişierul # de până la bibliotecă}}",
         "nSelected": "{count} selectate",
         "nReadyToFile": "{count} gata pentru fișier"
       },
@@ -4583,6 +4684,7 @@
     },
     "addToSheet": {
       "title": "Gestionează colecțiile",
+      "selectedCount": "{count, plural, =0 {nici o carte selectată} one {o carte selectată} few {# cărţi selectate} other {# de cărţi selectate}}",
       "newCollection": "Colecție nouă",
       "namePlaceholder": "Numele colecției",
       "create": "Crează",
@@ -4594,9 +4696,14 @@
       "inCollection": "În această colecție",
       "allInCollection": "Toate {total} în această colecție",
       "partialInCollection": "{partial} {total} în această colecție",
+      "bookCount": "{count, plural, =0 {Nu există cărţi} one {o carte} few {# cărţi} other {# de cărţi}}",
       "loadFailed": "Încărcarea colecțiilor a eșuat",
+      "createdAndAdded": "{count, plural, =0 {A creat \"{name}\" şi nu a adăugat nici o carte} one {A creat{name}\" şi a adăugat o carte} few {A creat \"{name}\" şi a adăugat # cărţi} other {A creat \"{name}\" şi a adăugat # de cărţi}}",
       "createFailed": "Crearea colecției a eșuat",
+      "addedNewWithExisting": "{count, plural, =0 {A adăugat o carte nouă la \"{name}({alreadyHad} deja acolo)} one {A adăugat o carte nouă la \"{name}\" ({alreadyHad} deja acolo)} few {A adăugat # cărţi noi la \"{name}({alreadyHad} deja acolo)} other {A adăugat # de cărţi noi la \"{name}({alreadyHad} deja acolo)}}",
+      "addedToCollection": "{count, plural, =0 {Nu au fost adăugate cărţi la \"{name}\"} one {A fost adăugată o carte la \"{name}} few {A fost adăugată # cărţi la \"{name}} other {A fost adăugată # de cărţi la \"{name}}}",
       "addFailed": "Adăugarea la colecție a eșuat",
+      "removedFromCollection": "{count, plural, =0 {Nu a fost eliminată nicio carte din \"{name}\"} one {A fost eliminată o carte din \"{name}} few {A fost eliminată # cărţi din \"{name}} other {A fost eliminată # de cărţi din \"{name}}}",
       "removeFailed": "Ștergerea din colecție a eșuat"
     }
   },
@@ -4607,6 +4714,9 @@
       "noResults": "Niciun rezultat",
       "loadingMore": "Se încarcă mai mult...",
       "loadMore": "Încarcă mai multe ({loaded}/{total})",
+      "allMatchesShown": "{count, plural, =0 {Toate cele 1 meciuri afișate} one {Toate meciurile 1 sunt afișate} few {Toate cele # meciuri afișate} other {Toate cele # de meciuri afișate}}",
+      "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
+      "fileCount": "{count, plural, =0 {nici un fişier} one {# fişier} few {# fişiere} other {# de fişiere}}",
       "uploadedToast": "{uploaded} încărcate",
       "uploadFailedToast": "Încărcarea a eșuat pentru {failed}",
       "uploadPartialToast": "{uploaded}, {failed} a eșuat",
@@ -4721,6 +4831,7 @@
       "apply": "Aplică",
       "fieldPlaceholder": "Lăsați necompletat pentru a curăța",
       "fieldPlaceholderArray": "Separat prin virgulă (lăsaţi necompletat pentru a şterge)",
+      "deleteConfirm": "{count, plural, =0 {Ştergeţi # carte?} one {Ştergeţi # carte?} few {Ştergeţi # cărţi?} other {Ştergeţi # de cărţi?}}",
       "typeDelete": "Tip DELETE"
     },
     "viewHeader": {
@@ -4840,7 +4951,9 @@
     "uploadCount": "Încărcaţi {count}",
     "onlySvgSupported": "Doar fișierele SVG sunt acceptate",
     "maxStaged": "Puteți să prezentați cel mult iconița {max} o dată",
+    "onlyMoreCanStage": "{count, plural, =0 {Nu mai pot fi puse în scenă nici o pictogramă} one {Doar # în plus pot fi puse în scenă} few {Numai # alte pictograme pot fi puse în scenă} other {Numai # de alte pictograme pot fi puse în scenă}}",
     "readFailed": "Nu s-a putut citi fișierele SVG",
+    "uploadedCount": "{count, plural, =0 {Nici o pictogramă încărcată} one {Încărcat # pictogramă} few {Încărcat # pictograme} other {Încărcat # de pictograme}}",
     "uploadedPartial": "{created}, {failed} a eșuat",
     "noIconsUploaded": "Nicio pictogramă încărcată",
     "uploadFailed": "Încărcarea pictogramelor a eșuat",
@@ -4909,6 +5022,7 @@
       },
       "shelfRows": {
         "label": "Rânduri de cărți",
+        "option": "{count, plural, one {Un rând de cărţi} few {# rânduri de cărţi} other {# de rânduri de cărţi}}",
         "hint": "Setaţi câte rânduri de cărţi fiecare raft. Ecranele cu săgeată sunt afişate cel mult două."
       },
       "reorderHintWidget": "Trageți pentru a reordona. Comutați pentru a afișa sau ascunde un widget.",
@@ -4934,6 +5048,7 @@
       "diversityScore": {
         "title": "Scor Diversitate",
         "notEnoughData": "Citește cel puțin 3 cărți pentru a-ți vedea scorul diversității",
+        "booksAnalyzed": "{count, plural, =0 {nici o carte analizată} one {# carte analizată} few {# de cărţi analizate} other {# de cărţi analizate}}",
         "subScores": {
           "genre": "Gen",
           "author": "Autor",
@@ -4960,6 +5075,7 @@
         "title": "Așteptare lungă",
         "empty": "Nicio carte în așteptare. Ai pornit totul!",
         "daysWaiting": "zile în aşteptare",
+        "pages": "{count, plural, =0 {nici o pagină} one {# pagină} few {# pagini} other {# de pagini}}",
         "startReading": "Începe să citești"
       },
       "monthlyChallenge": {
@@ -4978,6 +5094,7 @@
       "readingDna": {
         "title": "ADN de lectură",
         "notEnoughData": "Citește cel puțin 5 cărți pentru a-ți debloca ADN-ul de lectură",
+        "basedOn": "{count, plural, =0 {Bazat pe nicio carte} one {Bazat pe # carte} few {Bazat pe # cărţi} other {Bazat pe # de cărţi}}",
         "traits": {
           "length": "Lungime",
           "variety": "Varietate",
@@ -4998,11 +5115,14 @@
       "readingRhythm": {
         "title": "Ritm de citire",
         "empty": "Începe să citești pentru a vedea ritmul tău prinde formă",
+        "activeDays": "{count, plural, =0 {nu sunt zile active} one {# zi activă} few {# zile active} other {# de zile active}}",
         "consistency": "{activeDays} · {percent}% consistență"
       },
       "readingStreak": {
         "title": "Lectură de lectură",
         "empty": "Citește astăzi pentru a porni streak",
+        "streakLabel": "{count, plural, =0 {Zi stradală} one {Zi stradală} few {zile stradale} other {zile stradale}}",
+        "best": "{count, plural, =0 {Cel mai bun: # ziua} one {Best: # ziua} few {Cel mai bun: # zile} other {Cel mai bun: # de zile}}",
         "lastSevenDays": "Ultimele 7 zile"
       },
       "yearProjection": {
@@ -5120,6 +5240,7 @@
       "namePlaceholder": "ex. Book Club",
       "creating": "Creare...",
       "empty": "Niciun grup încă. Creați un grup pentru a trimite mai mulți destinatari simultan.",
+      "memberCount": "{count, plural, =0 {niciun membru} one {un membru} few {# membri} other {# de membri}}",
       "deleteTooltip": "Șterge grup",
       "noMembers": "Nici un membru încă.",
       "removeMember": "Elimină",
@@ -5187,6 +5308,7 @@
     },
     "send": {
       "title": "Trimite prin e-mail",
+      "bookCount": "{count, plural, =0 {Nu există cărţi} one {o carte} few {# cărţi} other {# de cărţi}}",
       "recipients": "Destinatari",
       "noRecipients": "Niciun destinatar configurat. Adăugați unul în setările de e-mail.",
       "groups": "Grupuri",
@@ -5200,6 +5322,7 @@
       "default": "Implicit",
       "send": "Trimite",
       "sending": "Trimitere...",
+      "queued": "{count, plural, =0 {nu există e-mailuri în coada de aşteptare} one {un e-mail în aşteptare} few {# e-mailuri în aşteptare} other {# de e-mailuri în aşteptare}}",
       "failed": "Trimitere eșuată"
     }
   },
@@ -5292,7 +5415,9 @@
       },
       "lastSynced": {
         "justNow": "Chiar acum",
-        "minutesAgo": "{count} min acum"
+        "minutesAgo": "{count} min acum",
+        "hoursAgo": "{count, plural, =0 {# oră în urmă} one {# oră în urmă} few {# ore în urmă} other {# de ore în urmă}}",
+        "daysAgo": "{count, plural, =0 {# zile în urmă} one {# acum} few {# zile în urmă} other {# de zile în urmă}}"
       }
     },
     "import": {
@@ -5303,6 +5428,9 @@
       "importProgress": "Progresul importului",
       "reviewMatches": "Revizuiește meciurile",
       "importReady": "Importă gata",
+      "exactMatches": "{count, plural, =0 {nici o potrivire exactă nu poate fi importată fără revizuire} one {# Potrivire exactă poate fi importată fără recenzie} few {# potriviri exacte pot fi importate fără a revizui} other {# de potriviri exacte pot fi importate fără a revizui}}",
+      "progressAvailable": "{count, plural, =0 {nici o actualizare de progres disponibilă} one {# actualizare de progres disponibilă} few {# actualizări de progres disponibile} other {# de actualizări de progres disponibile}}",
+      "progressConflicts": "{count, plural, =0 {nu există conflicte} one {# conflict} few {# conflicte} other {# de conflicte}}",
       "unavailable": {
         "missingToken": "Conectează Hardcover înainte de import.",
         "userDisabled": "Sincronizarea este întreruptă în setările hardcos."
@@ -5319,7 +5447,9 @@
         "progressUpdated": "{count} progres actualizat"
       },
       "toast": {
-        "importFailed": "Importarea stării de citire Hardcover a eșuat"
+        "importFailed": "Importarea stării de citire Hardcover a eșuat",
+        "imported": "{count, plural, =0 {nu sunt statusuri de citire importate{progress}} one {# statutul de citire importate{progress}} few {# de a citi statusuri importate{progress}} other {# de a citi statusuri importate{progress}}}",
+        "progressUpdates": "{count, plural, =0 {nici o actualizare de progres} one {# actualizare de progres} few {# actualizări de progres} other {# de actualizări de progres}}"
       }
     },
     "review": {
@@ -5333,6 +5463,7 @@
       "noRows": "Niciun rând nu corespunde filtrelor curente.",
       "selectRowAriaLabel": "Selectați {title}",
       "selectionSummary": "{count} selectat: {ready} gata, {reviewed} revizuit.",
+      "selectedProgress": "{count, plural, =0 {nici o actualizare de progres} one {# actualizare de progres} few {# actualizări de progres} other {# de actualizări de progres}}",
       "selectReady": "Selectează gata",
       "selectPage": "Selectați pagina",
       "clearPage": "Ștergeți pagina",
@@ -5403,6 +5534,7 @@
       "noEditionsFound": "Nici o ediţie găsită.",
       "booksTruncated": "Arată primele cărți {count} pe care le citești.",
       "editionsTruncated": "Se afișează primele ediții {count}.",
+      "pages": "{count, plural, one {# pagină} few {# pagini} other {# de pagini}}",
       "isbn": "ISBN {isbn}",
       "current": "Actuală",
       "useThis": "Utilizează asta",
@@ -5651,6 +5783,7 @@
       "empty": "Acest dosar este gol",
       "emptyHint": "Puteți selecta dosarul curent sau crea unul nou.",
       "openFolderAria": "Deschide {name}",
+      "selectedCount": "{count, plural, =0 {nici un folder selectat} one {# folder selectat} few {# foldere selectate} other {# de foldere selectate}}",
       "noFolders": "Nu s-au găsit dosare",
       "selectFolder": "Selectați acest dosar",
       "errors": {
@@ -5671,6 +5804,8 @@
       "upload": "Incarca",
       "uploadWithCount": "Încărcare ({count})",
       "viewInLibrary": "Vezi în bibliotecă",
+      "fileCount": "{count, plural, =0 {nici un fişier} one {# fişier} few {# fişiere} other {# de fişiere}}",
+      "booksAdded": "{count, plural, =0 {nici o carte adăugată} one {# adăugată} few {# cărţi adăugate} other {# de cărţi adăugate}}",
       "uploadedFailed": "{done} încărcat, {failed} a eșuat",
       "progress": "{done} de {total} încărcare...",
       "header": {
@@ -5684,6 +5819,9 @@
         "hint": "{formats} - până la {size} MB în fiecare"
       }
     }
+  },
+  "metadataScore": {
+    "missingFields": "{count, plural, =0 {niciun câmp lipsește - editează metadatele} one {# câmp lipsă - editează metadatele} few {# câmpuri lipsă - editează metadate} other {# de câmpuri lipsă - editează metadate}}"
   },
   "migration": {
     "sidebarTitle": "Import Booklore",
@@ -5858,6 +5996,7 @@
       "ofCount": "de {total}",
       "targetBookId": "Agendă țintă #{id}",
       "recommended": "Recomandat",
+      "resolveButton": "{count, plural, =0 {Rezolvă # duplicat} one {Rezolvă # duplicat} few {Rezolvă # duplicate} other {Rezolvă # de duplicate}}",
       "byAuthor": "de {author} (ID: {id})",
       "byFilePath": "{filePath} (ID: {id})",
       "bookloreSourceId": "ID sursa: {id}",
@@ -6205,7 +6344,8 @@
       "searching": "Se caută…",
       "tooShort": "Introduceți cel puțin {min} caractere",
       "noResults": "Nici un rezultat găsit",
-      "prompt": "Scrie pentru a căuta"
+      "prompt": "Scrie pentru a căuta",
+      "resultCount": "{count, plural, =0 {nu există rezultate} one {# rezultat} few {# rezultate} other {# de rezultate}}"
     },
     "sidebar": {
       "tabs": {
@@ -6351,6 +6491,7 @@
       "sleep": "Somn",
       "chapterAbbrev": "Ch.",
       "sleepTimer": "Cronometru somn",
+      "minutes": "{count, plural, one {# minut} few {# minute} other {# de minute}}",
       "endOfChapter": "Sfârșitul capitolului",
       "noChaptersAvailable": "Nici un capitol disponibil",
       "extend15": "+ 15 minute",
@@ -6365,7 +6506,8 @@
     }
   },
   "scanner": {
-    "filesProgress": "{processed}/{total} fișiere"
+    "filesProgress": "{processed}/{total} fișiere",
+    "booksFound": "{count, plural, =0 {nu au fost găsite cărţi} one {# carte găsită} few {# cărţi găsite} other {# de cărţi găsite}}"
   },
   "series": {
     "completion": {
@@ -6413,6 +6555,7 @@
       "pageTitleNamed": "Seria · {name}",
       "pageTitleWithId": "Serii #{id}",
       "entityName": "Serii",
+      "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
       "byAuthors": "de {authors}",
       "moreAuthors": "+{count} mai mult",
       "preparingEditor": "Se pregătește editorul...",
@@ -6477,6 +6620,7 @@
       "untitled": "SmartScope fără titlu",
       "subtitle": "Configurați setările inteligente de domeniu",
       "counting": "numărare...",
+      "bookCount": "{count, plural, =0 {Nu există cărţi} one {o carte} few {# cărţi} other {# de cărţi}}",
       "identity": "Identitate",
       "filters": "Filtre",
       "noFilters": "Niciun filtru setat. Toate cărțile accesibile vor fi incluse în această sferă inteligentă.",
@@ -6527,7 +6671,8 @@
     "card": {
       "loadError": "Încărcarea datelor a eșuat",
       "emptyTitle": "Încă nu există date",
-      "emptyDescription": "Nu există date disponibile pentru această diagramă"
+      "emptyDescription": "Nu există date disponibile pentru această diagramă",
+      "unknownField": "{count, plural, =0 {nu există date pentru acest domeniu} one {# carte nu are date pentru acest domeniu} few {# cărţi nu au nici o informaţie pentru acest domeniu} other {# de cărţi nu au nici o informaţie pentru acest domeniu}}"
     },
     "breakdown": {
       "ariaLabel": "Defalcare după sursă sau format"
@@ -6722,7 +6867,9 @@
       "summary": {
         "label": "Summary",
         "toRename": "{count} pentru redenumire",
-        "unchanged": "{count} neschimbat"
+        "unchanged": "{count} neschimbat",
+        "collisions": "{count, plural, =0 {# coliziune} one {# coliziune} few {# coliziuni} other {# de coliziuni}}",
+        "errors": "{count, plural, =0 {# eroare} one {# eroare} few {# erori} other {# de erori}}"
       },
       "empty": {
         "title": "Alege o bibliotecă pentru a începe",
@@ -6737,7 +6884,9 @@
         "showing": "Afișare {from}-{to} {total}"
       },
       "confirmDialog": {
-        "title": "Confirmare Redenumire în bloc"
+        "title": "Confirmare Redenumire în bloc",
+        "body": "{count, plural, =0 {Aceasta va redenumi # carte pe disc. Fişierele cu coliziuni sau erori vor fi sărite. Această acţiune nu poate fi anulată.} one {Aceasta va redenumi # carte pe disc. Fișierele cu coliziuni sau erori vor fi sărite. Această acțiune nu poate fi anulată.} few {Aceasta va redenumi # cărți pe disc. Fișierele cu coliziuni sau erori vor fi sărite. Această acțiune nu poate fi anulată.} other {Aceasta va redenumi # de cărți pe disc. Fișierele cu coliziuni sau erori vor fi sărite. Această acțiune nu poate fi anulată.}}",
+        "renameButton": "{count, plural, =0 {Redenumiţi # carte} one {Redenumiţi # carte} few {Redenumiţi # cărţi} other {Redenumiţi # de cărţi}}"
       }
     },
     "bookDuplicates": {
@@ -6755,6 +6904,7 @@
         "queued": "Scanare în așteptare",
         "running": "Scanare cărți"
       },
+      "groupsFound": "{count, plural, =0 {Niciun grup duplicat} one {Un grup duplicat} few {# grupuri duplicate} other {# de grupuri duplicate}}",
       "filter": "Potrivire tip",
       "allReasons": "Toate tipurile de meciuri",
       "reasons": {
@@ -6802,7 +6952,10 @@
       },
       "deleteDialog": {
         "title": "Ștergeți definitiv cărțile duplicate?",
-        "warning": "Metadata, colectările, datele de citire și starea dispozitivului nu sunt transferate în cartea păstrată. Datele asociate pentru alți utilizatori sunt, de asemenea, eliminate."
+        "description": "{count, plural, =0 {Acest lucru va şterge definitiv # de carte şi fişierele selectate.} one {Aceasta va şterge definitiv # şi fişierele selectate.} few {Aceasta va şterge definitiv # cărţi şi fişierele selectate.} other {Aceasta va şterge definitiv # de cărţi şi fişierele selectate.}}",
+        "warning": "Metadata, colectările, datele de citire și starea dispozitivului nu sunt transferate în cartea păstrată. Datele asociate pentru alți utilizatori sunt, de asemenea, eliminate.",
+        "confirm": "{count, plural, =0 {Ştergeţi # carte} one {Ştergeţi # carte} few {Ştergeţi # cărţi} other {Ştergeţi # de cărţi}}",
+        "success": "{count, plural, =0 {Nicio carte nu a fost ștearsă} one {O carte duplicat a fost ștearsă} few {# cărți duplicat șterse} other {# de cărți duplicat șterse}}"
       },
       "errors": {
         "start": "Nu s-a putut începe scanarea duplicat.",
@@ -6818,6 +6971,7 @@
     },
     "entityManager": {
       "unknown": "Necunoscut",
+      "bookCount": "{count, plural, =0 {Nici o carte} one {# carte} few {# cărţi} other {# de cărţi}}",
       "sortPrefix": "· sortare: {sortName}",
       "selectTargetToKeep": "Selectați ținta pentru a păstra",
       "writeToFiles": "Scrie în fişiere",
@@ -6844,6 +6998,8 @@
         "emptyDescription": "Reglaţi pragul de similaritate şi faceţi clic pe Scanare pentru a detecta dublurile potenţiale.",
         "noneFoundTitle": "Nici o dublură găsită",
         "noneFoundDescription": "Nu au fost detectate dubluri potențiale cu setările curente.",
+        "clustersFound": "{count, plural, =0 {niciun cluster nu a fost găsit} one {# cluster găsit} few {# clustere găsite} other {# de clustere găsite}}",
+        "plusOthers": "{count, plural, =0 {+ # altceva} one {+ # altele} few {+ # alții} other {+ # de alții}}",
         "percentSimilar": "{percent}% similar",
         "pairDetails": "Detalii pereche",
         "dismissEntityTitle": "Renunță la toate perechile pentru această entitate",
@@ -6976,9 +7132,13 @@
         "uploadPrompt": "Încărcaţi fişiere sau plasaţi-le în folderul Book Dock"
       },
       "retry": {
-        "noneToRetry": "Nu există fișiere de eroare pentru a reîncerca"
+        "noneToRetry": "Nu există fișiere de eroare pentru a reîncerca",
+        "retrying": "{count, plural, =0 {Reîncearcă un fișier} one {Reîncearcă un fișier} few {Reîncearcă # fișiere} other {Reîncearcă # de fișiere}}"
       },
       "applyFetched": {
+        "applied": "{count, plural, =0 {A fost aplicat niciunui fișier} one {S-a aplicat la un fișier} few {S-a aplicat la # fișiere} other {S-a aplicat la # de fișiere}}",
+        "skippedEdited": "{count, plural, =0 {a omis un fișier deoarece au editat manual} one {a omis un fișier deoarece a editat manual} few {au omis # fișiere, deoarece au editat manual} other {au omis # de fișiere, deoarece au editat manual}}",
+        "skippedNoMetadata": "{count, plural, =0 {a omis un fișier pentru că nu au găsit metadate} one {a sărit un fișier deoarece nu are metadate preluate} few {au omis # fișiere, pentru că nu au găsit metadate} other {au omis # de fișiere, pentru că nu au găsit metadate}}",
         "noneApplied": "Nu se aplică fișiere; {reasons}",
         "noneSelected": "Niciun fișier selectat"
       }
@@ -6991,6 +7151,7 @@
       "showControlsAria": "Arată controalele colecției",
       "loadError": "Nu s-a putut încărca această colecție",
       "toast": {
+        "removed": "{count, plural, =0 {Nici o carte nu a fost eliminată din colecţie} one {A fost eliminată o carte din colecţie} few {A fost eliminată # cărţi din colecţie} other {A fost eliminată # de cărţi din colecţie}}",
         "removeFailed": "Ștergerea cărților din colecție a eșuat"
       },
       "empty": {
@@ -7065,6 +7226,7 @@
     "title": "Ce este nou",
     "subtitle": "Tot ceea ce este transportat, cel mai nou început.",
     "versionPrefix": "{version} versiune",
+    "newUpdates": "{count, plural, =0 {nu sunt actualizări noi} one {o actualizare nouă} few {# actualizări noi} other {# de actualizări noi}}",
     "remindLater": "Amintește-mi mai târziu",
     "gotIt": "Am înțeles",
     "latest": "Ultimele",
