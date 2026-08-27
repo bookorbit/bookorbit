@@ -161,6 +161,7 @@ describe('RequestSearchPanel provider sources', () => {
     vi.clearAllMocks()
     state.mediaKind.value = 'ebook'
     state.libraries.value = []
+    state.hasSearched.value = false
     state.hasPermission.mockReturnValue(false)
     state.defaultFor.mockReturnValue(NO_DEFAULT)
     state.providers.value = [
@@ -331,7 +332,7 @@ describe('RequestSearchPanel provider sources', () => {
     state.defaultFor.mockReturnValue({ libraryId: 4, libraryName: 'Novels', folderId: null })
     const wrapper = await render()
 
-    expect(wrapper.findAll('button').find((button) => button.text() === 'Download')).toBeDefined()
+    expect(wrapper.findAll('button').find((button) => button.text() === 'Choose release')).toBeDefined()
 
     await wrapper.get('button[aria-label="How BookOrbit chooses the recommended ISBN"]').trigger('click')
     await wrapper.vm.$nextTick()
@@ -344,6 +345,94 @@ describe('RequestSearchPanel provider sources', () => {
     await wrapper.vm.$nextTick()
 
     expect(document.body.textContent).toContain('Recommended')
+  })
+
+  it('defaults a user with both fulfillment permissions to automation', async () => {
+    state.hasPermission.mockImplementation(
+      (permission: string) => permission === Permission.BookRequestAutoApprove || permission === Permission.BookRequestSelfFulfill,
+    )
+    state.defaultFor.mockReturnValue({ libraryId: 4, libraryName: 'Novels', folderId: null })
+    state.submit.mockResolvedValue({ request: { id: 31, userId: 7, status: 'approved' }, subscribed: false })
+    const wrapper = await render()
+
+    const automatic = wrapper.findAll('button').find((button) => button.text() === 'Automatic')!
+    const choose = wrapper.findAll('button').find((button) => button.text() === 'Choose a release')!
+    expect(automatic.attributes('aria-pressed')).toBe('true')
+    expect(choose.attributes('aria-pressed')).toBe('false')
+    expect(wrapper.find('button[aria-label="How BookOrbit chooses the recommended ISBN"]').exists()).toBe(false)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Get automatically')!
+      .trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(state.submit).toHaveBeenCalledWith(state.groups.value[0]!.candidate, expect.objectContaining({ selfServe: false }))
+    expect(state.push).not.toHaveBeenCalled()
+    expect(wrapper.emitted('submitted')).toHaveLength(1)
+  })
+
+  it('lets a user with both fulfillment permissions open the release picker instead', async () => {
+    state.hasPermission.mockImplementation(
+      (permission: string) => permission === Permission.BookRequestAutoApprove || permission === Permission.BookRequestSelfFulfill,
+    )
+    state.defaultFor.mockReturnValue({ libraryId: 4, libraryName: 'Novels', folderId: null })
+    state.submit.mockResolvedValue({ request: { id: 31, userId: 7, status: 'approved' }, subscribed: false })
+    const wrapper = await render()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Choose a release')!
+      .trigger('click')
+
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Choose a release')!
+        .attributes('aria-pressed'),
+    ).toBe('true')
+    expect(wrapper.find('button[aria-label="How BookOrbit chooses the recommended ISBN"]').exists()).toBe(true)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Choose release')!
+      .trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(state.submit).toHaveBeenCalledWith(state.groups.value[0]!.candidate, expect.objectContaining({ selfServe: true }))
+    expect(state.push).toHaveBeenCalledWith({
+      name: 'book-request-releases',
+      params: { id: 31 },
+      query: { isbn: '9780441013593' },
+    })
+  })
+
+  it('offers a one-off manual indexer search even when metadata results exist', async () => {
+    state.hasPermission.mockImplementation(
+      (permission: string) => permission === Permission.BookRequestAutoApprove || permission === Permission.BookRequestSelfFulfill,
+    )
+    state.defaultFor.mockReturnValue({ libraryId: 4, libraryName: 'Novels', folderId: null })
+    state.hasSearched.value = true
+    state.submitFreeText.mockResolvedValue({ request: { id: 32, userId: 7, status: 'approved' }, subscribed: false })
+    const wrapper = await render()
+
+    await wrapper.get('#request-title').setValue('The Ex Hex')
+    await wrapper.get('#request-author').setValue('Erin Sterling')
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Automatic')!
+        .attributes('aria-pressed'),
+    ).toBe('true')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Search indexers manually')!
+      .trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(state.submitFreeText).toHaveBeenCalledWith({ title: 'The Ex Hex', author: 'Erin Sterling' }, expect.objectContaining({ selfServe: true }))
+    expect(state.push).toHaveBeenCalledWith({ name: 'book-request-releases', params: { id: 32 }, query: {} })
   })
 
   it('lets a self-fulfilling user search the exact ISBN from a metadata row', async () => {
@@ -620,7 +709,7 @@ describe('RequestSearchPanel free-text fallback', () => {
   })
 
   /**
-   * Pressing Download twice folds you into your *own* row, which still reports `subscribed`. Being
+   * Choosing a release twice folds you into your *own* row, which still reports `subscribed`. Being
    * told you joined a queue you are already at the front of is wrong; ownership decides, not the flag.
    */
   it('returns you to your own picker when the work folds into a request you already own', async () => {

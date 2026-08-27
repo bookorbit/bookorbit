@@ -12,6 +12,7 @@ import {
 } from '@bookorbit/types'
 import type { BookRequestMediaKind, IndexerItem, ReleaseFileLayout, ReleaseTier, ReleaseTierConditions } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
+import TokenSelect from '@/components/ui/TokenSelect.vue'
 import { formatLanguageName } from '@/i18n/formatters'
 
 /**
@@ -74,10 +75,14 @@ const FORMATS: Record<BookRequestMediaKind, readonly string[]> = {
 const isAudio = computed(() => props.mediaKind === 'audiobook')
 const formats = computed(() => FORMATS[props.mediaKind])
 const languageOptions = computed(() =>
-  REQUEST_LANGUAGE_CODES.map((code) => ({ code, name: formatLanguageName(code) })).sort((left, right) =>
-    left.name.localeCompare(right.name, locale.value),
+  REQUEST_LANGUAGE_CODES.map((code) => ({ value: code, label: formatLanguageName(code) })).sort((left, right) =>
+    left.label.localeCompare(right.label, locale.value),
   ),
 )
+const indexerOptions = computed(() => props.indexers.map((indexer) => ({ value: String(indexer.id), label: indexer.name })))
+
+/** One hint for both pickers, so each field points at the same sentence rather than repeating it. */
+const multiSelectHintId = `release-profile-multi-select-hint-${props.mediaKind}`
 const canAdd = computed(() => tiers.value.length < MAX_RELEASE_TIERS)
 /**
  * Shown only once a tier actually sets a floor. MyAnonaMouse publishes MediaInfo for some torrents
@@ -185,16 +190,12 @@ function handleMaxSize(index: number, event: Event) {
   patch(index, { maxSizeBytes: raw === '' || !Number.isFinite(megabytes) || megabytes <= 0 ? undefined : megabytes * BYTES_PER_MEGABYTE })
 }
 
-function selectedValues(event: Event): string[] {
-  return [...(event.target as HTMLSelectElement).selectedOptions].map((option) => option.value)
+function handleLanguages(index: number, languages: string[]) {
+  patch(index, { languages })
 }
 
-function handleLanguages(index: number, event: Event) {
-  patch(index, { languages: selectedValues(event) })
-}
-
-function handleIndexers(index: number, event: Event) {
-  patch(index, { indexerIds: selectedValues(event).map(Number).filter(Number.isInteger) })
+function handleIndexers(index: number, indexerIds: string[]) {
+  patch(index, { indexerIds: indexerIds.map(Number).filter(Number.isInteger) })
 }
 
 function handleFreeleech(index: number, event: Event) {
@@ -363,37 +364,39 @@ function hasFormat(index: number, format: string): boolean {
             {{ t('bookRequests.releases.hideVipOnly') }}
           </label>
 
-          <label class="flex min-w-48 flex-1 basis-56 flex-col items-stretch gap-1 text-xs text-muted-foreground">
-            {{ t('settings.system.requests.profiles.languages') }}
-            <select
-              multiple
-              size="4"
-              class="rounded-md border border-input bg-background px-1.5 py-1 text-xs text-foreground"
-              :aria-description="t('settings.system.requests.profiles.multiSelectHint')"
-              :value="tier.conditions.languages ?? []"
-              @change="handleLanguages(index, $event)"
-            >
-              <option v-for="language in languageOptions" :key="language.code" :value="language.code">{{ language.name }}</option>
-            </select>
-          </label>
+          <div class="flex min-w-48 flex-1 basis-56 flex-col items-stretch gap-1">
+            <label :for="`${tier.id}-languages`" class="text-xs text-muted-foreground">
+              {{ t('settings.system.requests.profiles.languages') }}
+            </label>
+            <TokenSelect
+              :input-id="`${tier.id}-languages`"
+              :options="languageOptions"
+              :model-value="tier.conditions.languages ?? []"
+              :placeholder="t('settings.system.requests.profiles.multiSelectAny')"
+              :described-by="multiSelectHintId"
+              @update:model-value="handleLanguages(index, $event)"
+            />
+          </div>
 
-          <label class="flex min-w-48 flex-1 basis-56 flex-col items-stretch gap-1 text-xs text-muted-foreground">
-            {{ t('settings.system.requests.profiles.indexers') }}
-            <select
-              multiple
-              size="4"
-              class="rounded-md border border-input bg-background px-1.5 py-1 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              :aria-description="t('settings.system.requests.profiles.multiSelectHint')"
+          <div class="flex min-w-48 flex-1 basis-56 flex-col items-stretch gap-1">
+            <label :for="`${tier.id}-indexers`" class="text-xs text-muted-foreground">
+              {{ t('settings.system.requests.profiles.indexers') }}
+            </label>
+            <TokenSelect
+              :input-id="`${tier.id}-indexers`"
+              :options="indexerOptions"
+              :model-value="tier.conditions.indexerIds?.map(String) ?? []"
+              :placeholder="t('settings.system.requests.profiles.multiSelectAny')"
+              :described-by="multiSelectHintId"
               :disabled="indexers.length === 0"
-              :value="tier.conditions.indexerIds?.map(String) ?? []"
-              @change="handleIndexers(index, $event)"
-            >
-              <option v-for="indexer in indexers" :key="indexer.id" :value="indexer.id">{{ indexer.name }}</option>
-            </select>
-          </label>
+              @update:model-value="handleIndexers(index, $event)"
+            />
+          </div>
         </div>
       </li>
     </ol>
+
+    <p :id="multiSelectHintId" class="sr-only">{{ t('settings.system.requests.profiles.multiSelectHint') }}</p>
 
     <p v-if="warnsAboutBitrate" class="settings-hint settings-prose mt-2">
       {{ t('settings.system.requests.profiles.bitrateNote') }}

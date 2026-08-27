@@ -356,14 +356,27 @@ describe('RequestAutomationPanel', () => {
       }
     })
 
+    /**
+     * Driven the way a person drives it, one pick at a time. The multi-selects this replaced passed
+     * a `setValue([...])` that reached straight into `option.selected`, which is the one path a real
+     * browser never takes: Vue stringified the bound array and the second pick cleared the box.
+     */
     it('authors language and source conditions that the matcher already supports', async () => {
       vi.useFakeTimers()
       try {
         const wrapper = await profilePanel()
-        const selects = wrapper.findAll('select[multiple]')
 
-        await selects[0]!.setValue(['en', 'fr'])
-        await selects[1]!.setValue(['11', '12'])
+        async function pick(field: string, ...labels: string[]) {
+          const input = wrapper.find(`input#tier-1-${field}`)
+          for (const label of labels) {
+            ;(input.element as HTMLInputElement).value = label
+            await input.trigger('input')
+            await input.trigger('keydown', { key: 'Enter' })
+          }
+        }
+
+        await pick('languages', 'English', 'French')
+        await pick('indexers', 'Public books', 'Private books')
         await vi.advanceTimersByTimeAsync(1000)
 
         const profiles = lastBody().profiles as {

@@ -110,8 +110,11 @@ const { groups } = useCandidateGroups(filteredResults, mediaKind, getAvailabilit
 
 // Nobody approves these requests afterwards, so this is the only chance to say where the book goes.
 const autoApproves = computed(() => hasPermission(Permission.BookRequestAutoApprove))
-/** Downloads it now rather than asking for it, and picks the release by hand on the next screen. */
+/** May download it now rather than asking for it, and pick the release by hand on the next screen. */
 const selfFulfils = computed(() => hasPermission(Permission.BookRequestSelfFulfill))
+const fulfillmentMode = ref<'automatic' | 'choose_release'>('automatic')
+const canChooseFulfillment = computed(() => autoApproves.value && selfFulfils.value)
+const choosesRelease = computed(() => selfFulfils.value && (!autoApproves.value || fulfillmentMode.value === 'choose_release'))
 /**
  * Either way there is no second pair of eyes, so every destination rule below reads from this
  * rather than from auto-approval alone: the select is shown, an unset destination is fatal, and a
@@ -186,6 +189,14 @@ function handleSearchSubmit(event: Event) {
 function selectMediaKind(kind: BookRequestMediaKind) {
   mediaKind.value = kind
   if (hasSearched.value) void runSearch()
+}
+
+function selectAutomaticFulfillment() {
+  fulfillmentMode.value = 'automatic'
+}
+
+function selectReleaseFulfillment() {
+  fulfillmentMode.value = 'choose_release'
 }
 
 function handleLanguageChange(event: Event) {
@@ -378,7 +389,8 @@ function isRequestDisabled(group: CandidateGroup): boolean {
  */
 function requestLabel(group: CandidateGroup): string {
   if (isJoinable(group)) return t('bookRequests.search.joinRequest')
-  return selfFulfils.value ? t('bookRequests.search.download') : t('bookRequests.search.request')
+  if (choosesRelease.value) return t('bookRequests.search.chooseRelease')
+  return autoApproves.value ? t('bookRequests.search.getAutomatically') : t('bookRequests.search.request')
 }
 
 function isJoinable(group: CandidateGroup): boolean {
@@ -390,7 +402,9 @@ function isJoinable(group: CandidateGroup): boolean {
  * themselves. An approver handed a row that says nothing but a typed string has no way to tell
  * whether it is the book that was meant.
  */
-const showFreeTextOption = computed(() => selfFulfils.value && hasSearched.value && groups.value.length === 0 && title.value.trim() !== '')
+const canSearchIndexersManually = computed(() => selfFulfils.value && hasSearched.value && title.value.trim() !== '')
+const showFreeTextOption = computed(() => canSearchIndexersManually.value && groups.value.length === 0)
+const showManualSearchOverride = computed(() => canSearchIndexersManually.value && groups.value.length > 0)
 
 const freeTextBusy = ref(false)
 const freeTextNotice = ref<string | null>(null)
@@ -437,14 +451,13 @@ onUnmounted(() => {
  * Where a submitted request leaves you.
  *
  * `subscribed` means the work was already claimed, which is often somebody else's request. It is
- * not always: pressing Download twice folds you into *your own* row, and a self-fulfiller whose
+ * not always: choosing a release twice folds you into *your own* row, and a self-fulfiller whose
  * submission collides with an undriven request takes that row on rather than queueing behind it.
- * Both of those leave you with a request to drive while still reporting `subscribed`, so what
- * decides is whether it is yours to fulfil, not whether you joined something.
+ * Opening the picker therefore requires both manual intent and a request this person can drive.
  */
-async function afterSubmit(result: BookRequestSubmitResult, searchIsbn?: string | null): Promise<void> {
+async function afterSubmit(result: BookRequestSubmitResult, openPicker: boolean, searchIsbn?: string | null): Promise<void> {
   const mine = isBookRequestFulfiller(result.request, user.value?.id)
-  if (selfFulfils.value && mine && isGrabbableBookRequestStatus(result.request.status)) {
+  if (openPicker && mine && isGrabbableBookRequestStatus(result.request.status)) {
     await router.push({ name: 'book-request-releases', params: { id: result.request.id }, query: releasesQuery(searchIsbn) })
     return
   }
@@ -484,7 +497,7 @@ async function startFreeTextSearch() {
       toast.error(submitFailureText(lastFailure.value, t) ?? t('bookRequests.search.submitFailed'))
       return
     }
-    await afterSubmit(result)
+    await afterSubmit(result, true)
   } finally {
     freeTextBusy.value = false
   }
@@ -492,25 +505,25 @@ async function startFreeTextSearch() {
 
 async function requestGroup(group: CandidateGroup) {
   const choice = recommendedSearchChoice(group)
-  await requestGroupChoice(group, choice?.candidate ?? group.candidate, choice?.isbn ?? null)
+  await requestGroupChoice(group, choice?.candidate ?? group.candidate, choice?.isbn ?? null, choosesRelease.value)
 }
 
 async function requestCandidate(group: CandidateGroup, candidate: MetadataCandidate): Promise<void> {
-  await requestGroupChoice(group, candidate, canonicalizeBookRequestIsbn(candidate.isbn10, candidate.isbn13))
+  await requestGroupChoice(group, candidate, canonicalizeBookRequestIsbn(candidate.isbn10, candidate.isbn13), true)
 }
 
 async function requestTitleAuthor(group: CandidateGroup): Promise<void> {
-  await requestGroupChoice(group, group.candidate, null)
+  await requestGroupChoice(group, group.candidate, null, true)
 }
 
-async function requestGroupChoice(group: CandidateGroup, candidate: MetadataCandidate, isbn: string | null): Promise<void> {
+async function requestGroupChoice(group: CandidateGroup, candidate: MetadataCandidate, isbn: string | null, openPicker = true): Promise<void> {
   const hasSelectedCover = Object.prototype.hasOwnProperty.call(activeCoverUrls.value, group.key)
   const result = await submit(candidate, {
     targetLibraryId: targetLibraryId.value,
     targetFolderId: targetFolderId.value,
     language: language.value,
     coverUrl: hasSelectedCover ? (activeCoverUrls.value[group.key] ?? null) : group.coverUrl,
-    selfServe: selfFulfils.value,
+    selfServe: openPicker,
     isbn10: null,
     isbn13: isbn,
     providerKey: candidate.provider,
@@ -522,7 +535,7 @@ async function requestGroupChoice(group: CandidateGroup, candidate: MetadataCand
     toast.error(submitFailureText(lastFailure.value, t) ?? t('bookRequests.search.submitFailed'))
     return
   }
-  await afterSubmit(result, isbn)
+  await afterSubmit(result, openPicker, isbn)
 }
 
 function handleCoverSourceChange(payload: { key: string | undefined; src: string | null }) {
@@ -594,6 +607,33 @@ function mediaIconFor(kind: BookRequestMediaKind) {
             >
               <component :is="mediaIconFor(kind)" :size="13" aria-hidden="true" />
               {{ t(`bookRequests.mediaKind.${kind}`) }}
+            </button>
+          </fieldset>
+
+          <fieldset
+            v-if="canChooseFulfillment"
+            class="inline-flex h-9 w-full items-center gap-0.5 rounded-lg border border-border bg-card p-[3px] sm:w-auto"
+          >
+            <legend class="sr-only">{{ t('bookRequests.search.fulfillmentLabel') }}</legend>
+            <button
+              type="button"
+              class="inline-flex h-full flex-1 items-center justify-center rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none sm:flex-none"
+              :class="fulfillmentMode === 'automatic' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+              :aria-pressed="fulfillmentMode === 'automatic'"
+              @click="selectAutomaticFulfillment"
+            >
+              {{ t('bookRequests.search.fulfillmentAutomatic') }}
+            </button>
+            <button
+              type="button"
+              class="inline-flex h-full flex-1 items-center justify-center rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none sm:flex-none"
+              :class="
+                fulfillmentMode === 'choose_release' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              "
+              :aria-pressed="fulfillmentMode === 'choose_release'"
+              @click="selectReleaseFulfillment"
+            >
+              {{ t('bookRequests.search.fulfillmentChooseRelease') }}
             </button>
           </fieldset>
 
@@ -670,6 +710,17 @@ function mediaIconFor(kind: BookRequestMediaKind) {
             <SlidersHorizontal :size="13" aria-hidden="true" />
             {{ optionsOpen ? t('bookRequests.search.fewerOptions') : t('bookRequests.search.moreOptions') }}
             <span v-if="!optionsOpen && optionsSummary" class="text-primary">{{ optionsSummary }}</span>
+          </button>
+
+          <button
+            v-if="showManualSearchOverride"
+            type="button"
+            class="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60 motion-reduce:transition-none"
+            :disabled="freeTextBusy || destinationMissing"
+            @click="startFreeTextSearch"
+          >
+            <Search :size="13" aria-hidden="true" />
+            {{ t('bookRequests.search.manualSearchAction') }}
           </button>
         </div>
 
@@ -834,7 +885,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
           </div>
         </div>
 
-        <div v-if="selfFulfils && !isJoinable(group)" class="flex shrink-0 items-center gap-1.5">
+        <div v-if="choosesRelease && !isJoinable(group)" class="flex shrink-0 items-center gap-1.5">
           <Popover>
             <PopoverTrigger as-child>
               <Button
@@ -871,7 +922,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
               :disabled="isRequestDisabled(group)"
               @click="requestGroup(group)"
             >
-              {{ requestLabel(group) }}
+              {{ t('bookRequests.search.chooseRelease') }}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
@@ -945,7 +996,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
                   <th scope="col" class="px-2 py-1.5 text-start font-medium">{{ t('bookRequests.search.identifiers.isbn') }}</th>
                   <th scope="col" class="px-2 py-1.5 text-start font-medium">{{ t('bookRequests.search.identifiers.year') }}</th>
                   <th scope="col" class="px-2 py-1.5 text-start font-medium">{{ t('bookRequests.search.identifiers.language') }}</th>
-                  <th v-if="selfFulfils && !isJoinable(group)" scope="col" class="px-2 py-1.5 text-end font-medium">
+                  <th v-if="choosesRelease && !isJoinable(group)" scope="col" class="px-2 py-1.5 text-end font-medium">
                     {{ t('bookRequests.search.identifiers.action') }}
                   </th>
                 </tr>
@@ -963,7 +1014,7 @@ function mediaIconFor(kind: BookRequestMediaKind) {
                   <td class="px-2 py-2 font-mono text-foreground">{{ candidateIsbn(candidate) }}</td>
                   <td class="px-2 py-2 tabular-nums text-muted-foreground">{{ candidateYear(candidate) }}</td>
                   <td class="px-2 py-2 text-muted-foreground">{{ candidateLanguage(candidate) }}</td>
-                  <td v-if="selfFulfils && !isJoinable(group)" class="px-2 py-2 text-end">
+                  <td v-if="choosesRelease && !isJoinable(group)" class="px-2 py-2 text-end">
                     <Button
                       type="button"
                       variant="outline"

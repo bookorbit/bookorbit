@@ -3164,7 +3164,8 @@
           "maxSize": "Max MB",
           "languages": "Languages",
           "indexers": "Sources",
-          "multiSelectHint": "Select one or more, or leave the list empty to allow any"
+          "multiSelectHint": "Choose one or more, or leave it empty to allow any",
+          "multiSelectAny": "Any"
         },
         "health": {
           "ok": "Connected",
@@ -6247,6 +6248,9 @@
       "libraryDefault": "Default ({library})",
       "libraryChoose": "Choose a library",
       "libraryRequired": "Your requests are approved as soon as you make them, so pick the library the book should land in.",
+      "fulfillmentLabel": "Fulfillment",
+      "fulfillmentAutomatic": "Automatic",
+      "fulfillmentChooseRelease": "Choose a release",
       "folderLabel": "Folder",
       "languageLabel": "Request language",
       "languageAny": "Any language",
@@ -6262,6 +6266,7 @@
       "noResultsHint": "Try a different title or author.",
       "noResultsIndexerHint": "Try a different title or author, or search the indexers for \"{title}\" and pick a release yourself.",
       "freeTextAction": "Search indexers",
+      "manualSearchAction": "Search indexers manually",
       "yearUnknown": "Year unknown",
       "sourceCount": "{count, plural, one {# source} other {# sources}}",
       "sourcesLabel": "Sources: {sources}",
@@ -6301,6 +6306,8 @@
       },
       "request": "Request",
       "download": "Download",
+      "getAutomatically": "Get automatically",
+      "chooseRelease": "Choose release",
       "joinRequest": "Add me too",
       "submitted": "Request submitted",
       "joinedExisting": "Added you to the existing request",
@@ -7166,6 +7173,11 @@
         "typeAndEnter": "Type and press Enter to add",
         "pressEnter": "Press Enter to add",
         "remove": "Remove {value}"
+      },
+      "tokenSelect": {
+        "remove": "Remove {value}",
+        "noMatches": "No matches",
+        "showOptions": "Show options"
       }
     },
     "entityIndex": {

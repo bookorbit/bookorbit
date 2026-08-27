@@ -105,6 +105,20 @@ describe('releaseMatchesTier', () => {
     expect(releaseMatchesTier(release({ language: 'eng' }), { languages: ['ENG'] })).toBe(true);
   });
 
+  /**
+   * A tier can only ever store the two-letter code the settings form offers, while a source states
+   * whatever it states: MyAnonaMouse reports "ENG". Comparing the two as strings put every one of
+   * that tracker's releases outside every tier that named a language, which is a whole source
+   * silently falling out of a profile rather than a single release being judged.
+   */
+  it('agrees on a language across the code forms different sources state it in', () => {
+    expect(releaseMatchesTier(release({ language: 'ENG' }), { languages: ['en'] })).toBe(true);
+    expect(releaseMatchesTier(release({ language: 'en' }), { languages: ['en'] })).toBe(true);
+    expect(releaseMatchesTier(release({ language: 'en-GB' }), { languages: ['en'] })).toBe(true);
+    expect(releaseMatchesTier(release({ language: 'ger' }), { languages: ['en', 'de'] })).toBe(true);
+    expect(releaseMatchesTier(release({ language: 'FRE' }), { languages: ['en'] })).toBe(false);
+  });
+
   it('restricts to named sources', () => {
     expect(releaseMatchesTier(release({ indexerId: 14 }), { indexerIds: [14, 17] })).toBe(true);
     expect(releaseMatchesTier(release({ indexerId: 18 }), { indexerIds: [14, 17] })).toBe(false);

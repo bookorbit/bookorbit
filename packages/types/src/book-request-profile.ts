@@ -1,4 +1,5 @@
 import { BOOK_REQUEST_MEDIA_KINDS, type BookRequestMediaKind } from "./book-request";
+import { languagesAgree } from "./language";
 
 /**
  * Release profiles: the edition an operator wants, expressed once, so a release can be grabbed
@@ -135,8 +136,12 @@ export function releaseMatchesTier(release: ReleaseTierInput, conditions: Releas
 
   if (languages && languages.length > 0) {
     if (!release.language) return false;
-    const wanted = languages.map((language) => language.toLowerCase());
-    if (!wanted.includes(release.language.toLowerCase())) return false;
+    // Compared by subtag rather than as strings: a tier stores the two-letter code the form
+    // offers, while a source states whatever it states. MyAnonaMouse reports "ENG", which no
+    // amount of lowercasing makes equal to "en", so a raw comparison put every one of its
+    // releases outside every tier that named a language.
+    const stated = release.language;
+    if (!languages.some((language) => languagesAgree(language, stated))) return false;
   }
 
   if (indexerIds && indexerIds.length > 0 && !indexerIds.includes(release.indexerId)) return false;
