@@ -11,6 +11,7 @@ import type {
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
 import { LibraryService } from '../library/library.service';
 import { canonicalizeIsbn, mediaFamilyForFormat } from './book-duplicate-normalize';
 import { BookDuplicatesRepository } from './book-duplicates.repository';
@@ -97,8 +98,8 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
           : null,
         readingProgress: row.reading_progress === null ? null : Number(row.reading_progress),
         collections: row.collections,
-        addedAt: new Date(row.added_at).toISOString(),
-        updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+        addedAt: parsePgTimestamptz(row.added_at).toISOString(),
+        updatedAt: row.updated_at ? parsePgTimestamptz(row.updated_at).toISOString() : null,
         hasCover: row.has_cover,
       };
       const current = previewsByGroup.get(row.group_id);

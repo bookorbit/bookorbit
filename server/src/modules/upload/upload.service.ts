@@ -18,7 +18,7 @@ import { UploadValidatorService } from './upload-validator.service';
 import { UploadStorageService } from './upload-storage.service';
 import { UploadProcessorService } from './upload-processor.service';
 import { FileRenameService } from '../file-write/file-rename.service';
-import { isAudioFormat, resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
+import { isAudioFormat, resolveUploadPath } from '@bookorbit/types';
 import type { AddBookFileResult, UploadResult } from '@bookorbit/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
@@ -331,59 +331,45 @@ export class UploadService {
     this.logger.log(`[${event}] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} - rename book files completed`);
   }
 
+  /**
+   * Both organization modes keep the pattern's folder segments, so an upload lands where the
+   * rename and move services would put the same book. The modes differ only in what counts as
+   * the book: in `book_per_file` the file itself is the book key, not the folder holding it.
+   */
   private async resolveDestination(
     library: { name?: string | null; fileNamingPattern?: string | null; organizationMode?: string | null },
     libraryFolderPath: string,
     tempPath: string,
     filename: string,
     format: string,
-  ): Promise<{ absolutePath: string; bookFolderPath: string; relPath: string }> {
+  ): Promise<{ absolutePath: string; bookFolderPath: string }> {
     const pattern =
       library.fileNamingPattern ??
       (library.organizationMode === 'book_per_folder'
         ? await this.appSettings.getUploadPatternBookPerFolder()
         : await this.appSettings.getUploadPattern());
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
+    const isBookPerFile = library.organizationMode === 'book_per_file';
 
     if (pattern) {
       const stem = basename(filename, extname(filename));
       const tokens = await this.buildUploadPatternTokens(tempPath, format, stem, library.name);
-      if (library.organizationMode === 'book_per_file') {
-        const resolvedFilename = resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform });
-        if (resolvedFilename) {
-          const absolutePath = join(libraryFolderPath, resolvedFilename);
-          return {
-            absolutePath,
-            bookFolderPath: absolutePath,
-            relPath: resolvedFilename,
-          };
-        }
-      } else {
-        const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
+      const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
-        if (resolved) {
-          const absolutePath = join(libraryFolderPath, resolved);
-          const relPath = resolved;
-          const bookFolderPath = dirname(absolutePath);
-          return { absolutePath, bookFolderPath, relPath };
-        }
+      if (resolved) {
+        const absolutePath = join(libraryFolderPath, resolved);
+        return { absolutePath, bookFolderPath: isBookPerFile ? absolutePath : dirname(absolutePath) };
       }
     }
 
-    if (library.organizationMode === 'book_per_file') {
+    if (isBookPerFile) {
       const absolutePath = join(libraryFolderPath, filename);
-      return {
-        absolutePath,
-        bookFolderPath: absolutePath,
-        relPath: filename,
-      };
+      return { absolutePath, bookFolderPath: absolutePath };
     }
 
     const stem = basename(filename, extname(filename));
     const bookFolderPath = join(libraryFolderPath, stem);
-    const absolutePath = join(bookFolderPath, filename);
-    const relPath = join(stem, filename);
-    return { absolutePath, bookFolderPath, relPath };
+    return { absolutePath: join(bookFolderPath, filename), bookFolderPath };
   }
 
   private async buildUploadPatternTokens(

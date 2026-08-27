@@ -3,6 +3,7 @@ import { check, date, index, integer, jsonb, pgTable, primaryKey, real, serial, 
 import type { ReadStatus, ReadStatusSource, ReadingAttemptOrigin, ReadingAttemptOutcome, ReadingSessionSource } from '@bookorbit/types';
 
 import { bookFiles, books } from './books';
+import { timestamptz } from './columns';
 import { libraries } from './libraries';
 import { users } from './auth';
 
@@ -19,8 +20,8 @@ export const userBookStatus = pgTable(
     status: varchar('status', { length: 20 }).$type<ReadStatus>().notNull().default('unread'),
     // 'auto' (derived from progress) | 'manual' (user-set/imported; protected from progress updates except want_to_read)
     source: varchar('source', { length: 10 }).$type<ReadStatusSource>().notNull().default('auto'),
-    startedAt: timestamp('started_at', { withTimezone: true }),
-    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    startedAt: timestamptz('started_at'),
+    finishedAt: timestamptz('finished_at'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()

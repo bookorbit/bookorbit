@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
+import { downloadFromUrl } from '@/lib/download'
 import AnnotationStream from '../components/shared/AnnotationStream.vue'
 import AnnotationEntry from '../components/shared/AnnotationEntry.vue'
 import AnnotationEntryDetail from '../components/shared/AnnotationEntryDetail.vue'
@@ -190,7 +191,7 @@ async function handleBulkRestore() {
 }
 
 function handleExport(format: 'md' | 'csv' | 'json') {
-  window.open(hub.exportUrl(format), '_blank')
+  void downloadFromUrl(hub.exportUrl(format), `annotations.${format}`)
 }
 
 watch(

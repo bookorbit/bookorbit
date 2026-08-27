@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import type { GroupRule, SortSpec } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import { fileNameFromContentDisposition, triggerBlobDownload } from '@/lib/download'
 
 export type MetadataExportFormat = 'csv' | 'json'
 export type MetadataExportScope = 'selected' | 'all-matching'
@@ -65,32 +66,6 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
   return raw
 }
 
-function triggerBlobDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.rel = 'noopener'
-  document.body.append(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
-function extractFileName(disposition: string | null, fallback: string): string {
-  if (!disposition) return fallback
-  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1])
-    } catch {
-      // Fall through to regular filename parser.
-    }
-  }
-  const asciiMatch = disposition.match(/filename="([^"]+)"/i)
-  return asciiMatch?.[1] || fallback
-}
-
 function toPayload(request: MetadataExportRequest): MetadataExportPayload {
   if (request.scope === 'all-matching') {
     if (!request.allMatchingQuery) {
@@ -144,7 +119,7 @@ export function useBookMetadataExport() {
       }
       const blob = await response.blob()
       const defaultName = `bookorbit-${request.viewType}-${request.scope}.${request.format}`
-      const fileName = extractFileName(response.headers.get('Content-Disposition'), defaultName)
+      const fileName = fileNameFromContentDisposition(response.headers.get('Content-Disposition'), defaultName)
       triggerBlobDownload(blob, fileName)
 
       return {

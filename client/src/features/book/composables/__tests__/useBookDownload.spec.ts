@@ -6,9 +6,15 @@ const toastMock = vi.hoisted(() => ({
   error: vi.fn<(message: string) => void>(),
 }))
 
+const downloadMock = vi.hoisted(() => ({
+  downloadFromUrl: vi.fn<(url: string, fallbackFileName: string) => Promise<void>>().mockResolvedValue(undefined),
+}))
+
 vi.mock('vue-sonner', () => ({
   toast: toastMock,
 }))
+
+vi.mock('@/lib/download', () => downloadMock)
 
 describe('useBookDownload', () => {
   beforeEach(() => {
@@ -16,81 +22,94 @@ describe('useBookDownload', () => {
     toastMock.loading.mockClear()
     toastMock.dismiss.mockClear()
     toastMock.error.mockClear()
+    downloadMock.downloadFromUrl.mockClear()
+    downloadMock.downloadFromUrl.mockResolvedValue(undefined)
   })
 
-  it('triggers browser-native single-file download endpoint', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const appendSpy = vi.spyOn(document.body, 'append')
-    const removeSpy = vi.spyOn(HTMLElement.prototype, 'remove')
-
+  it('downloads a single file from its download endpoint', async () => {
     const { useBookDownload } = await import('../useBookDownload')
-    const { downloadFile } = useBookDownload()
+    const { downloadFile, isDownloading } = useBookDownload()
 
     await downloadFile(42)
 
-    const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
-    expect(anchor.href).toContain('/api/v1/books/files/42/download')
-    expect(clickSpy).toHaveBeenCalledTimes(1)
-    expect(removeSpy).toHaveBeenCalledTimes(1)
+    expect(downloadMock.downloadFromUrl).toHaveBeenCalledWith('/api/v1/books/files/42/download', 'book')
+    expect(toastMock.error).not.toHaveBeenCalled()
+    expect(isDownloading.value).toBe(false)
+  })
 
-    clickSpy.mockRestore()
-    appendSpy.mockRestore()
-    removeSpy.mockRestore()
+  it('reports a failed single-file download and clears the busy flag', async () => {
+    downloadMock.downloadFromUrl.mockRejectedValue(new Error('Download failed with status 403'))
+
+    const { useBookDownload } = await import('../useBookDownload')
+    const { downloadFile, isDownloading } = useBookDownload()
+
+    await downloadFile(42)
+
+    expect(toastMock.error).toHaveBeenCalledWith('Download failed')
+    expect(isDownloading.value).toBe(false)
   })
 
   it('uses primary export scope by default', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const appendSpy = vi.spyOn(document.body, 'append')
-
     const { useBookDownload } = await import('../useBookDownload')
     const { exportBooks } = useBookDownload()
 
     await exportBooks([1, 2], false)
 
-    const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
-    expect(anchor.href).toContain('/api/v1/books/export/download?')
-    expect(anchor.href).toContain('bookIds=1%2C2')
-    expect(anchor.href).toContain('scope=primary')
-    expect(anchor.download).toBe('')
-    expect(clickSpy).toHaveBeenCalledTimes(1)
-
-    clickSpy.mockRestore()
-    appendSpy.mockRestore()
+    const [url, fallback] = downloadMock.downloadFromUrl.mock.calls[0] ?? []
+    expect(url).toContain('/api/v1/books/export/download?')
+    expect(url).toContain('bookIds=1%2C2')
+    expect(url).toContain('scope=primary')
+    expect(fallback).toBe('bookorbit-export.zip')
   })
 
   it('uses all-formats scope when requested', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const appendSpy = vi.spyOn(document.body, 'append')
-
     const { useBookDownload } = await import('../useBookDownload')
     const { exportBooks } = useBookDownload()
 
     await exportBooks([5], true)
 
-    const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
-    expect(anchor.href).toContain('scope=all')
-    expect(anchor.download).toBe('')
-    expect(clickSpy).toHaveBeenCalledTimes(1)
-
-    clickSpy.mockRestore()
-    appendSpy.mockRestore()
+    expect(downloadMock.downloadFromUrl.mock.calls[0]?.[0]).toContain('scope=all')
   })
 
   it('supports audio-only export scope override', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const appendSpy = vi.spyOn(document.body, 'append')
-
     const { useBookDownload } = await import('../useBookDownload')
     const { exportBooks } = useBookDownload()
 
     await exportBooks([9], false, 'audio')
 
-    const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
-    expect(anchor.href).toContain('scope=audio')
-    expect(anchor.download).toBe('')
-    expect(clickSpy).toHaveBeenCalledTimes(1)
+    expect(downloadMock.downloadFromUrl.mock.calls[0]?.[0]).toContain('scope=audio')
+  })
 
-    clickSpy.mockRestore()
-    appendSpy.mockRestore()
+  it('keeps the preparing toast up until the export has been handed over', async () => {
+    let release: (() => void) | undefined
+    downloadMock.downloadFromUrl.mockReturnValue(
+      new Promise<void>((resolve) => {
+        release = resolve
+      }),
+    )
+
+    const { useBookDownload } = await import('../useBookDownload')
+    const { exportBooks } = useBookDownload()
+
+    const pending = exportBooks([1], false)
+    await Promise.resolve()
+    expect(toastMock.dismiss).not.toHaveBeenCalled()
+
+    release?.()
+    await pending
+    expect(toastMock.dismiss).toHaveBeenCalledWith('toast-id')
+  })
+
+  it('reports a failed export', async () => {
+    downloadMock.downloadFromUrl.mockRejectedValue(new Error('Download failed with status 500'))
+
+    const { useBookDownload } = await import('../useBookDownload')
+    const { exportBooks, isDownloading } = useBookDownload()
+
+    await exportBooks([1], false)
+
+    expect(toastMock.error).toHaveBeenCalledWith('Export failed')
+    expect(toastMock.dismiss).toHaveBeenCalledWith('toast-id')
+    expect(isDownloading.value).toBe(false)
   })
 })

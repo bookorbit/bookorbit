@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { ANNOTATION_HIGHLIGHT_COLORS, READER_OPENABLE_FORMATS, type AnnotationItem, type BookDetail } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
+import { downloadFromUrl } from '@/lib/download'
 import { useDeferredLoading } from '@/composables/useDeferredLoading'
 import AnnotationStream from '@/features/annotations/components/shared/AnnotationStream.vue'
 import AnnotationEntry from '@/features/annotations/components/shared/AnnotationEntry.vue'
@@ -167,7 +168,7 @@ async function handleBulkTrash() {
 }
 
 function handleExport(format: 'md' | 'csv' | 'json') {
-  window.open(`/api/v1/annotations/export?format=${format}&bookId=${props.book.id}`, '_blank')
+  void downloadFromUrl(`/api/v1/annotations/export?format=${format}&bookId=${props.book.id}`, `annotations.${format}`)
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

@@ -663,6 +663,65 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(book?.folderPath).toBe(dirname(bookFile!.absolutePath));
   });
 
+  it('finalize files a book_per_file library under the shipped default pattern folders', async () => {
+    const destination = await createLibraryWithFolder(context, { mode: 'book_per_file' });
+
+    const bookDockRow = await createBookDockRow(context, {
+      fileName: 'per-file-default-pattern.fb2',
+      selectedMetadata: {
+        title: 'Caliban Cove',
+        authors: ['S.D. Perry'],
+        seriesName: 'Resident Evil',
+        seriesIndex: '2',
+        publishedYear: 2012,
+      },
+      targetLibraryId: destination.libraryId,
+      targetFolderId: destination.libraryFolderId,
+    });
+
+    const previewResponse = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/files/preview-names',
+      headers: authHeader(context.adminToken),
+      payload: { fileIds: [bookDockRow.id] },
+    });
+
+    expect(previewResponse.statusCode).toBe(201);
+    const preview = previewResponse.json() as Array<{ fileId: number; newName: string }>;
+    expect(preview[0]?.newName).toBe('S.D. Perry/Resident Evil/02. Caliban Cove (2012).fb2');
+
+    const response = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/finalize',
+      headers: authHeader(context.adminToken),
+      payload: { fileIds: [bookDockRow.id] },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as BookDockFinalizeResult;
+    expect(body).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+    expect(body.results[0]?.newName).toBe(preview[0]?.newName);
+
+    const finalizedBookId = body.results[0]!.bookId!;
+    const [book] = await context.db
+      .select({ folderPath: schema.books.folderPath })
+      .from(schema.books)
+      .where(eq(schema.books.id, finalizedBookId))
+      .limit(1);
+    const [bookFile] = await context.db
+      .select({ absolutePath: schema.bookFiles.absolutePath, relPath: schema.bookFiles.relPath })
+      .from(schema.bookFiles)
+      .where(eq(schema.bookFiles.bookId, finalizedBookId))
+      .limit(1);
+
+    const expectedPath = join(destination.folderPath, 'S.D. Perry', 'Resident Evil', '02. Caliban Cove (2012).fb2');
+    expect(bookFile?.absolutePath).toBe(expectedPath);
+    expect(bookFile?.relPath).toBe('S.D. Perry/Resident Evil/02. Caliban Cove (2012).fb2');
+    expect(await fileExists(expectedPath)).toBe(true);
+    expect(await fileExists(join(destination.folderPath, '02. Caliban Cove (2012).fb2'))).toBe(false);
+    expect(book?.folderPath).toBe(expectedPath);
+  });
+
   it('finalize treats title duplicates as exact matches instead of wildcard patterns', async () => {
     const destination = await createLibraryWithFolder(context);
 

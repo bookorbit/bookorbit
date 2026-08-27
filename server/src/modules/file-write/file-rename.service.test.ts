@@ -472,6 +472,53 @@ describe('FileRenameService', () => {
     expect(mockRename).toHaveBeenCalledWith('/library/Old Title.epub', '/library/CON_/AUX_.epub');
   });
 
+  it('does not write a folder ending in a period for a sort-modified author (issue #1160)', async () => {
+    const { service, renameRepo, appSettings } = makeService();
+    appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(true);
+    appSettings.getUploadPattern.mockResolvedValue('{authors:sort}/{title}');
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: { absolutePath: '/library/Old Title.epub', relPath: 'Old Title.epub' },
+        fileNamingPattern: '{authors:sort}/{title}',
+        metadata: { title: 'Harry Potter and the Half-Blood Prince' },
+        authors: ['J.K. Rowling'],
+        bookFolderPath: '/library/Old Title.epub',
+      }),
+    );
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'success',
+        newPath: '/library/Rowling, J.K/Harry Potter and the Half-Blood Prince.epub',
+      }),
+    );
+    expect(mockRename).toHaveBeenCalledWith('/library/Old Title.epub', '/library/Rowling, J.K/Harry Potter and the Half-Blood Prince.epub');
+    for (const segment of (result.newPath as string).split('/')) {
+      expect(segment).not.toMatch(/[. ]$/);
+    }
+  });
+
+  it('keeps a folder ending in a period when cross-platform mode is disabled', async () => {
+    const { service, renameRepo, appSettings } = makeService();
+    appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(false);
+    appSettings.getUploadPattern.mockResolvedValue('{authors:sort}/{title}');
+    renameRepo.findBookRenameData.mockResolvedValue(
+      makeRenameData({
+        file: { absolutePath: '/library/Old Title.epub', relPath: 'Old Title.epub' },
+        fileNamingPattern: '{authors:sort}/{title}',
+        metadata: { title: 'Dune' },
+        authors: ['J.K. Rowling'],
+        bookFolderPath: '/library/Old Title.epub',
+      }),
+    );
+
+    const result = await service.performRename(5, 12);
+
+    expect(result).toEqual(expect.objectContaining({ status: 'success', newPath: '/library/Rowling, J.K./Dune.epub' }));
+  });
+
   it('strips colon from title in newPath when cross-platform mode is enabled', async () => {
     const { service, renameRepo, appSettings } = makeService();
     appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(true);

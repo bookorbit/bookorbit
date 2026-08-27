@@ -12,6 +12,7 @@ vi.mock('../metadata/lib/pdf-parser', () => ({ parsePdfFile: vi.fn() }));
 
 import { access as fsAccess, lstat, readdir, stat } from 'fs/promises';
 import { BadRequestException, ConflictException, ForbiddenException, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE } from '@bookorbit/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata } from '../metadata/lib/cbz-metadata';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
@@ -384,7 +385,7 @@ describe('UploadService', () => {
     expect(storage.streamToTemp).not.toHaveBeenCalled();
   });
 
-  it('book_per_file with pattern uses resolveDownloadFilename for flat layout', async () => {
+  it('book_per_file with a folderless pattern keeps the file at the library root', async () => {
     db.select
       .mockReturnValueOnce(
         selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: '{title}.{extension}', organizationMode: 'book_per_file' }]),
@@ -411,6 +412,76 @@ describe('UploadService', () => {
     expect(result).toEqual({ bookId: 99, filename: 'Dune.epub', format: 'epub', sizeBytes: 456 });
     expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Dune.epub');
     expect(processor.createBookRecord).toHaveBeenCalledWith(1, 2, '/library/Dune.epub', '/library/Dune.epub', 'Dune.epub', 'epub', 456);
+  });
+
+  it('book_per_file keeps the folder segments its pattern defines', async () => {
+    db.select
+      .mockReturnValueOnce(
+        selectChain([
+          {
+            id: 1,
+            allowedFormats: ['epub'],
+            fileNamingPattern: '{authors:first}/{series}/{title}.{extension}',
+            organizationMode: 'book_per_file',
+          },
+        ]),
+      )
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'Dune',
+      subtitle: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: 'Dune',
+      seriesIndex: null,
+      isbn13: null,
+      authors: [{ name: 'Frank Herbert' }],
+      tags: [],
+      description: null,
+      isbn10: null,
+    });
+
+    const result = await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(result).toEqual({ bookId: 99, filename: 'Dune.epub', format: 'epub', sizeBytes: 456 });
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Frank Herbert/Dune/Dune.epub');
+    expect(processor.createBookRecord).toHaveBeenCalledWith(
+      1,
+      2,
+      '/library/Frank Herbert/Dune/Dune.epub',
+      '/library/Frank Herbert/Dune/Dune.epub',
+      'Frank Herbert/Dune/Dune.epub',
+      'epub',
+      456,
+    );
+  });
+
+  it('book_per_file files under the shipped default pattern rather than at the library root', async () => {
+    db.select
+      .mockReturnValueOnce(selectChain([{ id: 1, allowedFormats: ['epub'], fileNamingPattern: null, organizationMode: 'book_per_file' }]))
+      .mockReturnValueOnce(selectChain([{ id: 2, libraryId: 1, path: '/library' }]));
+    appSettings.getUploadPattern.mockResolvedValue(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE);
+
+    mockExtractEpubMetadata.mockResolvedValue({
+      title: 'Dune',
+      subtitle: null,
+      publisher: null,
+      publishedYear: 1965,
+      language: null,
+      seriesName: 'Dune',
+      seriesIndex: '1',
+      isbn13: null,
+      authors: [{ name: 'Frank Herbert' }],
+      tags: [],
+      description: null,
+      isbn10: null,
+    });
+
+    await service.upload(1, 2, 'raw.epub', {} as any, user);
+
+    expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/library/Frank Herbert/Dune/01. Dune (1965).epub');
   });
 
   it('book_per_file without pattern uses filename directly', async () => {

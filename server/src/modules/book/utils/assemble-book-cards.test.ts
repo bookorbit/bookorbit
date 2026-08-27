@@ -1,3 +1,5 @@
+import { books } from '../../../db/schema/books';
+
 import { assembleBookCards, assembleCollapsedBookCards, collapseBookCards } from './assemble-book-cards';
 
 function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleBookCards>[0][number]>) {
@@ -68,6 +70,19 @@ describe('assembleBookCards', () => {
     expect(card.metadataScore).toBe(88);
     expect(card.files).toEqual([{ id: 10, format: 'epub', role: 'primary', sizeBytes: 4096 }]);
   });
+
+  // Issue #1143: a user-typed added date such as year 0025 decoded to an Invalid Date, and
+  // serializing the card threw RangeError, so every listing that contained the book 500'd.
+  it.each(['0025-08-25 00:00:00+00', '0013-01-01 00:00:00+00', '0050-06-15 00:00:00+00', '0001-01-01 00:00:00+00'])(
+    'serializes a book whose added date came back from Postgres as %s',
+    (stored) => {
+      const rows = [makeBookRow(1, { addedAt: books.addedAt.mapFromDriverValue(stored) })];
+
+      const [card] = assembleBookCards(rows, [], [], [], []);
+
+      expect(card.addedAt).toBe(`${stored.slice(0, 10)}T00:00:00.000Z`);
+    },
+  );
 
   it('passes through Hardcover book and edition identifiers', () => {
     const rows = [makeBookRow(1, { hardcoverId: 'new-orleans-rush', hardcoverEditionId: '8941973' })];
