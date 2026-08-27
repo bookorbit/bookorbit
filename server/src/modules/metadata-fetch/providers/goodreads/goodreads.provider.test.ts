@@ -356,6 +356,60 @@ describe('GoodreadsProvider', () => {
       expect(detailUrls).toEqual(['https://www.goodreads.com/book/show/1']);
     });
 
+    it('salvages the books already scraped when a bot challenge stops the batch part-way', async () => {
+      vi.useFakeTimers();
+      const autocomplete = [
+        {
+          bookId: '222794853',
+          bookUrl: '/book/show/222794853.The_First_Witch_of_Boston',
+          title: 'The First Witch of Boston',
+          bookTitleBare: 'The First Witch of Boston',
+        },
+        {
+          bookId: '247090873',
+          bookUrl: '/book/show/247090873.The_First_Witch_of_Boston_Book_Two',
+          title: 'The First Witch of Boston Book Two',
+          bookTitleBare: 'The First Witch of Boston Book Two',
+        },
+      ];
+      let firstBookAttempts = 0;
+
+      global.fetch = vi.fn((input: Parameters<typeof fetch>[0]) => {
+        const url = fetchUrl(input);
+        if (url.includes('/auto_complete')) return Promise.resolve({ ok: true, json: () => Promise.resolve(autocomplete) });
+        if (url.includes('/book/show/222794853')) {
+          firstBookAttempts += 1;
+          // Goodreads sheds load with a bare 503 that clears on the next try.
+          if (firstBookAttempts === 1) return Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('') });
+          return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(goodreadsBookHtml('222794853', 'The First Witch of Boston')) });
+        }
+        return Promise.resolve({ ok: true, status: 202, text: () => Promise.resolve('') });
+      }) as never;
+
+      // Attach the handler before the timers run: a rejected promise nobody is holding is an
+      // unhandled rejection, which fails the whole run.
+      const settled = provider.search({ title: 'The First Witch of Boston' }).catch((err: unknown) => err);
+      await vi.runAllTimersAsync();
+      const error = await settled;
+
+      expect(error).toBeInstanceOf(ProviderThrottleError);
+      const throttle = error as ProviderThrottleError;
+      expect(throttle.partialCandidates.map((c) => c.providerId)).toEqual(['222794853', '247090873']);
+      // The first book was scraped in full; the challenged one falls back to its autocomplete entry.
+      expect(throttle.partialCandidates[0].title).toBe('The First Witch of Boston');
+      expect(throttle.partialCandidates[1].title).toBe('The First Witch of Boston Book Two');
+
+      const detailUrls = vi
+        .mocked(global.fetch)
+        .mock.calls.map(([url]) => fetchUrl(url))
+        .filter((url) => url.includes('/book/show/'));
+      expect(detailUrls).toEqual([
+        'https://www.goodreads.com/book/show/222794853',
+        'https://www.goodreads.com/book/show/222794853',
+        'https://www.goodreads.com/book/show/247090873',
+      ]);
+    });
+
     it('reports a bot challenge on a direct lookup as a throttle', async () => {
       global.fetch = vi
         .fn()

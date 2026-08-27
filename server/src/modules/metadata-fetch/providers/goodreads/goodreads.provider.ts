@@ -8,7 +8,7 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_BUDGETS_MS, PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_RETRY, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { buildRequestSignal, createSearchDeadline, SearchDeadline, sleep } from '../provider-utils';
+import { buildRequestSignal, createSearchDeadline, rethrowWithPartialCandidates, SearchDeadline, sleep } from '../provider-utils';
 import { mapGoodreadsApolloState, mapGoodreadsAutocompleteItem } from './goodreads.mapper';
 import { GoodreadsAutocompleteItem, GoodreadsNextData } from './goodreads.types';
 
@@ -65,19 +65,27 @@ export class GoodreadsProvider implements IdentifiableProvider {
       // Try the detail scrape first, since it is the only source of a full description. A page that
       // loads but fails to parse, or one that is briefly unavailable, only costs this one book.
       const results: MetadataCandidate[] = [];
-      for (const target of targets.slice(0, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS)) {
-        let candidate: MetadataCandidate | null = null;
-        if (!deadline.expired()) {
-          if (results.length > 0) await sleep(PROVIDER_DELAYS_MS.GOODREADS_BETWEEN_REQUESTS, deadline.signal).catch(() => undefined);
-          // The pause between requests spends budget, so re-check before committing to a fetch.
+      try {
+        for (const target of targets.slice(0, PROVIDER_LIMITS.GOODREADS_MAX_RESULTS)) {
+          let candidate: MetadataCandidate | null = null;
+          let blocked = false;
           if (!deadline.expired()) {
-            const detail = await this.fetchBook(target.id, deadline);
-            candidate = detail.candidate;
-            if (detail.outcome === 'blocked') throw blockedError();
+            if (results.length > 0) await sleep(PROVIDER_DELAYS_MS.GOODREADS_BETWEEN_REQUESTS, deadline.signal).catch(() => undefined);
+            // The pause between requests spends budget, so re-check before committing to a fetch.
+            if (!deadline.expired()) {
+              const detail = await this.fetchBook(target.id, deadline);
+              candidate = detail.candidate;
+              blocked = detail.outcome === 'blocked';
+            }
           }
+          if (!candidate && target.item) candidate = mapGoodreadsAutocompleteItem(target.item, target.id);
+          if (candidate) results.push(candidate);
+          // The challenge gates every page from here on, but the book it hit still has its
+          // autocomplete candidate, and the books before it are already scraped in full.
+          if (blocked) throw blockedError();
         }
-        if (!candidate && target.item) candidate = mapGoodreadsAutocompleteItem(target.item, target.id);
-        if (candidate) results.push(candidate);
+      } catch (err) {
+        rethrowWithPartialCandidates(err, results);
       }
 
       return results;

@@ -9,7 +9,7 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { buildRequestSignal, normalizeMaxCandidates, sleep } from '../provider-utils';
+import { buildRequestSignal, normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import { extractAsins, parseBookPage } from './amazon.scraper';
 
 const HEADERS: HeadersInit = {
@@ -42,12 +42,16 @@ export class AmazonProvider implements IdentifiableProvider {
     const asins = await this.searchAsins(params, domain, cookie, maxCandidates, params.signal);
 
     const results: MetadataCandidate[] = [];
-    for (const asin of asins.slice(0, maxCandidates)) {
-      if (results.length > 0) {
-        await sleep(PROVIDER_DELAYS_MS.AMAZON_BETWEEN_REQUESTS, params.signal);
+    try {
+      for (const asin of asins.slice(0, maxCandidates)) {
+        if (results.length > 0) {
+          await sleep(PROVIDER_DELAYS_MS.AMAZON_BETWEEN_REQUESTS, params.signal);
+        }
+        const candidate = await this.fetchByAsin(asin, domain, cookie, params.signal);
+        if (candidate) results.push(candidate);
       }
-      const candidate = await this.fetchByAsin(asin, domain, cookie, params.signal);
-      if (candidate) results.push(candidate);
+    } catch (err) {
+      rethrowWithPartialCandidates(err, results);
     }
     return results;
   }

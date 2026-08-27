@@ -496,6 +496,39 @@ describe('MetadataFetchService', () => {
     expect(statusesOf(events)).toEqual([{ provider: MetadataProviderKey.COMICVINE, outcome: 'throttled' }]);
   });
 
+  it('keeps the candidates a throttled provider had already assembled, and still records the cooldown', async () => {
+    const scraped = candidate(MetadataProviderKey.GOODREADS, '222794853', 'Dune');
+    const throttled: MetadataProvider = {
+      key: MetadataProviderKey.GOODREADS,
+      label: 'Goodreads',
+      identifiable: false,
+      search: vi.fn().mockRejectedValue(new ProviderThrottleError(undefined, 'bot challenge', [scraped])),
+    };
+    registry.select.mockReturnValue([throttled]);
+
+    const events = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+
+    expect(events.filter(isCandidateEvent).map((event) => event.candidate)).toEqual([scraped]);
+    expect(statusesOf(events)).toEqual([{ provider: MetadataProviderKey.GOODREADS, outcome: 'throttled' }]);
+    expect(throttleTracker.record).toHaveBeenCalledWith(MetadataProviderKey.GOODREADS, undefined);
+  });
+
+  it('holds salvaged candidates to the same relevance bar as candidates from a provider that finished', async () => {
+    const unrelated = candidate(MetadataProviderKey.GOODREADS, '247090873', 'A Wholly Different Book');
+    const throttled: MetadataProvider = {
+      key: MetadataProviderKey.GOODREADS,
+      label: 'Goodreads',
+      identifiable: false,
+      search: vi.fn().mockRejectedValue(new ProviderThrottleError(undefined, 'bot challenge', [unrelated])),
+    };
+    registry.select.mockReturnValue([throttled]);
+
+    const events = await firstValueFrom(service.search({ title: 'Dune' }).pipe(toArray()));
+
+    expect(events.filter(isCandidateEvent)).toEqual([]);
+    expect(statusesOf(events)).toEqual([{ provider: MetadataProviderKey.GOODREADS, outcome: 'throttled' }]);
+  });
+
   it('reports a provider that errored, alongside the candidates the others found', async () => {
     const failing: MetadataProvider = {
       key: MetadataProviderKey.GOODREADS,

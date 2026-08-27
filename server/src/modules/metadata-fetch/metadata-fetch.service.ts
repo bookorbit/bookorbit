@@ -150,10 +150,14 @@ export class MetadataFetchService {
     } catch (error) {
       if (error instanceof ProviderThrottleError) {
         this.throttleTracker.record(provider.key, error.retryAfterSeconds);
+        // A provider throttled part-way through hands back what it had already assembled. The
+        // cooldown covers the requests it can no longer make; it is not a reason to drop finished
+        // candidates, and the status event still tells the client the provider was cut short.
+        const salvaged = filterAndRank([...error.partialCandidates], params);
         this.logger.warn(
-          `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} errorClass=ProviderThrottleError error="provider throttled" - provider fetch failed`,
+          `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} resultCount=${salvaged.length} errorClass=ProviderThrottleError error="provider throttled" - provider fetch failed`,
         );
-        return { candidates: [], outcome: 'throttled' };
+        return { candidates: salvaged, outcome: 'throttled' };
       }
 
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
