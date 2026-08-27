@@ -275,6 +275,7 @@ function normalizeSeriesMemberships(values: readonly MetadataSeriesMembership[] 
     out.push({
       seriesName,
       seriesIndex: value.seriesIndex ?? null,
+      expectedBookCount: value.expectedBookCount ?? null,
     })
   }
   return out

@@ -302,7 +302,9 @@ export function mapMangabakaWork(
   const seriesName = resolveTitle(series);
   const sequenceString = work.sequence_numeric != null ? String(work.sequence_numeric) : undefined;
   const seriesMemberships: MetadataSeriesMembership[] | undefined =
-    seriesName && sequenceString ? [{ seriesName, seriesIndex: sequenceString }] : undefined;
+    seriesName && sequenceString
+      ? [{ seriesName, seriesIndex: sequenceString, expectedBookCount: bestCollection?.count_main ?? undefined }]
+      : undefined;
   const subtitle = sanitizeSubtitle(work.sub_title);
 
   return {

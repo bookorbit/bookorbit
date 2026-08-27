@@ -52,6 +52,8 @@ export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof Meta
 export interface MetadataSeriesMembership {
   seriesName: string;
   seriesIndex?: SeriesIndex | null;
+  /** Total books in the series as reported by the provider (e.g. MangaBaka collection volume count). */
+  expectedBookCount?: number | null;
 }
 
 export interface BookCommunityRating {

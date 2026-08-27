@@ -549,7 +549,7 @@ export class MetadataFetchPipeline {
 
       const seriesIndex = parseSeriesIndex(membership.seriesIndex);
       seen.add(key);
-      normalized.push({ seriesName, seriesIndex });
+      normalized.push({ seriesName, seriesIndex, expectedBookCount: membership.expectedBookCount ?? undefined });
     }
 
     return normalized;

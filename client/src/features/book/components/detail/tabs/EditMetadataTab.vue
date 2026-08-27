@@ -459,8 +459,9 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
     return 0
   }
 
-  // Providers do not report series length in this patch, so carry the current value across
-  // rather than letting an applied suggestion silently clear a total someone entered.
+  // Providers can report the series total (e.g. MangaBaka collection volume count). Prefer the
+  // incoming value when present, otherwise carry the current total across so an applied
+  // suggestion never silently clears a total someone entered.
   const totalsByName = new Map(form.seriesMemberships.map((m) => [m.seriesName.trim().toLowerCase(), m.expectedBookCount ?? null]))
 
   setSeriesMemberships(
@@ -468,7 +469,7 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
       (formPatch.seriesMemberships ?? []).map((membership) => ({
         seriesName: membership.seriesName,
         seriesIndex: normalizeSeriesIndex(membership.seriesIndex),
-        expectedBookCount: totalsByName.get(membership.seriesName.trim().toLowerCase()) ?? null,
+        expectedBookCount: membership.expectedBookCount ?? totalsByName.get(membership.seriesName.trim().toLowerCase()) ?? null,
       })),
     ),
   )

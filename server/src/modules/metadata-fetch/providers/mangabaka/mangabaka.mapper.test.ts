@@ -653,9 +653,9 @@ describe('mapMangabakaWork', () => {
     expect(result?.comicMetadata?.volumeName).toBe('The Evil Spirit');
   });
 
-  it('populates seriesMemberships with series name and work sequence', () => {
+  it('populates seriesMemberships with series name, work sequence and collection volume count', () => {
     const result = mapMangabakaWork(mockWork, baseSeries);
-    expect(result?.seriesMemberships).toEqual([{ seriesName: 'Dice', seriesIndex: '1' }]);
+    expect(result?.seriesMemberships).toEqual([{ seriesName: 'Dice', seriesIndex: '1', expectedBookCount: 10 }]);
   });
 
   it('formats title with volume and chapter when chapterNumber is provided (rich format)', () => {
