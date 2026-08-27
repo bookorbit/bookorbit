@@ -762,6 +762,9 @@ export class MetadataService {
       mangabakaSeriesId: boundProviderId('mangabakaSeriesId', data.mangabakaSeriesId),
       itunesId: boundProviderId('itunesId', data.itunesId),
       comicMetadata: data.comicMetadata ?? undefined,
+      // A sidecar can name narrators (OPF role="nrt"); only sent when it did, so an extractor that
+      // has no narrator concept never reaches the replace below.
+      audioMetadata: data.narrators && data.narrators.length > 0 ? { narrators: data.narrators } : undefined,
     });
 
     const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};

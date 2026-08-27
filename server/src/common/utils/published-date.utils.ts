@@ -60,7 +60,12 @@ export function parsePublishedDateKey(value: unknown): string | undefined {
 
   if (MONTH_NAME_RE.test(trimmed) && /\b\d{1,2}\b/.test(trimmed) && /\b\d{4}\b/.test(trimmed)) {
     const parsed = new Date(trimmed);
-    return dateToPublishedDateKey(parsed);
+    if (Number.isNaN(parsed.getTime())) return undefined;
+    // Use local date components to avoid timezone offset shifting the day.
+    const year = parsed.getFullYear();
+    const month = parsed.getMonth() + 1;
+    const day = parsed.getDate();
+    return buildDateKey(String(year), String(month), String(day));
   }
 
   return undefined;
