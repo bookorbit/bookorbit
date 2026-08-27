@@ -59,28 +59,47 @@ const currentSpreadPreference = ref<PdfReaderSettings['spread']>(props.settings.
 const { activeDocument } = useActiveDocument()
 
 // Oversized pages (large scanned spreads) blow past the rasterizer budget at
-// high zoom and render nothing at all, so every custom scale is clamped
-// against the largest page in the document.
+// high zoom and render nothing at all, so the effective scale is capped against
+// the largest page in the document.
 const maxPageArea = computed(() => {
   const pages = activeDocument.value?.document?.pages
   return pages?.length ? largestPageArea(pages) : 0
 })
 
-function clampScale(scale: number) {
-  return clampScaleForPageArea(scale, maxPageArea.value, window.devicePixelRatio)
+// The budget is in device pixels, so it moves when the window changes screens.
+const devicePixelRatio = ref(window.devicePixelRatio)
+let pixelRatioQuery: MediaQueryList | null = null
+
+function handlePixelRatioChange() {
+  devicePixelRatio.value = window.devicePixelRatio
+  watchPixelRatio()
 }
 
-// A stored scale from a previous session can exceed the budget for this page
-// size, which would leave the reader blank on open with no error to explain it.
-watch(maxPageArea, (area) => {
-  if (!area || !zoom.value) return
-  const current = zoomState.value.currentZoomLevel
-  if (typeof current !== 'number') return
-  const clamped = clampScale(current)
-  if (clamped >= current) return
-  zoom.value.requestZoom(clamped)
-  emit('settingsChange', { zoomMode: 'custom', customScale: clamped })
-})
+function watchPixelRatio() {
+  pixelRatioQuery?.removeEventListener('change', handlePixelRatioChange)
+  pixelRatioQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+  pixelRatioQuery.addEventListener('change', handlePixelRatioChange)
+}
+
+function clampScale(scale: number) {
+  return clampScaleForPageArea(scale, maxPageArea.value, devicePixelRatio.value)
+}
+
+// Watching the resulting zoom level covers every route into it - the toolbar
+// step buttons, keyboard shortcuts, the slider, and a scale restored from a
+// previous session - so a new entry point cannot silently bypass the cap.
+watch(
+  () => [zoomState.value.currentZoomLevel, maxPageArea.value, devicePixelRatio.value] as const,
+  () => {
+    if (!maxPageArea.value || !zoom.value) return
+    const current = zoomState.value.currentZoomLevel
+    if (typeof current !== 'number') return
+    const clamped = clampScale(current)
+    if (clamped >= current) return
+    zoom.value.requestZoom(clamped)
+    emit('settingsChange', { zoomMode: 'custom', customScale: clamped })
+  },
+)
 
 let previewingZoom = false
 const zoomPercent = computed(() => Math.round(zoomState.value.currentZoomLevel * 100))
@@ -369,9 +388,12 @@ watch(
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
+  watchPixelRatio()
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  pixelRatioQuery?.removeEventListener('change', handlePixelRatioChange)
+  pixelRatioQuery = null
 })
 </script>
 
