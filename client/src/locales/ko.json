@@ -4507,6 +4507,23 @@
           "noResultsHint": "제목이나 저자 검색어를 조정해 보세요.",
           "searchPrompt": "위에서 검색한 뒤, 결과를 클릭하여 메타데이터 비교를 시작하세요."
         },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        },
         "writeAndRename": "파일에 쓰기 및 이름 변경",
         "writeAndRenameShort": "쓰기 및 이름 변경"
       },

@@ -4154,6 +4154,23 @@
           "noResultsHint": "Intenta ajustar el título o el autor.",
           "searchPrompt": "Busque arriba y luego haga clic en un resultado para comenzar a comparar metadatos."
         },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        },
         "writeAndRename": "Escribir en archivo y cambiar nombre",
         "writeAndRenameShort": "Escribir y cambiar nombre"
       },
