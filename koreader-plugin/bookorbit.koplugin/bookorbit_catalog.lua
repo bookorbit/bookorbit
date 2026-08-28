@@ -256,8 +256,13 @@ local Menu_onFirstPage = Menu.onFirstPage
 local Menu_onLastPage = Menu.onLastPage
 local Menu_onClose = Menu.onClose
 
+function BookOrbitCatalog:setApi(api)
+    self.api = api
+    self.client = BookOrbitApi.new(api)
+end
+
 function BookOrbitCatalog:init()
-    self.client = BookOrbitApi.new(self.api)
+    self:setApi(self.api)
     self.stack = {}
     self.settings = self.settings or {}
     CatalogWidgets.setAssetIconFiles({
