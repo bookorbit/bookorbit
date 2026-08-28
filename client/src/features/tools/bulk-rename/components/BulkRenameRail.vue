@@ -109,6 +109,10 @@ function rowStyle(virtual: { index: number; start: number; size: number }): Reco
   }
 }
 
+function virtualRowKey(key: PropertyKey | bigint): PropertyKey {
+  return typeof key === 'bigint' ? key.toString() : key
+}
+
 const SCOPES: { key: BulkRenameScope; label: string; status: BulkRenameStatus | null }[] = [
   { key: 'changes', label: 'tools.bulkRename.filter.changes', status: 'will_rename' },
   { key: 'collision', label: 'tools.bulkRename.filter.conflicts', status: 'collision' },
@@ -243,7 +247,7 @@ defineExpose({
       @scroll.passive="handleScroll"
     >
       <div class="relative w-full" :style="{ height: `${totalSize}px` }">
-        <template v-for="virtual in virtualRows" :key="virtual.key">
+        <template v-for="virtual in virtualRows" :key="virtualRowKey(virtual.key)">
           <div
             v-if="rows[virtual.index]!.kind === 'header'"
             :style="rowStyle(virtual)"
