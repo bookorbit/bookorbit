@@ -6426,62 +6426,6 @@
       "languages": "Lingue",
       "series": "Serie"
     },
-    "bulkRename": {
-      "previewToolbar": "Rinomina l'anteprima",
-      "renameSettings": "Rinominare le impostazioni",
-      "library": "Biblioteca",
-      "selectLibraryPlaceholder": "Seleziona una libreria...",
-      "noEligibleLibraries": "Nessuna libreria ha la ridenominazione dei file abilitata. Abilitalo nelle Impostazioni della Libreria.",
-      "refresh": "Aggiorna",
-      "applyRename": "Applica Rinomina",
-      "showFullPaths": "Mostra percorsi completi",
-      "columnsMenu": "Colonne",
-      "renamingInProgress": "Rinominare i file: puoi annullare in qualsiasi momento.",
-      "executionFailed": "La ridenominazione collettiva non è riuscita",
-      "previewFailed": "Impossibile caricare l'anteprima",
-      "noBooksMatch": "Nessun libro trovato corrispondente al filtro attuale.",
-      "openBookDetails": "Apri i dettagli del libro",
-      "columns": {
-        "title": "Titolo",
-        "currentPath": "Percorso attuale",
-        "newPath": "Nuovo percorso",
-        "status": "Stato"
-      },
-      "status": {
-        "willRename": "Rinominerà",
-        "unchanged": "Invariato",
-        "collision": "Collisione",
-        "noPattern": "Nessun modello",
-        "error": "Errore"
-      },
-      "filter": {
-        "all": "Tutto"
-      },
-      "summary": {
-        "label": "Sommario",
-        "toRename": "{count} per rinominare",
-        "unchanged": "{count} invariato",
-        "collisions": "{count, plural, =0 {# collisione} one {# collisione} other {# collisioni} many {# collisioni}}",
-        "errors": "{count, plural, =0 {# errore} one {# errore} other {# errori} many {# errori}}"
-      },
-      "empty": {
-        "title": "Scegli una libreria per iniziare",
-        "description": "Seleziona una libreria qui sopra per visualizzare in anteprima le modifiche di ridenominazione, filtrare per stato e applicare l'esecuzione di ridenominazione in blocco.",
-        "chooseLibrary": "Scegli Libreria"
-      },
-      "completed": {
-        "title": "Rinominazione collettiva completata",
-        "stats": "{succeeded} rinominato, {failed} fallito, {skipped} saltato ({processed} totale)"
-      },
-      "pagination": {
-        "showing": "Mostrando {from}-{to} di {total}"
-      },
-      "confirmDialog": {
-        "title": "Conferma la ridenominazione collettiva",
-        "body": "{count, plural, =0 {Questo rinominerà # libro su disco. I file con collisioni o errori verranno ignorati. Questa azione non può essere annullata.} one {Questo rinominerà # libro su disco. I file con collisioni o errori verranno ignorati. Questa azione non può essere annullata.} other {Questo rinominerà # libri su disco. I file con collisioni o errori verranno ignorati. Questa azione non può essere annullata.} many {Questo rinominerà # libri su disco. I file con collisioni o errori verranno ignorati. Questa azione non può essere annullata.}}",
-        "renameButton": "{count, plural, =0 {Rinominare # libro} one {Rinominare # libro} other {Rinominare # libri} many {Rinominare # libri}}"
-      }
-    },
     "bookDuplicates": {
       "scanSettings": "Impostazioni di scansione",
       "title": "Libri duplicati",
@@ -6656,6 +6600,22 @@
       "mergeModal": {
         "title": "Unisci entità",
         "description": "Seleziona quale entità mantenere. Gli altri verranno uniti e rimossi."
+      }
+    },
+    "bulkRename": {
+      "library": "Biblioteca",
+      "selectLibraryPlaceholder": "Seleziona una libreria...",
+      "noEligibleLibraries": "Nessuna libreria ha la ridenominazione dei file abilitata. Abilitalo nelle Impostazioni della Libreria.",
+      "refresh": "Aggiorna",
+      "previewFailed": "Impossibile caricare l'anteprima",
+      "executionFailed": "La ridenominazione collettiva non è riuscita",
+      "openBookDetails": "Apri i dettagli del libro",
+      "filter": {
+        "all": "Tutto"
+      },
+      "status": {
+        "unchanged": "Invariato",
+        "error": "Errore"
       }
     }
   },

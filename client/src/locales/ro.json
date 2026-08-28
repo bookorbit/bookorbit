@@ -6833,62 +6833,6 @@
       "languages": "Limbi",
       "series": "Serii"
     },
-    "bulkRename": {
-      "previewToolbar": "Redenumire previzualizare",
-      "renameSettings": "Redenumire setări",
-      "library": "Bibliotecă",
-      "selectLibraryPlaceholder": "Selectați o bibliotecă...",
-      "noEligibleLibraries": "Nicio bibliotecă nu are activată redenumirea fișierelor. Activați-o în Setările Bibliotecii.",
-      "refresh": "Împrospătează",
-      "applyRename": "Aplică Redenumirea",
-      "showFullPaths": "Arată căile complete",
-      "columnsMenu": "Coloane",
-      "renamingInProgress": "Redenumire fişiere - puteţi anula oricând.",
-      "executionFailed": "Redenumirea în masă a eșuat",
-      "previewFailed": "Încărcarea previzualizării a eșuat",
-      "noBooksMatch": "Nu s-au găsit cărți care să corespundă filtrului curent.",
-      "openBookDetails": "Detalii carte deschisă",
-      "columns": {
-        "title": "Titlu",
-        "currentPath": "Cale curentă",
-        "newPath": "Cale nouă",
-        "status": "Status"
-      },
-      "status": {
-        "willRename": "Va redenumi",
-        "unchanged": "Neautorizat",
-        "collision": "Coliziune",
-        "noPattern": "Niciun model",
-        "error": "Eroare"
-      },
-      "filter": {
-        "all": "Toate"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} pentru redenumire",
-        "unchanged": "{count} neschimbat",
-        "collisions": "{count, plural, =0 {# coliziune} one {# coliziune} few {# coliziuni} other {# de coliziuni}}",
-        "errors": "{count, plural, =0 {# eroare} one {# eroare} few {# erori} other {# de erori}}"
-      },
-      "empty": {
-        "title": "Alege o bibliotecă pentru a începe",
-        "description": "Selectați o bibliotecă de mai sus pentru a previzualiza modificările, a filtra după stare și a aplica redarea în masă rulată.",
-        "chooseLibrary": "Alege biblioteca"
-      },
-      "completed": {
-        "title": "Redenumire completă",
-        "stats": "{succeeded} redenumit, {failed} a eșuat, {skipped} a omis ({processed} total)"
-      },
-      "pagination": {
-        "showing": "Afișare {from}-{to} {total}"
-      },
-      "confirmDialog": {
-        "title": "Confirmare Redenumire în bloc",
-        "body": "{count, plural, =0 {Aceasta va redenumi # carte pe disc. Fişierele cu coliziuni sau erori vor fi sărite. Această acţiune nu poate fi anulată.} one {Aceasta va redenumi # carte pe disc. Fișierele cu coliziuni sau erori vor fi sărite. Această acțiune nu poate fi anulată.} few {Aceasta va redenumi # cărți pe disc. Fișierele cu coliziuni sau erori vor fi sărite. Această acțiune nu poate fi anulată.} other {Aceasta va redenumi # de cărți pe disc. Fișierele cu coliziuni sau erori vor fi sărite. Această acțiune nu poate fi anulată.}}",
-        "renameButton": "{count, plural, =0 {Redenumiţi # carte} one {Redenumiţi # carte} few {Redenumiţi # cărţi} other {Redenumiţi # de cărţi}}"
-      }
-    },
     "bookDuplicates": {
       "scanSettings": "Setări scanare",
       "title": "Cărți duplicate",
@@ -7061,6 +7005,22 @@
       "mergeModal": {
         "title": "Îmbinare Entități",
         "description": "Selectează ce entitate să păstreze. Ceilalți vor fi fuzionați și eliminați."
+      }
+    },
+    "bulkRename": {
+      "library": "Bibliotecă",
+      "selectLibraryPlaceholder": "Selectați o bibliotecă...",
+      "noEligibleLibraries": "Nicio bibliotecă nu are activată redenumirea fișierelor. Activați-o în Setările Bibliotecii.",
+      "refresh": "Împrospătează",
+      "previewFailed": "Încărcarea previzualizării a eșuat",
+      "executionFailed": "Redenumirea în masă a eșuat",
+      "openBookDetails": "Detalii carte deschisă",
+      "filter": {
+        "all": "Toate"
+      },
+      "status": {
+        "unchanged": "Neautorizat",
+        "error": "Eroare"
       }
     }
   },

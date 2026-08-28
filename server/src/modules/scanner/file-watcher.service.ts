@@ -34,6 +34,8 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
   private pendingCrossLibraryReconcileTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly suppressedDirScans = new Map<number, Set<string>>();
   private readonly suppressedDirScanTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Watchers kept alive but detached from event delivery while their library moves its own files. */
+  private readonly pausedWatchers = new Map<number, FSWatcher[]>();
   private reconcileTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -107,6 +109,11 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       for (const subs of this.subscriptions.values()) {
         for (const sub of subs) await sub.close();
       }
+      // A run that was still in flight can leave a paused watcher behind; it owns handles too.
+      for (const subs of this.pausedWatchers.values()) {
+        for (const sub of subs) await sub.close();
+      }
+      this.pausedWatchers.clear();
       this.subscriptions.clear();
       this.watchedLibraryPaths.clear();
       this.logger.log(`[${event}] [end] durationMs=${Date.now() - startedAt} - watcher destroy completed`);
@@ -222,14 +229,23 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     }
   }
 
+  /**
+   * Stops watching a library and releases its operating system handles.
+   *
+   * `close()` unwinds one handle per watched directory and blocks for seconds on a large library,
+   * so callers that only need the watcher to stop reacting to their own writes should use
+   * {@link pauseWatcher} instead.
+   */
   async stopWatcher(libraryId: number): Promise<void> {
     const event = 'scanner.watcher.stop';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] libraryId=${libraryId} - watcher stop requested`);
     try {
       this.watchedLibraryPaths.delete(libraryId);
-      const existing = this.subscriptions.get(libraryId);
-      if (!existing) {
+      const paused = this.pausedWatchers.get(libraryId) ?? [];
+      this.pausedWatchers.delete(libraryId);
+      const existing = [...(this.subscriptions.get(libraryId) ?? []), ...paused];
+      if (existing.length === 0) {
         this.logger.log(`[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} hadWatcher=false - watcher stop completed`);
         return;
       }
@@ -251,6 +267,45 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       );
       throw err;
     }
+  }
+
+  /**
+   * Makes a library's watcher stop delivering events without tearing it down, for callers that are
+   * about to move files themselves.
+   *
+   * Every event is gated on library membership in `subscriptions`: `schedule` returns immediately
+   * for a library that is absent, and a timer that is already pending is discarded when it fires.
+   * So removing the entry is what actually silences the watcher. Closing it as well would release
+   * one handle per watched directory, which measured 9.5s of blocking work across 944 directories
+   * on a real library, followed by a full re-walk to rebuild it.
+   *
+   * @returns whether a live watcher was paused, so the caller knows if it must resume one.
+   */
+  pauseWatcher(libraryId: number): boolean {
+    const event = 'scanner.watcher.pause';
+    const subs = this.subscriptions.get(libraryId);
+    if (!subs) return false;
+
+    this.subscriptions.delete(libraryId);
+    this.pausedWatchers.set(libraryId, subs);
+    this.clearPendingTimersForLibrary(libraryId);
+    this.clearLibraryFolderScanSuppressions(libraryId);
+
+    this.logger.log(`[${event}] [end] libraryId=${libraryId} watcherCount=${subs.length} - watcher paused`);
+    return true;
+  }
+
+  /** Re-arms a paused watcher. Anything that happened while it was paused is intentionally lost. */
+  resumeWatcher(libraryId: number): boolean {
+    const event = 'scanner.watcher.resume';
+    const paused = this.pausedWatchers.get(libraryId);
+    if (!paused) return false;
+
+    this.pausedWatchers.delete(libraryId);
+    this.subscriptions.set(libraryId, paused);
+
+    this.logger.log(`[${event}] [end] libraryId=${libraryId} watcherCount=${paused.length} - watcher resumed`);
+    return true;
   }
 
   private scheduleFolderScan(filePath: string, libraryId: number): void {
@@ -363,9 +418,26 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     return false;
   }
 
+  // The candidate walk skips every hidden entry, so an event for one can never describe a book
+  // file. Reacting to them only produces spurious work, and the write path's own
+  // .bookorbit-write-* temp file would otherwise schedule a rescan of the very book being written.
+  private isHiddenLibraryPath(path: string, libraryId: number): boolean {
+    for (const root of this.watchedLibraryPaths.get(libraryId) ?? []) {
+      if (path === root) return false;
+      if (!path.startsWith(root + sep)) continue;
+      return path
+        .slice(root.length + 1)
+        .split(sep)
+        .some((segment) => segment.startsWith('.'));
+    }
+    return false;
+  }
+
   private schedule(type: EventType, path: string, libraryId: number): void {
     // Guard orphaned timers - ignore events for unwatched libraries
     if (!this.subscriptions.has(libraryId)) return;
+
+    if (this.isHiddenLibraryPath(path, libraryId)) return;
 
     // Dir-level coalescing - if there's already a pending folder scan
     // for this file's directory, don't schedule individual file processing

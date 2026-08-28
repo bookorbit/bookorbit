@@ -5805,60 +5805,6 @@
       "languages": "Talen",
       "series": "Reeksen"
     },
-    "bulkRename": {
-      "library": "Bibliotheek",
-      "selectLibraryPlaceholder": "Selecteer een bibliotheek...",
-      "noEligibleLibraries": "Geen bibliotheken hebben bestand hernoemen ingeschakeld. Schakel het in bij Bibliotheekinstellingen.",
-      "refresh": "Vernieuwen",
-      "applyRename": "Hernoemen toepassen",
-      "showFullPaths": "Volledige paden tonen",
-      "columnsMenu": "Kolommen",
-      "renamingInProgress": "Bestanden worden hernoemd - je kunt op elk moment annuleren.",
-      "executionFailed": "Bulk hernoemen mislukt",
-      "previewFailed": "Voorbeeld laden mislukt",
-      "noBooksMatch": "Geen boeken gevonden die aan het huidige filter voldoen.",
-      "openBookDetails": "Boekdetails openen",
-      "columns": {
-        "title": "Titel",
-        "currentPath": "Huidig pad",
-        "newPath": "Nieuw pad",
-        "status": "Status"
-      },
-      "status": {
-        "willRename": "Wordt hernoemd",
-        "unchanged": "Ongewijzigd",
-        "collision": "Conflict",
-        "noPattern": "Geen patroon",
-        "error": "Fout"
-      },
-      "filter": {
-        "all": "Alle"
-      },
-      "summary": {
-        "label": "Samenvatting",
-        "toRename": "{count} te hernoemen",
-        "unchanged": "{count} ongewijzigd",
-        "collisions": "{count, plural, =0 {# conflicten} one {# conflict} other {# conflicten}}",
-        "errors": "{count, plural, =0 {# fouten} one {# fout} other {# fouten}}"
-      },
-      "empty": {
-        "title": "Kies een bibliotheek om te beginnen",
-        "description": "Selecteer hierboven een bibliotheek om hernoemwijzigingen te bekijken, op status te filteren en de bulk hernoem-actie toe te passen.",
-        "chooseLibrary": "Bibliotheek kiezen"
-      },
-      "completed": {
-        "title": "Bulk hernoemen voltooid",
-        "stats": "{succeeded} hernoemd, {failed} mislukt, {skipped} overgeslagen ({processed} totaal)"
-      },
-      "pagination": {
-        "showing": "{from}-{to} van {total} weergegeven"
-      },
-      "confirmDialog": {
-        "title": "Bulk hernoemen bevestigen",
-        "body": "{count, plural, =0 {Hiermee wordt # boek op schijf hernoemd. Bestanden met conflicten of fouten worden overgeslagen. Deze actie kan niet ongedaan worden gemaakt.} one {Hiermee wordt # boek op schijf hernoemd. Bestanden met conflicten of fouten worden overgeslagen. Deze actie kan niet ongedaan worden gemaakt.} other {Hiermee worden # boeken op schijf hernoemd. Bestanden met conflicten of fouten worden overgeslagen. Deze actie kan niet ongedaan worden gemaakt.}}",
-        "renameButton": "{count, plural, =0 {# boek hernoemen} one {# boek hernoemen} other {# boeken hernoemen}}"
-      }
-    },
     "bookDuplicates": {
       "groupsFound": "{count, plural, =0 {No duplicate groups} one {One duplicate group} other {# duplicate groups}}",
       "deleteDialog": {
@@ -5960,6 +5906,22 @@
       "mergeModal": {
         "title": "Entiteiten samenvoegen",
         "description": "Selecteer welke entiteit je wilt behouden. De andere worden erin samengevoegd en verwijderd."
+      }
+    },
+    "bulkRename": {
+      "library": "Bibliotheek",
+      "selectLibraryPlaceholder": "Selecteer een bibliotheek...",
+      "noEligibleLibraries": "Geen bibliotheken hebben bestand hernoemen ingeschakeld. Schakel het in bij Bibliotheekinstellingen.",
+      "refresh": "Vernieuwen",
+      "previewFailed": "Voorbeeld laden mislukt",
+      "executionFailed": "Bulk hernoemen mislukt",
+      "openBookDetails": "Boekdetails openen",
+      "filter": {
+        "all": "Alle"
+      },
+      "status": {
+        "unchanged": "Ongewijzigd",
+        "error": "Fout"
       }
     }
   },

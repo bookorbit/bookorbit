@@ -17,6 +17,7 @@ import type { MockedFunction } from 'vitest';
 import type { Dirent } from 'fs';
 import { readdir, stat } from 'fs/promises';
 
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { ScannerService } from './scanner.service';
 import { ScanJobStore } from './scan-job-store.service';
@@ -157,16 +158,18 @@ function makeService(
   const jobStore = new ScanJobStore();
   const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
   const achievementEvents = { emit: vi.fn() };
+  const selfWriteRegistry = new SelfWriteRegistry();
   const service = new ScannerService(
     repo as any,
     mockMetadata as any,
     jobStore,
     mockGateway as any,
     notificationService as any,
+    selfWriteRegistry,
     autoFetchOrchestrator as any,
     achievementEvents as any,
   );
-  return { service, jobStore, notificationService, achievementEvents };
+  return { service, jobStore, notificationService, achievementEvents, selfWriteRegistry };
 }
 
 /**
@@ -863,6 +866,27 @@ describe('genuinely new primary file', () => {
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), opf.absolutePath, 'opf');
     // Audio first, so an OPF that names narrators overwrites the composer tag rather than losing to it.
     expect(calls).toEqual(['audio', 'shared']);
+  });
+
+  it('does not read metadata back out of a book whose files this instance is writing', async () => {
+    const first = makeFileStat({ absolutePath: '/library/Book/01.mp3', relPath: 'Book/01.mp3', format: 'mp3', role: 'content' });
+    const second = makeFileStat({ absolutePath: '/library/Book/02.mp3', relPath: 'Book/02.mp3', ino: 1002n, format: 'mp3', role: 'content' });
+    const candidate = makeCandidate('/library/Book', [first, second]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service, selfWriteRegistry } = makeService(repo);
+    // The write is partway through: 02.mp3 still carries whatever it said before the edit.
+    selfWriteRegistry.begin([first.absolutePath, second.absolutePath]);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+    expect(mockMetadata.extractAudioChaptersAndNarrators).not.toHaveBeenCalled();
+
+    selfWriteRegistry.end([first.absolutePath, second.absolutePath]);
   });
 
   it('does not re-read the audio winner when embedded metadata already leads', async () => {

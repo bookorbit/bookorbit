@@ -3340,6 +3340,7 @@ export class BookService {
       default: {
         if (isAudioFormat(format)) {
           const parsed = await extractAudioMetadata(absolutePath);
+          if (!parsed) return {};
           const result: Record<string, unknown> = {};
           if (parsed.title !== null) result.title = parsed.title;
           if (parsed.subtitle !== null) result.subtitle = parsed.subtitle;

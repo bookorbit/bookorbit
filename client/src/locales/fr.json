@@ -7900,62 +7900,6 @@
       "languages": "Langues",
       "series": "Série"
     },
-    "bulkRename": {
-      "previewToolbar": "Renommer l'aperçu",
-      "renameSettings": "Renommer les paramètres",
-      "library": "Bibliothèque",
-      "selectLibraryPlaceholder": "Sélectionnez une bibliothèque...",
-      "noEligibleLibraries": "Aucune bibliothèque n'a activé le changement de nom de fichier. Activez-le dans les paramètres de la bibliothèque.",
-      "refresh": "Actualiser",
-      "applyRename": "Appliquer le renommage",
-      "showFullPaths": "Afficher les chemins complets",
-      "columnsMenu": "Colonnes",
-      "renamingInProgress": "Renommer des fichiers - vous pouvez annuler à tout moment.",
-      "executionFailed": "Échec du changement de nom groupé",
-      "previewFailed": "Échec du chargement de l'aperçu",
-      "noBooksMatch": "Aucun livre trouvé correspondant au filtre actuel.",
-      "openBookDetails": "Détails du livre ouvert",
-      "columns": {
-        "title": "Titre",
-        "currentPath": "Chemin actuel",
-        "newPath": "Nouveau chemin",
-        "status": "Statut"
-      },
-      "status": {
-        "willRename": "Renommera",
-        "unchanged": "Inchangé",
-        "collision": "Collision",
-        "noPattern": "Aucun modèle",
-        "error": "Erreur"
-      },
-      "filter": {
-        "all": "Tout"
-      },
-      "summary": {
-        "label": "Résumé",
-        "toRename": "{count} à renommer",
-        "unchanged": "{count} inchangé",
-        "collisions": "{count, plural, =0 {# collision} one {# collision} other {# collisions} many {# collisions}}",
-        "errors": "{count, plural, =0 {# erreur} one {# erreur} other {# erreurs} many {# erreurs}}"
-      },
-      "empty": {
-        "title": "Choisissez une bibliothèque pour commencer",
-        "description": "Sélectionnez une bibliothèque ci-dessus pour prévisualiser les modifications de renommage, filtrer par statut et appliquer l'exécution de renommage groupé.",
-        "chooseLibrary": "Choisir la bibliothèque"
-      },
-      "completed": {
-        "title": "Renommage groupé terminé",
-        "stats": "{succeeded} renommé, {failed} a échoué, {skipped} ignoré ({processed} au total)"
-      },
-      "pagination": {
-        "showing": "Affichage de {from}-{to} sur {total}"
-      },
-      "confirmDialog": {
-        "title": "Confirmer le changement de nom en bloc",
-        "body": "{count, plural, =0 {Cela renommera # livre sur disque. Les fichiers présentant des collisions ou des erreurs seront ignorés. Cette action ne peut pas être annulée.} one {Cela renommera # livre sur disque. Les fichiers présentant des collisions ou des erreurs seront ignorés. Cette action ne peut pas être annulée.} other {Cela renommera # livres sur disque. Les fichiers présentant des collisions ou des erreurs seront ignorés. Cette action ne peut pas être annulée.} many {Cela renommera # livres sur disque. Les fichiers présentant des collisions ou des erreurs seront ignorés. Cette action ne peut pas être annulée.}}",
-        "renameButton": "{count, plural, =0 {Renommer # livre} one {Renommer # livre} other {Renommer # livres} many {Renommer # livres}}"
-      }
-    },
     "bookDuplicates": {
       "scanSettings": "Paramètres de numérisation",
       "title": "Livres en double",
@@ -8201,6 +8145,22 @@
         "sweep": "La vérification des couvertures a échoué.",
         "list": "Impossible de charger ces entrées.",
         "clean": "Échec du nettoyage."
+      }
+    },
+    "bulkRename": {
+      "library": "Bibliothèque",
+      "selectLibraryPlaceholder": "Sélectionnez une bibliothèque...",
+      "noEligibleLibraries": "Aucune bibliothèque n'a activé le changement de nom de fichier. Activez-le dans les paramètres de la bibliothèque.",
+      "refresh": "Actualiser",
+      "previewFailed": "Échec du chargement de l'aperçu",
+      "executionFailed": "Échec du changement de nom groupé",
+      "openBookDetails": "Détails du livre ouvert",
+      "filter": {
+        "all": "Tout"
+      },
+      "status": {
+        "unchanged": "Inchangé",
+        "error": "Erreur"
       }
     }
   },

@@ -7973,62 +7973,6 @@
       "languages": "Idiomas",
       "series": "Séries"
     },
-    "bulkRename": {
-      "previewToolbar": "Pré-visualização da renomeação",
-      "renameSettings": "Renomear configurações",
-      "library": "Biblioteca",
-      "selectLibraryPlaceholder": "Selecione uma biblioteca...",
-      "noEligibleLibraries": "Nenhuma biblioteca possui a renomeação de arquivos ativada. Ative isso em Configurações da Biblioteca.",
-      "refresh": "Atualizar",
-      "applyRename": "Aplicar Renomeação",
-      "showFullPaths": "Mostrar caminhos completos",
-      "columnsMenu": "Colunas",
-      "renamingInProgress": "Renomeando arquivos - você pode cancelar a qualquer momento.",
-      "executionFailed": "A renomeação em massa falhou",
-      "previewFailed": "Falha ao carregar a pré-visualização",
-      "noBooksMatch": "Nenhum livro corresponde ao filtro atual.",
-      "openBookDetails": "Abrir detalhes do livro",
-      "columns": {
-        "title": "Título",
-        "currentPath": "Caminho Atual",
-        "newPath": "Novo Caminho",
-        "status": "Status"
-      },
-      "status": {
-        "willRename": "Será Renomeado",
-        "unchanged": "Inalterado",
-        "collision": "Colisão",
-        "noPattern": "Sem Padrão",
-        "error": "Erro"
-      },
-      "filter": {
-        "all": "Todos"
-      },
-      "summary": {
-        "label": "Resumo",
-        "toRename": "{count} para renomear",
-        "unchanged": "{count} inalterado",
-        "collisions": "{count, plural, =0 {# colisão} one {# colisão} many {# colisões} other {# colisões}}",
-        "errors": "{count, plural, =0 {# erro} one {# erro} many {# erros} other {# erros}}"
-      },
-      "empty": {
-        "title": "Escolha uma Biblioteca para Iniciar",
-        "description": "Selecione uma biblioteca acima para pré-visualizar alterações de nome, filtrar por status e aplicar a execução da renomeação em massa.",
-        "chooseLibrary": "Escolher Biblioteca"
-      },
-      "completed": {
-        "title": "Renomeação em massa concluída",
-        "stats": "{succeeded} renomeados, {failed} falharam, {skipped} ignorados ({processed} totais)"
-      },
-      "pagination": {
-        "showing": "Exibindo {from}-{to} de {total}"
-      },
-      "confirmDialog": {
-        "title": "Confirmar Renomeação em Massa",
-        "body": "{count, plural, =0 {Isto renomeará # livro no disco. Arquivos com colisões ou erros serão ignorados. Esta ação não pode ser desfeita.} one {Isto renomeará # livro no disco. Arquivos com colisões ou erros serão ignorados. Esta ação não pode ser desfeita.} many {Isto renomeará # livros no disco. Arquivos com colisões ou erros serão ignorados. Esta ação não pode ser desfeita.} other {Isto renomeará # livros no disco. Arquivos com colisões ou erros serão ignorados. Esta ação não pode ser desfeita.}}",
-        "renameButton": "{count, plural, =0 {Renomear # livro} one {Renomear # livro} many {Renomear # livros} other {Renomear # livros}}"
-      }
-    },
     "bookDuplicates": {
       "scanSettings": "Configuração das Análises",
       "title": "Livros duplicados",
@@ -8274,6 +8218,22 @@
         "sweep": "A verificação de capa falhou.",
         "list": "Não foi possível carregar estas entradas.",
         "clean": "Falha na limpeza."
+      }
+    },
+    "bulkRename": {
+      "library": "Biblioteca",
+      "selectLibraryPlaceholder": "Selecione uma biblioteca...",
+      "noEligibleLibraries": "Nenhuma biblioteca possui a renomeação de arquivos ativada. Ative isso em Configurações da Biblioteca.",
+      "refresh": "Atualizar",
+      "previewFailed": "Falha ao carregar a pré-visualização",
+      "executionFailed": "A renomeação em massa falhou",
+      "openBookDetails": "Abrir detalhes do livro",
+      "filter": {
+        "all": "Todos"
+      },
+      "status": {
+        "unchanged": "Inalterado",
+        "error": "Erro"
       }
     }
   },

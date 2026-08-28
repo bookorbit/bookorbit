@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { STATUS_COLORS, STATUS_ICONS } from '@/features/book/composables/useBookStatus'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
-import type { CoverAspectRatio } from '@bookorbit/types'
+import type { CoverAspectRatio, ReadStatus, UserBookStatus } from '@bookorbit/types'
 
 export interface CarouselBook {
   id: number
@@ -16,6 +18,7 @@ export interface CarouselBook {
   seriesIndex?: string | null
   hasCover: boolean
   authors: string[]
+  readStatus?: UserBookStatus | null
   isAudiobook?: boolean
   isComic?: boolean
 }
@@ -46,6 +49,7 @@ const cardWidthClass = computed(() => {
 })
 
 const router = useRouter()
+const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
 const scrollEl = ref<HTMLElement | null>(null)
 const coverResetVersion = ref(0)
@@ -70,6 +74,16 @@ function isAudiobook(book: CarouselBook): boolean {
 
 function isComic(book: CarouselBook): boolean {
   return book.isComic ?? false
+}
+
+function readStatus(book: CarouselBook): ReadStatus | null {
+  const status = book.readStatus?.status
+  return status != null && status !== 'unread' ? status : null
+}
+
+function readStatusLabel(status: ReadStatus): string {
+  const key = status.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())
+  return t(`book.readStatus.${key}`)
 }
 
 function cardAspectRatio(book: CarouselBook): string {
@@ -156,6 +170,13 @@ defineExpose({ scroll })
             :spine="!isAudiobook(book)"
             :is-comic="isComic(book)"
           />
+          <span
+            v-if="readStatus(book)"
+            class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none"
+          >
+            <component :is="STATUS_ICONS[readStatus(book)!]" :size="12" :class="STATUS_COLORS[readStatus(book)!]" />
+            <span class="sr-only">{{ readStatusLabel(readStatus(book)!) }}</span>
+          </span>
           <span
             v-if="showSeriesIndex && book.seriesIndex != null"
             class="absolute bottom-1.5 left-1.5 bg-black/60 text-white text-[9px] font-semibold leading-none px-1.5 py-1 rounded-full pointer-events-none"

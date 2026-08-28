@@ -6421,61 +6421,6 @@
       "languages": "Мови",
       "series": "Серія"
     },
-    "bulkRename": {
-      "previewToolbar": "Перейменувати попередній перегляд",
-      "renameSettings": "Перейменувати параметри",
-      "library": "Бібліотека",
-      "selectLibraryPlaceholder": "Виберіть бібліотеку...",
-      "noEligibleLibraries": "Жодна бібліотека не має перейменування файлу. Увімкніть її в Налаштуваннях.",
-      "refresh": "Оновити",
-      "applyRename": "Застосувати перейменування",
-      "showFullPaths": "Показати всі шляхи",
-      "columnsMenu": "Стовпці",
-      "renamingInProgress": "Перейменування файлів - ви можете скасувати в будь-який час.",
-      "executionFailed": "Не вдалося перейменувати основну назву",
-      "previewFailed": "Не вдалося завантажити попередній перегляд",
-      "noBooksMatch": "Немає книг, що відповідають поточному фільтру.",
-      "openBookDetails": "Відкрити відомості про книгу",
-      "columns": {
-        "title": "Найменування",
-        "currentPath": "Поточний шлях",
-        "newPath": "Новий шлях",
-        "status": "Статус"
-      },
-      "status": {
-        "willRename": "Перейменуватиме",
-        "unchanged": "Без змін",
-        "collision": "Колізія",
-        "noPattern": "Шаблон відсутній",
-        "error": "Помилка"
-      },
-      "filter": {
-        "all": "Всі"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} для перейменування",
-        "collisions": "{count, plural, =0 {# зіткнення} one {# зіткнення} few {# зіткнень} many {# зіткнень} other {# зіткнень}}",
-        "errors": "{count, plural, =0 {# помилка} one {# помилка} few {# помилок} many {# помилок} other {# помилок}}"
-      },
-      "empty": {
-        "title": "Виберіть бібліотеку, щоб почати",
-        "description": "Виберіть наведену вище бібліотеку для попереднього перегляду змін, фільтр за статусом і перейменування масових змін.",
-        "chooseLibrary": "Вибрати бібліотеку"
-      },
-      "completed": {
-        "title": "Масове перейменування завершено",
-        "stats": "{succeeded} перейменований, {failed} не вдалося, {skipped} пропущено (разом{processed})"
-      },
-      "pagination": {
-        "showing": "Показані {from}-{to} {total}"
-      },
-      "confirmDialog": {
-        "title": "Підтвердити перейменування групової маси",
-        "body": "{count, plural, =0 {This will rename # book on disk. Files with collisions or errors will be skipped. This action cannot be undone.} one {This will rename # book on disk. Files with collisions or errors will be skipped. This action cannot be undone.} few {This will rename # books on disk. Files with collisions or errors will be skipped. This action cannot be undone.} many {This will rename # books on disk. Files with collisions or errors will be skipped. This action cannot be undone.} other {This will rename # books on disk. Files with collisions or errors will be skipped. This action cannot be undone.}}",
-        "renameButton": "{count, plural, =0 {Перейменувати # книга} one {Перейменувати # книгу} few {Перейменувати # книг} many {Перейменувати # книг} other {Перейменувати # книг}}"
-      }
-    },
     "bookDuplicates": {
       "scanSettings": "Параметри сканування",
       "title": "Дублікати книг",
@@ -6646,6 +6591,22 @@
       "mergeModal": {
         "title": "Об'єднати сутності",
         "description": "Оберіть, який об'єкт для збереження. Інші будуть об'єднані та видалені."
+      }
+    },
+    "bulkRename": {
+      "library": "Бібліотека",
+      "selectLibraryPlaceholder": "Виберіть бібліотеку...",
+      "noEligibleLibraries": "Жодна бібліотека не має перейменування файлу. Увімкніть її в Налаштуваннях.",
+      "refresh": "Оновити",
+      "previewFailed": "Не вдалося завантажити попередній перегляд",
+      "executionFailed": "Не вдалося перейменувати основну назву",
+      "openBookDetails": "Відкрити відомості про книгу",
+      "filter": {
+        "all": "Всі"
+      },
+      "status": {
+        "unchanged": "Без змін",
+        "error": "Помилка"
       }
     }
   },

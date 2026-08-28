@@ -1,30 +1,33 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { basename, extname, join } from 'path';
 
 import type { BulkRenamePreviewItem, BulkRenamePreviewPage, BulkRenameProgressEvent, BulkRenameStatus } from '@bookorbit/types';
-import { NotificationType, resolveUploadPath } from '@bookorbit/types';
+import { NotificationType } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { NotificationService } from '../notification/notification.service';
 import { FileRenameService } from '../file-write/file-rename.service';
 import { FileRenameRepository } from '../file-write/file-rename.repository';
 import { FileWatcherService } from '../scanner/file-watcher.service';
-import { LibraryRepository } from './library.repository';
 import type { BulkRenameBookData } from '../file-write/bulk-rename.repository';
 import { BulkRenameRepository } from '../file-write/bulk-rename.repository';
-import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
+import { findSiblingOccupiedTarget, resolveBookFileTargets } from '../file-write/book-file-targets';
 
 const CACHE_TTL_MS = 60_000;
 
 interface CachedPreview {
   items: BulkRenamePreviewItem[];
   totalByStatus: Record<BulkRenameStatus, number>;
+  pattern: string;
   createdAt: number;
 }
 
 interface BulkRenameStreamOptions {
   onProgress: (event: BulkRenameProgressEvent) => void;
   isCancelled: () => boolean;
+  /** Books the reviewer skipped. Ids outside the candidate set are simply not present. */
+  excludeBookIds?: number[];
+  /** Books the reviewer picked, when the selection started empty. Mutually exclusive with the above. */
+  includeBookIds?: number[];
 }
 
 interface BulkRenameSummary {
@@ -48,10 +51,15 @@ export class BulkRenameService {
     private readonly appSettings: AppSettingsService,
     private readonly notificationService: NotificationService,
     private readonly fileWatcherService: FileWatcherService,
-    private readonly libraryRepo: LibraryRepository,
   ) {}
 
-  async getPreview(libraryId: number, page: number, pageSize: number, statusFilter?: BulkRenameStatus): Promise<BulkRenamePreviewPage> {
+  async getPreview(
+    libraryId: number,
+    page: number,
+    pageSize: number,
+    statusFilter?: BulkRenameStatus,
+    search?: string,
+  ): Promise<BulkRenamePreviewPage> {
     const cached = this.previewCache.get(libraryId);
     const now = Date.now();
 
@@ -63,7 +71,10 @@ export class BulkRenameService {
       this.previewCache.set(libraryId, preview);
     }
 
-    const filtered = statusFilter ? preview.items.filter((item) => item.status === statusFilter) : preview.items;
+    const statusMatched = statusFilter ? preview.items.filter((item) => item.status === statusFilter) : preview.items;
+    // Searching the whole candidate set, not the requested page, is the point: a library can hold
+    // tens of thousands of books and the client only ever holds the pages it has scrolled to.
+    const filtered = this.applySearch(statusMatched, search);
 
     const start = (page - 1) * pageSize;
     const items = filtered.slice(start, start + pageSize);
@@ -72,7 +83,14 @@ export class BulkRenameService {
       items,
       total: filtered.length,
       totalByStatus: preview.totalByStatus,
+      pattern: preview.pattern,
     };
+  }
+
+  private applySearch(items: BulkRenamePreviewItem[], search?: string): BulkRenamePreviewItem[] {
+    const query = search?.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => item.title.toLowerCase().includes(query) || item.currentPath.toLowerCase().includes(query));
   }
 
   async execute(libraryId: number, userId: number, options: BulkRenameStreamOptions): Promise<BulkRenameSummary> {
@@ -90,23 +108,38 @@ export class BulkRenameService {
     }
 
     this.runningLibraries.add(libraryId);
-    this.previewCache.delete(libraryId);
 
-    const preview = await this.computeFullPreview(libraryId);
-    const bookIds = preview.items.filter((item) => item.status === 'will_rename').map((item) => item.bookId);
-    this.logger.log(`[${event}] [start] libraryId=${libraryId} userId=${userId} candidateCount=${bookIds.length} - bulk rename started`);
+    let bookIds: number[];
+    try {
+      this.previewCache.delete(libraryId);
 
-    let watcherWasStopped = false;
-    if (settings.watch) {
-      await this.fileWatcherService.stopWatcher(libraryId);
-      watcherWasStopped = true;
+      const preview = await this.computeFullPreview(libraryId);
+      const candidates = preview.items.filter((item) => item.status === 'will_rename').map((item) => item.bookId);
+      // Either selection only ever narrows the candidate set; a book the preview held back stays held back.
+      bookIds = this.narrowCandidates(candidates, options);
+      this.logger.log(
+        `[${event}] [start] libraryId=${libraryId} userId=${userId} candidateCount=${candidates.length} excludedCount=${candidates.length - bookIds.length} - bulk rename started`,
+      );
+
+      // Flushes the response headers before the watcher teardown and the first rename, so the
+      // client shows the real total instead of an idle request.
+      options.onProgress({ started: true, total: bookIds.length });
+    } catch (err) {
+      // Nothing has moved yet, so the library is free again the moment preparation fails.
+      this.runningLibraries.delete(libraryId);
+      throw err;
     }
 
+    let watcherWasPaused = false;
     let succeeded = 0;
     let failed = 0;
     let skipped = 0;
 
     try {
+      if (settings.watch) {
+        watcherWasPaused = this.fileWatcherService.pauseWatcher(libraryId);
+      }
+
       for (const bookId of bookIds) {
         if (options.isCancelled()) break;
 
@@ -152,15 +185,11 @@ export class BulkRenameService {
       await this.notifyFailure(userId, libraryId, getErrorMessage(err));
       throw err;
     } finally {
+      // Resuming re-arms the existing watcher, so it costs nothing and cannot hold back the
+      // completion event. Anything the watcher saw during the run is intentionally discarded:
+      // every change was ours, and the database already records it.
+      if (watcherWasPaused) this.fileWatcherService.resumeWatcher(libraryId);
       this.runningLibraries.delete(libraryId);
-
-      if (watcherWasStopped) {
-        const folders = await this.libraryRepo.findFoldersByLibrary(libraryId);
-        await this.fileWatcherService.startWatcher(
-          libraryId,
-          folders.map((f) => f.path),
-        );
-      }
     }
   }
 
@@ -170,6 +199,19 @@ export class BulkRenameService {
 
   invalidateCache(libraryId: number): void {
     this.previewCache.delete(libraryId);
+  }
+
+  /**
+   * Narrows the candidate list from whichever side the client stated. Ids that are not candidates
+   * are ignored rather than rejected, so a stale client selection cannot rename a held-back book.
+   */
+  private narrowCandidates(candidates: number[], options: BulkRenameStreamOptions): number[] {
+    if (options.includeBookIds) {
+      const included = new Set(options.includeBookIds);
+      return candidates.filter((id) => included.has(id));
+    }
+    const excluded = new Set(options.excludeBookIds ?? []);
+    return excluded.size ? candidates.filter((id) => !excluded.has(id)) : candidates;
   }
 
   private async computeFullPreview(libraryId: number): Promise<CachedPreview> {
@@ -243,7 +285,7 @@ export class BulkRenameService {
       totalByStatus[item.status]++;
     }
 
-    return { items: previewItems, totalByStatus, createdAt: Date.now() };
+    return { items: previewItems, totalByStatus, pattern: pattern ?? '', createdAt: Date.now() };
   }
 
   private computePreviewItem(book: BulkRenameBookData, pattern: string | null, sanitizeForCrossPlatform: boolean): BulkRenamePreviewItem {
@@ -260,29 +302,48 @@ export class BulkRenameService {
     }
 
     try {
-      const format = (book.format ?? extname(book.absolutePath).slice(1)).toLowerCase();
-      const originalStem = basename(book.absolutePath, extname(book.absolutePath));
-      const tokens = buildPatternTokens({
+      // Fall back to the primary file alone when a book somehow has no file rows, so the preview
+      // still resolves rather than silently reporting every book as unchanged.
+      const files =
+        book.files.length > 0
+          ? book.files
+          : [{ id: book.primaryFileId, absolutePath: book.absolutePath, format: book.format, role: 'content', sortOrder: null }];
+
+      const targets = resolveBookFileTargets({
+        primaryFileId: book.primaryFileId,
+        files,
         metadata: book.metadata,
         authors: book.authors,
         narrators: book.narrators,
-        originalStem,
-        format,
         libraryName: book.libraryName,
+        libraryFolderPath: book.libraryFolderPath,
+        bookFolderPath: book.bookFolderPath,
+        organizationMode: book.organizationMode,
+        pattern,
+        sanitizeForCrossPlatform,
       });
-      const resolvedRelPath = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
-      if (!resolvedRelPath) {
+      const targetPath = targets.get(book.primaryFileId) ?? null;
+
+      if (!targetPath) {
         return { ...baseItem, status: 'no_pattern', reason: 'Pattern resolved to empty' };
       }
 
-      const newAbsolutePath = join(book.libraryFolderPath, resolvedRelPath);
-
-      if (newAbsolutePath === book.absolutePath) {
-        return { ...baseItem, newPath: newAbsolutePath, status: 'unchanged' };
+      if (targetPath === book.absolutePath) {
+        return { ...baseItem, newPath: targetPath, status: 'unchanged' };
       }
 
-      return { ...baseItem, newPath: newAbsolutePath, status: 'will_rename' };
+      const occupied = findSiblingOccupiedTarget(files, targets);
+      if (occupied) {
+        return {
+          ...baseItem,
+          newPath: targetPath,
+          status: 'collision',
+          reason: 'Renaming would overwrite another file in this book',
+        };
+      }
+
+      return { ...baseItem, newPath: targetPath, status: 'will_rename' };
     } catch (err) {
       return { ...baseItem, status: 'error', reason: getErrorMessage(err) };
     }

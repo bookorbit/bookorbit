@@ -231,6 +231,37 @@ describe('schedule() debounce', () => {
     expect(processSpy).toHaveBeenCalledWith('create', '/books/file.epub', 1);
   });
 
+  it("ignores a hidden entry below the library root - the write path's own temp file", async () => {
+    const { service } = makeService();
+    (service as any).subscriptions.set(1, []);
+    (service as any).watchedLibraryPaths.set(1, ['/books']);
+    const processSpy = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+
+    (service as any).schedule('create', '/books/Author/Book/.bookorbit-write-abc.mp3', 1);
+    (service as any).schedule('delete', '/books/Author/Book/.bookorbit-write-abc.mp3', 1);
+    (service as any).schedule('create', '/books/Author/.hidden/book.mp3', 1);
+    (service as any).schedule('create', '/books/Author/Book/.DS_Store', 1);
+
+    vi.runAllTimers();
+    await Promise.resolve();
+
+    expect(processSpy).not.toHaveBeenCalled();
+  });
+
+  it('still processes events under a library root that is itself hidden', async () => {
+    const { service } = makeService();
+    (service as any).subscriptions.set(1, []);
+    (service as any).watchedLibraryPaths.set(1, ['/mnt/.private/books']);
+    const processSpy = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+
+    (service as any).schedule('create', '/mnt/.private/books/Author/book.mp3', 1);
+
+    vi.runAllTimers();
+    await Promise.resolve();
+
+    expect(processSpy).toHaveBeenCalledWith('create', '/mnt/.private/books/Author/book.mp3', 1);
+  });
+
   it('does not debounce events for different paths', async () => {
     const { service } = makeService();
     (service as any).subscriptions.set(1, []);
@@ -486,4 +517,134 @@ describe('dir-level coalescing', () => {
 
     expect(processSpy).toHaveBeenCalledTimes(1);
   });
+});
+
+// ── pause / resume ────────────────────────────────────────────────────────────
+
+// Bulk rename and book move stop the watcher only so it will not react to their own writes. They
+// used to do that with stopWatcher, whose close() releases one operating system handle per watched
+// directory: 9.5s of blocking work across 944 directories on a real library, before a single file
+// moved, and then a full re-walk to rebuild it. Event delivery is gated on library membership in
+// `subscriptions`, so dropping the entry gives the same isolation at no cost.
+describe('pauseWatcher() / resumeWatcher()', () => {
+  it('drops events while paused and delivers them again after resuming', async () => {
+    const { service } = makeService();
+    (service as any).subscriptions.set(1, []);
+    const processSpy = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+
+    expect(service.pauseWatcher(1)).toBe(true);
+
+    (service as any).schedule('create', '/books/during-pause.epub', 1);
+    vi.runAllTimers();
+    await Promise.resolve();
+    expect(processSpy).not.toHaveBeenCalled();
+
+    expect(service.resumeWatcher(1)).toBe(true);
+
+    (service as any).schedule('create', '/books/after-resume.epub', 1);
+    vi.runAllTimers();
+    await Promise.resolve();
+    expect(processSpy).toHaveBeenCalledTimes(1);
+    expect(processSpy).toHaveBeenCalledWith('create', '/books/after-resume.epub', 1);
+  });
+
+  it('discards events that were already pending when the pause began', async () => {
+    const { service } = makeService();
+    (service as any).subscriptions.set(1, []);
+    const processSpy = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+
+    (service as any).schedule('create', '/books/inflight.epub', 1);
+    service.pauseWatcher(1);
+    service.resumeWatcher(1);
+
+    vi.runAllTimers();
+    await Promise.resolve();
+
+    expect(processSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps the watcher instance rather than closing it', () => {
+    const { service } = makeService();
+    const close = vi.fn().mockResolvedValue(undefined);
+    const sub = { close } as any;
+    (service as any).subscriptions.set(1, [sub]);
+
+    service.pauseWatcher(1);
+
+    // Closing is the blocking work this whole change exists to avoid.
+    expect(close).not.toHaveBeenCalled();
+    expect((service as any).pausedWatchers.get(1)).toEqual([sub]);
+
+    service.resumeWatcher(1);
+
+    expect(close).not.toHaveBeenCalled();
+    expect((service as any).subscriptions.get(1)).toEqual([sub]);
+    expect((service as any).pausedWatchers.has(1)).toBe(false);
+  });
+
+  it('reports when there was no live watcher to pause', () => {
+    const { service } = makeService();
+
+    expect(service.pauseWatcher(7)).toBe(false);
+    expect(service.resumeWatcher(7)).toBe(false);
+  });
+
+  it('closes a paused watcher when the library is stopped outright', async () => {
+    const { service } = makeService();
+    const close = vi.fn().mockResolvedValue(undefined);
+    (service as any).subscriptions.set(1, [{ close } as any]);
+
+    service.pauseWatcher(1);
+    await service.stopWatcher(1);
+
+    // A paused watcher still owns handles, so a real stop must release them.
+    expect(close).toHaveBeenCalledTimes(1);
+    expect((service as any).pausedWatchers.has(1)).toBe(false);
+  });
+
+  it('closes a paused watcher on shutdown', async () => {
+    const { service } = makeService();
+    const close = vi.fn().mockResolvedValue(undefined);
+    (service as any).subscriptions.set(1, [{ close } as any]);
+
+    service.pauseWatcher(1);
+    await service.onModuleDestroy();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A real chokidar watcher over a real directory, because the whole fix rests on the claim that a
+// paused watcher delivers nothing and a resumed one delivers again.
+describe('pauseWatcher() against a real filesystem', () => {
+  it('ignores a file created while paused and sees one created after resuming', async () => {
+    vi.useRealTimers();
+    const { writeFile } = await import('fs/promises');
+    const dir = await mkdtemp(join(tmpdir(), 'bookorbit-watcher-'));
+    const { service } = makeService();
+    const processSpy = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+
+    const settle = () => new Promise((resolve) => setTimeout(resolve, WATCHER_DEBOUNCE_MS * 4));
+
+    try {
+      await service.startWatcher(1, [dir]);
+
+      service.pauseWatcher(1);
+      await writeFile(join(dir, 'while-paused.epub'), 'x');
+      await settle();
+      expect(processSpy).not.toHaveBeenCalled();
+
+      service.resumeWatcher(1);
+      await writeFile(join(dir, 'after-resume.epub'), 'x');
+      await settle();
+
+      const seen = processSpy.mock.calls.map((call) => call[1]);
+      expect(seen).toContain(join(dir, 'after-resume.epub'));
+      expect(seen).not.toContain(join(dir, 'while-paused.epub'));
+    } finally {
+      await service.onModuleDestroy();
+      await rm(dir, { recursive: true, force: true });
+      vi.useFakeTimers();
+    }
+  }, 20000);
 });

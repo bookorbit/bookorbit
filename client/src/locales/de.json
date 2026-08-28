@@ -6499,60 +6499,6 @@
       "languages": "Sprachen",
       "series": "Reihen"
     },
-    "bulkRename": {
-      "library": "Bibliothek",
-      "selectLibraryPlaceholder": "Bibliothek auswählen...",
-      "noEligibleLibraries": "Für keine Bibliothek ist das Umbenennen von Dateien aktiviert. Aktivieren Sie es in den Bibliothekseinstellungen.",
-      "refresh": "Aktualisieren",
-      "applyRename": "Umbenennung anwenden",
-      "showFullPaths": "Vollständige Pfade anzeigen",
-      "columnsMenu": "Spalten",
-      "renamingInProgress": "Dateien werden umbenannt - Sie können jederzeit abbrechen.",
-      "executionFailed": "Massenumbenennung fehlgeschlagen",
-      "previewFailed": "Vorschau konnte nicht geladen werden",
-      "noBooksMatch": "Keine Bücher gefunden, die dem aktuellen Filter entsprechen.",
-      "openBookDetails": "Buchdetails öffnen",
-      "columns": {
-        "title": "Titel",
-        "currentPath": "Aktueller Pfad",
-        "newPath": "Neuer Pfad",
-        "status": "Status"
-      },
-      "status": {
-        "willRename": "Wird umbenannt",
-        "unchanged": "Unverändert",
-        "collision": "Konflikt",
-        "noPattern": "Kein Muster",
-        "error": "Fehler"
-      },
-      "filter": {
-        "all": "Alle"
-      },
-      "summary": {
-        "label": "Zusammenfassung",
-        "toRename": "{count} zum Umbenennen",
-        "unchanged": "{count} unverändert",
-        "collisions": "{count, plural, =0 {# Konflikt} one {# Konflikt} other {# Konflikte}}",
-        "errors": "{count, plural, =0 {# Fehler} one {# Fehler} other {# Fehler}}"
-      },
-      "empty": {
-        "title": "Bibliothek zum Starten auswählen",
-        "description": "Wählen Sie oben eine Bibliothek aus, um Umbenennungsänderungen in der Vorschau anzuzeigen, nach Status zu filtern und den Massenumbenennungslauf anzuwenden.",
-        "chooseLibrary": "Bibliothek wählen"
-      },
-      "completed": {
-        "title": "Massenumbenennung abgeschlossen",
-        "stats": "{succeeded} umbenannt, {failed} fehlgeschlagen, {skipped} übersprungen ({processed} insgesamt)"
-      },
-      "pagination": {
-        "showing": "Zeige {from}-{to} von {total}"
-      },
-      "confirmDialog": {
-        "title": "Massenumbenennung bestätigen",
-        "body": "{count, plural, =0 {Dadurch werden # Bücher auf dem Datenträger umbenannt. Dateien mit Konflikten oder Fehlern werden übersprungen. Diese Aktion kann nicht rückgängig gemacht werden.} one {Dadurch wird # Buch auf dem Datenträger umbenannt. Dateien mit Konflikten oder Fehlern werden übersprungen. Diese Aktion kann nicht rückgängig gemacht werden.} other {Dadurch werden # Bücher auf der Festplatte umbenannt. Dateien mit Konflikten oder Fehlern werden übersprungen. Diese Aktion kann nicht rückgängig gemacht werden.}}",
-        "renameButton": "{count, plural, =0 {# Buch umbenennen} one {# Buch umbenennen} other {# Bücher umbenennen}}"
-      }
-    },
     "bookDuplicates": {
       "scanSettings": "Scan-Einstellungen",
       "title": "Doppelte Bücher",
@@ -6710,6 +6656,22 @@
       "mergeModal": {
         "title": "Entitäten zusammenführen",
         "description": "Wählen Sie, welche Entität behalten werden soll. Die anderen werden in sie zusammengeführt und entfernt."
+      }
+    },
+    "bulkRename": {
+      "library": "Bibliothek",
+      "selectLibraryPlaceholder": "Bibliothek auswählen...",
+      "noEligibleLibraries": "Für keine Bibliothek ist das Umbenennen von Dateien aktiviert. Aktivieren Sie es in den Bibliothekseinstellungen.",
+      "refresh": "Aktualisieren",
+      "previewFailed": "Vorschau konnte nicht geladen werden",
+      "executionFailed": "Massenumbenennung fehlgeschlagen",
+      "openBookDetails": "Buchdetails öffnen",
+      "filter": {
+        "all": "Alle"
+      },
+      "status": {
+        "unchanged": "Unverändert",
+        "error": "Fehler"
       }
     }
   },

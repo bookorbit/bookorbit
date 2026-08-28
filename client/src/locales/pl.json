@@ -6258,62 +6258,6 @@
       "languages": "Języki",
       "series": "Seria"
     },
-    "bulkRename": {
-      "previewToolbar": "Zmień nazwę podglądu",
-      "renameSettings": "Zmień nazwę ustawień",
-      "library": "Biblioteka",
-      "selectLibraryPlaceholder": "Wybierz bibliotekę...",
-      "noEligibleLibraries": "Żadna biblioteka nie ma włączonej zmiany nazwy pliku. Włącz tę opcję w Ustawieniach biblioteki.",
-      "refresh": "Odśwież",
-      "applyRename": "Zastosuj Zmień nazwę",
-      "showFullPaths": "Pokaż pełne ścieżki",
-      "columnsMenu": "Kolumny",
-      "renamingInProgress": "Zmiana nazwy plików - możesz w każdej chwili zrezygnować.",
-      "executionFailed": "Zbiorcza zmiana nazwy nie powiodła się",
-      "previewFailed": "Nie udało się załadować podglądu",
-      "noBooksMatch": "Nie znaleziono książek pasujących do bieżącego filtra.",
-      "openBookDetails": "Otwórz szczegóły książki",
-      "columns": {
-        "title": "Tytuł",
-        "currentPath": "Aktualna ścieżka",
-        "newPath": "Nowa ścieżka",
-        "status": "Stan"
-      },
-      "status": {
-        "willRename": "Zmieni nazwę",
-        "unchanged": "Niezmienione",
-        "collision": "Kolizja",
-        "noPattern": "Brak wzoru",
-        "error": "Błąd"
-      },
-      "filter": {
-        "all": "Wszystko"
-      },
-      "summary": {
-        "label": "Podsumowanie",
-        "toRename": "{count}, aby zmienić nazwę",
-        "unchanged": "{count} bez zmian",
-        "collisions": "{count, plural, =0 {# kolizja} one {# kolizja} other {# kolizje} few {# kolizje} many {# kolizji}}",
-        "errors": "{count, plural, =0 {# błąd} one {# błąd} other {# błędy} few {# błędy} many {# błędów}}"
-      },
-      "empty": {
-        "title": "Wybierz bibliotekę, aby rozpocząć",
-        "description": "Wybierz bibliotekę powyżej, aby wyświetlić podgląd zmian zmiany nazwy, filtrować według stanu i zastosować zbiorczą zmianę nazwy.",
-        "chooseLibrary": "Wybierz Bibliotekę"
-      },
-      "completed": {
-        "title": "Zbiorcza zmiana nazwy zakończona",
-        "stats": "{succeeded} zmieniono nazwę, {failed} nie powiodło się, {skipped} pominięto (łącznie {processed})"
-      },
-      "pagination": {
-        "showing": "Wyświetlanie {from}-{to} z {total}"
-      },
-      "confirmDialog": {
-        "title": "Potwierdź zbiorczą zmianę nazwy",
-        "body": "{count, plural, =0 {Spowoduje to zmianę nazw # książek na dysku. Pliki z kolizjami lub błędami zostaną pominięte. Tej akcji nie można cofnąć.} one {Spowoduje to zmianę nazwy # książki na dysku. Pliki z kolizjami lub błędami zostaną pominięte. Tej akcji nie można cofnąć.} other {Spowoduje to zmianę nazwy # książki na dysku. Pliki z kolizjami lub błędami zostaną pominięte. Tej akcji nie można cofnąć.} few {Spowoduje to zmianę nazw # książek na dysku. Pliki z kolizjami lub błędami zostaną pominięte. Tej akcji nie można cofnąć.} many {Spowoduje to zmianę nazw # książek na dysku. Pliki z kolizjami lub błędami zostaną pominięte. Tej akcji nie można cofnąć.}}",
-        "renameButton": "{count, plural, =0 {Zmień nazwy # książek} one {Zmień nazwę # książki} other {Zmień nazwę # książki} few {Zmień nazwy # książek} many {Zmień nazwy # książek}}"
-      }
-    },
     "bookDuplicates": {
       "scanSettings": "Ustawienia skanowania",
       "title": "Duplikaty książek",
@@ -6488,6 +6432,22 @@
       "mergeModal": {
         "title": "Połącz podmioty",
         "description": "Wybierz, który element chcesz zachować. Pozostałe zostaną z nim połączone i usunięte."
+      }
+    },
+    "bulkRename": {
+      "library": "Biblioteka",
+      "selectLibraryPlaceholder": "Wybierz bibliotekę...",
+      "noEligibleLibraries": "Żadna biblioteka nie ma włączonej zmiany nazwy pliku. Włącz tę opcję w Ustawieniach biblioteki.",
+      "refresh": "Odśwież",
+      "previewFailed": "Nie udało się załadować podglądu",
+      "executionFailed": "Zbiorcza zmiana nazwy nie powiodła się",
+      "openBookDetails": "Otwórz szczegóły książki",
+      "filter": {
+        "all": "Wszystko"
+      },
+      "status": {
+        "unchanged": "Niezmienione",
+        "error": "Błąd"
       }
     }
   },
