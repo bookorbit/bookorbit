@@ -6874,6 +6874,30 @@
       "languages": "语文",
       "series": "系列"
     },
+    "bulkRename": {
+      "library": "书库",
+      "selectLibraryPlaceholder": "请选择书库…",
+      "noEligibleLibraries": "没有启用文件重命名的库。请在书库设置中启用它。",
+      "refresh": "刷新",
+      "previewFailed": "加载预览失败",
+      "executionFailed": "批量重命名失败",
+      "openBookDetails": "打开书的详细信息",
+      "filter": {
+        "all": "所有的"
+      },
+      "status": {
+        "willRename": "将重命名为",
+        "unchanged": "未更改",
+        "collision": "碰撞模式",
+        "noPattern": "没有图案",
+        "error": "错误"
+      },
+      "empty": {
+        "title": "选择要开始的库",
+        "description": "选择上面的库来预览更改，按状态筛选，并应用批量重命名运行。",
+        "chooseLibrary": "选择书库"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "扫描设置",
       "title": "复制书",
@@ -7048,22 +7072,6 @@
       "mergeModal": {
         "title": "合并实体",
         "description": "选择要保留的实体。其他实体将被合并并删除。"
-      }
-    },
-    "bulkRename": {
-      "library": "书库",
-      "selectLibraryPlaceholder": "请选择书库…",
-      "noEligibleLibraries": "没有启用文件重命名的库。请在书库设置中启用它。",
-      "refresh": "刷新",
-      "previewFailed": "加载预览失败",
-      "executionFailed": "批量重命名失败",
-      "openBookDetails": "打开书的详细信息",
-      "filter": {
-        "all": "所有的"
-      },
-      "status": {
-        "unchanged": "未更改",
-        "error": "错误"
       }
     }
   },

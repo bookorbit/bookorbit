@@ -6279,6 +6279,30 @@
       "languages": "Jazyky",
       "series": "Série"
     },
+    "bulkRename": {
+      "library": "Knihovna",
+      "selectLibraryPlaceholder": "Vyberte knihovnu...",
+      "noEligibleLibraries": "Žádné knihovny nemají povoleno přejmenování souboru. Povolte jej v nastavení knihovny.",
+      "refresh": "Aktualizovat",
+      "previewFailed": "Nepodařilo se načíst náhled",
+      "executionFailed": "Hromadné přejmenování se nezdařilo",
+      "openBookDetails": "Otevřít detaily knihy",
+      "filter": {
+        "all": "Vše"
+      },
+      "status": {
+        "willRename": "Přejmenovat",
+        "unchanged": "Nezměněno",
+        "collision": "Kolize",
+        "noPattern": "Žádné gesto",
+        "error": "Chyba"
+      },
+      "empty": {
+        "title": "Vyberte knihovnu pro spuštění",
+        "description": "Vyberte knihovnu výše pro zobrazení změn v náhledu, filtr podle stavu a použijte hromadný běh přejmenování.",
+        "chooseLibrary": "Vybrat knihovnu"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Nastavení skenování",
       "title": "Duplikovat knihy",
@@ -6453,22 +6477,6 @@
       "mergeModal": {
         "title": "Sloučit entity",
         "description": "Vyberte, která entita má být zachována. Ostatní budou sloučeny a odstraněny."
-      }
-    },
-    "bulkRename": {
-      "library": "Knihovna",
-      "selectLibraryPlaceholder": "Vyberte knihovnu...",
-      "noEligibleLibraries": "Žádné knihovny nemají povoleno přejmenování souboru. Povolte jej v nastavení knihovny.",
-      "refresh": "Aktualizovat",
-      "previewFailed": "Nepodařilo se načíst náhled",
-      "executionFailed": "Hromadné přejmenování se nezdařilo",
-      "openBookDetails": "Otevřít detaily knihy",
-      "filter": {
-        "all": "Vše"
-      },
-      "status": {
-        "unchanged": "Nezměněno",
-        "error": "Chyba"
       }
     }
   },

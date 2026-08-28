@@ -6195,6 +6195,30 @@
       "languages": "Kielet",
       "series": "Sarja"
     },
+    "bulkRename": {
+      "library": "Kirjasto",
+      "selectLibraryPlaceholder": "Valitse kirjasto...",
+      "noEligibleLibraries": "Yhtään kirjastoa ei ole nimetty uudelleen päällä. Ota se käyttöön kirjastojen asetuksista.",
+      "refresh": "Päivitä",
+      "previewFailed": "Esikatselun lataaminen epäonnistui",
+      "executionFailed": "Bulkin uudelleennimeäminen epäonnistui",
+      "openBookDetails": "Avaa kirjan tiedot",
+      "filter": {
+        "all": "Kaikki"
+      },
+      "status": {
+        "willRename": "Uudelleennimeä",
+        "unchanged": "Muuttumaton",
+        "collision": "Törmäys",
+        "noPattern": "Ei Kuvio",
+        "error": "Virhe"
+      },
+      "empty": {
+        "title": "Valitse kirjasto aloittaaksesi",
+        "description": "Valitse yllä oleva kirjasto, jos haluat esikatsella uudelleennimeä muutoksia, suodattaa statuksen mukaan ja käyttää suoritettua massaa.",
+        "chooseLibrary": "Valitse Kirjasto"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Skannaa asetukset",
       "title": "Monista Kirjat",
@@ -6364,22 +6388,6 @@
       "mergeModal": {
         "title": "Yhdistä Yksiköt",
         "description": "Valitse mikä entiteetti pitää. Muut yhdistetään siihen ja poistetaan."
-      }
-    },
-    "bulkRename": {
-      "library": "Kirjasto",
-      "selectLibraryPlaceholder": "Valitse kirjasto...",
-      "noEligibleLibraries": "Yhtään kirjastoa ei ole nimetty uudelleen päällä. Ota se käyttöön kirjastojen asetuksista.",
-      "refresh": "Päivitä",
-      "previewFailed": "Esikatselun lataaminen epäonnistui",
-      "executionFailed": "Bulkin uudelleennimeäminen epäonnistui",
-      "openBookDetails": "Avaa kirjan tiedot",
-      "filter": {
-        "all": "Kaikki"
-      },
-      "status": {
-        "unchanged": "Muuttumaton",
-        "error": "Virhe"
       }
     }
   },

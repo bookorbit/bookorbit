@@ -3991,7 +3991,13 @@
       "action": "Télécharger",
       "audiobookZip": "Livre audio (ZIP)",
       "allFormatsZip": "Tous formats (ZIP)",
-      "primaryOnlyZip": "Principal uniquement (ZIP)"
+      "primaryOnlyZip": "Principal uniquement (ZIP)",
+      "preparing": "Préparation du téléchargement...",
+      "preparingExport": "Préparation de {count, plural, one {# livre} other {# livres} many {# livres}} pour le téléchargement...",
+      "progressPercent": "Téléchargement : {percent} sur {total}",
+      "progressBytes": "Téléchargement : {transferred}",
+      "failed": "Échec du téléchargement",
+      "exportFailed": "Échec de l'export"
     },
     "sort": {
       "moveUp": "Monter",
@@ -4048,6 +4054,7 @@
         "collection": "Collection",
         "library": "Bibliothèque",
         "format": "Format",
+        "fileSize": "Taille du fichier principal",
         "addedAt": "Date d'ajout",
         "startedAt": "Date de début",
         "finishedAt": "Date de fin",
@@ -4106,7 +4113,8 @@
       "unit": {
         "days": "jours",
         "weeks": "semaines",
-        "months": "mois"
+        "months": "mois",
+        "megabytes": "Mo"
       },
       "scorePreset": {
         "outstanding": "Excellent",
@@ -4115,6 +4123,9 @@
         "poor": "Faible"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "par ex. 10",
+      "fileSizeValueAria": "Taille du fichier principal en mégaoctets",
+      "fileSizeMaximumAria": "Taille maximale du fichier principal en mégaoctets",
       "valuePlaceholder": "valeur",
       "maxPlaceholder": "maximum",
       "to": "à",
@@ -4659,6 +4670,32 @@
       },
       "files": {
         "title": "Fichiers de livres",
+        "stats": {
+          "files": "Fichiers",
+          "total": "Total",
+          "runtime": "Durée",
+          "formats": "Formats"
+        },
+        "filesHeading": "Fichiers",
+        "allPresent": "Complet",
+        "groupedByReader": "regroupés par lecteur",
+        "thisFile": "Ce fichier",
+        "writeBackShort": "Réécriture",
+        "fieldsSet": "{filled} / {total} définis",
+        "writtenSummary": "{fields} et {count, plural, one {# autre champ} other {# autres champs} many {# autres champs}} sont écrits dans le {format}.",
+        "writtenSummaryAll": "{fields} sont écrits dans le {format}.",
+        "writtenNothing": "Aucun des {total} champs modifiables n'a encore de valeur.",
+        "writeBackOff": "La réécriture est désactivée pour ce livre.",
+        "editMetadata": "Modifier les métadonnées",
+        "showAllTracks": "Tout afficher",
+        "collapseTracks": "Réduire",
+        "moreTracks": "{count, plural, one {# piste de plus} other {# pistes de plus} many {# pistes de plus}}",
+        "tracksRolled": "{count, plural, one {# piste} other {# pistes} many {# pistes}}",
+        "fileDetails": "Détails du fichier",
+        "openDetails": "Ouvrir les détails du fichier",
+        "closeDetails": "Fermer les détails du fichier",
+        "trackFrom": "Piste {track} sur {total}, à partir de {time}",
+        "throughCopy": "{percent} de ce fichier",
         "fileCount": "{count, plural, =0 {pas de fichiers} one {# fichier} other {# fichiers} many {# fichiers}}",
         "synced": "Synchronisé {time}",
         "sortAria": "Trier les fichiers",
@@ -5647,6 +5684,8 @@
     }
   },
   "collection": {
+    "visibleToAll": "Visible pour tous les utilisateurs",
+    "visibleToAllHint": "Tous les utilisateurs peuvent voir cette collection, mais vous seul pouvez modifier ses livres",
     "dialog": {
       "name": "Nom",
       "icon": "Icône",
@@ -5726,7 +5765,7 @@
       "whatsNew": "Quoi de neuf",
       "documentation": "Documentation",
       "help": "Aide",
-      "starOnGithub": "Étoile sur GitHub",
+      "starOnGithub": "Mettez une étoile sur GitHub",
       "new": "Nouveau",
       "newReleaseNotes": "Nouvelles notes de version disponibles",
       "account": "Compte",
@@ -5860,7 +5899,8 @@
       },
       "viewModes": {
         "grid": "Vue en grille",
-        "list": "Vue en liste"
+        "list": "Vue en liste",
+        "table": "Vue en tableau"
       }
     },
     "iconPicker": {
@@ -7568,7 +7608,10 @@
       "ownedOfExpected": "{owned} de {expected} dans la bibliothèque"
     },
     "gaps": {
-      "label": "Lacunes possibles :"
+      "label": "Lacunes possibles :",
+      "missingCount": "{count, plural, one {# manquant} other {# manquants} many {# manquants}}",
+      "missingList": "Manquants : {list}",
+      "previewMore": "{shown} +{count}"
     },
     "filters": {
       "title": "Filtres de série",
@@ -7598,7 +7641,10 @@
         "bookCount": "Nombre de livres",
         "recentAdditions": "Ajouts récents",
         "readingProgress": "Progrès en lecture"
-      }
+      },
+      "clearSearch": "Effacer la recherche",
+      "noMatchHint": "Essayez une autre bibliothèque, ou effacez les filtres actifs.",
+      "emptyHint": "Les séries apparaissent dès que vos livres portent des métadonnées de série."
     },
     "detail": {
       "pageTitle": "Série",
@@ -7639,6 +7685,66 @@
         "ascending": "Ascendant",
         "descending": "Décroissant"
       }
+    },
+    "authorsPlus": "{authors} +{count}",
+    "track": {
+      "readCount": "{count, plural, one {# lu} other {# lus} many {# lus}}",
+      "readingCount": "{count, plural, one {# en cours} other {# en cours} many {# en cours}}",
+      "unreadCount": "{count, plural, one {# non lu} other {# non lus} many {# non lus}}",
+      "missingCount": "{count, plural, one {# manquant} other {# manquants} many {# manquants}}",
+      "slotMissing": "{number} absent de la bibliothèque",
+      "untitled": "Sans titre"
+    },
+    "legend": {
+      "read": "Lu",
+      "reading": "En cours",
+      "unread": "En bibliothèque",
+      "missing": "Manquant"
+    },
+    "status": {
+      "label": "Filtrer les séries par statut de lecture",
+      "all": "Toutes",
+      "reading": "En cours",
+      "unread": "Non commencées",
+      "complete": "Complètes",
+      "gaps": "Trous",
+      "read": "Lue",
+      "inProgress": "En cours",
+      "hasGaps": "Avec des trous",
+      "notStarted": "Non commencées"
+    },
+    "index": {
+      "columnSeries": "Série",
+      "columnVolumes": "Volumes",
+      "columnRead": "Lus",
+      "columnNext": "À suivre",
+      "columnAdded": "Ajout",
+      "percent": "{value} %",
+      "captionReading": "{base} · {count, plural, one {# en cours} other {# en cours} many {# en cours}}",
+      "finished": "Lue de bout en bout",
+      "reading": "En cours",
+      "next": "Suivant",
+      "start": "Commencer"
+    },
+    "grouping": {
+      "label": "Grouper par",
+      "none": "Aucun regroupement",
+      "letter": "Par lettre",
+      "library": "Par bibliothèque",
+      "status": "Par statut"
+    },
+    "libraries": {
+      "more": "+{count}"
+    },
+    "card": {
+      "oneVolume": "Un volume",
+      "oneVolumeShort": "1 vol",
+      "volumeCount": "{count, plural, one {# volume} other {# volumes} many {# volumes}}",
+      "readSummary": "{base} · {read} lus",
+      "publishedOf": "{owned} sur {total} parus",
+      "complete": "Complète",
+      "moreVolumes": "{count, plural, one {# volume de plus} other {# volumes de plus} many {# volumes de plus}}",
+      "label": "{name}, {read} volumes lus sur {total}"
     }
   },
   "smartScope": {
@@ -7884,6 +7990,135 @@
       "languages": "Langues",
       "series": "Série"
     },
+    "bulkRename": {
+      "library": "Bibliothèque",
+      "selectLibraryPlaceholder": "Sélectionnez une bibliothèque...",
+      "noEligibleLibraries": "Aucune bibliothèque n'a activé le changement de nom de fichier. Activez-le dans les paramètres de la bibliothèque.",
+      "refresh": "Actualiser",
+      "previewFailed": "Échec du chargement de l'aperçu",
+      "executionFailed": "Échec du changement de nom groupé",
+      "openBookDetails": "Détails du livre ouvert",
+      "openBook": "Ouvrir le livre",
+      "toRenameCount": "{count, plural, =0 {rien à renommer} one {# à renommer} other {# à renommer} many {# à renommer}}",
+      "applyCount": "{count, plural, one {Appliquer # renommage} other {Appliquer # renommages} many {Appliquer # renommages}}",
+      "search": {
+        "placeholder": "Rechercher un livre ou un chemin",
+        "label": "Rechercher un livre",
+        "clear": "Effacer la recherche"
+      },
+      "filter": {
+        "all": "Tout",
+        "changes": "Modifications",
+        "conflicts": "Conflits",
+        "unchanged": "Inchangés"
+      },
+      "status": {
+        "willRename": "Renommera",
+        "unchanged": "Inchangé",
+        "collision": "Collision",
+        "noPattern": "Aucun modèle",
+        "error": "Erreur"
+      },
+      "group": {
+        "collision": "Conflit de destination",
+        "unchanged": "Déjà correct",
+        "noPattern": "Aucun modèle de nommage",
+        "error": "En erreur",
+        "includeAll": "Inclure tous les renommages « {kind} »",
+        "expand": "Développer « {kind} »",
+        "collapse": "Réduire « {kind} »",
+        "heldBack": "Ces éléments ne peuvent pas être renommés"
+      },
+      "changeKind": {
+        "ungroup": "Regroupement de série supprimé",
+        "flatten": "Niveau de dossier redondant supprimé",
+        "yearRemoved": "Année de publication supprimée",
+        "yearAdded": "Année de publication ajoutée",
+        "yearCorrected": "Année de publication corrigée",
+        "authorSpelling": "Orthographe du nom d'auteur",
+        "capitalisation": "Casse et espacement",
+        "unsafeCharacters": "Caractères interdits remplacés",
+        "filenameRebuilt": "Nom de fichier reconstruit à partir des métadonnées",
+        "folderRenamed": "Dossier renommé",
+        "rebuilt": "Dossier et nom de fichier reconstruits",
+        "restructured": "Chemin restructuré",
+        "multiple": "Modifications multiples"
+      },
+      "select": {
+        "ofSelected": "sur {total} sélectionnés",
+        "toggleAll": "Sélectionner ou désélectionner tous les renommages",
+        "toggleGroup": "Sélectionner ou désélectionner tous les renommages « {kind} »",
+        "toggleBook": "Renommer {title}"
+      },
+      "review": {
+        "loadMore": "Charger plus",
+        "queue": "Renommages en attente",
+        "position": "{index} sur {total}",
+        "previous": "Livre précédent",
+        "next": "Livre suivant",
+        "keyboardHint": "déplacer",
+        "keyboardSkip": "ignorer",
+        "skip": "Ignorer",
+        "include": "Inclure",
+        "excluded": "Exclu",
+        "back": "Retour à la liste"
+      },
+      "detail": {
+        "whatChanges": "Ce qui change",
+        "foldedFolders": "{count, plural, one {# dossier inchangé} other {# dossiers inchangés} many {# dossiers inchangés}}",
+        "onDisk": "Sur le disque",
+        "today": "Aujourd'hui",
+        "afterRename": "Après le renommage",
+        "showLibraryFolders": "Afficher les dossiers de la bibliothèque",
+        "hideLibraryFolders": "Masquer les dossiers de la bibliothèque",
+        "currentPath": "Chemin actuel",
+        "whyItMoves": "Pourquoi ce déplacement",
+        "levelTop": "Dossier principal",
+        "levelFolder": "Dossier {depth}",
+        "levelFilename": "Nom de fichier",
+        "levelRemoved": "Supprimé",
+        "tokenCount": "{count, plural, one {# jeton} other {# jetons} many {# jetons}}",
+        "optionalLevel": "Un niveau de dossier optionnel, produit par un groupe du modèle.",
+        "removedExplainer": "Le modèle de nommage ne prévoit aucun dossier à ce niveau : {folder} est donc supprimé et son contenu remonte d'un niveau.",
+        "conflictTitle": "Un autre fichier occupe déjà cette destination.",
+        "conflictBody": "Le renommage l'écraserait : ce livre est donc mis en attente jusqu'à la résolution du conflit.",
+        "siblings": "{count, plural, one {# autre avec la même modification} other {# autres avec la même modification} many {# autres avec la même modification}}",
+        "siblingsMore": "+{count} de plus"
+      },
+      "empty": {
+        "title": "Choisissez une bibliothèque pour commencer",
+        "description": "Sélectionnez une bibliothèque ci-dessus pour prévisualiser les modifications de renommage, filtrer par statut et appliquer l'exécution de renommage groupé.",
+        "chooseLibrary": "Choisir la bibliothèque",
+        "noneTitle": "Rien à passer en revue",
+        "noneDescription": "Aucun livre ne correspond au filtre actuel. Effacez la recherche ou passez à Tout.",
+        "noMatch": "Aucun livre ne correspond à votre recherche."
+      },
+      "confirmDialog": {
+        "willRename": "Seront renommés",
+        "skippedByYou": "Ignorés par vous",
+        "heldBack": "Mis en attente pour conflit",
+        "untouched": "Laissés inchangés",
+        "confirm": "{count, plural, one {Renommer # fichier} other {Renommer # fichiers} many {Renommer # fichiers}}",
+        "cannotRename": "Ne peuvent pas être renommés"
+      },
+      "run": {
+        "preparing": "Préparation...",
+        "preparingHint": "Vérification de chaque fichier par rapport au modèle de nommage avant tout déplacement.",
+        "title": "Renommage : {done} sur {total}",
+        "runningHint": "Les fichiers sont en cours de renommage. Vous pouvez arrêter une fois le fichier actuel terminé.",
+        "stop": "Arrêter après ce fichier",
+        "resultTitle": "{done, plural, one {# fichier renommé sur {total}} other {# fichiers renommés sur {total}} many {# fichiers renommés sur {total}}}",
+        "resultFailed": "{count, plural, one {# échec} other {# échecs} many {# échecs}}",
+        "resultSkipped": "{count, plural, one {# ignoré} other {# ignorés} many {# ignorés}}",
+        "dismiss": "Fermer"
+      },
+      "executionError": {
+        "http": "Le serveur a rejeté la requête (HTTP {status}).",
+        "noBody": "Le serveur n'a pas envoyé de corps de réponse.",
+        "incomplete": "La connexion s'est interrompue avant la fin du renommage. Il se peut que certains fichiers n'aient pas été renommés.",
+        "unknown": "Le renommage n'a pas pu être terminé."
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Paramètres de numérisation",
       "title": "Livres en double",
@@ -7979,7 +8214,8 @@
       },
       "actions": {
         "rename": "Renommer",
-        "split": "Diviser"
+        "split": "Diviser",
+        "merge": "Fusionner"
       },
       "duplicates": {
         "similarity": "Similitude :",
@@ -7999,7 +8235,20 @@
         "percentSimilar": "{percent} % de similarité",
         "pairDetails": "Détails de la paire",
         "dismissEntityTitle": "Ignorer toutes les paires pour cette entité",
-        "dismissPairTitle": "Rejeter cette paire"
+        "dismissPairTitle": "Rejeter cette paire",
+        "groupsLabel": "Groupes de doublons possibles",
+        "keepThisOne": "À conserver",
+        "mergeAway": "À fusionner",
+        "notAMatch": "Pas de correspondance",
+        "notAMatchTitle": "Ignorer tous les éléments de ce groupe",
+        "selectPromptTitle": "Sélectionnez un groupe à examiner",
+        "selectPromptDescription": "Choisissez un groupe dans la liste pour comparer ses entités côte à côte.",
+        "backToList": "Retour aux groupes",
+        "noBookTitles": "Aucun livre associé à cette fiche",
+        "thresholdLabel": "Similarité minimale",
+        "thresholdValue": "{percent} %+",
+        "willBeMerged": "{count, plural, one {# entité sera fusionnée et supprimée} other {# entités seront fusionnées et supprimées} many {# entités seront fusionnées et supprimées}}",
+        "chooseTargetHint": "Sélectionnez l'entité à conserver. Tout le reste du groupe sera fusionné avec elle."
       },
       "dismissed": {
         "loading": "Chargement des paires rejetées...",
@@ -8023,7 +8272,44 @@
           "nameDesc": "Nom Z-A",
           "fewestBooks": "Moins de livres",
           "mostBooks": "La plupart des livres"
-        }
+        },
+        "sortByLabel": "Trier par",
+        "entityTypeLabel": "Type d'entité",
+        "resultCount": "{count, plural, =0 {aucune entité} one {# entité} other {# entités} many {# entités}}",
+        "selectedCount": "{count, plural, one {# sélectionnée} other {# sélectionnées} many {# sélectionnées}}",
+        "columns": {
+          "name": "Nom",
+          "sortName": "Nom de tri",
+          "books": "Livres",
+          "status": "Statut",
+          "actions": "Actions"
+        },
+        "selectAllOnPage": "Sélectionner toutes les entités de cette page",
+        "selectEntity": "Sélectionner {name}",
+        "actionsFor": "Actions pour {name}",
+        "status": {
+          "noBooks": "Aucun livre"
+        },
+        "filters": {
+          "all": "Tout",
+          "noBooks": "Aucun livre"
+        },
+        "density": {
+          "label": "Hauteur des lignes",
+          "comfortable": "Confortable",
+          "compact": "Compact"
+        },
+        "rowsPerPage": "Lignes par page",
+        "range": "Affichage de {from} à {to} sur {total}",
+        "pagination": "Pagination",
+        "previousPage": "Page précédente",
+        "nextPage": "Page suivante",
+        "goToPage": "Aller à la page {page}",
+        "morePages": "Pages supplémentaires",
+        "noEntitiesDescription": "Rien n'a encore été ajouté à ce type d'entité.",
+        "noMatchesTitle": "Aucun résultat",
+        "noMatchesDescription": "Aucune entité ne correspond à votre recherche et à vos filtres actuels.",
+        "clearFilters": "Effacer les filtres"
       },
       "deleteMode": {
         "label": "Mode suppression",
@@ -8129,22 +8415,6 @@
         "sweep": "La vérification des couvertures a échoué.",
         "list": "Impossible de charger ces entrées.",
         "clean": "Échec du nettoyage."
-      }
-    },
-    "bulkRename": {
-      "library": "Bibliothèque",
-      "selectLibraryPlaceholder": "Sélectionnez une bibliothèque...",
-      "noEligibleLibraries": "Aucune bibliothèque n'a activé le changement de nom de fichier. Activez-le dans les paramètres de la bibliothèque.",
-      "refresh": "Actualiser",
-      "previewFailed": "Échec du chargement de l'aperçu",
-      "executionFailed": "Échec du changement de nom groupé",
-      "openBookDetails": "Détails du livre ouvert",
-      "filter": {
-        "all": "Tout"
-      },
-      "status": {
-        "unchanged": "Inchangé",
-        "error": "Erreur"
       }
     }
   },

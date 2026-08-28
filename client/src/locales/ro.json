@@ -6816,6 +6816,30 @@
       "languages": "Limbi",
       "series": "Serii"
     },
+    "bulkRename": {
+      "library": "Bibliotecă",
+      "selectLibraryPlaceholder": "Selectați o bibliotecă...",
+      "noEligibleLibraries": "Nicio bibliotecă nu are activată redenumirea fișierelor. Activați-o în Setările Bibliotecii.",
+      "refresh": "Împrospătează",
+      "previewFailed": "Încărcarea previzualizării a eșuat",
+      "executionFailed": "Redenumirea în masă a eșuat",
+      "openBookDetails": "Detalii carte deschisă",
+      "filter": {
+        "all": "Toate"
+      },
+      "status": {
+        "willRename": "Va redenumi",
+        "unchanged": "Neautorizat",
+        "collision": "Coliziune",
+        "noPattern": "Niciun model",
+        "error": "Eroare"
+      },
+      "empty": {
+        "title": "Alege o bibliotecă pentru a începe",
+        "description": "Selectați o bibliotecă de mai sus pentru a previzualiza modificările, a filtra după stare și a aplica redarea în masă rulată.",
+        "chooseLibrary": "Alege biblioteca"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Setări scanare",
       "title": "Cărți duplicate",
@@ -6988,22 +7012,6 @@
       "mergeModal": {
         "title": "Îmbinare Entități",
         "description": "Selectează ce entitate să păstreze. Ceilalți vor fi fuzionați și eliminați."
-      }
-    },
-    "bulkRename": {
-      "library": "Bibliotecă",
-      "selectLibraryPlaceholder": "Selectați o bibliotecă...",
-      "noEligibleLibraries": "Nicio bibliotecă nu are activată redenumirea fișierelor. Activați-o în Setările Bibliotecii.",
-      "refresh": "Împrospătează",
-      "previewFailed": "Încărcarea previzualizării a eșuat",
-      "executionFailed": "Redenumirea în masă a eșuat",
-      "openBookDetails": "Detalii carte deschisă",
-      "filter": {
-        "all": "Toate"
-      },
-      "status": {
-        "unchanged": "Neautorizat",
-        "error": "Eroare"
       }
     }
   },

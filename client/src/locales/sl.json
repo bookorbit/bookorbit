@@ -6939,6 +6939,30 @@
       "languages": "Jeziki",
       "series": "Serija"
     },
+    "bulkRename": {
+      "library": "Knjižnica",
+      "selectLibraryPlaceholder": "Izberi knjižnico...",
+      "noEligibleLibraries": "Nobena knjižnica nima omogočenega preimenovanja datotek. Omogočite ga v nastavitvah knjižnice.",
+      "refresh": "Osveži",
+      "previewFailed": "Predogleda ni bilo mogoče naložiti",
+      "executionFailed": "Množično preimenovanje ni uspelo",
+      "openBookDetails": "Odpri podrobnosti knjige",
+      "filter": {
+        "all": "Vse"
+      },
+      "status": {
+        "willRename": "Bo preimenovano",
+        "unchanged": "Nespremenjeno",
+        "collision": "Trk",
+        "noPattern": "Ni vzorca",
+        "error": "Napaka"
+      },
+      "empty": {
+        "title": "Izberite knjižnico za začetek",
+        "description": "Zgoraj izberite knjižnico za predogled sprememb preimenovanja, filtriranje po stanju in izvedbo množičnega preimenovanja.",
+        "chooseLibrary": "Izberi knjižnico"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Nastavitve skeniranja",
       "title": "Podvojene knjige",
@@ -7113,22 +7137,6 @@
       "mergeModal": {
         "title": "Združi entitete",
         "description": "Izberite, katero entiteto želite ohraniti. Ostale bodo združene vanjo in odstranjene."
-      }
-    },
-    "bulkRename": {
-      "library": "Knjižnica",
-      "selectLibraryPlaceholder": "Izberi knjižnico...",
-      "noEligibleLibraries": "Nobena knjižnica nima omogočenega preimenovanja datotek. Omogočite ga v nastavitvah knjižnice.",
-      "refresh": "Osveži",
-      "previewFailed": "Predogleda ni bilo mogoče naložiti",
-      "executionFailed": "Množično preimenovanje ni uspelo",
-      "openBookDetails": "Odpri podrobnosti knjige",
-      "filter": {
-        "all": "Vse"
-      },
-      "status": {
-        "unchanged": "Nespremenjeno",
-        "error": "Napaka"
       }
     }
   },

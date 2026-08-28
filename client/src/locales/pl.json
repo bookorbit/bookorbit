@@ -6236,6 +6236,30 @@
       "languages": "Języki",
       "series": "Seria"
     },
+    "bulkRename": {
+      "library": "Biblioteka",
+      "selectLibraryPlaceholder": "Wybierz bibliotekę...",
+      "noEligibleLibraries": "Żadna biblioteka nie ma włączonej zmiany nazwy pliku. Włącz tę opcję w Ustawieniach biblioteki.",
+      "refresh": "Odśwież",
+      "previewFailed": "Nie udało się załadować podglądu",
+      "executionFailed": "Zbiorcza zmiana nazwy nie powiodła się",
+      "openBookDetails": "Otwórz szczegóły książki",
+      "filter": {
+        "all": "Wszystko"
+      },
+      "status": {
+        "willRename": "Zmieni nazwę",
+        "unchanged": "Niezmienione",
+        "collision": "Kolizja",
+        "noPattern": "Brak wzoru",
+        "error": "Błąd"
+      },
+      "empty": {
+        "title": "Wybierz bibliotekę, aby rozpocząć",
+        "description": "Wybierz bibliotekę powyżej, aby wyświetlić podgląd zmian zmiany nazwy, filtrować według stanu i zastosować zbiorczą zmianę nazwy.",
+        "chooseLibrary": "Wybierz Bibliotekę"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Ustawienia skanowania",
       "title": "Duplikaty książek",
@@ -6410,22 +6434,6 @@
       "mergeModal": {
         "title": "Połącz podmioty",
         "description": "Wybierz, który element chcesz zachować. Pozostałe zostaną z nim połączone i usunięte."
-      }
-    },
-    "bulkRename": {
-      "library": "Biblioteka",
-      "selectLibraryPlaceholder": "Wybierz bibliotekę...",
-      "noEligibleLibraries": "Żadna biblioteka nie ma włączonej zmiany nazwy pliku. Włącz tę opcję w Ustawieniach biblioteki.",
-      "refresh": "Odśwież",
-      "previewFailed": "Nie udało się załadować podglądu",
-      "executionFailed": "Zbiorcza zmiana nazwy nie powiodła się",
-      "openBookDetails": "Otwórz szczegóły książki",
-      "filter": {
-        "all": "Wszystko"
-      },
-      "status": {
-        "unchanged": "Niezmienione",
-        "error": "Błąd"
       }
     }
   },
