@@ -377,7 +377,7 @@ export class KoboSyncController {
   ) {
     const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
     if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
-    const state = await this.readingStateService.getRawState(user.id, id);
+    const state = await this.readingStateService.getRawState(user.id, id, device.deviceId);
     reply.send(state ? [state] : []);
   }
 

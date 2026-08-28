@@ -554,10 +554,21 @@ export class KoreaderService {
   }
 
   private async convertProgressToCfi(bookFileId: number, xpointer: string): Promise<string | null> {
+    const startedAt = Date.now();
     try {
       const outcome = await this.positionConverter.xpointerPointToCfi({ bookFileId, pos: xpointer });
-      return outcome.status === 'failed' ? null : (outcome.cfi ?? null);
-    } catch {
+      if (outcome.status === 'failed') {
+        this.logger.warn(
+          `[koreader.progress_cfi_conversion] [fail] bookFileId=${bookFileId} durationMs=${Date.now() - startedAt} reason=${sanitizeLogValue(outcome.reason ?? 'unknown')} - xpointer to cfi conversion failed, progress degrades to percent`,
+        );
+        return null;
+      }
+      return outcome.cfi ?? null;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(
+        `[koreader.progress_cfi_conversion] [fail] bookFileId=${bookFileId} durationMs=${Date.now() - startedAt} errorClass=${err.constructor.name} error="${sanitizeLogValue(err.message)}" - xpointer to cfi conversion threw, progress degrades to percent`,
+      );
       return null;
     }
   }

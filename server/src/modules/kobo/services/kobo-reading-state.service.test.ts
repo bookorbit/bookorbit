@@ -31,7 +31,7 @@ function makeUpdateChain() {
 }
 
 function makeDb() {
-  return {
+  const db = {
     query: {
       books: { findFirst: vi.fn() },
       koboLibrarySnapshots: { findFirst: vi.fn() },
@@ -41,7 +41,11 @@ function makeDb() {
     insert: vi.fn(),
     update: vi.fn(() => makeUpdateChain()),
     execute: vi.fn().mockResolvedValue(undefined),
+    // Runs the callback against this same mock so a transactional write exercises the same
+    // stubbed chains (update/execute) as a non-transactional one would.
+    transaction: vi.fn((callback: (tx: typeof db) => Promise<unknown>) => callback(db)),
   };
+  return db;
 }
 
 const ACK = (entitlementId: string, result: 'Success' | 'Ignored') => ({
@@ -541,6 +545,37 @@ describe('KoboReadingStateService', () => {
       progressBridge.cfiToKoboBookmark.mockResolvedValue({ source: 'OEBPS/ch7.xhtml', value: 'kobo.31.1', contentSourceProgressPercent: 12.5 });
       return { db, updateChain };
     }
+
+    // Reproduces the stuck state found in practice: a device's snapshot row already marked
+    // synced = true (from an earlier delivery), and is_new = true, that never gets re-queued
+    // once refreshBookmarkFromHub later persists a hub-driven bookmark change for the book.
+    it('excludes the requesting device from the snapshot re-queue when it is known', async () => {
+      const { db } = makeRefreshableDb();
+      const service = makeService(db);
+      const excludeOtherDevicesSpy = vi.spyOn(service as never, 'markSnapshotBookUnsyncedForOtherDevices' as never);
+      const excludeNoDeviceSpy = vi.spyOn(service as never, 'markSnapshotBookUnsyncedForAllDevices' as never);
+
+      await service.getRawState(1, 44, 70);
+
+      expect(excludeOtherDevicesSpy).toHaveBeenCalledWith(1, 44, 70, db);
+      expect(excludeNoDeviceSpy).not.toHaveBeenCalled();
+    });
+
+    // getPageFromSnapshot marks a device's own page synced = true before its per-book
+    // getRawState call can trigger this refresh. Re-queuing that same device here would flip
+    // its row back to pending immediately after being marked delivered, so its very next sync
+    // would redeliver a book it was just given in this response, close to doubling a full sync.
+    it('re-queues every device when the requesting device is unknown', async () => {
+      const { db } = makeRefreshableDb();
+      const service = makeService(db);
+      const excludeOtherDevicesSpy = vi.spyOn(service as never, 'markSnapshotBookUnsyncedForOtherDevices' as never);
+      const excludeNoDeviceSpy = vi.spyOn(service as never, 'markSnapshotBookUnsyncedForAllDevices' as never);
+
+      await service.getRawState(1, 44);
+
+      expect(excludeNoDeviceSpy).toHaveBeenCalledWith(1, 44, db);
+      expect(excludeOtherDevicesSpy).not.toHaveBeenCalled();
+    });
 
     it('replaces the device Location with one computed from the hub position', async () => {
       const { db, updateChain } = makeRefreshableDb();

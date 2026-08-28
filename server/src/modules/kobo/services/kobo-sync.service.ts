@@ -143,7 +143,7 @@ export class KoboSyncService {
     // pending rows skips it: those rows already say what it is owed, and whatever changed while
     // it paged is picked up by the reconcile that opens its next sync.
     if (snapshot && (await this.hasPendingSnapshotBooks(snapshot.id))) {
-      return this.getPageFromSnapshot(userId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () =>
+      return this.getPageFromSnapshot(userId, snapshot.id, deviceId, deviceToken, baseUrl, smartScopeMatchCache, () =>
         this.fetchEligibleBookIds(userId, true, smartScopeMatchCache),
       );
     }
@@ -165,7 +165,7 @@ export class KoboSyncService {
     }
 
     const eligibleIds = new Set(eligibleSnapshotRows.map((row) => row.bookId));
-    return this.getPageFromSnapshot(userId, snapshot.id, deviceToken, baseUrl, smartScopeMatchCache, () => Promise.resolve(eligibleIds));
+    return this.getPageFromSnapshot(userId, snapshot.id, deviceId, deviceToken, baseUrl, smartScopeMatchCache, () => Promise.resolve(eligibleIds));
   }
 
   async getBookMetadata(userId: number, bookId: number, deviceToken: string, baseUrl: string): Promise<unknown[]> {
@@ -531,6 +531,7 @@ export class KoboSyncService {
   private async getPageFromSnapshot(
     userId: number,
     snapshotId: number,
+    deviceId: number,
     deviceToken: string,
     baseUrl: string,
     smartScopeMatchCache: SmartScopeMatchCache,
@@ -593,7 +594,7 @@ export class KoboSyncService {
       const book = booksById.get(row.bookId) ?? null;
       if (!book) continue;
 
-      const readingState = await this.readingStateService.getRawState(userId, row.bookId);
+      const readingState = await this.readingStateService.getRawState(userId, row.bookId, deviceId);
       const defaultReadingState = readingState ?? this.buildDefaultReadingState(book.koboEntitlementId);
 
       if (row.isNew || row.needsLegacyNumericRemoval) {
