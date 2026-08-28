@@ -832,7 +832,10 @@ function BookOrbitCatalog:showServerError(err)
 end
 
 function BookOrbitCatalog:errorText(err)
-    if isAuthError(err) then
+    local transfer_error = CatalogUtil.transferErrorText(err)
+    if transfer_error then
+        return transfer_error
+    elseif isAuthError(err) then
         return _("BookOrbit login failed. Check your KOReader credentials.")
     elseif type(err) == "number" then
         return T(_("BookOrbit server error (%1)."), err)
