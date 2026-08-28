@@ -5783,6 +5783,30 @@
       "languages": "Talen",
       "series": "Reeksen"
     },
+    "bulkRename": {
+      "library": "Bibliotheek",
+      "selectLibraryPlaceholder": "Selecteer een bibliotheek...",
+      "noEligibleLibraries": "Geen bibliotheken hebben bestand hernoemen ingeschakeld. Schakel het in bij Bibliotheekinstellingen.",
+      "refresh": "Vernieuwen",
+      "previewFailed": "Voorbeeld laden mislukt",
+      "executionFailed": "Bulk hernoemen mislukt",
+      "openBookDetails": "Boekdetails openen",
+      "filter": {
+        "all": "Alle"
+      },
+      "status": {
+        "willRename": "Wordt hernoemd",
+        "unchanged": "Ongewijzigd",
+        "collision": "Conflict",
+        "noPattern": "Geen patroon",
+        "error": "Fout"
+      },
+      "empty": {
+        "title": "Kies een bibliotheek om te beginnen",
+        "description": "Selecteer hierboven een bibliotheek om hernoemwijzigingen te bekijken, op status te filteren en de bulk hernoem-actie toe te passen.",
+        "chooseLibrary": "Bibliotheek kiezen"
+      }
+    },
     "bookDuplicates": {
       "groupsFound": "{count, plural, =0 {No duplicate groups} one {One duplicate group} other {# duplicate groups}}",
       "deleteDialog": {
@@ -5884,22 +5908,6 @@
       "mergeModal": {
         "title": "Entiteiten samenvoegen",
         "description": "Selecteer welke entiteit je wilt behouden. De andere worden erin samengevoegd en verwijderd."
-      }
-    },
-    "bulkRename": {
-      "library": "Bibliotheek",
-      "selectLibraryPlaceholder": "Selecteer een bibliotheek...",
-      "noEligibleLibraries": "Geen bibliotheken hebben bestand hernoemen ingeschakeld. Schakel het in bij Bibliotheekinstellingen.",
-      "refresh": "Vernieuwen",
-      "previewFailed": "Voorbeeld laden mislukt",
-      "executionFailed": "Bulk hernoemen mislukt",
-      "openBookDetails": "Boekdetails openen",
-      "filter": {
-        "all": "Alle"
-      },
-      "status": {
-        "unchanged": "Ongewijzigd",
-        "error": "Fout"
       }
     }
   },

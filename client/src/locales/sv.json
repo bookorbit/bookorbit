@@ -6316,6 +6316,30 @@
       "languages": "Språk",
       "series": "Serie"
     },
+    "bulkRename": {
+      "library": "Bibliotek",
+      "selectLibraryPlaceholder": "Välj ett bibliotek...",
+      "noEligibleLibraries": "Inga bibliotek har filnamn aktiverat. Aktivera det i biblioteksinställningar.",
+      "refresh": "Uppdatera",
+      "previewFailed": "Det gick inte att ladda förhandsgranskning",
+      "executionFailed": "Bulknamnbyte misslyckades",
+      "openBookDetails": "Öppna bokdetaljer",
+      "filter": {
+        "all": "Alla"
+      },
+      "status": {
+        "willRename": "Kommer byta namn",
+        "unchanged": "Oförändrad",
+        "collision": "Kollision",
+        "noPattern": "Inget mönster",
+        "error": "Fel"
+      },
+      "empty": {
+        "title": "Välj ett bibliotek för att starta",
+        "description": "Välj ett bibliotek ovan för att förhandsgranska byta namn på ändringar, filtrera efter status, och tillämpa bulk byta namn kör.",
+        "chooseLibrary": "Välj bibliotek"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Skanna inställningar",
       "title": "Duplicera böcker",
@@ -6489,22 +6513,6 @@
       "mergeModal": {
         "title": "Slå ihop enheter",
         "description": "Välj vilken enhet du vill behålla. De andra kommer att slås samman till den och tas bort."
-      }
-    },
-    "bulkRename": {
-      "library": "Bibliotek",
-      "selectLibraryPlaceholder": "Välj ett bibliotek...",
-      "noEligibleLibraries": "Inga bibliotek har filnamn aktiverat. Aktivera det i biblioteksinställningar.",
-      "refresh": "Uppdatera",
-      "previewFailed": "Det gick inte att ladda förhandsgranskning",
-      "executionFailed": "Bulknamnbyte misslyckades",
-      "openBookDetails": "Öppna bokdetaljer",
-      "filter": {
-        "all": "Alla"
-      },
-      "status": {
-        "unchanged": "Oförändrad",
-        "error": "Fel"
       }
     }
   },

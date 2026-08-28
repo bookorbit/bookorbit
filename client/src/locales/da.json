@@ -6314,6 +6314,30 @@
       "languages": "Sprog",
       "series": "Serie"
     },
+    "bulkRename": {
+      "library": "Bibliotek",
+      "selectLibraryPlaceholder": "Vælg et bibliotek...",
+      "noEligibleLibraries": "Ingen biblioteker har filnavnet aktiveret. Aktivér det i Biblioteks indstillinger.",
+      "refresh": "Opdater",
+      "previewFailed": "Kunne ikke indlæse forhåndsvisning",
+      "executionFailed": "Masse omdøbning mislykkedes",
+      "openBookDetails": "Åbn bogdetaljer",
+      "filter": {
+        "all": "Alle"
+      },
+      "status": {
+        "willRename": "Vil Omdøbe",
+        "unchanged": "Uændret",
+        "collision": "Kollision",
+        "noPattern": "Intet Mønster",
+        "error": "Fejl"
+      },
+      "empty": {
+        "title": "Vælg et bibliotek for at starte",
+        "description": "Vælg et bibliotek ovenfor for at forhåndsvise omdøbning ændringer, filter efter status, og anvend bulk omdøbe kørsel.",
+        "chooseLibrary": "Vælg Bibliotek"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Scan indstillinger",
       "title": "Dupliker Bøger",
@@ -6487,22 +6511,6 @@
       "mergeModal": {
         "title": "Flet Enheder",
         "description": "Vælg hvilken enhed der skal beholdes. De andre vil blive flettet ind i den og fjernet."
-      }
-    },
-    "bulkRename": {
-      "library": "Bibliotek",
-      "selectLibraryPlaceholder": "Vælg et bibliotek...",
-      "noEligibleLibraries": "Ingen biblioteker har filnavnet aktiveret. Aktivér det i Biblioteks indstillinger.",
-      "refresh": "Opdater",
-      "previewFailed": "Kunne ikke indlæse forhåndsvisning",
-      "executionFailed": "Masse omdøbning mislykkedes",
-      "openBookDetails": "Åbn bogdetaljer",
-      "filter": {
-        "all": "Alle"
-      },
-      "status": {
-        "unchanged": "Uændret",
-        "error": "Fejl"
       }
     }
   },

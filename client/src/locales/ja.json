@@ -6537,6 +6537,29 @@
       "languages": "言語",
       "series": "シリーズ"
     },
+    "bulkRename": {
+      "library": "ライブラリ",
+      "noEligibleLibraries": "ファイル名が有効になっているライブラリがありません。ライブラリ設定で有効にしてください。",
+      "refresh": "更新",
+      "previewFailed": "プレビューの読み込みに失敗しました",
+      "executionFailed": "一括名称変更に失敗しました",
+      "openBookDetails": "本の詳細を開く",
+      "filter": {
+        "all": "すべて"
+      },
+      "status": {
+        "willRename": "名前を変更する",
+        "unchanged": "変更なし",
+        "collision": "Collision",
+        "noPattern": "パターンなし",
+        "error": "エラー"
+      },
+      "empty": {
+        "title": "開始するライブラリを選択",
+        "description": "上記のライブラリを選択すると、変更の名前をプレビューし、ステータスごとにフィルタを適用し、一括変更を実行できます。",
+        "chooseLibrary": "ライブラリを選択"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "設定をスキャン",
       "title": "本を複製",
@@ -6702,21 +6725,6 @@
       "mergeModal": {
         "title": "エンティティを結合",
         "description": "保持するエンティティを選択します。その他のエンティティがマージされ、削除されます。"
-      }
-    },
-    "bulkRename": {
-      "library": "ライブラリ",
-      "noEligibleLibraries": "ファイル名が有効になっているライブラリがありません。ライブラリ設定で有効にしてください。",
-      "refresh": "更新",
-      "previewFailed": "プレビューの読み込みに失敗しました",
-      "executionFailed": "一括名称変更に失敗しました",
-      "openBookDetails": "本の詳細を開く",
-      "filter": {
-        "all": "すべて"
-      },
-      "status": {
-        "unchanged": "変更なし",
-        "error": "エラー"
       }
     }
   },

@@ -7951,6 +7951,30 @@
       "languages": "Idiomas",
       "series": "Serie"
     },
+    "bulkRename": {
+      "library": "Biblioteca",
+      "selectLibraryPlaceholder": "Seleccione una biblioteca...",
+      "noEligibleLibraries": "Ninguna biblioteca tiene habilitado el cambio de nombre de archivo. Habilítelo en la configuración de la biblioteca.",
+      "refresh": "Actualizar",
+      "previewFailed": "No se pudo cargar la vista previa",
+      "executionFailed": "Error al cambiar el nombre en masa",
+      "openBookDetails": "Detalles del libro abierto",
+      "filter": {
+        "all": "Todos"
+      },
+      "status": {
+        "willRename": "Cambiará el nombre",
+        "unchanged": "Sin cambios",
+        "collision": "Colisión",
+        "noPattern": "Sin patrón",
+        "error": "Error"
+      },
+      "empty": {
+        "title": "Elija una biblioteca para comenzar",
+        "description": "Seleccione una de las bibliotecas anteriores para obtener una vista previa de los cambios de nombre, filtrar por estado y aplicar la ejecución de cambio de nombre masivo.",
+        "chooseLibrary": "Elija biblioteca"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "Configuración de escaneo",
       "title": "Libros duplicados",
@@ -8196,22 +8220,6 @@
         "sweep": "La comprobación de portada ha fallado.",
         "list": "No se han podido cargar estas entradas.",
         "clean": "Error de limpieza."
-      }
-    },
-    "bulkRename": {
-      "library": "Biblioteca",
-      "selectLibraryPlaceholder": "Seleccione una biblioteca...",
-      "noEligibleLibraries": "Ninguna biblioteca tiene habilitado el cambio de nombre de archivo. Habilítelo en la configuración de la biblioteca.",
-      "refresh": "Actualizar",
-      "previewFailed": "No se pudo cargar la vista previa",
-      "executionFailed": "Error al cambiar el nombre en masa",
-      "openBookDetails": "Detalles del libro abierto",
-      "filter": {
-        "all": "Todos"
-      },
-      "status": {
-        "unchanged": "Sin cambios",
-        "error": "Error"
       }
     }
   },

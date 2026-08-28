@@ -7418,6 +7418,30 @@
       "languages": "언어",
       "series": "시리즈"
     },
+    "bulkRename": {
+      "library": "라이브러리",
+      "selectLibraryPlaceholder": "라이브러리를 선택하세요...",
+      "noEligibleLibraries": "파일 이름 변경 기능이 활성화된 라이브러리가 없습니다. 라이브러리 설정에서 활성화해 주세요.",
+      "refresh": "새로고침",
+      "previewFailed": "미리보기를 불러오는 데 실패했습니다.",
+      "executionFailed": "일괄 이름 변경에 실패했습니다.",
+      "openBookDetails": "책 상세 정보 열기",
+      "filter": {
+        "all": "모두"
+      },
+      "status": {
+        "willRename": "이름 변경 예정",
+        "unchanged": "변화 없음",
+        "collision": "충돌",
+        "noPattern": "패턴 없음",
+        "error": "오류"
+      },
+      "empty": {
+        "title": "작업할 라이브러리를 선택하세요",
+        "description": "위에서 라이브러리를 선택하여 이름 변경 사항을 미리 확인하고, 상태별로 필터링하고, 일괄 이름 변경을 실행할 수 있습니다.",
+        "chooseLibrary": "라이브러리 선택"
+      }
+    },
     "bookDuplicates": {
       "scanSettings": "스캔 설정",
       "title": "중복 도서",
@@ -7663,22 +7687,6 @@
         "sweep": "표지 검사에 실패했습니다.",
         "list": "선택한 항목들을 불러올 수 없습니다.",
         "clean": "정리에 실패했습니다."
-      }
-    },
-    "bulkRename": {
-      "library": "라이브러리",
-      "selectLibraryPlaceholder": "라이브러리를 선택하세요...",
-      "noEligibleLibraries": "파일 이름 변경 기능이 활성화된 라이브러리가 없습니다. 라이브러리 설정에서 활성화해 주세요.",
-      "refresh": "새로고침",
-      "previewFailed": "미리보기를 불러오는 데 실패했습니다.",
-      "executionFailed": "일괄 이름 변경에 실패했습니다.",
-      "openBookDetails": "책 상세 정보 열기",
-      "filter": {
-        "all": "모두"
-      },
-      "status": {
-        "unchanged": "변화 없음",
-        "error": "오류"
       }
     }
   },
