@@ -186,6 +186,13 @@ export class BookQueryBuilder {
         return this.libraryRuleToSql(operator, value as string[]);
       case 'format':
         return this.formatRuleToSql(operator, value as string[]);
+      case 'fileSize':
+        return this.numericRuleToSql(
+          sql<number>`(SELECT ${bookFiles.sizeBytes} FROM ${bookFiles} WHERE ${bookFiles.id} = ${books.primaryFileId})`,
+          operator,
+          value as number,
+          valueTo as number | undefined,
+        );
       case 'addedAt':
         return this.dateRuleToSql(operator, value as string | number, valueTo as string | undefined);
       case 'startedAt':
@@ -254,34 +261,35 @@ export class BookQueryBuilder {
     }
   }
 
-  private numericRuleToSql(col: AnyColumn, operator: string, value?: number, valueTo?: number): SQL {
+  private numericRuleToSql(col: AnyColumn | SQL, operator: string, value?: number, valueTo?: number): SQL {
+    const expression = col as SQL;
     switch (operator) {
       case 'eq':
         this.assertNumber(value, operator, 'value');
-        return eq(col, value!);
+        return eq(expression, value!);
       case 'notEq':
         this.assertNumber(value, operator, 'value');
-        return ne(col, value!);
+        return ne(expression, value!);
       case 'gt':
         this.assertNumber(value, operator, 'value');
-        return gt(col, value!);
+        return gt(expression, value!);
       case 'gte':
         this.assertNumber(value, operator, 'value');
-        return gte(col, value!);
+        return gte(expression, value!);
       case 'lt':
         this.assertNumber(value, operator, 'value');
-        return lt(col, value!);
+        return lt(expression, value!);
       case 'lte':
         this.assertNumber(value, operator, 'value');
-        return lte(col, value!);
+        return lte(expression, value!);
       case 'between':
         this.assertNumber(value, operator, 'value');
         this.assertNumber(valueTo, operator, 'valueTo');
-        return and(gte(col, value!), lte(col, valueTo!))!;
+        return and(gte(expression, value!), lte(expression, valueTo!))!;
       case 'isEmpty':
-        return isNull(col);
+        return isNull(expression);
       case 'isNotEmpty':
-        return isNotNull(col);
+        return isNotNull(expression);
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
     }

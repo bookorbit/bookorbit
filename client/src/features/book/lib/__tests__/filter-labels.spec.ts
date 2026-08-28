@@ -170,6 +170,11 @@ describe('ruleToParts', () => {
     expect(ruleToParts(rule)).toEqual({ field: 'Page Count', operator: 'between', value: '100 - 200' })
   })
 
+  it('formats primary file size values as readable byte sizes', () => {
+    const rule: Rule = { type: 'rule', field: 'fileSize', operator: 'between', value: 10_485_760, valueTo: 26_214_400 }
+    expect(ruleToParts(rule)).toEqual({ field: 'Primary File Size', operator: 'between', value: '10 MB - 25 MB' })
+  })
+
   it('renders an empty value when a valued operator has no value', () => {
     const rule: Rule = { type: 'rule', field: 'title', operator: 'eq' }
     expect(ruleToParts(rule)).toEqual({ field: 'Title', operator: 'is', value: '' })

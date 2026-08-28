@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import { eq } from 'drizzle-orm';
-import { rm } from 'fs/promises';
+import { rm, stat } from 'fs/promises';
 import { join } from 'path';
 
 import * as unzipper from 'unzipper';
@@ -316,6 +316,33 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
       });
 
       expectError(invalidLimit, 400, 'limit must not be greater than 20');
+    });
+
+    it('filters books by the selected primary file size', async () => {
+      const primaryFileSize = (await stat(visibleEpub.absolutePath)).size;
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/books/query',
+        headers: authHeader(limitedUser.accessToken),
+        payload: {
+          filter: {
+            type: 'group',
+            join: 'AND',
+            rules: [
+              { type: 'rule', field: 'title', operator: 'eq', value: 'Alpha Contract EPUB' },
+              { type: 'rule', field: 'fileSize', operator: 'eq', value: primaryFileSize },
+            ],
+          },
+          sort: [{ field: 'title', dir: 'asc' }],
+          pagination: { page: 0, size: 10 },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        total: 1,
+        items: [{ id: visibleEpub.bookId, files: [{ id: visibleEpub.bookFileId, role: 'primary', sizeBytes: primaryFileSize }] }],
+      });
     });
   });
 

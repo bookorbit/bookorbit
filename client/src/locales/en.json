@@ -4054,6 +4054,7 @@
         "collection": "Collection",
         "library": "Library",
         "format": "Format",
+        "fileSize": "Primary File Size",
         "addedAt": "Added Date",
         "startedAt": "Date Started",
         "finishedAt": "Date Finished",
@@ -4112,7 +4113,8 @@
       "unit": {
         "days": "days",
         "weeks": "weeks",
-        "months": "months"
+        "months": "months",
+        "megabytes": "MB"
       },
       "scorePreset": {
         "outstanding": "Outstanding",
@@ -4121,6 +4123,9 @@
         "poor": "Poor"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "e.g. 10",
+      "fileSizeValueAria": "Primary file size in megabytes",
+      "fileSizeMaximumAria": "Maximum primary file size in megabytes",
       "valuePlaceholder": "value",
       "maxPlaceholder": "max",
       "to": "to",
