@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookSelectionPayload, Collection } from '@bookorbit/types'
+import type { BookSelectionPayload, Collection, CreateCollectionPayload } from '@bookorbit/types'
 
 const collections = ref<Collection[]>([])
 const loaded = ref(false)
@@ -58,11 +58,12 @@ export function useCollections() {
     return res.json()
   }
 
-  async function createCollection(name: string, icon: string, description?: string): Promise<Collection> {
+  async function createCollection(name: string, icon: string, description?: string, isPublic?: boolean): Promise<Collection> {
+    const payload: CreateCollectionPayload = { name, icon, description, ...(isPublic !== undefined && { isPublic }) }
     const res = await api('/api/v1/collections', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, icon, description }),
+      body: JSON.stringify(payload),
     })
     if (!res.ok) throw new Error('Failed to create collection')
     const created: Collection = await res.json()
@@ -70,11 +71,16 @@ export function useCollections() {
     return created
   }
 
-  async function updateCollection(id: number, name: string, icon: string, syncToKobo?: boolean): Promise<Collection> {
+  async function updateCollection(id: number, name: string, icon: string, syncToKobo?: boolean, isPublic?: boolean): Promise<Collection> {
     const res = await api(`/api/v1/collections/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, icon, ...(syncToKobo !== undefined && { syncToKobo }) }),
+      body: JSON.stringify({
+        name,
+        icon,
+        ...(syncToKobo !== undefined && { syncToKobo }),
+        ...(isPublic !== undefined && { isPublic }),
+      }),
     })
     if (!res.ok) throw new Error('Failed to update collection')
     const updated: Collection = await res.json()

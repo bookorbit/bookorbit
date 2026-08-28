@@ -39,6 +39,7 @@ import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import JumpRail from '@/features/book/components/JumpRail.vue'
 import { toast } from 'vue-sonner'
 import { useCollections } from '@/features/collection/composables/useCollections'
+import { canMutateCollection } from '@/features/collection/lib/collection-access'
 import { useBookViewWindow } from '@/features/book/composables/useBookViewWindow'
 import { useSeriesCollapsePreference } from '@/features/book/composables/useSeriesCollapsePreference'
 import { useEffectiveSeriesCollapse } from '@/features/book/composables/useEffectiveSeriesCollapse'
@@ -76,6 +77,7 @@ const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId
 const { collections, loaded: collectionsLoaded, error: collectionsError, fetchCollections, removeBooksFromCollection } = useCollections()
 const collectionNotFound = ref(false)
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
+const isCollectionOwner = computed(() => canMutateCollection(collection.value))
 const pageTitle = computed(() => {
   if (collection.value?.name) return t('views.collection.pageTitle', { name: collection.value.name })
   return Number.isFinite(collectionId.value) ? t('views.collection.pageTitleWithId', { id: collectionId.value }) : t('views.collection.title')
@@ -279,7 +281,7 @@ const mobileControlsExpanded = ref(false)
 let removingInProgress = false
 
 async function handleRemoveFromCollection() {
-  if (removingInProgress || !collectionId.value || selectedIds.value.size === 0) return
+  if (!isCollectionOwner.value || removingInProgress || !collectionId.value || selectedIds.value.size === 0) return
   removingInProgress = true
   try {
     const ids = [...selectedIds.value]
@@ -424,7 +426,7 @@ defineOptions({ name: 'CollectionView' })
     <SelectionActionBar
       :visible="selectionMode"
       :count="selectedCount"
-      :in-collection="true"
+      :in-collection="isCollectionOwner"
       :in-flight="inFlight"
       @send="sendBookOpen = true"
       @download="handleDownloadFiles"
@@ -480,7 +482,7 @@ defineOptions({ name: 'CollectionView' })
     />
 
     <EditCollectionDialog
-      v-if="collection"
+      v-if="collection && isCollectionOwner"
       :open="editCollectionOpen"
       :collection="collection"
       @close="editCollectionOpen = false"
@@ -585,7 +587,7 @@ defineOptions({ name: 'CollectionView' })
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                v-if="collection"
+                v-if="collection && isCollectionOwner"
                 class="hidden sm:flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 :aria-label="t('views.collection.editCollection')"
                 @click="openCollectionEditor"
@@ -694,7 +696,7 @@ defineOptions({ name: 'CollectionView' })
             <span>{{ t('views.bookView.export') }}</span>
           </button>
           <button
-            v-if="collection"
+            v-if="collection && isCollectionOwner"
             class="flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             @click="openCollectionEditor"
           >

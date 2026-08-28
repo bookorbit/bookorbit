@@ -4,7 +4,7 @@ import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
 import { basename, dirname, extname, isAbsolute, join, normalize, relative, sep } from 'path';
 
 import type { FileRenameResult } from '@bookorbit/types';
-import { isAudioFormat, NotificationType, resolveUploadPath, sanitizePathSegment } from '@bookorbit/types';
+import { NotificationType, resolveUploadPath, sanitizePathSegment } from '@bookorbit/types';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
@@ -14,6 +14,7 @@ import type { BookFilePathUpdate, BookRenameData } from './file-rename.repositor
 import { FileRenameRepository } from './file-rename.repository';
 import { FileLockService, bookOperationLockKey } from './file-lock.service';
 import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
+import { resolveBookFileTargets } from './book-file-targets';
 
 const FILE_RENAME_EVENT = 'file.rename';
 const FILE_RENAME_ROLLBACK_EVENT = 'file.rename_rollback';
@@ -128,67 +129,24 @@ export class FileRenameService implements OnModuleDestroy {
     const currentAbsolutePath = data.file.absolutePath;
     const baseNewAbsolutePath = join(data.libraryFolderPath, resolvedRelPath);
     const currentFolderPath = data.bookFolderPath;
-    const baseNewFolderPath = dirname(baseNewAbsolutePath);
     const isBookPerFolder = data.organizationMode === 'book_per_folder';
-
-    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
-    const fileTargets = new Map<number, string>();
     const bookHasOwnFolder = isBookPerFolder && currentFolderPath !== currentAbsolutePath;
 
-    for (const file of allFiles) {
-      if (file.id === data.file.id) {
-        fileTargets.set(file.id, baseNewAbsolutePath);
-      } else if (file.role === 'content') {
-        const fileExt = extname(file.absolutePath);
-        const fileFormat = (file.format ?? fileExt.slice(1)).toLowerCase();
-        const fileOriginalStem = basename(file.absolutePath, fileExt);
-        const fileTokens = buildPatternTokens({
-          metadata: data.metadata,
-          authors: data.authors,
-          narrators: data.narrators,
-          originalStem: fileOriginalStem,
-          format: fileFormat,
-          libraryName: data.libraryName,
-        });
-        const fileResolvedRelPath = resolveUploadPath(pattern, fileTokens, fileFormat, { sanitizeForCrossPlatform });
-
-        let targetAbs: string;
-        if (fileResolvedRelPath) {
-          const resolvedAbs = join(data.libraryFolderPath, fileResolvedRelPath);
-          if (isBookPerFolder) {
-            const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
-            const oldSubDir = dirname(relToOldFolder);
-            targetAbs = join(baseNewFolderPath, oldSubDir, basename(resolvedAbs));
-          } else {
-            targetAbs = resolvedAbs;
-          }
-        } else {
-          const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
-          targetAbs = join(isBookPerFolder ? baseNewFolderPath : dirname(baseNewAbsolutePath), relToOldFolder);
-        }
-
-        fileTargets.set(file.id, targetAbs);
-      } else {
-        const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
-        const targetAbs = join(isBookPerFolder ? baseNewFolderPath : dirname(baseNewAbsolutePath), relToOldFolder);
-
-        fileTargets.set(file.id, targetAbs);
-      }
-    }
-
-    this.applyMultiTrackAudioPartSuffixes(fileTargets, allFiles, data.file.id);
-
-    if (this.hasInternalCollision(fileTargets)) {
-      fileTargets.clear();
-      fileTargets.set(data.file.id, baseNewAbsolutePath);
-      for (const file of allFiles) {
-        if (file.id !== data.file.id) {
-          const relToOldFolder = bookHasOwnFolder ? relative(currentFolderPath, file.absolutePath) : basename(file.absolutePath);
-          const targetDir = isBookPerFolder ? baseNewFolderPath : dirname(baseNewAbsolutePath);
-          fileTargets.set(file.id, join(targetDir, relToOldFolder));
-        }
-      }
-    }
+    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
+    // Shared with the bulk rename preview so the preview can never promise a rename this refuses.
+    const fileTargets = resolveBookFileTargets({
+      primaryFileId: data.file.id,
+      files: allFiles,
+      metadata: data.metadata,
+      authors: data.authors,
+      narrators: data.narrators,
+      libraryName: data.libraryName,
+      libraryFolderPath: data.libraryFolderPath,
+      bookFolderPath: currentFolderPath,
+      organizationMode: data.organizationMode,
+      pattern,
+      sanitizeForCrossPlatform,
+    });
 
     const newAbsolutePath = fileTargets.get(data.file.id) ?? baseNewAbsolutePath;
     const newFolderPath = dirname(newAbsolutePath);
@@ -612,58 +570,6 @@ export class FileRenameService implements OnModuleDestroy {
     }
   }
 
-  private applyMultiTrackAudioPartSuffixes(fileTargets: Map<number, string>, allFiles: RenameBookFile[], primaryFileId: number): void {
-    const audioFiles = allFiles.filter((file) => this.isAudioContentFile(file, primaryFileId));
-    if (audioFiles.length < 2) return;
-
-    const audioFilesByTarget = new Map<string, RenameBookFile[]>();
-    for (const file of audioFiles) {
-      const targetPath = fileTargets.get(file.id);
-      if (!targetPath) continue;
-
-      const key = targetPath.toLowerCase();
-      const existing = audioFilesByTarget.get(key);
-      if (existing) {
-        existing.push(file);
-      } else {
-        audioFilesByTarget.set(key, [file]);
-      }
-    }
-
-    const collidingGroups = [...audioFilesByTarget.values()].filter((group) => group.length > 1);
-    if (collidingGroups.length === 0) return;
-
-    const trackNumbersByFileId = new Map<number, number>();
-    [...audioFiles].sort(compareAudioTrackFiles).forEach((file, index) => {
-      trackNumbersByFileId.set(file.id, index + 1);
-    });
-
-    for (const group of collidingGroups) {
-      for (const file of group) {
-        const targetPath = fileTargets.get(file.id);
-        const trackNumber = trackNumbersByFileId.get(file.id);
-        if (!targetPath || !trackNumber) continue;
-
-        fileTargets.set(file.id, appendPartSuffix(targetPath, trackNumber));
-      }
-    }
-  }
-
-  private isAudioContentFile(file: RenameBookFile, primaryFileId: number): boolean {
-    const format = (file.format ?? extname(file.absolutePath).slice(1)).toLowerCase();
-    return Boolean(format && isAudioFormat(format) && (file.role === 'content' || file.id === primaryFileId));
-  }
-
-  private hasInternalCollision(fileTargets: Map<number, string>): boolean {
-    const seen = new Set<string>();
-    for (const targetPath of fileTargets.values()) {
-      const key = targetPath.toLowerCase();
-      if (seen.has(key)) return true;
-      seen.add(key);
-    }
-    return false;
-  }
-
   private foldersAreNested(pathA: string, pathB: string): boolean {
     const normA = (pathA.endsWith('/') ? pathA : pathA + '/').toLowerCase();
     const normB = (pathB.endsWith('/') ? pathB : pathB + '/').toLowerCase();
@@ -817,16 +723,4 @@ function resolvePositiveInteger(value: unknown, fallback: number): number {
 
 function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error && error.code === 'ENOENT';
-}
-
-function compareAudioTrackFiles(a: RenameBookFile, b: RenameBookFile): number {
-  const aSortOrder = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
-  const bSortOrder = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
-  return aSortOrder - bSortOrder || a.id - b.id;
-}
-
-function appendPartSuffix(targetPath: string, trackNumber: number): string {
-  const extension = extname(targetPath);
-  const stem = basename(targetPath, extension);
-  return join(dirname(targetPath), `${stem}-Part${String(trackNumber).padStart(2, '0')}${extension}`);
 }

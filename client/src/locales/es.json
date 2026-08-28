@@ -7968,25 +7968,15 @@
       "series": "Serie"
     },
     "bulkRename": {
-      "previewToolbar": "Cambiar nombre de vista previa",
-      "renameSettings": "Cambiar nombre de configuración",
       "library": "Biblioteca",
       "selectLibraryPlaceholder": "Seleccione una biblioteca...",
       "noEligibleLibraries": "Ninguna biblioteca tiene habilitado el cambio de nombre de archivo. Habilítelo en la configuración de la biblioteca.",
       "refresh": "Actualizar",
-      "applyRename": "Aplicar cambiar nombre",
-      "showFullPaths": "Mostrar rutas completas",
-      "columnsMenu": "Columnas",
-      "renamingInProgress": "Cambiar el nombre de los archivos: puede cancelar en cualquier momento.",
-      "executionFailed": "Error al cambiar el nombre en masa",
       "previewFailed": "No se pudo cargar la vista previa",
-      "noBooksMatch": "No se encontraron libros que coincidan con el filtro actual.",
+      "executionFailed": "Error al cambiar el nombre en masa",
       "openBookDetails": "Detalles del libro abierto",
-      "columns": {
-        "title": "Título",
-        "currentPath": "Ruta actual",
-        "newPath": "Nuevo camino",
-        "status": "Estado"
+      "filter": {
+        "all": "Todos"
       },
       "status": {
         "willRename": "Cambiará el nombre",
@@ -7995,32 +7985,10 @@
         "noPattern": "Sin patrón",
         "error": "Error"
       },
-      "filter": {
-        "all": "Todos"
-      },
-      "summary": {
-        "label": "Resumen",
-        "toRename": "{count} para cambiar el nombre",
-        "unchanged": "{count} sin cambios",
-        "collisions": "{count, plural, =0 {# colisión} one {# colisión} other {# colisiones} many {# colisiones}}",
-        "errors": "{count, plural, =0 {# error} one {# error} other {# errores} many {# errores}}"
-      },
       "empty": {
         "title": "Elija una biblioteca para comenzar",
         "description": "Seleccione una de las bibliotecas anteriores para obtener una vista previa de los cambios de nombre, filtrar por estado y aplicar la ejecución de cambio de nombre masivo.",
         "chooseLibrary": "Elija biblioteca"
-      },
-      "completed": {
-        "title": "Cambio de nombre masivo completado",
-        "stats": "{succeeded} renombrado, {failed} falló, {skipped} omitido ({processed} en total)"
-      },
-      "pagination": {
-        "showing": "Mostrando {from}-{to} de {total}"
-      },
-      "confirmDialog": {
-        "title": "Confirmar cambio de nombre masivo",
-        "body": "{count, plural, =0 {Esto cambiará el nombre # libro en disco. Se omitirán los archivos con colisiones o errores. Esta acción no se puede deshacer.} one {Esto cambiará el nombre # libro en disco. Se omitirán los archivos con colisiones o errores. Esta acción no se puede deshacer.} other {Esto cambiará el nombre # libros en disco. Se omitirán los archivos con colisiones o errores. Esta acción no se puede deshacer.} many {Esto cambiará el nombre # libros en disco. Se omitirán los archivos con colisiones o errores. Esta acción no se puede deshacer.}}",
-        "renameButton": "{count, plural, =0 {Cambiar nombre # libro} one {Cambiar nombre # libro} other {Cambiar nombre # libros} many {Cambiar nombre # libros}}"
       }
     },
     "bookDuplicates": {

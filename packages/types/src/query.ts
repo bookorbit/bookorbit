@@ -17,6 +17,7 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
  * - `collection` - resolved via `collection_books` join to `collections.name`
  * - `library` - resolved via `books.library_id` join to `libraries.name`
  * - `format` - resolved via `book_files.format` (primary file)
+ * - `fileSize` - resolved via `book_files.size_bytes` (primary file; rule values are bytes)
  * - `isbn` - matches both `isbn10` and `isbn13` in `book_metadata`
  * - `publishedDate` - uses full dates when available and falls back to published year
  * - `lockStatus` - derived from `book_metadata.locked_fields` (non-empty array = locked)
@@ -39,6 +40,7 @@ export type StaticRuleField =
   | "collection"
   | "library"
   | "format"
+  | "fileSize"
   | "addedAt"
   | "startedAt"
   | "finishedAt"
@@ -109,6 +111,7 @@ export const FIELD_OPERATORS: Record<StaticRuleField, RuleOperator[]> = {
   collection: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   library: ["includesAny", "excludesAll"],
   format: ["includesAny", "excludesAll"],
+  fileSize: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   publishedDate: ["before", "after", "between", "withinLast", "isEmpty", "isNotEmpty"],
   publishedYear: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   seriesIndex: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],

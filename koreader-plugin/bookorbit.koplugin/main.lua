@@ -48,7 +48,7 @@ local BookOrbitProgressSync = require("bookorbit_progress_sync")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "1.5.0"
+local PLUGIN_VERSION = "1.5.1"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -59,6 +59,7 @@ local SYNC_STRATEGY = {
 local LAST_ERROR_LABELS = {
     auth = _("login failed"),
     network = _("server not reachable"),
+    server = _("server request failed"),
     invalid_json = _("invalid server response"),
     unsupported_server = _("server update required"),
     body_too_large = _("request too large"),

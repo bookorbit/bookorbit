@@ -10,9 +10,12 @@ vi.mock('@/lib/api', () => ({
 function makeCollection(overrides: Partial<Collection> = {}): Collection {
   return {
     id: 7,
+    userId: 1,
     name: 'Favorites',
     icon: 'FolderOpen',
     description: null,
+    isPublic: false,
+    isOwner: true,
     syncToKobo: false,
     displayOrder: 0,
     bookCount: 0,
@@ -50,6 +53,23 @@ describe('useCollections', () => {
       icon: 'FolderOpen',
     })
     expect(collections.value).toEqual([created])
+  })
+
+  it('sends explicit visibility when creating a public collection', async () => {
+    const created = makeCollection({ isPublic: true })
+    apiMock.mockResolvedValueOnce(makeResponse(created))
+
+    const { useCollections } = await import('../useCollections')
+    const { createCollection } = useCollections()
+
+    await createCollection('Shared', 'Globe', undefined, true)
+
+    const [, request] = apiMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(request.body))).toEqual({
+      name: 'Shared',
+      icon: 'Globe',
+      isPublic: true,
+    })
   })
 
   it('removes deleted collections from local state', async () => {

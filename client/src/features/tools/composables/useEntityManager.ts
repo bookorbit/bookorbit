@@ -374,6 +374,14 @@ export function useEntityManager() {
     selectionAnchorSelected.value = shouldSelect
   }
 
+  function setSelection(ids: (number | string)[], selected: boolean): void {
+    const newSet = new Set(selectedIds.value)
+    ids.forEach((id) => setItemSelected(newSet, id, selected))
+    selectedIds.value = newSet
+    selectionAnchorId.value = null
+    selectionAnchorSelected.value = false
+  }
+
   function rangeSelectTo(targetId: number | string): void {
     if (selectionAnchorId.value === null) {
       toggleSelection(targetId)
@@ -467,6 +475,7 @@ export function useEntityManager() {
     selectedItemsMap,
     toggleSelection,
     rangeSelectTo,
+    setSelection,
     removeFromSelection,
     clearSelection,
 

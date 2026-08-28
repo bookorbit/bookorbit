@@ -13,6 +13,7 @@ export const collections = pgTable(
     name: text('name').notNull(),
     icon: text('icon'),
     description: text('description'),
+    isPublic: boolean('is_public').notNull().default(false),
     syncToKobo: boolean('sync_to_kobo').notNull().default(false),
     displayOrder: integer('display_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -24,6 +25,7 @@ export const collections = pgTable(
   (t) => [
     uniqueIndex('collections_user_name_uidx').on(t.userId, t.name),
     index('collections_user_display_name_idx').on(t.userId, t.displayOrder, t.name),
+    index('collections_public_display_name_idx').on(t.isPublic, t.displayOrder, t.name),
   ],
 );
 
@@ -47,3 +49,6 @@ export const collectionBooks = pgTable(
     index('collection_books_collection_position_idx').on(table.collectionId, table.position),
   ],
 );
+
+export type Collection = typeof collections.$inferSelect;
+export type NewCollection = typeof collections.$inferInsert;

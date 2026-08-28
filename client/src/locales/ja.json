@@ -6555,24 +6555,14 @@
       "series": "シリーズ"
     },
     "bulkRename": {
-      "previewToolbar": "プレビューの名前を変更",
-      "renameSettings": "設定の名前を変更",
       "library": "ライブラリ",
       "noEligibleLibraries": "ファイル名が有効になっているライブラリがありません。ライブラリ設定で有効にしてください。",
       "refresh": "更新",
-      "applyRename": "名前の変更を適用",
-      "showFullPaths": "フルパスを表示",
-      "columnsMenu": "列",
-      "renamingInProgress": "ファイル名を変更する - いつでもキャンセルできます。",
-      "executionFailed": "一括名称変更に失敗しました",
       "previewFailed": "プレビューの読み込みに失敗しました",
-      "noBooksMatch": "現在のフィルタに一致する本が見つかりませんでした。",
+      "executionFailed": "一括名称変更に失敗しました",
       "openBookDetails": "本の詳細を開く",
-      "columns": {
-        "title": "タイトル",
-        "currentPath": "現在のパス",
-        "newPath": "新しいパス",
-        "status": "ステータス"
+      "filter": {
+        "all": "すべて"
       },
       "status": {
         "willRename": "名前を変更する",
@@ -6581,32 +6571,10 @@
         "noPattern": "パターンなし",
         "error": "エラー"
       },
-      "filter": {
-        "all": "すべて"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "名前を変更するには {count}",
-        "unchanged": "{count} 変更しない",
-        "collisions": "{count, plural, =0 {# コリジョン} one {# コリジョン} other {# コリジョン}}",
-        "errors": "{count, plural, =0 {# error} one {# error} other {# errors}}"
-      },
       "empty": {
         "title": "開始するライブラリを選択",
         "description": "上記のライブラリを選択すると、変更の名前をプレビューし、ステータスごとにフィルタを適用し、一括変更を実行できます。",
         "chooseLibrary": "ライブラリを選択"
-      },
-      "completed": {
-        "title": "一括リネーム完了",
-        "stats": "{succeeded} の名前が変更され、 {failed} に失敗しました。 {skipped} スキップしました (合計:{processed} 合計)"
-      },
-      "pagination": {
-        "showing": "{from}-{to} の {total} を表示"
-      },
-      "confirmDialog": {
-        "title": "一括リネームを確認",
-        "body": "{count, plural, =0 {ディスク上の # 本の名前を変更します。衝突やエラーのあるファイルはスキップされます。この操作は元に戻せません。} one {ディスク上の # 本の名前を変更します。衝突やエラーのあるファイルはスキップされます。この操作は元に戻せません。} other {ディスク上の # 冊のブックの名前が変更されます。衝突またはエラーのあるファイルはスキップされます。この操作は元に戻せません。}}",
-        "renameButton": "{count, plural, =0 {リネーム # 本} one {リネーム # 本} other {リネーム # 本}}"
       }
     },
     "bookDuplicates": {

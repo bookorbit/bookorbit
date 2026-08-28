@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 import type { BulkRenameStatus } from '@bookorbit/types';
 
@@ -18,4 +18,14 @@ export class BulkRenamePreviewQueryDto {
   @IsOptional()
   @IsIn(VALID_STATUSES)
   status?: BulkRenameStatus;
+
+  /**
+   * Free-text filter over title and current path. Applied across the whole candidate set rather
+   * than the current page, so a match on a later page is still reachable.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  search?: string;
 }

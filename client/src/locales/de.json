@@ -2275,13 +2275,27 @@
           "action": "Änderungen speichern",
           "blocked": "Das ungültige Muster vor dem Speichern korrigieren"
         },
+        "examplesDescription": "Idioms die Rezepte decken nicht ab. Ein Muster, das in einem Schrägstrich endet, löst sich in einen Ordner und hält den hochgeladenen Dateinamen drin.",
         "examplesApply": "Anwenden",
         "examplesApplyAria": "{label} Muster anwenden",
+        "examplesUploadOnly": "Upload-Muster zur Referenz. Wechseln Sie zu einer Datei als Buch oder als Buchregel zu einer Datei, um eins anzuwenden.",
+        "examplesFileModeOnly": "Ordner als Buch benötigt ein eigenes Segment für Dateinamen, daher gilt dieses Idiom nur für \"Datei als Buch\"-bibliotheken.",
         "example": {
           "seriesOrStandalone": "Reihe oder eigenständiger Ordner",
           "optionalSubtitle": "Optionaler Untertitel",
-          "languageFolder": "Sprach-Verzeichnis"
-        }
+          "languageFolder": "Sprach-Verzeichnis",
+          "publisherFolder": "Verlags-Ordner",
+          "stackedOptional": "Gestapelte optionale Ordner",
+          "folderDrop": "Nur den Ordner, den Dateinamen beibehalten"
+        },
+        "exampleCase": {
+          "complete": "Vollständig",
+          "noSeries": "Ohne Reihe",
+          "noSubtitle": "Kein Untertitel",
+          "noLanguage": "Keine Sprache",
+          "noPublisher": "Ohne Verlag"
+        },
+        "unknownModifier": "Unbekannter Modifikator \"{modifier}\". Dieser wird ignoriert, sodass der Wert unverändert bleibt."
       },
       "kobo": {
         "title": "Kobo-Synchronisierung",
@@ -2322,6 +2336,8 @@
         "twoWaySyncHint": "Synchronisiert die Leseposition zwischen BookOrbit und Kobo. Erfordert KEPUB-Zustellung für präzise Positionen und zuverlässige Wiederherstellung der Seite.",
         "syncHighlights": "BookOrbit-Markierungen mit Kobo synchronisieren",
         "syncHighlightsHint": "Sendet Markierungen, die in BookOrbit oder KOReader erstellt wurden, an Ihr Kobo. Kobo-Markierungen werden auch dann in BookOrbit importiert, wenn diese Option deaktiviert ist. Verknüpfte Anmerkungen synchronisieren Bearbeitungen und Löschungen in beide Richtungen. Erfordert KEPUB-Zustellung; das Buch auf dem Kobo muss das von BookOrbit heruntergeladene KEPUB sein.",
+        "storeSync": "Kobo Store-Titel einbeziehen",
+        "storeSyncHint": "Übermitteln Sie auch Bücher von Ihrem Kobo Account, einschließlich Kobo Plus käufe, neben Ihrer BookOrbit Bibliothek. Ohne dies erreichen nur Bücher von BookOrbit das Gerät. Store-Titel werden direkt von Kobo heruntergeladen und werden nicht zu Ihrer BookOrbit Bibliothek hinzugefügt.",
         "convertKepub": "In KEPUB konvertieren",
         "convertKepubHint": "Sendet geeignete EPUBs als KEPUB. Dies bleibt aktiviert, solange Fortschrittssynchronisierung oder Markierungen von BookOrbit zu Kobo aktiviert sind. Bei der nächsten Kobo-Synchronisierung werden betroffene Bücher erneut als KEPUB-Downloads angeboten; entfernen Sie eine alte EPUB-Kopie, falls Kobo diese weiterhin öffnet.",
         "forceHyphenation": "Silbentrennung erzwingen",
@@ -2494,6 +2510,8 @@
         "daysAgo": "vor {count} Tagen",
         "unknown": "Unbekannt",
         "updateAvailable": "Update verfügbar",
+        "manualUpdateRequired": "Manuelles Update erforderlich",
+        "manualUpdateExplanation": "Diese Plugin-Version kann keine eigenen Updates installieren. Laden Sie das \"bookorbit.koplugin\"-Plugin herunter und speichern sie es unter \"koreader/plugins/\" auf dem Gerät.",
         "upToDate": "Aktuell",
         "versionUnknown": "Version unbekannt",
         "latestPlugin": "Neuestes Plugin: v{version}",
@@ -2507,6 +2525,23 @@
         "usernamePlaceholder": "z. B. meinreader",
         "password": "Passwort",
         "passwordPlaceholder": "Mindestens 6 Zeichen",
+        "changeCredentials": {
+          "action": "Zugangsdaten ändern",
+          "title": "KOReader Zugangsdaten ändern",
+          "description": "Jedes BookOrbit-Konto hat eigene KOReader-Zugangsdaten. Ändern Sie sie es hier, ohne synchronisierte Daten zu löschen.",
+          "newPassword": "Neues Passwort",
+          "usernameInvalid": "Der Benutzername muss zwischen 3 und 100 Zeichen lang sein.",
+          "passwordPlaceholder": "Leer lassen, um das aktuelle Passwort beizubehalten",
+          "passwordHint": "Lassen Sie dieses Feld leer, um das aktuelle Passwort zu behalten.",
+          "passwordInvalid": "Das Passwort muss zwischen 6 und 128 Zeichen lang sein.",
+          "deviceNotice": "Geräte, die den vorherigen Login verwenden, müssen mit einem neu heruntergeladenen Plugin-Paket erneut verbunden oder aktualisiert werden.",
+          "showPassword": "Neues Passwort anzeigen",
+          "hidePassword": "Neues Passwort verbergen",
+          "save": "Anmeldedaten speichern",
+          "saving": "Speichern...",
+          "updated": "KOReader Zugangsdaten aktualisiert",
+          "updateFailed": "KOReader Anmeldedaten konnten nicht aktualisiert werden"
+        },
         "creating": "Wird erstellt ...",
         "create": "Erstellen",
         "credentialsCreated": "KOReader-Synchronisierungsanmeldedaten erstellt",
@@ -2523,6 +2558,8 @@
         "credentialsCreatedLabel": "Anmeldedaten erstellt",
         "setup": "Einrichtung",
         "pluginServerUrl": "Plugin-Server-URL",
+        "syncUrl": "KOReader Sync-URL",
+        "syncUrlHint": "Funktioniert mit dem BookOrbit-Plugin und KOReader's eingebauter Fortschrittssynchronisierung.",
         "copied": "Kopiert",
         "copyUrl": "URL kopieren",
         "preconfiguredPlugin": "Vorkonfiguriertes BookOrbit-Plugin",
@@ -2562,6 +2599,7 @@
         "stockStep1Prefix": "Gehen Sie auf Ihrem KOReader-Gerät zu",
         "stockStep1Suffix": ".",
         "stockStep2": "Stellen Sie den benutzerdefinierten Synchronisierungsserver auf die oben gezeigte URL ein.",
+        "stockStep2InlineUrl": "Setze den benutzerdefinierten Sync-Server auf die folgende URL:",
         "stockStep3": "Geben Sie den erstellten Benutzernamen und das Passwort ein und tippen Sie dann auf Anmelden.",
         "locationNote": "BookOrbit speichert KOReader-kompatible EPUB-Positionen aus dem Web-Reader. Die Wiederherstellung sollte in etwa an der gleichen Position landen, wobei die genaue Zeilenplatzierung je nach Reader und EPUB-Layout variieren kann.",
         "dangerZone": "Gefahrenzone",
@@ -2680,6 +2718,9 @@
         "removeDeviceFailed": "Entfernen des Geräts fehlgeschlagen",
         "removeDeviceConfirmTitle": "{device} entfernen?",
         "removeDeviceConfirmBody": "Dies löscht dauerhaft den synchronisierten Fortschritt, die Leseaktivität und alle nicht zugeordneten Bucheinträge dieses Geräts, die von keinem anderen Gerät mehr gemeldet werden. Wenn das Gerät später erneut synchronisiert, erscheint es wieder als neuer Eintrag.",
+        "deleteDeviceDataConfirmTitle": "Synchronisierte Daten von {device} löschen?",
+        "deleteDeviceDataConfirmBody": "Dies löscht dauerhaft den synchronisierten Fortschritt dieses Geräts, die Seiten-für-Seiten-Leseaktivität und alle nicht übereinstimmenden Bucheinträge, die nicht mehr von einem anderen Gerät gemeldet werden. Das Lesen von Sessions, die bereits in deinen Statistiken aufgezeichnet wurden, wird beibehalten. Wenn das Gerät später erneut synchronisiert wird, wird es als neuer Eintrag wieder erscheinen.",
+        "devicesHint": "Das Abmelden des Gerätes blendet es aus, es behält jedoch seine Daten. Das Löschen der synchronisierten Daten kann nicht rückgängig gemacht werden.",
         "retire": "Archivieren",
         "retiring": "Archiviert...",
         "restore": "Wiederherstellen",
@@ -2762,10 +2803,35 @@
     },
     "nav": {
       "title": "Einstellungen",
+      "ariaLabel": "Einstellungsbereiche",
+      "searchPlaceholder": "Sucheinstellungen",
+      "clearSearch": "Suche zurücksetzen",
+      "noResults": "Keine Einstellungen entsprechen {query}.",
+      "shortcutHint": "Drücke Cmd K um zu einer beliebigen Einstellung zu springen",
+      "groups": {
+        "you": "Du",
+        "library": "Bibliothek",
+        "devices": "Geräte & Synchronisation",
+        "server": "Server"
+      },
       "descriptions": {
+        "profile": "Name, E-Mail, Passwort und aktive Sitzungen.",
+        "appearanceTheme": "Thema, Akzente Farbe, Hintergrund und Eckradius.",
+        "appearanceBookCovers": "Schatten, Buchrücken-Effekte und Platzhalter-Kunstwerk abdecken.",
+        "appearanceIcons": "Wählen Sie den Symbol-Stil, der in der gesamten App verwendet wird.",
         "appearanceLayout": "Standard Bibliotheksansicht, Dichte und Abstand.",
         "appearanceBehavior": "Wie die Bibliothek reagiert, wie Sie suchen und sortieren.",
-        "appearanceLanguage": "Interface-Sprache und regionale Formate."
+        "appearanceLanguage": "Interface-Sprache und regionale Formate.",
+        "readerEbook": "Schriftarten, Abstände und Seitenverhalten für eBooks.",
+        "readerPdf": "Rendering, Zoom, und Seite passend für PDFs.",
+        "readerComics": "Leserichtung und Seitenaufteilung für Comics.",
+        "readerAudio": "Wiedergabegeschwindigkeit, überspringe Intervalle und Sleep-Timer.",
+        "readerFonts": "Schriftarten während des Lesens verfügbar.",
+        "readerGeneral": "Standardwerte werden von jedem Lesemodus geteilt.",
+        "notifications": "Was BookOrbit erzählt und wo.",
+        "privacy": "Lese-Einsichten, gemeinsame Links und Aktivitätssichtbarkeit.",
+        "restrictions": "Altersbewertungen und verborgene Inhalte für dieses Konto.",
+        "accountActivity": "Lese- und Sitzungsaktivität pro Benutzer."
       }
     }
   },
@@ -3088,7 +3154,15 @@
         "reason": {
           "locked": "{name} ist nach zu vielen fehlgeschlagenen Anmeldungen gesperrt",
           "neverSignedIn": "{name} hat sich noch nie angemeldet"
-        }
+        },
+        "collapse": "Ausblenden",
+        "expand": "Anzeigen"
+      },
+      "defaults": {
+        "title": "Standardwerte für neue Konten",
+        "appliesTo": "Gilt für Selbstregistrierung und OIDC",
+        "startingLibraries": "Start-Bibliotheken",
+        "startingLibrariesHint": "Leserechte automatisch für jedes neues Benutzerkonto."
       }
     }
   },
@@ -3214,7 +3288,9 @@
         "noMatch": "Keine Markierungen entsprechen Ihren Filtern.",
         "resetFilters": "Filter zurücksetzen",
         "trashEmpty": "Papierkorb ist leer",
-        "noAnnotations": "Noch keine Markierungen. Im Web oder auf Ihrem E-Reader erstellte Markierungen erscheinen hier."
+        "noAnnotations": "Noch keine Markierungen. Im Web oder auf Ihrem E-Reader erstellte Markierungen erscheinen hier.",
+        "syncKoreaderBody": "Das Plugin lädt Anmerkungen mit ihren Positionen hoch.",
+        "goToLibrary": "Gehe zur Bibliothek"
       },
       "toast": {
         "movedToTrash": "In den Papierkorb verschoben",
@@ -3224,16 +3300,63 @@
         "bulkTrashed": "{count, plural, =0 {Keine Markierungen in den Papierkorb verschoben} one {# Markierung in den Papierkorb verschoben} other {# Markierungen in den Papierkorb verschoben}}",
         "bulkRestored": "{count, plural, =0 {Keine Markierungen wiederhergestellt} one {# Markierung wiederhergestellt} other {# Markierungen wiederhergestellt}}",
         "bulkRecolored": "{count, plural, =0 {Farbe für keine Markierung geändert} one {Farbe für # Markierung geändert} other {Farbe für # Markierungen geändert}}",
-        "bulkRestyled": "{count, plural, =0 {Stil für keine Markierung geändert} one {Stil für # Markierung geändert} other {Stil für # Markierungen geändert}}"
+        "bulkRestyled": "{count, plural, =0 {Stil für keine Markierung geändert} one {Stil für # Markierung geändert} other {Stil für # Markierungen geändert}}",
+        "noteSaved": "Notiz gespeichert"
       },
+      "railTitle": "{marks} Markierungen · {books} Bücher",
+      "lastTwelveMonths": "Letzte 12 Monate",
+      "colour": "Farbe",
+      "whereFrom": "Woher sie kommen",
+      "theShelf": "Das Regal",
+      "devices": "Geräte",
+      "reviewThem": "Diese überprüfen",
+      "anchorLost": "Anker verloren",
+      "anchorRepaired": "Repariert",
+      "notes": "Notizen",
+      "review": "Überprüfen",
+      "viewLabel": "Gruppieren und sortieren",
       "views": {
+        "newest": "Neueste zuerst",
+        "oldest": "Älteste zuerst",
+        "book": "Nach Buch",
         "color": "Nach Farbe",
         "source": "Nach Quelle"
       },
       "matchCount": "{shown} von {total}",
       "moreActions": "Weitere Aktionen",
       "loadMore": "{count, plural, one {Lade 1 mehr} other {Lade # mehr}}",
-      "openBook": "Buch öffnen"
+      "openBook": "Buch öffnen",
+      "noteLabel": "Notiz",
+      "yourNote": "Ihre Notiz",
+      "notePlaceholder": "Sag', warum es wichtig war.",
+      "openAtThisPage": "An dieser Seite öffnen",
+      "positionAndSync": "Position & Synchronisierung",
+      "loadFailed": "Konnte die Highlights nicht laden. Versuche es in einem Moment erneut.",
+      "chips": {
+        "dateBetween": "{from} bis {to}",
+        "dateFrom": "Von {from}",
+        "dateUntil": "Bis {to}"
+      },
+      "activitySummary": "{count, plural, one {# Hervorhebung zwischen {from} und {to}} other {# Hervorhebung zwischen {from} und {to}}}",
+      "book": "Buch",
+      "needsReview": "Benötigt Überprüfung"
+    },
+    "sources": {
+      "web": "Web",
+      "koreader": "KOReader",
+      "kobo": "Kobo"
+    },
+    "colors": {
+      "yellow": "Gelb",
+      "green": "Grün",
+      "blue": "Blau",
+      "pink": "Pink",
+      "orange": "Orange",
+      "red": "Rot",
+      "olive": "Olivgrün",
+      "cyan": "Cyan",
+      "purple": "Lila",
+      "gray": "Grau"
     }
   },
   "audit": {
@@ -3247,6 +3370,22 @@
     "showLess": "Weniger anzeigen",
     "details": "Details",
     "hideDetails": "Details ausblenden",
+    "refresh": "Auditprotokolle aktualisieren",
+    "loadError": "Audit-Ereignisse konnten nicht geladen werden.",
+    "removeFilter": "Filter {value} entfernen",
+    "allActions": "Alle Aktionen",
+    "allEventTypes": "Alle Ereignistypen",
+    "allActors": "Alle Akteure",
+    "noActionsFound": "Keine passenden Aktionen",
+    "noActorsFound": "Keine passenden Akteure",
+    "noResourcesFound": "Keine passenden Zieltypen",
+    "unknownAction": "Unbekannte Aktion",
+    "unknownResource": "Anderer Zieltyp",
+    "allResources": "Alle Ressourcen",
+    "allTargetTypes": "Alle Zieltypen",
+    "quickDates": "Schnellauswahl Datum",
+    "today": "Heute",
+    "sevenDays": "7 Tage",
     "detailAction": "Aktion: {value}",
     "detailIp": "IP: {value}",
     "showing": "Zeige {from}-{to} von {total}",
@@ -3273,6 +3412,22 @@
       "action": "Aktion",
       "description": "Beschreibung",
       "ip": "IP"
+    },
+    "resourceLabels": {
+      "Collection": "Sammlung",
+      "SmartScope": "Intelligenter Bereich",
+      "BookDockFile": "Buchdock-Datei",
+      "Author": "Autor",
+      "AppSettings": "App-Einstellungen",
+      "Genre": "Genre",
+      "Tag": "Tag",
+      "KoboDevice": "Kobo-Gerät",
+      "EmailProvider": "E-Mail-Anbieter",
+      "EmailTemplate": "E-Mail-Vorlage",
+      "EmailRecipient": "E-Mail-Empfänger"
+    },
+    "actionLabels": {
+      "AuthSessionRevoke": "Sitzung widerrufen"
     }
   },
   "auth": {
@@ -3940,7 +4095,9 @@
         "koboNotSynced": "Nicht synchronisiert",
         "koboNotSyncedTooltip": "Für die nächste Kobo-Synchronisierung vorgemerkt.",
         "filesNotFound": "Dateien nicht gefunden",
-        "filesNotFoundDescription": "Die Datei(en) für dieses Buch können auf dem Datenträger nicht mehr gefunden werden. Die Metadaten sind weiterhin verfügbar. Führen Sie einen Bibliotheks-Scan durch, um dies zu bestätigen, oder entfernen Sie den Eintrag."
+        "filesNotFoundDescription": "Die Datei(en) für dieses Buch können auf dem Datenträger nicht mehr gefunden werden. Die Metadaten sind weiterhin verfügbar. Führen Sie einen Bibliotheks-Scan durch, um dies zu bestätigen, oder entfernen Sie den Eintrag.",
+        "noSessionsYet": "Noch keine Lesesitzungen. Das Öffnen dieses Buches im Reader verfolgt Zeit, Tempo und Fortschritt pro Gerät.",
+        "activitySessions": "Sitzungen"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {keine Felder} one {ein Feld} other {# Felder}}",
@@ -4195,6 +4352,29 @@
         "paginationUnit": "Markierungen"
       },
       "readingLog": {
+        "vitals": {
+          "sessions": "Sitzungen",
+          "avgSession": "Durchschnittliche Sitzung",
+          "addSession": "Sitzung hinzufügen"
+        },
+        "ledger": {
+          "title": "Sitzungen",
+          "empty": "Noch keine Sitzungen aufgezeichnet",
+          "emptyHint": "Öffnen Sie das Buch im Reader, synchronisieren Sie ein Gerät oder fügen Sie eine Sitzung per Hand hinzu."
+        },
+        "attempts": {
+          "sessionCount": "{count, plural, one {# Sitzung} other {# Sitzungen}}"
+        },
+        "records": {
+          "longestSession": "Längste Sitzung",
+          "empty": "Die Aufzeichnungen erscheinen, sobald dieses Buch Sitzungen hat."
+        },
+        "band": {
+          "curveSubSitting": "Eine Sitzung, Sitzung für Sitzung",
+          "traceSub": "Jeder Balken zeigt die Spanne einer Sitzung",
+          "traceSubWithBacktracks": "{count, plural, one {Jeder Balken zeigt eine Sitzung, # zurückgesprungen} other {Jeder Balken zeigt eine Sitzung, # zurückgesprungen}}",
+          "traceEmptyHint": "Sobald Sessions existieren, zeigen diese die gelesene Spanne, inklusive Rücksprünge auf vorherige Seiten."
+        },
         "moreActionsAria": "Weitere Aktionen für das Leseprotokoll",
         "export": {
           "button": "Exportieren"
@@ -6504,19 +6684,11 @@
       "selectLibraryPlaceholder": "Bibliothek auswählen...",
       "noEligibleLibraries": "Für keine Bibliothek ist das Umbenennen von Dateien aktiviert. Aktivieren Sie es in den Bibliothekseinstellungen.",
       "refresh": "Aktualisieren",
-      "applyRename": "Umbenennung anwenden",
-      "showFullPaths": "Vollständige Pfade anzeigen",
-      "columnsMenu": "Spalten",
-      "renamingInProgress": "Dateien werden umbenannt - Sie können jederzeit abbrechen.",
-      "executionFailed": "Massenumbenennung fehlgeschlagen",
       "previewFailed": "Vorschau konnte nicht geladen werden",
-      "noBooksMatch": "Keine Bücher gefunden, die dem aktuellen Filter entsprechen.",
+      "executionFailed": "Massenumbenennung fehlgeschlagen",
       "openBookDetails": "Buchdetails öffnen",
-      "columns": {
-        "title": "Titel",
-        "currentPath": "Aktueller Pfad",
-        "newPath": "Neuer Pfad",
-        "status": "Status"
+      "filter": {
+        "all": "Alle"
       },
       "status": {
         "willRename": "Wird umbenannt",
@@ -6525,32 +6697,10 @@
         "noPattern": "Kein Muster",
         "error": "Fehler"
       },
-      "filter": {
-        "all": "Alle"
-      },
-      "summary": {
-        "label": "Zusammenfassung",
-        "toRename": "{count} zum Umbenennen",
-        "unchanged": "{count} unverändert",
-        "collisions": "{count, plural, =0 {# Konflikt} one {# Konflikt} other {# Konflikte}}",
-        "errors": "{count, plural, =0 {# Fehler} one {# Fehler} other {# Fehler}}"
-      },
       "empty": {
         "title": "Bibliothek zum Starten auswählen",
         "description": "Wählen Sie oben eine Bibliothek aus, um Umbenennungsänderungen in der Vorschau anzuzeigen, nach Status zu filtern und den Massenumbenennungslauf anzuwenden.",
         "chooseLibrary": "Bibliothek wählen"
-      },
-      "completed": {
-        "title": "Massenumbenennung abgeschlossen",
-        "stats": "{succeeded} umbenannt, {failed} fehlgeschlagen, {skipped} übersprungen ({processed} insgesamt)"
-      },
-      "pagination": {
-        "showing": "Zeige {from}-{to} von {total}"
-      },
-      "confirmDialog": {
-        "title": "Massenumbenennung bestätigen",
-        "body": "{count, plural, =0 {Dadurch werden # Bücher auf dem Datenträger umbenannt. Dateien mit Konflikten oder Fehlern werden übersprungen. Diese Aktion kann nicht rückgängig gemacht werden.} one {Dadurch wird # Buch auf dem Datenträger umbenannt. Dateien mit Konflikten oder Fehlern werden übersprungen. Diese Aktion kann nicht rückgängig gemacht werden.} other {Dadurch werden # Bücher auf der Festplatte umbenannt. Dateien mit Konflikten oder Fehlern werden übersprungen. Diese Aktion kann nicht rückgängig gemacht werden.}}",
-        "renameButton": "{count, plural, =0 {# Buch umbenennen} one {# Buch umbenennen} other {# Bücher umbenennen}}"
       }
     },
     "bookDuplicates": {

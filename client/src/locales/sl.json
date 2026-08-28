@@ -6962,25 +6962,15 @@
       "series": "Serija"
     },
     "bulkRename": {
-      "previewToolbar": "Preodgled preimenovanja",
-      "renameSettings": "Nastavitve preimenovanja",
       "library": "Knjižnica",
       "selectLibraryPlaceholder": "Izberi knjižnico...",
       "noEligibleLibraries": "Nobena knjižnica nima omogočenega preimenovanja datotek. Omogočite ga v nastavitvah knjižnice.",
       "refresh": "Osveži",
-      "applyRename": "Uveljavi preimenovanje",
-      "showFullPaths": "Prikaži polne poti",
-      "columnsMenu": "Stolpci",
-      "renamingInProgress": "Preimenovanje datotek poteka - kadar koli lahko prekličete.",
-      "executionFailed": "Množično preimenovanje ni uspelo",
       "previewFailed": "Predogleda ni bilo mogoče naložiti",
-      "noBooksMatch": "Ni najdenih knjig, ki bi ustrezale trenutnemu filtru.",
+      "executionFailed": "Množično preimenovanje ni uspelo",
       "openBookDetails": "Odpri podrobnosti knjige",
-      "columns": {
-        "title": "Naslov",
-        "currentPath": "Trenutna pot",
-        "newPath": "Nova pot",
-        "status": "Stanje"
+      "filter": {
+        "all": "Vse"
       },
       "status": {
         "willRename": "Bo preimenovano",
@@ -6989,32 +6979,10 @@
         "noPattern": "Ni vzorca",
         "error": "Napaka"
       },
-      "filter": {
-        "all": "Vse"
-      },
-      "summary": {
-        "label": "Povzetek",
-        "toRename": "{count} za preimenovanje",
-        "unchanged": "{count} nespremenjenih",
-        "collisions": "{count, plural, =0 {# trkov} one {# trk} two {# trki} few {# trki} other {# trki}}",
-        "errors": "{count, plural, =0 {# napak} one {# napaka} two {# napake} few {# napake} other {# napake}}"
-      },
       "empty": {
         "title": "Izberite knjižnico za začetek",
         "description": "Zgoraj izberite knjižnico za predogled sprememb preimenovanja, filtriranje po stanju in izvedbo množičnega preimenovanja.",
         "chooseLibrary": "Izberi knjižnico"
-      },
-      "completed": {
-        "title": "Množično preimenovanje končano",
-        "stats": "{succeeded} preimenovanih, {failed} neuspešnih, {skipped} preskočenih (skupaj {processed})"
-      },
-      "pagination": {
-        "showing": "Prikazano {from}-{to} od {total}"
-      },
-      "confirmDialog": {
-        "title": "Potrdi množično preimenovanje",
-        "body": "{count, plural, =0 {To bo preimenovalo # knjig na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} one {To bo preimenovalo # knjigo na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} two {To bo preimenovalo # knjigi na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} few {To bo preimenovalo # knjigi na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.} other {To bo preimenovalo # knjigi na disku. Datoteke s trki ali napakami bodo preskočene. Tega dejanja ni mogoče razveljaviti.}}",
-        "renameButton": "{count, plural, =0 {Preimenuj # knjig} one {Preimenuj # knjigo} two {Preimenuj # knjigi} few {Preimenuj # knjigi} other {Preimenuj # knjigi}}"
       }
     },
     "bookDuplicates": {

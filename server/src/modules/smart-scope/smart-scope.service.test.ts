@@ -127,7 +127,12 @@ describe('SmartScopeService', () => {
     const result = await service.findAll(user);
 
     expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(1);
-    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(secondSmartScope.filter, { accessibleLibraryIds: [2, 3], userId: 8, timeZone: 'UTC' });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(secondSmartScope.filter, {
+      accessibleLibraryIds: [2, 3],
+      userId: 8,
+      timeZone: 'UTC',
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
     expect(result).toEqual([
       { ...firstSmartScope, isOwner: false, koboSyncEnabled: false, bookCount: 0 },
       { ...secondSmartScope, isOwner: false, koboSyncEnabled: false, bookCount: 7 },
@@ -162,7 +167,12 @@ describe('SmartScopeService', () => {
       { ...healthyScope, isOwner: false, koboSyncEnabled: false, bookCount: 7 },
     ]);
     expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(1);
-    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(healthyScope.filter, { accessibleLibraryIds: [2, 3], userId: 8, timeZone: 'UTC' });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(healthyScope.filter, {
+      accessibleLibraryIds: [2, 3],
+      userId: 8,
+      timeZone: 'UTC',
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[smart_scope.count] [fail] scopeId=1 userId=8'));
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('durationMs='));

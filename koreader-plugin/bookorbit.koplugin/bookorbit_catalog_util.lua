@@ -386,6 +386,15 @@ function CatalogUtil.safeFilenameBase(detail)
     return base
 end
 
+function CatalogUtil.transferErrorText(err)
+    if err == "unsafe_destination" then
+        return _("The download destination is outside the selected folder.")
+    elseif err == "temp_dir_failed" then
+        return _("Could not create a temporary download folder in the selected folder.")
+    end
+    return nil
+end
+
 function CatalogUtil.coverLabel(book)
     local lines = {}
     local title = book and book.title or _("Untitled")

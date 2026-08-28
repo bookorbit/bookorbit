@@ -597,4 +597,11 @@ describe('metadata format extractors', () => {
       }),
     );
   });
+
+  // Persisting an unreadable file as empty metadata would wipe whatever the book already had.
+  it('AudioFormatExtractor returns null when the file cannot be read', async () => {
+    mockExtractAudioMetadata.mockResolvedValue(null);
+
+    await expect(new AudioFormatExtractor().extract('/books/hail-mary.m4b')).resolves.toBeNull();
+  });
 });

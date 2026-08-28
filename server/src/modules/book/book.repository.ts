@@ -13,7 +13,7 @@ import type {
   TemporalJumpBucketPrecision,
   TemporalJumpBucketUnit,
 } from '@bookorbit/types';
-import type { BookRecommendation } from '@bookorbit/types';
+import type { UnscopedBookRecommendation } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
@@ -1716,7 +1716,7 @@ export class BookRepository {
       .where(inArray(books.id, bookIds));
   }
 
-  async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<BookRecommendation[]> {
+  async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<UnscopedBookRecommendation[]> {
     if (bookIds.length === 0) return [];
 
     const [rows, authorRows] = await Promise.all([

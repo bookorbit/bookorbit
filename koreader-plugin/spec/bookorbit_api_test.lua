@@ -6,11 +6,15 @@ local encoded_subprocess_result
 
 package.loaded["logger"] = {
     dbg = function() end,
+    warn = function() end,
 }
 
 package.loaded["util"] = {
     trim = function(value)
         return tostring(value or ""):match("^%s*(.-)%s*$")
+    end,
+    fixUtf8 = function(value)
+        return value
     end,
     urlEncode = function(value)
         return tostring(value)
@@ -66,8 +70,10 @@ package.loaded["ltn12"] = {
 }
 
 local last_request_url
+local request_count = 0
 package.loaded["socket.http"] = {
     request = function(request)
+        request_count = request_count + 1
         request_ran_in_subprocess = in_subprocess
         last_request_url = request.url
         if mock_http_body then
@@ -78,6 +84,7 @@ package.loaded["socket.http"] = {
 }
 
 local rapidjson_null = {}
+local last_encoded_value
 package.loaded["rapidjson"] = {
     null = rapidjson_null,
     encode = function(value)
@@ -86,6 +93,7 @@ package.loaded["rapidjson"] = {
             encoded_subprocess_result = value
             return "__subprocess_result__"
         end
+        last_encoded_value = value
         return "{}"
     end,
     decode = function(raw)
@@ -170,6 +178,62 @@ client:catalogDashboardSection("up-next-in-series")
 assertEqual(last_request_url,
     "https://bookorbit.example.com/api/v1/koreader/plugin/catalog/dashboard/sections/up-next-in-series",
     "the dashboard-section endpoint is addressed by source type")
+
+local match_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    device_id = "device-id",
+    device_model = "Test device",
+    plugin_version = "1.5.1",
+}
+local hash_a = string.rep("a", 32)
+local hash_b = string.rep("B", 32)
+local invalid_hash = "not-an-md5"
+local oversized_title = string.rep("t", 501)
+local oversized_authors = string.rep("a", 1001)
+
+mock_http_body = "{\"ok\":true}"
+mock_http_code = 200
+body, err = match_client:matchCheck({ hash_a, invalid_hash, hash_b }, {
+    [hash_a] = {
+        title = oversized_title,
+        authors = oversized_authors,
+        last_open = -1,
+        source = "invalid",
+        metadata_ambiguous = "yes",
+    },
+    [hash_b] = {
+        title = 123,
+        authors = {},
+        last_open = "123",
+        source = "file",
+        metadata_ambiguous = false,
+    },
+})
+assertEqual(body.ok, true, "a match-check with one invalid row still reaches the server")
+assertEqual(err, nil, "a sanitized match-check succeeds")
+assertEqual(#last_encoded_value.hashes, 2, "an invalid hash is removed without dropping valid peers")
+assertEqual(last_encoded_value.hashes[1], hash_a, "the first valid hash keeps its position")
+assertEqual(last_encoded_value.hashes[2], hash_b, "the later valid hash closes the filtered gap")
+assertEqual(#last_encoded_value.books, 2, "candidate metadata stays aligned with filtered hashes")
+assertEqual(#last_encoded_value.books[1].title, 500, "an oversized title is bounded to the server contract")
+assertEqual(#last_encoded_value.books[1].authors, 1000, "oversized authors are bounded to the server contract")
+assertEqual(last_encoded_value.books[1].lastOpen, nil, "a negative timestamp is omitted")
+assertEqual(last_encoded_value.books[1].source, nil, "an unknown source is omitted")
+assertEqual(last_encoded_value.books[1].metadataAmbiguous, nil, "a non-boolean ambiguity flag is omitted")
+assertEqual(last_encoded_value.books[2].title, nil, "non-string titles are omitted")
+assertEqual(last_encoded_value.books[2].authors, nil, "non-string authors are omitted")
+assertEqual(last_encoded_value.books[2].lastOpen, 123, "a numeric timestamp string is normalized")
+assertEqual(last_encoded_value.books[2].source, "file", "a valid source is preserved")
+assertEqual(last_encoded_value.books[2].metadataAmbiguous, false, "a boolean ambiguity flag is preserved")
+
+local requests_before_empty_match = request_count
+body, err = match_client:matchCheck({ invalid_hash }, { [invalid_hash] = { title = "Ignored" } })
+assertEqual(type(body), "table", "an all-invalid batch resolves locally")
+assertEqual(#body.matches, 0, "an all-invalid batch has no matches")
+assertEqual(err, nil, "an all-invalid batch is not reported as a network error")
+assertEqual(request_count, requests_before_empty_match, "an empty sanitized batch is not sent to the server")
 
 local wrapped = true
 local subprocess_calls = 0

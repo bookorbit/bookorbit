@@ -3,6 +3,7 @@ import { asc, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import type { TargetBookFile } from './book-file-targets';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookFiles, bookMetadata, bookNarrators, books, libraries, libraryFolders, narrators } from '../../db/schema';
 
@@ -11,6 +12,7 @@ type Db = NodePgDatabase<typeof schema>;
 export interface BulkRenameBookData {
   bookId: number;
   title: string | null;
+  primaryFileId: number;
   absolutePath: string;
   relPath: string | null;
   format: string | null;
@@ -31,6 +33,12 @@ export interface BulkRenameBookData {
   };
   authors: string[];
   narrators: string[];
+  /**
+   * Every file the book owns, not just the primary one. A multi-track audiobook only reveals that
+   * its parts collide on one filename when the siblings are visible, and the preview has to see
+   * that to avoid promising a rename the executor would refuse.
+   */
+  files: TargetBookFile[];
 }
 
 @Injectable()
@@ -41,6 +49,7 @@ export class BulkRenameRepository {
     const rows = await this.db
       .select({
         bookId: books.id,
+        primaryFileId: bookFiles.id,
         absolutePath: bookFiles.absolutePath,
         relPath: bookFiles.relPath,
         format: bookFiles.format,
@@ -70,7 +79,7 @@ export class BulkRenameRepository {
 
     const libraryBookIds = this.db.select({ id: books.id }).from(books).where(eq(books.libraryId, libraryId));
 
-    const [authorRows, narratorRows] = await Promise.all([
+    const [authorRows, narratorRows, fileRows] = await Promise.all([
       this.db
         .select({
           bookId: bookAuthors.bookId,
@@ -89,7 +98,33 @@ export class BulkRenameRepository {
         .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
         .where(inArray(bookNarrators.bookId, libraryBookIds))
         .orderBy(asc(bookNarrators.bookId), asc(bookNarrators.displayOrder)),
+      this.db
+        .select({
+          bookId: bookFiles.bookId,
+          id: bookFiles.id,
+          absolutePath: bookFiles.absolutePath,
+          format: bookFiles.format,
+          role: bookFiles.role,
+          sortOrder: bookFiles.sortOrder,
+        })
+        .from(bookFiles)
+        .where(inArray(bookFiles.bookId, libraryBookIds))
+        .orderBy(asc(bookFiles.bookId), asc(bookFiles.id)),
     ]);
+
+    const filesByBook = new Map<number, TargetBookFile[]>();
+    for (const row of fileRows) {
+      const entry: TargetBookFile = {
+        id: row.id,
+        absolutePath: row.absolutePath,
+        format: row.format,
+        role: row.role,
+        sortOrder: row.sortOrder,
+      };
+      const existing = filesByBook.get(row.bookId);
+      if (existing) existing.push(entry);
+      else filesByBook.set(row.bookId, [entry]);
+    }
 
     const groupByBook = (rows: { bookId: number; name: string }[]): Map<number, string[]> => {
       const byBook = new Map<number, string[]>();
@@ -110,6 +145,7 @@ export class BulkRenameRepository {
     return rows.map((row) => ({
       bookId: row.bookId,
       title: row.title,
+      primaryFileId: row.primaryFileId,
       absolutePath: row.absolutePath,
       relPath: row.relPath,
       format: row.format,
@@ -130,6 +166,7 @@ export class BulkRenameRepository {
       },
       authors: authorsByBook.get(row.bookId) ?? [],
       narrators: narratorsByBook.get(row.bookId) ?? [],
+      files: filesByBook.get(row.bookId) ?? [],
     }));
   }
 

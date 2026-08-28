@@ -59,6 +59,11 @@
   --color-pattern-optional: var(--pattern-optional);
   --color-pattern-fallback: var(--pattern-fallback);
 
+  --color-diff-del: var(--diff-del);
+  --color-diff-ins: var(--diff-ins);
+  --color-path-dim: var(--path-dim);
+  --color-path-fold: var(--path-fold);
+
   --shadow-xs: var(--elevation-xs);
   --shadow-sm: var(--elevation-sm);
   --shadow-md: var(--elevation-md);

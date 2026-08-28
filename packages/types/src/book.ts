@@ -330,9 +330,13 @@ export type BookRecommendation = {
   updatedAt: string | null;
   hasCover: boolean;
   authors: string[];
+  readStatus: UserBookStatus | null;
   isAudiobook?: boolean;
   isComic?: boolean;
 };
+
+/** A recommendation row before a user's read status is attached, for lookups that have no user in scope. */
+export type UnscopedBookRecommendation = Omit<BookRecommendation, "readStatus">;
 
 export type SeriesBookRecommendation = {
   id: number;
@@ -342,6 +346,7 @@ export type SeriesBookRecommendation = {
   seriesIndex: SeriesIndex | null;
   hasCover: boolean;
   authors: string[];
+  readStatus: UserBookStatus | null;
   isAudiobook?: boolean;
   isComic?: boolean;
 };

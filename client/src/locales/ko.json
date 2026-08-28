@@ -7430,25 +7430,15 @@
       "series": "시리즈"
     },
     "bulkRename": {
-      "previewToolbar": "이름 변경 미리보기",
-      "renameSettings": "이름 변경 설정",
       "library": "라이브러리",
       "selectLibraryPlaceholder": "라이브러리를 선택하세요...",
       "noEligibleLibraries": "파일 이름 변경 기능이 활성화된 라이브러리가 없습니다. 라이브러리 설정에서 활성화해 주세요.",
       "refresh": "새로고침",
-      "applyRename": "이름 변경 적용",
-      "showFullPaths": "전체 경로 표시",
-      "columnsMenu": "열",
-      "renamingInProgress": "파일 이름 변경 중 - 언제든지 취소할 수 있습니다.",
-      "executionFailed": "일괄 이름 변경에 실패했습니다.",
       "previewFailed": "미리보기를 불러오는 데 실패했습니다.",
-      "noBooksMatch": "현재 필터와 일치하는 책이 없습니다.",
+      "executionFailed": "일괄 이름 변경에 실패했습니다.",
       "openBookDetails": "책 상세 정보 열기",
-      "columns": {
-        "title": "제목",
-        "currentPath": "현재 경로",
-        "newPath": "새 경로",
-        "status": "상태"
+      "filter": {
+        "all": "모두"
       },
       "status": {
         "willRename": "이름 변경 예정",
@@ -7457,32 +7447,10 @@
         "noPattern": "패턴 없음",
         "error": "오류"
       },
-      "filter": {
-        "all": "모두"
-      },
-      "summary": {
-        "label": "요약",
-        "toRename": "{count}개 이름 변경",
-        "unchanged": "{count} 변화 없음",
-        "collisions": "{count, plural, =0 {#개 충돌} one {#개 충돌} other {#개 충돌}}",
-        "errors": "{count, plural, =0 {#개 오류} one {#개 오류} other {#개 오류}}"
-      },
       "empty": {
         "title": "작업할 라이브러리를 선택하세요",
         "description": "위에서 라이브러리를 선택하여 이름 변경 사항을 미리 확인하고, 상태별로 필터링하고, 일괄 이름 변경을 실행할 수 있습니다.",
         "chooseLibrary": "라이브러리 선택"
-      },
-      "completed": {
-        "title": "일괄 이름 변경 완료",
-        "stats": "{succeeded}개 항목 이름 변경됨, {failed}개 실패, {skipped}개 건너뜀 (총 {processed}개 항목)"
-      },
-      "pagination": {
-        "showing": "총 {total}개 항목 중 {from}-{to} 표시"
-      },
-      "confirmDialog": {
-        "title": "일괄 이름 변경 확인",
-        "body": "{count, plural, =0 {이 작업은 디스크 내 #개 파일의 이름을 변경합니다. 충돌이나 오류가 있는 파일은 건너뜁니다. 이 작업은 되돌릴 수 없습니다.} one {이 작업은 디스크 내 #개 파일의 이름을 변경합니다. 충돌이나 오류가 있는 파일은 건너뜁니다. 이 작업은 되돌릴 수 없습니다.} other {이 작업은 디스크 내 #개 파일의 이름을 변경합니다. 충돌이나 오류가 있는 파일은 건너뜁니다. 이 작업은 되돌릴 수 없습니다.}}",
-        "renameButton": "{count, plural, =0 {#권 이름 변경} one {#권 이름 변경} other {#권 이름 변경}}"
       }
     },
     "bookDuplicates": {

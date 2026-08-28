@@ -4059,6 +4059,7 @@
         "collection": "Collection",
         "library": "Library",
         "format": "Format",
+        "fileSize": "Primary File Size",
         "addedAt": "Added Date",
         "startedAt": "Date Started",
         "finishedAt": "Date Finished",
@@ -4117,7 +4118,8 @@
       "unit": {
         "days": "days",
         "weeks": "weeks",
-        "months": "months"
+        "months": "months",
+        "megabytes": "MB"
       },
       "scorePreset": {
         "outstanding": "Outstanding",
@@ -4126,6 +4128,9 @@
         "poor": "Poor"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "e.g. 10",
+      "fileSizeValueAria": "Primary file size in megabytes",
+      "fileSizeMaximumAria": "Maximum primary file size in megabytes",
       "valuePlaceholder": "value",
       "maxPlaceholder": "max",
       "to": "to",
@@ -5701,6 +5706,8 @@
     }
   },
   "collection": {
+    "visibleToAll": "Visible to all users",
+    "visibleToAllHint": "Every user can see this collection, but only you can change its books",
     "dialog": {
       "name": "Name",
       "icon": "Icon",
@@ -8006,59 +8013,134 @@
       "series": "Series"
     },
     "bulkRename": {
-      "previewToolbar": "Rename preview",
-      "renameSettings": "Rename settings",
       "library": "Library",
       "selectLibraryPlaceholder": "Select a library...",
       "noEligibleLibraries": "No libraries have file rename enabled. Enable it in Library Settings.",
       "refresh": "Refresh",
-      "applyRename": "Apply Rename",
-      "showFullPaths": "Show full paths",
-      "columnsMenu": "Columns",
-      "renamingInProgress": "Renaming files - you can cancel at any time.",
-      "executionFailed": "Bulk rename failed",
       "previewFailed": "Failed to load preview",
-      "noBooksMatch": "No books found matching the current filter.",
+      "executionFailed": "Bulk rename failed",
       "openBookDetails": "Open book details",
-      "columns": {
-        "title": "Title",
-        "currentPath": "Current Path",
-        "newPath": "New Path",
-        "status": "Status"
-      },
-      "status": {
-        "willRename": "Will Rename",
-        "unchanged": "Unchanged",
-        "collision": "Collision",
-        "noPattern": "No Pattern",
-        "error": "Error"
+      "openBook": "Open book",
+      "toRenameCount": "{count, plural, =0 {nothing to rename} one {# to rename} other {# to rename}}",
+      "applyCount": "{count, plural, one {Apply # rename} other {Apply # renames}}",
+      "search": {
+        "placeholder": "Find a book or path",
+        "label": "Find a book",
+        "clear": "Clear search"
       },
       "filter": {
-        "all": "All"
+        "all": "All",
+        "changes": "Changes",
+        "conflicts": "Conflicts",
+        "unchanged": "Unchanged"
       },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} to rename",
-        "unchanged": "{count} unchanged",
-        "collisions": "{count, plural, =0 {# collision} one {# collision} other {# collisions}}",
-        "errors": "{count, plural, =0 {# error} one {# error} other {# errors}}"
+      "status": {
+        "willRename": "Will rename",
+        "unchanged": "Unchanged",
+        "collision": "Conflict",
+        "noPattern": "No pattern",
+        "error": "Error"
+      },
+      "group": {
+        "collision": "Destination conflict",
+        "unchanged": "Already correct",
+        "noPattern": "No naming pattern",
+        "error": "Errored",
+        "includeAll": "Include every {kind} rename",
+        "expand": "Expand {kind}",
+        "collapse": "Collapse {kind}",
+        "heldBack": "These cannot be renamed"
+      },
+      "changeKind": {
+        "ungroup": "Series grouping removed",
+        "flatten": "Duplicate folder level removed",
+        "yearRemoved": "Publication year removed",
+        "yearAdded": "Publication year added",
+        "yearCorrected": "Publication year corrected",
+        "authorSpelling": "Author name spelling",
+        "capitalisation": "Capitalisation and spacing",
+        "unsafeCharacters": "Unsafe characters replaced",
+        "filenameRebuilt": "Filename rebuilt from metadata",
+        "folderRenamed": "Folder renamed",
+        "rebuilt": "Folder and filename rebuilt",
+        "restructured": "Path restructured",
+        "multiple": "Multiple changes"
+      },
+      "select": {
+        "ofSelected": "of {total} selected",
+        "toggleAll": "Select or clear every rename",
+        "toggleGroup": "Select or clear every {kind} rename",
+        "toggleBook": "Rename {title}"
+      },
+      "review": {
+        "loadMore": "Load more",
+        "queue": "Pending renames",
+        "position": "{index} of {total}",
+        "previous": "Previous book",
+        "next": "Next book",
+        "keyboardHint": "move",
+        "keyboardSkip": "skip",
+        "skip": "Skip",
+        "include": "Include",
+        "excluded": "Excluded",
+        "back": "Back to the list"
+      },
+      "detail": {
+        "whatChanges": "What changes",
+        "foldedFolders": "{count, plural, one {# unchanged folder} other {# unchanged folders}}",
+        "onDisk": "On disk",
+        "today": "Today",
+        "afterRename": "After rename",
+        "showLibraryFolders": "Show library folders",
+        "hideLibraryFolders": "Hide library folders",
+        "currentPath": "Current path",
+        "whyItMoves": "Why it moves",
+        "levelTop": "Top folder",
+        "levelFolder": "Folder {depth}",
+        "levelFilename": "Filename",
+        "levelRemoved": "Removed",
+        "tokenCount": "{count, plural, one {# token} other {# tokens}}",
+        "optionalLevel": "An optional folder level, produced by a group in the pattern.",
+        "removedExplainer": "The naming pattern has no folder at this level, so {folder} is dropped and its contents move up.",
+        "conflictTitle": "Another file already claims this destination.",
+        "conflictBody": "Renaming would overwrite it, so this book is held back until the conflict is resolved.",
+        "siblings": "{count, plural, one {# more with the same change} other {# more with the same change}}",
+        "siblingsMore": "+{count} more"
       },
       "empty": {
-        "title": "Pick a Library to Start",
-        "description": "Select a library above to preview rename changes, filter by status, and apply the bulk rename run.",
-        "chooseLibrary": "Choose Library"
-      },
-      "completed": {
-        "title": "Bulk rename completed",
-        "stats": "{succeeded} renamed, {failed} failed, {skipped} skipped ({processed} total)"
-      },
-      "pagination": {
-        "showing": "Showing {from}-{to} of {total}"
+        "title": "Pick a library to start",
+        "description": "Select a library to preview rename changes, review them one at a time, and apply the run.",
+        "chooseLibrary": "Choose library",
+        "noneTitle": "Nothing to review",
+        "noneDescription": "No book matches the current filter. Clear the search or switch to All.",
+        "noMatch": "No books match your search."
       },
       "confirmDialog": {
-        "title": "Confirm Bulk Rename",
-        "body": "{count, plural, =0 {This will rename # book on disk. Files with collisions or errors will be skipped. This action cannot be undone.} one {This will rename # book on disk. Files with collisions or errors will be skipped. This action cannot be undone.} other {This will rename # books on disk. Files with collisions or errors will be skipped. This action cannot be undone.}}",
-        "renameButton": "{count, plural, =0 {Rename # book} one {Rename # book} other {Rename # books}}"
+        "title": "{count, plural, one {Rename # file on disk?} other {Rename # files on disk?}}",
+        "body": "This moves real files inside {library}. BookOrbit records each move, but undoing means renaming back.",
+        "willRename": "Will be renamed",
+        "skippedByYou": "Skipped by you",
+        "heldBack": "Held back as conflicts",
+        "untouched": "Left untouched",
+        "confirm": "{count, plural, one {Rename # file} other {Rename # files}}",
+        "cannotRename": "Cannot be renamed"
+      },
+      "run": {
+        "preparing": "Preparing…",
+        "preparingHint": "Checking every file against the naming pattern before anything moves.",
+        "title": "Renaming {done} of {total}",
+        "runningHint": "Files are being renamed. You can stop after the current file finishes.",
+        "stop": "Stop after this file",
+        "resultTitle": "{done, plural, one {Renamed # of {total} files} other {Renamed # of {total} files}}",
+        "resultFailed": "{count, plural, one {# failed} other {# failed}}",
+        "resultSkipped": "{count, plural, one {# skipped} other {# skipped}}",
+        "dismiss": "Dismiss"
+      },
+      "executionError": {
+        "http": "The server rejected the request (HTTP {status}).",
+        "noBody": "The server did not send a response body.",
+        "incomplete": "The connection ended before the rename finished. Some files may not have been renamed.",
+        "unknown": "The rename could not be completed."
       }
     },
     "bookDuplicates": {
@@ -8156,7 +8238,8 @@
       },
       "actions": {
         "rename": "Rename",
-        "split": "Split"
+        "split": "Split",
+        "merge": "Merge"
       },
       "duplicates": {
         "similarity": "Similarity:",
@@ -8176,7 +8259,20 @@
         "percentSimilar": "{percent}% similar",
         "pairDetails": "Pair details",
         "dismissEntityTitle": "Dismiss all pairs for this entity",
-        "dismissPairTitle": "Dismiss this pair"
+        "dismissPairTitle": "Dismiss this pair",
+        "groupsLabel": "Possible duplicate groups",
+        "keepThisOne": "Keep this one",
+        "mergeAway": "Merge away",
+        "notAMatch": "Not a match",
+        "notAMatchTitle": "Dismiss every pair in this group",
+        "selectPromptTitle": "Select a group to review",
+        "selectPromptDescription": "Choose a group from the list to compare its entities side by side.",
+        "backToList": "Back to groups",
+        "noBookTitles": "No books linked to this record",
+        "thresholdLabel": "Minimum similarity",
+        "thresholdValue": "{percent}%+",
+        "willBeMerged": "{count, plural, one {# entity will be merged and removed} other {# entities will be merged and removed}}",
+        "chooseTargetHint": "Select the entity to keep. Everything else in the group merges into it."
       },
       "dismissed": {
         "loading": "Loading dismissed pairs...",
@@ -8200,7 +8296,44 @@
           "nameDesc": "Name Z-A",
           "fewestBooks": "Fewest books",
           "mostBooks": "Most books"
-        }
+        },
+        "sortByLabel": "Sort by",
+        "entityTypeLabel": "Entity type",
+        "resultCount": "{count, plural, =0 {no entities} one {# entity} other {# entities}}",
+        "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+        "columns": {
+          "name": "Name",
+          "sortName": "Sort name",
+          "books": "Books",
+          "status": "Status",
+          "actions": "Actions"
+        },
+        "selectAllOnPage": "Select all entities on this page",
+        "selectEntity": "Select {name}",
+        "actionsFor": "Actions for {name}",
+        "status": {
+          "noBooks": "No books"
+        },
+        "filters": {
+          "all": "All",
+          "noBooks": "No books"
+        },
+        "density": {
+          "label": "Row height",
+          "comfortable": "Comfortable",
+          "compact": "Compact"
+        },
+        "rowsPerPage": "Rows per page",
+        "range": "Showing {from}-{to} of {total}",
+        "pagination": "Pagination",
+        "previousPage": "Previous page",
+        "nextPage": "Next page",
+        "goToPage": "Go to page {page}",
+        "morePages": "More pages",
+        "noEntitiesDescription": "Nothing has been added to this entity type yet.",
+        "noMatchesTitle": "No matches",
+        "noMatchesDescription": "No entities match your current search and filters.",
+        "clearFilters": "Clear filters"
       },
       "deleteMode": {
         "label": "Delete mode",

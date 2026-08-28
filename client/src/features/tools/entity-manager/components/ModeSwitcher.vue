@@ -20,12 +20,14 @@ function handleSelect(value: Mode): void {
 </script>
 
 <template>
-  <div class="flex gap-1 rounded-lg border border-border p-0.5">
+  <div class="inline-flex gap-0.5 rounded-lg bg-secondary p-0.5" role="group">
     <button
       v-for="m in modes"
       :key="m.value"
-      class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-      :class="modelValue === m.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
+      type="button"
+      class="h-7 rounded-md px-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      :class="modelValue === m.value ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+      :aria-pressed="modelValue === m.value"
       @click="handleSelect(m.value)"
     >
       {{ m.label }}

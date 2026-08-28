@@ -15,11 +15,14 @@ async function errorsFor<T extends object>(dtoClass: new () => T, value: Record<
 describe('Collection DTO validation', () => {
   describe('CreateCollectionDto', () => {
     it('accepts valid payloads and rejects empty names or missing icons', async () => {
-      expect((await errorsFor(CreateCollectionDto, { name: 'Favorites', icon: '⭐', description: 'Best books', syncToKobo: true })).length).toBe(0);
+      expect(
+        (await errorsFor(CreateCollectionDto, { name: 'Favorites', icon: '⭐', description: 'Best books', isPublic: true, syncToKobo: true })).length,
+      ).toBe(0);
       expect((await errorsFor(CreateCollectionDto, { name: '' })).length).toBeGreaterThan(0);
       expect((await errorsFor(CreateCollectionDto, {})).length).toBeGreaterThan(0);
       expect((await errorsFor(CreateCollectionDto, { name: 'Favorites' })).length).toBeGreaterThan(0);
       expect((await errorsFor(CreateCollectionDto, { name: 'Favorites', icon: '   ' })).length).toBeGreaterThan(0);
+      expect((await errorsFor(CreateCollectionDto, { name: 'Favorites', icon: '⭐', isPublic: 'yes' })).length).toBeGreaterThan(0);
     });
 
     it('enforces field lengths', async () => {
@@ -36,6 +39,8 @@ describe('Collection DTO validation', () => {
       expect((await errorsFor(UpdateCollectionDto, { name: '' })).length).toBeGreaterThan(0);
       expect((await errorsFor(UpdateCollectionDto, { icon: '   ' })).length).toBeGreaterThan(0);
       expect((await errorsFor(UpdateCollectionDto, { icon: null })).length).toBeGreaterThan(0);
+      expect((await errorsFor(UpdateCollectionDto, { isPublic: false })).length).toBe(0);
+      expect((await errorsFor(UpdateCollectionDto, { isPublic: 1 })).length).toBeGreaterThan(0);
     });
   });
 

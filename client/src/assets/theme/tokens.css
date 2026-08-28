@@ -157,6 +157,19 @@
   --pattern-optional: oklch(0.46 0.1 195);
   --pattern-fallback: oklch(0.48 0.13 68);
 
+  /* Rename diff. A bulk rename is a small edit inside a long path, so the ink that marks
+     removed and added characters carries the whole feature. Tuned per theme like every other
+     text colour here: one lightness cannot clear AA on both a light card and a dark one.
+     --path-dim is the unchanged remainder of a path and --path-fold its separators. */
+  --diff-del: oklch(0.48 0.19 25);
+  --diff-del-bg: oklch(0.48 0.19 25 / 0.13);
+  --diff-del-line: oklch(0.48 0.19 25 / 0.32);
+  --diff-ins: oklch(0.42 0.15 150);
+  --diff-ins-bg: oklch(0.42 0.15 150 / 0.14);
+  --diff-ins-line: oklch(0.42 0.15 150 / 0.34);
+  --path-dim: oklch(0.52 0.001 var(--tint-h));
+  --path-fold: oklch(0.62 0.02 var(--tint-h));
+
   --audit-authentication: oklch(0.55 0.17 295);
   --audit-books: oklch(0.55 0.16 245);
   --audit-users: oklch(0.62 0.14 70);
@@ -313,6 +326,15 @@
   --pattern-modifier: oklch(0.8 0.11 305);
   --pattern-optional: oklch(0.82 0.09 195);
   --pattern-fallback: oklch(0.82 0.12 75);
+
+  --diff-del: oklch(0.79 0.16 25);
+  --diff-del-bg: oklch(0.79 0.16 25 / 0.16);
+  --diff-del-line: oklch(0.79 0.16 25 / 0.4);
+  --diff-ins: oklch(0.81 0.16 150);
+  --diff-ins-bg: oklch(0.81 0.16 150 / 0.15);
+  --diff-ins-line: oklch(0.81 0.16 150 / 0.38);
+  --path-dim: oklch(0.725 0.001 var(--tint-h));
+  --path-fold: oklch(0.6 0.01 var(--tint-h));
 
   --audit-authentication: oklch(0.72 0.17 295);
   --audit-books: oklch(0.72 0.14 245);

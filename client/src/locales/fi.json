@@ -6218,25 +6218,15 @@
       "series": "Sarja"
     },
     "bulkRename": {
-      "previewToolbar": "Nimeä esikatselu uudelleen",
-      "renameSettings": "Nimeä asetukset uudelleen",
       "library": "Kirjasto",
       "selectLibraryPlaceholder": "Valitse kirjasto...",
       "noEligibleLibraries": "Yhtään kirjastoa ei ole nimetty uudelleen päällä. Ota se käyttöön kirjastojen asetuksista.",
       "refresh": "Päivitä",
-      "applyRename": "Uudelleennimeä Sovellus",
-      "showFullPaths": "Näytä koko polut",
-      "columnsMenu": "Sarakkeet",
-      "renamingInProgress": "Tiedostojen uudelleennimeäminen - voit peruuttaa milloin tahansa.",
-      "executionFailed": "Bulkin uudelleennimeäminen epäonnistui",
       "previewFailed": "Esikatselun lataaminen epäonnistui",
-      "noBooksMatch": "Nykyistä suodatinta vastaavia kirjoja ei löytynyt.",
+      "executionFailed": "Bulkin uudelleennimeäminen epäonnistui",
       "openBookDetails": "Avaa kirjan tiedot",
-      "columns": {
-        "title": "Otsikko",
-        "currentPath": "Nykyinen Polku",
-        "newPath": "Uusi Polku",
-        "status": "Tila"
+      "filter": {
+        "all": "Kaikki"
       },
       "status": {
         "willRename": "Uudelleennimeä",
@@ -6245,28 +6235,10 @@
         "noPattern": "Ei Kuvio",
         "error": "Virhe"
       },
-      "filter": {
-        "all": "Kaikki"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} uudelleennimeäksesi",
-        "unchanged": "{count} muuttumaton",
-        "collisions": "{count, plural, =0 {# törmäys} one {# törmäys} other {# törmäystä}}",
-        "errors": "{count, plural, =0 {# virhe} one {# virhe} other {# virheitä}}"
-      },
       "empty": {
         "title": "Valitse kirjasto aloittaaksesi",
         "description": "Valitse yllä oleva kirjasto, jos haluat esikatsella uudelleennimeä muutoksia, suodattaa statuksen mukaan ja käyttää suoritettua massaa.",
         "chooseLibrary": "Valitse Kirjasto"
-      },
-      "completed": {
-        "title": "Bulk uudelleennimeäminen valmis"
-      },
-      "confirmDialog": {
-        "title": "Vahvista Bulk Uudelleennimeä",
-        "body": "{count, plural, =0 {Tämä nimeää uudelleen # kirjan levyllä. Tiedostot, joissa on törmäyksiä tai virheitä, ohitetaan. Tätä toimintoa ei voi perua.} one {Tämä uudelleennimeä # kirja levyltä. Tiedostot törmäyksillä tai virheillä ohitetaan. Tätä toimintoa ei voi peruuttaa.} other {Tämä uudelleennimeä # kirjoja levyltä. Tiedostot, joissa on yhteentörmäyksiä tai virheitä, ohitetaan. Tätä toimintoa ei voi peruuttaa.}}",
-        "renameButton": "{count, plural, =0 {Nimeä # kirja} one {Nimeä uudelleen # kirja} other {Nimeä # kirjaa}}"
       }
     },
     "bookDuplicates": {

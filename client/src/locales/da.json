@@ -6337,25 +6337,15 @@
       "series": "Serie"
     },
     "bulkRename": {
-      "previewToolbar": "Omdøb forhåndsvisning",
-      "renameSettings": "Omdøb indstillinger",
       "library": "Bibliotek",
       "selectLibraryPlaceholder": "Vælg et bibliotek...",
       "noEligibleLibraries": "Ingen biblioteker har filnavnet aktiveret. Aktivér det i Biblioteks indstillinger.",
       "refresh": "Opdater",
-      "applyRename": "Anvend Omdøb",
-      "showFullPaths": "Vis fulde stier",
-      "columnsMenu": "Kolonner",
-      "renamingInProgress": "Omdøbning af filer - du kan annullere til enhver tid.",
-      "executionFailed": "Masse omdøbning mislykkedes",
       "previewFailed": "Kunne ikke indlæse forhåndsvisning",
-      "noBooksMatch": "Ingen bøger fundet som matcher det aktuelle filter.",
+      "executionFailed": "Masse omdøbning mislykkedes",
       "openBookDetails": "Åbn bogdetaljer",
-      "columns": {
-        "title": "Titel",
-        "currentPath": "Nuværende Sti",
-        "newPath": "Ny Sti",
-        "status": "Status"
+      "filter": {
+        "all": "Alle"
       },
       "status": {
         "willRename": "Vil Omdøbe",
@@ -6364,32 +6354,10 @@
         "noPattern": "Intet Mønster",
         "error": "Fejl"
       },
-      "filter": {
-        "all": "Alle"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} for at omdøbe",
-        "unchanged": "{count} uændret",
-        "collisions": "{count, plural, =0 {# kollision} one {# kollision} other {# kollisioner}}",
-        "errors": "{count, plural, =0 {# fejl} one {# fejl} other {# fejl}}"
-      },
       "empty": {
         "title": "Vælg et bibliotek for at starte",
         "description": "Vælg et bibliotek ovenfor for at forhåndsvise omdøbning ændringer, filter efter status, og anvend bulk omdøbe kørsel.",
         "chooseLibrary": "Vælg Bibliotek"
-      },
-      "completed": {
-        "title": "Bulk omdøbning fuldført",
-        "stats": "{succeeded} omdøbt, {failed} mislykkedes, {skipped} skippet ({processed} i alt)"
-      },
-      "pagination": {
-        "showing": "Viser {from}-{to} af {total}"
-      },
-      "confirmDialog": {
-        "title": "Bekræft Masse Omdøb",
-        "body": "{count, plural, =0 {Dette vil omdøbe # bog på disk. Filer med kollisioner eller fejl vil blive sprunget over. Denne handling kan ikke fortrydes.} one {Dette vil omdøbe # bog på disken. Filer med kollisioner eller fejl vil blive sprunget over. Denne handling kan ikke fortrydes.} other {Dette vil omdøbe # bøger på disken. Filer med kollisioner eller fejl vil blive sprunget over. Denne handling kan ikke fortrydes.}}",
-        "renameButton": "{count, plural, =0 {Omdøb # bog} one {Omdøb # bog} other {Omdøb # bøger}}"
       }
     },
     "bookDuplicates": {
