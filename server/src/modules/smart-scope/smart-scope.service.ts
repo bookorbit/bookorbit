@@ -93,7 +93,12 @@ export class SmartScopeService {
         try {
           const filter = validateGroupRule(smartScope.filter);
           if (!filter) return { ...this.toResponse(smartScope, user, koboSyncEnabledFor(smartScope)), bookCount: 0 };
-          where = this.queryBuilder.buildWhere(filter, { accessibleLibraryIds, userId: user.id, timeZone });
+          where = this.queryBuilder.buildWhere(filter, {
+            accessibleLibraryIds,
+            userId: user.id,
+            timeZone,
+            contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+          });
         } catch (err) {
           if (!(err instanceof BadRequestException)) throw err;
           const errorClass = err.constructor.name;

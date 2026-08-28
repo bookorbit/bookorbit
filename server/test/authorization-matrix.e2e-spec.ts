@@ -1113,6 +1113,109 @@ describe('Authorization matrix (e2e)', () => {
         },
       });
       expectError(addInaccessibleBook, 403, 'No access to this library');
+
+      const publicCollectionResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/collections',
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: {
+          name: `authz-public-collection-${randomUUID()}`,
+          icon: 'Globe',
+          isPublic: true,
+        },
+      });
+      expect(publicCollectionResponse.statusCode).toBe(201);
+      const publicCollectionId = (publicCollectionResponse.json() as { id: number }).id;
+
+      const addVisibleOwnerBook = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/collections/${publicCollectionId}/books`,
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { bookIds: [bookA.bookId] },
+      });
+      expect(addVisibleOwnerBook.statusCode).toBe(201);
+
+      const publicRead = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/collections/${publicCollectionId}`,
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(publicRead.statusCode).toBe(200);
+      expect(publicRead.json()).toEqual(expect.objectContaining({ id: publicCollectionId, isPublic: true, isOwner: false, bookCount: 0 }));
+
+      const publicBooks = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/collections/${publicCollectionId}/books?page=0&size=50`,
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(publicBooks.statusCode).toBe(200);
+      expect(publicBooks.json()).toEqual(expect.objectContaining({ items: [], total: 0 }));
+
+      const publicList = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/collections',
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(publicList.statusCode).toBe(200);
+      expect(publicList.json()).toEqual(expect.arrayContaining([expect.objectContaining({ id: publicCollectionId, bookCount: 0, isOwner: false })]));
+      expect(publicList.json()).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: collectionId })]));
+
+      const writableTargets = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/collections?bookIds=${bookA.bookId}`,
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(writableTargets.statusCode).toBe(200);
+      expect(writableTargets.json()).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: publicCollectionId })]));
+
+      for (const mutation of [
+        { method: 'PATCH' as const, url: `/api/v1/collections/${publicCollectionId}`, payload: { name: 'Hijacked' } },
+        { method: 'POST' as const, url: `/api/v1/collections/${publicCollectionId}/books`, payload: { bookIds: [bookA.bookId] } },
+        { method: 'DELETE' as const, url: `/api/v1/collections/${publicCollectionId}`, payload: undefined },
+      ]) {
+        const response = await ctx.app.inject({
+          method: mutation.method,
+          url: mutation.url,
+          headers: authHeader(personas.otherUser.accessToken),
+          ...(mutation.payload ? { payload: mutation.payload } : {}),
+        });
+        expectError(response, 403, 'Cannot modify this collection');
+      }
+
+      const otherUserCollectionResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/collections',
+        headers: authHeader(personas.otherUser.accessToken),
+        payload: {
+          name: `authz-owned-collection-${randomUUID()}`,
+          icon: 'Folder',
+        },
+      });
+      expect(otherUserCollectionResponse.statusCode).toBe(201);
+      const otherUserCollection = otherUserCollectionResponse.json() as { id: number; displayOrder: number };
+
+      const foreignReorder = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/collections/reorder',
+        headers: authHeader(personas.otherUser.accessToken),
+        payload: {
+          order: [
+            { id: otherUserCollection.id, displayOrder: 999 },
+            { id: publicCollectionId, displayOrder: 0 },
+          ],
+        },
+      });
+      expectError(foreignReorder, 403, 'Cannot reorder one or more collections');
+
+      const listAfterRejectedReorder = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/collections',
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(listAfterRejectedReorder.statusCode).toBe(200);
+      expect(listAfterRejectedReorder.json()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: otherUserCollection.id, displayOrder: otherUserCollection.displayOrder })]),
+      );
     });
 
     it('enforces smartScope private read and owner-only write rules', async () => {

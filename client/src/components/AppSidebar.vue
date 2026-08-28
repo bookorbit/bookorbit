@@ -19,6 +19,7 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryScanRefresh } from '@/features/library/composables/useLibraryScanRefresh'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { useCollections } from '@/features/collection/composables/useCollections'
+import { ownedCollectionOrder } from '@/features/collection/lib/collection-access'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
@@ -57,6 +58,12 @@ async function persistSmartScopeOrder(order: { id: number; displayOrder: number 
   const ownedOrder = order.filter((entry) => ownedIds.has(entry.id))
   if (ownedOrder.length === 0) return
   await reorderSmartScopes(ownedOrder)
+}
+
+async function persistCollectionOrder(order: { id: number; displayOrder: number }[]) {
+  const ownedOrder = ownedCollectionOrder(collections.value, order)
+  if (ownedOrder.length === 0) return
+  await reorderCollections(ownedOrder)
 }
 
 const createSmartScopeOpen = ref(false)
@@ -360,7 +367,7 @@ onUnmounted(() => stopLibraryUploadListener())
             can-add
             :add-label="t('components.sidebar.newCollection')"
             can-reorder
-            :persist-order="reorderCollections"
+            :persist-order="persistCollectionOrder"
             @add="openCreateCollection"
             @navigate="handleNavigate"
           />

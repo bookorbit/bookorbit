@@ -568,6 +568,13 @@
       "when": 1787850415027,
       "tag": "0080_add_book_metadata_cover_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1787931558680,
+      "tag": "0081_add_public_collections",
+      "breakpoints": true
     }
   ]
 }

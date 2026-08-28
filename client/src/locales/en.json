@@ -5684,6 +5684,8 @@
     }
   },
   "collection": {
+    "visibleToAll": "Visible to all users",
+    "visibleToAllHint": "Every user can see this collection, but only you can change its books",
     "dialog": {
       "name": "Name",
       "icon": "Icon",
