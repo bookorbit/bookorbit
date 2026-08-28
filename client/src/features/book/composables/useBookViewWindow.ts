@@ -1,6 +1,14 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, getCurrentInstance, onActivated, ref, watch, type Ref } from 'vue'
 import { useElementSize, useWindowSize } from '@vueuse/core'
-import { jumpBucketKindForSort, type GroupRule, type JumpBucket, type SortSpec } from '@bookorbit/types'
+import {
+  MAX_RANDOM_SORT_SEED,
+  createRandomSortSeed,
+  hasRandomSort,
+  jumpBucketKindForSort,
+  type GroupRule,
+  type JumpBucket,
+  type SortSpec,
+} from '@bookorbit/types'
 import { useBookProgressRefresh } from './useBookProgressRefresh'
 import { BOOK_WINDOW_BLOCK_SIZE, useBookWindow, type BookWindowQuery } from './useBookWindow'
 import { useJumpBuckets } from './useJumpBuckets'
@@ -39,8 +47,36 @@ export function useBookViewWindow(options: {
   const filter = ref<GroupRule | undefined>(undefined)
   const sort = ref<SortSpec[]>(copySort(options.defaultSort ?? DEFAULT_SORT))
 
+  // One shuffle per visit: the seed is minted here and travels with every page request, so
+  // paging stays coherent while a reload, a different scope, or the shuffle button re-rolls it.
+  const randomSeed = ref(createRandomSortSeed())
+  const randomSortActive = computed(() => hasRandomSort(sort.value))
+
+  function reshuffle() {
+    const next = createRandomSortSeed()
+    randomSeed.value = next === randomSeed.value ? (next + 1) % (MAX_RANDOM_SORT_SEED + 1) : next
+  }
+
+  // Registered before useBookWindow so a sort or scope change re-rolls the seed in the same flush
+  // the window reads the query, rather than costing a second round trip.
+  watch(randomSortActive, (active) => {
+    if (active) reshuffle()
+  })
+  watch(options.scopeId, () => {
+    reshuffle()
+  })
+
+  if (getCurrentInstance()) {
+    let hasActivated = false
+    onActivated(() => {
+      if (hasActivated && randomSortActive.value) reshuffle()
+      hasActivated = true
+    })
+  }
+
   const query = computed<BookWindowQuery>(() => ({
     sort: sort.value,
+    ...(randomSortActive.value ? { randomSeed: randomSeed.value } : {}),
     ...(filter.value ? { filter: filter.value } : {}),
     ...(options.collapseEnabled?.value ? { collapseSeries: true } : {}),
     ...(options.q?.value.trim() ? { q: options.q.value.trim() } : {}),
@@ -130,6 +166,8 @@ export function useBookViewWindow(options: {
     filter,
     sort,
     query,
+    randomSortActive,
+    reshuffle,
     firstVisibleIndex,
     handleFirstVisibleIndex,
     handleRange,

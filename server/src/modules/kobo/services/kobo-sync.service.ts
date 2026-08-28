@@ -1104,6 +1104,7 @@ export class KoboSyncService {
         seriesName: schema.bookMetadata.seriesName,
         seriesIndex: schema.bookMetadata.seriesIndex,
         metadataUpdatedAt: schema.bookMetadata.updatedAt,
+        coverUpdatedAt: schema.bookMetadata.coverUpdatedAt,
         fileFormat: schema.bookFiles.format,
         fileSizeBytes: schema.bookFiles.sizeBytes,
         fileHash: schema.bookFiles.fileHash,
@@ -1127,6 +1128,7 @@ export class KoboSyncService {
         schema.bookMetadata.seriesName,
         schema.bookMetadata.seriesIndex,
         schema.bookMetadata.updatedAt,
+        schema.bookMetadata.coverUpdatedAt,
         schema.bookFiles.format,
         schema.bookFiles.sizeBytes,
         schema.bookFiles.fileHash,
@@ -1148,7 +1150,7 @@ export class KoboSyncService {
       const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings, isFixedLayout);
       const identity = identitiesById.get(row.bookId);
       const coverImageId = identity
-        ? this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.metadataUpdatedAt)
+        ? this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.coverUpdatedAt)
         : String(row.bookId);
       return {
         bookId: row.bookId,
@@ -1201,6 +1203,7 @@ export class KoboSyncService {
         fileHash: schema.bookFiles.fileHash,
         isFixedLayout: schema.bookFiles.isFixedLayout,
         metadataUpdatedAt: schema.bookMetadata.updatedAt,
+        coverUpdatedAt: schema.bookMetadata.coverUpdatedAt,
         addedAt: schema.books.addedAt,
         updatedAt: schema.books.updatedAt,
       })
@@ -1254,7 +1257,7 @@ export class KoboSyncService {
       const delivery = this.getDeliveryInfo(row.fileFormat, row.fileSizeBytes, deliverySettings, row.isFixedLayout);
       const identity = identitiesById.get(row.bookId);
       if (!identity) continue;
-      const coverImageId = this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.metadataUpdatedAt);
+      const coverImageId = this.bookIdentityService.buildVersionedCoverImageId(identity.coverImageId, row.coverUpdatedAt);
       const language = normalizeKoboLanguage(row.language);
       const isbn = selectKoboIsbn(row.isbn13, row.isbn10);
       byId.set(row.bookId, {

@@ -61,6 +61,21 @@ describe('BookQueryPipe', () => {
     expect(result.filter).toBeDefined();
   });
 
+  it('accepts a shuffle seed', () => {
+    const result = pipe.transform({ sort: [{ field: 'random', dir: 'asc' }], randomSeed: 987654 });
+    expect(result.randomSeed).toBe(987654);
+  });
+
+  it('leaves the shuffle seed undefined when the caller omits it', () => {
+    expect(pipe.transform({ sort: [{ field: 'random', dir: 'asc' }] }).randomSeed).toBeUndefined();
+  });
+
+  it('throws BadRequestException for an out-of-range shuffle seed', () => {
+    expect(() => pipe.transform({ randomSeed: 2_147_483_648 })).toThrow(BadRequestException);
+    expect(() => pipe.transform({ randomSeed: -1 })).toThrow(BadRequestException);
+    expect(() => pipe.transform({ randomSeed: 1.5 })).toThrow(BadRequestException);
+  });
+
   it('throws BadRequestException for invalid sort field', () => {
     expect(() => pipe.transform({ sort: [{ field: 'unknownField', dir: 'asc' }] })).toThrow(BadRequestException);
   });

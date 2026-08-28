@@ -136,7 +136,7 @@ const USER_CTX = { accessibleLibraryIds: [1] as number[], userId: 10 };
  * new operator is added to RuleOperator but not handled here.
  */
 function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unknown; valueTo?: unknown } {
-  const numericFields: RuleField[] = ['publishedYear', 'seriesIndex', 'pageCount', 'rating', 'communityRating', 'metadataScore'];
+  const numericFields: RuleField[] = ['publishedYear', 'seriesIndex', 'pageCount', 'fileSize', 'rating', 'communityRating', 'metadataScore'];
   const dateFields: RuleField[] = ['publishedDate', 'addedAt', 'startedAt', 'finishedAt'];
   const isNumericField = numericFields.includes(field);
 
@@ -878,6 +878,16 @@ describe('numericRuleToSql (via pageCount and publishedYear)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'publishedYear', operator: 'notEq', value: 2001 }) as never, BASE_CTX) as any;
     expect(getRuleSql(where)).toMatchObject({ type: 'ne' });
+  });
+
+  it('filters file size through the selected primary file', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'fileSize', operator: 'gte', value: 10_485_760 }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where) as any;
+
+    expect(clause).toMatchObject({ type: 'gte', right: 10_485_760 });
+    expect(clause.left).toMatchObject({ type: 'sql' });
+    expect(collectColumnNames(clause.left)).toEqual(expect.arrayContaining(['size_bytes', 'id', 'primary_file_id']));
   });
 });
 
@@ -1844,6 +1854,12 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('uses the supplied shuffle seed for the collapsed random sort', () => {
+    const result = BookQueryBuilder.buildCollapseOrderBy([{ field: 'random', dir: 'asc' }], 7, undefined, { randomSeed: 4242 });
+
+    expect(result).toContain(`md5(r.id::text || ':' || 4242::text) ASC`);
   });
 
   it('joins multiple sort parts with comma', () => {

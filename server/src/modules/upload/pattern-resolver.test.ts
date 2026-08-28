@@ -751,3 +751,131 @@ describe('DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER', () => {
     expect(validatePattern(P)).toBe(true);
   });
 });
+
+// ── Trailing dots and spaces in assembled segments (issue #1160) ─────────────
+
+describe('assembled segment normalization', () => {
+  const ISSUE_PATTERN = '{authors:sort}/<{series} {seriesIndex} >{title} ({year})/{authors}_{year}_{title} ({publisher}, {language})';
+
+  const ISSUE_VALUES: Record<string, string> = {
+    title: 'Harry Potter and the Half-Blood Prince',
+    year: '2005',
+    series: 'Harry Potter',
+    seriesIndex: '06',
+    publisher: 'Pottermore',
+    language: 'English',
+    originalFilename: 'hp6',
+    extension: 'epub',
+  };
+
+  function resolveIssuePath(authors: string): string {
+    const resolved = resolveUploadPath(ISSUE_PATTERN, { ...ISSUE_VALUES, authors }, 'epub', { sanitizeForCrossPlatform: true });
+    expect(resolved).not.toBeNull();
+    return resolved as string;
+  }
+
+  it('a sort-modified author no longer leaves the folder ending in a period', () => {
+    expect(resolveIssuePath('J.K. Rowling').split('/')[0]).toBe('Rowling, J.K');
+  });
+
+  it.each([
+    ['J.K. Rowling', 'Rowling, J.K'],
+    ['JK. Rowling', 'Rowling, JK'],
+    ['JK Rowling', 'Rowling, JK'],
+    ['asd.', 'asd'],
+    ['asd.asd', 'asd.asd'],
+    ['asd. asd', 'asd, asd'],
+  ])('reported author %j resolves to folder %j', (authors, expectedFolder) => {
+    expect(resolveIssuePath(authors).split('/')[0]).toBe(expectedFolder);
+  });
+
+  it('no segment of a resolved path ends in a dot or a space', () => {
+    for (const authors of ['J.K. Rowling', 'JK. Rowling', 'JK Rowling', 'asd.', 'asd.asd', 'asd. asd', 'W. E. B. Du Bois']) {
+      for (const segment of resolveIssuePath(authors).split('/')) {
+        expect(segment).not.toMatch(/[. ]$/);
+      }
+    }
+  });
+
+  it('sort modifier on a single-name author is unaffected', () => {
+    expect(resolveUploadPath('{authors:sort}', { authors: 'Homer' }, 'epub', { sanitizeForCrossPlatform: true })).toBe('Homer.epub');
+  });
+
+  it('first modifier trims a trailing period left by a suffixed name', () => {
+    expect(
+      resolveUploadPath('{authors:first}/{title}', { authors: 'Sammy Davis Jr., Jane Boyd', title: 'Yes I Can' }, 'epub', {
+        sanitizeForCrossPlatform: true,
+      }),
+    ).toBe('Sammy Davis Jr/Yes I Can.epub');
+  });
+
+  it('an empty trailing token no longer leaves the segment ending in a space', () => {
+    expect(
+      resolveUploadPath('{authors}/{title} - {subtitle}', { authors: 'Andy Weir', title: 'Artemis', subtitle: '' }, 'epub', {
+        sanitizeForCrossPlatform: true,
+      }),
+    ).toBe('Andy Weir/Artemis -.epub');
+  });
+
+  it('a literal trailing period in the pattern is trimmed from the folder segment', () => {
+    expect(resolveUploadPath('{authors}./{title}', { authors: 'Andy Weir', title: 'Artemis' }, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'Andy Weir/Artemis.epub',
+    );
+  });
+
+  it('a segment that is entirely dots falls back to the replacement character', () => {
+    expect(resolveUploadPath('{authors}/.../{title}', { authors: 'Andy Weir', title: 'Artemis' }, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'Andy Weir/_/Artemis.epub',
+    );
+  });
+
+  it('honours a non-default replacement character', () => {
+    expect(
+      resolveUploadPath('{authors}/.../{title}', { authors: 'Andy Weir', title: 'Artemis' }, 'epub', {
+        sanitizeForCrossPlatform: true,
+        replacementCharacter: '-',
+      }),
+    ).toBe('Andy Weir/-/Artemis.epub');
+  });
+
+  it('download filenames drop the trailing period instead of doubling the dot', () => {
+    expect(resolveDownloadFilename('{authors:sort}', { authors: 'J.K. Rowling' }, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'Rowling, J.K.epub',
+    );
+  });
+
+  it('leaves the trailing period intact when cross-platform sanitization is disabled', () => {
+    expect(resolveUploadPath('{authors:sort}/{title}', { authors: 'J.K. Rowling', title: 'Artemis' }, 'epub')).toBe('Rowling, J.K./Artemis.epub');
+  });
+
+  it('does not double-guard a reserved name that contains a dot', () => {
+    expect(resolveUploadPath('{title}', { ...FULL, title: 'NUL.txt' }, 'epub', { sanitizeForCrossPlatform: true })).toBe('NUL.txt_.epub');
+    expect(resolveDownloadFilename('{title}', { ...FULL, title: 'NUL.txt ' }, 'epub', { sanitizeForCrossPlatform: true })).toBe('NUL.txt_.epub');
+  });
+
+  it('keeps the trailing separator of a folder-only pattern', () => {
+    expect(
+      resolveUploadPath('{authors:sort}/', { authors: 'J.K. Rowling', originalFilename: 'hp6' }, 'epub', { sanitizeForCrossPlatform: true }),
+    ).toBe('Rowling, J.K/hp6.epub');
+  });
+
+  it('still treats a slash inside a token value as part of the segment', () => {
+    expect(resolveUploadPath('{title}', { ...FULL, title: '24/7 Life.' }, 'epub', { sanitizeForCrossPlatform: true })).toBe('24_7 Life.epub');
+  });
+
+  it('applies the reserved-name guard exactly once alongside the trailing-dot trim', () => {
+    const values = { authors: 'J.K. Rowling', title: 'NUL.txt' };
+    const options = { sanitizeForCrossPlatform: true } as const;
+    const first = resolveUploadPath('{authors:sort}/{title}', values, 'epub', options);
+    const second = resolveUploadPath('{authors:sort}/{title}', values, 'epub', options);
+
+    expect(first).toBe('Rowling, J.K/NUL.txt_.epub');
+    expect(second).toBe(first);
+  });
+
+  it('leaves an already-clean segment untouched', () => {
+    expect(resolveUploadPath('{authors}/{title}', { authors: 'Rowling, J.K', title: 'Artemis' }, 'epub', { sanitizeForCrossPlatform: true })).toBe(
+      'Rowling, J.K/Artemis.epub',
+    );
+  });
+});

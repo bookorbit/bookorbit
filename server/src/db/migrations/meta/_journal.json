@@ -547,6 +547,34 @@
       "when": 1787678883089,
       "tag": "0077_add_notification_coalescing",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1787689487276,
+      "tag": "0078_add_kobo_statistics_cursors",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1787777420432,
+      "tag": "0079_add_annotations_user_created_active_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1787850415027,
+      "tag": "0080_add_book_metadata_cover_updated_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1787931558680,
+      "tag": "0081_add_public_collections",
+      "breakpoints": true
     }
   ]
 }

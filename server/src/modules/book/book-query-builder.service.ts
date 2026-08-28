@@ -19,7 +19,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
 import { compareSeriesIndexSql, seriesIndexSortKey, seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
 import * as schema from '../../db/schema';
-import { BookSortBuilder, customMetadataValueColumn, type BookSortContext } from './book-sort-builder.service';
+import { BookSortBuilder, customMetadataValueColumn, resolveRandomSortSeed, type BookSortContext } from './book-sort-builder.service';
 import {
   audiobookProgress,
   authors,
@@ -186,6 +186,13 @@ export class BookQueryBuilder {
         return this.libraryRuleToSql(operator, value as string[]);
       case 'format':
         return this.formatRuleToSql(operator, value as string[]);
+      case 'fileSize':
+        return this.numericRuleToSql(
+          sql<number>`(SELECT ${bookFiles.sizeBytes} FROM ${bookFiles} WHERE ${bookFiles.id} = ${books.primaryFileId})`,
+          operator,
+          value as number,
+          valueTo as number | undefined,
+        );
       case 'addedAt':
         return this.dateRuleToSql(operator, value as string | number, valueTo as string | undefined);
       case 'startedAt':
@@ -254,34 +261,35 @@ export class BookQueryBuilder {
     }
   }
 
-  private numericRuleToSql(col: AnyColumn, operator: string, value?: number, valueTo?: number): SQL {
+  private numericRuleToSql(col: AnyColumn | SQL, operator: string, value?: number, valueTo?: number): SQL {
+    const expression = col as SQL;
     switch (operator) {
       case 'eq':
         this.assertNumber(value, operator, 'value');
-        return eq(col, value!);
+        return eq(expression, value!);
       case 'notEq':
         this.assertNumber(value, operator, 'value');
-        return ne(col, value!);
+        return ne(expression, value!);
       case 'gt':
         this.assertNumber(value, operator, 'value');
-        return gt(col, value!);
+        return gt(expression, value!);
       case 'gte':
         this.assertNumber(value, operator, 'value');
-        return gte(col, value!);
+        return gte(expression, value!);
       case 'lt':
         this.assertNumber(value, operator, 'value');
-        return lt(col, value!);
+        return lt(expression, value!);
       case 'lte':
         this.assertNumber(value, operator, 'value');
-        return lte(col, value!);
+        return lte(expression, value!);
       case 'between':
         this.assertNumber(value, operator, 'value');
         this.assertNumber(valueTo, operator, 'valueTo');
-        return and(gte(col, value!), lte(col, valueTo!))!;
+        return and(gte(expression, value!), lte(expression, valueTo!))!;
       case 'isEmpty':
-        return isNull(col);
+        return isNull(expression);
       case 'isNotEmpty':
-        return isNotNull(col);
+        return isNotNull(expression);
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for numeric field`);
     }
@@ -1057,7 +1065,7 @@ export class BookQueryBuilder {
     return node.rules.some((r) => BookQueryBuilder.hasSeriesSelectionFilter(r));
   }
 
-  static buildCollapseOrderBy(sort: SortSpec[], userId: number, customFieldTypes?: CustomMetadataFieldTypeMap): string {
+  static buildCollapseOrderBy(sort: SortSpec[], userId: number, customFieldTypes?: CustomMetadataFieldTypeMap, context?: BookSortContext): string {
     if (sort.length === 0) return 'sort_title ASC NULLS LAST, r.id ASC';
 
     if (!Number.isSafeInteger(userId)) throw new BadRequestException('Invalid userId for collapse order');
@@ -1143,9 +1151,8 @@ export class BookQueryBuilder {
           parts.push(`(SELECT ubs.started_at FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}) ${D} NULLS LAST`);
           break;
         case 'random': {
-          const daySeed = Math.floor(Date.now() / 86_400_000);
-          const scopedSeed = daySeed + userId;
-          parts.push(`md5(r.id::text || ':' || ${scopedSeed}::text) ${D}`);
+          const seed = Math.trunc(resolveRandomSortSeed(context, userId));
+          parts.push(`md5(r.id::text || ':' || ${seed}::text) ${D}`);
           parts.push(`r.id ${D}`);
           break;
         }

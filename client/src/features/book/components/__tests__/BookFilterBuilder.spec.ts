@@ -83,6 +83,34 @@ describe('BookFilterBuilder', () => {
     expect(optionText).toContain('Date Finished')
   })
 
+  it('serializes primary file size input from megabytes to bytes', async () => {
+    const wrapper = mount(BookFilterBuilder, {
+      props: {
+        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
+      },
+    })
+
+    await wrapper.findAll('select')[0]!.setValue('fileSize')
+    await wrapper.findAll('select')[1]!.setValue('gte')
+    await wrapper.get('input[aria-label="Primary file size in megabytes"]').setValue('10.5')
+
+    expect(lastUpdate(wrapper)).toEqual({
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'fileSize', operator: 'gte', value: 11_010_048, valueTo: undefined }],
+    })
+  })
+
+  it('hydrates saved primary file size bytes as megabytes', () => {
+    const wrapper = mount(BookFilterBuilder, {
+      props: {
+        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'fileSize', operator: 'lte', value: 26_214_400 }] },
+      },
+    })
+
+    expect((wrapper.get('input[aria-label="Primary file size in megabytes"]').element as HTMLInputElement).value).toBe('25')
+  })
+
   it('offers date and empty/not-empty operators for Date Started', async () => {
     const wrapper = mount(BookFilterBuilder, {
       props: {

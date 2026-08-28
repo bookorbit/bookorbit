@@ -50,6 +50,24 @@
 
   --star-highlight: oklch(0.76 0.18 90);
 
+  /* Series volume track. Kept apart from --success / --warning / --destructive because those are
+     tuned to clear AA as text: as fills these only have to separate from each other and from the
+     card, so light mode wants a brighter amber and a distinctly darker neutral than the text set. */
+  --volume-read: oklch(0.6 0.16 148);
+  --volume-reading: oklch(0.74 0.15 72);
+  --volume-unread: oklch(0.855 var(--tint-c-surface) var(--tint-h));
+  --volume-missing: oklch(0.58 0.22 27);
+
+  /* Metadata score ramp: red at 0, through orange and yellow, to green at 100. Consumers
+     interpolate between these four with color-mix in oklch, so the whole spectrum follows
+     from four tokens. Tuned per theme like every other text colour here: on a light card the
+     yellow middle has to sit darker than the red and green ends to clear AA, and on a dark
+     card it has to sit lighter. */
+  --score-red: oklch(0.55 0.19 25);
+  --score-orange: oklch(0.55 0.16 55);
+  --score-yellow: oklch(0.54 0.13 95);
+  --score-green: oklch(0.5 0.15 148);
+
   --border: oklch(0.878 var(--tint-c-surface) var(--tint-h));
   --input: oklch(0.878 var(--tint-c-surface) var(--tint-h));
   --ring: oklch(0.65 var(--tint-c-surface) var(--tint-h));
@@ -139,6 +157,19 @@
   --pattern-optional: oklch(0.46 0.1 195);
   --pattern-fallback: oklch(0.48 0.13 68);
 
+  /* Rename diff. A bulk rename is a small edit inside a long path, so the ink that marks
+     removed and added characters carries the whole feature. Tuned per theme like every other
+     text colour here: one lightness cannot clear AA on both a light card and a dark one.
+     --path-dim is the unchanged remainder of a path and --path-fold its separators. */
+  --diff-del: oklch(0.48 0.19 25);
+  --diff-del-bg: oklch(0.48 0.19 25 / 0.13);
+  --diff-del-line: oklch(0.48 0.19 25 / 0.32);
+  --diff-ins: oklch(0.42 0.15 150);
+  --diff-ins-bg: oklch(0.42 0.15 150 / 0.14);
+  --diff-ins-line: oklch(0.42 0.15 150 / 0.34);
+  --path-dim: oklch(0.52 0.001 var(--tint-h));
+  --path-fold: oklch(0.62 0.02 var(--tint-h));
+
   --audit-authentication: oklch(0.55 0.17 295);
   --audit-books: oklch(0.55 0.16 245);
   --audit-users: oklch(0.62 0.14 70);
@@ -146,6 +177,30 @@
   --audit-collections: oklch(0.55 0.09 255);
   --audit-integrations: oklch(0.58 0.15 150);
   --audit-settings: oklch(0.55 0.15 25);
+
+  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
+     reason every other text colour is: one set of hex values for both themes left the brightest
+     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
+  --pill-format-default: oklch(0.55 0.02 260);
+  --pill-format-epub: oklch(0.55 0.14 150);
+  --pill-format-kepub: oklch(0.55 0.12 178);
+  --pill-format-mobi: oklch(0.55 0.18 275);
+  --pill-format-azw3: oklch(0.53 0.11 185);
+  --pill-format-azw: oklch(0.55 0.14 235);
+  --pill-format-fb2: oklch(0.55 0.17 355);
+  --pill-format-djvu: oklch(0.55 0.04 255);
+  --pill-format-txt: oklch(0.55 0.03 60);
+  --pill-format-pdf: oklch(0.55 0.17 25);
+  --pill-format-cbz: oklch(0.55 0.16 260);
+  --pill-format-cbr: oklch(0.58 0.15 55);
+  --pill-format-cb7: oklch(0.55 0.19 300);
+  --pill-format-cbx: oklch(0.55 0.17 325);
+  --pill-format-m4b: oklch(0.58 0.13 75);
+  --pill-format-m4a: oklch(0.58 0.13 95);
+  --pill-format-mp3: oklch(0.56 0.15 145);
+  --pill-format-opus: oklch(0.55 0.11 205);
+  --pill-format-ogg: oklch(0.56 0.15 130);
+  --pill-format-flac: oklch(0.55 0.13 165);
 }
 
 @media (min-width: 40rem) {
@@ -197,6 +252,18 @@
   --warning-foreground: oklch(0.145 0 0);
 
   --star-highlight: oklch(0.84 0.17 95);
+
+  --volume-read: oklch(0.7 0.16 148);
+  --volume-reading: oklch(0.78 0.14 75);
+  --volume-unread: oklch(0.315 var(--tint-c-surface) var(--tint-h));
+  --volume-missing: oklch(0.7 0.19 25);
+
+  /* Lifted the way the pills are, with the yellow middle highest so the ramp holds an even
+     weight across the spectrum on a dark card */
+  --score-red: oklch(0.72 0.18 25);
+  --score-orange: oklch(0.78 0.15 55);
+  --score-yellow: oklch(0.85 0.15 95);
+  --score-green: oklch(0.78 0.16 148);
 
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -260,6 +327,15 @@
   --pattern-optional: oklch(0.82 0.09 195);
   --pattern-fallback: oklch(0.82 0.12 75);
 
+  --diff-del: oklch(0.79 0.16 25);
+  --diff-del-bg: oklch(0.79 0.16 25 / 0.16);
+  --diff-del-line: oklch(0.79 0.16 25 / 0.4);
+  --diff-ins: oklch(0.81 0.16 150);
+  --diff-ins-bg: oklch(0.81 0.16 150 / 0.15);
+  --diff-ins-line: oklch(0.81 0.16 150 / 0.38);
+  --path-dim: oklch(0.725 0.001 var(--tint-h));
+  --path-fold: oklch(0.6 0.01 var(--tint-h));
+
   --audit-authentication: oklch(0.72 0.17 295);
   --audit-books: oklch(0.72 0.14 245);
   --audit-users: oklch(0.78 0.13 70);
@@ -267,4 +343,29 @@
   --audit-collections: oklch(0.72 0.09 255);
   --audit-integrations: oklch(0.75 0.13 150);
   --audit-settings: oklch(0.72 0.15 25);
+
+  /* File format, worn as a chip whose own text carries the colour. Tuned per theme for the same
+     reason every other text colour is: one set of hex values for both themes left the brightest
+     (yellow on white, around 1.9:1) unreadable in light mode and the darkest invisible in dark. */
+
+  --pill-format-default: oklch(0.75 0.02 260);
+  --pill-format-epub: oklch(0.75 0.13 150);
+  --pill-format-kepub: oklch(0.75 0.11 178);
+  --pill-format-mobi: oklch(0.72 0.16 275);
+  --pill-format-azw3: oklch(0.76 0.11 185);
+  --pill-format-azw: oklch(0.72 0.13 235);
+  --pill-format-fb2: oklch(0.73 0.15 355);
+  --pill-format-djvu: oklch(0.75 0.04 255);
+  --pill-format-txt: oklch(0.76 0.03 60);
+  --pill-format-pdf: oklch(0.72 0.15 25);
+  --pill-format-cbz: oklch(0.72 0.14 260);
+  --pill-format-cbr: oklch(0.76 0.13 55);
+  --pill-format-cb7: oklch(0.72 0.17 300);
+  --pill-format-cbx: oklch(0.73 0.15 325);
+  --pill-format-m4b: oklch(0.79 0.13 75);
+  --pill-format-m4a: oklch(0.8 0.13 95);
+  --pill-format-mp3: oklch(0.78 0.15 145);
+  --pill-format-opus: oklch(0.76 0.11 205);
+  --pill-format-ogg: oklch(0.78 0.15 130);
+  --pill-format-flac: oklch(0.75 0.13 165);
 }

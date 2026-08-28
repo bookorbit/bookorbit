@@ -1,0 +1,2 @@
+ALTER TABLE "collections" ADD COLUMN "is_public" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE INDEX "collections_public_display_name_idx" ON "collections" USING btree ("is_public","display_order","name");

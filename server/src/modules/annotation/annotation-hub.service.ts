@@ -4,6 +4,7 @@ import type {
   AnnotationDeviceSyncInfo,
   AnnotationHubBookFacet,
   AnnotationHubItem,
+  AnnotationHubOverview,
   AnnotationHubResponse,
   AnnotationHubStats,
   AnnotationPositionFormat,
@@ -11,6 +12,7 @@ import type {
   AnnotationSyncDetail,
 } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { foldActivityWeeks, longestQuietWeeks } from './annotation-stats.utils';
 import { AnnotationConversionService } from './annotation-conversion.service';
 import { AnnotationExportService, type AnnotationExportFormat, type AnnotationExportResult } from './annotation-export.service';
 import { AnnotationSyncRepository } from './annotation-sync.repository';
@@ -21,6 +23,10 @@ import type { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto
 const BULK_EVENT = 'annotation.bulk';
 const RETRY_EVENT = 'annotation.position_retry';
 const DEFAULT_BOOK_FACET_LIMIT = 20;
+/** The sparkline covers a year, and the shelf is a ranked preview, not the whole library. */
+const ACTIVITY_WINDOW_DAYS = 371;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SHELF_LIMIT = 12;
 
 function toBookFacet(row: { bookId: number; bookTitle: string | null; author: string | null; count: number }): AnnotationHubBookFacet {
   return { bookId: row.bookId, bookTitle: row.bookTitle, author: row.author, count: Number(row.count) };
@@ -63,6 +69,61 @@ export class AnnotationHubService {
   /** Total annotations the hub lists by default; trashed rows are excluded. */
   async countActive(userId: number): Promise<number> {
     return this.annotationRepo.countHub(userId, { status: 'active' });
+  }
+
+  /**
+   * The library-wide facets behind the hub's side rail. Deliberately a separate call from
+   * `list`: the stream is an infinite scroll, and recomputing six aggregates over every
+   * annotation a user owns on each page of it is the one cost this page cannot carry.
+   */
+  async overview(userId: number, query: AnnotationHubQueryDto): Promise<AnnotationHubOverview> {
+    const filters = this.buildFilters(query);
+    const now = new Date();
+    const since = new Date(now.getTime() - ACTIVITY_WINDOW_DAYS * DAY_MS);
+    const [total, statsRow, colorRows, needsReview, trashed, shelfRows, weekRows, deviceRows] = await Promise.all([
+      this.annotationRepo.countHub(userId, filters),
+      this.annotationRepo.getHubStats(userId, filters),
+      this.annotationRepo.getHubColorBreakdown(userId, filters),
+      this.annotationRepo.countHubNeedsReview(userId, filters),
+      this.annotationRepo.countHubTrashed(userId),
+      this.annotationRepo.findHubBookFacets(userId, { status: filters.status, limit: SHELF_LIMIT, order: 'count' }),
+      this.annotationRepo.getHubActivityWeeks(userId, filters, since),
+      this.annotationRepo.getHubDeviceSummary(userId),
+    ]);
+
+    const weeks = foldActivityWeeks(weekRows);
+    const koboIds = deviceRows.filter((row) => row.source === 'kobo' && /^\d+$/.test(row.deviceId)).map((row) => Number(row.deviceId));
+    const koboNames = await this.syncRepo.findKoboDeviceNames(koboIds);
+
+    return {
+      total,
+      books: Number(statsRow?.books ?? 0),
+      withNotes: Number(statsRow?.withNotes ?? 0),
+      needsReview,
+      trashed,
+      originBreakdown: (
+        [
+          { origin: 'web', count: Number(statsRow?.web ?? 0) },
+          { origin: 'koreader', count: Number(statsRow?.koreader ?? 0) },
+          { origin: 'kobo', count: Number(statsRow?.kobo ?? 0) },
+        ] as AnnotationHubOverview['originBreakdown']
+      )
+        .filter((entry) => entry.count > 0)
+        .sort((a, b) => b.count - a.count),
+      colorBreakdown: colorRows.map((row) => ({ color: row.color, count: Number(row.count) })),
+      shelf: shelfRows.map(toBookFacet),
+      weeks,
+      busiestWeek: weeks.reduce<AnnotationHubOverview['busiestWeek']>((best, week) => (best && best.count >= week.count ? best : week), null),
+      longestQuietWeeks: longestQuietWeeks(weeks, now),
+      devices: deviceRows.map((row) => ({
+        source: row.source,
+        deviceId: row.deviceId,
+        deviceName: row.source === 'kobo' ? (koboNames.get(row.deviceId) ?? null) : null,
+        annotations: Number(row.annotations),
+        behind: Number(row.behind),
+        lastSyncedAt: (row.lastSyncedAt ?? new Date()).toISOString(),
+      })),
+    };
   }
 
   async listBooks(
@@ -234,6 +295,7 @@ export class AnnotationHubService {
       dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
       dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
       hasNote: query.hasNote || undefined,
+      needsReview: query.needsReview || undefined,
       status: query.status ?? 'active',
     };
   }

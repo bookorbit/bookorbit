@@ -16,6 +16,8 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     smartScopeFilterExpanded: true,
     authorCoverSize: 140,
     authorCoverShape: 'circle',
+    authorRowDensity: 'comfortable',
+    authorCoverFallback: false,
     tableZebraStriping: false,
     tableDensity: 'comfortable',
     bookSpineOverlay: 'subtle',

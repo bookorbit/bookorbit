@@ -177,6 +177,22 @@ function stripTrailingDotsAndSpaces(value: string): string {
   return end === value.length ? value : value.slice(0, end);
 }
 
+/**
+ * Token values are sanitized before modifiers and literal pattern text run, so an assembled
+ * segment can still end in a dot or space: `{authors:sort}` rewrites "J.K. Rowling" to
+ * "Rowling, J.K.". Windows and SMB reject those names and serve a mangled 8.3 alias instead.
+ * Only the trailing run is trimmed here; re-running sanitizePathSegment would append a second
+ * reserved-name guard ("NUL.txt_" -> "NUL.txt__").
+ */
+function normalizeResolvedSegments(path: string, options: Required<PathResolverOptions>): string {
+  if (!options.sanitizeForCrossPlatform || !path) return path;
+
+  return path
+    .split("/")
+    .map((segment) => (segment ? stripTrailingDotsAndSpaces(segment) || options.replacementCharacter : segment))
+    .join("/");
+}
+
 function sanitizeResolutionValues(values: Record<string, string>, options: Required<PathResolverOptions>): Record<string, string> {
   if (!options.sanitizeForCrossPlatform) return values;
 
@@ -277,7 +293,7 @@ function limitPathSegmentBytes(path: string, dotExt: string): string {
 export function resolveUploadPath(pattern: string, values: Record<string, string>, ext: string, options?: PathResolverOptions): string | null {
   const normalizedOptions = normalizeResolverOptions(options);
   const resolvedValues = sanitizeResolutionValues(values, normalizedOptions);
-  const resolved = replacePlaceholders(pattern, resolvedValues);
+  const resolved = normalizeResolvedSegments(replacePlaceholders(pattern, resolvedValues), normalizedOptions);
   if (!resolved) return null;
 
   const dotExt = normalizeDotExt(ext);
@@ -301,7 +317,7 @@ export function resolveUploadPath(pattern: string, values: Record<string, string
 export function resolveDownloadFilename(pattern: string, values: Record<string, string>, ext: string, options?: PathResolverOptions): string | null {
   const normalizedOptions = normalizeResolverOptions(options);
   const resolvedValues = sanitizeResolutionValues(values, normalizedOptions);
-  const resolved = replacePlaceholders(pattern, resolvedValues);
+  const resolved = normalizeResolvedSegments(replacePlaceholders(pattern, resolvedValues), normalizedOptions);
   if (!resolved) return null;
 
   const dotExt = normalizeDotExt(ext);

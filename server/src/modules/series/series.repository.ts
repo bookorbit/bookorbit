@@ -5,10 +5,11 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
+import { MAX_SERIES_TOTAL_BOOKS } from '../../common/utils/series-total-books.utils';
 import { compareSeriesIndexSql, seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, books, bookSeries, bookSeriesMemberships, userBookStatus } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookMetadata, books, bookSeries, bookSeriesMemberships, libraries, userBookStatus } from '../../db/schema';
 import type { SeriesListSort, SortDirection } from './dto/list-series.dto';
 import type { SeriesBookSort } from './dto/list-series-books.dto';
 
@@ -19,10 +20,38 @@ type SeriesSummaryRow = {
   name: string;
   bookCount: number;
   readCount: number;
+  readingCount: number;
+  expectedBookCount: number | null;
   authors: string[];
   coverBookIds: number[];
   lastAddedAt: string | null;
+  members: SeriesMemberRow[];
+  membersTruncated: boolean;
+  libraryNames: string[];
 };
+
+/** One book of a series, as the list needs it to draw the volume ladder. */
+export type SeriesMemberRow = {
+  bookId: number;
+  seriesIndex: string | null;
+  title: string | null;
+  status: string | null;
+};
+
+export type SeriesFacetRow = {
+  all: number;
+  notStarted: number;
+  inProgress: number;
+  complete: number;
+  hasGaps: number;
+};
+
+/**
+ * Books of one series the list will read to build its ladder. Far above any real series length,
+ * and only a backstop: a series past it reports its counts but no ladder detail and no gaps,
+ * because naming a volume missing needs every sibling in hand.
+ */
+const SERIES_MEMBER_SCAN_LIMIT = 400;
 
 export type SeriesNextBookRow = {
   bookId: number;
@@ -69,7 +98,7 @@ export class SeriesRepository {
     completionStatus?: string;
     author?: string;
     contentFilters?: ContentFilterRules;
-  }): Promise<{ items: SeriesSummaryRow[]; total: number; page: number; size: number }> {
+  }): Promise<{ items: SeriesSummaryRow[]; total: number; facets: SeriesFacetRow; page: number; size: number }> {
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
     const filterClauses = params.contentFilters ? buildContentFilterClauses(params.contentFilters, this.db) : [];
 
@@ -90,6 +119,7 @@ export class SeriesRepository {
 
     const bookCountExpr = sql<number>`count(distinct ${books.id})::int`;
     const readCountExpr = sql<number>`count(distinct CASE WHEN ${userBookStatus.status} = 'read' THEN ${books.id} END)::int`;
+    const readingCountExpr = sql<number>`count(distinct CASE WHEN ${userBookStatus.status} = 'reading' THEN ${books.id} END)::int`;
     const lastAddedExpr = sql<string | null>`max(${books.addedAt})::text`;
     const readProgressExpr = sql<number>`
       CASE WHEN count(distinct ${books.id}) = 0 THEN 0
@@ -97,16 +127,19 @@ export class SeriesRepository {
       END`;
     const nameExpr = sql<string>`${bookSeries.name}`;
 
-    const completionHaving = this.buildCompletionHaving(params.completionStatus, bookCountExpr, readCountExpr);
+    const hasGapsExpr = this.buildHasGapsExpression(bookCountExpr);
+    const completionHaving = this.buildCompletionHaving(params.completionStatus, bookCountExpr, readCountExpr, hasGapsExpr);
     const sortExpr = this.buildSortExpression(params.sort, params.order, nameExpr, bookCountExpr, lastAddedExpr, readProgressExpr);
 
-    const baseQuery = this.db
+    // Facets are counted before the completion filter, so the tab a user is standing on can
+    // still show what the other tabs hold. One pass replaces the separate total query.
+    const facetSource = this.db
+      // Raw SQL selected through a subquery has to carry its own alias, or referencing it
+      // from the outer FILTER throws before a query is ever sent.
       .select({
-        id: bookSeries.id,
-        name: bookSeries.name,
-        bookCount: bookCountExpr,
-        readCount: readCountExpr,
-        lastAddedAt: lastAddedExpr,
+        bookCount: bookCountExpr.as('book_count'),
+        readCount: readCountExpr.as('read_count'),
+        hasGaps: hasGapsExpr.as('has_gaps'),
       })
       .from(books)
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -114,11 +147,18 @@ export class SeriesRepository {
       .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(baseWhere)
-      .groupBy(bookSeries.id, bookSeries.name);
+      .groupBy(bookSeries.id, bookSeries.name, bookSeries.expectedBookCount)
+      .as('series_groups');
 
-    const countQuery = this.db
-      .select({ total: sql<number>`count(*)::int` })
-      .from((completionHaving ? baseQuery.having(completionHaving) : baseQuery).as('series_groups'));
+    const facetQuery = this.db
+      .select({
+        all: sql<number>`count(*)::int`,
+        notStarted: sql<number>`count(*) FILTER (WHERE ${facetSource.readCount} = 0)::int`,
+        inProgress: sql<number>`count(*) FILTER (WHERE ${facetSource.readCount} > 0 AND ${facetSource.readCount} < ${facetSource.bookCount})::int`,
+        complete: sql<number>`count(*) FILTER (WHERE ${facetSource.readCount} = ${facetSource.bookCount})::int`,
+        hasGaps: sql<number>`count(*) FILTER (WHERE ${facetSource.hasGaps})::int`,
+      })
+      .from(facetSource);
 
     const dataQuery = this.db
       .select({
@@ -126,6 +166,8 @@ export class SeriesRepository {
         name: bookSeries.name,
         bookCount: bookCountExpr,
         readCount: readCountExpr,
+        readingCount: readingCountExpr,
+        expectedBookCount: bookSeries.expectedBookCount,
         lastAddedAt: lastAddedExpr,
       })
       .from(books)
@@ -134,7 +176,7 @@ export class SeriesRepository {
       .innerJoin(bookSeries, eq(bookSeries.id, bookSeriesMemberships.seriesId))
       .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, params.userId)))
       .where(baseWhere)
-      .groupBy(bookSeries.id, bookSeries.name)
+      .groupBy(bookSeries.id, bookSeries.name, bookSeries.expectedBookCount)
       .$dynamic();
 
     if (completionHaving) {
@@ -145,30 +187,55 @@ export class SeriesRepository {
     dataQuery.limit(params.size);
     dataQuery.offset(params.page * params.size);
 
-    const [countResult, seriesRows] = await Promise.all([countQuery, dataQuery]);
-    const total = countResult[0]?.total ?? 0;
+    const [facetResult, seriesRows] = await Promise.all([facetQuery, dataQuery]);
+    const facets: SeriesFacetRow = facetResult[0] ?? { all: 0, notStarted: 0, inProgress: 0, complete: 0, hasGaps: 0 };
+    const total = this.totalForStatus(facets, params.completionStatus);
 
     if (seriesRows.length === 0) {
-      return { items: [], total, page: params.page, size: params.size };
+      return { items: [], total, facets, page: params.page, size: params.size };
     }
 
     const seriesIds = seriesRows.map((row) => row.id);
-    const [authorData, coverData] = await Promise.all([
+    const [authorData, coverData, memberData] = await Promise.all([
       this.fetchAuthorsForSeries(seriesIds, params.libraryIds, params.contentFilters),
       this.fetchCoverBookIds(seriesIds, params.libraryIds, params.contentFilters),
+      this.fetchSeriesMembers(seriesIds, params.libraryIds, params.userId, params.contentFilters),
     ]);
 
-    const items: SeriesSummaryRow[] = seriesRows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      bookCount: row.bookCount,
-      readCount: row.readCount,
-      authors: authorData.get(row.id) ?? [],
-      coverBookIds: coverData.get(row.id) ?? [],
-      lastAddedAt: row.lastAddedAt,
-    }));
+    const items: SeriesSummaryRow[] = seriesRows.map((row) => {
+      const members = memberData.get(row.id);
+      return {
+        id: row.id,
+        name: row.name,
+        bookCount: row.bookCount,
+        readCount: row.readCount,
+        readingCount: row.readingCount,
+        expectedBookCount: row.expectedBookCount ?? null,
+        authors: authorData.get(row.id) ?? [],
+        coverBookIds: coverData.get(row.id) ?? [],
+        lastAddedAt: row.lastAddedAt,
+        members: members?.rows ?? [],
+        membersTruncated: members?.truncated ?? false,
+        libraryNames: members?.libraryNames ?? [],
+      };
+    });
 
-    return { items, total, page: params.page, size: params.size };
+    return { items, total, facets, page: params.page, size: params.size };
+  }
+
+  private totalForStatus(facets: SeriesFacetRow, status: string | undefined): number {
+    switch (status) {
+      case 'not_started':
+        return facets.notStarted;
+      case 'in_progress':
+        return facets.inProgress;
+      case 'complete':
+        return facets.complete;
+      case 'has_gaps':
+        return facets.hasGaps;
+      default:
+        return facets.all;
+    }
   }
 
   async countSeries(params: { libraryIds: number[]; contentFilters?: ContentFilterRules }): Promise<number> {
@@ -404,7 +471,12 @@ export class SeriesRepository {
     return result;
   }
 
-  private buildCompletionHaving(status: string | undefined, bookCountExpr: SQL<number>, readCountExpr: SQL<number>): SQL | undefined {
+  private buildCompletionHaving(
+    status: string | undefined,
+    bookCountExpr: SQL<number>,
+    readCountExpr: SQL<number>,
+    hasGapsExpr: SQL<boolean>,
+  ): SQL | undefined {
     if (!status) return undefined;
 
     switch (status) {
@@ -414,9 +486,115 @@ export class SeriesRepository {
         return sql`${readCountExpr} > 0 AND ${readCountExpr} < ${bookCountExpr}`;
       case 'complete':
         return sql`${readCountExpr} = ${bookCountExpr}`;
+      case 'has_gaps':
+        return sql`${hasGapsExpr}`;
       default:
         return undefined;
     }
+  }
+
+  /**
+   * "This series is missing a volume", decided in SQL so the filter and its facet count can run
+   * over the whole library instead of a page. It mirrors `computeSeriesGaps` branch for branch:
+   * a provider total is only trusted when every book is numbered with a plain integer and none
+   * of them runs past the total, and without a trusted total only interior holes are knowable.
+   *
+   * Indices of ten digits or more are treated as unusable rather than cast, which is where this
+   * is fractionally stricter than the TypeScript: that function drops them for exceeding the
+   * safe-integer range, and either way the series reports no gaps.
+   */
+  private buildHasGapsExpression(bookCountExpr: SQL<number>): SQL<boolean> {
+    const idx = bookSeriesMemberships.seriesIndex;
+    const intIdx = sql`CASE WHEN ${idx} ~ '^[0-9]{1,9}$' THEN ${idx}::int END`;
+
+    const numberedCount = sql`count(distinct CASE WHEN ${idx} IS NOT NULL THEN ${books.id} END)`;
+    const integerCount = sql`count(distinct CASE WHEN ${idx} ~ '^[0-9]{1,9}$' THEN ${books.id} END)`;
+    const oversizedCount = sql`count(distinct CASE WHEN ${idx} ~ '^[0-9]{10,}$' THEN ${books.id} END)`;
+    const minIdx = sql`min(${intIdx})`;
+    const maxIdx = sql`max(${intIdx})`;
+    const distinctIdx = sql`count(distinct ${intIdx})`;
+    const expected = sql`${bookSeries.expectedBookCount}`;
+
+    const trusted = sql`(
+      ${expected} IS NOT NULL
+      AND ${expected} BETWEEN 1 AND ${MAX_SERIES_TOTAL_BOOKS}
+      AND ${numberedCount} = ${bookCountExpr}
+      AND ${integerCount} = ${numberedCount}
+      AND ${maxIdx} <= ${expected}
+    )`;
+
+    return sql<boolean>`(
+      ${integerCount} > 0
+      AND ${oversizedCount} = 0
+      AND ${minIdx} >= 1
+      AND ${maxIdx} <= ${MAX_SERIES_TOTAL_BOOKS}
+      AND CASE
+        WHEN ${trusted} THEN ${distinctIdx} < ${expected}
+        ELSE ${integerCount} >= 2 AND ${distinctIdx} < (${maxIdx} - ${minIdx} + 1)
+      END
+    )`;
+  }
+
+  /**
+   * Every book of the listed series in one pass, ordered the way the series reads. The ladder,
+   * the shelf covers' order, the up-next volume and the gap list are all derived from this, so
+   * it is fetched once per page rather than once per row.
+   */
+  private async fetchSeriesMembers(
+    seriesIds: number[],
+    libraryIds: number[],
+    userId: number,
+    contentFilters?: ContentFilterRules,
+  ): Promise<Map<number, { rows: SeriesMemberRow[]; truncated: boolean; libraryNames: string[] }>> {
+    if (seriesIds.length === 0) return new Map();
+
+    const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    const orderInWindow = sql.join(
+      [...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, 'ASC'), sql`${books.addedAt} ASC`, sql`${books.id} ASC`],
+      sql`, `,
+    );
+
+    const ranked = this.db
+      .select({
+        seriesId: bookSeriesMemberships.seriesId,
+        bookId: books.id,
+        seriesIndex: bookSeriesMemberships.seriesIndex,
+        title: bookMetadata.title,
+        status: userBookStatus.status,
+        libraryName: libraries.name,
+        rank: sql<number>`row_number() over (partition by ${bookSeriesMemberships.seriesId} order by ${orderInWindow})`.as('rank'),
+      })
+      .from(books)
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .innerJoin(bookSeriesMemberships, eq(bookSeriesMemberships.bookId, books.id))
+      .leftJoin(libraries, eq(libraries.id, books.libraryId))
+      .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)))
+      .where(and(inArray(bookSeriesMemberships.seriesId, seriesIds), this.buildLibraryFilter(libraryIds), ...filterClauses))
+      .as('ranked_members');
+
+    const rows = await this.db
+      .select()
+      .from(ranked)
+      .where(sql`${ranked.rank} <= ${SERIES_MEMBER_SCAN_LIMIT + 1}`)
+      .orderBy(ranked.seriesId, ranked.rank);
+
+    const result = new Map<number, { rows: SeriesMemberRow[]; truncated: boolean; libraryNames: string[] }>();
+    for (const row of rows) {
+      if (row.seriesId == null) continue;
+      let entry = result.get(row.seriesId);
+      if (!entry) {
+        entry = { rows: [], truncated: false, libraryNames: [] };
+        result.set(row.seriesId, entry);
+      }
+      if (entry.rows.length >= SERIES_MEMBER_SCAN_LIMIT) {
+        entry.truncated = true;
+        continue;
+      }
+      entry.rows.push({ bookId: row.bookId, seriesIndex: row.seriesIndex, title: row.title, status: row.status });
+      if (row.libraryName && !entry.libraryNames.includes(row.libraryName)) entry.libraryNames.push(row.libraryName);
+    }
+    for (const entry of result.values()) entry.libraryNames.sort((a, b) => a.localeCompare(b));
+    return result;
   }
 
   private buildSortExpression(

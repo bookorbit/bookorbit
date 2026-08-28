@@ -1,308 +1,171 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { nextTick } from 'vue'
-
-vi.mock('@/lib/api', () => ({
-  api: vi.fn<() => Promise<Response>>(),
-}))
-
-vi.mock('../../api/bulk-rename', () => ({
-  fetchBulkRenamePreview: vi.fn<() => Promise<BulkRenamePreviewPage>>(),
-  fetchBulkRenameStatus: vi.fn<() => Promise<{ running: boolean }>>(),
-  executeBulkRename: vi.fn<() => Promise<Response>>(),
-}))
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useBulkRename } from '../useBulkRename'
-import * as bulkRenameApi from '../../api/bulk-rename'
-import type { BulkRenamePreviewPage } from '@bookorbit/types'
 
-const mockFetchPreview = vi.mocked(bulkRenameApi.fetchBulkRenamePreview)
-const mockExecute = vi.mocked(bulkRenameApi.executeBulkRename)
+const apiMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<unknown>>())
 
-function makePreviewPage(overrides: Partial<BulkRenamePreviewPage> = {}): BulkRenamePreviewPage {
+vi.mock('@/lib/api', () => ({
+  api: (...args: unknown[]) => apiMock(...args),
+}))
+
+/** Builds a response whose body streams the given SSE frames and then closes. */
+function sseResponse(frames: string[], options: { ok?: boolean; status?: number } = {}) {
+  const encoder = new TextEncoder()
   return {
-    items: overrides.items ?? [
-      {
-        bookId: 1,
-        title: 'Test Book',
-        currentPath: '/lib/old.epub',
-        newPath: '/lib/new.epub',
-        status: 'will_rename',
+    ok: options.ok ?? true,
+    status: options.status ?? 200,
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const frame of frames) controller.enqueue(encoder.encode(frame))
+        controller.close()
       },
-    ],
-    total: overrides.total ?? 1,
-    totalByStatus: overrides.totalByStatus ?? {
-      will_rename: 1,
-      unchanged: 0,
-      collision: 0,
-      no_pattern: 0,
-      error: 0,
-    },
+    }),
   }
 }
 
-describe('useBulkRename', () => {
+function frame(event: unknown): string {
+  return `data: ${JSON.stringify(event)}\n\n`
+}
+
+describe('useBulkRename execute stream', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    apiMock.mockReset()
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  function armed() {
+    const bulk = useBulkRename()
+    bulk.selectLibrary(1)
+    return bulk
+  }
+
+  it('takes the run total from the started event', async () => {
+    apiMock.mockResolvedValue(
+      sseResponse([frame({ started: true, total: 7 }), frame({ done: true, processed: 7, succeeded: 7, failed: 0, skipped: 0 })]),
+    )
+
+    const bulk = armed()
+    await bulk.execute({ excludeBookIds: [] })
+
+    expect(bulk.runTotal.value).toBe(7)
   })
 
-  describe('initial state', () => {
-    it('has no library selected', () => {
-      const bulk = useBulkRename()
-      expect(bulk.selectedLibraryId.value).toBeNull()
-    })
+  it('counts only per-book events as renamed, never the lifecycle events', async () => {
+    apiMock.mockResolvedValue(
+      sseResponse([
+        frame({ started: true, total: 2 }),
+        frame({ bookId: 1, status: 'success' }),
+        frame({ bookId: 2, status: 'success' }),
+        frame({ done: true, processed: 2, succeeded: 2, failed: 0, skipped: 0 }),
+      ]),
+    )
 
-    it('has empty preview data', () => {
-      const bulk = useBulkRename()
-      expect(bulk.previewItems.value).toEqual([])
-      expect(bulk.previewTotal.value).toBe(0)
-    })
+    const bulk = armed()
+    await bulk.execute({ excludeBookIds: [] })
 
-    it('is not loading or executing', () => {
-      const bulk = useBulkRename()
-      expect(bulk.loading.value).toBe(false)
-      expect(bulk.executing.value).toBe(false)
-    })
-
-    it('has no errors', () => {
-      const bulk = useBulkRename()
-      expect(bulk.previewError.value).toBeNull()
-      expect(bulk.executionError.value).toBeNull()
-    })
+    expect(bulk.renamedCount.value).toBe(2)
+    expect(bulk.runTotal.value).toBe(2)
+    expect(bulk.executionStats.value).toEqual({ processed: 2, succeeded: 2, failed: 0, skipped: 0 })
+    expect(bulk.executionError.value).toBeNull()
   })
 
-  describe('selectLibrary', () => {
-    it('sets the selected library id', () => {
-      const bulk = useBulkRename()
-      bulk.selectLibrary(5)
-      expect(bulk.selectedLibraryId.value).toBe(5)
-    })
+  it('handles frames split across chunk boundaries', async () => {
+    const full =
+      frame({ started: true, total: 1 }) +
+      frame({ bookId: 1, status: 'success' }) +
+      frame({ done: true, processed: 1, succeeded: 1, failed: 0, skipped: 0 })
+    const cut = Math.floor(full.length / 3)
 
-    it('resets page and status filter', () => {
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-      expect(bulk.page.value).toBe(1)
-      expect(bulk.statusFilter.value).toBeUndefined()
-    })
+    apiMock.mockResolvedValue(sseResponse([full.slice(0, cut), full.slice(cut, cut * 2), full.slice(cut * 2)]))
 
-    it('clears previous preview data', () => {
-      const bulk = useBulkRename()
-      bulk.previewItems.value = [{ bookId: 1, title: 'Old', currentPath: '/a', newPath: '/b', status: 'will_rename' }]
-      bulk.previewTotal.value = 1
+    const bulk = armed()
+    await bulk.execute({ excludeBookIds: [] })
 
-      bulk.selectLibrary(2)
-      expect(bulk.previewItems.value).toEqual([])
-      expect(bulk.previewTotal.value).toBe(0)
-    })
-
-    it('clears execution state', () => {
-      const bulk = useBulkRename()
-      bulk.executionStats.value = { processed: 1, succeeded: 1, failed: 0, skipped: 0 }
-      bulk.executionError.value = 'old error'
-
-      bulk.selectLibrary(3)
-      expect(bulk.executionStats.value).toBeNull()
-      expect(bulk.executionError.value).toBeNull()
-    })
+    expect(bulk.runTotal.value).toBe(1)
+    expect(bulk.renamedCount.value).toBe(1)
+    expect(bulk.executionStats.value?.succeeded).toBe(1)
   })
 
-  describe('loadPreview', () => {
-    it('fetches preview from API', async () => {
-      const page = makePreviewPage()
-      mockFetchPreview.mockResolvedValue(page)
+  it('reports an error when the stream ends without a completion event', async () => {
+    // Headers now flush before the run, so a mid-run server failure arrives as a stream that just
+    // stops. Reporting success here would tell the user files moved when they may not have.
+    apiMock.mockResolvedValue(sseResponse([frame({ started: true, total: 3 }), frame({ bookId: 1, status: 'success' })]))
 
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-      await bulk.loadPreview()
+    const bulk = armed()
+    await bulk.execute({ excludeBookIds: [] })
 
-      expect(mockFetchPreview).toHaveBeenCalledWith(1, 1, 50, undefined)
-      expect(bulk.previewItems.value).toEqual(page.items)
-      expect(bulk.previewTotal.value).toBe(1)
-      expect(bulk.totalByStatus.value.will_rename).toBe(1)
-    })
-
-    it('does nothing when no library is selected', async () => {
-      const bulk = useBulkRename()
-      await bulk.loadPreview()
-      expect(mockFetchPreview).not.toHaveBeenCalled()
-    })
-
-    it('sets loading state during fetch', async () => {
-      let resolve: ((value: BulkRenamePreviewPage) => void) | undefined
-      mockFetchPreview.mockImplementation(() => new Promise((r) => (resolve = r)))
-
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-
-      const promise = bulk.loadPreview()
-      expect(bulk.loading.value).toBe(true)
-
-      resolve!(makePreviewPage())
-      await promise
-
-      expect(bulk.loading.value).toBe(false)
-    })
-
-    it('sets error on fetch failure', async () => {
-      mockFetchPreview.mockRejectedValue(new Error('network error'))
-
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-      await bulk.loadPreview()
-
-      expect(bulk.previewError.value).toBe('network error')
-    })
-
-    it('passes status filter to API', async () => {
-      mockFetchPreview.mockResolvedValue(makePreviewPage())
-
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-      bulk.setStatusFilter('collision')
-      await nextTick()
-      await nextTick()
-
-      expect(mockFetchPreview).toHaveBeenCalledWith(1, 1, 50, 'collision')
-    })
+    expect(bulk.executionStats.value).toBeNull()
+    // A stable code, never a user-facing string: the view owns the wording so it can be translated.
+    expect(bulk.executionError.value).toEqual({ code: 'incomplete' })
   })
 
-  describe('setPage', () => {
-    it('updates the page number', () => {
-      const bulk = useBulkRename()
-      bulk.setPage(3)
-      expect(bulk.page.value).toBe(3)
-    })
+  it('reports an error when the stream carries nothing at all', async () => {
+    apiMock.mockResolvedValue(sseResponse([]))
+
+    const bulk = armed()
+    await bulk.execute({ excludeBookIds: [] })
+
+    expect(bulk.executionError.value).toEqual({ code: 'incomplete' })
   })
 
-  describe('setStatusFilter', () => {
-    it('updates the status filter and resets page', () => {
-      const bulk = useBulkRename()
-      bulk.setPage(3)
-      bulk.setStatusFilter('will_rename')
-      expect(bulk.statusFilter.value).toBe('will_rename')
-      expect(bulk.page.value).toBe(1)
-    })
+  it('surfaces a non-ok response instead of reading the body', async () => {
+    apiMock.mockResolvedValue(sseResponse([], { ok: false, status: 500 }))
 
-    it('can be cleared to undefined', () => {
-      const bulk = useBulkRename()
-      bulk.setStatusFilter('collision')
-      bulk.setStatusFilter(undefined)
-      expect(bulk.statusFilter.value).toBeUndefined()
-    })
+    const bulk = armed()
+    await bulk.execute({ excludeBookIds: [] })
+
+    expect(bulk.executionError.value).toEqual({ code: 'http', status: 500 })
   })
 
-  describe('totalPages', () => {
-    it('computes pages from total and pageSize', () => {
-      const bulk = useBulkRename()
-      bulk.previewTotal.value = 120
-
-      expect(bulk.totalPages.value).toBe(3)
+  it('stays silent when the user cancels the run', async () => {
+    apiMock.mockImplementation((_url, init) => {
+      const signal = (init as { signal?: AbortSignal } | undefined)?.signal
+      return Promise.reject(Object.assign(new Error('aborted'), { name: 'AbortError', signal }))
     })
 
-    it('returns 1 when total is 0', () => {
-      const bulk = useBulkRename()
-      expect(bulk.totalPages.value).toBe(1)
-    })
+    const bulk = armed()
+    const promise = bulk.execute({ excludeBookIds: [] })
+    bulk.cancelExecution()
+    await promise
+
+    expect(bulk.executionError.value).toBeNull()
   })
 
-  describe('execute', () => {
-    function makeSSEResponse(events: string[]): Response {
-      const encoder = new TextEncoder()
-      const chunks = events.map((e) => encoder.encode(`data: ${e}\n\n`))
-      let index = 0
+  it('resets the run total between runs so a stale total cannot linger', async () => {
+    apiMock.mockResolvedValue(
+      sseResponse([frame({ started: true, total: 9 }), frame({ done: true, processed: 9, succeeded: 9, failed: 0, skipped: 0 })]),
+    )
 
-      const readable = new ReadableStream<Uint8Array>({
-        pull(controller) {
-          if (index < chunks.length) {
-            controller.enqueue(chunks[index++])
-          } else {
-            controller.close()
-          }
-        },
-      })
+    const bulk = armed()
+    await bulk.execute({ excludeBookIds: [] })
+    expect(bulk.runTotal.value).toBe(9)
 
-      return { ok: true, body: readable } as unknown as Response
-    }
+    apiMock.mockResolvedValue(
+      sseResponse([frame({ started: true, total: 2 }), frame({ done: true, processed: 2, succeeded: 2, failed: 0, skipped: 0 })]),
+    )
+    await bulk.execute({ excludeBookIds: [] })
 
-    it('streams SSE events and extracts final stats', async () => {
-      const doneEvent = JSON.stringify({ done: true, processed: 5, succeeded: 3, failed: 1, skipped: 1 })
-      mockExecute.mockResolvedValue(makeSSEResponse([JSON.stringify({ bookId: 1, status: 'success' }), doneEvent]))
-
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-      await bulk.execute()
-
-      expect(bulk.executionStats.value).toEqual({ processed: 5, succeeded: 3, failed: 1, skipped: 1 })
-      expect(bulk.executing.value).toBe(false)
-    })
-
-    it('does nothing when no library is selected', async () => {
-      const bulk = useBulkRename()
-      await bulk.execute()
-      expect(mockExecute).not.toHaveBeenCalled()
-    })
-
-    it('sets executing state during execution', async () => {
-      let resolve: ((value: Response) => void) | undefined
-      mockExecute.mockImplementation(() => new Promise((r) => (resolve = r)))
-
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-
-      const promise = bulk.execute()
-      expect(bulk.executing.value).toBe(true)
-
-      const doneEvent = JSON.stringify({ done: true, processed: 0, succeeded: 0, failed: 0, skipped: 0 })
-      const encoder = new TextEncoder()
-      const readable = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(encoder.encode(`data: ${doneEvent}\n\n`))
-          controller.close()
-        },
-      })
-      resolve!({ ok: true, body: readable } as unknown as Response)
-      await promise
-
-      expect(bulk.executing.value).toBe(false)
-    })
-
-    it('sets error on HTTP failure', async () => {
-      mockExecute.mockResolvedValue({ ok: false, status: 500 } as Response)
-
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-      await bulk.execute()
-
-      expect(bulk.executionError.value).toBe('HTTP 500')
-    })
-
-    it('sets error on missing body', async () => {
-      mockExecute.mockResolvedValue({ ok: true, body: null } as unknown as Response)
-
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
-      await bulk.execute()
-
-      expect(bulk.executionError.value).toBe('No response body')
-    })
+    expect(bulk.runTotal.value).toBe(2)
   })
 
-  describe('cancelExecution', () => {
-    it('aborts the execution without setting error', async () => {
-      const abortError = new DOMException('signal is aborted', 'AbortError')
-      mockExecute.mockRejectedValue(abortError)
+  it('sends the selection through to the execute endpoint', async () => {
+    apiMock.mockResolvedValue(
+      sseResponse([frame({ started: true, total: 1 }), frame({ done: true, processed: 1, succeeded: 1, failed: 0, skipped: 0 })]),
+    )
 
-      const bulk = useBulkRename()
-      bulk.selectLibrary(1)
+    const bulk = armed()
+    await bulk.execute({ includeBookIds: [42] })
 
-      const executePromise = bulk.execute()
-      bulk.cancelExecution()
-      await executePromise
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/libraries/1/bulk-rename/execute',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ includeBookIds: [42] }) }),
+    )
+  })
 
-      expect(bulk.executionError.value).toBeNull()
-    })
+  it('does nothing when no library is selected', async () => {
+    const bulk = useBulkRename()
+    await bulk.execute({ excludeBookIds: [] })
+
+    expect(apiMock).not.toHaveBeenCalled()
+    expect(bulk.executing.value).toBe(false)
   })
 })

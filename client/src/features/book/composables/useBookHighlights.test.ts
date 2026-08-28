@@ -32,7 +32,19 @@ function makeListResponse(overrides?: Record<string, unknown>) {
       colorBreakdown: [{ color: '#FACC15', count: 1 }],
       chaptersWithHighlights: 1,
       highlightsWithNotes: 0,
+      highlightsNeedingReview: 0,
       chapters: ['Chapter 1'],
+      chapterBreakdown: [
+        {
+          title: 'Chapter 1',
+          count: 1,
+          colors: [{ color: '#FACC15', count: 1 }],
+          chapterIndex: 0,
+          order: 0,
+          firstCreatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      activity: [{ day: '2026-01-01', count: 1, origins: [{ origin: 'web', count: 1 }] }],
     },
     ...overrides,
   }
@@ -86,7 +98,7 @@ describe('useBookHighlights', () => {
 
     const url = mockFetch.mock.calls[0]?.[0] as string
     expect(url).toContain('page=1')
-    expect(url).toContain('pageSize=25')
+    expect(url).toContain('pageSize=100')
     expect(url).toContain('sortBy=position')
     expect(url).toContain('sortDir=asc')
   })
@@ -106,36 +118,75 @@ describe('useBookHighlights', () => {
     expect(mockFetch.mock.calls[0]?.[0]).toContain('colors=%23FACC15')
   })
 
-  it('maps the merged sort key to sortBy/sortDir', async () => {
+  it('drives the grouping and the request sort from one view key', async () => {
     mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
     const bookId = ref(5)
-    const { sortBy, sortDir, sortKey } = useBookHighlights(bookId)
+    const { view, groupMode } = useBookHighlights(bookId)
 
     await nextTick()
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
-    expect(sortKey.value).toBe('position')
-    sortKey.value = 'newest'
-    expect(sortBy.value).toBe('createdAt')
-    expect(sortDir.value).toBe('desc')
-    sortKey.value = 'oldest'
-    expect(sortDir.value).toBe('asc')
+    expect(view.value).toBe('position')
+    expect(groupMode.value).toBe('chapter')
+
+    view.value = 'newest'
+    expect(groupMode.value).toBe('day')
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('sortBy=createdAt'))
+    expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('sortDir=desc')
+
+    view.value = 'colour'
+    expect(groupMode.value).toBe('colour')
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('sortBy=position'))
   })
 
-  it('reloads when the page changes', async () => {
+  it('appends the next window instead of replacing the loaded one', async () => {
+    const first = makeListResponse({ total: 2 })
+    const second = makeListResponse({
+      total: 2,
+      items: [{ ...first.items[0], id: 2, text: 'second highlight' }],
+    })
+    mockFetch.mockResolvedValueOnce(mockOkResponse(first)).mockResolvedValueOnce(mockOkResponse(second))
+    const bookId = ref(5)
+    const { items, hasMore, loadMore } = useBookHighlights(bookId)
+
+    await nextTick()
+    await vi.waitFor(() => expect(items.value).toHaveLength(1))
+    expect(hasMore.value).toBe(true)
+
+    await loadMore()
+
+    expect(items.value.map((item) => item.id)).toEqual([1, 2])
+    expect(hasMore.value).toBe(false)
+    expect(mockFetch.mock.calls[1]?.[0]).toContain('page=2')
+  })
+
+  it('does not load more once everything is loaded', async () => {
     mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
     const bookId = ref(5)
-    const { page } = useBookHighlights(bookId)
+    const { hasMore, loadMore } = useBookHighlights(bookId)
 
     await nextTick()
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
     mockFetch.mockClear()
 
-    page.value = 3
+    expect(hasMore.value).toBe(false)
+    await loadMore()
 
-    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    expect(page.value).toBe(3)
-    expect(mockFetch.mock.calls[0]?.[0]).toContain('page=3')
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('ignores a duplicate row when a page boundary overlaps', async () => {
+    const first = makeListResponse({ total: 3 })
+    mockFetch.mockResolvedValueOnce(mockOkResponse(first)).mockResolvedValueOnce(mockOkResponse(makeListResponse({ total: 3 })))
+    const bookId = ref(5)
+    const { items, loadMore } = useBookHighlights(bookId)
+
+    await nextTick()
+    await vi.waitFor(() => expect(items.value).toHaveLength(1))
+
+    await loadMore()
+
+    expect(items.value).toHaveLength(1)
   })
 
   it('updateNote optimistically patches the item and PATCHes the endpoint', async () => {
@@ -333,39 +384,37 @@ describe('useBookHighlights', () => {
     expect(dateTo.value).toBe('')
   })
 
-  it('maps the position sort key back to sortBy/sortDir', async () => {
+  it('sends the notes and review refinements to the server, not to the loaded window', async () => {
     mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
     const bookId = ref(5)
-    const { sortKey, sortBy, sortDir } = useBookHighlights(bookId)
+    const { toggleNotesOnly, toggleNeedsReviewOnly } = useBookHighlights(bookId)
 
     await nextTick()
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
-    sortKey.value = 'newest'
-    expect(sortBy.value).toBe('createdAt')
+    toggleNotesOnly()
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('hasNote=true'))
 
-    sortKey.value = 'position'
-    expect(sortBy.value).toBe('position')
-    expect(sortDir.value).toBe('asc')
+    toggleNeedsReviewOnly()
+    await vi.waitFor(() => expect(String(mockFetch.mock.calls.at(-1)?.[0])).toContain('needsReview=true'))
   })
 
-  it('refetches exactly once when a filter changes while on a later page', async () => {
-    mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
+  it('refetches exactly once from the top when a filter changes after loading more', async () => {
+    mockFetch.mockResolvedValue(mockOkResponse(makeListResponse({ total: 2 })))
     const bookId = ref(5)
-    const { page, colors } = useBookHighlights(bookId)
+    const { colors, loadMore } = useBookHighlights(bookId)
 
     await nextTick()
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
-    page.value = 3
-    await nextTick()
+    await loadMore()
     mockFetch.mockClear()
 
     colors.value = ['#FACC15']
     await nextTick()
 
-    expect(page.value).toBe(1)
     expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockFetch.mock.calls[0]?.[0]).toContain('page=1')
   })
 
   it('discards a stale fetch when a newer fetch supersedes it', async () => {
@@ -399,14 +448,13 @@ describe('useBookHighlights', () => {
   it('resets state when bookId changes', async () => {
     mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
     const bookId = ref(5)
-    const { colors, search, chapter, page } = useBookHighlights(bookId)
+    const { colors, search, chapter } = useBookHighlights(bookId)
 
     await nextTick()
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled())
 
     colors.value = ['#FACC15']
     chapter.value = 'Chapter 1'
-    page.value = 3
     mockFetch.mockClear()
     mockFetch.mockResolvedValue(mockOkResponse(makeListResponse()))
 
@@ -416,6 +464,5 @@ describe('useBookHighlights', () => {
     expect(colors.value).toEqual([])
     expect(search.value).toBe('')
     expect(chapter.value).toBe('')
-    expect(page.value).toBe(1)
   })
 })

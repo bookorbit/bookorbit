@@ -61,3 +61,5 @@ minimumReleaseAgeExclude:
   - concurrently@10.0.5
   - jose@6.2.9
   - vue-tsc@3.3.10
+  - "@lucide/vue@1.35.0"
+  - nodemailer@9.0.6

@@ -165,13 +165,18 @@ onUnmounted(() => clearTimeout(debounceTimer))
       />
       <button
         type="button"
-        class="absolute bottom-2 right-2 flex items-center justify-center size-6 rounded-md bg-background/90 shadow-sm border border-input hover:bg-muted transition-colors"
+        class="absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-md border shadow-sm backdrop-blur-sm transition-colors"
+        :class="
+          props.locked
+            ? 'border-primary/40 bg-primary/25 text-primary hover:bg-primary/35'
+            : 'border-input bg-background/90 text-muted-foreground hover:bg-muted hover:text-foreground'
+        "
         :title="props.locked ? t('book.detail.coverEditor.unlockCover') : t('book.detail.coverEditor.lockCover')"
         :disabled="props.disabled"
         @click.stop="handleToggleLock"
       >
-        <Lock v-if="props.locked" class="size-3.5 text-primary" />
-        <LockOpen v-else class="size-3.5 text-muted-foreground" />
+        <Lock v-if="props.locked" class="size-4" />
+        <LockOpen v-else class="size-4" />
       </button>
     </div>
 

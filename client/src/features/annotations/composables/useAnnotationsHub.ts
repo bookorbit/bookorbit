@@ -1,8 +1,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
-import type { AnnotationHubBookFacet, AnnotationHubItem, AnnotationHubResponse, AnnotationHubStats } from '@bookorbit/types'
+import type { AnnotationHubBookFacet, AnnotationHubItem, AnnotationHubOverview, AnnotationHubResponse } from '@bookorbit/types'
 import { api } from '@/lib/api'
-import { type SortKey } from '../lib/filter-options'
-import { buildFilterChips } from '../lib/filter-chips'
+import { HUB_VIEWS, type HubViewKey } from '../lib/hub-groups'
 import { useAnnotationSelection } from './useAnnotationSelection'
 import { useAnnotationMutations } from './useAnnotationMutations'
 
@@ -17,13 +16,14 @@ export interface AnnotationsHubState {
   styleFilter: string
   originFilter: string
   notesOnly: boolean
+  needsReviewOnly: boolean
   dateFrom: string
   dateTo: string
-  sortKey: SortKey
-  page: number
+  view: HubViewKey
 }
 
 const SEARCH_RELOAD_DEBOUNCE_MS = 300
+const PAGE_SIZE = 50
 
 /**
  * Turns a yyyy-mm-dd value from an `<input type="date">` into a UTC ISO instant at the
@@ -40,8 +40,8 @@ export function useAnnotationsHub() {
   const items = ref<AnnotationHubItem[]>([])
   const total = ref(0)
   const page = ref(1)
-  const pageSize = ref(25)
   const loading = ref(false)
+  const loadingMore = ref(false)
   const error = ref<string | null>(null)
 
   const status = ref<HubStatus>('active')
@@ -50,67 +50,34 @@ export function useAnnotationsHub() {
   const styleFilter = ref('all')
   const originFilter = ref('all')
   const bookFilter = ref<number | 'all'>('all')
-  const sortBy = ref<'createdAt' | 'book'>('createdAt')
-  const sortDir = ref<'asc' | 'desc'>('desc')
+  const view = ref<HubViewKey>('newest')
   const dateFrom = ref('')
   const dateTo = ref('')
   const notesOnly = ref(false)
+  const needsReviewOnly = ref(false)
   const hydrating = ref(false)
 
   const selectedBookLabel = ref<string | null>(null)
-  const stats = ref<AnnotationHubStats | null>(null)
+  const overview = ref<AnnotationHubOverview | null>(null)
 
   const selection = useAnnotationSelection(items)
   const mutations = useAnnotationMutations(items, (id) => items.value.find((item) => item.id === id)?.bookId ?? null)
 
-  const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-  const rangeStart = computed(() => (total.value === 0 ? 0 : (page.value - 1) * pageSize.value + 1))
-  const rangeEnd = computed(() => Math.min(page.value * pageSize.value, total.value))
+  const spec = computed(() => HUB_VIEWS[view.value])
+  const groupMode = computed(() => spec.value.group)
+  const hasMore = computed(() => items.value.length < total.value)
 
-  const sortKey = computed<SortKey>({
-    get() {
-      if (sortBy.value === 'book') return sortDir.value === 'asc' ? 'book-asc' : 'book-desc'
-      return sortDir.value === 'desc' ? 'newest' : 'oldest'
-    },
-    set(value) {
-      switch (value) {
-        case 'newest':
-          sortBy.value = 'createdAt'
-          sortDir.value = 'desc'
-          break
-        case 'oldest':
-          sortBy.value = 'createdAt'
-          sortDir.value = 'asc'
-          break
-        case 'book-asc':
-          sortBy.value = 'book'
-          sortDir.value = 'asc'
-          break
-        case 'book-desc':
-          sortBy.value = 'book'
-          sortDir.value = 'desc'
-          break
-      }
-    },
-  })
-
-  const activeFilterChips = computed(() =>
-    buildFilterChips({
-      colors: colors.value,
-      styleFilter: styleFilter.value,
-      originFilter: originFilter.value,
-      dateFrom: dateFrom.value,
-      dateTo: dateTo.value,
-    }),
+  const popoverFilterCount = computed(
+    () =>
+      colors.value.length + (styleFilter.value !== 'all' ? 1 : 0) + (originFilter.value !== 'all' ? 1 : 0) + (dateFrom.value || dateTo.value ? 1 : 0),
   )
-
-  const popoverFilterCount = computed(() => activeFilterChips.value.length)
 
   const hasActiveFilters = computed(
     () =>
       search.value.trim() !== '' ||
       bookFilter.value !== 'all' ||
       notesOnly.value ||
+      needsReviewOnly.value ||
       colors.value.length > 0 ||
       styleFilter.value !== 'all' ||
       originFilter.value !== 'all' ||
@@ -120,11 +87,9 @@ export function useAnnotationsHub() {
 
   function buildQuery(extra: Record<string, string> = {}): string {
     const params = new URLSearchParams()
-    params.set('page', String(page.value))
-    params.set('pageSize', String(pageSize.value))
     params.set('status', status.value)
-    params.set('sortBy', sortBy.value)
-    params.set('sortDir', sortDir.value)
+    params.set('sortBy', spec.value.sortBy)
+    params.set('sortDir', spec.value.sortDir)
     if (search.value.trim()) params.set('search', search.value.trim())
     if (colors.value.length > 0) params.set('colors', colors.value.join(','))
     if (styleFilter.value !== 'all') params.set('styles', styleFilter.value)
@@ -135,30 +100,55 @@ export function useAnnotationsHub() {
     const to = toDayBoundaryIso(dateTo.value, 'end')
     if (to) params.set('dateTo', to)
     if (notesOnly.value) params.set('hasNote', 'true')
+    if (needsReviewOnly.value) params.set('needsReview', 'true')
     for (const [key, value] of Object.entries(extra)) params.set(key, value)
     return params.toString()
   }
 
   let loadSeq = 0
-  async function load() {
+  async function load(append = false) {
     const seq = ++loadSeq
-    loading.value = true
+    const target = append ? page.value + 1 : 1
+    if (append) loadingMore.value = true
+    else loading.value = true
     error.value = null
     try {
-      const res = await api(`/api/v1/annotations?${buildQuery()}`)
+      const res = await api(`/api/v1/annotations?${buildQuery({ page: String(target), pageSize: String(PAGE_SIZE) })}`)
       if (seq !== loadSeq) return
       if (!res.ok) {
-        error.value = 'Failed to load annotations'
+        error.value = 'failed'
         return
       }
       const body: AnnotationHubResponse = await res.json()
       if (seq !== loadSeq) return
-      items.value = body.items
+      items.value = append ? [...items.value, ...body.items] : body.items
       total.value = body.total
-      stats.value = body.stats
+      page.value = target
+    } catch {
+      if (seq === loadSeq) error.value = 'failed'
     } finally {
-      if (seq === loadSeq) loading.value = false
+      if (seq === loadSeq) {
+        loading.value = false
+        loadingMore.value = false
+      }
     }
+  }
+
+  async function loadMore() {
+    if (loading.value || loadingMore.value || !hasMore.value) return
+    await load(true)
+  }
+
+  let overviewSeq = 0
+  async function loadOverview() {
+    const seq = ++overviewSeq
+    const res = await api(`/api/v1/annotations/overview?${buildQuery()}`)
+    if (seq !== overviewSeq || !res.ok) return
+    overview.value = (await res.json()) as AnnotationHubOverview
+  }
+
+  async function refresh() {
+    await Promise.all([load(), loadOverview()])
   }
 
   async function searchBooks(q: string): Promise<AnnotationHubBookFacet[]> {
@@ -180,11 +170,33 @@ export function useAnnotationsHub() {
     if (!res.ok) return
     const facets = (await res.json()) as AnnotationHubBookFacet[]
     const match = facets.find((facet) => facet.bookId === bookFilter.value)
-    if (match) selectedBookLabel.value = match.bookTitle ?? 'Unknown book'
+    if (match) selectedBookLabel.value = match.bookTitle ?? null
   }
 
   function toggleNotesOnly() {
     notesOnly.value = !notesOnly.value
+  }
+
+  function toggleNeedsReviewOnly() {
+    needsReviewOnly.value = !needsReviewOnly.value
+  }
+
+  function toggleColor(hex: string) {
+    colors.value = colors.value.includes(hex) ? colors.value.filter((value) => value !== hex) : [...colors.value, hex]
+  }
+
+  function toggleOrigin(origin: string) {
+    originFilter.value = originFilter.value === origin ? 'all' : origin
+  }
+
+  function toggleBook(bookId: number, label: string | null) {
+    if (bookFilter.value === bookId) {
+      bookFilter.value = 'all'
+      selectedBookLabel.value = null
+      return
+    }
+    bookFilter.value = bookId
+    selectedBookLabel.value = label
   }
 
   function clearDates() {
@@ -204,6 +216,7 @@ export function useAnnotationsHub() {
     bookFilter.value = 'all'
     selectedBookLabel.value = null
     notesOnly.value = false
+    needsReviewOnly.value = false
     clearPopoverFilters()
   }
 
@@ -227,10 +240,10 @@ export function useAnnotationsHub() {
     if (state.styleFilter !== undefined) styleFilter.value = state.styleFilter
     if (state.originFilter !== undefined) originFilter.value = state.originFilter
     if (state.notesOnly !== undefined) notesOnly.value = state.notesOnly
+    if (state.needsReviewOnly !== undefined) needsReviewOnly.value = state.needsReviewOnly
     if (state.dateFrom !== undefined) dateFrom.value = state.dateFrom
     if (state.dateTo !== undefined) dateTo.value = state.dateTo
-    if (state.sortKey !== undefined) sortKey.value = state.sortKey
-    if (state.page !== undefined) page.value = state.page
+    if (state.view !== undefined) view.value = state.view
     void nextTick(() => {
       hydrating.value = false
     })
@@ -247,27 +260,37 @@ export function useAnnotationsHub() {
     if (!res.ok) return 0
     const body = (await res.json()) as { affected: number }
     selection.clearSelection()
-    await load()
+    await refresh()
     return body.affected
   }
 
   async function restore(id: number): Promise<boolean> {
     const res = await api(`/api/v1/annotations/${id}/restore`, { method: 'POST' })
-    if (res.ok) await load()
+    if (res.ok) await refresh()
     return res.ok
   }
 
   async function purge(id: number): Promise<{ ok: boolean; message?: string }> {
     const res = await api(`/api/v1/annotations/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      await load()
+      await refresh()
       return { ok: true }
     }
     if (res.status === 409) {
       const body = (await res.json().catch(() => null)) as { message?: string } | null
-      return { ok: false, message: body?.message ?? 'Still pending device sync' }
+      return { ok: false, message: body?.message }
     }
-    return { ok: false, message: 'Failed to delete' }
+    return { ok: false }
+  }
+
+  async function trashOne(id: number): Promise<boolean> {
+    const res = await api('/api/v1/annotations/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [id], action: 'trash' }),
+    })
+    if (res.ok) await refresh()
+    return res.ok
   }
 
   function exportUrl(format: 'md' | 'csv' | 'json'): string {
@@ -276,11 +299,10 @@ export function useAnnotationsHub() {
 
   function reloadFromFilterChange() {
     selection.clearSelection()
-    if (page.value === 1) void load()
-    else page.value = 1
+    void refresh()
   }
 
-  watch([status, colors, styleFilter, originFilter, bookFilter, sortBy, sortDir, dateFrom, dateTo, notesOnly], () => {
+  watch([status, colors, styleFilter, originFilter, bookFilter, view, dateFrom, dateTo, notesOnly, needsReviewOnly], () => {
     if (hydrating.value) return
     reloadFromFilterChange()
   })
@@ -295,21 +317,13 @@ export function useAnnotationsHub() {
     bookFilter.value = 'all'
     selectedBookLabel.value = null
   })
-  watch(page, () => {
-    if (hydrating.value) return
-    selection.clearSelection()
-    void load()
-  })
 
   return {
     items,
     total,
-    page,
-    pageSize,
-    totalPages,
-    rangeStart,
-    rangeEnd,
     loading,
+    loadingMore,
+    hasMore,
     error,
     status,
     search,
@@ -317,29 +331,35 @@ export function useAnnotationsHub() {
     styleFilter,
     originFilter,
     bookFilter,
-    sortBy,
-    sortDir,
-    sortKey,
+    view,
+    groupMode,
     dateFrom,
     dateTo,
     notesOnly,
+    needsReviewOnly,
     hydrating,
-    activeFilterChips,
     popoverFilterCount,
     hasActiveFilters,
     selectedBookLabel,
-    stats,
+    overview,
     selectedIds: selection.selectedIds,
     savingIds: mutations.savingIds,
     hasSelection: selection.hasSelection,
     allVisibleSelected: selection.allVisibleSelected,
     load,
+    loadMore,
+    loadOverview,
+    refresh,
     searchBooks,
     resolveSelectedBook,
     toggleSelected: selection.toggleSelected,
     clearSelection: selection.clearSelection,
     selectAllOnPage: selection.selectAllOnPage,
     toggleNotesOnly,
+    toggleNeedsReviewOnly,
+    toggleColor,
+    toggleOrigin,
+    toggleBook,
     clearDates,
     clearPopoverFilters,
     resetAllFilters,
@@ -351,6 +371,7 @@ export function useAnnotationsHub() {
     bulk,
     restore,
     purge,
+    trashOne,
     exportUrl,
   }
 }

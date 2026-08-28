@@ -2985,19 +2985,8 @@
       "refreshMetadata": "Obnovit metadata",
       "deleteAuthor": "Odstranit autora"
     },
-    "listRow": {
-      "noRecentAdditions": "Žádné nedávné příspěvky",
-      "portraitAlt": "Portrét {name}"
-    },
     "filters": {
-      "title": "Filtry autorů",
-      "clearAll": "Vymazat vše",
-      "allLibraries": "Všechny knihovny",
-      "allAuthors": "Všichni autoři",
-      "hasPhoto": "Má fotku",
-      "missingPhoto": "Chybějící fotka",
-      "minBooks": "Minerální knihy",
-      "anyPlaceholder": "Jakýkoliv"
+      "allLibraries": "Všechny knihovny"
     },
     "header": {
       "never": "Nikdy",
@@ -6291,25 +6280,15 @@
       "series": "Série"
     },
     "bulkRename": {
-      "previewToolbar": "Přejmenovat náhled",
-      "renameSettings": "Přejmenovat nastavení",
       "library": "Knihovna",
       "selectLibraryPlaceholder": "Vyberte knihovnu...",
       "noEligibleLibraries": "Žádné knihovny nemají povoleno přejmenování souboru. Povolte jej v nastavení knihovny.",
       "refresh": "Aktualizovat",
-      "applyRename": "Použít přejmenování",
-      "showFullPaths": "Zobrazit úplné cesty",
-      "columnsMenu": "Sloupce",
-      "renamingInProgress": "Přejmenovávání souborů - můžete kdykoliv zrušit.",
-      "executionFailed": "Hromadné přejmenování se nezdařilo",
       "previewFailed": "Nepodařilo se načíst náhled",
-      "noBooksMatch": "Nebyly nalezeny žádné knihy odpovídající aktuálnímu filtru.",
+      "executionFailed": "Hromadné přejmenování se nezdařilo",
       "openBookDetails": "Otevřít detaily knihy",
-      "columns": {
-        "title": "Hlava 1 – Celkem",
-        "currentPath": "Aktuální cesta",
-        "newPath": "Nová cesta",
-        "status": "Stav"
+      "filter": {
+        "all": "Vše"
       },
       "status": {
         "willRename": "Přejmenovat",
@@ -6318,32 +6297,10 @@
         "noPattern": "Žádné gesto",
         "error": "Chyba"
       },
-      "filter": {
-        "all": "Vše"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} přejmenovat",
-        "unchanged": "{count} nezměněno",
-        "collisions": "{count, plural, =0 {# kolize} one {# kolize} few {# kolize} many {# kolize} other {# kolize}}",
-        "errors": "{count, plural, =0 {# Chyba} one {# Chyba} few {# chyb} many {# chyb} other {# chyb}}"
-      },
       "empty": {
         "title": "Vyberte knihovnu pro spuštění",
         "description": "Vyberte knihovnu výše pro zobrazení změn v náhledu, filtr podle stavu a použijte hromadný běh přejmenování.",
         "chooseLibrary": "Vybrat knihovnu"
-      },
-      "completed": {
-        "title": "Hromadné přejmenování dokončeno",
-        "stats": "{succeeded} přejmenován, {failed} se nezdařilo, {skipped} přeskočeno ({processed} celkem)"
-      },
-      "pagination": {
-        "showing": "Zobrazuji {from}-{to} z {total}"
-      },
-      "confirmDialog": {
-        "title": "Potvrdit hromadné přejmenování",
-        "body": "{count, plural, =0 {Toto přejmenuje knihu # na disku. Soubory s kolizemi nebo chybami budou přeskočeny. Tuto akci nelze vrátit zpět.} one {Toto přejmenuje knihu # na disku. Soubory s kolizemi nebo chybami budou přeskočeny. Tuto akci nelze vrátit zpět.} few {Toto přejmenuje na disk # knih. Soubory s kolizemi nebo chybami budou přeskočeny. Tuto akci nelze vrátit zpět.} many {Toto přejmenuje na disk # knih. Soubory s kolizemi nebo chybami budou přeskočeny. Tuto akci nelze vrátit zpět.} other {Toto přejmenuje na disk # knih. Soubory s kolizemi nebo chybami budou přeskočeny. Tuto akci nelze vrátit zpět.}}",
-        "renameButton": "{count, plural, =0 {Přejmenujte # knihu} one {Přejmenujte # knihu} few {Přejmenujte # knihy} many {Přejmenujte # knihy} other {Přejmenujte # knihy}}"
       }
     },
     "bookDuplicates": {

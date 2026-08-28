@@ -191,8 +191,8 @@ export class MigrationImportRepository {
     const now = new Date();
     await this.db
       .insert(schema.bookMetadata)
-      .values({ bookId, coverSource: 'custom', updatedAt: now })
-      .onConflictDoUpdate({ target: schema.bookMetadata.bookId, set: { coverSource: 'custom', updatedAt: now } });
+      .values({ bookId, coverSource: 'custom', coverUpdatedAt: now, updatedAt: now })
+      .onConflictDoUpdate({ target: schema.bookMetadata.bookId, set: { coverSource: 'custom', coverUpdatedAt: now, updatedAt: now } });
   }
 
   // --- User book statuses ---

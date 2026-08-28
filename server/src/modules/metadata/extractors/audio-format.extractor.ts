@@ -4,6 +4,7 @@ import type { FormatExtractor, ParsedBookData } from './format-extractor.interfa
 export class AudioFormatExtractor implements FormatExtractor {
   async extract(absolutePath: string): Promise<ParsedBookData | null> {
     const audio = await extractAudioMetadata(absolutePath);
+    if (!audio) return null;
     return {
       title: audio.title,
       subtitle: audio.subtitle,

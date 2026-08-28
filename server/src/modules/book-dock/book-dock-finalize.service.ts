@@ -28,7 +28,7 @@ import type {
   ComicMetadataFields,
   MetadataSeriesMembership,
 } from '@bookorbit/types';
-import { MetadataProviderKey, NotificationType, Permission, parseSeriesIndex, resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType, Permission, parseSeriesIndex, resolveUploadPath } from '@bookorbit/types';
 import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -58,6 +58,7 @@ import type { BookDockFileRow } from '../../db/schema';
 type Db = NodePgDatabase<typeof schema>;
 type LibraryRow = typeof libraries.$inferSelect;
 type LibraryFolderRow = typeof libraryFolders.$inferSelect;
+type NamingLibrary = { name?: string | null; fileNamingPattern?: string | null; organizationMode?: string | null };
 
 type FinalizeOverrideEntry = {
   libraryId?: number;
@@ -735,54 +736,53 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
     return rows.map((row) => {
       const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
-      const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
       const effectiveLibraryId = row.targetLibraryId ?? defaultLibraryId ?? null;
       const lib = effectiveLibraryId !== null ? libraryMap.get(effectiveLibraryId) : undefined;
-      let newName = lib?.organizationMode === 'book_per_folder' ? join(basename(row.fileName, extname(row.fileName)), row.fileName) : row.fileName;
-      const libraryPattern = lib?.fileNamingPattern ?? null;
-      const appPattern = lib?.organizationMode === 'book_per_folder' ? appPatternFolder : appPatternFile;
-      const pattern = libraryPattern ?? appPattern;
-
-      if (pattern) {
-        const tokens = this.buildFilePatternTokens(meta, row.fileName, format, lib?.name);
-        const resolved =
-          lib?.organizationMode === 'book_per_file'
-            ? resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform })
-            : resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
-        if (resolved) newName = resolved;
-      }
+      const pattern = lib?.fileNamingPattern ?? (lib?.organizationMode === 'book_per_folder' ? appPatternFolder : appPatternFile);
+      const newName = this.resolveRelativeDestination(lib, row, format, pattern, sanitizeForCrossPlatform);
 
       return { fileId: row.id, fileName: row.fileName, newName };
     });
   }
 
-  private async resolveDestination(
-    library: { name?: string | null; fileNamingPattern?: string | null; organizationMode?: string | null },
-    folderPath: string,
-    row: BookDockFileRow,
-    format: string,
-  ): Promise<string> {
+  private async resolveDestination(library: NamingLibrary, folderPath: string, row: BookDockFileRow, format: string): Promise<string> {
     const pattern =
       library.fileNamingPattern ??
       (library.organizationMode === 'book_per_folder'
         ? await this.appSettings.getUploadPatternBookPerFolder()
         : await this.appSettings.getUploadPattern());
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
-    const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
 
+    return join(folderPath, this.resolveRelativeDestination(library, row, format, pattern, sanitizeForCrossPlatform));
+  }
+
+  /**
+   * Where a docked file belongs under its library folder. The finalize move and the name
+   * preview both go through here so they cannot disagree about the destination.
+   *
+   * Both organization modes keep the pattern's folder segments, matching the rename and move
+   * services; `book_per_file` differs only in that the file itself is the book, so without a
+   * pattern it stays where it is instead of gaining a folder of its own.
+   */
+  private resolveRelativeDestination(
+    library: NamingLibrary | undefined,
+    row: BookDockFileRow,
+    format: string,
+    pattern: string | null,
+    sanitizeForCrossPlatform: boolean,
+  ): string {
     if (pattern) {
-      const tokens = this.buildFilePatternTokens(meta, row.fileName, format, library.name);
-      const resolved =
-        library.organizationMode === 'book_per_file'
-          ? resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform })
-          : resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
-      if (resolved) return join(folderPath, resolved);
+      const meta = row.selectedMetadata ?? row.embeddedMetadata ?? {};
+      const tokens = this.buildFilePatternTokens(meta, row.fileName, format, library?.name);
+      const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
+      if (resolved) return resolved;
     }
 
-    if (library.organizationMode === 'book_per_file') return join(folderPath, row.fileName);
+    if (library?.organizationMode === 'book_per_folder') {
+      return join(basename(row.fileName, extname(row.fileName)), row.fileName);
+    }
 
-    const stem = basename(row.fileName, extname(row.fileName));
-    return join(folderPath, stem, row.fileName);
+    return row.fileName;
   }
 
   private buildFilePatternTokens(meta: BookDockMetadata, fileName: string, format: string, libraryName?: string | null): Record<string, string> {

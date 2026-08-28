@@ -17,7 +17,7 @@ const tintVars = computed(() => coverTintVars(props.coverTint))
     :style="tintVars"
   >
     <BookDetailHeader :book-id="bookId" />
-    <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+    <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:px-6 sm:py-4">
       <slot />
     </main>
   </div>

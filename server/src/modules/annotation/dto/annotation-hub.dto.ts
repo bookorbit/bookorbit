@@ -66,12 +66,17 @@ export class AnnotationHubQueryDto {
   hasNote?: boolean;
 
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  needsReview?: boolean;
+
+  @IsOptional()
   @IsIn(['active', 'trashed'])
   status?: 'active' | 'trashed';
 
   @IsOptional()
-  @IsIn(['createdAt', 'book'])
-  sortBy?: 'createdAt' | 'book';
+  @IsIn(['createdAt', 'book', 'color', 'origin'])
+  sortBy?: 'createdAt' | 'book' | 'color' | 'origin';
 
   @IsOptional()
   @IsIn(['asc', 'desc'])

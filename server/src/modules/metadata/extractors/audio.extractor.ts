@@ -7,6 +7,9 @@ const execFile = promisify(execFileCallback);
 
 const FFPROBE_PATH = process.env.FFPROBE_PATH || 'ffprobe';
 const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
+// A chapter-rich audiobook prints far more than execFile's 1 MB default, and an overflow there
+// would surface as a failed read of a perfectly good file.
+const FFPROBE_OUTPUT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 
 export interface AudioExtractResult {
   title: string | null;
@@ -26,6 +29,11 @@ export interface AudioExtractResult {
   durationSeconds: number | null;
   chapters: AudiobookChapter[];
   coverBytes: Buffer | null;
+}
+
+export interface AudioChapterProbe {
+  chapters: AudiobookChapter[];
+  durationMs: number | null;
 }
 
 interface FfprobeStream {
@@ -48,18 +56,15 @@ interface FfprobeOutput {
   chapters?: FfprobeChapter[];
 }
 
-export async function extractAudioMetadata(absolutePath: string): Promise<AudioExtractResult> {
+// Null means the file could not be read, which is not the same as a file that carries no tags:
+// callers persist what they get, so a failed read must never be mistaken for empty metadata.
+export async function extractAudioMetadata(absolutePath: string): Promise<AudioExtractResult | null> {
   try {
-    const { stdout } = await execFile(FFPROBE_PATH, [
-      '-v',
-      'quiet',
-      '-print_format',
-      'json',
-      '-show_format',
-      '-show_chapters',
-      '-show_streams',
-      absolutePath,
-    ]);
+    const { stdout } = await execFile(
+      FFPROBE_PATH,
+      ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', '-show_streams', absolutePath],
+      { maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES },
+    );
 
     const data: FfprobeOutput = JSON.parse(stdout);
     const tags = normalizeTags(data.format?.tags ?? {});
@@ -106,11 +111,7 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
     const librofmId = tagValue(tags, 'librofm_isbn');
     const durationSeconds = parseDurationSeconds(data.format?.duration);
 
-    const mappedChapters: AudiobookChapter[] = chapters.flatMap((ch) => {
-      const startMs = parseChapterStartMs(ch.start_time);
-      if (startMs === null) return [];
-      return [{ title: ch.tags?.title ?? '', startMs }];
-    });
+    const mappedChapters = mapChapters(chapters);
 
     const coverBytes = await extractCoverBytes(absolutePath, streams);
 
@@ -134,18 +135,42 @@ export async function extractAudioMetadata(absolutePath: string): Promise<AudioE
       coverBytes,
     };
   } catch {
-    return emptyResult();
+    return null;
   }
 }
 
 export async function parseAudioDuration(absolutePath: string): Promise<number | null> {
   try {
-    const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', absolutePath]);
+    const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', absolutePath], {
+      maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES,
+    });
     const data: FfprobeOutput = JSON.parse(stdout);
     return parseDurationSeconds(data.format?.duration);
   } catch {
     return null;
   }
+}
+
+// Chapters and length only: the merge pass for multi-file audiobooks needs both from every file,
+// and a full extract would also pull tags and cover art it has no use for.
+export async function probeAudioChapters(absolutePath: string): Promise<AudioChapterProbe> {
+  try {
+    const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', absolutePath], {
+      maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES,
+    });
+    const data: FfprobeOutput = JSON.parse(stdout);
+    return { chapters: mapChapters(data.chapters ?? []), durationMs: parseDurationMs(data.format?.duration) };
+  } catch {
+    return { chapters: [], durationMs: null };
+  }
+}
+
+function mapChapters(chapters: FfprobeChapter[]): AudiobookChapter[] {
+  return chapters.flatMap((ch) => {
+    const startMs = parseChapterStartMs(ch.start_time);
+    if (startMs === null) return [];
+    return [{ title: ch.tags?.title ?? '', startMs }];
+  });
 }
 
 async function extractCoverBytes(absolutePath: string, streams: FfprobeStream[]): Promise<Buffer | null> {
@@ -219,6 +244,14 @@ function parseDurationSeconds(raw: string | undefined): number | null {
   return Number.isFinite(parsed) ? Math.round(parsed) : null;
 }
 
+// Milliseconds, not the rounded seconds stored per file: chapter offsets accumulate across files,
+// so half-second rounding errors would compound down the book.
+function parseDurationMs(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? Math.round(parsed * 1000) : null;
+}
+
 function parseChapterStartMs(raw: string): number | null {
   const parsed = Number.parseFloat(raw);
   return Number.isFinite(parsed) ? Math.round(parsed * 1000) : null;
@@ -252,26 +285,4 @@ function normalizeLanguageValue(value: string | null): string | null {
   if (!normalized) return null;
   const lower = normalized.toLowerCase();
   return lower === 'und' || lower === 'unknown' ? null : normalized;
-}
-
-function emptyResult(): AudioExtractResult {
-  return {
-    title: null,
-    subtitle: null,
-    authors: [],
-    narrators: [],
-    publisher: null,
-    publishedDate: null,
-    publishedYear: null,
-    description: null,
-    language: null,
-    seriesName: null,
-    seriesIndex: null,
-    genres: [],
-    audibleId: null,
-    librofmId: null,
-    durationSeconds: null,
-    chapters: [],
-    coverBytes: null,
-  };
 }

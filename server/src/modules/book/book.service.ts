@@ -1095,6 +1095,7 @@ export class BookService {
           userId,
           customFieldTypes,
           ...(options?.defaultCollectionId !== undefined ? { defaultCollectionId: options.defaultCollectionId } : {}),
+          ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
         });
       // Collapsed rows render BookTableCollapsedSeriesCell which does not display custom metadata.
       const result = {
@@ -1122,10 +1123,10 @@ export class BookService {
       return result;
     }
 
-    const orderBy =
-      options?.defaultCollectionId !== undefined
-        ? this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, { defaultCollectionId: options.defaultCollectionId })
-        : this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes);
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, {
+      ...(options?.defaultCollectionId !== undefined ? { defaultCollectionId: options.defaultCollectionId } : {}),
+      ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
+    });
     const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
       await this.bookRepo.findCards({
         where,
@@ -1164,7 +1165,9 @@ export class BookService {
 
   async executeBookIdsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<number[]> {
     const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
-    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes);
+    const orderBy = this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, {
+      ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
+    });
     return this.bookRepo.findCardIds({
       where,
       orderBy,
@@ -1231,11 +1234,12 @@ export class BookService {
         // rows inside a bucket, so they can reference custom fields. The temporal path
         // never applies the full sort, which is why this only matters here.
         const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
+        const randomSeedOption = query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {};
         response = shouldCollapse
-          ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort, customFieldTypes })
+          ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort, customFieldTypes, ...randomSeedOption })
           : await this.bookRepo.findJumpBuckets({
               ...discreteOpts,
-              orderBy: this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes),
+              orderBy: this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, randomSeedOption),
             });
       }
       this.logger.log(
@@ -3322,6 +3326,7 @@ export class BookService {
       default: {
         if (isAudioFormat(format)) {
           const parsed = await extractAudioMetadata(absolutePath);
+          if (!parsed) return {};
           const result: Record<string, unknown> = {};
           if (parsed.title !== null) result.title = parsed.title;
           if (parsed.subtitle !== null) result.subtitle = parsed.subtitle;

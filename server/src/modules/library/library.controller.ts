@@ -10,6 +10,7 @@ import { Auditable } from '../../common/decorators/auditable.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookQueryPipe, JumpBucketsQueryPipe } from '../book/pipes/book-query.pipe';
 import { BookService } from '../book/book.service';
+import { BulkRenameExecuteDto } from './dto/bulk-rename-execute.dto';
 import { BulkRenamePreviewQueryDto } from './dto/bulk-rename-preview-query.dto';
 import { CreateLibraryDto } from './dto/create-library.dto';
 import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
@@ -250,7 +251,7 @@ export class LibraryController {
   @RequireLibraryAccess('editor')
   @RequirePermission(Permission.ManageLibraries)
   getBulkRenamePreview(@Param('id', ParseIntPipe) libraryId: number, @Query() query: BulkRenamePreviewQueryDto) {
-    return this.bulkRenameService.getPreview(libraryId, query.page, query.pageSize, query.status);
+    return this.bulkRenameService.getPreview(libraryId, query.page, query.pageSize, query.status, query.search);
   }
 
   @Get(':id/bulk-rename/status')
@@ -269,7 +270,12 @@ export class LibraryController {
     getResourceId: (req) => parseInt(req.params['id'], 10),
     description: (req) => `Bulk renamed books in library #${req.params['id']}`,
   })
-  async executeBulkRename(@Param('id', ParseIntPipe) libraryId: number, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+  async executeBulkRename(
+    @Param('id', ParseIntPipe) libraryId: number,
+    @Body() body: BulkRenameExecuteDto,
+    @CurrentUser() user: RequestUser,
+    @Res() reply: FastifyReply,
+  ) {
     let disconnected = false;
     let streamStarted = false;
     const handleDisconnect = () => {
@@ -296,6 +302,8 @@ export class LibraryController {
 
     try {
       const summary = await this.bulkRenameService.execute(libraryId, user.id, {
+        excludeBookIds: body.excludeBookIds,
+        includeBookIds: body.includeBookIds,
         onProgress: writeEvent,
         isCancelled: () => disconnected || reply.raw.writableEnded || reply.raw.destroyed,
       });

@@ -1,4 +1,5 @@
-import { nextTick, ref } from 'vue'
+import { defineComponent, nextTick, ref } from 'vue'
+import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard, BooksPage, GroupRule, JumpBucket, SortSpec } from '@bookorbit/types'
 import { COLLECTION_DEFAULT_SORT } from '../../lib/sort-defaults'
@@ -402,5 +403,101 @@ describe('useBookViewWindow', () => {
     expect(listRequests()).toContain(1)
 
     win.releaseRailGutter()
+  })
+
+  it('omits the shuffle seed until a sort tier is random', async () => {
+    mockApi(120)
+    const { win } = setup()
+    await flush()
+
+    expect(win.randomSortActive.value).toBe(false)
+    expect(listRequestBodies()[0]).not.toHaveProperty('randomSeed')
+
+    win.sort.value = [{ field: 'random', dir: 'asc' }]
+    await flush()
+
+    expect(win.randomSortActive.value).toBe(true)
+    const seed = listRequestBodies().at(-1)?.randomSeed
+    expect(typeof seed).toBe('number')
+  })
+
+  it('sends one seed for every page of a shuffled listing', async () => {
+    mockApi(250)
+    const { win } = setup({ defaultSort: [{ field: 'random', dir: 'asc' }] })
+    await flush()
+
+    await win.ensureRange(100, 199)
+    await flush()
+
+    const seeds = listRequestBodies().map((body) => body.randomSeed)
+    expect(seeds.length).toBeGreaterThan(1)
+    expect(new Set(seeds).size).toBe(1)
+    expect(typeof seeds[0]).toBe('number')
+  })
+
+  it('reshuffles into a new seed and refetches', async () => {
+    mockApi(120)
+    const { win } = setup({ defaultSort: [{ field: 'random', dir: 'asc' }] })
+    await flush()
+    const first = listRequestBodies().at(-1)?.randomSeed
+
+    win.reshuffle()
+    await flush()
+
+    const second = listRequestBodies().at(-1)?.randomSeed
+    expect(second).not.toBe(first)
+    expect(listRequestBodies().length).toBeGreaterThan(1)
+  })
+
+  it('reshuffles when the scope changes so two scopes never share an order', async () => {
+    mockApi(120)
+    const { win, scopeId } = setup({ defaultSort: [{ field: 'random', dir: 'asc' }] })
+    await flush()
+    const first = listRequestBodies().at(-1)?.randomSeed
+
+    scopeId.value = 2
+    await flush()
+
+    expect(listRequestBodies().at(-1)?.randomSeed).not.toBe(first)
+    expect(win.randomSortActive.value).toBe(true)
+  })
+
+  it('reshuffles when a kept-alive random listing is revisited', async () => {
+    mockApi(120)
+    const visible = ref(true)
+
+    const Source = defineComponent({
+      setup() {
+        useBookViewWindow({
+          scopeId: ref(1),
+          listEndpoint: (id) => `/api/v1/libraries/${id}/books`,
+          bucketsEndpoint: (id) => `/api/v1/libraries/${id}/books/jump-buckets`,
+          viewMode: ref('table'),
+          defaultSort: [{ field: 'random', dir: 'asc' }],
+        })
+        return {}
+      },
+      template: '<div />',
+    })
+    const Harness = defineComponent({
+      components: { Source },
+      setup() {
+        return { visible }
+      },
+      template: '<KeepAlive><Source v-if="visible" /></KeepAlive>',
+    })
+
+    const wrapper = mount(Harness)
+    await flush()
+    const first = listRequestBodies().at(-1)?.randomSeed
+    fetchMock.mockClear()
+
+    visible.value = false
+    await nextTick()
+    visible.value = true
+    await flush()
+
+    expect(listRequestBodies().at(-1)?.randomSeed).not.toBe(first)
+    wrapper.unmount()
   })
 })

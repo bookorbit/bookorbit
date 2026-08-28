@@ -10,7 +10,12 @@ vi.mock('fs/promises', () => ({
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { access, lstat, readdir, readFile, stat, unlink } from 'fs/promises';
 
-import { NotificationType, type BookDockMetadata } from '@bookorbit/types';
+import {
+  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
+  DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER,
+  NotificationType,
+  type BookDockMetadata,
+} from '@bookorbit/types';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
 
 const mockAccess = vi.mocked(access);
@@ -147,6 +152,11 @@ function makeRow(overrides?: Partial<Record<string, unknown>>) {
     updatedAt: new Date(),
     ...overrides,
   };
+}
+
+/** A book the shipped default patterns can fill every optional segment of. */
+function defaultPatternMetadata(): BookDockMetadata {
+  return { title: 'Dune', authors: ['Frank Herbert'], seriesName: 'Dune', seriesIndex: '1', publishedYear: 1965 } as BookDockMetadata;
 }
 
 describe('BookDockFinalizeService', () => {
@@ -636,6 +646,34 @@ describe('BookDockFinalizeService', () => {
       expect(processor.createBookRecord).toHaveBeenCalledWith(5, 9, '/library/new', '/library/new/book.epub', 'new/book.epub', 'epub', 100);
     });
 
+    it('files a book_per_file book under the pattern folders instead of the library root', async () => {
+      const { service, appSettings, processor, storage } = makeService();
+      appSettings.getUploadPattern.mockResolvedValue(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE);
+      vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
+        id: 5,
+        allowedFormats: ['epub'],
+        fileNamingPattern: null,
+        organizationMode: 'book_per_file',
+      } as never);
+      vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
+      vi.spyOn(service as never, 'applyMetadata').mockResolvedValue(undefined as never);
+      vi.spyOn(service as never, 'cleanupBookDockRecord').mockResolvedValue(undefined as never);
+      mockStat.mockResolvedValueOnce({ size: 100 } as never);
+      processor.createBookRecord.mockResolvedValueOnce({ bookId: 557 });
+      const row = makeRow({ targetLibraryId: 5, targetFolderId: 9, selectedMetadata: defaultPatternMetadata() });
+      const destPath = '/library/Frank Herbert/Dune/01. Dune (1965).epub';
+
+      await expect((service as any).finalizeFile(row, undefined, undefined, new Map(), 1, true)).resolves.toEqual({
+        fileId: 1,
+        fileName: 'book.epub',
+        newName: 'Frank Herbert/Dune/01. Dune (1965).epub',
+        success: true,
+        bookId: 557,
+      });
+      expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/book.epub', destPath);
+      expect(processor.createBookRecord).toHaveBeenCalledWith(5, 9, destPath, destPath, 'Frank Herbert/Dune/01. Dune (1965).epub', 'epub', 100);
+    });
+
     it('uses the file path as bookFolderPath in book_per_file mode', async () => {
       const { service, processor } = makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
@@ -1086,6 +1124,29 @@ describe('BookDockFinalizeService', () => {
 
     const result = await service.previewNames([1], false, [], undefined, 1, true);
     expect(result[0].newName).toBe('CON_/AUX_.epub');
+  });
+
+  it.each([
+    ['book_per_file', DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE, 'Frank Herbert/Dune/01. Dune (1965).epub'],
+    ['book_per_folder', DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER, 'Frank Herbert/Dune/01. Dune (1965)/01. Dune (1965).epub'],
+  ])('previewNames promises the destination finalize actually uses for a %s library', async (organizationMode, pattern, expected) => {
+    const { service, repo, appSettings, db } = makeService();
+    const library = { id: 10, name: 'Books', fileNamingPattern: null, organizationMode };
+    const row = makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: defaultPatternMetadata() });
+    repo.findByIds.mockResolvedValue([row]);
+    appSettings.getUploadPattern.mockResolvedValue(organizationMode === 'book_per_file' ? pattern : null);
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue(organizationMode === 'book_per_folder' ? pattern : null);
+    db.select.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([library]),
+      }),
+    });
+
+    const [preview] = await service.previewNames([1], false, [], undefined, 1, true);
+    const destPath = await (service as any).resolveDestination(library, '/library', row, 'epub');
+
+    expect(preview.newName).toBe(expected);
+    expect(destPath).toBe(`/library/${preview.newName}`);
   });
 
   it('applyMetadata updates scalar metadata fields and related author/genre rows', async () => {
@@ -1575,9 +1636,10 @@ describe('BookDockFinalizeService', () => {
     expect(storage.moveToPath).not.toHaveBeenCalled();
   });
 
-  it('resolveDestination builds names from patterns and falls back to original filename', async () => {
+  it('resolveDestination builds names from patterns and falls back per organization mode', async () => {
     const { service, appSettings } = makeService();
     appSettings.getUploadPattern.mockResolvedValue(null);
+    appSettings.getUploadPatternBookPerFolder.mockResolvedValue(null);
     const rowWithMeta = makeRow({
       fileName: 'original.epub',
       selectedMetadata: { title: 'Dune', seriesIndex: '2.5' } as BookDockMetadata,
@@ -1586,9 +1648,12 @@ describe('BookDockFinalizeService', () => {
     await expect((service as any).resolveDestination({ fileNamingPattern: '{title}-{seriesIndex}' }, '/library', rowWithMeta, 'epub')).resolves.toBe(
       '/library/Dune-02.5.epub',
     );
-    await expect((service as any).resolveDestination({ fileNamingPattern: null }, '/library', rowWithMeta, 'epub')).resolves.toBe(
-      '/library/original/original.epub',
-    );
+    await expect(
+      (service as any).resolveDestination({ fileNamingPattern: null, organizationMode: 'book_per_folder' }, '/library', rowWithMeta, 'epub'),
+    ).resolves.toBe('/library/original/original.epub');
+    await expect(
+      (service as any).resolveDestination({ fileNamingPattern: null, organizationMode: 'book_per_file' }, '/library', rowWithMeta, 'epub'),
+    ).resolves.toBe('/library/original.epub');
   });
 
   it('resolveDestination uses folder-mode global pattern for book_per_folder libraries', async () => {
@@ -1613,6 +1678,29 @@ describe('BookDockFinalizeService', () => {
     ).resolves.toBe('/library/Foundation.epub');
     expect(appSettings.getUploadPattern).toHaveBeenCalled();
     expect(appSettings.getUploadPatternBookPerFolder).not.toHaveBeenCalled();
+  });
+
+  it('resolveDestination keeps the folder segments a book_per_file pattern defines', async () => {
+    const { service, appSettings } = makeService();
+    appSettings.getUploadPattern.mockResolvedValue('{authors:first}/{series}/{title}');
+    const row = makeRow({
+      fileName: 'book.epub',
+      selectedMetadata: { title: 'Foundation', authors: ['Isaac Asimov'], seriesName: 'Foundation' } as BookDockMetadata,
+    });
+
+    await expect(
+      (service as any).resolveDestination({ fileNamingPattern: null, organizationMode: 'book_per_file' }, '/library', row, 'epub'),
+    ).resolves.toBe('/library/Isaac Asimov/Foundation/Foundation.epub');
+  });
+
+  it('resolveDestination files a book_per_file library under the shipped default pattern', async () => {
+    const { service, appSettings } = makeService();
+    appSettings.getUploadPattern.mockResolvedValue(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE);
+    const row = makeRow({ fileName: 'book.epub', selectedMetadata: defaultPatternMetadata() });
+
+    await expect(
+      (service as any).resolveDestination({ fileNamingPattern: null, organizationMode: 'book_per_file' }, '/library', row, 'epub'),
+    ).resolves.toBe('/library/Frank Herbert/Dune/01. Dune (1965).epub');
   });
 
   it('resolveDestination library pattern wins over mode-specific global pattern', async () => {

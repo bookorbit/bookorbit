@@ -33,8 +33,9 @@ import { ComicMetadataRepository } from './comic-metadata.repository';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { NarratorService } from '../narrator/narrator.service';
 import { authors, bookAuthors, bookGenres, bookMetadata, books, bookTags, genres, tags } from '../../db/schema';
-import { type ComicMetadataFields, isAudioFormat } from '@bookorbit/types';
-import { parseAudioDuration } from './extractors/audio.extractor';
+import { type AudiobookChapter, type ComicMetadataFields, isAudioFormat } from '@bookorbit/types';
+import { chaptersReachLastFile, mergeAudioChapters, type AudioChapterSource } from './extractors/audio-chapter-merge';
+import { parseAudioDuration, probeAudioChapters } from './extractors/audio.extractor';
 import type { ParsedBookData } from './extractors/format-extractor.interface';
 import { generateThumbnail, imageExt } from './lib/cover';
 import { METADATA_AUDIO_FORMATS, MetadataExtractionService } from './metadata-extraction.service';
@@ -280,6 +281,76 @@ export class MetadataService {
           sql`${schema.bookFiles.isFixedLayout} is distinct from ${isFixedLayout}`,
         ),
       );
+  }
+
+  /**
+   * Rebuilds the chapter list of an audiobook split across several files.
+   *
+   * Metadata extraction reads a single file, and each file of a multi-file audiobook embeds only its
+   * own chapters, numbered from zero. Probing every file in playback order is what turns those
+   * per-file lists into one book-length list.
+   *
+   * With no file changed this first checks the stored list against the files, so books scanned
+   * before chapters were merged are repaired without re-probing every audiobook on every scan.
+   */
+  async extractMergedAudioChapters(bookId: number, absolutePaths: string[], options: { filesChanged: boolean }): Promise<void> {
+    const event = 'metadata.merge_audio_chapters';
+    const startedAt = Date.now();
+    if (absolutePaths.length < 2) return;
+    if (!options.filesChanged && (await this.storedChaptersCoverBook(bookId, absolutePaths))) return;
+
+    const sources: AudioChapterSource[] = [];
+    for (const absolutePath of absolutePaths) {
+      const { chapters, durationMs } = await probeAudioChapters(absolutePath);
+      sources.push({ absolutePath, chapters, durationMs });
+    }
+
+    const merged = mergeAudioChapters(sources);
+    if (merged === null) {
+      this.logger.warn(
+        `[${event}] [fail] bookId=${bookId} files=${absolutePaths.length} durationMs=${Date.now() - startedAt} errorClass=UnknownFileDuration error="a file length could not be read" - chapters left unchanged`,
+      );
+      return;
+    }
+    if (merged.length === 0) {
+      this.logger.debug(
+        `[${event}] [end] bookId=${bookId} files=${absolutePaths.length} durationMs=${Date.now() - startedAt} chapters=0 - no embedded chapters to merge`,
+      );
+      return;
+    }
+
+    const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
+      audioMetadata: { chapters: merged },
+    });
+    if (filtered.audioMetadata?.chapters === undefined) return;
+
+    await this.db
+      .update(bookMetadata)
+      .set({ chapters: filtered.audioMetadata.chapters, updatedAt: new Date() })
+      .where(eq(bookMetadata.bookId, bookId));
+
+    this.logger.debug(
+      `[${event}] [end] bookId=${bookId} files=${absolutePaths.length} durationMs=${Date.now() - startedAt} chapters=${merged.length} - merged audio chapters saved`,
+    );
+  }
+
+  private async storedChaptersCoverBook(bookId: number, orderedAudioPaths: string[]): Promise<boolean> {
+    const [meta] = await this.db.select({ chapters: bookMetadata.chapters }).from(bookMetadata).where(eq(bookMetadata.bookId, bookId)).limit(1);
+    const stored = (meta?.chapters ?? []) as AudiobookChapter[];
+    if (stored.length === 0) return true;
+
+    const fileRows = await this.db
+      .select({ absolutePath: schema.bookFiles.absolutePath, durationSeconds: schema.bookFiles.durationSeconds })
+      .from(schema.bookFiles)
+      .where(eq(schema.bookFiles.bookId, bookId));
+
+    const durationByPath = new Map(fileRows.map((row) => [row.absolutePath, row.durationSeconds]));
+    const orderedDurationsMs = orderedAudioPaths.map((absolutePath) => {
+      const durationSeconds = durationByPath.get(absolutePath);
+      return durationSeconds === null || durationSeconds === undefined ? null : durationSeconds * 1000;
+    });
+
+    return chaptersReachLastFile(stored, orderedDurationsMs);
   }
 
   async extractAudioFileDuration(bookId: number, absolutePath: string): Promise<void> {
@@ -814,6 +885,9 @@ export class MetadataService {
     }
 
     if (!preserveCustom) {
+      // The extracted cover and its thumbnail were just rewritten, so the served image moved even
+      // when the first-writer-wins update above matched no row.
+      await this.db.update(bookMetadata).set({ coverUpdatedAt: now }).where(eq(bookMetadata.bookId, bookId));
       await this.db.update(books).set({ updatedAt: now }).where(eq(books.id, bookId));
     }
   }

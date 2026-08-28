@@ -210,7 +210,7 @@ describe('ReadingSessionRepository - insertManualSession', () => {
       timeZone: 'UTC',
     });
 
-    expect(result).toEqual({ id: 321 });
+    expect(result).toEqual({ id: 321, attemptId: null });
     expect(sessionValues).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 5,

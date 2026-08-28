@@ -3002,19 +3002,8 @@
       "refreshMetadata": "Uppdatera metadata",
       "deleteAuthor": "Ta bort författare"
     },
-    "listRow": {
-      "noRecentAdditions": "Inga senaste tillägg",
-      "portraitAlt": "{name} porträtt"
-    },
     "filters": {
-      "title": "Författare Filter",
-      "clearAll": "Rensa alla",
-      "allLibraries": "Alla bibliotek",
-      "allAuthors": "Alla författare",
-      "hasPhoto": "Har foto",
-      "missingPhoto": "Fotot saknas",
-      "minBooks": "Minsta böcker",
-      "anyPlaceholder": "Valfri"
+      "allLibraries": "Alla bibliotek"
     },
     "header": {
       "never": "Aldrig",
@@ -6328,25 +6317,15 @@
       "series": "Serie"
     },
     "bulkRename": {
-      "previewToolbar": "Döp om förhandsgranskning",
-      "renameSettings": "Döp om inställningar",
       "library": "Bibliotek",
       "selectLibraryPlaceholder": "Välj ett bibliotek...",
       "noEligibleLibraries": "Inga bibliotek har filnamn aktiverat. Aktivera det i biblioteksinställningar.",
       "refresh": "Uppdatera",
-      "applyRename": "Tillämpa byta namn",
-      "showFullPaths": "Visa hela sökvägar",
-      "columnsMenu": "Kolumner",
-      "renamingInProgress": "Byter namn på filer - du kan avbryta när som helst.",
-      "executionFailed": "Bulknamnbyte misslyckades",
       "previewFailed": "Det gick inte att ladda förhandsgranskning",
-      "noBooksMatch": "Inga böcker hittades som matchar det aktuella filtret.",
+      "executionFailed": "Bulknamnbyte misslyckades",
       "openBookDetails": "Öppna bokdetaljer",
-      "columns": {
-        "title": "Titel",
-        "currentPath": "Nuvarande sökväg",
-        "newPath": "Ny sökväg",
-        "status": "Status"
+      "filter": {
+        "all": "Alla"
       },
       "status": {
         "willRename": "Kommer byta namn",
@@ -6355,32 +6334,10 @@
         "noPattern": "Inget mönster",
         "error": "Fel"
       },
-      "filter": {
-        "all": "Alla"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} för att byta namn",
-        "unchanged": "{count} oförändrad",
-        "collisions": "{count, plural, =0 {# kollision} one {# kollision} other {# kollisioner}}",
-        "errors": "{count, plural, =0 {# fel} one {# fel} other {# fel}}"
-      },
       "empty": {
         "title": "Välj ett bibliotek för att starta",
         "description": "Välj ett bibliotek ovan för att förhandsgranska byta namn på ändringar, filtrera efter status, och tillämpa bulk byta namn kör.",
         "chooseLibrary": "Välj bibliotek"
-      },
-      "completed": {
-        "title": "Namnet på bulk slutförd",
-        "stats": "{succeeded} bytte namn, {failed} misslyckades, {skipped} hoppade över ({processed} totalt)"
-      },
-      "pagination": {
-        "showing": "Visar {from}-{to} av {total}"
-      },
-      "confirmDialog": {
-        "title": "Bekräfta Bulk Byt namn",
-        "body": "{count, plural, =0 {Detta kommer att byta namn på # bok på disk. Filer med kollisioner eller fel kommer att hoppas över. Denna åtgärd kan inte ångras.} one {Detta kommer att byta namn på # bok på disk. Filer med kollisioner eller fel kommer att hoppas över. Denna åtgärd kan inte ångras.} other {Detta kommer att byta namn på # böcker på disk. Filer med kollisioner eller fel kommer att hoppas över. Denna åtgärd kan inte ångras.}}",
-        "renameButton": "{count, plural, =0 {Döp om # bok} one {Döp om # bok} other {Döp om # böcker}}"
       }
     },
     "bookDuplicates": {

@@ -50,6 +50,9 @@ export interface DisplayPreferences {
   smartScopeFilterExpanded: boolean;
   authorCoverSize: number;
   authorCoverShape: AuthorCoverShape;
+  authorRowDensity: TableDensity;
+  /** Stand a book's cover in for a missing author portrait. Off: monogram instead. */
+  authorCoverFallback: boolean;
   tableZebraStriping: boolean;
   tableDensity: TableDensity;
   bookSpineOverlay: BookSpineOverlay;

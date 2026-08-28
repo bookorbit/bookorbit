@@ -38,7 +38,7 @@
       "fields": {
         "frequency": "読み込み頻度と有効日数",
         "completion": "集計ブックが開始および完了しました",
-        "formats": "分布の書式設定",
+        "formats": "ファイル形式の内訳",
         "genres": "幅広いジャンルの配布",
         "trend": "集計読書トレンド",
         "books": "現在、最新、および最も読まれた本のタイトル",
@@ -1050,6 +1050,7 @@
         "scanStartFailed": "\"{name}\" のスキャンを開始できませんでした",
         "refreshCoversFailed": "\"{name}\" のカバーを更新できませんでした",
         "scanStartedAll": "すべてのライブラリのスキャンが開始されました",
+        "librariesFailedToStart": "{count, plural, =0 {開始に失敗したライブラリはありません} one {# ライブラリの開始に失敗しました} other {# ライブラリの開始に失敗しました}}",
         "scansStartFailed": "スキャンの開始に失敗しました",
         "libraryCreated": "ライブラリ \"{name}\" を作成しました",
         "libraryUpdated": "ライブラリ \"{name}\" が更新されました",
@@ -1674,7 +1675,7 @@
         "serverFontVisibilityFailed": "サーバーのフォント表示の更新に失敗しました"
       },
       "bookDock": {
-        "title": "ブック・ドック",
+        "title": "Book Dock",
         "subtitle": "Book Dock に入ったときのファイルの処理方法を設定します。",
         "dropFolder": "フォルダをドロップ",
         "containerPath": "コンテナパス",
@@ -2062,7 +2063,7 @@
         "readingEvents": "イベントを読んでいます",
         "highlights": "ハイライト",
         "syncedTotals": "同期合計",
-        "trashedHighlights": "ゴミ箱のハイライト",
+        "trashedHighlights": "削除したハイライト",
         "setupGuide": "セットアップガイド",
         "setupSteps": "KOReader の設定手順",
         "setupStepsHint": "カタログの閲覧、ダウンロード、進行状況、イベントの読み取り、ハイライトにBookOrbitプラグインを使用します。進行状況のみにストックプラグインを使用します。",
@@ -2217,7 +2218,7 @@
         "notesBody": "リーダアプリでOPDSアカウントを使用してください。誤って共有された場合は、パスワードを非公開にしたり、回転させたりしてください。",
         "deleteConfirmTitle": "OPDS アカウントを削除しますか？",
         "deleteConfirmBody": "\"{username}\" を削除します。この操作は元に戻せません。",
-        "sortRecent": "最近追加したもの",
+        "sortRecent": "最近追加された項目",
         "sortTitleAsc": "タイトル (A-Z)",
         "sortTitleDesc": "Title (Z-A)",
         "sortAuthorAsc": "著者 (A-Z)",
@@ -2250,7 +2251,7 @@
     "system": {
       "tabs": {
         "file-naming": "ファイル名",
-        "book-dock": "ブック・ドック",
+        "book-dock": "Book Dock",
         "maintenance": "メンテナンス",
         "audit-log": "監査ログ"
       }
@@ -2689,8 +2690,8 @@
       "colorAndStyle": "色とスタイル",
       "copied": "コピーしました",
       "copyText": "テキストをコピー",
-      "trash": "ごみ箱に入れる",
-      "moveToTrash": "ゴミ箱に移動"
+      "trash": "ごみ箱",
+      "moveToTrash": "ごみ箱に移動"
     },
     "hub": {
       "title": "注釈",
@@ -2704,26 +2705,27 @@
       "notesOnly": "ノートのみ",
       "style": "スタイル",
       "source": "ソース",
-      "bulkTrash": "ごみ箱に入れる",
+      "bulkTrash": "ごみ箱",
       "bulkRestore": "復元",
       "tabs": {
         "highlights": "ハイライト",
-        "trash": "ごみ箱に入れる"
+        "trash": "ごみ箱"
       },
       "empty": {
         "noMatch": "フィルタに一致するハイライトはありません。",
         "resetFilters": "フィルターをリセット",
-        "trashEmpty": "ゴミ箱は空です",
+        "trashEmpty": "ごみ箱は空です",
         "noAnnotations": "まだ注釈はありません。Web上で作成したハイライトが表示されるか、eリーダーがここに表示されます。"
       },
       "toast": {
-        "movedToTrash": "ゴミ箱に移動しました",
+        "movedToTrash": "ごみ箱に移動しました",
         "annotationRestored": "注釈が復元されました",
         "annotationDeletedForever": "注釈は永久に削除されました",
         "failedToDelete": "削除に失敗",
         "bulkTrashed": "{count, plural, =0 {アノテーションをゴミ箱に移動しました} one {アノテーションをゴミ箱に移動しました} other {アノテーションをゴミ箱に移動しました}}",
         "bulkRestored": "{count, plural, =0 {ノーアノテーション} one {リストアされた#アノテーション} other {リストアされた#アノテーション}}",
-        "bulkRecolored": "{count, plural, =0 {ノーアノテーションを再着色しました} one {recolored # annotation} other {recolored # annotations}}"
+        "bulkRecolored": "{count, plural, =0 {ノーアノテーションを再着色しました} one {recolored # annotation} other {recolored # annotations}}",
+        "bulkRestyled": "{count, plural, =0 {リセットされたアノテーションはありません} one {リセットされた # アノテーション} other {リセットされた # アノテーション}}"
       }
     }
   },
@@ -3080,19 +3082,8 @@
       "refreshMetadata": "メタデータを更新",
       "deleteAuthor": "投稿者を削除"
     },
-    "listRow": {
-      "noRecentAdditions": "最近の追加はありません",
-      "portraitAlt": "{name} 縦向き画像"
-    },
     "filters": {
-      "title": "投稿者フィルター",
-      "clearAll": "すべてクリア",
-      "allLibraries": "すべてのライブラリ",
-      "allAuthors": "すべての著者",
-      "hasPhoto": "写真あり",
-      "missingPhoto": "不足している写真",
-      "minBooks": "最小の本",
-      "anyPlaceholder": "任意の"
+      "allLibraries": "すべてのライブラリ"
     },
     "header": {
       "never": "一切なし",
@@ -3198,7 +3189,7 @@
         "descending": "降順",
         "allLoaded": "すべての {total} 本が読み込まれました",
         "sort": {
-          "recentlyAdded": "最近追加したもの",
+          "recentlyAdded": "最近追加された項目",
           "title": "タイトル",
           "publishedYear": "出版年"
         },
@@ -3910,7 +3901,7 @@
         "filterByChapter": "チャプターでフィルター",
         "allChapters": "すべての章",
         "untitled": "無題のタイトル",
-        "trash": "ごみ箱に入れる",
+        "trash": "ごみ箱",
         "empty": {
           "noMatch": "フィルタに一致するハイライトはありません。",
           "resetFilters": "フィルターをリセット",
@@ -4453,7 +4444,7 @@
       "sort": {
         "label": "並び替え",
         "attention": "注意が必要です",
-        "createdAt": "最近追加したもの",
+        "createdAt": "最近追加された項目",
         "fileName": "ファイル名",
         "fileSize": "サイズ",
         "format": "書式",
@@ -4522,7 +4513,7 @@
       "uploadedToast": "{uploaded} をアップロードしました",
       "uploadFailedToast": "{failed} のアップロードに失敗しました",
       "uploadPartialToast": "{uploaded}をアップロードしました。 {failed} に失敗しました",
-      "bookDock": "ブック・ドック",
+      "bookDock": "Book Dock",
       "statistics": "統計情報",
       "achievements": "実績",
       "annotations": "注釈",
@@ -4778,11 +4769,11 @@
         "shelves": "棚"
       },
       "widgetNames": {
-        "readingStreak": "連続読み込み中",
-        "currentlyReading": "現在の読み込み中",
+        "readingStreak": "読書継続記録",
+        "currentlyReading": "読書中",
         "readingGoal": "読書目標",
-        "readingDna": "DNA を読んでいる",
-        "monthlyChallenge": "毎月のチャレンジ",
+        "readingDna": "読書DNA",
+        "monthlyChallenge": "月間チャレンジ",
         "highlightOfTheDay": "今日のハイライト",
         "neglectedGems": "無視された宝石",
         "readingRhythm": "リズムを読んでいる",
@@ -4792,12 +4783,12 @@
         "longWait": "The Long Wait"
       },
       "shelfNames": {
-        "recentlyAdded": "最近追加したもの",
+        "recentlyAdded": "最近追加された項目",
         "continueReading": "読書を続ける",
         "continueListening": "リスニングを続ける",
         "wantToRead": "読みたい",
         "upNextInSeries": "次の系列を開く",
-        "random": "新しい何かを見つける",
+        "random": "新しい本を見つける",
         "smartScope": "スマートスコープ"
       },
       "shelfLayout": {
@@ -4829,8 +4820,8 @@
     },
     "widgets": {
       "currentlyReading": {
-        "title": "現在の読み込み中",
-        "empty": "進行中の本はありません。ここから読んでみてください。",
+        "title": "読書中",
+        "empty": "読書中の本はありません。本を読み始めると、ここに表示されます。",
         "continueReading": "続きを読む"
       },
       "diversityScore": {
@@ -4866,7 +4857,7 @@
         "startReading": "読書を開始"
       },
       "monthlyChallenge": {
-        "title": "毎月のチャレンジ"
+        "title": "月間チャレンジ"
       },
       "neglectedGems": {
         "title": "無視された宝石",
@@ -4876,8 +4867,8 @@
         "shuffle": "シャッフル"
       },
       "readingDna": {
-        "title": "DNA を読んでいる",
-        "notEnoughData": "読書のDNAをアンロックするには、少なくとも5冊の本を読んでください",
+        "title": "読書DNA",
+        "notEnoughData": "5冊以上読むと、あなたの「読書DNA」が解放されます",
         "basedOn": "{count, plural, =0 {本がないことに基づいています} one {#本に基づいて} other {#本に基づいています}}",
         "traits": {
           "length": "長さ",
@@ -4887,8 +4878,8 @@
         }
       },
       "readingGoal": {
-        "title": "目標 {year} を読んでいます",
-        "setGoalPrompt": "あなたの進捗を追跡するために読書の目標を設定してください",
+        "title": "{year} 年の読書目標",
+        "setGoalPrompt": "読書目標を設定して、達成状況を記録しましょう",
         "setGoal": "目標を設定",
         "booksPerYear": "年間の本数",
         "ofGoal": "/ {goal}",
@@ -4902,8 +4893,8 @@
         "avgPerDay": "平均 {time}/日"
       },
       "readingStreak": {
-        "title": "連続読み込み中",
-        "empty": "連続記録を開始するには、今日を読んでください",
+        "title": "読書継続記録",
+        "empty": "今日から読書を始めて、連続記録をつけましょう",
         "streakLabel": "{count, plural, =0 {日連続} one {日連続} other {日連続}}",
         "lastSevenDays": "過去 7 日間"
       },
@@ -5098,6 +5089,7 @@
       "template": "テンプレート",
       "default": "デフォルト",
       "send": "送信",
+      "queued": "{count, plural, =0 {キューに入れられたメールはありません} one {1 つのメールがキューに入れられました} other {# 件のメールがキューに入れられました}}",
       "failed": "送信に失敗しました"
     }
   },
@@ -5959,7 +5951,7 @@
           "description": "他のライブラリツールからのインポートが完了または失敗した場合。"
         },
         "bookDock": {
-          "label": "ブック・ドック",
+          "label": "Book Dock",
           "description": "ドックにドロップされたファイルは、確認または確定する準備ができています。"
         },
         "koboSync": {
@@ -6308,7 +6300,7 @@
       "sort": {
         "seriesOrder": "系列順序",
         "title": "タイトル",
-        "recentlyAdded": "最近追加したもの"
+        "recentlyAdded": "最近追加された項目"
       },
       "order": {
         "ascending": "昇順",
@@ -6401,7 +6393,7 @@
     },
     "charts": {
       "acquisitionLag": {
-        "title": "取得遅延数"
+        "title": "出版から登録までの期間"
       },
       "booksAddedOverTime": {
         "title": "時間の経過とともに追加された本",
@@ -6412,10 +6404,10 @@
         "lastYear": "昨年の"
       },
       "formatDistribution": {
-        "title": "分布の書式設定"
+        "title": "ファイル形式の内訳"
       },
       "formatShareOverTime": {
-        "title": "時間の経過とともに共有をフォーマット"
+        "title": "Format Share Over Time"
       },
       "genreCooccurrence": {
         "title": "Gene Co-occurrent"
@@ -6427,19 +6419,19 @@
         "title": "言語の分布"
       },
       "largestBooks": {
-        "title": "上位50冊の本"
+        "title": "ファイルサイズ上位50冊"
       },
       "libraryIntegrity": {
-        "title": "ライブラリのインテグリティ"
+        "title": "ライブラリの健全性"
       },
       "libraryMetadataCompleteness": {
-        "title": "ライブラリメタデータの完了"
+        "title": "ライブラリメタデータの完全性"
       },
       "metadataCompleteness": {
-        "title": "メタデータの完了"
+        "title": "メタデータの完全性"
       },
       "metadataScoreDistribution": {
-        "title": "メタデータスコア配布"
+        "title": "メタデータスコアの分布"
       },
       "pageCountDistribution": {
         "title": "ページカウントの配布"
@@ -6454,7 +6446,7 @@
         "title": "フォーマットによるストレージ"
       },
       "topAuthors": {
-        "title": "上位25人の著者"
+        "title": "著者 Top 25"
       },
       "topSeries": {
         "title": "Top 50 series"
@@ -6546,24 +6538,14 @@
       "series": "シリーズ"
     },
     "bulkRename": {
-      "previewToolbar": "プレビューの名前を変更",
-      "renameSettings": "設定の名前を変更",
       "library": "ライブラリ",
       "noEligibleLibraries": "ファイル名が有効になっているライブラリがありません。ライブラリ設定で有効にしてください。",
       "refresh": "更新",
-      "applyRename": "名前の変更を適用",
-      "showFullPaths": "フルパスを表示",
-      "columnsMenu": "列",
-      "renamingInProgress": "ファイル名を変更する - いつでもキャンセルできます。",
-      "executionFailed": "一括名称変更に失敗しました",
       "previewFailed": "プレビューの読み込みに失敗しました",
-      "noBooksMatch": "現在のフィルタに一致する本が見つかりませんでした。",
+      "executionFailed": "一括名称変更に失敗しました",
       "openBookDetails": "本の詳細を開く",
-      "columns": {
-        "title": "タイトル",
-        "currentPath": "現在のパス",
-        "newPath": "新しいパス",
-        "status": "ステータス"
+      "filter": {
+        "all": "すべて"
       },
       "status": {
         "willRename": "名前を変更する",
@@ -6572,31 +6554,10 @@
         "noPattern": "パターンなし",
         "error": "エラー"
       },
-      "filter": {
-        "all": "すべて"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "名前を変更するには {count}",
-        "unchanged": "{count} 変更しない",
-        "collisions": "{count, plural, =0 {# コリジョン} one {# コリジョン} other {# コリジョン}}",
-        "errors": "{count, plural, =0 {# error} one {# error} other {# errors}}"
-      },
       "empty": {
         "title": "開始するライブラリを選択",
         "description": "上記のライブラリを選択すると、変更の名前をプレビューし、ステータスごとにフィルタを適用し、一括変更を実行できます。",
         "chooseLibrary": "ライブラリを選択"
-      },
-      "completed": {
-        "title": "一括リネーム完了",
-        "stats": "{succeeded} の名前が変更され、 {failed} に失敗しました。 {skipped} スキップしました (合計:{processed} 合計)"
-      },
-      "pagination": {
-        "showing": "{from}-{to} の {total} を表示"
-      },
-      "confirmDialog": {
-        "title": "一括リネームを確認",
-        "renameButton": "{count, plural, =0 {リネーム # 本} one {リネーム # 本} other {リネーム # 本}}"
       }
     },
     "bookDuplicates": {
@@ -6821,7 +6782,7 @@
       }
     },
     "bookDock": {
-      "title": "ブック・ドック",
+      "title": "Book Dock",
       "newFilesDetected": "新しいファイルが検出されました",
       "reconnecting": "再接続中",
       "rescanFailed": "再スキャンに失敗しました",
@@ -6951,7 +6912,7 @@
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader 同期",
-    "bookDock": "ブック・ドック",
+    "bookDock": "Book Dock",
     "whatsNew": "新着情報",
     "annotations": "注釈",
     "achievements": "実績",
@@ -7019,7 +6980,7 @@
     },
     "system": {
       "file-naming": "ファイル名",
-      "book-dock": "ブック・ドック",
+      "book-dock": "Book Dock",
       "maintenance": "メンテナンス",
       "audit-log": "監査ログ"
     },

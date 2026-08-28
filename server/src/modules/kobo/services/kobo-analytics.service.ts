@@ -6,6 +6,7 @@ import { BookService } from '../../book/book.service';
 import { ReadingSessionService } from '../../reading-session/reading-session.service';
 import type { KoboDeviceContext } from '../guards/kobo-token.guard';
 import type { KoboAnalyticsBody, KoboAnalyticsEvent } from '../kobo-analytics.types';
+import { koboSourceDeviceKey, koboStatisticsSessionIdPrefix } from '../kobo-statistics-session.util';
 import { KoboBookIdentityService } from './kobo-book-identity.service';
 import { KoboAnalyticsResolverService } from './kobo-analytics-resolver.service';
 
@@ -178,6 +179,10 @@ export class KoboAnalyticsService {
       },
       user,
       'kobo',
+      {
+        sourceDeviceKey: koboSourceDeviceKey(deviceId),
+        estimateSessionIdPrefix: koboStatisticsSessionIdPrefix(deviceId),
+      },
     );
   }
 

@@ -306,6 +306,30 @@ describe('AnnotationRepository', () => {
       ]);
     });
 
+    it('folds the chapter and activity groupings into per-chapter and per-day entries', async () => {
+      const db = makeDb(
+        [{ totalHighlights: 3, chaptersWithHighlights: 2, highlightsWithNotes: 0 }],
+        [],
+        [],
+        [
+          { title: 'Cetology', color: 'yellow', count: 1, chapterIndex: 28, cfiSpineStep: 58, firstCreatedAt: new Date('2026-04-09T00:00:00Z') },
+          { title: 'Loomings', color: 'yellow', count: 1, chapterIndex: 0, cfiSpineStep: 2, firstCreatedAt: new Date('2026-04-02T00:00:00Z') },
+          { title: 'Loomings', color: '#38BDF8', count: 1, chapterIndex: 0, cfiSpineStep: 2, firstCreatedAt: new Date('2026-04-03T00:00:00Z') },
+        ],
+        [
+          { day: '2026-04-02', origin: 'kobo', count: 2 },
+          { day: '2026-04-09', origin: 'web', count: 1 },
+        ],
+      );
+      const repo = new AnnotationRepository(db as never);
+
+      const result = await repo.getStats(5, 10, {});
+
+      expect(result.chapterBreakdown.map((c) => c.title)).toEqual(['Loomings', 'Cetology']);
+      expect(result.chapterBreakdown[0]).toMatchObject({ count: 2, chapterIndex: 0, order: 0 });
+      expect(result.activity.map((a) => a.day)).toEqual(['2026-04-09', '2026-04-02']);
+    });
+
     it('returns zero stats when no annotations exist', async () => {
       const db = makeDb([{ totalHighlights: 0, chaptersWithHighlights: 0, highlightsWithNotes: 0 }], [], []);
       const repo = new AnnotationRepository(db as never);

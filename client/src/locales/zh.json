@@ -3224,19 +3224,8 @@
       "refreshMetadata": "刷新元数据",
       "deleteAuthor": "删除作者"
     },
-    "listRow": {
-      "noRecentAdditions": "没有最近的添加",
-      "portraitAlt": "{name} 的头像"
-    },
     "filters": {
-      "title": "作者过滤器",
-      "clearAll": "全部清除",
-      "allLibraries": "所有库",
-      "allAuthors": "所有作者",
-      "hasPhoto": "有照片",
-      "missingPhoto": "缺少照片",
-      "minBooks": "最小书",
-      "anyPlaceholder": "任何"
+      "allLibraries": "所有库"
     },
     "header": {
       "never": "从不使用",
@@ -6886,25 +6875,15 @@
       "series": "系列"
     },
     "bulkRename": {
-      "previewToolbar": "重命名预览",
-      "renameSettings": "重命名设置",
       "library": "书库",
       "selectLibraryPlaceholder": "请选择书库…",
       "noEligibleLibraries": "没有启用文件重命名的库。请在书库设置中启用它。",
       "refresh": "刷新",
-      "applyRename": "应用重命名",
-      "showFullPaths": "显示完整路径",
-      "columnsMenu": "列",
-      "renamingInProgress": "重命名文件 - 您可以随时取消。",
-      "executionFailed": "批量重命名失败",
       "previewFailed": "加载预览失败",
-      "noBooksMatch": "没有找到匹配当前过滤器的书籍。",
+      "executionFailed": "批量重命名失败",
       "openBookDetails": "打开书的详细信息",
-      "columns": {
-        "title": "标题",
-        "currentPath": "当前路径",
-        "newPath": "新建路径",
-        "status": "状态"
+      "filter": {
+        "all": "所有的"
       },
       "status": {
         "willRename": "将重命名为",
@@ -6913,32 +6892,10 @@
         "noPattern": "没有图案",
         "error": "错误"
       },
-      "filter": {
-        "all": "所有的"
-      },
-      "summary": {
-        "label": "Summary",
-        "toRename": "待重命名：{count} 项",
-        "unchanged": "未改动：{count} 项",
-        "collisions": "{count, plural, =0 {# 碰撞} one {# 碰撞} other {# 碰撞}}",
-        "errors": "{count, plural, =0 {# 错误} one {# 错误} other {# 错误}}"
-      },
       "empty": {
         "title": "选择要开始的库",
         "description": "选择上面的库来预览更改，按状态筛选，并应用批量重命名运行。",
         "chooseLibrary": "选择书库"
-      },
-      "completed": {
-        "title": "批量重命名完成",
-        "stats": "成功 {succeeded} 条、失败 {failed} 条、跳过 {skipped} 条（总计 {processed} 条）"
-      },
-      "pagination": {
-        "showing": "展示 {from}–{to} 条，共 {total} 条"
-      },
-      "confirmDialog": {
-        "title": "确认批量重命名",
-        "body": "{count, plural, =0 {这将重命名磁盘上的 # 簿。有碰撞或错误的文件将被跳过。此操作无法撤消。} one {这将重命名磁盘上的 # 簿。有碰撞或错误的文件将被跳过。 此操作不能撤消。} other {这将重命名磁盘上的 # 簿。 有碰撞或错误的文件将被跳过。此操作无法撤消。}}",
-        "renameButton": "{count, plural, =0 {重命名# 书} one {重命名# 书} other {重命名# 书}}"
       }
     },
     "bookDuplicates": {

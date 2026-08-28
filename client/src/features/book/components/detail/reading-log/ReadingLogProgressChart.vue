@@ -1,0 +1,161 @@
+<script setup lang="ts">
+import { computed, onMounted, shallowRef, watchEffect } from 'vue'
+import { useI18n } from 'vue-i18n'
+import VChart from 'vue-echarts'
+import type { BookReadingSession, BookReadingSessionStats } from '@bookorbit/types'
+import { formatDate } from '@/i18n/formatters'
+import { useThemeStore } from '@/stores/theme'
+import { getBookorbitThemeName, initChartThemes, readCssColor } from '@/lib/echarts'
+
+const props = defineProps<{
+  sessions: BookReadingSession[]
+  stats: BookReadingSessionStats | null
+  loading: boolean
+}>()
+
+const { t } = useI18n()
+const themeStore = useThemeStore()
+const chartTheme = computed(() => getBookorbitThemeName(themeStore.resolvedTheme, themeStore.accent))
+const option = shallowRef({})
+
+onMounted(() => initChartThemes())
+
+const hasData = computed(() => {
+  if (props.sessions.length > 0) return true
+  const stats = props.stats
+  if (!stats) return false
+  return stats.progressSummary.length > 0 || stats.dailySummary.length > 0
+})
+
+function formatDayLabel(day: string): string {
+  return formatDate(new Date(`${day}T00:00:00`), { month: 'short', day: 'numeric' })
+}
+
+function formatSessionLabel(iso: string): string {
+  return formatDate(new Date(iso), { hour: 'numeric', minute: '2-digit' })
+}
+
+function formatSessionTimestamp(iso: string): string {
+  return formatDate(new Date(iso), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const remainder = Math.floor(seconds % 60)
+  if (minutes > 0) return remainder > 0 ? `${minutes}m ${remainder}s` : `${minutes}m`
+  return `${remainder}s`
+}
+
+/** A book read in one sitting has one point on a day axis and nothing to plot against it. */
+const useSessionTimeline = computed(() => {
+  if (props.sessions.length < 2) return false
+  const days = new Set(props.sessions.map((session) => new Date(session.startedAt).toDateString()))
+  return days.size === 1
+})
+
+watchEffect(() => {
+  const stats = props.stats
+  if (!hasData.value || (!stats && props.sessions.length === 0)) {
+    option.value = {}
+    return
+  }
+
+  let labels: string[]
+  let timestamps: string[]
+  let progress: Array<number | null>
+  let minutes: number[]
+  let durationLabels: string[]
+
+  if (useSessionTimeline.value) {
+    const timeline = [...props.sessions].sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt))
+    labels = timeline.map((session) => formatSessionLabel(session.startedAt))
+    timestamps = timeline.map((session) => formatSessionTimestamp(session.startedAt))
+    progress = timeline.map((session) => session.endProgress)
+    minutes = timeline.map((session) => Math.round((session.durationSeconds / 60) * 10) / 10)
+    durationLabels = timeline.map((session) => formatDuration(session.durationSeconds))
+  } else {
+    const days = [
+      ...new Set([...(stats?.progressSummary.map((point) => point.day) ?? []), ...(stats?.dailySummary.map((day) => day.day) ?? [])]),
+    ].sort()
+    const progressByDay = new Map(stats?.progressSummary.map((point) => [point.day, point.endProgress]) ?? [])
+    const minutesByDay = new Map(stats?.dailySummary.map((day) => [day.day, day.totalMinutes]) ?? [])
+    labels = days.map(formatDayLabel)
+    timestamps = labels
+    progress = days.map((day) => progressByDay.get(day) ?? null)
+    minutes = days.map((day) => minutesByDay.get(day) ?? 0)
+    durationLabels = minutes.map((value) => `${value} ${t('book.detail.readingLog.journey.minutesUnit')}`)
+  }
+
+  const primary = readCssColor('--primary')
+
+  option.value = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: { seriesName: string; value: number | null; dataIndex: number }[]) => {
+        if (!params.length) return ''
+        const index = params[0]!.dataIndex
+        const lines = params.flatMap((point) => {
+          if (point.value == null) return []
+          return point.seriesName === 'progress'
+            ? [`${t('book.detail.readingLog.journey.tooltipProgress')}: <strong>${point.value.toFixed(1)}%</strong>`]
+            : [`${t('book.detail.readingLog.journey.tooltipReading')}: <strong>${durationLabels[index] ?? ''}</strong>`]
+        })
+        return [timestamps[index] ?? '', ...lines].join('<br/>')
+      },
+    },
+    grid: { left: 34, right: 34, top: 12, bottom: 22, containLabel: false },
+    xAxis: {
+      type: 'category',
+      data: labels,
+      boundaryGap: true,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { opacity: 0.35 } },
+      axisLabel: { fontSize: 10, hideOverlap: true, margin: 8 },
+    },
+    yAxis: [
+      { type: 'value', min: 0, max: 100, interval: 25, axisLabel: { fontSize: 10, formatter: (value: number) => `${value}%` } },
+      {
+        type: 'value',
+        minInterval: 1,
+        splitLine: { show: false },
+        axisLabel: { fontSize: 10, formatter: (value: number) => `${value}m` },
+      },
+    ],
+    series: [
+      {
+        name: 'reading',
+        type: 'bar',
+        yAxisIndex: 1,
+        data: minutes,
+        barMaxWidth: 16,
+        itemStyle: { borderRadius: [3, 3, 0, 0], color: primary, opacity: 0.32 },
+      },
+      {
+        name: 'progress',
+        type: 'line',
+        yAxisIndex: 0,
+        data: progress,
+        showSymbol: progress.filter((value) => value != null).length <= 60,
+        symbolSize: 5,
+        connectNulls: true,
+        itemStyle: { color: primary },
+        lineStyle: { width: 2, color: primary },
+        z: 3,
+      },
+    ],
+  }
+})
+</script>
+
+<template>
+  <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }">
+    <VChart :theme="chartTheme" :option autoresize class="absolute inset-0" />
+  </div>
+  <div v-else-if="loading" class="flex flex-1 items-end gap-1 px-2 pb-5 pt-2" aria-hidden="true">
+    <div v-for="bar in 18" :key="bar" class="flex-1 rounded-t bg-muted animate-shimmer" :style="{ height: `${18 + ((bar * 37) % 60)}%` }" />
+  </div>
+  <div v-else class="flex flex-1 flex-col items-center justify-center gap-1 py-6 text-center">
+    <p class="text-[13px] font-medium text-foreground">{{ t('book.detail.readingLog.journey.empty') }}</p>
+    <p class="max-w-[46ch] text-xs leading-relaxed text-muted-foreground">{{ t('book.detail.readingLog.journey.emptyHint') }}</p>
+  </div>
+</template>

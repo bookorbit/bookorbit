@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesNextBookResponse, SeriesPage, SeriesSummary } from '@bookorbit/types';
-import { READER_OPENABLE_FORMATS, getOpenableFormatsForGroup } from '@bookorbit/types';
+import { READER_OPENABLE_FORMATS, SERIES_GAP_PREVIEW_LIMIT, getOpenableFormatsForGroup } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import type { RequestUser } from '../../common/types/request-user';
-import { MAX_SERIES_TOTAL_BOOKS, normalizeSeriesTotalBooks } from '../../common/utils/series-total-books.utils';
+import { normalizeSeriesTotalBooks } from '../../common/utils/series-total-books.utils';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { BookReadService } from '../book/book-read.service';
 import { LibraryService } from '../library/library.service';
@@ -12,6 +12,8 @@ import { FindNextSeriesBookDto } from './dto/find-next-series-book.dto';
 import { ListSeriesBooksDto } from './dto/list-series-books.dto';
 import { ListSeriesDto } from './dto/list-series.dto';
 import { SeriesRepository } from './series.repository';
+import { computeSeriesGaps } from './utils/series-gaps.utils';
+import { buildVolumeLadder } from './utils/series-ladder.utils';
 
 @Injectable()
 export class SeriesService {
@@ -36,7 +38,7 @@ export class SeriesService {
 
     const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
     if (libraryIds.length === 0) {
-      return { items: [], total: 0, page, size };
+      return { items: [], total: 0, page, size, facets: { all: 0, notStarted: 0, inProgress: 0, complete: 0, hasGaps: 0 } };
     }
 
     const result = await this.seriesRepo.findPage({
@@ -52,17 +54,36 @@ export class SeriesService {
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
 
-    const items: SeriesSummary[] = result.items.map((row) => ({
-      id: row.id,
-      name: row.name,
-      bookCount: row.bookCount,
-      readCount: row.readCount,
-      authors: row.authors,
-      coverBookIds: row.coverBookIds,
-      lastAddedAt: row.lastAddedAt ?? null,
-    }));
+    const items: SeriesSummary[] = result.items.map((row) => {
+      const ladder = buildVolumeLadder({
+        members: row.members,
+        truncated: row.membersTruncated,
+        bookCount: row.bookCount,
+        expectedBookCount: row.expectedBookCount,
+      });
 
-    return { items, total: result.total, page: result.page, size: result.size };
+      return {
+        id: row.id,
+        name: row.name,
+        bookCount: row.bookCount,
+        readCount: row.readCount,
+        readingCount: row.readingCount,
+        authors: row.authors,
+        coverBookIds: row.coverBookIds,
+        lastAddedAt: row.lastAddedAt ?? null,
+        libraryNames: row.libraryNames,
+        expectedBookCount: normalizeSeriesTotalBooks(row.expectedBookCount) ?? null,
+        volumes: ladder.volumes,
+        volumesTruncated: ladder.truncated,
+        gaps: ladder.gaps.slice(0, SERIES_GAP_PREVIEW_LIMIT),
+        gapCount: ladder.gaps.length,
+        nextBookId: ladder.next?.bookId ?? null,
+        nextIndex: ladder.next?.index ?? null,
+        nextTitle: ladder.next?.title ?? null,
+      };
+    });
+
+    return { items, total: result.total, facets: result.facets, page: result.page, size: result.size };
   }
 
   /** Total series the user can browse; matches the unfiltered total of {@link findAll}. */
@@ -125,7 +146,7 @@ export class SeriesService {
       throw new NotFoundException('Series not found');
     }
 
-    const possibleGaps = this.computeGaps(detail.indices, detail.bookCount, detail.expectedBookCount);
+    const possibleGaps = computeSeriesGaps(detail.indices, detail.bookCount, detail.expectedBookCount);
 
     let items: BooksPage['items'] = [];
     if (bookPage.bookIds.length > 0) {
@@ -168,62 +189,6 @@ export class SeriesService {
     };
 
     return { items, total: bookPage.total, page, size, seriesInfo };
-  }
-
-  private computeGaps(indices: string[], bookCount: number, expectedBookCount: number | null): number[] {
-    const integerIndices = indices
-      .filter((idx) => /^\d+$/.test(idx))
-      .map((idx) => Number(idx))
-      .filter(Number.isSafeInteger);
-    if (integerIndices.length === 0) return [];
-
-    const min = Math.min(...integerIndices);
-    const max = Math.max(...integerIndices);
-    if (min < 1 || max > MAX_SERIES_TOTAL_BOOKS) return [];
-
-    const expectedMax = this.resolveTrustedExpectedMax(indices, bookCount, integerIndices, expectedBookCount);
-
-    // With no trusted total only interior holes are knowable, and one book has no interior.
-    if (expectedMax === undefined) {
-      if (integerIndices.length < 2) return [];
-      return this.collectMissing(integerIndices, min, max);
-    }
-
-    return this.collectMissing(integerIndices, 1, expectedMax);
-  }
-
-  /**
-   * A provider total turns "the books you own" into "the books the series has", which is the whole
-   * point, but it also lets us name books as missing. Only trust it when nothing about the local
-   * data contradicts it, because a false "you are missing #5" is worse than staying quiet.
-   */
-  private resolveTrustedExpectedMax(
-    indices: string[],
-    bookCount: number,
-    integerIndices: number[],
-    expectedBookCount: number | null,
-  ): number | undefined {
-    const expected = normalizeSeriesTotalBooks(expectedBookCount);
-    if (expected === undefined) return undefined;
-
-    // An owned book with no usable index would be reported missing, so every book must be numbered.
-    if (indices.length !== bookCount || integerIndices.length !== indices.length) return undefined;
-
-    // Owning a book numbered past the total means the total is stale or matched the wrong series.
-    if (Math.max(...integerIndices) > expected) return undefined;
-
-    return expected;
-  }
-
-  private collectMissing(integerIndices: number[], from: number, to: number): number[] {
-    const present = new Set(integerIndices);
-    const gaps: number[] = [];
-    for (let i = from; i <= to; i++) {
-      if (!present.has(i)) {
-        gaps.push(i);
-      }
-    }
-    return gaps;
   }
 
   /**

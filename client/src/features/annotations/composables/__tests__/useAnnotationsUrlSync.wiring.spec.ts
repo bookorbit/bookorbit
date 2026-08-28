@@ -31,14 +31,14 @@ describe('useAnnotationsUrlSync wiring', () => {
   })
 
   it('hydrates the hub from the query and does not write while hydrating', async () => {
-    routeStub.query = { status: 'trashed', page: '2' }
+    routeStub.query = { status: 'trashed', view: 'book' }
     const hub = useAnnotationsHub()
     useAnnotationsUrlSync(hub)
 
     expect(replaceMock).not.toHaveBeenCalled()
     await nextTick()
     expect(hub.status.value).toBe('trashed')
-    expect(hub.page.value).toBe(2)
+    expect(hub.view.value).toBe('book')
   })
 
   it('mirrors a later filter change into the URL via router.replace', async () => {

@@ -14,6 +14,7 @@ import {
   findTranslationLosses,
   normalizeCrowdinCatalog,
   parseAllowedTranslationLosses,
+  retentionLossLimit,
   sourceDrift,
   syncCrowdinTranslations,
 } from './sync-crowdin-translations.mjs'
@@ -99,8 +100,8 @@ describe('Crowdin translation synchronization', () => {
     const exported = new Map()
 
     expect(findTranslationLosses({ locale: 'cs', reference: referenceMessages, current, exported })).toEqual([
-      { locale: 'cs', key: 'common.save', reason: 'missing from Crowdin export' },
-      { locale: 'cs', key: 'common.cancel', reason: 'missing from Crowdin export' },
+      { locale: 'cs', key: 'common.save' },
+      { locale: 'cs', key: 'common.cancel' },
     ])
   })
 
@@ -112,7 +113,7 @@ describe('Crowdin translation synchronization', () => {
     const current = new Map([['common.save', 'Save']])
 
     expect(findTranslationLosses({ locale: 'cs', reference: referenceMessages, current, exported: new Map() })).toEqual([
-      { locale: 'cs', key: 'common.save', reason: 'missing from Crowdin export' },
+      { locale: 'cs', key: 'common.save' },
     ])
   })
 
@@ -133,22 +134,16 @@ describe('Crowdin translation synchronization', () => {
     ).toEqual([])
   })
 
-  it('reports why catalog validation dropped a key instead of a bare absence', () => {
+  it('counts a message this sync rejected as a rejection rather than a lost translation', () => {
     expect(
       findTranslationLosses({
         locale: 'cs',
         reference: new Map([['common.save', 'Save']]),
         current: new Map([['common.save', 'Uložit']]),
         exported: new Map(),
-        rejected: new Map([['common.save', ['cs: Unicode em dash is not allowed in common.save']]]),
+        rejected: new Set(['common.save']),
       }),
-    ).toEqual([
-      {
-        locale: 'cs',
-        key: 'common.save',
-        reason: 'rejected by catalog validation - cs: Unicode em dash is not allowed in common.save',
-      },
-    ])
+    ).toEqual([])
   })
 
   it('ignores catalog keys that English no longer defines', () => {
@@ -168,42 +163,47 @@ describe('Crowdin translation synchronization', () => {
     const exportedCatalogs = new Map(TARGET_CATALOGS.map(({ locale }) => [locale, new Map([['bookDock.tab.error', 'Error']])]))
     currentCatalogs.set('es', new Map([['bookDock.tab.error', 'error']]))
 
-    expect(() => assertTranslationRetention({ reference: referenceMessages, currentCatalogs, exportedCatalogs })).not.toThrow()
-    expect(() =>
-      assertTranslationRetention({
-        reference: referenceMessages,
-        currentCatalogs,
-        exportedCatalogs,
-        allowedLosses: parseAllowedTranslationLosses('es:bookDock.tab.error'),
-      }),
-    ).toThrow('es:bookDock.tab.error - acknowledgement does not match an exported loss')
+    expect(assertTranslationRetention({ reference: referenceMessages, currentCatalogs, exportedCatalogs })).toEqual([])
   })
 
-  it('requires exact acknowledgements for intentional translation losses', () => {
+  it('reports ordinary Crowdin churn instead of failing the whole export', () => {
     const referenceMessages = new Map([['common.save', 'Save']])
     const currentCatalogs = new Map(TARGET_CATALOGS.map(({ locale }) => [locale, new Map()]))
     const exportedCatalogs = new Map(TARGET_CATALOGS.map(({ locale }) => [locale, new Map()]))
     currentCatalogs.set('cs', new Map([['common.save', 'Uložit']]))
 
-    expect(() => assertTranslationRetention({ reference: referenceMessages, currentCatalogs, exportedCatalogs })).toThrow(
-      'cs:common.save - missing from Crowdin export',
-    )
-    expect(() =>
+    expect(assertTranslationRetention({ reference: referenceMessages, currentCatalogs, exportedCatalogs })).toEqual([
+      { locale: 'cs', key: 'common.save' },
+    ])
+    expect(
       assertTranslationRetention({
         reference: referenceMessages,
         currentCatalogs,
         exportedCatalogs,
         allowedLosses: parseAllowedTranslationLosses('cs:common.save'),
       }),
-    ).not.toThrow()
-    expect(() =>
-      assertTranslationRetention({
-        reference: referenceMessages,
-        currentCatalogs,
-        exportedCatalogs,
-        allowedLosses: parseAllowedTranslationLosses('de:common.save'),
-      }),
-    ).toThrow('de:common.save - acknowledgement does not match an exported loss')
+    ).toEqual([])
+  })
+
+  it('fails when an export drops more of a catalog than churn explains', () => {
+    const keys = Array.from({ length: 200 }, (_, index) => `common.key${index}`)
+    const referenceMessages = new Map(keys.map((key) => [key, 'Save']))
+    const currentCatalogs = new Map(TARGET_CATALOGS.map(({ locale }) => [locale, new Map()]))
+    const exportedCatalogs = new Map(TARGET_CATALOGS.map(({ locale }) => [locale, new Map()]))
+    currentCatalogs.set('cs', new Map(keys.map((key) => [key, 'Uložit'])))
+
+    expect(retentionLossLimit(200)).toBe(25)
+    expect(() => assertTranslationRetention({ reference: referenceMessages, currentCatalogs, exportedCatalogs })).toThrow(
+      'cs: 200 translations dropped, more than the 25 allowed',
+    )
+    exportedCatalogs.set('cs', new Map(keys.slice(0, 190).map((key) => [key, 'Uložit'])))
+    expect(() => assertTranslationRetention({ reference: referenceMessages, currentCatalogs, exportedCatalogs })).not.toThrow()
+  })
+
+  it('scales the retention limit with the size of the translated catalog', () => {
+    expect(retentionLossLimit(0)).toBe(25)
+    expect(retentionLossLimit(2500)).toBe(25)
+    expect(retentionLossLimit(5640)).toBe(57)
   })
 
   it('rejects malformed and duplicate loss acknowledgements', () => {
@@ -348,7 +348,7 @@ describe('Crowdin translation synchronization', () => {
     const catalogDirectory = await createCatalogFixture(targetCatalogs)
     const outputDirectory = path.join(catalogDirectory, 'output')
     const reportPath = path.join(catalogDirectory, 'rejections.md')
-    const catalogs = new Map([[targetCatalogs[0].languageId, { common: { save: 'Bad \u2014 value' } }]])
+    const catalogs = new Map([[targetCatalogs[0].languageId, { common: { save: 'Bad <b>value</b>' } }]])
 
     const { rejections } = await syncCrowdinTranslations({
       token: 'secret',
@@ -365,55 +365,109 @@ describe('Crowdin translation synchronization', () => {
       {
         locale: targetCatalogs[0].locale,
         key: 'common.save',
-        errors: [`${targetCatalogs[0].locale}: Unicode em dash is not allowed in common.save`],
+        errors: [`${targetCatalogs[0].locale}: HTML is not allowed in common.save`],
       },
     ])
     expect(JSON.parse(await readFile(path.join(outputDirectory, `${targetCatalogs[0].locale}.json`), 'utf8'))).toEqual({})
     expect(JSON.parse(await readFile(path.join(outputDirectory, `${targetCatalogs[1].locale}.json`), 'utf8'))).toEqual({
       common: { save: `Translated ${targetCatalogs[1].languageId}` },
     })
-    expect(await readFile(reportPath, 'utf8')).toContain('Unicode em dash is not allowed in common.save')
+    expect(await readFile(reportPath, 'utf8')).toContain('HTML is not allowed in common.save')
   })
 
-  it('fails when a rejected message would drop an existing translation', async () => {
+  it('keeps exporting when a rejected message drops an existing translation', async () => {
     const targetCatalogs = TARGET_CATALOGS.slice(0, 2)
     const currentCatalogs = new Map([[targetCatalogs[0].locale, { common: { save: 'Ulozit' } }]])
     const catalogDirectory = await createCatalogFixture(targetCatalogs, currentCatalogs)
     const outputDirectory = path.join(catalogDirectory, 'output')
-    const catalogs = new Map([[targetCatalogs[0].languageId, { common: { save: 'Bad \u2014 value' } }]])
+    const catalogs = new Map([[targetCatalogs[0].languageId, { common: { save: 'Bad <b>value</b>' } }]])
 
-    await expect(
-      syncCrowdinTranslations({
-        token: 'secret',
-        fetchImpl: createSynchronizationFetch({ catalogs }),
-        catalogDirectory,
-        outputDirectory,
-        targetCatalogs,
-        assertTargetConfiguration: async () => {},
-        protectedTerms: [],
-      }),
-    ).rejects.toThrow('rejected by catalog validation')
-    await expect(access(outputDirectory)).rejects.toThrow()
+    const { rejections, losses } = await syncCrowdinTranslations({
+      token: 'secret',
+      fetchImpl: createSynchronizationFetch({ catalogs }),
+      catalogDirectory,
+      outputDirectory,
+      targetCatalogs,
+      assertTargetConfiguration: async () => {},
+      protectedTerms: [],
+    })
+
+    expect(rejections).toHaveLength(1)
+    expect(losses).toEqual([])
+    expect(JSON.parse(await readFile(path.join(outputDirectory, `${targetCatalogs[0].locale}.json`), 'utf8'))).toEqual({})
+  })
+
+  it('rewrites a Crowdin em dash instead of discarding the translation', async () => {
+    const targetCatalogs = TARGET_CATALOGS.slice(0, 2)
+    const currentCatalogs = new Map([[targetCatalogs[0].locale, { common: { save: 'Ulozit - hned' } }]])
+    const catalogDirectory = await createCatalogFixture(targetCatalogs, currentCatalogs)
+    const outputDirectory = path.join(catalogDirectory, 'output')
+    const catalogs = new Map([[targetCatalogs[0].languageId, { common: { save: 'Ulozit \u2014 hned' } }]])
+
+    const { rejections, losses, repairs } = await syncCrowdinTranslations({
+      token: 'secret',
+      fetchImpl: createSynchronizationFetch({ catalogs }),
+      catalogDirectory,
+      outputDirectory,
+      targetCatalogs,
+      assertTargetConfiguration: async () => {},
+      protectedTerms: [],
+    })
+
+    expect(rejections).toEqual([])
+    expect(losses).toEqual([])
+    expect(repairs).toEqual([{ locale: targetCatalogs[0].locale, key: 'common.save', message: 'Ulozit - hned', kinds: ['typography'] }])
+    expect(JSON.parse(await readFile(path.join(outputDirectory, `${targetCatalogs[0].locale}.json`), 'utf8'))).toEqual({
+      common: { save: 'Ulozit - hned' },
+    })
+  })
+
+  it('completes a plural category the target locale needs and Crowdin omitted', async () => {
+    const targetCatalogs = [TARGET_CATALOGS.find(({ locale }) => locale === 'ro')]
+    const referenceCatalog = { books: { count: '{count, plural, one {# book} other {# books}}' } }
+    const catalogDirectory = await createCatalogFixture(targetCatalogs, new Map(), referenceCatalog)
+    const outputDirectory = path.join(catalogDirectory, 'output')
+    const catalogs = new Map([['ro', { books: { count: '{count, plural, one {# carte} other {# de carti}}' } }]])
+
+    const { rejections, repairs } = await syncCrowdinTranslations({
+      token: 'secret',
+      fetchImpl: createSynchronizationFetch({ identifiers: ['books.count'], catalogs }),
+      catalogDirectory,
+      outputDirectory,
+      targetCatalogs,
+      assertTargetConfiguration: async () => {},
+      protectedTerms: [],
+    })
+
+    expect(rejections).toEqual([])
+    expect(repairs).toEqual([
+      { locale: 'ro', key: 'books.count', message: expect.stringContaining('few {# de carti}'), kinds: ['plural categories'] },
+    ])
+    expect(JSON.parse(await readFile(path.join(outputDirectory, 'ro.json'), 'utf8'))).toEqual({
+      books: { count: '{count, plural, one {# carte} other {# de carti} few {# de carti}}' },
+    })
   })
 
   it('checks translation retention before writing any files', async () => {
     const targetCatalogs = TARGET_CATALOGS.slice(0, 2)
-    const currentCatalogs = new Map([[targetCatalogs[0].locale, { common: { save: 'Ulozit' } }]])
-    const catalogDirectory = await createCatalogFixture(targetCatalogs, currentCatalogs)
+    const keys = Array.from({ length: 40 }, (_, index) => `key${index}`)
+    const referenceCatalog = { common: Object.fromEntries(keys.map((key) => [key, 'Save'])) }
+    const currentCatalogs = new Map([[targetCatalogs[0].locale, { common: Object.fromEntries(keys.map((key) => [key, 'Ulozit'])) }]])
+    const catalogDirectory = await createCatalogFixture(targetCatalogs, currentCatalogs, referenceCatalog)
     const outputDirectory = path.join(catalogDirectory, 'output')
-    const catalogs = new Map([[targetCatalogs[0].languageId, {}]])
+    const catalogs = new Map(targetCatalogs.map(({ languageId }) => [languageId, {}]))
 
     await expect(
       syncCrowdinTranslations({
         token: 'secret',
-        fetchImpl: createSynchronizationFetch({ catalogs }),
+        fetchImpl: createSynchronizationFetch({ identifiers: keys.map((key) => `common.${key}`), catalogs }),
         catalogDirectory,
         outputDirectory,
         targetCatalogs,
         assertTargetConfiguration: async () => {},
         protectedTerms: [],
       }),
-    ).rejects.toThrow('missing from Crowdin export')
+    ).rejects.toThrow('40 translations dropped, more than the 25 allowed')
     await expect(access(outputDirectory)).rejects.toThrow()
   })
 
@@ -434,7 +488,7 @@ describe('Crowdin translation synchronization', () => {
         assertTargetConfiguration: async () => {},
         protectedTerms: [],
       }),
-    ).resolves.toEqual({ rejections: [], corrections: [] })
+    ).resolves.toEqual({ rejections: [], corrections: [], repairs: [], losses: [] })
     expect(JSON.parse(await readFile(path.join(outputDirectory, `${targetCatalogs[0].locale}.json`), 'utf8'))).toEqual({
       common: { save: 'Save' },
     })

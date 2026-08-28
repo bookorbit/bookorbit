@@ -330,7 +330,7 @@ describe('GoodreadsProvider', () => {
       expect(result.find((c) => c.providerId === '1')?.title).toBe('B1');
     });
 
-    it('stops fetching detail pages once one is WAF-blocked and falls back to autocomplete', async () => {
+    it('reports a bot challenge as a throttle instead of quietly degrading the whole batch', async () => {
       vi.useFakeTimers();
       const autocomplete = [
         { bookId: '1', bookUrl: '/book/show/1.B1', title: 'B1', bookTitleBare: 'B1' },
@@ -343,16 +343,141 @@ describe('GoodreadsProvider', () => {
         return Promise.resolve({ ok: true, status: 202, text: () => Promise.resolve('<div id="challenge-container"></div>') });
       }) as never;
 
-      const searchPromise = provider.search({ title: 'B' });
+      // The rejection lands while the timers run, so the assertion has to be attached before then:
+      // a rejected promise nobody is holding is an unhandled rejection, which fails the whole run.
+      const rejects = expect(provider.search({ title: 'B' })).rejects.toBeInstanceOf(ProviderThrottleError);
       await vi.runAllTimersAsync();
-      const result = await searchPromise;
 
+      await rejects;
       const detailUrls = vi
         .mocked(global.fetch)
         .mock.calls.map(([url]) => fetchUrl(url))
         .filter((url) => url.includes('/book/show/'));
       expect(detailUrls).toEqual(['https://www.goodreads.com/book/show/1']);
-      expect(result.map((c) => c.title)).toEqual(['B1', 'B2']);
+    });
+
+    it('reports a bot challenge on a direct lookup as a throttle', async () => {
+      global.fetch = vi
+        .fn()
+        .mockResolvedValue({ ok: true, status: 202, text: () => Promise.resolve('<div id="challenge-container"></div>') }) as never;
+
+      await expect(provider.lookupById('123')).rejects.toBeInstanceOf(ProviderThrottleError);
+    });
+
+    it('leaves the description empty when an unavailable detail page forces the truncated autocomplete blurb', async () => {
+      vi.useFakeTimers();
+      const autocomplete = [
+        {
+          bookId: '229004506',
+          bookUrl: '/book/show/229004506-the-widow',
+          title: 'The Widow',
+          bookTitleBare: 'The Widow',
+          author: { name: 'John Grisham' },
+          numPages: 404,
+          description: {
+            html: 'Simon Latch is a lawyer in rural Virginia, making just enough to pay his bills while his marriage slowly falls apart. Then into his office walks Eleanor Barnett, an elderly wi\u2026',
+            truncated: true,
+          },
+        },
+      ];
+
+      global.fetch = vi.fn((input: Parameters<typeof fetch>[0]) => {
+        const url = fetchUrl(input);
+        if (url.includes('/auto_complete')) return Promise.resolve({ ok: true, json: () => Promise.resolve(autocomplete) });
+        return Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('') });
+      }) as never;
+
+      const searchPromise = provider.search({ title: 'The Widow', author: 'John Grisham' });
+      await vi.runAllTimersAsync();
+      const result = await searchPromise;
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('The Widow');
+      expect(result[0].pageCount).toBe(404);
+      expect(result[0].description).toBeUndefined();
+    });
+
+    it('retries a detail page Goodreads reports as temporarily unavailable', async () => {
+      vi.useFakeTimers();
+      const autocomplete = [{ bookId: '1', bookUrl: '/book/show/1.B1', title: 'B1', bookTitleBare: 'B1' }];
+      let detailAttempts = 0;
+
+      global.fetch = vi.fn((input: Parameters<typeof fetch>[0]) => {
+        const url = fetchUrl(input);
+        if (url.includes('/auto_complete')) return Promise.resolve({ ok: true, json: () => Promise.resolve(autocomplete) });
+        detailAttempts += 1;
+        if (detailAttempts === 1) return Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('') });
+        return Promise.resolve({ ok: true, text: () => Promise.resolve(goodreadsBookHtml('1', 'B1 From Detail')) });
+      }) as never;
+
+      const searchPromise = provider.search({ title: 'B' });
+      await vi.runAllTimersAsync();
+      const result = await searchPromise;
+
+      expect(detailAttempts).toBe(2);
+      expect(result[0].title).toBe('B1 From Detail');
+    });
+
+    it('stops retrying a detail page once the attempt budget is spent', async () => {
+      vi.useFakeTimers();
+      const autocomplete = [{ bookId: '1', bookUrl: '/book/show/1.B1', title: 'B1', bookTitleBare: 'B1' }];
+      let detailAttempts = 0;
+
+      global.fetch = vi.fn((input: Parameters<typeof fetch>[0]) => {
+        const url = fetchUrl(input);
+        if (url.includes('/auto_complete')) return Promise.resolve({ ok: true, json: () => Promise.resolve(autocomplete) });
+        detailAttempts += 1;
+        return Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('') });
+      }) as never;
+
+      const searchPromise = provider.search({ title: 'B' });
+      await vi.runAllTimersAsync();
+      const result = await searchPromise;
+
+      expect(detailAttempts).toBe(3);
+      expect(result[0].title).toBe('B1');
+    });
+
+    it('keeps fetching detail pages for the rest of the batch after one is temporarily unavailable', async () => {
+      vi.useFakeTimers();
+      const autocomplete = [
+        { bookId: '1', bookUrl: '/book/show/1.B1', title: 'B1', bookTitleBare: 'B1' },
+        { bookId: '2', bookUrl: '/book/show/2.B2', title: 'B2', bookTitleBare: 'B2' },
+      ];
+
+      global.fetch = vi.fn((input: Parameters<typeof fetch>[0]) => {
+        const url = fetchUrl(input);
+        if (url.includes('/auto_complete')) return Promise.resolve({ ok: true, json: () => Promise.resolve(autocomplete) });
+        if (url.includes('/book/show/1')) return Promise.resolve({ ok: false, status: 503, text: () => Promise.resolve('') });
+        return Promise.resolve({ ok: true, text: () => Promise.resolve(goodreadsBookHtml('2', 'B2 From Detail')) });
+      }) as never;
+
+      const searchPromise = provider.search({ title: 'B' });
+      await vi.runAllTimersAsync();
+      const result = await searchPromise;
+
+      expect(result.find((c) => c.providerId === '1')?.title).toBe('B1');
+      expect(result.find((c) => c.providerId === '2')?.title).toBe('B2 From Detail');
+    });
+
+    it('does not retry a detail page that is simply missing', async () => {
+      vi.useFakeTimers();
+      const autocomplete = [{ bookId: '1', bookUrl: '/book/show/1.B1', title: 'B1', bookTitleBare: 'B1' }];
+      let detailAttempts = 0;
+
+      global.fetch = vi.fn((input: Parameters<typeof fetch>[0]) => {
+        const url = fetchUrl(input);
+        if (url.includes('/auto_complete')) return Promise.resolve({ ok: true, json: () => Promise.resolve(autocomplete) });
+        detailAttempts += 1;
+        return Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('') });
+      }) as never;
+
+      const searchPromise = provider.search({ title: 'B' });
+      await vi.runAllTimersAsync();
+      const result = await searchPromise;
+
+      expect(detailAttempts).toBe(1);
+      expect(result[0].title).toBe('B1');
     });
   });
 

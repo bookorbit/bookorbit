@@ -2742,7 +2742,7 @@ describe('BookService', () => {
       } as never);
 
       expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
-      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }], 42, undefined);
+      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }], 42, undefined, {});
       expect(bookRepo.findJumpBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ where: 'WHERE', field: 'title', kind: 'letter', userId: 42, maxBuckets: 24, orderBy: ['ORDER'] }),
       );
@@ -4480,7 +4480,7 @@ describe('BookService', () => {
 
       const result = await service.executeBooksQuery(12, undefined, query);
 
-      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith(query.sort, 12, undefined);
+      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith(query.sort, 12, undefined, {});
       expect(bookRepo.findCards).toHaveBeenCalledWith({
         where: undefined,
         orderBy: 'order-by',
@@ -4605,7 +4605,7 @@ describe('BookService', () => {
       await service.executeBooksQuery(12, undefined, query);
 
       expect(customMetadataService.getActiveFieldTypes).toHaveBeenCalledWith([7]);
-      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith(query.sort, 12, fieldTypes);
+      expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith(query.sort, 12, fieldTypes, {});
     });
 
     it('does not query custom metadata field types when no custom sort is used', async () => {

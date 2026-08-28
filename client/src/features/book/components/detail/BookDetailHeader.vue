@@ -34,7 +34,7 @@ async function navigateToBook(id: number) {
 
 <template>
   <div
-    class="flex items-stretch border-b shrink-0 h-12 md:h-11 px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-3"
+    class="flex items-stretch border-b shrink-0 h-10 md:h-9 px-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-3"
   >
     <BookDetailTabs :book-id="bookId" />
 

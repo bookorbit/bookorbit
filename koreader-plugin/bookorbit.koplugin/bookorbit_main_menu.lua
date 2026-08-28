@@ -702,6 +702,17 @@ function MainMenu:showDashboardMenu(catalog)
     UIManager:show(menu_container)
 end
 
+function MainMenu:refreshActiveCatalogApi(refresh)
+    if not self.catalog_browser then return end
+    self.catalog_browser:setApi(self:apiOpts(true))
+    if refresh then self.catalog_browser:refreshCurrent() end
+end
+
+function MainMenu:applyServerAddress(server_url)
+    self.settings.server_url = server_url
+    self:refreshActiveCatalogApi(false)
+end
+
 function MainMenu:setServerAddress()
     local dialog
     dialog = InputDialog:new{
@@ -722,7 +733,7 @@ function MainMenu:setServerAddress()
                     is_enter_default = true,
                     callback = function()
                         local normalized = BookOrbitApi.normalizeServerUrl(dialog:getInputText())
-                        self.settings.server_url = normalized
+                        self:applyServerAddress(normalized)
                         UIManager:close(dialog)
                         if normalized then
                             Notification:notify(T(_("BookOrbit server set to %1"), normalized))
@@ -801,6 +812,7 @@ function MainMenu:doLogin(username, password, menu)
     if body then
         self.settings.username = username
         self.settings.userkey = userkey
+        self:refreshActiveCatalogApi(true)
         if menu then menu:updateItems() end
         UIManager:show(InfoMessage:new{ text = _("Logged in to BookOrbit.") })
         UIManager:scheduleIn(1, function()
@@ -821,6 +833,7 @@ end
 
 function MainMenu:logout(menu)
     self.settings.userkey = nil
+    self:refreshActiveCatalogApi(false)
     if menu then menu:updateItems() end
 end
 

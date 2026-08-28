@@ -1,7 +1,9 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { naturalCompare } from '../../common/utils/natural-sort.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 
 import type {
   BookMissingEvent,
@@ -201,6 +203,7 @@ export class ScannerService implements OnApplicationBootstrap {
     private readonly scanJobStore: ScanJobStore,
     private readonly scanGateway: ScanGateway,
     private readonly notificationService: NotificationService,
+    private readonly selfWriteRegistry: SelfWriteRegistry,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
     @Optional() private readonly achievementEvents?: AchievementEventsService,
   ) {}
@@ -1578,6 +1581,11 @@ export class ScannerService implements OnApplicationBootstrap {
     //     configured source that names narrators itself outranks the audio tags.
     //   - Extraction only fires when at least one configured metadata source is new, reassigned, or changed.
 
+    // A file this instance is writing right now holds whatever its tags said before the write
+    // reached it. The database is the source those tags are being written from, so reading any of
+    // them back mid-write can only overwrite the saved metadata with a pre-write view of it.
+    const selfWriteInProgress = registeredFiles.some((file) => this.selfWriteRegistry.isSuppressed(file.absolutePath));
+
     const metadataSources = this.buildMetadataExtractionSources(registeredFiles, winner, metadataPrecedence);
     const shouldExtractMetadata =
       metadataSources.some((source) => hasMetadataSourceChanged(source.file)) || (book.primaryFileId === null && winner !== null);
@@ -1592,7 +1600,13 @@ export class ScannerService implements OnApplicationBootstrap {
     //     Runs before shared extraction so a source that declares narrators (an OPF carrying
     //     role="nrt") overwrites the composer tag rather than being overwritten by it.
     const audioWinnerLeadsMetadata = winnerIsAudio && metadataSources[0]?.key === 'embedded';
-    if (!audioWinnerLeadsMetadata && changedAudioFiles.length > 0) {
+    if (selfWriteInProgress && (shouldExtractMetadata || changedAudioFiles.length > 0)) {
+      this.logger.log(
+        `[scanner.extract_metadata] [end] bookId=${book.id} action=skip_self_write_in_progress - metadata extraction skipped while this instance writes the book's own files`,
+      );
+    }
+
+    if (!audioWinnerLeadsMetadata && changedAudioFiles.length > 0 && !selfWriteInProgress) {
       const sortedAudio = [...audioContentFiles].sort((a, b) =>
         basename(a.absolutePath).localeCompare(basename(b.absolutePath), undefined, { numeric: true }),
       );
@@ -1607,7 +1621,7 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     // 3b: Extract shared metadata from the first available configured source.
-    if (shouldExtractMetadata) {
+    if (shouldExtractMetadata && !selfWriteInProgress) {
       await this.extractFirstAvailableMetadataSource(book.id, metadataSources);
     }
 
@@ -1635,6 +1649,25 @@ export class ScannerService implements OnApplicationBootstrap {
       } catch (err) {
         this.logger.warn(
           `[scanner.aggregate_audio_duration] [fail] bookId=${book.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - audio duration aggregation failed`,
+        );
+      }
+    }
+
+    // 3e: Rebuild chapters across every audio file. Steps 3a and 3b read chapters from one file, and
+    //     each file of a multi-file audiobook embeds only its own chapters starting at zero, so on
+    //     its own that leaves the later files with no chapters at all and the last chapter of the
+    //     first file stretched over the rest of the book. Runs for unchanged books too, which is
+    //     what repairs the ones scanned before chapters were merged; it settles after one pass.
+    if (audioContentFiles.length > 1) {
+      const orderedAudioPaths = [...audioContentFiles]
+        .sort((a, b) => naturalCompare(basename(a.absolutePath), basename(b.absolutePath)))
+        .map((file) => file.absolutePath);
+      const filesChanged = shouldExtractMetadata || changedAudioFiles.length > 0;
+      try {
+        await this.metadataService.extractMergedAudioChapters(book.id, orderedAudioPaths, { filesChanged });
+      } catch (err) {
+        this.logger.warn(
+          `[scanner.merge_audio_chapters] [fail] bookId=${book.id} files=${orderedAudioPaths.length} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - audio chapter merge failed`,
         );
       }
     }

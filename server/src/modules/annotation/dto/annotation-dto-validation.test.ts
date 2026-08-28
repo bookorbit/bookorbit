@@ -113,7 +113,10 @@ describe('AnnotationHubQueryDto validation', () => {
     expect((await errorsFor(AnnotationHubQueryDto, { page: '0' })).length).toBeGreaterThan(0);
     expect((await errorsFor(AnnotationHubQueryDto, { pageSize: '101' })).length).toBeGreaterThan(0);
     expect((await errorsFor(AnnotationHubQueryDto, { status: 'archived' })).length).toBeGreaterThan(0);
-    expect((await errorsFor(AnnotationHubQueryDto, { sortBy: 'color' })).length).toBeGreaterThan(0);
+    expect((await errorsFor(AnnotationHubQueryDto, { sortBy: 'chapter' })).length).toBeGreaterThan(0);
+    // The hub's group control sorts by these, so they have to pass.
+    expect(await errorsFor(AnnotationHubQueryDto, { sortBy: 'color' })).toEqual([]);
+    expect(await errorsFor(AnnotationHubQueryDto, { sortBy: 'origin' })).toEqual([]);
     expect((await errorsFor(AnnotationHubQueryDto, { search: 'x'.repeat(201) })).length).toBeGreaterThan(0);
   });
 });

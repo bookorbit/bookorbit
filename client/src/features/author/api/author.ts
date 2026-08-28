@@ -1,18 +1,31 @@
 import { api } from '@/lib/api'
-import type { AuthorsPage, AuthorDetail, AuthorMetadataCandidate, AuthorMetadataProviderKey, BooksPage, MergeAuthorsResult } from '@bookorbit/types'
+import type {
+  AuthorsPage,
+  AuthorDetail,
+  AuthorMetadataCandidate,
+  AuthorMetadataProviderKey,
+  BooksPage,
+  JumpBucketsResponse,
+  MergeAuthorsResult,
+} from '@bookorbit/types'
 import type { AuthorBookSort, AuthorListSort, SortDirection } from '../types/author'
 
 export const MAX_AUTHOR_IMAGE_BYTES = 20 * 1024 * 1024
 
-type ListAuthorsParams = {
+export type AuthorFilterParams = {
   q?: string
+  libraryId?: number | null
+  hasPhoto?: boolean | null
+  hasSortName?: boolean | null
+  addedWithinDays?: number | null
+  minBookCount?: number | null
+}
+
+type ListAuthorsParams = AuthorFilterParams & {
   page: number
   size: number
   sort: AuthorListSort
   order: SortDirection
-  libraryId?: number | null
-  hasPhoto?: boolean | null
-  minBookCount?: number | null
 }
 
 type ListAuthorBooksParams = {
@@ -84,18 +97,40 @@ function toQuery(params: Record<string, string | number | (string | number)[] | 
 
 export async function fetchAuthors(params: ListAuthorsParams): Promise<AuthorsPage> {
   const query = toQuery({
-    q: params.q,
     page: params.page,
     size: params.size,
     sort: params.sort,
     order: params.order,
-    libraryId: params.libraryId ?? undefined,
-    hasPhoto: params.hasPhoto != null ? String(params.hasPhoto) : undefined,
-    minBookCount: params.minBookCount ?? undefined,
+    ...authorFilterQuery(params),
   })
 
   const res = await api(`/api/v1/authors${query}`)
   if (!res.ok) throw new Error('Failed to load authors')
+  return res.json()
+}
+
+function authorFilterQuery(params: AuthorFilterParams) {
+  return {
+    q: params.q,
+    libraryId: params.libraryId ?? undefined,
+    hasPhoto: params.hasPhoto != null ? String(params.hasPhoto) : undefined,
+    hasSortName: params.hasSortName != null ? String(params.hasSortName) : undefined,
+    addedWithinDays: params.addedWithinDays ?? undefined,
+    minBookCount: params.minBookCount ?? undefined,
+  }
+}
+
+/**
+ * A-Z buckets for the jump rail, under the same filters as the list. Server-computed
+ * so the rail covers the whole result set rather than the pages already scrolled to.
+ */
+export async function fetchAuthorJumpBuckets(
+  params: AuthorFilterParams & { sort: 'name' | 'sortName'; order: SortDirection },
+): Promise<JumpBucketsResponse> {
+  const query = toQuery({ sort: params.sort, order: params.order, ...authorFilterQuery(params) })
+
+  const res = await api(`/api/v1/authors/jump-buckets${query}`)
+  if (!res.ok) throw new Error('Failed to load author jump buckets')
   return res.json()
 }
 

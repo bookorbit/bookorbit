@@ -199,7 +199,7 @@ local function finish(ctx, err)
     end
 
     if ctx.plugin and ctx.plugin.recordSyncError then
-        if err == "auth" or err == "network" then
+        if err == "auth" or err == "network" or err == "server" then
             ctx.plugin:recordSyncError("sweep", err)
         elseif not err and ctx.had_errors then
             ctx.plugin:recordSyncError("sweep", "partial_failure")
@@ -237,6 +237,17 @@ local function finish(ctx, err)
             UIManager:show(InfoMessage:new{ text = _("BookOrbit sync: server not reachable."), timeout = 4 })
         end
         logger.dbg("BookOrbit: sweep aborted, server not reachable")
+        if ctx.on_finish then
+            pcall(ctx.on_finish, err)
+        end
+        return
+    end
+
+    if err == "server" then
+        if ctx.interactive then
+            UIManager:show(InfoMessage:new{ text = _("BookOrbit sync: server request failed."), timeout = 4 })
+        end
+        logger.warn("BookOrbit: sweep aborted, server request failed")
         if ctx.on_finish then
             pcall(ctx.on_finish, err)
         end
@@ -606,6 +617,7 @@ local function stepMatchNext(ctx)
     if aborted(ctx) then return end
     if not body then
         if isAuthError(err) then return finish(ctx, "auth") end
+        if type(err) == "number" then return finish(ctx, "server") end
         return finish(ctx, "network")
     end
 

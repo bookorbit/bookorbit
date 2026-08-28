@@ -17,6 +17,7 @@ import type { MockedFunction } from 'vitest';
 import type { Dirent } from 'fs';
 import { readdir, stat } from 'fs/promises';
 
+import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { ScannerService } from './scanner.service';
 import { ScanJobStore } from './scan-job-store.service';
@@ -147,6 +148,7 @@ const mockMetadata = {
   extractAudioFileDuration: vi.fn().mockResolvedValue(undefined),
   aggregateAudioDuration: vi.fn().mockResolvedValue(undefined),
   extractAudioChaptersAndNarrators: vi.fn().mockResolvedValue(undefined),
+  extractMergedAudioChapters: vi.fn().mockResolvedValue(undefined),
 };
 
 function makeService(
@@ -156,16 +158,18 @@ function makeService(
   const jobStore = new ScanJobStore();
   const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
   const achievementEvents = { emit: vi.fn() };
+  const selfWriteRegistry = new SelfWriteRegistry();
   const service = new ScannerService(
     repo as any,
     mockMetadata as any,
     jobStore,
     mockGateway as any,
     notificationService as any,
+    selfWriteRegistry,
     autoFetchOrchestrator as any,
     achievementEvents as any,
   );
-  return { service, jobStore, notificationService, achievementEvents };
+  return { service, jobStore, notificationService, achievementEvents, selfWriteRegistry };
 }
 
 /**
@@ -864,6 +868,27 @@ describe('genuinely new primary file', () => {
     expect(calls).toEqual(['audio', 'shared']);
   });
 
+  it('does not read metadata back out of a book whose files this instance is writing', async () => {
+    const first = makeFileStat({ absolutePath: '/library/Book/01.mp3', relPath: 'Book/01.mp3', format: 'mp3', role: 'content' });
+    const second = makeFileStat({ absolutePath: '/library/Book/02.mp3', relPath: 'Book/02.mp3', ino: 1002n, format: 'mp3', role: 'content' });
+    const candidate = makeCandidate('/library/Book', [first, second]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service, selfWriteRegistry } = makeService(repo);
+    // The write is partway through: 02.mp3 still carries whatever it said before the edit.
+    selfWriteRegistry.begin([first.absolutePath, second.absolutePath]);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+    expect(mockMetadata.extractAudioChaptersAndNarrators).not.toHaveBeenCalled();
+
+    selfWriteRegistry.end([first.absolutePath, second.absolutePath]);
+  });
+
   it('does not re-read the audio winner when embedded metadata already leads', async () => {
     const m4b = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b', format: 'm4b', role: 'content' });
     const opf = makeFileStat({
@@ -1560,6 +1585,171 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(1);
     expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/book.m4b');
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('merges chapters across every audio file of a multi-file audiobook, in playback order', async () => {
+    const file2 = makeFileStat({ absolutePath: '/library/Book/Book - 02.m4b', relPath: 'Book/Book - 02.m4b', format: 'm4b', role: 'content' });
+    const file10 = makeFileStat({
+      absolutePath: '/library/Book/Book - 10.m4b',
+      relPath: 'Book/Book - 10.m4b',
+      ino: 1010n,
+      format: 'm4b',
+      role: 'content',
+    });
+    const file1 = makeFileStat({
+      absolutePath: '/library/Book/Book - 01.m4b',
+      relPath: 'Book/Book - 01.m4b',
+      ino: 1001n,
+      format: 'm4b',
+      role: 'content',
+    });
+    const candidate = makeCandidate('/library/Book', [file2, file10, file1]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    // Natural order, not lexicographic: file 10 plays after file 2, so its chapters offset last.
+    expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(
+      expect.any(Number),
+      ['/library/Book/Book - 01.m4b', '/library/Book/Book - 02.m4b', '/library/Book/Book - 10.m4b'],
+      { filesChanged: true },
+    );
+  });
+
+  it('merges chapters for a multi-file audiobook whose files are the leading metadata source', async () => {
+    const file1 = makeFileStat({ absolutePath: '/library/Book/01.mp3', relPath: 'Book/01.mp3', format: 'mp3', role: 'content' });
+    const file2 = makeFileStat({ absolutePath: '/library/Book/02.mp3', relPath: 'Book/02.mp3', ino: 1002n, format: 'mp3', role: 'content' });
+    const candidate = makeCandidate('/library/Book', [file1, file2]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue({
+        allowedFormats: [],
+        formatPriority: DEFAULT_FORMAT_PRIORITY,
+        metadataPrecedence: ['embedded', 'opfFile'],
+        excludePatterns: [],
+        organizationMode: 'book_per_folder',
+      }),
+    });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    // Shared extraction reads only the winner, so the merge has to run for this path too.
+    expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Book/01.mp3', 'mp3');
+    expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(expect.any(Number), ['/library/Book/01.mp3', '/library/Book/02.mp3'], {
+      filesChanged: true,
+    });
+  });
+
+  it('still checks chapters for an unchanged multi-file audiobook, so older scans get repaired', async () => {
+    const file1 = makeFileStat({ absolutePath: '/library/Book/01.m4b', relPath: 'Book/01.m4b', ino: 9001n, format: 'm4b', role: 'content' });
+    const file2 = makeFileStat({ absolutePath: '/library/Book/02.m4b', relPath: 'Book/02.m4b', ino: 9002n, format: 'm4b', role: 'content' });
+
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Book', status: 'present' }]),
+      findBookFilesByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([
+          makeBookFile({ id: 10, bookId: 1, absolutePath: file1.absolutePath, ino: file1.ino }),
+          makeBookFile({ id: 11, bookId: 1, absolutePath: file2.absolutePath, ino: file2.ino }),
+        ]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Book', [file1, file2])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+    expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(expect.any(Number), ['/library/Book/01.m4b', '/library/Book/02.m4b'], {
+      filesChanged: false,
+    });
+  });
+
+  it('leaves non-content audio files out of the merged chapter list', async () => {
+    const content = makeFileStat({ absolutePath: '/library/Book/01.m4b', relPath: 'Book/01.m4b', format: 'm4b', role: 'content' });
+    const other = makeFileStat({
+      absolutePath: '/library/Book/sample.mp3',
+      relPath: 'Book/sample.mp3',
+      ino: 1002n,
+      format: 'mp3',
+      role: 'metadata',
+    });
+    const candidate = makeCandidate('/library/Book', [content, other]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractMergedAudioChapters).not.toHaveBeenCalled();
+  });
+
+  it('does not merge chapters for a single-file audiobook', async () => {
+    const candidate = makeCandidate('/library/Book', [makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b' })]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractMergedAudioChapters).not.toHaveBeenCalled();
+  });
+
+  it('does not merge chapters for books without audio files', async () => {
+    const epub1 = makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub', format: 'epub', role: 'content' });
+    const epub2 = makeFileStat({
+      absolutePath: '/library/Book/book.pdf',
+      relPath: 'Book/book.pdf',
+      ino: 1002n,
+      format: 'pdf',
+      role: 'content',
+    });
+    const candidate = makeCandidate('/library/Book', [epub1, epub2]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(mockMetadata.extractMergedAudioChapters).not.toHaveBeenCalled();
+  });
+
+  it('completes the scan when merging chapters fails', async () => {
+    const file1 = makeFileStat({ absolutePath: '/library/Book/01.m4b', relPath: 'Book/01.m4b', format: 'm4b', role: 'content' });
+    const file2 = makeFileStat({ absolutePath: '/library/Book/02.m4b', relPath: 'Book/02.m4b', ino: 1002n, format: 'm4b', role: 'content' });
+    const candidate = makeCandidate('/library/Book', [file1, file2]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+    mockMetadata.extractMergedAudioChapters.mockRejectedValueOnce(new Error('ffprobe missing'));
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.completeScanJob).toHaveBeenCalled();
+    expect(repo.failScanJob).not.toHaveBeenCalled();
   });
 
   it('does not call aggregateAudioDuration for epub books', async () => {

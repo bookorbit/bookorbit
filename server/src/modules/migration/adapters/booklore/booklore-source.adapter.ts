@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { parseSeriesIndex } from '@bookorbit/types';
+import { parseSeriesIndex, type SeriesIndex } from '@bookorbit/types';
 import { constants as fsConstants } from 'fs';
 import { access, stat } from 'fs/promises';
 import type mysql from 'mysql2/promise';
@@ -527,7 +527,7 @@ export class BookloreSourceAdapter implements SourceAdapter<BookloreConnectionCo
         language: asString(row.language),
         pageCount: asInteger(row.pageCount),
         seriesName: asString(row.seriesName),
-        seriesIndex: parseSeriesIndex(row.seriesIndex),
+        seriesIndex: parseBookloreSeriesIndex(row.seriesIndex),
         rating: asInteger(row.rating),
         googleBooksId: asString(row.googleBooksId),
         goodreadsId: asString(row.goodreadsId),
@@ -1212,6 +1212,18 @@ function hasProgressSignal(row: SourceUserFileProgress): boolean {
 function sqlString(alias: string, column: string | null, outName: string): string {
   if (!column) return `NULL AS ${outName}`;
   return `CAST(${alias}.\`${column}\` AS CHAR) AS ${outName}`;
+}
+
+/**
+ * Booklore stores the series index in a `DECIMAL(10,2)` column, which the driver hands back at its
+ * full scale: 2.5 arrives as "2.50". The scale is storage formatting, not a label anyone authored,
+ * and keeping it sorts the book wrong, because the series sort index reads the fractional part as
+ * its own number and ranks 50 above 9. Trim it before the value becomes a series index.
+ */
+export function parseBookloreSeriesIndex(value: unknown): SeriesIndex | null {
+  const candidate = typeof value === 'string' ? value.trim() : value;
+  if (typeof candidate !== 'string' || !/^\d+\.\d+$/.test(candidate)) return parseSeriesIndex(candidate);
+  return parseSeriesIndex(candidate.replace(/0+$/, '').replace(/\.$/, ''));
 }
 
 function sqlNumber(alias: string, column: string | null, outName: string): string {

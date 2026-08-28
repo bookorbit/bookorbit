@@ -6,6 +6,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { normalizeIconValue } from '../../common/utils/icon-value.utils';
+import type { Collection as CollectionRow } from '../../db/schema/collections';
 import { BookService } from '../book/book.service';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { LibraryService } from '../library/library.service';
@@ -42,17 +43,56 @@ export class CollectionService {
     private readonly achievementEvents: AchievementEventsService,
   ) {}
 
-  private assertAccess(ownerId: number, user: RequestUser): void {
-    if (ownerId !== user.id && !user.isSuperuser) {
+  private assertReadAccess(collection: CollectionRow, user: RequestUser): void {
+    if (!collection.isPublic && collection.userId !== user.id && !user.isSuperuser) {
       throw new ForbiddenException(COLLECTION_ACCESS_DENIED_MESSAGE);
     }
   }
 
-  private async findCollectionForUserOrThrow(id: number, user: RequestUser) {
+  private assertWriteAccess(collection: CollectionRow, user: RequestUser): void {
+    if (collection.userId !== user.id && !user.isSuperuser) {
+      throw new ForbiddenException('Cannot modify this collection');
+    }
+  }
+
+  private async getCollectionOrThrow(id: number): Promise<CollectionRow> {
     const [collection] = await this.collectionRepo.findById(id);
     if (!collection) throw new NotFoundException(COLLECTION_NOT_FOUND_MESSAGE);
-    this.assertAccess(collection.userId, user);
     return collection;
+  }
+
+  private async getReadableCollectionOrThrow(id: number, user: RequestUser): Promise<CollectionRow> {
+    const collection = await this.getCollectionOrThrow(id);
+    this.assertReadAccess(collection, user);
+    return collection;
+  }
+
+  private async getWritableCollectionOrThrow(id: number, user: RequestUser): Promise<CollectionRow> {
+    const collection = await this.getCollectionOrThrow(id);
+    this.assertWriteAccess(collection, user);
+    return collection;
+  }
+
+  private toResponse<T extends CollectionRow & { bookCount: number }>(collection: T, user: RequestUser) {
+    return { ...collection, isOwner: collection.userId === user.id };
+  }
+
+  private async buildViewerBookWhere(user: RequestUser): Promise<SQL | undefined> {
+    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
+    return this.queryBuilder.buildWhere(undefined, {
+      accessibleLibraryIds: libraryIds,
+      userId: user.id,
+      timeZone,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
+  }
+
+  private async hydrateForViewer(collection: CollectionRow, user: RequestUser) {
+    const visibleBooksWhere = await this.buildViewerBookWhere(user);
+    const [hydrated] = await this.collectionRepo.findByIdForViewer(collection.id, user.id, user.isSuperuser, visibleBooksWhere);
+    if (!hydrated) throw new NotFoundException(COLLECTION_NOT_FOUND_MESSAGE);
+    return this.toResponse(hydrated, user);
   }
 
   private buildErrorLogFields(error: unknown): { errorClass: string; errorMessage: string } {
@@ -74,11 +114,14 @@ export class CollectionService {
     return [...new Set(ids)];
   }
 
-  findAll(user: RequestUser, bookIds?: number[]) {
+  async findAll(user: RequestUser, bookIds?: number[]) {
+    const visibleBooksWhere = await this.buildViewerBookWhere(user);
     if (bookIds && bookIds.length > 0) {
-      return this.collectionRepo.findAllForUserWithMembership(user.id, bookIds);
+      const collections = await this.collectionRepo.findAllOwnedForUserWithMembership(user.id, bookIds, visibleBooksWhere);
+      return collections.map((collection) => this.toResponse(collection, user));
     }
-    return this.collectionRepo.findAllForUser(user.id);
+    const collections = await this.collectionRepo.findAllVisibleForUser(user.id, visibleBooksWhere);
+    return collections.map((collection) => this.toResponse(collection, user));
   }
 
   async findAllWithSelectionMembership(dto: CollectionBooksDto, user: RequestUser) {
@@ -87,7 +130,8 @@ export class CollectionService {
   }
 
   async findOne(id: number, user: RequestUser) {
-    return this.findCollectionForUserOrThrow(id, user);
+    const collection = await this.getReadableCollectionOrThrow(id, user);
+    return this.hydrateForViewer(collection, user);
   }
 
   async create(dto: CreateCollectionDto, user: RequestUser) {
@@ -101,14 +145,14 @@ export class CollectionService {
         name: dto.name,
         icon,
         description: dto.description ?? null,
+        isPublic: dto.isPublic ?? false,
         syncToKobo: dto.syncToKobo ?? false,
       });
-      const [collection] = await this.collectionRepo.findById(inserted.id);
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_COLLECTION_CREATED, {
         userId: user.id,
         collectionId: inserted.id,
       });
-      return collection;
+      return this.hydrateForViewer(inserted, user);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException('A collection with this name already exists');
@@ -118,7 +162,7 @@ export class CollectionService {
   }
 
   async update(id: number, dto: UpdateCollectionDto, user: RequestUser) {
-    const existing = await this.findCollectionForUserOrThrow(id, user);
+    const existing = await this.getWritableCollectionOrThrow(id, user);
     const icon = dto.icon !== undefined ? normalizeIconValue(dto.icon) : normalizeIconValue(existing.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
@@ -129,6 +173,7 @@ export class CollectionService {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.icon !== undefined && { icon }),
         ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
         ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
       });
     } catch (error) {
@@ -139,11 +184,12 @@ export class CollectionService {
     }
 
     const [updated] = await this.collectionRepo.findById(id);
-    return updated;
+    if (!updated) throw new NotFoundException(COLLECTION_NOT_FOUND_MESSAGE);
+    return this.hydrateForViewer(updated, user);
   }
 
   async remove(id: number, user: RequestUser) {
-    const existing = await this.findCollectionForUserOrThrow(id, user);
+    const existing = await this.getWritableCollectionOrThrow(id, user);
     await this.collectionRepo.delete(id, existing.userId);
   }
 
@@ -152,7 +198,14 @@ export class CollectionService {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} itemCount=${dto.order.length} - reorder collections started`);
     try {
-      await this.collectionRepo.updateDisplayOrders(user.id, dto.order);
+      const distinctIds = new Set(dto.order.map((item) => item.id));
+      if (distinctIds.size !== dto.order.length) {
+        throw new BadRequestException('Duplicate collection IDs are not allowed in reorder payload');
+      }
+      const updatedCount = await this.collectionRepo.updateDisplayOrders(user.id, dto.order);
+      if (updatedCount !== dto.order.length) {
+        throw new ForbiddenException('Cannot reorder one or more collections');
+      }
       this.logger.log(
         `[${event}] [end] userId=${user.id} durationMs=${Date.now() - startedAt} itemCount=${dto.order.length} - reorder collections completed`,
       );
@@ -172,14 +225,13 @@ export class CollectionService {
       `[${event}] [start] collectionId=${id} userId=${user.id} selectionMode=${this.getSelectionMode(dto)} requestedCount=${this.getRequestedCount(dto)} - add books started`,
     );
     try {
-      await this.findCollectionForUserOrThrow(id, user);
+      const collection = await this.getWritableCollectionOrThrow(id, user);
       const bookIds = await this.resolveSelectionBookIds(dto, user);
       if (bookIds.length > 0) {
         await this.collectionRepo.addBooks(id, bookIds);
       }
-      const [updated] = await this.collectionRepo.findById(id);
       this.logger.log(`[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} bookCount=${bookIds.length} - add books completed`);
-      return updated;
+      return this.hydrateForViewer(collection, user);
     } catch (error) {
       const { errorClass, errorMessage } = this.buildErrorLogFields(error);
       this.logger.warn(
@@ -196,16 +248,15 @@ export class CollectionService {
       `[${event}] [start] collectionId=${id} userId=${user.id} selectionMode=${this.getSelectionMode(dto)} requestedCount=${this.getRequestedCount(dto)} - remove books started`,
     );
     try {
-      await this.findCollectionForUserOrThrow(id, user);
+      const collection = await this.getWritableCollectionOrThrow(id, user);
       const bookIds = await this.resolveSelectionBookIds(dto, user);
       if (bookIds.length > 0) {
         await this.collectionRepo.removeBooks(id, bookIds);
       }
-      const [updated] = await this.collectionRepo.findById(id);
       this.logger.log(
         `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} bookCount=${bookIds.length} - remove books completed`,
       );
-      return updated;
+      return this.hydrateForViewer(collection, user);
     } catch (error) {
       const { errorClass, errorMessage } = this.buildErrorLogFields(error);
       this.logger.warn(
@@ -254,7 +305,7 @@ export class CollectionService {
   }
 
   private async buildBooksWhere(id: number, user: RequestUser, query: BookQuery): Promise<SQL | undefined> {
-    await this.findCollectionForUserOrThrow(id, user);
+    await this.getReadableCollectionOrThrow(id, user);
     const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
     const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
     const filterWhere = this.queryBuilder.buildWhere(query.filter, {
@@ -264,6 +315,6 @@ export class CollectionService {
       timeZone,
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
-    return and(filterWhere, this.collectionRepo.buildMembershipWhere(id));
+    return and(filterWhere, this.collectionRepo.buildReadableMembershipWhere(id, user.id, user.isSuperuser));
   }
 }

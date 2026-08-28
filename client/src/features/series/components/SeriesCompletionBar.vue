@@ -18,7 +18,7 @@ const percentage = computed(() => {
 
 const barColorClass = computed(() => {
   if (percentage.value === 0) return 'bg-muted-foreground/30'
-  if (percentage.value >= 100) return 'bg-green-500'
+  if (percentage.value >= 100) return 'bg-success'
   return 'bg-primary'
 })
 

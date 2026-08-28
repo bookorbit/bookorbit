@@ -13,11 +13,12 @@ import type {
   TemporalJumpBucketPrecision,
   TemporalJumpBucketUnit,
 } from '@bookorbit/types';
-import type { BookRecommendation } from '@bookorbit/types';
+import type { UnscopedBookRecommendation } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { advanceIsoTimestamp } from '../../common/utils/iso-timestamp.utils';
+import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
 import { seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
@@ -760,6 +761,7 @@ export class BookRepository {
     userId: number;
     customFieldTypes?: CustomMetadataFieldTypeMap;
     defaultCollectionId?: number;
+    randomSeed?: number;
   }): Promise<{
     rows: Array<{
       id: number;
@@ -824,7 +826,7 @@ export class BookRepository {
       throw new BadRequestException('Invalid default collection id');
     }
     const whereFragment = this.visibleWhere(where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     // The collectionOrder branch of the order by names sort_collection_position, so the column has
     // to exist even for the library and smart scope queries that can never sort on it.
     const collectionPosition =
@@ -1054,8 +1056,8 @@ export class BookRepository {
       coverAspectRatio: r.cover_aspect_ratio,
       primaryFileId: r.primary_file_id,
       folderPath: r.folder_path,
-      addedAt: new Date(r.added_at),
-      updatedAt: new Date(r.updated_at),
+      addedAt: parsePgTimestamptz(r.added_at),
+      updatedAt: parsePgTimestamptz(r.updated_at),
       title: r.title,
       seriesId: r.series_id,
       seriesName: r.series_name,
@@ -1077,7 +1079,7 @@ export class BookRepository {
       readCount: r.read_count !== null ? Number(r.read_count) : null,
       coverBookIds: r.cover_book_ids,
       coverUpdatedAtByBookId: parseDateByBookId(r.cover_updated_at_by_book_id),
-      seriesLatestAddedAt: r.sort_added_at ? new Date(r.sort_added_at) : null,
+      seriesLatestAddedAt: r.sort_added_at ? parsePgTimestamptz(r.sort_added_at) : null,
       firstVolumeBookId: r.first_volume_book_id ?? null,
       latestVolumeBookId: r.latest_volume_book_id ?? null,
       firstUnreadBookId: r.first_unread_book_id ?? null,
@@ -1167,11 +1169,12 @@ export class BookRepository {
     userId: number;
     maxBuckets: number;
     customFieldTypes?: CustomMetadataFieldTypeMap;
+    randomSeed?: number;
   }): Promise<JumpBucketsResponse> {
     const source = collapsedDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
     const whereFragment = this.visibleWhere(opts.where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
     const result = await this.db.execute<DiscreteJumpBucketRawRow>(
@@ -1713,7 +1716,7 @@ export class BookRepository {
       .where(inArray(books.id, bookIds));
   }
 
-  async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<BookRecommendation[]> {
+  async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<UnscopedBookRecommendation[]> {
     if (bookIds.length === 0) return [];
 
     const [rows, authorRows] = await Promise.all([

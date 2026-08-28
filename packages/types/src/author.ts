@@ -9,6 +9,18 @@ export type AuthorSummary = {
   imageUrl?: string | null;
   bookCount: number;
   lastAddedAt: string | null;
+  /**
+   * A book of theirs that has cover art, most recently added first. Only 19% of a
+   * typical library's authors have a portrait, so the grid falls back to this
+   * before it falls back to a monogram. Null when none of their books has a cover.
+   */
+  coverBookId?: number | null;
+};
+
+/** One bucket of the authors A-Z rail. `letter` is "#" for anything non-alphabetic. */
+export type AuthorLetterCount = {
+  letter: string;
+  count: number;
 };
 
 export type AuthorDetail = AuthorSummary & {

@@ -104,7 +104,11 @@ function parseSeriesFromTitle(title: string | undefined): { seriesName?: string;
   return { seriesName: normalize(match[1]), seriesIndex: parseSeriesIndex(match[2]) };
 }
 
+// Autocomplete caps the blurb near 180 characters and flags the cut with `truncated`. Keeping the
+// snippet would let a WAF-blocked detail page overwrite a full description from a later provider
+// with an ellipsised fragment, so drop it and leave the field for someone who has the whole thing.
 function extractAutocompleteDescription(description: GoodreadsAutocompleteItem['description']): string | undefined {
+  if (typeof description === 'object' && description?.truncated) return undefined;
   const html = typeof description === 'string' ? description : description?.html;
   if (!html) return undefined;
   const text = htmlToPlainText(html, { preserveLineBreaks: true });
