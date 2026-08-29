@@ -1,0 +1,28 @@
+issuer: http://localhost:5556/dex
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+# Dev only: http issuer, no approval screen, and username/password login via the static list below.
+oauth2:
+  skipApprovalScreen: true
+
+enablePasswordDB: true
+
+staticClients:
+  - id: bookorbit-mobile
+    name: BookOrbit Mobile
+    public: true
+    redirectURIs:
+      - bookorbit://oauth2-callback
+      - http://localhost:5173/oauth2-callback
+
+staticPasswords:
+  - email: "dev@bookorbit.local"
+    # bcrypt hash of "password" (cost 10)
+    hash: "$2b$10$0ZjmQ93OgxPgeTBArfHa9.VJIifcBBPqnjka/JnrG4GKwtNGtrFnC"
+    username: "dev"
+    userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"

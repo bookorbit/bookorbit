@@ -58,6 +58,7 @@ const envSchema = z.object({
   FILE_WRITE_MAX_CONCURRENT_WRITES: z.coerce.number().int().positive().optional(),
   CLIENT_URL: z.string().url().optional(),
   APP_URL: z.string().url().default('http://localhost:5173'),
+  OIDC_EXTRA_REDIRECT_URIS: z.string().optional(),
   TRUST_PROXY: z.string().optional(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   MIGRATION_ENCRYPTION_KEY: z.string().optional(),

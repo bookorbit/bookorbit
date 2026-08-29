@@ -22,7 +22,7 @@ const PROVIDER = {
   updatedAt: new Date(),
 };
 
-function makeService() {
+function makeService(options: { extraRedirectUris?: string[] } = {}) {
   const providerService = {
     findBySlugOrFail: vi.fn().mockResolvedValue(PROVIDER),
     findByIdOrFail: vi.fn().mockResolvedValue(PROVIDER),
@@ -87,6 +87,7 @@ function makeService() {
   const configService = {
     get: vi.fn().mockImplementation((key: string) => {
       if (key === 'app.appUrl') return APP_URL;
+      if (key === 'app.oidcExtraRedirectUris') return options.extraRedirectUris;
       return undefined;
     }),
   };
@@ -185,6 +186,41 @@ describe('OidcService', () => {
       await expect(service.handleCallback({ ...BASE_CALLBACK, redirectUri: 'https://evil.example/callback' }, {} as never)).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('rejects an unknown custom-scheme redirect URI', async () => {
+      const { service } = makeService();
+      await expect(service.handleCallback({ ...BASE_CALLBACK, redirectUri: 'evil://oauth2-callback' }, {} as never)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('accepts the default native redirect URI (bookorbit://oauth2-callback)', async () => {
+      const { service, identityRepo, userService, authService } = makeService();
+      identityRepo.findByProviderAndSubject.mockResolvedValue({ userId: 5 });
+      userService.findById.mockResolvedValue({ id: 5, username: 'u1', active: true, permissions: [] });
+      await expect(service.handleCallback({ ...BASE_CALLBACK, redirectUri: 'bookorbit://oauth2-callback' }, {} as never)).resolves.toMatchObject({
+        mode: 'login',
+      });
+      expect(authService.issueTokensForUser).toHaveBeenCalled();
+    });
+
+    it('accepts a redirect URI with surrounding whitespace', async () => {
+      const { service, identityRepo, userService } = makeService();
+      identityRepo.findByProviderAndSubject.mockResolvedValue({ userId: 5 });
+      userService.findById.mockResolvedValue({ id: 5, username: 'u1', active: true, permissions: [] });
+      await expect(service.handleCallback({ ...BASE_CALLBACK, redirectUri: `  ${VALID_REDIRECT_URI}  ` }, {} as never)).resolves.toMatchObject({
+        mode: 'login',
+      });
+    });
+
+    it('accepts an extra web redirect URI configured via OIDC_EXTRA_REDIRECT_URIS', async () => {
+      const { service, identityRepo, userService } = makeService({ extraRedirectUris: ['https://books.vpn/oauth2-callback'] });
+      identityRepo.findByProviderAndSubject.mockResolvedValue({ userId: 5 });
+      userService.findById.mockResolvedValue({ id: 5, username: 'u1', active: true, permissions: [] });
+      await expect(
+        service.handleCallback({ ...BASE_CALLBACK, redirectUri: 'https://books.vpn/oauth2-callback' }, {} as never),
+      ).resolves.toMatchObject({ mode: 'login' });
     });
 
     it('rejects callback when extracted subject is missing', async () => {
