@@ -4636,6 +4636,12 @@
           "notInFieldRulesText": "{providers}. Incluido en la búsqueda manual con Todo habilitado, pero no utilizado por la recuperación automática de metadatos.",
           "noResults": "No se encontraron resultados",
           "noResultsHint": "Intenta ajustar el título o el autor.",
+          "searchInterrupted": "La búsqueda no terminó",
+          "searchIncomplete": "Es posible que falten algunos resultados",
+          "providerTimedOut": "{provider} tardó demasiado en responder.",
+          "providerThrottled": "{provider} ha alcanzado su límite de solicitudes. Espera un momento y vuelve a intentarlo.",
+          "providerFailed": "No se ha podido acceder a {provider}.",
+          "searchInterruptedHint": "Inténtelo de nuevo, o limite el ámbito de búsqueda.",
           "searchPrompt": "Busque arriba y luego haga clic en un resultado para comenzar a comparar metadatos."
         },
         "mangabakaDrillDown": {

@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 
 import { createPostgresClientConfig } from '../db/postgres-connection-config';
 import { installPostgresExtensions } from './postgres-extensions';
+import { prepareLegacySeriesIndexColumns } from './series-index-migration-compatibility';
 
 function resolveMigrationsFolder(): string {
   const candidates = [
@@ -38,6 +39,7 @@ async function runMigrations() {
 
   try {
     await installPostgresExtensions(pool);
+    await prepareLegacySeriesIndexColumns(pool);
 
     const migrationsFolder = resolveMigrationsFolder();
     await migrate(drizzle(pool), { migrationsFolder });
