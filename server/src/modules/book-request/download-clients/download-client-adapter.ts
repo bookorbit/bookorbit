@@ -73,6 +73,16 @@ export interface DownloadStatus {
   trackerError?: string;
 }
 
+export interface OwnedDownloadClientItem extends DownloadStatus {
+  name: string;
+}
+
+export interface OwnedDownloadClientInventory {
+  supported: boolean;
+  truncated: boolean;
+  items: OwnedDownloadClientItem[];
+}
+
 export interface DownloadClientAdapter {
   readonly type: DownloadClientType;
   readonly label: string;
@@ -85,6 +95,7 @@ export interface DownloadClientAdapter {
    * in flight. A hash the client no longer knows about is simply absent from the result.
    */
   status(hashes: string[], config: ResolvedClientConfig): Promise<DownloadStatus[]>;
+  listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory>;
   remove(hash: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void>;
   test(config: ResolvedClientConfig): Promise<DownloadClientTestResult>;
   /**

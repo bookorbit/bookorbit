@@ -47,6 +47,9 @@ export const DOWNLOAD_CLIENT_ERROR_CODES = [
   "DOWNLOAD_CLIENT_MAPPING_REQUIRED",
   /** The test ran and the client refused or could not be reached. Carries the adapter's reason. */
   "DOWNLOAD_CLIENT_TEST_FAILED",
+  "DOWNLOAD_CLIENT_RECONCILIATION_UNSUPPORTED",
+  "DOWNLOAD_CLIENT_RECONCILIATION_NOT_ORPHAN",
+  "DOWNLOAD_CLIENT_RECONCILIATION_NOT_ADOPTABLE",
   ...REQUEST_CREDENTIAL_ERROR_CODES,
 ] as const;
 export type DownloadClientErrorCode = (typeof DOWNLOAD_CLIENT_ERROR_CODES)[number];
@@ -92,6 +95,39 @@ export interface DownloadClientSummary {
 export interface DownloadClientListResult {
   clients: DownloadClientItem[];
   encryptionConfigured: boolean;
+}
+
+export interface DownloadClientReconciliationAttempt {
+  downloadId: number;
+  requestId: number;
+  requestTitle: string;
+  status: BookRequestDownloadStatus;
+}
+
+export interface DownloadClientReconciliationItem {
+  infoHash: string;
+  name: string;
+  state: "queued" | "downloading" | "completed" | "failed" | "unknown";
+  progressPercent: number;
+  trackedAttempt: DownloadClientReconciliationAttempt | null;
+  adoptableAttempts: DownloadClientReconciliationAttempt[];
+}
+
+export interface DownloadClientReconciliationResult {
+  clientId: number;
+  supported: boolean;
+  ownershipMarker: string;
+  truncated: boolean;
+  items: DownloadClientReconciliationItem[];
+  missingAttempts: DownloadClientReconciliationAttempt[];
+}
+
+export interface AdoptDownloadClientItemPayload {
+  downloadId: number;
+}
+
+export interface RemoveOrphanedDownloadClientItemPayload {
+  deleteFiles?: boolean;
 }
 
 export interface CreateDownloadClientPayload {
@@ -276,10 +312,16 @@ export const GRAB_FAILURE_CODES = [
   "GRAB_SOURCE_UNAVAILABLE",
   /** The download client would not take it, so nothing needing that client will start either. */
   "GRAB_CLIENT_REFUSED",
+  /** The download client was temporarily unreachable or answered with a server failure. */
+  "GRAB_CLIENT_UNAVAILABLE",
   /** This release alone: gone from the results, unimportable, or already downloading. */
   "GRAB_RELEASE_REFUSED",
 ] as const;
 export type GrabFailureCode = (typeof GRAB_FAILURE_CODES)[number];
+
+export function grabFailureCode(value: unknown): GrabFailureCode | null {
+  return typeof value === "string" && (GRAB_FAILURE_CODES as readonly string[]).includes(value) ? (value as GrabFailureCode) : null;
+}
 
 /**
  * Whether the refusal is a property of the source rather than of the one release. Both the
@@ -309,7 +351,7 @@ export function findGrabRefusal(
 ): GrabRefusal | null {
   return (
     refusals.find((refusal) => {
-      if (refusal.code === "GRAB_CLIENT_REFUSED") return release.seedsBack;
+      if (refusal.code === "GRAB_CLIENT_REFUSED" || refusal.code === "GRAB_CLIENT_UNAVAILABLE") return release.seedsBack;
       if (refusal.indexerId !== release.indexerId) return false;
       if (refusal.code === "GRAB_VIP_REQUIRED") return release.vipOnly;
       return SOURCE_WIDE_GRAB_FAILURE_CODES.includes(refusal.code);

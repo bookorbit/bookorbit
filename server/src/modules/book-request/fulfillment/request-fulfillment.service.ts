@@ -77,6 +77,7 @@ import type { SearchBookRequestReleasesDto } from '../dto/search-book-request-re
 
 /** One metadata lookup against the source, spent only on the release an approver actually picked. */
 const RESOLVE_FILE_TIMEOUT_MS = 20_000;
+const TRANSIENT_GRAB_RETRY_DELAY_MS = 500;
 const RESOLVED_RELEASE_TTL_MS = 60_000;
 const MAX_RESOLVED_RELEASES = 25;
 const MAX_DISPLAYED_MANIFEST_FILES = 200;
@@ -236,7 +237,7 @@ export class RequestFulfillmentService {
     // source, but was the first one even tried?"
     let grab: ResolvedGrab;
     try {
-      grab = await this.resolveGrab(requestId, dto);
+      grab = await this.withTransientRetry(user === null, requestId, 'source', () => this.resolveGrab(requestId, dto));
       assertReleaseCanImport(grab.inspection);
     } catch (error) {
       await this.recordRefusedAttempt(requestId, dto, user, error);
@@ -246,6 +247,8 @@ export class RequestFulfillmentService {
     // Deliberately outside it: this refuses on the routing alone, before anything is asked of a
     // client, and an attempt nothing was ever asked to take is not an attempt.
     const client = await this.resolveClient(dto.downloadClientId ?? null, grab.source);
+    const directUrl = client === null ? requireFileUrl(grab) : null;
+    const directFileName = client === null ? stagedDirectFileName(grab.fileName, grab.releaseFormat) : null;
 
     let download: BookRequestDownloadRow;
     try {
@@ -262,6 +265,8 @@ export class RequestFulfillmentService {
         releaseFormat: grab.releaseFormat ?? null,
         freeleech: grab.freeleech ?? false,
         clientHash: grab.infoHash,
+        directUrl,
+        directFileName,
         status: 'queued',
         grabbedAt: new Date(),
       });
@@ -274,32 +279,46 @@ export class RequestFulfillmentService {
 
     try {
       if (client === null) {
-        await this.direct.add({ fileUrl: requireFileUrl(grab), fileName: grab.fileName, format: grab.releaseFormat, infoHash: grab.infoHash });
+        await this.direct.add({
+          downloadId: download.id,
+          fileUrl: directUrl as string,
+          fileName: directFileName as string,
+          infoHash: grab.infoHash,
+        });
       } else {
         const config = await this.clients.resolveConfig(client.id);
         const adapter = this.registry.require(config.adapterType);
-        await adapter.add(
-          {
-            magnet: grab.magnet,
-            torrentFile: grab.torrentFile,
-            torrentFileName: grab.torrentFileName ?? dto.torrentFileName,
-            infoHash: grab.infoHash,
-            // The indexer's goals, enforced by the client: BookOrbit never stops a seed itself.
-            ...(grab.seedRatioGoal !== null && grab.seedRatioGoal !== undefined ? { seedRatioGoal: grab.seedRatioGoal } : {}),
-            ...(grab.seedTimeMinutes !== null && grab.seedTimeMinutes !== undefined ? { seedTimeMinutes: grab.seedTimeMinutes } : {}),
-          },
-          config,
+        await this.withTransientRetry(user === null, requestId, 'client', () =>
+          adapter.add(
+            {
+              magnet: grab.magnet,
+              torrentFile: grab.torrentFile,
+              torrentFileName: grab.torrentFileName ?? dto.torrentFileName,
+              infoHash: grab.infoHash,
+              // The indexer's goals, enforced by the client: BookOrbit never stops a seed itself.
+              ...(grab.seedRatioGoal !== null && grab.seedRatioGoal !== undefined ? { seedRatioGoal: grab.seedRatioGoal } : {}),
+              ...(grab.seedTimeMinutes !== null && grab.seedTimeMinutes !== undefined ? { seedTimeMinutes: grab.seedTimeMinutes } : {}),
+            },
+            config,
+          ),
         );
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.downloads.update(download.id, { status: 'failed', errorMessage: message });
+      await this.downloads.update(download.id, {
+        status: 'failed',
+        errorMessage: message,
+        ...(client === null ? { directUrl: null, directEtag: null, directLastModified: null } : {}),
+      });
       this.logger.warn(
         `[book_request.grab] [fail] requestId=${requestId} downloadId=${download.id} clientId=${client?.id ?? 'direct'} error="${sanitizeLogValue(message)}" - the download could not be started`,
       );
       // Which half refused decides what another attempt should do: a client that is down refuses
       // every torrent alike, while a file BookOrbit fetches itself was refused by the source.
-      throw withGrabCode(error, client === null ? 'GRAB_SOURCE_REFUSED' : 'GRAB_CLIENT_REFUSED');
+      throw withGrabCode(
+        error,
+        client === null ? 'GRAB_SOURCE_REFUSED' : isServiceUnavailable(error) ? 'GRAB_CLIENT_UNAVAILABLE' : 'GRAB_CLIENT_REFUSED',
+      );
     }
 
     // Still conditional on the claim this grab took, so a cancellation that landed while the client
@@ -314,6 +333,21 @@ export class RequestFulfillmentService {
     this.gateway.emitChanged();
 
     return this.toItem(requestId, user?.id ?? null);
+  }
+
+  private async withTransientRetry<T>(automated: boolean, requestId: number, phase: 'source' | 'client', run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (!automated || !isTransientGrabFailure(error)) throw error;
+
+      const code = grabFailureCode(error) ?? (phase === 'client' ? 'GRAB_CLIENT_UNAVAILABLE' : 'GRAB_SOURCE_UNAVAILABLE');
+      this.logger.warn(
+        `[book_request.grab_retry] [start] requestId=${requestId} phase=${phase} code=${code} backoffMs=${TRANSIENT_GRAB_RETRY_DELAY_MS} - retrying one transient grab refusal`,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, TRANSIENT_GRAB_RETRY_DELAY_MS));
+      return run();
+    }
   }
 
   /**
@@ -408,7 +442,13 @@ export class RequestFulfillmentService {
     // poll loop and the watchdog. An attempt somebody already settled keeps the reason it settled
     // for, and a request somebody already cancelled, rejected or filed stays that way rather than
     // being reopened as a failure - which would also announce a failure nobody is waiting on.
-    if (!(await this.downloads.updateIf(download.id, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES, { status: 'failed', errorMessage: reason }))) {
+    if (
+      !(await this.downloads.updateIf(download.id, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES, {
+        status: 'failed',
+        errorMessage: reason,
+        ...(download.source === 'direct_url' ? { directUrl: null, directEtag: null, directLastModified: null } : {}),
+      }))
+    ) {
       return;
     }
     if (!(await this.requests.updateIf(download.requestId, WORKER_WRITABLE_BOOK_REQUEST_STATUSES, { status: 'failed', statusReason: reason }))) {
@@ -769,6 +809,15 @@ function withGrabCode(error: unknown, errorCode: GrabFailureCode): unknown {
   if (status === (HttpStatus.CONFLICT as number)) return grabConflict(errorCode, error.message);
   if (status === (HttpStatus.BAD_REQUEST as number)) return grabError(errorCode, error.message);
   return new HttpException({ message: error.message, errorCode, statusCode: status }, status);
+}
+
+function isServiceUnavailable(error: unknown): boolean {
+  return error instanceof HttpException && error.getStatus() === (HttpStatus.SERVICE_UNAVAILABLE as number);
+}
+
+function isTransientGrabFailure(error: unknown): boolean {
+  const code = grabFailureCode(error);
+  return code === 'GRAB_SOURCE_UNAVAILABLE' || code === 'GRAB_CLIENT_UNAVAILABLE' || isServiceUnavailable(error);
 }
 
 /** The code an attempt failed with, where it carried one. Null is "we do not know", never a guess. */

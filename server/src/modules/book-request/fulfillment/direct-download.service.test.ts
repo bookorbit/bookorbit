@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -15,6 +15,7 @@ vi.mock('undici', async (importOriginal) => ({
 import { Agent } from 'undici';
 
 import { DirectDownloadService, stagedDirectFileName } from './direct-download.service';
+import type { BookRequestDownloadRow } from '../../../db/schema';
 
 const HASH = 'a'.repeat(40);
 /** Real time a case may spend waiting on event-loop turns, and a test budget that outlasts it. */
@@ -25,10 +26,12 @@ describe('DirectDownloadService', () => {
   let appDataPath: string;
   let service: DirectDownloadService;
   let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
+  let downloads: { update: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     appDataPath = await mkdtemp(join(tmpdir(), 'bookorbit-http-'));
-    service = new DirectDownloadService({ appDataPath } as never);
+    downloads = { update: vi.fn().mockResolvedValue(undefined) };
+    service = new DirectDownloadService({ appDataPath } as never, downloads as never);
     fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -63,6 +66,132 @@ describe('DirectDownloadService', () => {
     await expect(readFile(status.contentPath!, 'utf8')).resolves.toBe('a real epub would go here');
   });
 
+  it('persists validators and resumes a partial file only from the requested byte', async () => {
+    const directory = join(appDataPath, 'request-downloads', HASH);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'partial');
+    fetchMock.mockResolvedValue(
+      new Response(' tail', {
+        status: 206,
+        headers: {
+          'content-type': 'application/epub+zip',
+          'content-range': 'bytes 7-11/12',
+          etag: '"edition-1"',
+        },
+      }),
+    );
+
+    const resumed = await service.resume({
+      id: 44,
+      source: 'direct_url',
+      clientHash: HASH,
+      directUrl: 'https://archive.org/download/x/book.epub',
+      directFileName: 'book.epub',
+      directEtag: '"edition-1"',
+      directLastModified: null,
+      totalBytes: 12,
+      status: 'downloading',
+    } as BookRequestDownloadRow);
+
+    expect(resumed).toBe(true);
+    expect((await settle()).state).toBe('completed');
+    await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('partial tail');
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ Range: 'bytes=7-', 'If-Range': '"edition-1"' });
+    expect(downloads.update).toHaveBeenCalledWith(44, expect.objectContaining({ directEtag: '"edition-1"', totalBytes: 12 }));
+  });
+
+  it('fails rather than appending when a source ignores the validated range request', async () => {
+    const directory = join(appDataPath, 'request-downloads', HASH);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'partial');
+    fetchMock.mockResolvedValue(fileResponse('a different whole file', { etag: '"edition-2"' }));
+
+    await service.resume({
+      id: 45,
+      source: 'direct_url',
+      clientHash: HASH,
+      directUrl: 'https://archive.org/download/x/book.epub',
+      directFileName: 'book.epub',
+      directEtag: '"edition-1"',
+      directLastModified: null,
+      totalBytes: 12,
+      status: 'downloading',
+    } as BookRequestDownloadRow);
+
+    const status = await settle();
+    expect(status.state).toBe('failed');
+    expect(status.errorMessage).toContain('does not support resuming');
+  });
+
+  it('accepts a completed partial file only when a 416 confirms its exact saved size', async () => {
+    const directory = join(appDataPath, 'request-downloads', HASH);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'complete');
+    fetchMock.mockResolvedValue(new Response('', { status: 416, headers: { 'content-range': 'bytes */8' } }));
+
+    await service.resume({
+      id: 46,
+      source: 'direct_url',
+      clientHash: HASH,
+      directUrl: 'https://archive.org/download/x/book.epub',
+      directFileName: 'book.epub',
+      directEtag: '"edition-1"',
+      directLastModified: null,
+      totalBytes: 8,
+      status: 'downloading',
+    } as BookRequestDownloadRow);
+
+    await expect(settle()).resolves.toMatchObject({ state: 'completed', downloadedBytes: 8, totalBytes: 8 });
+    await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('complete');
+  });
+
+  it('fails a resumed response that ends before its declared total', async () => {
+    const directory = join(appDataPath, 'request-downloads', HASH);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'partial');
+    fetchMock.mockResolvedValue(
+      new Response('x', {
+        status: 206,
+        headers: { 'content-type': 'application/epub+zip', 'content-range': 'bytes 7-11/12', etag: '"edition-1"' },
+      }),
+    );
+
+    await service.resume({
+      id: 47,
+      source: 'direct_url',
+      clientHash: HASH,
+      directUrl: 'https://archive.org/download/x/book.epub',
+      directFileName: 'book.epub',
+      directEtag: '"edition-1"',
+      directLastModified: null,
+      totalBytes: 12,
+      status: 'downloading',
+    } as BookRequestDownloadRow);
+
+    await expect(settle()).resolves.toMatchObject({ state: 'failed', errorMessage: 'That source ended after 8 of 12 bytes' });
+  });
+
+  it('refuses a partial file with no strong validator before making a request', async () => {
+    const directory = join(appDataPath, 'request-downloads', HASH);
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, 'book.epub'), 'partial');
+
+    await expect(
+      service.resume({
+        id: 48,
+        source: 'direct_url',
+        clientHash: HASH,
+        directUrl: 'https://archive.org/download/x/book.epub',
+        directFileName: 'book.epub',
+        directEtag: null,
+        directLastModified: null,
+        totalBytes: 12,
+        status: 'downloading',
+      } as BookRequestDownloadRow),
+    ).resolves.toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   /**
    * The importer classifies by extension alone, so a name the source did not put one on is a file
    * it finds no book in. Inspection reported this release ready, which is a promise the staged
@@ -82,7 +211,7 @@ describe('DirectDownloadService', () => {
    * failed against the live archive on a 187712 byte EPUB while every mocked test passed.
    */
   it('accepts a content-length that does not divide evenly', async () => {
-    fetchMock.mockResolvedValue(fileResponse('payload', { 'content-length': '187712' }));
+    fetchMock.mockResolvedValue(fileResponse('x'.repeat(187712), { 'content-length': '187712' }));
 
     await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
 
@@ -435,10 +564,7 @@ describe('DirectDownloadService', () => {
     });
   });
 
-  /**
-   * Progress lives in memory, so a transfer a restart interrupted leaves bytes nothing will ever
-   * poll, import or remove - and each failed URL stages under its own hash rather than reusing one.
-   */
+  /** Startup reaps directories only after resumable attempts have claimed the ones they still need. */
   describe('reapStaging', () => {
     const OTHER = 'c'.repeat(40);
 

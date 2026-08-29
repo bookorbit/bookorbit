@@ -27,6 +27,7 @@ import { useRequestListDensity } from './composables/useRequestListDensity'
 import { useRequestQueue } from './composables/useRequestQueue'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { REQUEST_DRAWER } from './requestDrawerContext'
+import { localizedRequestActionFailure } from './requestActionFailure'
 
 const TABS = ['search', 'mine', 'all'] as const
 type RequestsTab = (typeof TABS)[number]
@@ -264,9 +265,9 @@ function dropFromLists(id: number) {
  */
 function applyUpdate(outcome: ActionOutcome, failureKey: string): boolean {
   if (!outcome.item) {
-    // The reason is third-party prose from a tracker or download client, so it is shown as the
-    // server wrote it under a translated heading rather than matched against known English.
-    toast.error(t(failureKey), outcome.reason ? { description: outcome.reason } : undefined)
+    const localized = localizedRequestActionFailure(outcome)
+    const description = localized ? t(localized.key, localized.params) : outcome.reason
+    toast.error(t(failureKey), description ? { description } : undefined)
     return false
   }
   mine.replaceItem(outcome.item)
@@ -404,7 +405,12 @@ async function runBulk(
     return
   }
   toast.warning(t(keys.partial, { done: result.updated.length, failed: result.failed.length }), {
-    description: result.failed.map((failure) => `${failure.title}: ${failure.reason}`).join('\n'),
+    description: result.failed
+      .map((failure) => {
+        const localized = localizedRequestActionFailure(failure)
+        return `${failure.title}: ${localized ? t(localized.key, localized.params) : failure.reason}`
+      })
+      .join('\n'),
   })
 }
 

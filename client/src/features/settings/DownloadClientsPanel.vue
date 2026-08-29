@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Download, Loader2, Pencil, Plug, Plus, Trash2, TriangleAlert } from '@lucide/vue'
+import { Download, Link2, Loader2, Pencil, Plug, Plus, RefreshCw, Trash2, TriangleAlert } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { DOWNLOAD_CLIENT_TYPES } from '@bookorbit/types'
-import type { CreateDownloadClientPayload, DownloadClientItem, DownloadClientType, IndexerColor } from '@bookorbit/types'
+import type {
+  CreateDownloadClientPayload,
+  DownloadClientItem,
+  DownloadClientReconciliationAttempt,
+  DownloadClientReconciliationItem,
+  DownloadClientType,
+  IndexerColor,
+} from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
+import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ConnectionHealth from './ConnectionHealth.vue'
 import AdapterTypePicker, { type AdapterTypeOption } from './components/AdapterTypePicker.vue'
@@ -52,7 +60,23 @@ const { t } = useI18n()
 /** Reported upwards so the page states the instance-level encryption fact once, not per panel. */
 const emit = defineEmits<{ encryptionState: [configured: boolean] }>()
 
-const { clients, encryptionConfigured, loading, saving, loadFailed, fetchClients, save, remove, test, testPathMapping } = useDownloadClients()
+const {
+  clients,
+  encryptionConfigured,
+  loading,
+  saving,
+  loadFailed,
+  reconciliation,
+  reconcilingIds,
+  fetchClients,
+  save,
+  remove,
+  test,
+  testPathMapping,
+  reconcile,
+  adopt,
+  removeOrphan,
+} = useDownloadClients()
 
 watch(encryptionConfigured, (configured) => emit('encryptionState', configured))
 
@@ -63,6 +87,7 @@ const testingId = ref<number | null>(null)
 const passwordVisible = ref(false)
 const hardlinkResults = reactive<Record<string, string>>({})
 const fieldErrors = reactive<Partial<Record<FieldKey, string>>>({})
+const pendingOrphanRemoval = ref<{ clientId: number; infoHash: string; name: string } | null>(null)
 
 /**
  * Server codes carry the copy; the English `message` is a last resort for anything unmapped, which
@@ -76,6 +101,9 @@ const SAVE_ERROR_KEYS: Record<string, string> = {
   REQUEST_ENCRYPTION_KEY_CHANGED: 'settings.system.requests.errors.encryptionKeyChanged',
   DOWNLOAD_CLIENT_PATH_NOT_ABSOLUTE: 'settings.system.requests.errors.pathNotAbsolute',
   DOWNLOAD_CLIENT_MAPPING_REQUIRED: 'settings.system.requests.errors.mappingRequired',
+  DOWNLOAD_CLIENT_RECONCILIATION_UNSUPPORTED: 'settings.system.requests.reconciliation.unsupported',
+  DOWNLOAD_CLIENT_RECONCILIATION_NOT_ORPHAN: 'settings.system.requests.reconciliation.notOrphan',
+  DOWNLOAD_CLIENT_RECONCILIATION_NOT_ADOPTABLE: 'settings.system.requests.reconciliation.notAdoptable',
 }
 
 /** Which box a rejection belongs under. Anything unmapped stays a toast, rather than nowhere. */
@@ -337,6 +365,42 @@ async function handleHardlinkTest(client: DownloadClientItem, mappingId: number)
 function hardlinkResultFor(client: DownloadClientItem, mappingId: number): string | undefined {
   return hardlinkResults[`${client.id}:${mappingId}`]
 }
+
+function reconciliationIssues(clientId: number): DownloadClientReconciliationItem[] {
+  return (reconciliation.value[clientId]?.items ?? []).filter(
+    (item) => item.trackedAttempt === null || item.trackedAttempt.status === 'failed' || item.adoptableAttempts.length > 0,
+  )
+}
+
+async function handleReconcile(client: DownloadClientItem) {
+  const failure = await reconcile(client.id)
+  if (failure) toast.error(describeFailure(failure))
+}
+
+async function handleAdopt(client: DownloadClientItem, item: DownloadClientReconciliationItem, attempt: DownloadClientReconciliationAttempt) {
+  const failure = await adopt(client.id, item.infoHash, attempt.downloadId)
+  if (failure) toast.error(describeFailure(failure))
+  else toast.success(t('settings.system.requests.reconciliation.adopted', { title: attempt.requestTitle }))
+}
+
+function requestOrphanRemoval(client: DownloadClientItem, item: DownloadClientReconciliationItem) {
+  pendingOrphanRemoval.value = { clientId: client.id, infoHash: item.infoHash, name: item.name }
+}
+
+function cancelOrphanRemoval() {
+  pendingOrphanRemoval.value = null
+}
+
+async function confirmOrphanRemoval() {
+  const pending = pendingOrphanRemoval.value
+  if (!pending) return
+  const failure = await removeOrphan(pending.clientId, pending.infoHash)
+  if (failure) toast.error(describeFailure(failure))
+  else {
+    toast.success(t('settings.system.requests.reconciliation.removed'))
+    pendingOrphanRemoval.value = null
+  }
+}
 </script>
 
 <template>
@@ -424,6 +488,11 @@ function hardlinkResultFor(client: DownloadClientItem, mappingId: number): strin
               </div>
 
               <div class="flex shrink-0 items-center gap-1.5">
+                <Button size="sm" variant="outline" :disabled="reconcilingIds.has(client.id)" @click="handleReconcile(client)">
+                  <Loader2 v-if="reconcilingIds.has(client.id)" class="animate-spin" aria-hidden="true" />
+                  <RefreshCw v-else :size="14" aria-hidden="true" />
+                  {{ t('settings.system.requests.reconciliation.action') }}
+                </Button>
                 <Button size="sm" variant="outline" :disabled="testingId === client.id" @click="handleTest(client)">
                   <Plug :size="14" aria-hidden="true" />
                   {{ t('settings.system.requests.test') }}
@@ -448,6 +517,67 @@ function hardlinkResultFor(client: DownloadClientItem, mappingId: number): strin
                 </div>
               </li>
             </ul>
+
+            <div v-if="reconciliation[client.id]" class="mt-3 border-t border-border pt-3">
+              <p v-if="!reconciliation[client.id]?.supported" role="status" class="text-sm text-muted-foreground">
+                {{ t('settings.system.requests.reconciliation.unsupported') }}
+              </p>
+              <template v-else>
+                <p v-if="reconciliation[client.id]?.truncated" role="status" class="mb-2 text-sm text-warning">
+                  {{ t('settings.system.requests.reconciliation.truncated') }}
+                </p>
+                <p
+                  v-if="reconciliationIssues(client.id).length === 0 && reconciliation[client.id]?.missingAttempts.length === 0"
+                  role="status"
+                  class="text-sm text-muted-foreground"
+                >
+                  {{ t('settings.system.requests.reconciliation.clean') }}
+                </p>
+                <ul v-else class="space-y-2">
+                  <li v-for="item in reconciliationIssues(client.id)" :key="item.infoHash" class="rounded-lg border border-border p-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="text-sm font-medium text-foreground">{{ item.name }}</p>
+                        <p class="mt-0.5 break-all font-mono text-xs text-muted-foreground">{{ item.infoHash }}</p>
+                        <p class="mt-1 text-xs text-muted-foreground">
+                          {{
+                            item.trackedAttempt
+                              ? t('settings.system.requests.reconciliation.failedAttempt', { title: item.trackedAttempt.requestTitle })
+                              : t('settings.system.requests.reconciliation.orphan')
+                          }}
+                        </p>
+                      </div>
+                      <Button v-if="item.trackedAttempt === null" size="sm" variant="destructive" @click="requestOrphanRemoval(client, item)">
+                        <Trash2 :size="14" aria-hidden="true" />
+                        {{ t('settings.system.requests.reconciliation.remove') }}
+                      </Button>
+                    </div>
+                    <div v-if="item.adoptableAttempts.length > 0" class="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        v-for="attempt in item.adoptableAttempts"
+                        :key="attempt.downloadId"
+                        size="sm"
+                        variant="outline"
+                        @click="handleAdopt(client, item, attempt)"
+                      >
+                        <Link2 :size="14" aria-hidden="true" />
+                        {{ t('settings.system.requests.reconciliation.adopt', { title: attempt.requestTitle }) }}
+                      </Button>
+                    </div>
+                  </li>
+                  <li
+                    v-for="attempt in reconciliation[client.id]?.missingAttempts ?? []"
+                    :key="`missing-${attempt.downloadId}`"
+                    class="rounded-lg border border-border p-3"
+                  >
+                    <p class="text-sm font-medium text-foreground">{{ attempt.requestTitle }}</p>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      {{ t('settings.system.requests.reconciliation.missing', { status: attempt.status }) }}
+                    </p>
+                  </li>
+                </ul>
+              </template>
+            </div>
           </div>
         </li>
       </ul>
@@ -710,5 +840,15 @@ function hardlinkResultFor(client: DownloadClientItem, mappingId: number): strin
         </div>
       </template>
     </SettingsEditorSheet>
+
+    <ConfirmDialog
+      :open="pendingOrphanRemoval !== null"
+      :title="t('settings.system.requests.reconciliation.removeTitle')"
+      :description="t('settings.system.requests.reconciliation.removeDescription', { name: pendingOrphanRemoval?.name ?? '' })"
+      :confirm-label="t('settings.system.requests.reconciliation.remove')"
+      :busy="pendingOrphanRemoval !== null && reconcilingIds.has(pendingOrphanRemoval.clientId)"
+      @confirm="confirmOrphanRemoval"
+      @cancel="cancelOrphanRemoval"
+    />
   </div>
 </template>

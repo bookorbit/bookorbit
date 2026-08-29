@@ -901,7 +901,12 @@ describe('BookRequestService.cancel', () => {
       },
     });
 
-    await expect(service.cancel(10, user())).rejects.toThrow('A request that is available can no longer be cancelled');
+    await expect(service.cancel(10, user())).rejects.toMatchObject({
+      response: {
+        errorCode: 'BOOK_REQUEST_STALE_TRANSITION',
+        errorMeta: { action: 'cancel', status: 'available' },
+      },
+    });
     expect(removal.removeLatestForRequest).not.toHaveBeenCalled();
   });
 
@@ -1662,7 +1667,12 @@ describe('BookRequestService lifecycle races', () => {
       },
     });
 
-    await expect(service.approve(10, {}, approver)).rejects.toThrow('Only a pending request can be approved; this one is rejected');
+    await expect(service.approve(10, {}, approver)).rejects.toMatchObject({
+      response: {
+        errorCode: 'BOOK_REQUEST_STALE_TRANSITION',
+        errorMeta: { action: 'approve', status: 'rejected' },
+      },
+    });
 
     expect(repo.updateIf).toHaveBeenCalledTimes(1);
     expect(notifications.notify).not.toHaveBeenCalled();
@@ -1680,7 +1690,12 @@ describe('BookRequestService lifecycle races', () => {
       },
     });
 
-    await expect(service.reject(10, {}, approver)).rejects.toThrow('Only a pending request can be rejected; this one is approved');
+    await expect(service.reject(10, {}, approver)).rejects.toMatchObject({
+      response: {
+        errorCode: 'BOOK_REQUEST_STALE_TRANSITION',
+        errorMeta: { action: 'reject', status: 'approved' },
+      },
+    });
     expect(notifications.notify).not.toHaveBeenCalled();
   });
 
@@ -1696,7 +1711,12 @@ describe('BookRequestService lifecycle races', () => {
       },
     });
 
-    await expect(service.cancel(10, user())).rejects.toThrow('A request that is available can no longer be cancelled');
+    await expect(service.cancel(10, user())).rejects.toMatchObject({
+      response: {
+        errorCode: 'BOOK_REQUEST_STALE_TRANSITION',
+        errorMeta: { action: 'cancel', status: 'available' },
+      },
+    });
   });
 
   it('refuses a fulfil that lost to a concurrent one rather than filing the book twice', async () => {
@@ -1878,7 +1898,15 @@ describe('BookRequestService.approveMany', () => {
     const result = await service.approveMany({ ids: [10, 11, 12] }, approver());
 
     expect(result.updated).toHaveLength(2);
-    expect(result.failed).toEqual([{ id: 11, title: 'Watchers', reason: 'Only a pending request can be approved; this one is available' }]);
+    expect(result.failed).toEqual([
+      {
+        id: 11,
+        title: 'Watchers',
+        reason: 'Only a pending request can be approved; this one is available',
+        errorCode: 'BOOK_REQUEST_NOT_PENDING',
+        errorMeta: { action: 'approve', status: 'available' },
+      },
+    ]);
   });
 
   it('collapses a repeated id so one row cannot be approved twice in a batch', async () => {
@@ -1910,7 +1938,13 @@ describe('BookRequestService.dismissMany', () => {
     expect(result.updated).toHaveLength(1);
     expect(repo.dismissIf).toHaveBeenCalledTimes(1);
     expect(result.failed).toEqual([
-      { id: 11, title: 'Whistler', reason: 'A request that is downloading is still being worked on; cancel it instead' },
+      {
+        id: 11,
+        title: 'Whistler',
+        reason: 'A request that is downloading is still being worked on; cancel it instead',
+        errorCode: null,
+        errorMeta: null,
+      },
     ]);
   });
 });

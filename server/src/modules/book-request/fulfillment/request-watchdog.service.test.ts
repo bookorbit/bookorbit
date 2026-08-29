@@ -9,6 +9,7 @@ function makeService(
   const downloads = {
     findByStatusOlderThan: vi.fn().mockImplementation((statuses: string[]) => Promise.resolve(byStatus[statuses.join(',')] ?? [])),
     findLiveDirectHashes: vi.fn().mockResolvedValue([]),
+    findActiveDirect: vi.fn().mockResolvedValue([]),
   };
   const fulfillment = { failDownload: vi.fn().mockResolvedValue(undefined) };
   const requests = {
@@ -21,7 +22,7 @@ function makeService(
   };
   const gateway = { emitChanged: vi.fn() };
   const auditEvents = { emit: vi.fn() };
-  const direct = { reapStaging: vi.fn().mockResolvedValue(0) };
+  const direct = { reapStaging: vi.fn().mockResolvedValue(0), resume: vi.fn().mockResolvedValue(true) };
 
   return {
     service: new RequestWatchdogService(
@@ -142,11 +143,30 @@ describe('RequestWatchdogService stranded searches', () => {
   });
 });
 
-/**
- * Direct-download progress lives in memory, so a transfer a restart interrupted leaves bytes
- * nothing will poll, import or remove - and each failed URL stages under its own hash.
- */
-describe('RequestWatchdogService staging reap', () => {
+describe('RequestWatchdogService direct-download startup reconciliation', () => {
+  it('resumes every active direct attempt before reaping staging', async () => {
+    const row = { id: 11, source: 'direct_url', clientHash: 'aaa' } as BookRequestDownloadRow;
+    const { service, downloads, direct, fulfillment } = makeService();
+    downloads.findActiveDirect.mockResolvedValue([row]);
+
+    await service.onApplicationBootstrap();
+
+    expect(direct.resume).toHaveBeenCalledWith(row);
+    expect(direct.resume.mock.invocationCallOrder[0]).toBeLessThan(direct.reapStaging.mock.invocationCallOrder[0]);
+    expect(fulfillment.failDownload).not.toHaveBeenCalled();
+  });
+
+  it('fails an interrupted attempt immediately when it cannot be resumed safely', async () => {
+    const row = { id: 11, source: 'direct_url', clientHash: 'aaa' } as BookRequestDownloadRow;
+    const { service, downloads, direct, fulfillment } = makeService();
+    downloads.findActiveDirect.mockResolvedValue([row]);
+    direct.resume.mockResolvedValue(false);
+
+    await service.onApplicationBootstrap();
+
+    expect(fulfillment.failDownload).toHaveBeenCalledWith(row, 'The interrupted direct download could not be resumed safely');
+  });
+
   it('reaps staging against the attempts that could still read it', async () => {
     const { service, downloads, direct } = makeService();
     downloads.findLiveDirectHashes.mockResolvedValue(['aaa', 'bbb']);

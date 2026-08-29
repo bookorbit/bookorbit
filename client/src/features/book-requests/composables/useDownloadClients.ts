@@ -6,6 +6,7 @@ import type {
   DownloadClientErrorCode,
   DownloadClientItem,
   DownloadClientListResult,
+  DownloadClientReconciliationResult,
   DownloadClientSummary,
   DownloadClientTestResult,
   PathMappingHardlinkTestResult,
@@ -42,6 +43,15 @@ export function useDownloadClients() {
   const loading = ref(false)
   const saving = ref(false)
   const loadFailed = ref(false)
+  const reconciliation = ref<Record<number, DownloadClientReconciliationResult | undefined>>({})
+  const reconcilingIds = ref<Set<number>>(new Set())
+
+  function markReconciling(id: number, active: boolean) {
+    const next = new Set(reconcilingIds.value)
+    if (active) next.add(id)
+    else next.delete(id)
+    reconcilingIds.value = next
+  }
 
   /**
    * `silent` refreshes the list without blanking the panel. The loading flag swaps the whole
@@ -131,7 +141,71 @@ export function useDownloadClients() {
     }
   }
 
-  return { clients, encryptionConfigured, loading, saving, loadFailed, fetchClients, save, remove, test, testPathMapping }
+  async function reconcile(id: number): Promise<DownloadClientFailure | null> {
+    markReconciling(id, true)
+    try {
+      const res = await api(`${BASE_PATH}/${id}/reconciliation`)
+      if (!res.ok) return await toFailure(res)
+      reconciliation.value = { ...reconciliation.value, [id]: (await res.json()) as DownloadClientReconciliationResult }
+      return null
+    } catch {
+      return NETWORK_FAILURE
+    } finally {
+      markReconciling(id, false)
+    }
+  }
+
+  async function adopt(clientId: number, infoHash: string, downloadId: number): Promise<DownloadClientFailure | null> {
+    markReconciling(clientId, true)
+    try {
+      const res = await api(`${BASE_PATH}/${clientId}/reconciliation/${encodeURIComponent(infoHash)}/adopt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ downloadId }),
+      })
+      if (!res.ok) return await toFailure(res)
+      return await reconcile(clientId)
+    } catch {
+      return NETWORK_FAILURE
+    } finally {
+      markReconciling(clientId, false)
+    }
+  }
+
+  async function removeOrphan(clientId: number, infoHash: string): Promise<DownloadClientFailure | null> {
+    markReconciling(clientId, true)
+    try {
+      const res = await api(`${BASE_PATH}/${clientId}/reconciliation/${encodeURIComponent(infoHash)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteFiles: false }),
+      })
+      if (!res.ok) return await toFailure(res)
+      return await reconcile(clientId)
+    } catch {
+      return NETWORK_FAILURE
+    } finally {
+      markReconciling(clientId, false)
+    }
+  }
+
+  return {
+    clients,
+    encryptionConfigured,
+    loading,
+    saving,
+    loadFailed,
+    reconciliation,
+    reconcilingIds,
+    fetchClients,
+    save,
+    remove,
+    test,
+    testPathMapping,
+    reconcile,
+    adopt,
+    removeOrphan,
+  }
 }
 
 /**

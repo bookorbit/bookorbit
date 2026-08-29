@@ -3,8 +3,16 @@ import type { DownloadClientTestResult } from '@bookorbit/types';
 
 import { ensureSafeUrl } from '../../../../common/utils/ssrf.utils';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
-import type { DownloadClientAdapter, DownloadState, DownloadStatus, GrabPayload, ResolvedClientConfig, SeedInfo } from '../download-client-adapter';
-import { endpointUrl, fetchClient, readClientJson } from './client-http.utils';
+import type {
+  DownloadClientAdapter,
+  DownloadState,
+  DownloadStatus,
+  GrabPayload,
+  OwnedDownloadClientInventory,
+  ResolvedClientConfig,
+  SeedInfo,
+} from '../download-client-adapter';
+import { endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'Deluge';
 const JSON_PATH = '/json';
@@ -12,6 +20,7 @@ const JSON_PATH = '/json';
 const SESSION_TTL_MS = 30 * 60 * 1000;
 /** A Web UI with a long host list is misconfigured rather than interesting, so stop trying. */
 const HOST_ATTEMPT_LIMIT = 5;
+const RECONCILIATION_LIMIT = 1000;
 
 /**
  * Asked for on every poll. Both spellings of the download folder are requested because 1.3 knows
@@ -35,6 +44,7 @@ const STATUS_FIELDS = [
   'is_finished',
   'message',
   'tracker_status',
+  'label',
 ];
 
 const STATE_BY_DELUGE: Record<string, DownloadState> = {
@@ -66,6 +76,7 @@ interface DelugeTorrent {
   is_finished?: boolean;
   message?: string;
   tracker_status?: string;
+  label?: string;
 }
 
 interface DelugeError {
@@ -193,6 +204,23 @@ export class DelugeAdapter implements DownloadClientAdapter {
     });
   }
 
+  async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
+    const session = await this.session(config);
+    const label = toLabelId(config.category);
+    if (!session.labelPlugin || !label) return { supported: false, truncated: false, items: [] };
+
+    const result = await this.rpc<Record<string, DelugeTorrent> | null>(config, 'core.get_torrents_status', [{ label }, STATUS_FIELDS]);
+    const owned = Object.entries(result ?? {}).filter(([, entry]) => entry.label === undefined || entry.label === label);
+    return {
+      supported: true,
+      truncated: owned.length > RECONCILIATION_LIMIT,
+      items: owned.slice(0, RECONCILIATION_LIMIT).map(([key, entry]) => {
+        const hash = (entry.hash ?? key).toLowerCase();
+        return { ...toDownloadStatus(hash, entry), name: entry.name?.trim() || hash };
+      }),
+    };
+  }
+
   async remove(hash: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void> {
     const removed = await this.rpc<boolean>(config, 'core.remove_torrent', [hash.toLowerCase(), opts.deleteFiles]);
     // Deluge answers a torrent it does not hold with `false` rather than an error, and a removal
@@ -301,7 +329,10 @@ export class DelugeAdapter implements DownloadClientAdapter {
       LABEL,
     );
 
-    if (!response.ok) throw new BadRequestException(`Deluge answered ${response.status} for ${method}`);
+    if (!response.ok) {
+      throwForClientServerError(response, LABEL, method);
+      throw new BadRequestException(`Deluge answered ${response.status} for ${method}`);
+    }
 
     const payload = await readClientJson<{ result?: T; error?: DelugeError | null }>(response, LABEL);
     return { result: payload.result, error: payload.error ?? null, cookie: extractSessionCookie(response) };

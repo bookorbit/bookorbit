@@ -3,8 +3,16 @@ import type { DownloadClientTestResult } from '@bookorbit/types';
 
 import { ensureSafeUrl } from '../../../../common/utils/ssrf.utils';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
-import type { DownloadClientAdapter, DownloadState, DownloadStatus, GrabPayload, ResolvedClientConfig, SeedInfo } from '../download-client-adapter';
-import { basicAuthHeader, endpointUrl, fetchClient, readClientJson } from './client-http.utils';
+import type {
+  DownloadClientAdapter,
+  DownloadState,
+  DownloadStatus,
+  GrabPayload,
+  OwnedDownloadClientInventory,
+  ResolvedClientConfig,
+  SeedInfo,
+} from '../download-client-adapter';
+import { basicAuthHeader, endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'Transmission';
 const RPC_PATH = '/transmission/rpc';
@@ -26,6 +34,7 @@ const ERROR_LOCAL = 3;
 
 /** `seedRatioMode`: 0 follows the global limit, 1 is this torrent's own, 2 is unlimited. */
 const RATIO_MODE_SINGLE = 1;
+const RECONCILIATION_LIMIT = 1000;
 
 /**
  * Asked for on every poll. `error` and `errorString` are what make a refused announce visible:
@@ -182,6 +191,23 @@ export class TransmissionAdapter implements DownloadClientAdapter {
     });
   }
 
+  async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
+    const ownedDir = await this.categoryDir(config);
+    if (!ownedDir) return { supported: false, truncated: false, items: [] };
+
+    const result = await this.rpc<{ torrents?: TransmissionTorrent[] }>(config, 'torrent-get', { fields: STATUS_FIELDS });
+    const owned = (result.torrents ?? []).filter((entry) => entry.downloadDir?.replace(/\/+$/, '') === ownedDir.replace(/\/+$/, ''));
+    return {
+      supported: true,
+      truncated: owned.length > RECONCILIATION_LIMIT,
+      items: owned.slice(0, RECONCILIATION_LIMIT).flatMap((entry) => {
+        const hash = entry.hashString?.toLowerCase();
+        if (!hash) return [];
+        return [{ ...toDownloadStatus(hash, entry), name: entry.name?.trim() || hash }];
+      }),
+    };
+  }
+
   async remove(hash: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void> {
     await this.rpc(config, 'torrent-remove', { ids: [hash.toLowerCase()], 'delete-local-data': opts.deleteFiles });
   }
@@ -231,7 +257,10 @@ export class TransmissionAdapter implements DownloadClientAdapter {
       return this.rpc<T>(config, method, args, false);
     }
     if (response.status === 401) throw new BadRequestException('Transmission rejected those credentials');
-    if (!response.ok) throw new BadRequestException(`Transmission answered ${response.status} for ${method}`);
+    if (!response.ok) {
+      throwForClientServerError(response, LABEL, method);
+      throw new BadRequestException(`Transmission answered ${response.status} for ${method}`);
+    }
 
     const payload = await readClientJson<{ result?: string; arguments?: T }>(response, LABEL);
     // The one 200 that is not success: Transmission reports a refusal in the body with the reason

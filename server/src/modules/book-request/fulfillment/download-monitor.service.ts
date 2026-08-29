@@ -263,8 +263,8 @@ export class DownloadMonitorService implements OnModuleDestroy {
 
   /**
    * A hash the target did not report. For a torrent that is usually a client that has not indexed
-   * it yet, so it gets a grace period; for a direct transfer it means this process has no record of
-   * it, which after the grace can only be a restart, and there is nothing to resume.
+   * it yet, so it gets a grace period; for a direct transfer it means startup could not resume it
+   * or the in-process transfer disappeared, so waiting longer cannot make it return.
    */
   private async handleMissing(row: BookRequestDownloadRow): Promise<void> {
     if (!this.olderThan(row, MISSING_TORRENT_GRACE_MS)) return;
@@ -313,6 +313,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
       contentPath: status.contentPath ?? row.contentPath,
       ...(movedBytes ? { lastProgressAt: new Date() } : {}),
       ...(status.state === 'completed' ? { completedAt: row.completedAt ?? new Date() } : {}),
+      ...(row.source === 'direct_url' && status.state === 'completed' ? { directUrl: null, directEtag: null, directLastModified: null } : {}),
     });
     if (!updated) return;
 

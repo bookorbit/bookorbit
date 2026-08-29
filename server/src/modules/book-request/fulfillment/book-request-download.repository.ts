@@ -4,6 +4,7 @@ import { and, count, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'd
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
+  GRABBABLE_BOOK_REQUEST_STATUSES,
   IN_FLIGHT_BOOK_REQUEST_DOWNLOAD_STATUSES,
   UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES,
 } from '@bookorbit/types';
@@ -44,6 +45,13 @@ export interface BookRequestDownloadJoinedRow {
   indexerName: string | null;
   indexerColor: IndexerColor | null;
 }
+
+export interface ReconciliationAttemptRow {
+  download: BookRequestDownloadRow;
+  requestTitle: string;
+}
+
+class AdoptionRaceError extends Error {}
 
 @Injectable()
 export class BookRequestDownloadRepository {
@@ -146,6 +154,13 @@ export class BookRequestDownloadRepository {
       );
   }
 
+  async findActiveDirect(): Promise<BookRequestDownloadRow[]> {
+    return this.db
+      .select()
+      .from(bookRequestDownloads)
+      .where(and(eq(bookRequestDownloads.source, 'direct_url'), inArray(bookRequestDownloads.status, [...ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES])));
+  }
+
   /**
    * Finished downloads that never claimed a Book Dock row, which means the import never started.
    * Once a row has one, retrying would link the file a second time, so a crash after that point is
@@ -195,6 +210,76 @@ export class BookRequestDownloadRepository {
         and(eq(bookRequestDownloads.downloadClientId, clientId), inArray(bookRequestDownloads.status, [...IN_FLIGHT_BOOK_REQUEST_DOWNLOAD_STATUSES])),
       );
     return row?.total ?? 0;
+  }
+
+  async findTrackedForClientHashes(clientId: number, hashes: string[]): Promise<ReconciliationAttemptRow[]> {
+    if (hashes.length === 0) return [];
+    return this.db
+      .select({ download: bookRequestDownloads, requestTitle: bookRequests.title })
+      .from(bookRequestDownloads)
+      .innerJoin(bookRequests, eq(bookRequests.id, bookRequestDownloads.requestId))
+      .where(and(eq(bookRequestDownloads.downloadClientId, clientId), inArray(bookRequestDownloads.clientHash, hashes)))
+      .orderBy(desc(bookRequestDownloads.id));
+  }
+
+  async findAdoptableForHashes(hashes: string[]): Promise<ReconciliationAttemptRow[]> {
+    if (hashes.length === 0) return [];
+    return this.db
+      .select({ download: bookRequestDownloads, requestTitle: bookRequests.title })
+      .from(bookRequestDownloads)
+      .innerJoin(bookRequests, eq(bookRequests.id, bookRequestDownloads.requestId))
+      .where(
+        and(
+          inArray(bookRequestDownloads.clientHash, hashes),
+          eq(bookRequestDownloads.status, 'failed'),
+          inArray(bookRequests.status, [...GRABBABLE_BOOK_REQUEST_STATUSES]),
+        ),
+      )
+      .orderBy(desc(bookRequestDownloads.id))
+      .limit(1000);
+  }
+
+  async findActiveForClient(clientId: number): Promise<ReconciliationAttemptRow[]> {
+    return this.db
+      .select({ download: bookRequestDownloads, requestTitle: bookRequests.title })
+      .from(bookRequestDownloads)
+      .innerJoin(bookRequests, eq(bookRequests.id, bookRequestDownloads.requestId))
+      .where(
+        and(eq(bookRequestDownloads.downloadClientId, clientId), inArray(bookRequestDownloads.status, [...ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES])),
+      )
+      .orderBy(desc(bookRequestDownloads.id))
+      .limit(1000);
+  }
+
+  async adoptFailedAttempt(
+    downloadId: number,
+    clientId: number,
+    clientHash: string,
+    data: Pick<NewBookRequestDownloadRow, 'status' | 'progressPercent' | 'downloadedBytes' | 'totalBytes' | 'contentPath'>,
+  ): Promise<BookRequestDownloadRow | undefined> {
+    try {
+      return await this.db.transaction(async (tx) => {
+        const [download] = await tx
+          .update(bookRequestDownloads)
+          .set({ ...data, downloadClientId: clientId, errorMessage: null })
+          .where(
+            and(eq(bookRequestDownloads.id, downloadId), eq(bookRequestDownloads.clientHash, clientHash), eq(bookRequestDownloads.status, 'failed')),
+          )
+          .returning();
+        if (!download) throw new AdoptionRaceError();
+
+        const [request] = await tx
+          .update(bookRequests)
+          .set({ status: data.status === 'queued' ? 'grabbed' : 'downloading', statusReason: null })
+          .where(and(eq(bookRequests.id, download.requestId), inArray(bookRequests.status, [...GRABBABLE_BOOK_REQUEST_STATUSES])))
+          .returning({ id: bookRequests.id });
+        if (!request) throw new AdoptionRaceError();
+        return download;
+      });
+    } catch (error) {
+      if (error instanceof AdoptionRaceError) return undefined;
+      throw error;
+    }
   }
 
   /**

@@ -18,6 +18,7 @@ const REFUSAL_KEYS: Partial<Record<GrabFailureCode, string>> = {
   GRAB_SOURCE_UNAVAILABLE: 'sourceUnavailable',
   GRAB_VIP_REQUIRED: 'vipRequired',
   GRAB_CLIENT_REFUSED: 'clientRefused',
+  GRAB_CLIENT_UNAVAILABLE: 'clientUnavailable',
 }
 
 /** The refusal travels back with the call it belongs to, so one grab cannot describe another. */

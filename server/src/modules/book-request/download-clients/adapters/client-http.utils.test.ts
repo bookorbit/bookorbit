@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 
 import { basicAuthHeader, endpointUrl, fetchClient, readClientJson, readClientText } from './client-http.utils';
 
@@ -93,7 +93,7 @@ describe('fetchClient', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
 
     await expect(fetchClient(url, {}, 'Transmission')).rejects.toMatchObject({
-      constructor: BadRequestException,
+      constructor: ServiceUnavailableException,
       message: expect.stringContaining('Transmission'),
     });
   });

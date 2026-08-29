@@ -51,6 +51,7 @@ import { useRequestReview } from '../composables/useRequestReview'
 import { REQUEST_DRAWER } from '../requestDrawerContext'
 import { canCancelRequest, canDeleteRequest, canDismissRequest, canLeaveRequest, cancelStopsATransfer } from '../requestActions'
 import { requestFailureText } from '../requestOutcome'
+import { localizedRequestActionFailure } from '../requestActionFailure'
 import { currentRequestProgress, requestPresentationStatus } from '../requestPipeline'
 
 const { t, locale } = useI18n()
@@ -324,9 +325,9 @@ function handleKeydown(event: KeyboardEvent) {
  */
 function applyUpdate(outcome: ActionOutcome, failureKey: string): boolean {
   if (!outcome.item) {
-    // The reason is third-party prose from a tracker or download client, so it is shown as the
-    // server wrote it under a translated heading rather than matched against known English.
-    toast.error(t(failureKey), outcome.reason ? { description: outcome.reason } : undefined)
+    const localized = localizedRequestActionFailure(outcome)
+    const description = localized ? t(localized.key, localized.params) : outcome.reason
+    toast.error(t(failureKey), description ? { description } : undefined)
     return false
   }
   setRequest(outcome.item)

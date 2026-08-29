@@ -1,5 +1,5 @@
 import { createWriteStream } from 'node:fs';
-import { mkdir, readdir, rm } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 
 import { Readable } from 'node:stream';
@@ -12,7 +12,9 @@ import { storageConfig } from '../../../config/config';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { safeFetch } from '../../../common/utils/safe-fetch';
 import { ensureSafeUrl } from '../../../common/utils/ssrf.utils';
+import type { BookRequestDownloadRow } from '../../../db/schema';
 import type { DownloadStatus } from '../download-clients/download-client-adapter';
+import { BookRequestDownloadRepository } from './book-request-download.repository';
 
 /**
  * Where BookOrbit's own fetches land, and therefore the boundary the import may read one out of.
@@ -107,6 +109,7 @@ interface Progress {
 }
 
 export interface DirectDownloadRequest {
+  downloadId: number;
   fileUrl: string;
   fileName?: string;
   /** What the source declared the file to be, which is what names a file that arrived without one. */
@@ -133,10 +136,9 @@ export interface DirectDownloadRequest {
  * choose, so an operator is never asked to configure it and no row stands for it. Attempts it
  * fetched are the ones whose `source` is `direct_url`.
  *
- * Progress lives in memory. A download in flight across a restart is therefore lost rather than
- * resumed, and reports `unknown` so the stall watchdog fails it and the approver can retry. That
- * is a deliberate simplification: these are single files that take seconds, not a seeding torrent
- * whose state has to outlive the process.
+ * Active progress lives in memory, while the source URL, target name, byte count and HTTP
+ * validators live on the attempt row. On restart a partial file is resumed only when `If-Range`
+ * and an exact `Content-Range` prove the response continues the same representation.
  */
 @Injectable()
 export class DirectDownloadService {
@@ -146,7 +148,10 @@ export class DirectDownloadService {
   private readonly controllers = new Map<string, AbortController>();
   private readonly tasks = new Map<string, Promise<void>>();
 
-  constructor(@Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>) {}
+  constructor(
+    @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
+    private readonly downloads: BookRequestDownloadRepository,
+  ) {}
 
   private get root(): string {
     return directDownloadRoot(this.storage.appDataPath);
@@ -159,39 +164,84 @@ export class DirectDownloadService {
     const target = safeJoin(directory, stagedDirectFileName(release.fileName, release.format));
 
     await mkdir(directory, { recursive: true });
-    this.progress.set(release.infoHash, { state: 'downloading', downloadedBytes: 0, totalBytes: null, contentPath: null });
+    this.start(release.downloadId, release.infoHash, url, target, directory, 0, null, null);
+
+    return { clientHash: release.infoHash };
+  }
+
+  /** Restores one active direct attempt left by the previous process. */
+  async resume(download: BookRequestDownloadRow): Promise<boolean> {
+    if (
+      download.source !== 'direct_url' ||
+      download.clientHash === null ||
+      download.directUrl === null ||
+      download.directFileName === null ||
+      this.progress.has(download.clientHash)
+    ) {
+      return false;
+    }
+
+    const url = await ensureSafeUrl(download.directUrl, { allowPrivate: ALLOW_PRIVATE });
+    const directory = join(this.root, download.clientHash);
+    const target = safeJoin(directory, download.directFileName);
+    const existingBytes = await stat(target)
+      .then((entry) => (entry.isFile() ? entry.size : 0))
+      .catch(() => 0);
+    const validator = resumeValidator(download.directEtag, download.directLastModified);
+    if (existingBytes > 0 && validator === null) return false;
+    if (existingBytes > MAX_FILE_BYTES) return false;
+
+    await mkdir(directory, { recursive: true });
+    this.start(download.id, download.clientHash, url, target, directory, existingBytes, validator, download.totalBytes);
+    this.logger.log(
+      `[direct_download.resume] [start] downloadId=${download.id} hash=${download.clientHash} bytes=${existingBytes} - resuming an interrupted direct download`,
+    );
+    return true;
+  }
+
+  private start(
+    downloadId: number,
+    infoHash: string,
+    url: URL,
+    target: string,
+    directory: string,
+    offset: number,
+    validator: string | null,
+    expectedBytes: number | null,
+  ): void {
+    this.progress.set(infoHash, {
+      state: 'downloading',
+      downloadedBytes: offset,
+      totalBytes: expectedBytes,
+      contentPath: null,
+    });
     const controller = new AbortController();
-    this.controllers.set(release.infoHash, controller);
+    this.controllers.set(infoHash, controller);
 
     // Deliberately not awaited: `add` hands the work over the way a torrent client does, and the
     // poll loop is what reports on it from here.
-    const task = this.run(release.infoHash, url, target, controller.signal)
+    const task = this.run(downloadId, infoHash, url, target, controller.signal, offset, validator, expectedBytes)
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
-        this.progress.set(release.infoHash, {
+        const current = this.progress.get(infoHash);
+        this.progress.set(infoHash, {
           state: 'failed',
-          downloadedBytes: 0,
-          totalBytes: null,
+          downloadedBytes: current?.downloadedBytes ?? offset,
+          totalBytes: current?.totalBytes ?? expectedBytes,
           contentPath: null,
           errorMessage: message,
           terminalAt: Date.now(),
         });
-        this.logger.warn(`[direct_download.fetch] [fail] hash=${release.infoHash} error="${sanitizeLogValue(message)}" - direct download failed`);
+        this.logger.warn(`[direct_download.fetch] [fail] hash=${infoHash} error="${sanitizeLogValue(message)}" - direct download failed`);
       })
       .finally(async () => {
-        this.controllers.delete(release.infoHash);
-        this.tasks.delete(release.infoHash);
-        // A partial file is never resumed, so anything that did not finish leaves nothing behind.
-        // Every ending goes through here: a timeout, the size ceiling, a dead connection, a
-        // stream that broke, and a cancellation - which is also the only path that can trip the
-        // ceiling with roughly eight gigabytes already written.
-        if (this.progress.get(release.infoHash)?.state !== 'completed') await this.discard(release.infoHash, directory);
+        this.controllers.delete(infoHash);
+        this.tasks.delete(infoHash);
+        if (this.progress.get(infoHash)?.state !== 'completed') await this.discard(infoHash, directory);
       });
-    this.tasks.set(release.infoHash, task);
+    this.tasks.set(infoHash, task);
     void task;
-
-    return { clientHash: release.infoHash };
   }
 
   /**
@@ -245,8 +295,8 @@ export class DirectDownloadService {
 
   /**
    * Drops staging directories no attempt is behind any more, against the hashes of the attempts
-   * that are. For bootstrap: progress lives in memory, so a transfer interrupted by a restart
-   * leaves a directory nothing will ever poll, import or remove, and each failed URL gets its own.
+   * that are. Bootstrap first resumes safe partial transfers and fails the rest, then calls this
+   * to remove directories whose attempts no longer have work behind them.
    *
    * Safe to call while transfers are running only because anything this process is working on is
    * held in `progress` and skipped; the caller is still expected to be the boot path.
@@ -288,14 +338,42 @@ export class DirectDownloadService {
     }
   }
 
-  private async run(infoHash: string, url: URL, target: string, signal: AbortSignal): Promise<void> {
-    const response = await this.open(url, signal);
-
-    const declared = Number(response.headers.get('content-length'));
-    const totalBytes = Number.isFinite(declared) && declared > 0 ? declared : null;
+  private async run(
+    downloadId: number,
+    infoHash: string,
+    url: URL,
+    target: string,
+    signal: AbortSignal,
+    offset: number,
+    validator: string | null,
+    expectedBytes: number | null,
+  ): Promise<void> {
+    const response = await this.open(url, signal, offset > 0 ? { Range: `bytes=${offset}-`, 'If-Range': validator as string } : {});
+    const responseMeta = validateDownloadResponse(response, offset, expectedBytes, validator);
+    const totalBytes = responseMeta.totalBytes;
     if (totalBytes !== null && totalBytes > MAX_FILE_BYTES) {
       throw new Error(`That file is ${totalBytes} bytes, past the ${MAX_FILE_BYTES} byte limit`);
     }
+
+    if (responseMeta.alreadyComplete) {
+      await response.body?.cancel().catch(() => {});
+      this.progress.set(infoHash, {
+        state: 'completed',
+        downloadedBytes: offset,
+        totalBytes: offset,
+        contentPath: target,
+        terminalAt: Date.now(),
+      });
+      return;
+    }
+
+    const etag = strongEtag(response.headers.get('etag'));
+    const lastModified = response.headers.get('last-modified')?.trim() || null;
+    await this.downloads.update(downloadId, {
+      directEtag: etag ?? strongEtag(validator),
+      directLastModified: lastModified ?? (validator && strongEtag(validator) === null ? validator : null),
+      totalBytes,
+    });
 
     // Filename alone says nothing about what a server actually sent, and a courtesy error page
     // saved as book.epub would go on to fail somewhere much less obvious.
@@ -303,7 +381,7 @@ export class DirectDownloadService {
     if (HTML_CONTENT_TYPE.test(contentType)) throw new Error('That URL answered with a web page rather than a file');
     if (!response.body) throw new Error('That URL answered with an empty body');
 
-    let downloaded = 0;
+    let downloaded = offset;
     let lastChunkAt = Date.now();
     const body = response.body;
     const reader = body.getReader();
@@ -359,7 +437,7 @@ export class DirectDownloadService {
     };
 
     try {
-      await pipeline(Readable.from(counted()), createWriteStream(target), { signal: transfer });
+      await pipeline(Readable.from(counted()), createWriteStream(target, { flags: offset > 0 ? 'a' : 'w' }), { signal: transfer });
     } catch (error) {
       // `pipeline` rejects with a bare "The operation was aborted" rather than the reason it was
       // given, which is what put that sentence in the operator's log in place of the cause.
@@ -370,7 +448,10 @@ export class DirectDownloadService {
       clearInterval(watchdog);
     }
 
-    if (downloaded === 0) throw new Error('That URL answered with an empty file');
+    if (downloaded === offset) throw new Error('That URL answered with an empty file');
+    if (totalBytes !== null && downloaded !== totalBytes) {
+      throw new Error(`That source ended after ${downloaded} of ${totalBytes} bytes`);
+    }
     this.progress.set(infoHash, {
       state: 'completed',
       downloadedBytes: downloaded,
@@ -390,10 +471,10 @@ export class DirectDownloadService {
    * socket open until the agent times it out: five hops through a chain of mirrors would otherwise
    * leave five sockets and five buffers behind per grab.
    */
-  private async open(url: URL, signal: AbortSignal): Promise<Response> {
+  private async open(url: URL, signal: AbortSignal, headers: Record<string, string> = {}): Promise<Response> {
     let current = url;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const response = await this.openHop(current, signal);
+      const response = await this.openHop(current, signal, headers);
 
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
@@ -404,7 +485,7 @@ export class DirectDownloadService {
         continue;
       }
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 416) {
         await response.body?.cancel().catch(() => {});
         throw new Error(`That URL answered ${response.status}`);
       }
@@ -425,7 +506,7 @@ export class DirectDownloadService {
    *
    * The body is not left unbounded: `run` holds it to an idle timeout and a total ceiling.
    */
-  private async openHop(url: URL, signal: AbortSignal): Promise<Response> {
+  private async openHop(url: URL, signal: AbortSignal, headers: Record<string, string>): Promise<Response> {
     const connect = new AbortController();
     const deadline = setTimeout(() => connect.abort(new Error(`That URL did not answer within ${CONNECT_TIMEOUT_MS}ms`)), CONNECT_TIMEOUT_MS);
     try {
@@ -434,7 +515,7 @@ export class DirectDownloadService {
         {
           redirect: 'manual',
           signal: AbortSignal.any([signal, connect.signal]),
-          headers: { Accept: '*/*', 'User-Agent': USER_AGENT },
+          headers: { Accept: '*/*', 'User-Agent': USER_AGENT, ...headers },
         },
         // Pinned, because the URL came from an indexer or a plugin rather than from an operator:
         // this is exactly the caller the resolve-twice window in `safeFetch` is not acceptable
@@ -445,6 +526,75 @@ export class DirectDownloadService {
       clearTimeout(deadline);
     }
   }
+}
+
+interface ValidatedDownloadResponse {
+  totalBytes: number | null;
+  alreadyComplete: boolean;
+}
+
+function validateDownloadResponse(
+  response: Response,
+  offset: number,
+  expectedBytes: number | null,
+  validator: string | null,
+): ValidatedDownloadResponse {
+  if (offset === 0) {
+    if (response.status !== 200) throw new Error(`That URL answered ${response.status} to a new download`);
+    const declared = Number(response.headers.get('content-length'));
+    return { totalBytes: Number.isFinite(declared) && declared > 0 ? declared : null, alreadyComplete: false };
+  }
+
+  if (!validator) throw new Error('That partial download has no HTTP validator and cannot be resumed safely');
+
+  if (response.status === 416) {
+    const total = parseUnsatisfiedRange(response.headers.get('content-range'));
+    if (total !== offset || (expectedBytes !== null && expectedBytes !== total)) {
+      throw new Error('That source no longer agrees with the saved partial download');
+    }
+    return { totalBytes: total, alreadyComplete: true };
+  }
+
+  if (response.status !== 206) {
+    throw new Error('That source does not support resuming this partial download safely');
+  }
+
+  const range = parseContentRange(response.headers.get('content-range'));
+  if (range.start !== offset || range.end < range.start) {
+    throw new Error('That source resumed from a different byte than BookOrbit requested');
+  }
+  if (expectedBytes !== null && range.total !== expectedBytes) {
+    throw new Error('That source changed size since this download started');
+  }
+  return { totalBytes: range.total, alreadyComplete: false };
+}
+
+function parseContentRange(value: string | null): { start: number; end: number; total: number } {
+  const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(value?.trim() ?? '');
+  if (!match) throw new Error('That source returned an invalid Content-Range while resuming');
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  const total = Number(match[3]);
+  if (![start, end, total].every(Number.isSafeInteger) || total <= 0 || end >= total) {
+    throw new Error('That source returned an invalid Content-Range while resuming');
+  }
+  return { start, end, total };
+}
+
+function parseUnsatisfiedRange(value: string | null): number {
+  const match = /^bytes \*\/(\d+)$/.exec(value?.trim() ?? '');
+  const total = Number(match?.[1]);
+  if (!Number.isSafeInteger(total) || total <= 0) throw new Error('That source returned an invalid range response');
+  return total;
+}
+
+function strongEtag(value: string | null): string | null {
+  const normalized = value?.trim();
+  return normalized && /^"[\s\S]*"$/.test(normalized) ? normalized : null;
+}
+
+function resumeValidator(etag: string | null, lastModified: string | null): string | null {
+  return strongEtag(etag) ?? (lastModified?.trim() || null);
 }
 
 /**

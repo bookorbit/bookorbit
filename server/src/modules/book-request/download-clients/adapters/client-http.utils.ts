@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 
 import { readBoundedText, ResponseTooLargeError } from '../../../../common/utils/bounded-response';
 
@@ -43,12 +43,17 @@ export async function fetchClient(url: URL, init: RequestInit, label: string): P
     return await fetch(url, { ...init, signal: controller.signal, redirect: 'manual' });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new BadRequestException(`${label} did not answer in time`);
+      throw new ServiceUnavailableException(`${label} did not answer in time`);
     }
-    throw new BadRequestException(`Could not reach ${label}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new ServiceUnavailableException(`Could not reach ${label}: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Daemon-side failures are temporary; authentication and request refusals remain durable 4xx. */
+export function throwForClientServerError(response: Response, label: string, operation: string): void {
+  if (response.status >= 500) throw new ServiceUnavailableException(`${label} answered ${response.status} for ${operation}`);
 }
 
 /**

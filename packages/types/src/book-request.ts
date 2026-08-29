@@ -300,6 +300,28 @@ export function bookRequestSubmitErrorCode(value: unknown): BookRequestSubmitErr
     : null;
 }
 
+/** Stable reasons an action against an existing request was refused. */
+export const BOOK_REQUEST_ACTION_ERROR_CODES = [
+  /** Approve and reject only apply while a request is pending. Carries `action` and `status`. */
+  "BOOK_REQUEST_NOT_PENDING",
+  /** The request has already reached a state that cannot be cancelled. Carries `status`. */
+  "BOOK_REQUEST_NOT_CANCELLABLE",
+  /** Approval cannot continue until a destination library is selected. */
+  "BOOK_REQUEST_DESTINATION_REQUIRED",
+  /** The caller is not allowed to perform the named lifecycle action. Carries `action`. */
+  "BOOK_REQUEST_ACTION_FORBIDDEN",
+  /** Another transition committed after the action read the row. Carries `action` and `status`. */
+  "BOOK_REQUEST_STALE_TRANSITION",
+] as const;
+
+export type BookRequestActionErrorCode = (typeof BOOK_REQUEST_ACTION_ERROR_CODES)[number];
+
+export function bookRequestActionErrorCode(value: unknown): BookRequestActionErrorCode | null {
+  return typeof value === "string" && (BOOK_REQUEST_ACTION_ERROR_CODES as readonly string[]).includes(value)
+    ? (value as BookRequestActionErrorCode)
+    : null;
+}
+
 /** One metadata record that contributed to a grouped work result. */
 export interface BookRequestMetadataSource {
   providerKey: string;
@@ -536,6 +558,8 @@ export interface BookRequestBulkFailure {
   /** Named rather than numbered, because the message that carries this is read by a person. */
   title: string;
   reason: string;
+  errorCode: BookRequestActionErrorCode | BookRequestSubmitErrorCode | null;
+  errorMeta: BookRequestFailureMeta | null;
 }
 
 /**

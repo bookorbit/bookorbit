@@ -3,8 +3,16 @@ import type { DownloadClientTestResult } from '@bookorbit/types';
 
 import { ensureSafeUrl } from '../../../../common/utils/ssrf.utils';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
-import type { DownloadClientAdapter, DownloadState, DownloadStatus, GrabPayload, ResolvedClientConfig, SeedInfo } from '../download-client-adapter';
-import { endpointUrl, fetchClient, readClientJson, readClientText } from './client-http.utils';
+import type {
+  DownloadClientAdapter,
+  DownloadState,
+  DownloadStatus,
+  GrabPayload,
+  OwnedDownloadClientInventory,
+  ResolvedClientConfig,
+  SeedInfo,
+} from '../download-client-adapter';
+import { endpointUrl, fetchClient, readClientJson, readClientText, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'qBittorrent';
 /** qBittorrent's SID cookie lasts an hour by default; re-login well before it lapses. */
@@ -17,6 +25,7 @@ const STATUS_BATCH_SIZE = 100;
  * client-wide problem, and hammering the client with one call per torrent would not diagnose it.
  */
 const TRACKER_PROBE_LIMIT = 20;
+const RECONCILIATION_LIMIT = 1000;
 
 interface QbTracker {
   url?: string;
@@ -145,6 +154,23 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
     return results;
   }
 
+  async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
+    const response = await this.call(config, `/api/v2/torrents/info?category=${encodeURIComponent(config.category)}`, { method: 'GET' });
+    const payload = await readClientJson<unknown>(response, LABEL);
+    if (!Array.isArray(payload)) return { supported: true, truncated: false, items: [] };
+
+    const entries = payload as QbTorrentInfo[];
+    return {
+      supported: true,
+      truncated: entries.length > RECONCILIATION_LIMIT,
+      items: entries.slice(0, RECONCILIATION_LIMIT).flatMap((entry) => {
+        const hash = entry.hash?.toLowerCase();
+        if (!hash) return [];
+        return [{ ...toDownloadStatus(hash, entry), name: entry.name?.trim() || hash }];
+      }),
+    };
+  }
+
   /**
    * Fills in `trackerError` for the torrents that are getting nowhere. qBittorrent reports a
    * rejected announce as `stalledDL`, which maps to a perfectly ordinary in-flight state, so the
@@ -212,6 +238,7 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
       return this.call(config, path, init, false);
     }
     if (!response.ok) {
+      throwForClientServerError(response, LABEL, path.split('?')[0]!);
       throw new BadRequestException(`qBittorrent answered ${response.status} for ${path.split('?')[0]}`);
     }
     return response;
@@ -229,7 +256,10 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
       LABEL,
     );
 
-    if (!response.ok) throw new BadRequestException(`qBittorrent refused the login with ${response.status}`);
+    if (!response.ok) {
+      throwForClientServerError(response, LABEL, 'login');
+      throw new BadRequestException(`qBittorrent refused the login with ${response.status}`);
+    }
     const text = (await readClientText(response, LABEL)).trim();
     if (text.toLowerCase().startsWith('fail')) throw new BadRequestException('qBittorrent rejected those credentials');
 

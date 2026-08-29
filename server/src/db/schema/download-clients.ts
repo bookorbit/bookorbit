@@ -114,6 +114,12 @@ export const bookRequestDownloads = pgTable(
     downloadedBytes: bigint('downloaded_bytes', { mode: 'number' }).notNull().default(0),
     totalBytes: bigint('total_bytes', { mode: 'number' }),
 
+    /** Internal resume metadata for BookOrbit's built-in direct downloader. Never returned by an API. */
+    directUrl: text('direct_url'),
+    directFileName: varchar('direct_file_name', { length: 500 }),
+    directEtag: varchar('direct_etag', { length: 1024 }),
+    directLastModified: varchar('direct_last_modified', { length: 200 }),
+
     /** What the client reported, in its own namespace, and what that mapped to locally. */
     contentPath: text('content_path'),
     localPath: text('local_path'),

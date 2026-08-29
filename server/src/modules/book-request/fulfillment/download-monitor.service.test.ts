@@ -214,6 +214,21 @@ describe('DownloadMonitorService.tick', () => {
     expect(imports.importDownload).toHaveBeenCalledTimes(1);
   });
 
+  it('drops direct-download resume credentials once the transfer completes', async () => {
+    const { service, downloads } = makeService({
+      active: [row({ source: 'direct_url', downloadClientId: null })],
+      statuses: [status({ state: 'completed', progressPercent: 100, downloadedBytes: 1000 })],
+    });
+
+    await polled(service);
+
+    expect(downloads.updateIf).toHaveBeenCalledWith(
+      11,
+      ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
+      expect.objectContaining({ directUrl: null, directEtag: null, directLastModified: null }),
+    );
+  });
+
   /**
    * A client poll can take twenty seconds to answer, and a cancellation landing inside that window
    * has already taken the attempt out of the active set. Writing the stale answer back would

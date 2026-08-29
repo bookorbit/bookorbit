@@ -25,6 +25,7 @@ import { BookRequestService } from './book-request.service';
 import { RequestCredentialService } from './request-credential.service';
 import { DOWNLOAD_CLIENT_ADAPTERS } from './download-clients/download-client-adapter';
 import { DownloadClientConfigService } from './download-clients/download-client-config.service';
+import { DownloadClientReconciliationService } from './download-clients/download-client-reconciliation.service';
 import { DownloadClientController } from './download-clients/download-client.controller';
 import { DownloadClientRegistry } from './download-clients/download-client-registry';
 import { DownloadClientRepository } from './download-clients/download-client.repository';
@@ -100,6 +101,7 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
 
     DownloadClientRepository,
     DownloadClientConfigService,
+    DownloadClientReconciliationService,
     DownloadClientRegistry,
     PathMappingService,
     QbittorrentAdapter,

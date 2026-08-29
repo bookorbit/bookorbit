@@ -622,6 +622,7 @@ function nextStepDescription(code: GrabFailureCode | null, halt: boolean): strin
     case 'GRAB_SOURCE_UNAVAILABLE':
       return "skipping this source's remaining releases and trying the next one";
     case 'GRAB_CLIENT_REFUSED':
+    case 'GRAB_CLIENT_UNAVAILABLE':
       return 'skipping every release needing that download client and trying the next one';
     default:
       return 'trying the next release down';

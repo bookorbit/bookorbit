@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { NotificationType, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES, WORKER_WRITABLE_BOOK_REQUEST_STATUSES } from '@bookorbit/types';
 
 import type { RequestUser } from '../../../common/types/request-user';
@@ -193,6 +193,39 @@ describe('RequestFulfillmentService.grab', () => {
     // the claim is still ours, so a cancellation that landed mid-grab is not rolled back over.
     expect(requests.updateIf).toHaveBeenCalledWith(7, ['grabbed'], { status: 'approved' });
     expect(requests.updateIf).not.toHaveBeenCalledWith(7, expect.anything(), expect.objectContaining({ status: 'failed' }));
+  });
+
+  it('retries one transient client failure for automation without creating another attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, downloads, adapter } = makeService();
+      adapter.add
+        .mockRejectedValueOnce(new ServiceUnavailableException('qBittorrent is restarting'))
+        .mockResolvedValueOnce({ clientHash: INFO_HASH });
+
+      const grabbed = service.grab(7, { magnet: MAGNET }, null);
+      await vi.advanceTimersByTimeAsync(500);
+      await grabbed;
+
+      expect(adapter.add).toHaveBeenCalledTimes(2);
+      expect(downloads.create).toHaveBeenCalledTimes(1);
+      expect(downloads.update).not.toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed' }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not retry a transient client failure from a manual grab', async () => {
+    const { service, downloads, adapter } = makeService();
+    adapter.add.mockRejectedValue(new ServiceUnavailableException('qBittorrent is restarting'));
+
+    await expect(service.grab(7, { magnet: MAGNET }, user())).rejects.toMatchObject({
+      status: 503,
+      response: { errorCode: 'GRAB_CLIENT_UNAVAILABLE' },
+    });
+
+    expect(adapter.add).toHaveBeenCalledTimes(1);
+    expect(downloads.create).toHaveBeenCalledTimes(1);
   });
 
   /** Two approvers on one request: whoever loses the claim is told, not silently ignored. */
@@ -532,7 +565,7 @@ describe('RequestFulfillmentService.grab from a picked release', () => {
     });
 
     await service.grab(7, { indexerId: 9, releaseGuid: 'r-1' }, user());
-    expect(direct.add).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'download.epub', format: 'epub' }));
+    expect(direct.add).toHaveBeenCalledWith(expect.objectContaining({ downloadId: 11, fileName: 'download.epub' }));
   });
 
   /** Refused at inspection, which is before the fetch, rather than after downloading the whole file. */
@@ -695,6 +728,29 @@ describe('RequestFulfillmentService.grab from a picked release', () => {
     });
   });
 
+  it('retries one unavailable source resolution for automation before spending another attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchTorrentFile = vi
+        .fn()
+        .mockRejectedValueOnce(new IndexerSearchException('timeout', 'tracker did not answer in time'))
+        .mockResolvedValueOnce(torrentBytes());
+      const { service, downloads } = makeService({
+        releases: { find: vi.fn().mockReturnValue(RELEASE) },
+        indexerAdapter: { fetchTorrentFile },
+      });
+
+      const grabbed = service.grab(7, { indexerId: 9, releaseGuid: 'r-1' }, null);
+      await vi.advanceTimersByTimeAsync(500);
+      await grabbed;
+
+      expect(fetchTorrentFile).toHaveBeenCalledTimes(2);
+      expect(downloads.create).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says the release list has expired rather than grabbing something else', async () => {
     const { service, downloads } = makeService({ releases: { find: vi.fn().mockReturnValue(undefined) } });
 
@@ -778,6 +834,18 @@ describe('RequestFulfillmentService.failDownload', () => {
       { id: 7, selfServe: false },
       NotificationType.BookRequestFailed,
       expect.objectContaining({ meta: { requestId: 7, downloadId: 11 } }),
+    );
+  });
+
+  it('drops a direct source URL when its attempt fails', async () => {
+    const { service, downloads } = makeService();
+
+    await service.failDownload({ id: 11, requestId: 7, source: 'direct_url' } as BookRequestDownloadRow, 'stalled');
+
+    expect(downloads.updateIf).toHaveBeenCalledWith(
+      11,
+      UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES,
+      expect.objectContaining({ directUrl: null, directEtag: null, directLastModified: null }),
     );
   });
 

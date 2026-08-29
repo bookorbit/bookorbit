@@ -2877,6 +2877,23 @@
           "localMissing": "BookOrbit cannot see that path.",
           "dockMissing": "The Book Dock folder is not readable."
         },
+        "reconciliation": {
+          "action": "Reconcile",
+          "clean": "Every owned client item matches a retained BookOrbit download attempt.",
+          "unsupported": "This client cannot enumerate items by BookOrbit's ownership marker. For Deluge, enable the Label plugin; for Transmission, configure a category folder.",
+          "truncated": "The client returned more than 1,000 owned items. Resolve the visible entries, then reconcile again.",
+          "orphan": "No retained BookOrbit attempt owns this client item.",
+          "failedAttempt": "The client still holds this item, but its attempt for \"{title}\" is marked failed.",
+          "missing": "This {status} attempt is no longer present in the download client.",
+          "adopt": "Attach to {title}",
+          "adopted": "Attached the client item to {title}",
+          "remove": "Remove from client",
+          "removed": "Removed the orphaned client item",
+          "removeTitle": "Remove this orphaned client item?",
+          "removeDescription": "{name} is removed from the download client. Its downloaded files are kept.",
+          "notOrphan": "That client item is still attached to a BookOrbit download attempt.",
+          "notAdoptable": "That client item or failed attempt changed and can no longer be attached. Reconcile again."
+        },
         "errors": {
           "loadFailed": "Could not load download clients",
           "saveFailed": "Could not save that download client",
@@ -6569,7 +6586,8 @@
         "sourceRefused": "This source turned down an earlier release",
         "sourceUnavailable": "This source did not answer",
         "vipRequired": "Needs a VIP account on this source",
-        "clientRefused": "Your download client refused an earlier release"
+        "clientRefused": "Your download client refused an earlier release",
+        "clientUnavailable": "Your download client did not answer an earlier release"
       },
       "singleFileNote": "A release can be one book in several formats, an audiobook in parts, or an archive - all of those import as a single book. A release holding several separate books asks you which one to keep.",
       "searching": "Searching indexers...",
@@ -6822,6 +6840,13 @@
       "SUBMIT_SELF_SERVE_LIMIT": "Finish or cancel some downloads first: you can have {limit} in flight at once",
       "SUBMIT_ON_BEHALF_FORBIDDEN": "You are not allowed to request books for other people",
       "SUBMIT_ON_BEHALF_UNKNOWN_USER": "That user cannot have a book request made for them"
+    },
+    "actionError": {
+      "BOOK_REQUEST_NOT_PENDING": "Only a pending request supports this action; this request is currently {status}",
+      "BOOK_REQUEST_NOT_CANCELLABLE": "A request that is {status} can no longer be cancelled",
+      "BOOK_REQUEST_DESTINATION_REQUIRED": "Pick a destination library before approving this request",
+      "BOOK_REQUEST_ACTION_FORBIDDEN": "You are not allowed to {action} this request",
+      "BOOK_REQUEST_STALE_TRANSITION": "This request changed while the action was being applied. It is now {status}."
     },
     "bulk": {
       "selected": "{count, plural, one {# request selected} other {# requests selected}}",

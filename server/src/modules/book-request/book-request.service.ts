@@ -2,8 +2,10 @@ import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inj
 import {
   ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
   ACTIVE_BOOK_REQUEST_STATUSES,
+  BOOK_REQUEST_ACTION_ERROR_CODES,
   BOOK_REQUEST_MEDIA_KINDS,
   BOOK_REQUEST_STATUSES,
+  BOOK_REQUEST_SUBMIT_ERROR_CODES,
   CANCELLABLE_BOOK_REQUEST_STATUSES,
   emptyResolvedRequestDestinations,
   FULFILLABLE_BOOK_REQUEST_STATUSES,
@@ -20,6 +22,7 @@ import {
 import type {
   BookRequestAvailability,
   BookRequestAvailabilityQuery,
+  BookRequestActionErrorCode,
   BookRequestFailureMeta,
   BookRequestSubmitErrorCode,
   BookRequestItem,
@@ -124,6 +127,14 @@ function submitRefusal(errorCode: BookRequestSubmitErrorCode, message: string, e
 
 /** The same, for the refusals that are about what this person may do rather than what they sent. */
 function submitForbidden(errorCode: BookRequestSubmitErrorCode, message: string, errorMeta?: BookRequestFailureMeta): ForbiddenException {
+  return new ForbiddenException({ message, errorCode, ...(errorMeta ? { errorMeta } : {}), statusCode: HttpStatus.FORBIDDEN });
+}
+
+function actionRefusal(errorCode: BookRequestActionErrorCode, message: string, errorMeta?: BookRequestFailureMeta): BadRequestException {
+  return new BadRequestException({ message, errorCode, ...(errorMeta ? { errorMeta } : {}), statusCode: HttpStatus.BAD_REQUEST });
+}
+
+function actionForbidden(errorCode: BookRequestActionErrorCode, message: string, errorMeta?: BookRequestFailureMeta): ForbiddenException {
   return new ForbiddenException({ message, errorCode, ...(errorMeta ? { errorMeta } : {}), statusCode: HttpStatus.FORBIDDEN });
 }
 
@@ -600,6 +611,16 @@ export class BookRequestService {
     return new BadRequestException(describe(joined.request.status as BookRequestStatus));
   }
 
+  private async staleLifecycleTransition(id: number, action: 'approve' | 'reject' | 'cancel'): Promise<HttpException> {
+    const joined = await this.repo.findById(id);
+    if (!joined) return new NotFoundException('Book request not found');
+    const status = joined.request.status as BookRequestStatus;
+    return actionRefusal('BOOK_REQUEST_STALE_TRANSITION', `The request changed before ${action} could be applied; it is now ${status}`, {
+      action,
+      status,
+    });
+  }
+
   /**
    * Who may steer or stop one request: its requester, a moderator, or the self-fulfiller who took
    * it on. The last of those matters because a fulfiller who cannot cancel the transfer they
@@ -639,9 +660,13 @@ export class BookRequestService {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
 
-    if (!this.canDrive(joined.request, user)) throw new ForbiddenException('You cannot cancel this book request');
+    if (!this.canDrive(joined.request, user)) {
+      throw actionForbidden('BOOK_REQUEST_ACTION_FORBIDDEN', 'You cannot cancel this book request', { action: 'cancel' });
+    }
     if (!isCancellableBookRequestStatus(joined.request.status as BookRequestStatus)) {
-      throw new BadRequestException(`A request that is ${joined.request.status} can no longer be cancelled`);
+      throw actionRefusal('BOOK_REQUEST_NOT_CANCELLABLE', `A request that is ${joined.request.status} can no longer be cancelled`, {
+        status: joined.request.status,
+      });
     }
 
     // The transition first, and only then the client. Detaching first would hand the seed of a
@@ -654,7 +679,7 @@ export class BookRequestService {
       decidedAt: new Date(),
       statusReason: null,
     });
-    if (!updated) throw await this.staleTransition(id, (status) => `A request that is ${status} can no longer be cancelled`);
+    if (!updated) throw await this.staleLifecycleTransition(id, 'cancel');
 
     const outcome = await this.removal.removeLatestForRequest(id, false, user.username);
     // The cancellation stands either way; the note is what tells the requester a transfer may
@@ -807,7 +832,10 @@ export class BookRequestService {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
     if (joined.request.status !== 'pending') {
-      throw new BadRequestException(`Only a pending request can be approved; this one is ${joined.request.status}`);
+      throw actionRefusal('BOOK_REQUEST_NOT_PENDING', `Only a pending request can be approved; this one is ${joined.request.status}`, {
+        action: 'approve',
+        status: joined.request.status,
+      });
     }
 
     // The approver may reroute, but only somewhere they can reach themselves.
@@ -829,7 +857,7 @@ export class BookRequestService {
     // Fulfilment has nowhere to file the book without one, and an approval that skips it only
     // fails much later, at the grab or after a whole download has already run.
     if (targetLibraryId === null) {
-      throw new BadRequestException('Pick a destination library before approving this request');
+      throw actionRefusal('BOOK_REQUEST_DESTINATION_REQUIRED', 'Pick a destination library before approving this request');
     }
 
     const targetFolderId = await this.resolveDestinationFolder(carriedFolderId, targetLibraryId);
@@ -847,7 +875,7 @@ export class BookRequestService {
         targetFolderId,
       }))
     ) {
-      throw await this.staleTransition(id, (status) => `Only a pending request can be approved; this one is ${status}`);
+      throw await this.staleLifecycleTransition(id, 'approve');
     }
 
     this.gateway.emitChanged();
@@ -901,7 +929,15 @@ export class BookRequestService {
         }
         const reason = error instanceof HttpException ? error.message : fallbackReason;
         const joined = await this.repo.findById(id);
-        failed.push({ id, title: joined?.request.title ?? String(id), reason });
+        const response = error instanceof HttpException ? error.getResponse() : null;
+        const body = typeof response === 'object' && response !== null ? (response as { errorCode?: unknown; errorMeta?: unknown }) : null;
+        const errorCode =
+          typeof body?.errorCode === 'string' &&
+          ([...BOOK_REQUEST_ACTION_ERROR_CODES, ...BOOK_REQUEST_SUBMIT_ERROR_CODES] as readonly string[]).includes(body.errorCode)
+            ? (body.errorCode as BookRequestActionErrorCode | BookRequestSubmitErrorCode)
+            : null;
+        const errorMeta = typeof body?.errorMeta === 'object' && body.errorMeta !== null ? (body.errorMeta as BookRequestFailureMeta) : null;
+        failed.push({ id, title: joined?.request.title ?? String(id), reason, errorCode, errorMeta });
       }
     }
 
@@ -952,7 +988,10 @@ export class BookRequestService {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
     if (joined.request.status !== 'pending') {
-      throw new BadRequestException(`Only a pending request can be rejected; this one is ${joined.request.status}`);
+      throw actionRefusal('BOOK_REQUEST_NOT_PENDING', `Only a pending request can be rejected; this one is ${joined.request.status}`, {
+        action: 'reject',
+        status: joined.request.status,
+      });
     }
 
     if (
@@ -963,7 +1002,7 @@ export class BookRequestService {
         decisionNote: dto.decisionNote ?? null,
       }))
     ) {
-      throw await this.staleTransition(id, (status) => `Only a pending request can be rejected; this one is ${status}`);
+      throw await this.staleLifecycleTransition(id, 'reject');
     }
 
     this.gateway.emitChanged();

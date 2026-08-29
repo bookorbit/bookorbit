@@ -4,7 +4,9 @@ import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 import { Auditable } from '../../../common/decorators/auditable.decorator';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { DownloadClientConfigService } from './download-client-config.service';
+import { DownloadClientReconciliationService } from './download-client-reconciliation.service';
 import { CreateDownloadClientDto, TestPathMappingDto, UpdateDownloadClientDto } from './dto/download-client.dto';
+import { AdoptDownloadClientItemDto, RemoveOrphanedDownloadClientItemDto } from './dto/reconcile-download-client.dto';
 
 /**
  * Gated on `ManageAppSettings`, not `ManageBookRequests`: moderating a queue and holding seedbox
@@ -14,7 +16,10 @@ import { CreateDownloadClientDto, TestPathMappingDto, UpdateDownloadClientDto } 
 @Controller('admin/download-clients')
 @RequirePermission(Permission.ManageAppSettings)
 export class DownloadClientController {
-  constructor(private readonly service: DownloadClientConfigService) {}
+  constructor(
+    private readonly service: DownloadClientConfigService,
+    private readonly reconciliation: DownloadClientReconciliationService,
+  ) {}
 
   @Get()
   findAll() {
@@ -24,6 +29,34 @@ export class DownloadClientController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.service.findOne(id);
+  }
+
+  @Get(':id/reconciliation')
+  reconcile(@Param('id', ParseIntPipe) id: number) {
+    return this.reconciliation.reconcile(id);
+  }
+
+  @Post(':id/reconciliation/:hash/adopt')
+  @Auditable({
+    action: AuditAction.DownloadClientUpdate,
+    resource: AuditResource.DownloadClient,
+    getResourceId: (req) => Number(req.params.id),
+    description: (req) => `Adopted an owned download into client #${req.params.id}`,
+  })
+  adopt(@Param('id', ParseIntPipe) id: number, @Param('hash') hash: string, @Body() dto: AdoptDownloadClientItemDto) {
+    return this.reconciliation.adopt(id, hash, dto.downloadId);
+  }
+
+  @Delete(':id/reconciliation/:hash')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Auditable({
+    action: AuditAction.DownloadClientUpdate,
+    resource: AuditResource.DownloadClient,
+    getResourceId: (req) => Number(req.params.id),
+    description: (req) => `Removed an orphaned owned download from client #${req.params.id}`,
+  })
+  removeOrphan(@Param('id', ParseIntPipe) id: number, @Param('hash') hash: string, @Body() dto: RemoveOrphanedDownloadClientItemDto) {
+    return this.reconciliation.removeOrphan(id, hash, dto.deleteFiles ?? false);
   }
 
   @Post()

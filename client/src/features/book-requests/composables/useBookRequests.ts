@@ -1,15 +1,18 @@
 import { computed, onScopeDispose, ref } from 'vue'
-import { GRAB_FAILURE_CODES } from '@bookorbit/types'
+import { bookRequestActionErrorCode, bookRequestSubmitErrorCode, grabFailureCode } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { fulfilmentBase } from '../fulfilmentBase'
 import type {
   BookRequestItem,
+  BookRequestActionErrorCode,
+  BookRequestFailureMeta,
   BookRequestMediaKind,
   BookRequestPage,
   BookRequestRequesterOption,
   BookRequestSortDirection,
   BookRequestSortField,
   BookRequestStatus,
+  BookRequestSubmitErrorCode,
   BookRequestBulkResult,
   BulkBookRequestsPayload,
   BulkRejectBookRequestsPayload,
@@ -206,11 +209,22 @@ async function postRequest(path: string, body?: unknown): Promise<ActionOutcome>
     body: JSON.stringify(body ?? {}),
   })
   if (!res.ok) {
-    const payload = (await res.json().catch(() => null)) as { message?: string | string[]; errorCode?: string } | null
+    const payload = (await res.json().catch(() => null)) as {
+      message?: string | string[]
+      errorCode?: unknown
+      errorMeta?: BookRequestFailureMeta
+    } | null
     const message = Array.isArray(payload?.message) ? payload.message.join('. ') : payload?.message
-    return { item: null, reason: message?.trim() ? message.trim() : null, errorCode: grabFailureCodeOf(payload?.errorCode) }
+    const errorCode =
+      grabFailureCode(payload?.errorCode) ?? bookRequestActionErrorCode(payload?.errorCode) ?? bookRequestSubmitErrorCode(payload?.errorCode)
+    return {
+      item: null,
+      reason: message?.trim() ? message.trim() : null,
+      errorCode,
+      errorMeta: payload?.errorMeta ?? null,
+    }
   }
-  return { item: (await res.json()) as BookRequestItem, reason: null, errorCode: null }
+  return { item: (await res.json()) as BookRequestItem, reason: null, errorCode: null, errorMeta: null }
 }
 
 /**
@@ -223,18 +237,14 @@ async function postRequest(path: string, body?: unknown): Promise<ActionOutcome>
 export interface ActionOutcome {
   item: BookRequestItem | null
   reason: string | null
-  /** How far a refused grab reaches, which is what lets the picker rule out the rest of a source. */
-  errorCode: GrabFailureCode | null
+  errorCode: GrabFailureCode | BookRequestActionErrorCode | BookRequestSubmitErrorCode | null
+  errorMeta?: BookRequestFailureMeta | null
 }
 
 /** The same, for the one action that answers 204 and so has no row to hand back. */
 export interface DeleteOutcome {
   ok: boolean
   reason: string | null
-}
-
-function grabFailureCodeOf(value: unknown): GrabFailureCode | null {
-  return typeof value === 'string' && (GRAB_FAILURE_CODES as readonly string[]).includes(value) ? (value as GrabFailureCode) : null
 }
 
 /** A 204 carries no row to hand back, so success is the absence of a reason rather than an item. */
@@ -331,7 +341,10 @@ export function useBookRequestActions(canManage: () => boolean) {
     fulfill: (id: number, body: FulfillBookRequestPayload) => run(id, `/api/v1/admin/book-requests/${id}/fulfill`, body),
     // The three a self-server may also call on their own row. Everything above them stays on the
     // admin path, and the UI only offers those to a moderator.
-    grab: (id: number, body: GrabBookRequestPayload) => run(id, `${basePath()}/${id}/grab`, body),
+    grab: async (id: number, body: GrabBookRequestPayload) => {
+      const outcome = await run(id, `${basePath()}/${id}/grab`, body)
+      return { ...outcome, errorCode: grabFailureCode(outcome.errorCode) }
+    },
     forceFile: (id: number) => run(id, `${basePath()}/${id}/force-file`),
     /** The other answer to a held import: the release was the wrong book, so throw it away. */
     discardImport: (id: number) => run(id, `${basePath()}/${id}/discard-import`),

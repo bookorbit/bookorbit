@@ -77,9 +77,28 @@ export class RequestWatchdogService implements OnApplicationBootstrap {
     }
 
     try {
+      await this.resumeInterruptedDirectDownloads();
+    } catch (error) {
+      this.logFailure('direct_resume', error);
+    }
+
+    try {
       await this.reapStagedDownloads();
     } catch (error) {
       this.logFailure('staging_reap', error);
+    }
+  }
+
+  private async resumeInterruptedDirectDownloads(): Promise<void> {
+    const rows = await this.downloads.findActiveDirect();
+    for (const row of rows) {
+      try {
+        if (await this.direct.resume(row)) continue;
+        await this.fulfillment.failDownload(row, 'The interrupted direct download could not be resumed safely');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await this.fulfillment.failDownload(row, `The interrupted direct download could not be resumed: ${message}`);
+      }
     }
   }
 
