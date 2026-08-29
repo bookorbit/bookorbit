@@ -21,6 +21,7 @@ function resetEnv(): void {
   delete process.env.APP_URL;
   delete process.env.APP_VERSION;
   delete process.env.OIDC_ALLOW_LOCAL_ISSUERS;
+  delete process.env.OIDC_EXTRA_REDIRECT_URIS;
   delete process.env.SWAGGER_ENABLED;
   delete process.env.KOBO_CLOUDSCRAPER_PYTHON;
   delete process.env.KOREADER_PLUGIN_PATH;
@@ -70,6 +71,7 @@ describe('config', () => {
       githubReleasesRepo: 'bookorbit/bookorbit',
       githubReleasesToken: undefined,
       oidcAllowLocalIssuers: false,
+      oidcExtraRedirectUris: [],
       swaggerEnabled: false,
       koboCloudscraperPython: undefined,
       koreaderPluginSourcePath: undefined,
@@ -98,6 +100,7 @@ describe('config', () => {
       githubReleasesRepo: 'acme/app',
       githubReleasesToken: 'ghp_example',
       oidcAllowLocalIssuers: true,
+      oidcExtraRedirectUris: [],
       swaggerEnabled: true,
       koboCloudscraperPython: '/opt/bookorbit-python/bin/python',
       koreaderPluginSourcePath: '/opt/koreader/bookorbit.koplugin',
@@ -117,6 +120,16 @@ describe('config', () => {
   it('falls back to false when OIDC_ALLOW_LOCAL_ISSUERS is invalid', () => {
     process.env.OIDC_ALLOW_LOCAL_ISSUERS = 'maybe';
     expect(appConfig().oidcAllowLocalIssuers).toBe(false);
+  });
+
+  it('parses OIDC_EXTRA_REDIRECT_URIS as a comma-separated list', () => {
+    process.env.OIDC_EXTRA_REDIRECT_URIS = 'bookorbit://oauth2-callback, https://books.lan/oauth2-callback';
+    expect(appConfig().oidcExtraRedirectUris).toEqual(['bookorbit://oauth2-callback', 'https://books.lan/oauth2-callback']);
+  });
+
+  it('falls back to the empty-list default when OIDC_EXTRA_REDIRECT_URIS has no usable entries', () => {
+    process.env.OIDC_EXTRA_REDIRECT_URIS = ' , ,';
+    expect(appConfig().oidcExtraRedirectUris).toEqual([]);
   });
 
   it('uses defaults for database, auth, email, and migration config', () => {
