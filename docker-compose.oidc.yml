@@ -1,0 +1,10 @@
+services:
+  dex:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    container_name: bookorbit-dex
+    ports:
+      - "5556:5556"
+    volumes:
+      - ./scripts/dex-config.yaml:/etc/dex/config.yaml:ro
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    restart: unless-stopped

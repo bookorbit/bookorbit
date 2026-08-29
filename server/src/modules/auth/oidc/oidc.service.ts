@@ -5,6 +5,7 @@ import type { FastifyReply } from 'fastify';
 import { AuditAction, AuditResource, OidcCallbackResponse, OidcErrorCode, Permission } from '@bookorbit/types';
 import type { OidcAutoProvision, OidcClaimMapping } from '@bookorbit/types';
 
+import { DEFAULT_OIDC_EXTRA_REDIRECT_URI } from '../../../config/config';
 import { AUDIT_EVENT, AuditEventsService } from '../../audit/audit-events.service';
 import { OidcProviderService } from '../../app-settings/oidc-provider.service';
 import { OidcIdentityRepository } from '../../user/oidc-identity.repository';
@@ -32,19 +33,11 @@ function toThrowable(error: unknown, fallbackMessage: string): Error {
   return error instanceof Error ? error : new UnauthorizedException(fallbackMessage);
 }
 
-function normalizeRedirectUri(raw: string): string {
-  try {
-    const u = new URL(raw);
-    return u.origin + u.pathname;
-  } catch {
-    return raw;
-  }
-}
-
 @Injectable()
 export class OidcService {
   private readonly logger = new Logger(OidcService.name);
   private readonly appUrl: string;
+  private readonly allowedRedirectUris: string[];
 
   constructor(
     private readonly providerService: OidcProviderService,
@@ -63,6 +56,28 @@ export class OidcService {
     private readonly configService: ConfigService,
   ) {
     this.appUrl = (this.configService.get<string>('app.appUrl') ?? 'http://localhost:5173').replace(/\/$/, '');
+    const extraUris = this.configService.get<string[]>('app.oidcExtraRedirectUris') ?? [DEFAULT_OIDC_EXTRA_REDIRECT_URI];
+    this.allowedRedirectUris = [`${this.appUrl}/oauth2-callback`, ...extraUris];
+  }
+
+  /**
+   * Whether [redirectUri] is on the allow-list (APP_URL callback + OIDC_EXTRA_REDIRECT_URIS).
+   * http/https URIs are compared by origin + pathname so a deployment reachable on several
+   * hostnames can list each; custom-scheme URIs (e.g. `bookorbit://oauth2-callback` from
+   * native clients) are compared as exact strings after trimming whitespace and trailing slashes.
+   */
+  private isRedirectUriAllowed(redirectUri: string): boolean {
+    const normalize = (raw: string): string => {
+      const trimmed = raw.trim();
+      try {
+        const u = new URL(trimmed);
+        return u.protocol === 'http:' || u.protocol === 'https:' ? u.origin + u.pathname : trimmed.replace(/\/+$/, '');
+      } catch {
+        return trimmed.replace(/\/+$/, '');
+      }
+    };
+    const target = normalize(redirectUri);
+    return this.allowedRedirectUris.some((allowed) => normalize(allowed) === target);
   }
 
   async generateState(providerSlug: string): Promise<{ state: string; authorizationEndpoint: string }> {
@@ -165,8 +180,7 @@ export class OidcService {
     const claimMapping = provider.claimMapping as OidcClaimMapping;
     const autoProvision = provider.autoProvision as OidcAutoProvision;
 
-    const allowedRedirectUri = `${this.appUrl}/oauth2-callback`;
-    if (normalizeRedirectUri(params.redirectUri) !== normalizeRedirectUri(allowedRedirectUri)) {
+    if (!this.isRedirectUriAllowed(params.redirectUri)) {
       throw new BadRequestException(`Redirect URI is not allowed: ${params.redirectUri}`);
     }
 
