@@ -1959,7 +1959,7 @@
         "readingModeHint": "Comment les pages sont parcourues - utilisez « Infini (pas d'espaces) » pour les webtoons",
         "paginated": "Paginé",
         "infiniteSpaced": "Infini (espacé)",
-        "infiniteNoGaps": "Infini (pas de lacunes)",
+        "infiniteNoGaps": "Infini (pas de trous)",
         "pageView": "Affichage des pages",
         "pageViewHint": "Afficher une ou deux pages côte à côte",
         "single": "Célibataire",
@@ -5774,7 +5774,7 @@
       "githubStar": {
         "title": "Vous appréciez BookOrbit ?",
         "body": "Si BookOrbit vous aide avec votre bibliothèque, pensez à mettre le projet en vedette sur GitHub. Cela aide davantage de personnes à découvrir l'application et prend en charge le développement continu.",
-        "cta": "Étoile BookOrbit sur GitHub"
+        "cta": "Mettez une étoile à BookOrbit sur GitHub"
       },
       "surfaceOpacity": "Opacité de la surface",
       "surfaceOpacityValue": "{value} %",
@@ -6426,7 +6426,7 @@
       },
       "syncOnRating": {
         "title": "Synchronisation lors du changement de note",
-        "description": "Augmentez votre nombre d'étoiles à Hardcover."
+        "description": "Envoyez vos notes à Hardcover."
       },
       "privacy": {
         "title": "Confidentialité",
@@ -7540,7 +7540,7 @@
       "scroll": {
         "paged": "Paginé",
         "infinite": "Infini",
-        "noGaps": "Aucune lacune"
+        "noGaps": "Aucun trou"
       },
       "direction": {
         "ltr": "De gauche à droite",
@@ -7608,7 +7608,7 @@
       "ownedOfExpected": "{owned} de {expected} dans la bibliothèque"
     },
     "gaps": {
-      "label": "Lacunes possibles :",
+      "label": "Trous possibles :",
       "missingCount": "{count, plural, one {# manquant} other {# manquants} many {# manquants}}",
       "missingList": "Manquants : {list}",
       "previewMore": "{shown} +{count}"
