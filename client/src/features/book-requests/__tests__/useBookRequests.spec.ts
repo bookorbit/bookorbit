@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMock = vi.hoisted(() => vi.fn<(...args: [RequestInfo | URL, RequestInit?]) => Promise<unknown>>())
 
@@ -50,73 +50,11 @@ describe('useBookRequests filters', () => {
     expect(apiMock).toHaveBeenCalledExactlyOnceWith('/api/v1/admin/book-requests/requesters')
     expect(requests.requesterOptions.value).toEqual(options)
   })
-})
 
-/**
- * The endpoint answers with a bounded page, so on an instance with more requesters than that the
- * select silently omits people. The search is what makes the rest of them reachable, and pinning
- * the active choice is what stops a narrowing search from dropping the filter out of its control.
- */
-describe('useBookRequests requester search', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  async function settleSearch() {
-    await vi.runAllTimersAsync()
-  }
-
-  it('asks the server for the term rather than filtering the page it already has', async () => {
-    apiMock.mockResolvedValue(response([]))
-    const requests = await freshRequests('all')
-
-    requests.requesterSearch.value = 'ada'
-    requests.searchRequesters()
-    await settleSearch()
-
-    expect(apiMock).toHaveBeenCalledExactlyOnceWith('/api/v1/admin/book-requests/requesters?search=ada')
-  })
-
-  it('asks once for a burst of keystrokes', async () => {
-    apiMock.mockResolvedValue(response([]))
-    const requests = await freshRequests('all')
-
-    for (const term of ['a', 'ad', 'ada']) {
-      requests.requesterSearch.value = term
-      requests.searchRequesters()
-    }
-    await settleSearch()
-
-    expect(apiMock).toHaveBeenCalledExactlyOnceWith('/api/v1/admin/book-requests/requesters?search=ada')
-  })
-
-  it('keeps the requester the list is filtered on when a search no longer matches them', async () => {
-    const ada = { userId: 42, username: 'ada', name: 'Ada Lovelace' }
-    apiMock.mockResolvedValue(response([ada]))
-    const requests = await freshRequests('all')
-    await requests.fetchRequesterOptions()
-    requests.requesterUserId.value = 42
-    await vi.waitFor(() => expect(requests.requesterOptions.value).toContainEqual(ada))
-
-    apiMock.mockResolvedValue(response([{ userId: 7, username: 'grace', name: 'Grace Hopper' }]))
-    requests.requesterSearch.value = 'grace'
-    requests.searchRequesters()
-    await settleSearch()
-
-    expect(requests.requesterOptions.value).toEqual([ada, { userId: 7, username: 'grace', name: 'Grace Hopper' }])
-  })
-
-  it('does nothing for the caller-scoped list, which has no requester filter', async () => {
+  it('does not load requester options for the caller-scoped list', async () => {
     const requests = await freshRequests('mine')
 
-    requests.requesterSearch.value = 'ada'
-    requests.searchRequesters()
-    await settleSearch()
+    await requests.fetchRequesterOptions()
 
     expect(apiMock).not.toHaveBeenCalled()
   })
@@ -227,6 +165,19 @@ describe('useBookRequestActions with more than one row in flight', () => {
     slow.release()
     await running
     expect(actions.isPending(1)).toBe(false)
+  })
+
+  it('cancels only the named download through the requester-scoped route', async () => {
+    const actions = await freshActions()
+    apiMock.mockResolvedValue(response({ id: 1, status: 'approved' }))
+
+    await actions.cancelDownload(1, 11)
+
+    expect(apiMock).toHaveBeenCalledExactlyOnceWith('/api/v1/book-requests/1/downloads/11/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    })
   })
 
   /**

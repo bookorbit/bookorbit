@@ -62,6 +62,17 @@ beforeEach(() => {
 })
 
 describe('RequestAttemptsPanel', () => {
+  it('collapses earlier attempts by default and lets the user expand them', async () => {
+    const wrapper = await render([CURRENT, attempt()])
+    const disclosure = wrapper.get('details')
+
+    expect((disclosure.element as HTMLDetailsElement).open).toBe(false)
+
+    await disclosure.get('summary').trigger('click')
+
+    expect((disclosure.element as HTMLDetailsElement).open).toBe(true)
+  })
+
   /**
    * The question this answers: the book arrived from Library Genesis, and nothing on the request
    * said the tracker had been asked first and had refused.
@@ -91,6 +102,6 @@ describe('RequestAttemptsPanel', () => {
   it('renders nothing at all when a request has only ever made one attempt', async () => {
     const wrapper = await render([CURRENT])
 
-    expect(wrapper.find('section').exists()).toBe(false)
+    expect(wrapper.find('details').exists()).toBe(false)
   })
 })

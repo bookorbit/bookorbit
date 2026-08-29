@@ -469,10 +469,6 @@ function handleFilterChange() {
   void activeList.value.applyFilters()
 }
 
-function handleRequesterSearch() {
-  all.searchRequesters()
-}
-
 function goToPreviousPage() {
   clearSelection()
   void activeList.value.goToPage(activeList.value.page.value - 1)
@@ -578,24 +574,10 @@ function goToNextPage() {
             </select>
           </div>
 
-          <!-- Wraps within itself, unlike its neighbours: three controls do not fit one narrow line. -->
-          <div v-if="activeTab === 'all'" class="flex flex-wrap items-center gap-2">
+          <div v-if="activeTab === 'all'" class="flex items-center gap-2">
             <label for="requests-requester-all" class="text-sm text-muted-foreground">
               {{ t('bookRequests.filters.requester') }}
             </label>
-            <!--
-              The select holds one bounded page of requesters, so on a large instance the search is
-              what makes the rest of them reachable rather than quietly absent.
-            -->
-            <input
-              id="requests-requester-search"
-              v-model="all.requesterSearch.value"
-              type="search"
-              class="h-8 w-32 rounded-md border border-input bg-background px-2 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-              :placeholder="t('bookRequests.filters.requesterSearchPlaceholder')"
-              :aria-label="t('bookRequests.filters.requesterSearchLabel')"
-              @input="handleRequesterSearch"
-            />
             <select
               id="requests-requester-all"
               v-model.number="all.requesterUserId.value"

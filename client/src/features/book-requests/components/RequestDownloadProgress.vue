@@ -18,11 +18,13 @@ const props = withDefaults(
     showError?: boolean
     /** Recovery stays permission-gated by the request detail that owns the release picker. */
     canRetry?: boolean
+    /** Cancellation follows the same request ownership rules as the detail menu. */
+    canCancel?: boolean
   }>(),
-  { showError: true, canRetry: false },
+  { showError: true, canRetry: false, canCancel: false },
 )
 
-const emit = defineEmits<{ retry: [] }>()
+const emit = defineEmits<{ retry: []; cancel: [] }>()
 
 const { t } = useI18n()
 
@@ -37,6 +39,7 @@ const totalBytes = computed(() => currentLive.value?.totalBytes ?? props.downloa
 /** Only a live transfer has a meaningful bar; everything else is a state, not a proportion. */
 const showBar = computed(() => status.value === 'queued' || status.value === 'downloading')
 const showRetry = computed(() => status.value === 'failed' && props.canRetry)
+const showCancel = computed(() => showBar.value && props.canCancel)
 
 /**
  * Which source this came from, and how. A finished transfer says only that the book arrived, and
@@ -60,6 +63,10 @@ const sizeLine = computed(() => {
 
 function handleRetry() {
   emit('retry')
+}
+
+function handleCancel() {
+  emit('cancel')
 }
 </script>
 
@@ -85,10 +92,15 @@ function handleRetry() {
     <p v-if="showBar && sizeLine" class="settings-hint tabular-nums">{{ sizeLine }}</p>
     <p v-if="props.showError && download.errorMessage" class="settings-hint">{{ download.errorMessage }}</p>
     <p class="settings-hint break-all">{{ download.releaseTitle }}</p>
-    <Button v-if="showRetry" variant="outline" size="sm" class="mt-2" @click="handleRetry">
-      <RefreshCw :size="14" aria-hidden="true" />
-      {{ t('bookRequests.actions.retryRelease') }}
-    </Button>
+    <div v-if="showRetry || showCancel" class="mt-2 flex flex-wrap gap-2">
+      <Button v-if="showRetry" variant="outline" size="sm" @click="handleRetry">
+        <RefreshCw :size="14" aria-hidden="true" />
+        {{ t('bookRequests.actions.retryRelease') }}
+      </Button>
+      <Button v-if="showCancel" variant="destructive-outline" size="sm" @click="handleCancel">
+        {{ t('bookRequests.actions.cancelDownload') }}
+      </Button>
+    </div>
     <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
       <span class="rounded-full border px-1.5 py-px font-medium" :class="sourceChipClass(download.indexerColor)">
         {{ sourceName }}

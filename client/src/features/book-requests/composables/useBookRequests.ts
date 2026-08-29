@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref } from 'vue'
 import { GRAB_FAILURE_CODES } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { fulfilmentBase } from '../fulfilmentBase'
@@ -25,9 +25,6 @@ export type RequestScope = 'mine' | 'all'
 
 const PAGE_SIZE = 20
 
-/** Typing is a question per keystroke; asking the server once per pause is enough of an answer. */
-const REQUESTER_SEARCH_DEBOUNCE_MS = 250
-
 export function useBookRequests(scope: RequestScope) {
   const items = ref<BookRequestItem[]>([])
   const total = ref(0)
@@ -36,18 +33,7 @@ export function useBookRequests(scope: RequestScope) {
   const mediaKind = ref<BookRequestMediaKind | ''>('')
   const requesterUserId = ref<number | ''>('')
   const requesterOptions = ref<BookRequestRequesterOption[]>([])
-  const requesterSearch = ref('')
-  /**
-   * Whoever the list is currently filtered on, held separately from the options.
-   *
-   * The options are one page of an answer to a search, so a narrowing search would otherwise drop
-   * the active filter out of its own control and leave a select showing a value it does not list.
-   */
-  const selectedRequester = ref<BookRequestRequesterOption | null>(null)
   let requesterOptionsInitialized = false
-  let requesterSearchHandle: ReturnType<typeof setTimeout> | null = null
-  /** Bumped per request so a slow answer to an earlier search cannot land on a later one. */
-  let requesterSearchGeneration = 0
   const includeDismissed = ref(false)
   /** '' is "either", so the control has a third state rather than a checkbox that means two. */
   const selfServe = ref<'' | 'true' | 'false'>('')
@@ -111,64 +97,20 @@ export function useBookRequests(scope: RequestScope) {
     }
   }
 
-  /**
-   * The requesters the filter offers: what the current search matched, plus whoever it is already
-   * pointed at. The server answers with a bounded page, so the search is what makes somebody past
-   * that page reachable rather than silently missing.
-   */
-  const requesterChoices = computed<BookRequestRequesterOption[]>(() => {
-    const selected = selectedRequester.value
-    if (!selected || requesterOptions.value.some((option) => option.userId === selected.userId)) return requesterOptions.value
-    return [selected, ...requesterOptions.value]
-  })
-
-  async function loadRequesterOptions(): Promise<void> {
-    const search = requesterSearch.value.trim()
-    const generation = ++requesterSearchGeneration
+  /** The requesters the filter offers, fetched once when the tab that has the filter first opens. */
+  async function fetchRequesterOptions(): Promise<void> {
+    if (scope !== 'all' || requesterOptionsInitialized) return
     try {
-      const query = search ? `?search=${encodeURIComponent(search)}` : ''
-      const res = await api(`/api/v1/admin/book-requests/requesters${query}`)
-      if (!res.ok || generation !== requesterSearchGeneration) return
+      const res = await api('/api/v1/admin/book-requests/requesters')
+      if (!res.ok) return
       requesterOptions.value = (await res.json()) as BookRequestRequesterOption[]
       requesterOptionsInitialized = true
     } catch {
-      // The request list remains usable and the next keystroke or tab visit retries this.
+      // The request list remains usable and the next tab visit retries this.
     }
   }
 
-  /** The first page of requesters, fetched once when the tab that has the filter first opens. */
-  async function fetchRequesterOptions(): Promise<void> {
-    if (scope !== 'all' || requesterOptionsInitialized) return
-    await loadRequesterOptions()
-  }
-
-  /** A new search is always a new question, so this asks whatever the first load already did. */
-  function searchRequesters(): void {
-    if (scope !== 'all') return
-    if (requesterSearchHandle) clearTimeout(requesterSearchHandle)
-    requesterSearchHandle = setTimeout(() => {
-      requesterSearchHandle = null
-      void loadRequesterOptions()
-    }, REQUESTER_SEARCH_DEBOUNCE_MS)
-  }
-
-  // Remembered at the moment of choosing, which is the only moment the option is certain to be in
-  // the list: a later search can narrow it out, and the filter still has to name who it is on.
-  watch(requesterUserId, (id) => {
-    if (id === '') {
-      selectedRequester.value = null
-      return
-    }
-    const match = requesterChoices.value.find((option) => option.userId === id)
-    if (match) selectedRequester.value = match
-  })
-
-  // A tab left mid-keystroke otherwise fires its search into a scope that has gone, and a slow
-  // answer lands on refs nothing is rendering.
   onScopeDispose(() => {
-    if (requesterSearchHandle) clearTimeout(requesterSearchHandle)
-    requesterSearchHandle = null
-    requesterSearchGeneration += 1
     fetchGeneration += 1
   })
 
@@ -234,8 +176,7 @@ export function useBookRequests(scope: RequestScope) {
     status,
     mediaKind,
     requesterUserId,
-    requesterOptions: requesterChoices,
-    requesterSearch,
+    requesterOptions,
     includeDismissed,
     selfServe,
     sortBy,
@@ -245,7 +186,6 @@ export function useBookRequests(scope: RequestScope) {
     error,
     fetchRequests,
     fetchRequesterOptions,
-    searchRequesters,
     applyFilters,
     applySort,
     goToPage,
@@ -404,6 +344,7 @@ export function useBookRequestActions(canManage: () => boolean) {
     dismissMany,
     /** The language the request asks for, which decides which releases can match it at all. */
     setLanguage: (id: number, language: string | null) => run(id, `/api/v1/book-requests/${id}/language`, { language }),
+    cancelDownload: (id: number, downloadId: number) => run(id, `/api/v1/book-requests/${id}/downloads/${downloadId}/cancel`),
     cancel: (id: number) => run(id, `/api/v1/book-requests/${id}/cancel`),
     dismiss: (id: number) => run(id, `/api/v1/book-requests/${id}/dismiss`),
     restore: (id: number) => run(id, `/api/v1/book-requests/${id}/restore`),

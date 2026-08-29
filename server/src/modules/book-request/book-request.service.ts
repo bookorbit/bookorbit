@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
+  ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
   ACTIVE_BOOK_REQUEST_STATUSES,
   BOOK_REQUEST_MEDIA_KINDS,
   BOOK_REQUEST_STATUSES,
@@ -89,6 +90,9 @@ const SUBMIT_INSERT_ATTEMPTS = 2;
 
 /** The one status approve and reject may be reached from. */
 const PENDING_ONLY: readonly BookRequestStatus[] = ['pending'];
+
+/** Request states that can own a transfer which is still downloading bytes. */
+const ACTIVE_TRANSFER_REQUEST_STATUSES: readonly BookRequestStatus[] = ['grabbed', 'downloading'];
 
 /**
  * How many self-serve requests one person may have in flight at once.
@@ -666,6 +670,31 @@ export class BookRequestService {
     );
 
     this.gateway.emitChanged();
+    return this.getOne(id, user);
+  }
+
+  /**
+   * Stop only the active transfer and put the request back where another release can be chosen.
+   * This is intentionally separate from `cancel`: the request, its subscribers, and its approval
+   * remain intact.
+   */
+  async cancelDownload(id: number, downloadId: number, user: RequestUser): Promise<BookRequestItem> {
+    const joined = await this.repo.findById(id);
+    if (!joined) throw new NotFoundException('Book request not found');
+    if (!this.canDrive(joined.request, user)) throw new ForbiddenException('You cannot cancel this book request download');
+
+    const download = await this.downloads.findById(downloadId);
+    if (!download || download.requestId !== id) throw new NotFoundException('That download attempt does not belong to this request');
+    if (!(ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES as readonly string[]).includes(download.status)) {
+      throw new BadRequestException(`A download that is ${download.status} can no longer be cancelled`);
+    }
+
+    const stopped = await this.removal.removeAttempt(id, downloadId, false, user.username);
+    if (!stopped) throw new BadRequestException('The download finished before it could be cancelled');
+
+    await this.repo.updateIf(id, ACTIVE_TRANSFER_REQUEST_STATUSES, { status: 'approved', statusReason: null });
+    this.gateway.emitChanged();
+
     return this.getOne(id, user);
   }
 

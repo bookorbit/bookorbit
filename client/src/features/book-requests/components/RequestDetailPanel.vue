@@ -147,12 +147,13 @@ const hasMenuActions = computed(() => canDismiss.value || canLeave.value || canC
 const canApproveNow = computed(() => canDecide.value && !busy.value && targetLibraryId.value !== null)
 const showFooter = computed(() => canDecide.value || (canGrab.value && !showTransferRetry.value))
 
-const confirming = ref<'cancel' | 'delete' | 'leave' | 'discardImport' | null>(null)
+const confirming = ref<'cancel' | 'cancelDownload' | 'delete' | 'leave' | 'discardImport' | null>(null)
 
 const CONFIRM_COPY = {
   delete: { title: 'bookRequests.confirm.deleteTitle', label: 'bookRequests.actions.delete' },
   leave: { title: 'bookRequests.confirm.leaveTitle', label: 'bookRequests.actions.leave' },
   discardImport: { title: 'bookRequests.confirm.discardImportTitle', label: 'bookRequests.review.discard' },
+  cancelDownload: { title: 'bookRequests.confirm.cancelDownloadTitle', label: 'bookRequests.actions.cancelDownload' },
   cancel: { title: 'bookRequests.confirm.cancelTitle', label: 'bookRequests.actions.cancel' },
 } as const
 
@@ -162,6 +163,7 @@ const confirmDescription = computed(() => {
   if (confirming.value === 'delete') return t('bookRequests.confirm.deleteDescription')
   if (confirming.value === 'leave') return t('bookRequests.confirm.leaveDescription')
   if (confirming.value === 'discardImport') return t('bookRequests.confirm.discardImportDescription')
+  if (confirming.value === 'cancelDownload') return t('bookRequests.confirm.cancelDownloadDescription')
   return request.value && cancelStopsATransfer(request.value)
     ? t('bookRequests.confirm.cancelDescriptionWithDownload')
     : t('bookRequests.confirm.cancelDescription')
@@ -388,6 +390,12 @@ async function cancelRequest() {
   if (applyUpdate(outcome, 'bookRequests.errors.cancelFailed')) toast.success(t('bookRequests.toasts.cancelled'))
 }
 
+async function cancelDownload() {
+  if (!request.value?.download) return
+  const outcome = await actions.cancelDownload(request.value.id, request.value.download.id)
+  if (applyUpdate(outcome, 'bookRequests.errors.cancelDownloadFailed')) toast.success(t('bookRequests.toasts.downloadCancelled'))
+}
+
 async function deleteRequest() {
   if (!request.value) return
   const outcome = await actions.remove(request.value.id)
@@ -404,6 +412,10 @@ async function deleteRequest() {
 function handleCancel() {
   if (request.value && cancelStopsATransfer(request.value)) confirming.value = 'cancel'
   else void cancelRequest()
+}
+
+function handleCancelDownload() {
+  confirming.value = 'cancelDownload'
 }
 
 function handleRemove() {
@@ -427,6 +439,7 @@ async function handleConfirm() {
   const pending = confirming.value
   if (pending === 'delete') await deleteRequest()
   else if (pending === 'cancel') await cancelRequest()
+  else if (pending === 'cancelDownload') await cancelDownload()
   else if (pending === 'leave') await leaveRequest()
   else if (pending === 'discardImport') await discardImport()
   confirming.value = null
@@ -644,7 +657,9 @@ function dockFileMeta(file: BookDockFile): string {
               :live="liveProgress"
               :show-error="showDownloadError"
               :can-retry="showTransferRetry"
+              :can-cancel="canCancel"
               @retry="goToReleases"
+              @cancel="handleCancelDownload"
             />
           </section>
 

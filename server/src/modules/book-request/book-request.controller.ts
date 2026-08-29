@@ -100,6 +100,18 @@ export class BookRequestController {
     return this.service.cancel(id, user);
   }
 
+  @Post(':id/downloads/:downloadId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: AuditAction.BookRequestRemoveDownload,
+    resource: AuditResource.BookRequest,
+    getResourceId: (req) => Number(req.params.id),
+    description: 'Cancelled an active book request download',
+  })
+  cancelDownload(@Param('id', ParseIntPipe) id: number, @Param('downloadId', ParseIntPipe) downloadId: number, @CurrentUser() user: RequestUser) {
+    return this.service.cancelDownload(id, downloadId, user);
+  }
+
   /**
    * Leaving a request somebody else made, which is the way back out of joining one. Not audited
    * for the same reason dismissal is not: it changes nothing anybody else can see.

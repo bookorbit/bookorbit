@@ -151,4 +151,28 @@ describe('RequestDownloadProgress', () => {
 
     expect(wrapper.find('button').exists()).toBe(false)
   })
+
+  it('offers an authorized cancellation while a download is active', async () => {
+    const wrapper = mount(RequestDownloadProgress, {
+      props: { download: download({ status: 'downloading' }), live: null, canCancel: true },
+    })
+
+    const cancel = wrapper.get('button')
+    expect(cancel.text()).toBe('Cancel download')
+
+    await cancel.trigger('click')
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+  })
+
+  it('does not offer download cancellation without permission or after the transfer finishes', () => {
+    const unauthorized = mount(RequestDownloadProgress, {
+      props: { download: download({ status: 'downloading' }), live: null },
+    })
+    const finished = mount(RequestDownloadProgress, {
+      props: { download: download({ status: 'completed' }), live: null, canCancel: true },
+    })
+
+    expect(unauthorized.find('button').exists()).toBe(false)
+    expect(finished.find('button').exists()).toBe(false)
+  })
 })

@@ -29,9 +29,9 @@ import { SearchBookRequestReleasesDto } from './dto/search-book-request-releases
  * `getAllAndOverride`, so a handler-level permission *replaces* the class-level one instead of
  * adding to it, and these routes would have stopped requiring `BookRequestAccess` at all.
  *
- * Deliberately absent: `fulfill`, which closes a request by hand, and removing a torrent from a
- * download client. Both act on shared infrastructure rather than on this download, and cancelling
- * already stops a transfer for the person who started it.
+ * Deliberately absent: `fulfill`, which closes a request by hand, and removing a completed torrent
+ * that is only seeding. Cancelling an active transfer lives on the shared request controller, so
+ * the person driving it can stop the download without closing the request.
  */
 @Controller('book-request-fulfilment')
 @RequirePermission(Permission.BookRequestAccess, Permission.BookRequestSelfFulfill)

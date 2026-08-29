@@ -140,6 +140,7 @@ function makeService(
   const notifier = new BookRequestNotifier(notifications as never, repo as never, libraryService as never, contentFilterRepo as never);
   const downloads = {
     findLatestForRequests: vi.fn().mockResolvedValue(new Map()),
+    findById: vi.fn().mockResolvedValue({ id: 11, requestId: 10, status: 'downloading' }),
     failInFlightForRequest: vi.fn().mockResolvedValue(0),
     ...overrides.downloads,
   };
@@ -152,6 +153,7 @@ function makeService(
   };
   const removal = {
     removeLatestForRequest: vi.fn().mockResolvedValue({ removed: false, error: null }),
+    removeAttempt: vi.fn().mockResolvedValue(true),
     ...overrides.removal,
   };
   // The summary caches on the broadcast count, so the stub has to move it the way the real one does.
@@ -909,6 +911,60 @@ describe('BookRequestService.cancel', () => {
     await service.cancel(10, user());
 
     expect(repo.updateIf).toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ statusReason: null }));
+  });
+});
+
+describe('BookRequestService.cancelDownload', () => {
+  it('stops only the active transfer and leaves the request approved for another release', async () => {
+    const { service, repo, removal, gateway } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'downloading' })) },
+    });
+
+    await service.cancelDownload(10, 11, user());
+
+    expect(removal.removeAttempt).toHaveBeenCalledWith(10, 11, false, 'reader');
+    expect(repo.updateIf).toHaveBeenCalledWith(10, ['grabbed', 'downloading'], { status: 'approved', statusReason: null });
+    expect(repo.updateIf).not.toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ status: 'cancelled' }));
+    expect(gateway.emitChanged).toHaveBeenCalled();
+  });
+
+  it('refuses someone who cannot drive the request', async () => {
+    const { service, removal } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(joined({ userId: 2, status: 'downloading' })) },
+    });
+
+    await expect(service.cancelDownload(10, 11, user())).rejects.toThrow(ForbiddenException);
+    expect(removal.removeAttempt).not.toHaveBeenCalled();
+  });
+
+  it('refuses an attempt from another request', async () => {
+    const { service, removal } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'downloading' })) },
+      downloads: { findById: vi.fn().mockResolvedValue({ id: 11, requestId: 99, status: 'downloading' }) },
+    });
+
+    await expect(service.cancelDownload(10, 11, user())).rejects.toThrow(NotFoundException);
+    expect(removal.removeAttempt).not.toHaveBeenCalled();
+  });
+
+  it('does not cancel a transfer that has already completed', async () => {
+    const { service, removal } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'importing' })) },
+      downloads: { findById: vi.fn().mockResolvedValue({ id: 11, requestId: 10, status: 'completed' }) },
+    });
+
+    await expect(service.cancelDownload(10, 11, user())).rejects.toThrow(BadRequestException);
+    expect(removal.removeAttempt).not.toHaveBeenCalled();
+  });
+
+  it('does not report a cancellation when completion wins the detach race', async () => {
+    const { service, repo } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'downloading' })) },
+      removal: { removeAttempt: vi.fn().mockResolvedValue(false) },
+    });
+
+    await expect(service.cancelDownload(10, 11, user())).rejects.toThrow('The download finished before it could be cancelled');
+    expect(repo.updateIf).not.toHaveBeenCalled();
   });
 });
 

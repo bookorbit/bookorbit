@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Globe, Loader2, Magnet } from '@lucide/vue'
+import { ChevronDown, Globe, Loader2, Magnet } from '@lucide/vue'
 import type { BookRequestDownloadItem, BookRequestItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
@@ -60,39 +60,46 @@ function facts(attempt: BookRequestDownloadItem): string[] {
 </script>
 
 <template>
-  <section v-if="show" class="rounded-lg border border-border bg-card p-4" :aria-label="t('bookRequests.attempts.title')">
-    <h3 class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{{ t('bookRequests.attempts.title') }}</h3>
+  <details v-if="show" :key="request.id" class="group rounded-lg border border-border bg-card">
+    <summary
+      class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3 text-xs font-semibold tracking-wide text-foreground uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-webkit-details-marker]:hidden"
+    >
+      {{ t('bookRequests.attempts.title') }}
+      <ChevronDown class="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+    </summary>
 
-    <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
-      <Loader2 class="size-4 animate-spin" aria-hidden="true" />
-      {{ t('bookRequests.attempts.loading') }}
+    <div class="px-4 pb-4">
+      <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 class="size-4 animate-spin" aria-hidden="true" />
+        {{ t('bookRequests.attempts.loading') }}
+      </div>
+
+      <p v-else-if="failed" role="alert" class="text-sm text-destructive">{{ t('bookRequests.attempts.loadFailed') }}</p>
+
+      <ul v-else class="space-y-2.5">
+        <li v-for="attempt in earlier" :key="attempt.id" class="text-sm">
+          <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span
+              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-xs font-medium"
+              :class="isRefusal(attempt) ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-border text-muted-foreground'"
+            >
+              <Magnet v-if="seedsBack(attempt)" :size="11" aria-hidden="true" />
+              <Globe v-else :size="11" aria-hidden="true" />
+              {{ outcomeText(attempt) }}
+            </span>
+            <span class="min-w-0 flex-1 truncate text-foreground">{{ attempt.releaseTitle }}</span>
+          </p>
+
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            <template v-for="(fact, index) in facts(attempt)" :key="fact">
+              <span v-if="index > 0" aria-hidden="true"> · </span>
+              <span>{{ fact }}</span>
+            </template>
+          </p>
+
+          <p v-if="attempt.errorMessage" class="mt-0.5 text-xs text-destructive">{{ attempt.errorMessage }}</p>
+        </li>
+      </ul>
     </div>
-
-    <p v-else-if="failed" role="alert" class="text-sm text-destructive">{{ t('bookRequests.attempts.loadFailed') }}</p>
-
-    <ul v-else class="space-y-2.5">
-      <li v-for="attempt in earlier" :key="attempt.id" class="text-sm">
-        <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span
-            class="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-xs font-medium"
-            :class="isRefusal(attempt) ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-border text-muted-foreground'"
-          >
-            <Magnet v-if="seedsBack(attempt)" :size="11" aria-hidden="true" />
-            <Globe v-else :size="11" aria-hidden="true" />
-            {{ outcomeText(attempt) }}
-          </span>
-          <span class="min-w-0 flex-1 truncate text-foreground">{{ attempt.releaseTitle }}</span>
-        </p>
-
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          <template v-for="(fact, index) in facts(attempt)" :key="fact">
-            <span v-if="index > 0" aria-hidden="true"> · </span>
-            <span>{{ fact }}</span>
-          </template>
-        </p>
-
-        <p v-if="attempt.errorMessage" class="mt-0.5 text-xs text-destructive">{{ attempt.errorMessage }}</p>
-      </li>
-    </ul>
-  </section>
+  </details>
 </template>

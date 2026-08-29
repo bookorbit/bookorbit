@@ -339,6 +339,18 @@
   {
     "file": "server/src/modules/book-request/book-request.controller.ts",
     "className": "BookRequestController",
+    "methodName": "cancelDownload",
+    "httpMethod": "POST",
+    "path": "/book-requests/:id/downloads/:downloadId/cancel",
+    "permissions": ["Permission.BookRequestAccess"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-request/book-request.controller.ts",
+    "className": "BookRequestController",
     "methodName": "unsubscribe",
     "httpMethod": "DELETE",
     "path": "/book-requests/:id/subscription",

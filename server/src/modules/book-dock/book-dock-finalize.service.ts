@@ -35,7 +35,6 @@ import {
   NotificationType,
   parseSeriesIndex,
   Permission,
-  resolveDownloadFilename,
   resolveUploadPath,
 } from '@bookorbit/types';
 import type { BookRequestImportFormats } from '@bookorbit/types';
