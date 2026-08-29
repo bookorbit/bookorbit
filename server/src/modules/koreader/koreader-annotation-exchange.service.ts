@@ -282,12 +282,13 @@ export class KoreaderAnnotationExchangeService {
 
     for (const annotation of adds) {
       const formats = positions.get(annotation.id);
-      // KOReader's apply path is reflowable/xpointer-only and rejects PDF adds, so never
-      // push a PDF position. A PDF-only annotation (a web highlight in a PDF) has no EPUB
-      // position to send; skip it rather than fall into the CFI->xpointer path, which would
-      // store a failed xpointer and inflate the needs-review count.
+      // KOReader's apply path is reflowable/xpointer-only and rejects PDF adds. A PDF-only
+      // annotation (a web highlight in a PDF with no EPUB anchor) has nothing to send, so skip
+      // it rather than fall into the CFI->xpointer path, which would store a failed xpointer and
+      // inflate the needs-review count. A mixed PDF+CFI annotation still converts its CFI below.
       const position = formats?.xpointer ?? null;
-      if (!position && formats?.pdf) {
+      const cfiConvertible = formats?.cfi?.pos0 != null;
+      if (!position && formats?.pdf && !cfiConvertible) {
         skippedNoPosition += 1;
         continue;
       }

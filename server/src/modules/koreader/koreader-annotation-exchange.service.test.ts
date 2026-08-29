@@ -255,6 +255,31 @@ describe('KoreaderAnnotationExchangeService', () => {
     expect(annotationSync.upsertGeneratedPosition).not.toHaveBeenCalled();
   });
 
+  it('converts a mixed PDF+CFI annotation via its CFI instead of skipping it', async () => {
+    annotationSync.computePushDown.mockResolvedValue({ adds: [makeAnnotationRow()], edits: [], deletes: [], more: false });
+    annotationSync.findPositions.mockResolvedValue([
+      {
+        annotationId: 100,
+        format: 'pdf',
+        pos0: '{"page":0,"rect":{"x":1,"y":2,"width":3,"height":4},"rects":[]}',
+        pos1: null,
+        status: 'exact',
+        converterVersion: null,
+        extras: { pageno: 7 },
+      },
+      { annotationId: 100, format: 'cfi', pos0: 'epubcfi(/6/2!/4/2,/1:0,/1:5)', pos1: null, status: 'exact', converterVersion: null, extras: null },
+    ]);
+
+    const response = await service.exchange(makeUser(), makeExchangeDto([makeBook()]));
+
+    expect(positionConverter.cfiToXpointer).toHaveBeenCalledWith({ bookFileId: 10, cfi: 'epubcfi(/6/2!/4/2,/1:0,/1:5)', text: 'highlighted text' });
+    expect(annotationSync.upsertGeneratedPosition).toHaveBeenCalledWith(
+      expect.objectContaining({ format: 'xpointer', status: 'pending', pos0: '/body/DocFragment[1]/body/p/text().0' }),
+    );
+    expect(response.results[0].toApply.add).toEqual([]);
+    expect(response.results[0].skippedNoPosition).toBe(0);
+  });
+
   it('stops converting after the per-request budget and skips the rest', async () => {
     const adds = Array.from({ length: 22 }, (_, index) => makeAnnotationRow({ id: 200 + index }));
     annotationSync.computePushDown.mockResolvedValue({ adds, edits: [], deletes: [], more: false });

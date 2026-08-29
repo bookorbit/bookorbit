@@ -335,4 +335,49 @@ describe('usePdfHighlights', () => {
 
     unmount()
   })
+
+  it('keeps the popup open and selection intact when creating a highlight fails', async () => {
+    apiMock.mockImplementation((_input, init) => {
+      if (init?.method === 'POST') return Promise.resolve(response(false))
+      return Promise.resolve(response(true, []))
+    })
+    const { highlights, unmount } = mountHighlights()
+    await flushPromises()
+
+    mocks.menuListeners[0](PLACEMENT)
+    await flushPromises()
+    expect(highlights.popupVisible.value).toBe(true)
+
+    await highlights.applyHighlight('#38BDF8', 'highlight')
+    await flushPromises()
+
+    expect(highlights.popupVisible.value).toBe(true)
+    expect(mocks.selScope.clear).not.toHaveBeenCalled()
+    expect(mocks.annScope.createAnnotation).not.toHaveBeenCalled()
+
+    unmount()
+  })
+
+  it('keeps the note dialog open and preserves typed text when saving a new note fails', async () => {
+    apiMock.mockImplementation((_input, init) => {
+      if (init?.method === 'POST') return Promise.resolve(response(false))
+      return Promise.resolve(response(true, []))
+    })
+    const { highlights, unmount } = mountHighlights()
+    await flushPromises()
+
+    mocks.menuListeners[0](PLACEMENT)
+    await flushPromises()
+
+    highlights.openNoteDialog()
+    highlights.noteText.value = 'draft note'
+    await highlights.saveNote('draft note')
+    await flushPromises()
+
+    expect(highlights.showNoteDialog.value).toBe(true)
+    expect(highlights.noteText.value).toBe('draft note')
+    expect(mocks.selScope.clear).not.toHaveBeenCalled()
+
+    unmount()
+  })
 })

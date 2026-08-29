@@ -171,15 +171,16 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     return fileAnnotations.value.find((annotation) => annotation.id === id) ?? null
   }
 
-  async function restyleExisting(id: number, patch: { color?: string; style?: string; note?: string | null }) {
+  async function restyleExisting(id: number, patch: { color?: string; style?: string; note?: string | null }): Promise<boolean> {
     const previous = fileAnnotations.value.find((annotation) => annotation.id === id) ?? null
     const updated = await store.update(id, patch)
-    if (!updated) return
+    if (!updated) return false
     if (previous) unrenderAnnotation(previous)
     renderAnnotation(updated)
+    return true
   }
-
-  async function createFromSelection(color: string, style: string, note: string | null) {
+  async function createFromSelection(color: string, style: string, note: string | null): Promise<boolean> {
+    let failed = false
     for (const entry of pendingSelection) {
       if (entry.rects.length === 0) continue
       const created = await store.create({
@@ -191,17 +192,22 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
         note,
       })
       if (created) renderAnnotation(created)
+      else failed = true
     }
+    return !failed
   }
 
   async function applyHighlight(color: string, style: string, note?: string) {
+    let ok: boolean
     if (overlappingAnnotationId.value !== null) {
       const patch: { color: string; style: string; note?: string } = { color, style }
       if (note !== undefined) patch.note = note
-      await restyleExisting(overlappingAnnotationId.value, patch)
+      ok = await restyleExisting(overlappingAnnotationId.value, patch)
     } else {
-      await createFromSelection(color, style, note ?? null)
+      ok = await createFromSelection(color, style, note ?? null)
     }
+    // Keep the selection mark and popup on failure so the user can retry without losing it.
+    if (!ok) return
     clearSelection()
     dismissPopup()
   }
@@ -213,11 +219,12 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
   }
 
   async function saveNote(note: string) {
-    if (overlappingAnnotationId.value !== null) {
-      await restyleExisting(overlappingAnnotationId.value, { note })
-    } else {
-      await createFromSelection(DEFAULT_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_STYLE, note)
-    }
+    const ok =
+      overlappingAnnotationId.value !== null
+        ? await restyleExisting(overlappingAnnotationId.value, { note })
+        : await createFromSelection(DEFAULT_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_STYLE, note)
+    // Keep the dialog open and the typed note intact on failure so it is not lost.
+    if (!ok) return
     showNoteDialog.value = false
     noteText.value = ''
     clearSelection()
