@@ -371,6 +371,12 @@ export function build(opfXml: string, payload: BookWritePayload): { newOpfXml: s
     pkgAttrs['@_xmlns:opf'] = 'http://www.idpf.org/2007/opf';
   }
 
+  // Some EPUBs scope xmlns:dc to each dc:* element. Rebuilding metadata removes those
+  // declarations, so bind the regenerated elements from their common package ancestor.
+  if (!attr(pkgAttrs, '@_xmlns:dc')) {
+    pkgAttrs['@_xmlns:dc'] = 'http://purl.org/dc/elements/1.1/';
+  }
+
   const pkgContent = getPkgContentAll(pkgNode, pkgTag);
   const metadata = findMetadata(pkgContent);
   if (!metadata) throw new Error('Cannot find <metadata> element in OPF');

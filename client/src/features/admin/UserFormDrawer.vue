@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button'
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { X } from '@lucide/vue'
+import { ShieldCheck, X } from '@lucide/vue'
 import { api } from '@/lib/api'
 import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
 import type { AuthUser } from '@bookorbit/types'
@@ -27,11 +27,14 @@ const props = defineProps<{
   user: Partial<AuthUser> | null
   libraries: Library[]
   defaultLibraryIds?: number[]
+  canManageSuperuser?: boolean
+  currentUserId?: number
 }>()
 
 const emit = defineEmits<{
   close: []
   saved: [resetUrl?: string]
+  requestSuperuserChange: [isSuperuser: boolean]
 }>()
 
 const { t } = useI18n()
@@ -71,6 +74,15 @@ const { search: searchGenres } = useGenreSearchWithIds()
 
 const isEdit = computed(() => !!props.user?.id)
 const isSuperuserTarget = computed(() => !!props.user?.isSuperuser)
+const isOwnAccount = computed(() => props.user?.id === props.currentUserId)
+const canChangeSuperuser = computed(
+  () =>
+    isEdit.value &&
+    props.canManageSuperuser === true &&
+    props.currentUserId !== undefined &&
+    !isOwnAccount.value &&
+    props.user?.provisioningMethod !== 'shared',
+)
 const isMobile = useMediaQuery('(max-width: 767px)')
 
 function toggleLibrary(libraryId: number) {
@@ -298,6 +310,11 @@ function applyAdminPermissions() {
 function clearPermissions() {
   applyPreset('clear')
 }
+
+function requestSuperuserChange() {
+  if (!canChangeSuperuser.value) return
+  emit('requestSuperuserChange', !isSuperuserTarget.value)
+}
 </script>
 
 <template>
@@ -393,6 +410,49 @@ function clearPermissions() {
         </div>
 
         <div v-if="currentTab === 'access'" class="space-y-6">
+          <section
+            v-if="isEdit && canManageSuperuser"
+            aria-labelledby="superuser-access-heading"
+            class="rounded-lg border border-border bg-muted p-4"
+          >
+            <div class="flex items-start gap-3">
+              <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <ShieldCheck :size="18" class="text-primary" aria-hidden="true" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 id="superuser-access-heading" class="text-sm font-semibold text-foreground">
+                    {{ t('adminFeature.userForm.superuserAccess.title') }}
+                  </h3>
+                  <Badge variant="secondary">
+                    {{ isSuperuserTarget ? t('adminFeature.userForm.superuserAccess.enabled') : t('adminFeature.userForm.superuserAccess.disabled') }}
+                  </Badge>
+                </div>
+                <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                  {{
+                    isOwnAccount
+                      ? t('adminFeature.userForm.superuserAccess.selfHint')
+                      : isSharedAccount
+                        ? t('adminFeature.userForm.superuserAccess.sharedHint')
+                        : isSuperuserTarget
+                          ? t('adminFeature.userForm.superuserAccess.enabledHint')
+                          : t('adminFeature.userForm.superuserAccess.disabledHint')
+                  }}
+                </p>
+                <Button
+                  v-if="canChangeSuperuser"
+                  :variant="isSuperuserTarget ? 'destructive' : 'outline'"
+                  size="sm"
+                  type="button"
+                  class="mt-3"
+                  @click="requestSuperuserChange"
+                >
+                  {{ isSuperuserTarget ? t('adminFeature.userForm.superuserAccess.demote') : t('adminFeature.userForm.superuserAccess.promote') }}
+                </Button>
+              </div>
+            </div>
+          </section>
+
           <div v-if="libraries.length > 0" class="space-y-3">
             <label class="settings-label">{{ t('adminFeature.userForm.libraryAccess') }}</label>
             <div class="space-y-1.5 rounded-md border border-border p-3">

@@ -215,6 +215,42 @@ describe('useDisplaySettingsSync', () => {
     )
   })
 
+  it('syncs authorRowDensity changes to the server', async () => {
+    vi.useFakeTimers()
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValue({ ok: true })
+
+    sync.initDisplaySettingsSync()
+    displaySettings.useDisplaySettings().authorRowDensity.value = 'compact'
+    await vi.advanceTimersByTimeAsync(1500)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/user-preferences/display',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.stringContaining('"authorRowDensity":"compact"'),
+      }),
+    )
+  })
+
+  it('syncs authorCoverFallback changes to the server', async () => {
+    vi.useFakeTimers()
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValue({ ok: true })
+
+    sync.initDisplaySettingsSync()
+    displaySettings.useDisplaySettings().authorCoverFallback.value = true
+    await vi.advanceTimersByTimeAsync(1500)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/user-preferences/display',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.stringContaining('"authorCoverFallback":true'),
+      }),
+    )
+  })
+
   it('flushes a pending save with keepalive on pagehide', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn<() => Promise<Response>>().mockResolvedValue({ ok: true } as Response)

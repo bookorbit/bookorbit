@@ -71,6 +71,8 @@ const validDisplayPreferences: DisplayPreferences = {
   smartScopeFilterExpanded: true,
   authorCoverSize: 140,
   authorCoverShape: 'circle',
+  authorRowDensity: 'comfortable',
+  authorCoverFallback: false,
   tableZebraStriping: false,
   tableDensity: 'comfortable',
   bookSpineOverlay: 'subtle',
@@ -401,6 +403,36 @@ describe('UserPreferencesService', () => {
     await expect(
       service.upsertDisplayPreferences(11, { ...validDisplayPreferences, showJumpRails: 'yes' } as unknown as Record<string, unknown>),
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertDisplayPreferences accepts and persists author display preferences', async () => {
+    const preferences = {
+      ...validDisplayPreferences,
+      authorRowDensity: 'compact',
+      authorCoverFallback: true,
+    } satisfies DisplayPreferences;
+
+    await expect(service.upsertDisplayPreferences(11, preferences)).resolves.toBeUndefined();
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', preferences);
+  });
+
+  it('upsertDisplayPreferences defaults author display preferences omitted by older clients', async () => {
+    const { authorRowDensity, authorCoverFallback, ...olderPreferences } = validDisplayPreferences;
+    void authorRowDensity;
+    void authorCoverFallback;
+
+    await expect(service.upsertDisplayPreferences(11, olderPreferences)).resolves.toBeUndefined();
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ authorRowDensity: 'comfortable', authorCoverFallback: false }));
+  });
+
+  it.each([
+    ['authorRowDensity', 'dense'],
+    ['authorCoverFallback', 'yes'],
+  ])('upsertDisplayPreferences rejects invalid %s values', async (field, value) => {
+    await expect(service.upsertDisplayPreferences(11, { ...validDisplayPreferences, [field]: value })).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
   });
 

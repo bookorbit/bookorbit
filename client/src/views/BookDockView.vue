@@ -36,6 +36,7 @@ type BookDockSelectionPayload = {
   excludedIds?: number[]
   status?: string
   needsReview?: boolean
+  readyToFile?: boolean
   search?: string
 }
 
@@ -156,6 +157,7 @@ const errorCount = computed(() => {
 const emptyMessage = computed(() => {
   if (filters.search) return t('views.bookDock.empty.noSearchMatch', { query: filters.search })
   if (filters.needsReview) return t('bookDock.layout.empty.nothingToReview')
+  if (filters.readyToFile) return t('bookDock.layout.empty.nothingReadyToFile')
   if (filters.status) return t('views.bookDock.empty.noStatusFiles', { status: filters.status })
   return t('views.bookDock.empty.uploadPrompt')
 })

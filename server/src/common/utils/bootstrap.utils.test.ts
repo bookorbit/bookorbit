@@ -98,19 +98,12 @@ describe('parseTrustProxy', () => {
     expect(parseTrustProxy('   ')).toBe('loopback,linklocal,uniquelocal');
   });
 
-  it.each(['false', '0', 'no', 'off'])('returns false for falsy string %s', (val) => {
+  it.each(['false', 'no', 'off'])('returns false for falsy string %s', (val) => {
     expect(parseTrustProxy(val)).toBe(false);
   });
 
-  it.each(['true', '1', 'yes', 'on'])('returns true for truthy string %s', (val) => {
+  it.each(['true', 'yes', 'on'])('returns true for truthy string %s', (val) => {
     expect(parseTrustProxy(val)).toBe(true);
-  });
-
-  it('parses non-negative integer hop counts', () => {
-    expect(parseTrustProxy('0')).toBe(false); // '0' is a falsy string, handled before hop-count check
-    expect(parseTrustProxy('1')).toBe(true); // '1' is a truthy string
-    expect(parseTrustProxy('2')).toBe(2);
-    expect(parseTrustProxy('10')).toBe(10);
   });
 
   it('returns the raw string for arbitrary proxy values', () => {
@@ -119,14 +112,8 @@ describe('parseTrustProxy', () => {
     expect(parseTrustProxy('loopback')).toBe('loopback');
   });
 
-  it('returns the raw string for decimal numbers (not valid integers)', () => {
-    expect(parseTrustProxy('1.5')).toBe('1.5');
-    expect(parseTrustProxy('2.9')).toBe('2.9');
-  });
-
-  it('returns the raw string for negative integers', () => {
-    expect(parseTrustProxy('-1')).toBe('-1');
-    expect(parseTrustProxy('-5')).toBe('-5');
+  it.each(['0', '1', '2', '10', '1.5', '2.9', '-1', '-5', '1e2'])('rejects numeric hop-count value %s', (value) => {
+    expect(() => parseTrustProxy(value)).toThrow('Numeric TRUST_PROXY hop counts are not supported; configure trusted proxy IP or CIDR ranges');
   });
 
   it('trims surrounding whitespace before evaluating', () => {

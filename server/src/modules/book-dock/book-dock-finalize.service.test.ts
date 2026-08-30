@@ -473,9 +473,10 @@ describe('BookDockFinalizeService', () => {
       );
       vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
 
-      const result = await service.finalize(7, true, true, [], true, [], 5, 9, [], 'ready', 'foo');
+      const result = await service.finalize(7, true, true, [], true, [], 5, 9, [], undefined, 'foo', undefined, true);
 
       expect(repo.findSelectionBatch).toHaveBeenCalledTimes(2);
+      expect(repo.findSelectionBatch).toHaveBeenCalledWith(expect.objectContaining({ readyToFile: true }));
       expect(result.total).toBe(2);
       expect(result.failed).toBe(0);
     });

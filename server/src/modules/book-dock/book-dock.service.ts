@@ -93,6 +93,7 @@ export class BookDockService {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<void> {
     await this.processSelectionRows(
       {
@@ -102,6 +103,7 @@ export class BookDockService {
         status,
         search,
         needsReview,
+        readyToFile,
         userId,
         canManageAll,
       },
@@ -126,6 +128,7 @@ export class BookDockService {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<{ total: number; updated: number; failed: number }> {
     let updated = 0;
     let failed = 0;
@@ -137,6 +140,7 @@ export class BookDockService {
         status,
         search,
         needsReview,
+        readyToFile,
         userId,
         canManageAll,
       },
@@ -178,6 +182,7 @@ export class BookDockService {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<{ total: number; applied: number; skipped: number; skippedEdited: number }> {
     let applied = 0;
     let skipped = 0;
@@ -190,6 +195,7 @@ export class BookDockService {
         status,
         search,
         needsReview,
+        readyToFile,
         userId,
         canManageAll,
       },
@@ -224,6 +230,7 @@ export class BookDockService {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<{ total: number; queued: number }> {
     let queued = 0;
     const total = await this.processSelectionRows(
@@ -234,6 +241,7 @@ export class BookDockService {
         status,
         search,
         needsReview,
+        readyToFile,
         userId,
         canManageAll,
       },
@@ -266,6 +274,7 @@ export class BookDockService {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<{ total: number; updated: number; failed: number }> {
     await this.assertValidTarget(targetLibraryId, targetFolderId);
     let updated = 0;
@@ -277,6 +286,7 @@ export class BookDockService {
         status,
         search,
         needsReview,
+        readyToFile,
         userId,
         canManageAll,
       },
@@ -301,6 +311,7 @@ export class BookDockService {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<{ total: number; withDestination: number; withoutDestination: number }> {
     const destinationPairCounts = new Map<string, number>();
     const folderIdSet = new Set<number>();
@@ -312,6 +323,7 @@ export class BookDockService {
         status,
         search,
         needsReview,
+        readyToFile,
         userId,
         canManageAll,
       },
@@ -479,6 +491,7 @@ export class BookDockService {
       status?: string;
       search?: string;
       needsReview?: boolean;
+      readyToFile?: boolean;
       userId?: number;
       canManageAll?: boolean;
     },
@@ -498,6 +511,7 @@ export class BookDockService {
           status: options.status,
           search: options.search,
           needsReview: options.needsReview,
+          readyToFile: options.readyToFile,
           userId,
           canManageAll,
         });

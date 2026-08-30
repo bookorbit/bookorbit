@@ -134,7 +134,7 @@ function onCoverChanged(source: 'extracted' | 'custom' | null) {
 <template>
   <BookDetailLayout :book-id="bookId" :cover-tint="coverTint">
     <Transition name="content" mode="out-in">
-      <div v-if="detail" key="detail" class="h-full">
+      <div v-if="detail" key="detail" class="@container/book-detail h-full">
         <!--
           Only the two lazy tabs are cached. Both fetch on mount, so without this every return
           replays blank -> skeleton -> content in under 120ms, which reads as a flash rather than

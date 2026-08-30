@@ -16,6 +16,11 @@ export class ListBookDockFilesDto {
   needsReview?: boolean;
 
   @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  readyToFile?: boolean;
+
+  @IsOptional()
   @Transform(({ value }) => parseInt(value as string, 10))
   @IsInt()
   @Min(1)

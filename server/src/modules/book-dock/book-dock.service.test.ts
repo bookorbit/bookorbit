@@ -329,13 +329,14 @@ describe('BookDockService', () => {
       .mockResolvedValueOnce([]);
 
     await service.discardFile(1, 1, false);
-    await service.bulkDiscard([], true);
+    await service.bulkDiscard([], true, [], undefined, undefined, 1, true, undefined, true);
 
     expect(vi.mocked(unlink)).toHaveBeenCalledWith('/bucket/book.epub');
     expect(vi.mocked(unlink)).toHaveBeenCalledWith('/covers/1.png');
     expect(vi.mocked(unlink)).toHaveBeenCalledWith('/covers/1_thumb.jpg');
     expect(repo.deleteById).toHaveBeenCalledWith(1);
     expect(repo.deleteByIds).toHaveBeenCalledWith([2]);
+    expect(repo.findSelectionBatch).toHaveBeenCalledWith(expect.objectContaining({ readyToFile: true }));
   });
 
   it('proxies summary and statistics repository queries', async () => {

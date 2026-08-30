@@ -208,16 +208,12 @@ export class UserService {
       await this.assertEmailAvailable(dto.email, id);
     }
 
-    if (dto.active === false && target.isSuperuser) {
-      const otherSuperusers = await this.userRepo.countOtherSuperusers(id);
-      if (otherSuperusers === 0) {
-        throw new ConflictException('Cannot deactivate the last administrator');
-      }
-    }
-
-    const user = await this.userRepo.update(id, dto);
-    if (!user) throw new NotFoundException('User not found');
-    return user;
+    const result = await this.userRepo.updateManagedUser(requestingUser.id, id, dto);
+    if (result.status === 'target_not_found') throw new NotFoundException('User not found');
+    if (result.status === 'requester_not_superuser') throw new ForbiddenException('Only administrators can edit administrator accounts');
+    if (result.status === 'last_superuser') throw new ConflictException('Cannot deactivate the last administrator');
+    if (!result.user) throw new NotFoundException('User not found');
+    return result.user;
   }
 
   async updateMe(userId: number, dto: UpdateMeDto) {
@@ -334,13 +330,10 @@ export class UserService {
     if (id === requestingUser.id) {
       throw new ConflictException('You cannot delete your own account');
     }
-    const [target, otherSuperusers] = await Promise.all([this.userRepo.findByIdWithPermissions(id), this.userRepo.countOtherSuperusers(id)]);
-    if (!target) throw new NotFoundException('User not found');
-    if (target?.isSuperuser) {
-      if (!requestingUser.isSuperuser) throw new ForbiddenException('Only administrators can delete administrator accounts');
-      if (otherSuperusers === 0) throw new ConflictException('Cannot delete the last administrator');
-    }
-    await this.userRepo.delete(id);
+    const result = await this.userRepo.deleteManagedUser(requestingUser.id, id);
+    if (result === 'target_not_found') throw new NotFoundException('User not found');
+    if (result === 'requester_not_superuser') throw new ForbiddenException('Only administrators can delete administrator accounts');
+    if (result === 'last_superuser') throw new ConflictException('Cannot delete the last administrator');
   }
 
   setPermissionsDirectly(userId: number, permissionNames: Permission[]) {
@@ -369,18 +362,12 @@ export class UserService {
     if (targetUserId === requestingUser.id) {
       throw new ConflictException('You cannot change your own superuser status');
     }
-    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
-    if (!target) throw new NotFoundException('User not found');
-    if (target.provisioningMethod === 'shared') {
-      throw new BadRequestException('Shared accounts cannot be made superuser');
-    }
-    if (!isSuperuser && target.isSuperuser) {
-      const otherSuperusers = await this.userRepo.countOtherSuperusers(targetUserId);
-      if (otherSuperusers === 0) {
-        throw new ConflictException('Cannot remove the last administrator');
-      }
-    }
-    await this.userRepo.setSuperuser(targetUserId, isSuperuser);
+    const result = await this.userRepo.setSuperuser(requestingUser.id, targetUserId, isSuperuser);
+    if (result === 'self_target') throw new ConflictException('You cannot change your own superuser status');
+    if (result === 'requester_not_superuser') throw new ForbiddenException('Only administrators can change superuser status');
+    if (result === 'target_not_found') throw new NotFoundException('User not found');
+    if (result === 'shared_target') throw new BadRequestException('Shared accounts cannot be made superuser');
+    if (result === 'last_superuser') throw new ConflictException('Cannot remove the last administrator');
   }
 
   async getLibraryIds(userId: number): Promise<number[]> {

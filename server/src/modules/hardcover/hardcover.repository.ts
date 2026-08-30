@@ -130,7 +130,7 @@ export class HardcoverRepository {
   async findBookStatesByBookIds(userId: number, bookIds: number[]): Promise<HardcoverBookState[]> {
     if (bookIds.length === 0) return [];
     return this.db.query.hardcoverBookState.findMany({
-      where: and(eq(schema.hardcoverBookState.userId, userId), inArray(schema.hardcoverBookState.bookId, bookIds)),
+      where: and(eq(schema.hardcoverBookState.userId, userId), sql`${schema.hardcoverBookState.bookId} = any(${sql.param(bookIds)}::integer[])`),
     });
   }
 

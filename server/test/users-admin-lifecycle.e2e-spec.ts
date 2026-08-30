@@ -3,7 +3,11 @@ import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import type { Permission } from '@bookorbit/types';
-import { Permission as PermissionEnum } from '@bookorbit/types';
+import { AuditAction, Permission as PermissionEnum } from '@bookorbit/types';
+import { and, count, eq, inArray } from 'drizzle-orm';
+
+import * as schema from '../src/db/schema';
+import { UserRepository } from '../src/modules/user/user.repository';
 
 import {
   authHeader,
@@ -12,6 +16,7 @@ import {
   createOidcUser,
   createUserAndLogin,
   createUsersAdminLifecycleE2EContext,
+  loginForToken,
   setUserActive,
   type CreatedLibrary,
   type OidcUserSeed,
@@ -55,6 +60,17 @@ function expectError(response: Awaited<ReturnType<UsersAdminLifecycleE2EContext[
   expect(response.statusCode).toBe(status);
   const message = responseMessage(response.json() as { message?: string | string[] });
   expect(message).toContain(messageFragment);
+}
+
+async function waitForAuditAction(ctx: UsersAdminLifecycleE2EContext, resourceId: number, action: AuditAction): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const row = await ctx.db.query.auditLog.findFirst({
+      where: and(eq(schema.auditLog.resourceId, resourceId), eq(schema.auditLog.action, action)),
+    });
+    if (row) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`Audit action ${action} was not recorded for user ${resourceId}`);
 }
 
 function parseTokenFromResetUrl(resetUrl: string): string {
@@ -449,8 +465,53 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       expectError(nonSuperSetSuperuser, 403, 'Only administrators can change superuser status');
     });
 
-    it('allows superuser toggling for positive superuser transfer flows', async () => {
+    it('strictly validates superuser transition payloads', async () => {
       const candidate = await createUserAndLogin(ctx);
+      const invalidPayloads: Array<Record<string, unknown>> = [{ isSuperuser: 'true' }, {}, { isSuperuser: true, unexpected: true }];
+
+      for (const payload of invalidPayloads) {
+        const response = await ctx.app.inject({
+          method: 'PUT',
+          url: `/api/v1/users/${candidate.userId}/superuser`,
+          headers: authHeader(ctx.adminToken),
+          payload,
+        });
+        expect(response.statusCode).toBe(400);
+      }
+    });
+
+    it('rejects promotion of shared accounts', async () => {
+      const suffix = randomUUID().replaceAll('-', '');
+      const createShared = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/users/shared',
+        headers: authHeader(ctx.adminToken),
+        payload: {
+          username: `users-admin-lifecycle-shared-${suffix}`,
+          name: `Users Admin Lifecycle Shared ${suffix}`,
+        },
+      });
+      expect(createShared.statusCode).toBe(201);
+      const sharedUserId = (createShared.json() as { id: number }).id;
+
+      const promote = await ctx.app.inject({
+        method: 'PUT',
+        url: `/api/v1/users/${sharedUserId}/superuser`,
+        headers: authHeader(ctx.adminToken),
+        payload: { isSuperuser: true },
+      });
+      expectError(promote, 400, 'Shared accounts cannot be made superuser');
+    });
+
+    it('toggles superuser access, invalidates existing sessions, and records distinct audit actions', async () => {
+      const candidate = await createUserAndLogin(ctx);
+      const createResetLink = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/users/${candidate.userId}/reset-password`,
+        headers: authHeader(manageUsersAdmin.accessToken),
+      });
+      expect(createResetLink.statusCode).toBe(201);
+      const prePromotionResetToken = parseTokenFromResetUrl((createResetLink.json() as { resetUrl: string }).resetUrl);
 
       const promote = await ctx.app.inject({
         method: 'PUT',
@@ -459,6 +520,24 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
         payload: { isSuperuser: true },
       });
       expect(promote.statusCode).toBe(204);
+      await waitForAuditAction(ctx, candidate.userId, AuditAction.UserSuperuserEnable);
+
+      const oldSessionAfterPromote = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/me',
+        headers: authHeader(candidate.accessToken),
+      });
+      expect(oldSessionAfterPromote.statusCode).toBe(401);
+
+      const resetAfterPromote = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/reset-password',
+        payload: {
+          token: prePromotionResetToken,
+          newPassword: 'ShouldNotReplacePassword123',
+        },
+      });
+      expectError(resetAfterPromote, 400, 'Invalid or expired reset token');
 
       const readAfterPromote = await ctx.app.inject({
         method: 'GET',
@@ -468,6 +547,9 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       expect(readAfterPromote.statusCode).toBe(200);
       expect((readAfterPromote.json() as { isSuperuser: boolean }).isSuperuser).toBe(true);
 
+      const promotedAccessToken = await loginForToken(ctx.app, candidate.username, candidate.password);
+      expect(promotedAccessToken).not.toBeNull();
+
       const demote = await ctx.app.inject({
         method: 'PUT',
         url: `/api/v1/users/${candidate.userId}/superuser`,
@@ -475,6 +557,14 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
         payload: { isSuperuser: false },
       });
       expect(demote.statusCode).toBe(204);
+      await waitForAuditAction(ctx, candidate.userId, AuditAction.UserSuperuserDisable);
+
+      const promotedSessionAfterDemote = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/me',
+        headers: authHeader(promotedAccessToken!),
+      });
+      expect(promotedSessionAfterDemote.statusCode).toBe(401);
 
       const readAfterDemote = await ctx.app.inject({
         method: 'GET',
@@ -483,6 +573,46 @@ describe('Users admin lifecycle (e2e)', { timeout: 180_000 }, () => {
       });
       expect(readAfterDemote.statusCode).toBe(200);
       expect((readAfterDemote.json() as { isSuperuser: boolean }).isSuperuser).toBe(false);
+    });
+
+    it('preserves one active superuser during concurrent cross-demotion attempts', async () => {
+      const originalSuperusers = await ctx.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.isSuperuser, true));
+      const first = await createUserAndLogin(ctx, { isSuperuser: true });
+      const second = await createUserAndLogin(ctx, { isSuperuser: true });
+      const userRepository = ctx.app.get(UserRepository);
+
+      try {
+        await ctx.db.update(schema.users).set({ isSuperuser: false });
+        await ctx.db
+          .update(schema.users)
+          .set({ isSuperuser: true })
+          .where(inArray(schema.users.id, [first.userId, second.userId]));
+
+        const statuses = await Promise.all([
+          userRepository.setSuperuser(first.userId, second.userId, false),
+          userRepository.setSuperuser(second.userId, first.userId, false),
+        ]);
+
+        expect(statuses.toSorted()).toEqual(['requester_not_superuser', 'updated']);
+        const [{ total }] = await ctx.db
+          .select({ total: count() })
+          .from(schema.users)
+          .where(and(eq(schema.users.active, true), eq(schema.users.isSuperuser, true)));
+        expect(Number(total)).toBe(1);
+      } finally {
+        await ctx.db.update(schema.users).set({ isSuperuser: false });
+        if (originalSuperusers.length > 0) {
+          await ctx.db
+            .update(schema.users)
+            .set({ isSuperuser: true })
+            .where(
+              inArray(
+                schema.users.id,
+                originalSuperusers.map((user) => user.id),
+              ),
+            );
+        }
+      }
     });
 
     it('blocks self-superuser toggle by a superuser', async () => {

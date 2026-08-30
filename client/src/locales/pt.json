@@ -4059,6 +4059,7 @@
         "collection": "Coleção",
         "library": "Biblioteca",
         "format": "Formato",
+        "fileSize": "Tamanho do arquivo primário",
         "addedAt": "Data de adição",
         "startedAt": "Data de Início",
         "finishedAt": "Data de Término",
@@ -4117,7 +4118,8 @@
       "unit": {
         "days": "dias",
         "weeks": "semanas",
-        "months": "meses"
+        "months": "meses",
+        "megabytes": "MB"
       },
       "scorePreset": {
         "outstanding": "Excepcional",
@@ -4126,6 +4128,9 @@
         "poor": "Ruim"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "ex. 10",
+      "fileSizeValueAria": "Tamanho do arquivo principal em megabytes",
+      "fileSizeMaximumAria": "Tamanho máximo de arquivo em megabytes",
       "valuePlaceholder": "valor",
       "maxPlaceholder": "máx",
       "to": "até",
@@ -5701,6 +5706,8 @@
     }
   },
   "collection": {
+    "visibleToAll": "Visível para todos os usuários",
+    "visibleToAllHint": "Todos os usuários podem ver essa coleção, mas somente você pode mudar seus livros",
     "dialog": {
       "name": "Nome",
       "icon": "Ícone",
@@ -8112,7 +8119,7 @@
         "willRename": "Será renomeado",
         "skippedByYou": "Ignorado por você",
         "heldBack": "Reteve como conflitos",
-        "untouched": "Deixado como está",
+        "untouched": "Permanece como está",
         "confirm": "{count, plural, one {Renomeie # arquivo} other {Renomeie # arquivos}}",
         "cannotRename": "Não pode ser renomeado"
       },

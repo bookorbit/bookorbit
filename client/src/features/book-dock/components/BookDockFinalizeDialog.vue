@@ -12,7 +12,15 @@ import { useBookDockFinalize } from '../composables/useBookDockFinalize'
 const { t } = useI18n()
 
 const props = defineProps<{
-  selectionPayload: { fileIds?: number[]; selectAll?: boolean; excludedIds?: number[]; status?: string; search?: string }
+  selectionPayload: {
+    fileIds?: number[]
+    selectAll?: boolean
+    excludedIds?: number[]
+    status?: string
+    needsReview?: boolean
+    readyToFile?: boolean
+    search?: string
+  }
   selectionCount: number
 }>()
 
@@ -21,6 +29,8 @@ type FinalizePayload = {
   selectAll?: boolean
   excludedIds?: number[]
   status?: string
+  needsReview?: boolean
+  readyToFile?: boolean
   search?: string
   defaultLibraryId?: number
   defaultFolderId?: number

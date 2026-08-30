@@ -12,6 +12,7 @@ import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
+import type { FastifyInstance } from 'fastify';
 import { appConfig } from './config/config';
 import { setupSwaggerDocs } from './swagger';
 import {
@@ -35,6 +36,8 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
 
   const fastify = adapter.getInstance();
+  // Nest adds originalUrl to the raw request, but these helpers only use standard Fastify APIs.
+  const standardFastify = fastify as unknown as FastifyInstance;
 
   // Fastify's default JSON parser rejects empty bodies, so we inject '{}' before parsing.
   fastify.addHook('preParsing', (request, _reply, payload, done) => {
@@ -45,7 +48,7 @@ async function bootstrap() {
     done(null, payload);
   });
   // Reverse proxies can forward empty mutating requests with chunked transfer or an unsupported content type.
-  registerEmptyBodyContentTypeParser(fastify);
+  registerEmptyBodyContentTypeParser(standardFastify);
 
   // Echo pino-http's request ID so clients can correlate errors with server logs.
   fastify.addHook('onSend', (_request, reply, _payload, done) => {
@@ -78,7 +81,7 @@ async function bootstrap() {
   }
 
   await app.register(fastifyHelmet as never, buildHelmetOptions({ allowCloudflareInsights }));
-  registerConditionalHsts(fastify);
+  registerConditionalHsts(standardFastify);
 
   await app.register(fastifyCompress as never, { encodings: ['gzip', 'br'] });
 
@@ -104,7 +107,10 @@ async function bootstrap() {
         if (!shouldServeSpaFallback(request.url)) {
           return reply.status(404).send({ statusCode: 404, message: 'Not Found', path: request.url });
         }
-        return reply.sendFile('index.html');
+        // Nest's SWC type checker does not retain @fastify/static's reply augmentation
+        // through the adapter callback, even though the plugin decorates this reply at runtime.
+        const staticReply = reply as typeof reply & { sendFile(filename: string): typeof reply };
+        return staticReply.sendFile('index.html');
       });
     };
 

@@ -282,6 +282,20 @@ describe('DetailsTab - present state', () => {
     expect(wrapper.emitted('saved')?.[0]).toEqual([updated])
   })
 
+  it('opens the personal review editor from the review summary', async () => {
+    const wrapper = mount(DetailsTab, {
+      props: { book: makeBook() },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    const writeButton = wrapper.findAll('button').find((button) => button.text() === 'Write')
+    expect(writeButton).toBeTruthy()
+    await writeButton!.trigger('click')
+
+    expect(wrapper.find('textarea').isVisible()).toBe(true)
+  })
+
   it('shows reading date fields when both dates are null and status is null', () => {
     const wrapper = mount(DetailsTab, {
       props: { book: makeBook({ status: 'present', readStatus: null }) },

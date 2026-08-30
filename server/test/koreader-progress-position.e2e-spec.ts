@@ -193,4 +193,26 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
     expect(stored?.pageNumber).toBeNull();
     expect(stored?.percentage).toBeCloseTo(80, 5);
   });
+
+  it('does not route progress when the document hash matches different books', async () => {
+    const comicProgressBefore = await storedProgress(comic.bookFileId);
+    const epubProgressBefore = await storedProgress(epub.bookFileId);
+
+    await ctx.db.update(schema.bookFiles).set({ fileHash: comicHash }).where(eq(schema.bookFiles.id, epub.bookFileId));
+
+    try {
+      const response = await ctx.app.inject({
+        method: 'PUT',
+        url: '/api/v1/koreader/syncs/progress',
+        headers: deviceHeaders(),
+        payload: { document: comicHash, percentage: 0.99, progress: '999' },
+      });
+
+      expect(response.statusCode).toBe(404);
+      await expect(storedProgress(comic.bookFileId)).resolves.toEqual(comicProgressBefore);
+      await expect(storedProgress(epub.bookFileId)).resolves.toEqual(epubProgressBefore);
+    } finally {
+      await ctx.db.update(schema.bookFiles).set({ fileHash: epubHash }).where(eq(schema.bookFiles.id, epub.bookFileId));
+    }
+  });
 });

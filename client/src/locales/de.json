@@ -3424,7 +3424,15 @@
       "KoboDevice": "Kobo-Gerät",
       "EmailProvider": "E-Mail-Anbieter",
       "EmailTemplate": "E-Mail-Vorlage",
-      "EmailRecipient": "E-Mail-Empfänger"
+      "EmailRecipient": "E-Mail-Empfänger",
+      "EmailRecipientGroup": "E-Mail-Empfängergruppe",
+      "Narrator": "Erzähler",
+      "Publisher": "Verlag",
+      "Language": "Sprache",
+      "Series": "Reihe",
+      "OidcIdentity": "OIDC-Identität",
+      "MagicLinkToken": "Magischer Link",
+      "ReadingInsightsProfile": "Leseprofil"
     },
     "actionLabels": {
       "AuthSessionRevoke": "Sitzung widerrufen"

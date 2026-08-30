@@ -340,13 +340,28 @@ describe('parseOpf', () => {
       expect(r.seriesIndex).toBe('1');
     });
 
-    it('parses fractional series index', () => {
+    it.each([
+      ['1.0', '1'],
+      ['2.0', '2'],
+      ['10.0', '10'],
+      ['0.0', '0'],
+      ['01.0', '01'],
+      ['1', '1'],
+      ['1.5', '1.5'],
+      ['5.10', '5.10'],
+      ['5.01', '5.01'],
+      ['1.00', '1.00'],
+      [' 1.0 ', '1'],
+      ['-1.0', null],
+      ['1e2', null],
+      ['1.0.0', null],
+    ])('maps Calibre series index %s to %s', (embedded, expected) => {
       const xml = epub2Opf(`
         <meta name="calibre:series" content="Discworld"/>
-        <meta name="calibre:series_index" content="5.10"/>
+        <meta name="calibre:series_index" content="${embedded}"/>
       `);
-      const r = parseOpf(xml);
-      expect(r.seriesIndex).toBe('5.10');
+
+      expect(parseOpf(xml).seriesIndex).toBe(expected);
     });
 
     it('parses EPUB3 belongs-to-collection series', () => {
@@ -358,6 +373,16 @@ describe('parseOpf', () => {
       const r = parseOpf(xml);
       expect(r.seriesName).toBe('Dune Chronicles');
       expect(r.seriesIndex).toBe('1');
+    });
+
+    it('preserves an exact EPUB3 group-position ending in .0', () => {
+      const xml = epub3Opf(`
+        <meta id="series" property="belongs-to-collection">Dune Chronicles</meta>
+        <meta refines="#series" property="collection-type">series</meta>
+        <meta refines="#series" property="group-position">1.0</meta>
+      `);
+
+      expect(parseOpf(xml).seriesIndex).toBe('1.0');
     });
 
     it('Calibre series takes precedence over EPUB3 belongs-to-collection', () => {
