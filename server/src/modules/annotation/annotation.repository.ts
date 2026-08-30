@@ -318,6 +318,11 @@ export class AnnotationRepository {
     });
   }
 
+  /**
+   * Creates an annotation and its `pdf` position in one transaction. The geometry JSON is
+   * stored in pos0, the 1-based page in `extras.pageno` (so the hub can derive a page deep
+   * link), and bookFileId anchors the jump target. Returns the row shaped like the read model.
+   */
   async createPdf(data: NewAnnotation & { bookFileId?: number | null }, pdf: { page: number; pos0: string }): Promise<AnnotationWithCfi> {
     const { bookFileId, ...annotationData } = data;
     const pageno = pdf.page + 1;

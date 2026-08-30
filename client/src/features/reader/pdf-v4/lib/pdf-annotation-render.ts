@@ -14,20 +14,24 @@ export const PDF_ANNOTATION_ID_PREFIX = 'bo-'
 
 const HIGHLIGHT_OPACITY = 0.4
 
+/** Derives the EmbedPDF annotation object id for a database annotation row. */
 export function toPluginId(annotationId: number): string {
   return `${PDF_ANNOTATION_ID_PREFIX}${annotationId}`
 }
 
+/** Extracts the database annotation id from an EmbedPDF object id, or null if it is not ours. */
 export function fromPluginId(pluginId: string): number | null {
   if (!pluginId.startsWith(PDF_ANNOTATION_ID_PREFIX)) return null
   const parsed = Number.parseInt(pluginId.slice(PDF_ANNOTATION_ID_PREFIX.length), 10)
   return Number.isFinite(parsed) ? parsed : null
 }
 
+/** Converts our flat persisted rect into the EmbedPDF `Rect` shape. */
 export function toRect(rect: AnnotationRect): Rect {
   return { origin: { x: rect.x, y: rect.y }, size: { width: rect.width, height: rect.height } }
 }
 
+/** Converts an EmbedPDF `Rect` back into our flat persisted rect shape. */
 export function fromRect(rect: Rect): AnnotationRect {
   return { x: rect.origin.x, y: rect.origin.y, width: rect.size.width, height: rect.size.height }
 }
@@ -113,6 +117,7 @@ export function findOverlappingAnnotation(annotations: AnnotationItem[], page: n
   return null
 }
 
+/** Assembles a persistable PDF position from a page index and its segment rects. */
 export function toPdfPosition(page: number, rects: AnnotationRect[]): AnnotationPdfPosition {
   return { page, rect: boundingRect(rects), rects }
 }
