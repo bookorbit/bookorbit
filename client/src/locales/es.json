@@ -3991,7 +3991,13 @@
       "action": "Descargar",
       "audiobookZip": "Audiolibro (ZIP)",
       "allFormatsZip": "Todos los formatos (ZIP)",
-      "primaryOnlyZip": "Solo primaria (ZIP)"
+      "primaryOnlyZip": "Solo primaria (ZIP)",
+      "preparing": "Preparando descarga...",
+      "preparingExport": "Preparando {count, plural, one {# libro} other {# libros}} para descargar...",
+      "progressPercent": "Descargando {percent} de {total}",
+      "progressBytes": "Descargando {transferred}",
+      "failed": "Descarga fallida",
+      "exportFailed": "Exportación fallida"
     },
     "sort": {
       "moveUp": "Subir",
@@ -4048,6 +4054,7 @@
         "collection": "Colección",
         "library": "Biblioteca",
         "format": "Formato",
+        "fileSize": "Tamaño de archivo principal",
         "addedAt": "Fecha añadida",
         "startedAt": "Fecha de inicio",
         "finishedAt": "Fecha de finalización",
@@ -4106,7 +4113,8 @@
       "unit": {
         "days": "días",
         "weeks": "semanas",
-        "months": "meses"
+        "months": "meses",
+        "megabytes": "Mb"
       },
       "scorePreset": {
         "outstanding": "Excelente",
@@ -4115,6 +4123,9 @@
         "poor": "Bajo"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "por ej. 10",
+      "fileSizeValueAria": "Tamaño del archivo primario en megabytes",
+      "fileSizeMaximumAria": "Tamaño máximo de archivo primario en megabytes",
       "valuePlaceholder": "valor",
       "maxPlaceholder": "máximo",
       "to": "a",
@@ -4659,6 +4670,32 @@
       },
       "files": {
         "title": "Archivos de libros",
+        "stats": {
+          "files": "Archivos",
+          "total": "Total",
+          "runtime": "Tiempo de ejecución",
+          "formats": "Formatos"
+        },
+        "filesHeading": "Archivos",
+        "allPresent": "Todos los presentes",
+        "groupedByReader": "agrupado por lector",
+        "thisFile": "Este archivo",
+        "writeBackShort": "Escritura de vuelta",
+        "fieldsSet": "{filled} / {total} definido",
+        "writtenSummary": "{fields} y {count, plural, one {# campo más} other {# campos más}} se escriben en el {format}.",
+        "writtenSummaryAll": "{fields} están escritos en el {format}.",
+        "writtenNothing": "Ninguno de los campos escribibles de {total} tienen un valor aún.",
+        "writeBackOff": "La escritura de vuelta está desactivada para este libro.",
+        "editMetadata": "Modificar metadatos",
+        "showAllTracks": "Mostrar todo",
+        "collapseTracks": "Contraer",
+        "moreTracks": "{count, plural, one {# más pista} other {# más pistas}}",
+        "tracksRolled": "{count, plural, one {# pista} other {# pistas}}",
+        "fileDetails": "Detalles del archivo",
+        "openDetails": "Abrir detalles del archivo",
+        "closeDetails": "Cerrar detalles del archivo",
+        "trackFrom": "Pista {track} de {total}, desde {time}",
+        "throughCopy": "Has completado el {percent} de esta copia.",
         "fileCount": "{count, plural, =0 {sin archivos} one {# archivo} other {# archivos} many {# archivos}}",
         "synced": "Sincronizado {time}",
         "sortAria": "Ordene archivos",
@@ -5647,6 +5684,8 @@
     }
   },
   "collection": {
+    "visibleToAll": "Visible para todos los usuarios",
+    "visibleToAllHint": "Todos los usuarios pueden ver esta colección, pero solo usted puede cambiar sus libros",
     "dialog": {
       "name": "Nombre",
       "icon": "Icono",
@@ -7959,8 +7998,19 @@
       "previewFailed": "No se pudo cargar la vista previa",
       "executionFailed": "Error al cambiar el nombre en masa",
       "openBookDetails": "Detalles del libro abierto",
+      "openBook": "Abrir libro",
+      "toRenameCount": "{count, plural, =0 {nada para renombrar} one {# para renombrar} other {# para renombrar}}",
+      "applyCount": "{count, plural, one {Aplicar # renombrar} other {Aplicar # renombres}}",
+      "search": {
+        "placeholder": "Buscar un libro o ruta",
+        "label": "Buscar un libro",
+        "clear": "Limpiar búsqueda"
+      },
       "filter": {
-        "all": "Todos"
+        "all": "Todos",
+        "changes": "Cambios",
+        "conflicts": "Conflictos",
+        "unchanged": "Sin cambios"
       },
       "status": {
         "willRename": "Cambiará el nombre",
@@ -7969,10 +8019,104 @@
         "noPattern": "Sin patrón",
         "error": "Error"
       },
+      "group": {
+        "collision": "Conflicto de destino",
+        "unchanged": "Ya es correcto",
+        "noPattern": "Ningún patrón de nombre",
+        "error": "Error",
+        "includeAll": "Incluir cada renombrado {kind}",
+        "expand": "Expandir {kind}",
+        "collapse": "Contraer {kind}",
+        "heldBack": "No se pueden renombrar"
+      },
+      "changeKind": {
+        "ungroup": "Agrupación de series eliminada",
+        "flatten": "Se ha eliminado el nivel de carpeta duplicado",
+        "yearRemoved": "Año de publicación eliminado",
+        "yearAdded": "Año de publicación añadido",
+        "yearCorrected": "Año de publicación corregido",
+        "authorSpelling": "Ortografía del nombre del autor",
+        "capitalisation": "Uso de mayúsculas y espacios",
+        "unsafeCharacters": "Caracteres no seguros reemplazados",
+        "filenameRebuilt": "Nombre de archivo reconstruido a partir de metadatos",
+        "folderRenamed": "Carpeta renombrada",
+        "rebuilt": "Carpeta y nombre de archivo reconstruidos",
+        "restructured": "Ruta reestructurada",
+        "multiple": "Varios cambios"
+      },
+      "select": {
+        "ofSelected": "de {total} seleccionados",
+        "toggleAll": "Seleccionar o borrar cada renombrado",
+        "toggleGroup": "Seleccionar o borrar cada renombrado {kind}",
+        "toggleBook": "Renombrar {title}"
+      },
+      "review": {
+        "loadMore": "Cargar más",
+        "queue": "Cambios pendientes",
+        "position": "{index} de {total}",
+        "previous": "Libro anterior",
+        "next": "Siguiente libro",
+        "keyboardHint": "mover",
+        "keyboardSkip": "saltar",
+        "skip": "Saltar",
+        "include": "Incluir",
+        "excluded": "Excluir",
+        "back": "Volver a la lista"
+      },
+      "detail": {
+        "whatChanges": "Qué cambia",
+        "foldedFolders": "{count, plural, one {# carpeta sin cambios} other {# carpetas sin cambios}}",
+        "onDisk": "En disco",
+        "today": "Hoy",
+        "afterRename": "Después de renombrar",
+        "showLibraryFolders": "Mostrar carpetas de biblioteca",
+        "hideLibraryFolders": "Ocultar carpetas de biblioteca",
+        "currentPath": "Ruta actual",
+        "whyItMoves": "Por qué se mueve",
+        "levelTop": "Carpeta superior",
+        "levelFolder": "Carpeta {depth}",
+        "levelFilename": "Nombre de archivo",
+        "levelRemoved": "Eliminado",
+        "tokenCount": "{count, plural, one {# token} other {# tokens}}",
+        "optionalLevel": "Un nivel opcional de carpeta, producido por un grupo en el patrón.",
+        "removedExplainer": "El patrón de nomenclatura no tiene ninguna carpeta en este nivel, por lo que se deja caer {folder} y su contenido se mueve hacia arriba.",
+        "conflictTitle": "Otro archivo ya reclama este destino.",
+        "conflictBody": "El cambio de nombre lo sobrescribiría, por lo que este libro se mantiene en espera hasta que se resuelva el conflicto.",
+        "siblings": "{count, plural, one {# más con el mismo cambio} other {# más con el mismo cambio}}",
+        "siblingsMore": "+{count} más"
+      },
       "empty": {
         "title": "Elija una biblioteca para comenzar",
         "description": "Seleccione una de las bibliotecas anteriores para obtener una vista previa de los cambios de nombre, filtrar por estado y aplicar la ejecución de cambio de nombre masivo.",
-        "chooseLibrary": "Elija biblioteca"
+        "chooseLibrary": "Elija biblioteca",
+        "noneTitle": "Nada que revisar",
+        "noneDescription": "Ningún libro coincide con el filtro actual. Limpia la búsqueda o cambia a Todos.",
+        "noMatch": "No hay libros que coincidan con su búsqueda."
+      },
+      "confirmDialog": {
+        "willRename": "Será renombrado",
+        "skippedByYou": "Omitido por ti",
+        "heldBack": "Retroceder como conflictos",
+        "untouched": "Dejar sin cambios",
+        "confirm": "{count, plural, one {Renombrar # archivo} other {Renombrar # archivos}}",
+        "cannotRename": "No se puede renombrar"
+      },
+      "run": {
+        "preparing": "Preparando…",
+        "preparingHint": "Comprobando todos los archivos con el patrón de nombres antes de mover nada.",
+        "title": "Renombrando {done} de {total}",
+        "runningHint": "Los archivos están siendo renombrados. Puede detenerse después de que el archivo actual termine.",
+        "stop": "Detener después de este archivo",
+        "resultTitle": "{done, plural, one {Se ha cambiado el nombre de # de {total} archivos} other {Se ha cambiado el nombre de # de {total} archivos}}",
+        "resultFailed": "{count, plural, one {# falló} other {# falló}}",
+        "resultSkipped": "{count, plural, one {# omitido} other {# omitido}}",
+        "dismiss": "Descartar"
+      },
+      "executionError": {
+        "http": "El servidor ha rechazado la solicitud (HTTP {status}).",
+        "noBody": "El servidor no ha enviado un cuerpo de respuesta.",
+        "incomplete": "La conexión terminó antes de que terminara el renombrado. Es posible que algunos archivos no hayan sido renombrados.",
+        "unknown": "El renombrado no se ha podido completar."
       }
     },
     "bookDuplicates": {
@@ -8070,7 +8214,8 @@
       },
       "actions": {
         "rename": "Cambiar nombre",
-        "split": "Dividir"
+        "split": "Dividir",
+        "merge": "Fusionar"
       },
       "duplicates": {
         "similarity": "Similitud:",
@@ -8090,7 +8235,20 @@
         "percentSimilar": "{percent}% de similitud",
         "pairDetails": "Detalles del par",
         "dismissEntityTitle": "Descartar todos los pares para esta entidad",
-        "dismissPairTitle": "Descartar este par"
+        "dismissPairTitle": "Descartar este par",
+        "groupsLabel": "Posibles grupos duplicados",
+        "keepThisOne": "Conservar este",
+        "mergeAway": "Fusionar",
+        "notAMatch": "Sin coincidencias",
+        "notAMatchTitle": "Descartar cada par en este grupo",
+        "selectPromptTitle": "Seleccione un grupo a revisar",
+        "selectPromptDescription": "Elija un grupo de la lista para comparar sus entidades codo con codo.",
+        "backToList": "Volver a grupos",
+        "noBookTitles": "No hay libros vinculados a este registro",
+        "thresholdLabel": "Similitud mínima",
+        "thresholdValue": "{percent}%+",
+        "willBeMerged": "{count, plural, one {# entidad será fusionada y eliminada} other {# entidades serán fusionadas y eliminadas}}",
+        "chooseTargetHint": "Seleccione la entidad a mantener. Todo lo demás en el grupo se fusiona en ella."
       },
       "dismissed": {
         "loading": "Cargando pares descartados...",
@@ -8114,7 +8272,44 @@
           "nameDesc": "Nombre Z-A",
           "fewestBooks": "Menos libros",
           "mostBooks": "La mayoría de los libros"
-        }
+        },
+        "sortByLabel": "Ordenar por",
+        "entityTypeLabel": "Tipo de entidad",
+        "resultCount": "{count, plural, =0 {no hay entidades} one {# entidad} other {# entidades}}",
+        "selectedCount": "{count, plural, one {# seleccionado} other {# seleccionado}}",
+        "columns": {
+          "name": "Nombre",
+          "sortName": "Ordenar nombre",
+          "books": "Libros",
+          "status": "Estado",
+          "actions": "Acciones"
+        },
+        "selectAllOnPage": "Seleccionar todas las entidades de esta página",
+        "selectEntity": "Seleccionar {name}",
+        "actionsFor": "Acciones para {name}",
+        "status": {
+          "noBooks": "Sin libros"
+        },
+        "filters": {
+          "all": "Todos",
+          "noBooks": "Sin libros"
+        },
+        "density": {
+          "label": "Altura de las filas",
+          "comfortable": "Cómodo",
+          "compact": "Compacto"
+        },
+        "rowsPerPage": "Filas por página",
+        "range": "Mostrando {from}-{to} de {total}",
+        "pagination": "Paginación",
+        "previousPage": "Página anterior",
+        "nextPage": "Siguiente página",
+        "goToPage": "Ir a la página {page}",
+        "morePages": "Más páginas",
+        "noEntitiesDescription": "No se ha añadido nada a este tipo de entidad todavía.",
+        "noMatchesTitle": "Sin coincidencias",
+        "noMatchesDescription": "Ninguna entidad coincide con tu búsqueda y los filtros actuales.",
+        "clearFilters": "Limpiar filtros"
       },
       "deleteMode": {
         "label": "Modo eliminar",

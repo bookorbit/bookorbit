@@ -290,7 +290,7 @@ async function getAdminToken(app: NestFastifyApplication, db: Db): Promise<strin
   return body.accessToken;
 }
 
-async function loginForToken(app: NestFastifyApplication, username: string, password: string): Promise<string | null> {
+export async function loginForToken(app: NestFastifyApplication, username: string, password: string): Promise<string | null> {
   const response = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/login',

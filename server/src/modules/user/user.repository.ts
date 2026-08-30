@@ -12,6 +12,12 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+const SUPERUSER_LIFECYCLE_LOCK_KEY = 'bookorbit:superuser-lifecycle';
+
+export type ManagedUserMutationStatus = 'updated' | 'target_not_found' | 'requester_not_superuser' | 'last_superuser';
+export type SuperuserTransitionStatus = ManagedUserMutationStatus | 'unchanged' | 'self_target' | 'shared_target';
 
 /**
  * An account needs an administrator's attention when it is locked out, is still on the
@@ -393,8 +399,54 @@ export class UserRepository {
     return user;
   }
 
+  async updateManagedUser(
+    requestingUserId: number,
+    targetUserId: number,
+    data: Partial<Pick<typeof schema.users.$inferInsert, 'name' | 'email' | 'active'>>,
+  ): Promise<{ status: ManagedUserMutationStatus; user?: Awaited<ReturnType<UserRepository['update']>> }> {
+    return this.db.transaction(async (tx) => {
+      await this.lockSuperuserLifecycle(tx);
+      const { requester, target } = await this.findLifecycleUsers(tx, requestingUserId, targetUserId);
+      if (!target) return { status: 'target_not_found' };
+      if (target.isSuperuser && !this.isActiveSuperuser(requester)) return { status: 'requester_not_superuser' };
+      if (data.active === false && target.isSuperuser && (await this.countOtherActiveSuperusers(tx, targetUserId)) === 0) {
+        return { status: 'last_superuser' };
+      }
+
+      const [user] = await tx
+        .update(schema.users)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.users.id, targetUserId))
+        .returning({
+          id: schema.users.id,
+          username: schema.users.username,
+          name: schema.users.name,
+          email: schema.users.email,
+          active: schema.users.active,
+          isDefaultPassword: schema.users.isDefaultPassword,
+          settings: schema.users.settings,
+          createdAt: schema.users.createdAt,
+          updatedAt: schema.users.updatedAt,
+        });
+      return user ? { status: 'updated', user } : { status: 'target_not_found' };
+    });
+  }
+
   async delete(id: number) {
     await this.db.delete(schema.users).where(eq(schema.users.id, id));
+  }
+
+  async deleteManagedUser(requestingUserId: number, targetUserId: number): Promise<ManagedUserMutationStatus> {
+    return this.db.transaction(async (tx) => {
+      await this.lockSuperuserLifecycle(tx);
+      const { requester, target } = await this.findLifecycleUsers(tx, requestingUserId, targetUserId);
+      if (!target) return 'target_not_found';
+      if (target.isSuperuser && !this.isActiveSuperuser(requester)) return 'requester_not_superuser';
+      if (target.isSuperuser && (await this.countOtherActiveSuperusers(tx, targetUserId)) === 0) return 'last_superuser';
+
+      await tx.delete(schema.users).where(eq(schema.users.id, targetUserId));
+      return 'updated';
+    });
   }
 
   async setPermissions(userId: number, permissionNames: Permission[]) {
@@ -406,8 +458,36 @@ export class UserRepository {
     });
   }
 
-  async setSuperuser(userId: number, isSuperuser: boolean) {
-    await this.db.update(schema.users).set({ isSuperuser }).where(eq(schema.users.id, userId));
+  async setSuperuser(requestingUserId: number, targetUserId: number, isSuperuser: boolean): Promise<SuperuserTransitionStatus> {
+    return this.db.transaction(async (tx) => {
+      await this.lockSuperuserLifecycle(tx);
+      const { requester, target } = await this.findLifecycleUsers(tx, requestingUserId, targetUserId);
+      if (requestingUserId === targetUserId) return 'self_target';
+      if (!this.isActiveSuperuser(requester)) return 'requester_not_superuser';
+      if (!target) return 'target_not_found';
+      if (isSuperuser && target.provisioningMethod === 'shared') return 'shared_target';
+      if (target.isSuperuser === isSuperuser) return 'unchanged';
+      if (!isSuperuser && (await this.countOtherActiveSuperusers(tx, targetUserId)) === 0) return 'last_superuser';
+
+      const now = new Date();
+      await tx
+        .update(schema.users)
+        .set({
+          isSuperuser,
+          tokenVersion: sql`${schema.users.tokenVersion} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(schema.users.id, targetUserId));
+      await tx
+        .update(schema.refreshTokens)
+        .set({ revokedAt: now })
+        .where(and(eq(schema.refreshTokens.userId, targetUserId), isNull(schema.refreshTokens.revokedAt)));
+      await tx
+        .update(schema.passwordResetTokens)
+        .set({ usedAt: now })
+        .where(and(eq(schema.passwordResetTokens.userId, targetUserId), isNull(schema.passwordResetTokens.usedAt)));
+      return 'updated';
+    });
   }
 
   async countOtherSuperusers(excludeUserId: number): Promise<number> {
@@ -415,6 +495,38 @@ export class UserRepository {
       .select({ total: count() })
       .from(schema.users)
       .where(and(eq(schema.users.isSuperuser, true), ne(schema.users.id, excludeUserId)));
+    return Number(total);
+  }
+
+  private async lockSuperuserLifecycle(tx: Tx): Promise<void> {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${SUPERUSER_LIFECYCLE_LOCK_KEY})::bigint)`);
+  }
+
+  private async findLifecycleUsers(tx: Tx, requestingUserId: number, targetUserId: number) {
+    const rows = await tx
+      .select({
+        id: schema.users.id,
+        active: schema.users.active,
+        isSuperuser: schema.users.isSuperuser,
+        provisioningMethod: schema.users.provisioningMethod,
+      })
+      .from(schema.users)
+      .where(inArray(schema.users.id, [requestingUserId, targetUserId]));
+    return {
+      requester: rows.find((row) => row.id === requestingUserId),
+      target: rows.find((row) => row.id === targetUserId),
+    };
+  }
+
+  private isActiveSuperuser(user: { active: boolean; isSuperuser: boolean } | undefined): boolean {
+    return user?.active === true && user.isSuperuser;
+  }
+
+  private async countOtherActiveSuperusers(tx: Tx, excludeUserId: number): Promise<number> {
+    const [{ total }] = await tx
+      .select({ total: count() })
+      .from(schema.users)
+      .where(and(eq(schema.users.active, true), eq(schema.users.isSuperuser, true), ne(schema.users.id, excludeUserId)));
     return Number(total);
   }
 

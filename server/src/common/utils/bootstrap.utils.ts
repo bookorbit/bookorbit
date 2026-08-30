@@ -10,16 +10,17 @@ const BODY_METHODS = new Set(['DELETE', 'PATCH', 'POST', 'PUT']);
 const HSTS_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 const HSTS_HEADER_VALUE = `max-age=${HSTS_MAX_AGE_SECONDS}; includeSubDomains`;
 
-export function parseTrustProxy(value: string | undefined): string | boolean | number {
+export function parseTrustProxy(value: string | undefined): string | boolean {
   const raw = value?.trim();
   if (!raw) return DEFAULT_TRUST_PROXY;
 
   const normalized = raw.toLowerCase();
-  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
-  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+  if (['false', 'no', 'off'].includes(normalized)) return false;
+  if (['true', 'yes', 'on'].includes(normalized)) return true;
 
-  const hopCount = Number(raw);
-  if (Number.isInteger(hopCount) && hopCount >= 0) return hopCount;
+  if (!Number.isNaN(Number(raw))) {
+    throw new Error('Numeric TRUST_PROXY hop counts are not supported; configure trusted proxy IP or CIDR ranges');
+  }
 
   return raw;
 }

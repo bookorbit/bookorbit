@@ -7,6 +7,7 @@ import { Permission } from '@bookorbit/types';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SetLibrariesDto } from './dto/set-libraries.dto';
 import { SetPermissionsDto } from './dto/set-permissions.dto';
+import { SetSuperuserDto } from './dto/set-superuser.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -33,6 +34,12 @@ describe('User DTO validation', () => {
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [1, 2] }))).toBe(true);
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [Permission.LibraryDownload] }))).toBe(false);
     expect(await hasErrors(plainToInstance(SetPermissionsDto, { permissionNames: [] }))).toBe(false);
+  });
+
+  it('SetSuperuserDto requires a boolean', async () => {
+    expect(await hasErrors(plainToInstance(SetSuperuserDto, { isSuperuser: true }))).toBe(false);
+    expect(await hasErrors(plainToInstance(SetSuperuserDto, { isSuperuser: 'true' }))).toBe(true);
+    expect(await hasErrors(plainToInstance(SetSuperuserDto, {}))).toBe(true);
   });
 
   it('SetLibrariesDto requires positive integer IDs', async () => {

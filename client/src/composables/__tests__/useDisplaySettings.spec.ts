@@ -16,6 +16,8 @@ function resetDisplaySettings() {
   settings.smartScopeFilterExpanded.value = true
   settings.authorCoverSize.value = 120
   settings.authorCoverShape.value = 'circle'
+  settings.authorRowDensity.value = 'comfortable'
+  settings.authorCoverFallback.value = false
   settings.tableZebraStriping.value = false
   settings.tableDensity.value = 'comfortable'
   settings.bookSpineOverlay.value = 'off'

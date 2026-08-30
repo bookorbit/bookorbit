@@ -61,6 +61,8 @@ const DISPLAY_PREFERENCES_SCHEMA = z
     smartScopeFilterExpanded: z.boolean(),
     authorCoverSize: z.number().int().min(100).max(400),
     authorCoverShape: z.enum(AUTHOR_COVER_SHAPES),
+    authorRowDensity: z.enum(TABLE_DENSITIES).default('comfortable'),
+    authorCoverFallback: z.boolean().default(false),
     tableZebraStriping: z.boolean(),
     tableDensity: z.enum(TABLE_DENSITIES),
     bookSpineOverlay: z.enum(BOOK_SPINE_OVERLAYS),
@@ -83,7 +85,7 @@ const DISPLAY_PREFERENCES_SCHEMA = z
         message: 'cardOverlays must not contain duplicate values',
       });
     }
-  });
+  }) satisfies z.ZodType<DisplayPreferences>;
 
 const COVER_SEARCH_PREFERENCES_SCHEMA = z
   .object({

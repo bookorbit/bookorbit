@@ -24,13 +24,14 @@ export class AuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap((responseBody) => {
         const user = req.user;
+        const action = typeof options.action === 'function' ? options.action(req, responseBody) : options.action;
         const description = typeof options.description === 'function' ? options.description(req, responseBody) : options.description;
         const meta = options.getMeta?.(req, responseBody);
 
         this.auditEvents.emit(AUDIT_EVENT, {
           userId: user?.id ?? null,
           actorUsername: user?.username ?? 'system',
-          action: options.action,
+          action,
           resource: options.resource,
           resourceId: options.getResourceId?.(req, responseBody),
           description,

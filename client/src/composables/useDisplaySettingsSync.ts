@@ -113,6 +113,8 @@ export function initDisplaySettingsSync(): void {
         settings.smartScopeFilterExpanded.value,
         settings.authorCoverSize.value,
         settings.authorCoverShape.value,
+        settings.authorRowDensity.value,
+        settings.authorCoverFallback.value,
         settings.tableZebraStriping.value,
         settings.tableDensity.value,
         settings.bookSpineOverlay.value,

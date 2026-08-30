@@ -481,18 +481,157 @@ describe('UserRepository', () => {
     );
   });
 
-  it('delete and setSuperuser issue scoped user updates', async () => {
+  it('delete issues a scoped user update', async () => {
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     db.delete.mockReturnValue({ where: deleteWhere });
 
     await repo.delete(12);
     expect(db.delete).toHaveBeenCalledWith(schema.users);
     expect(deleteWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 12 }));
+  });
 
-    await repo.setSuperuser(12, true);
-    expect(db.update).toHaveBeenCalledWith(schema.users);
-    expect(updateSet).toHaveBeenCalledWith({ isSuperuser: true });
-    expect(updateWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 12 }));
+  it('setSuperuser serializes the transition and revokes target sessions in the same transaction', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: true, isSuperuser: true, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: false, provisioningMethod: 'local' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const txSelect = vi.fn().mockReturnValue({ from: lifecycleFrom });
+
+    const userWhere = vi.fn().mockResolvedValue(undefined);
+    const refreshWhere = vi.fn().mockResolvedValue(undefined);
+    const passwordResetWhere = vi.fn().mockResolvedValue(undefined);
+    const userSet = vi.fn().mockReturnValue({ where: userWhere });
+    const refreshSet = vi.fn().mockReturnValue({ where: refreshWhere });
+    const passwordResetSet = vi.fn().mockReturnValue({ where: passwordResetWhere });
+    const txUpdate = vi.fn().mockImplementation((table) => ({
+      set: table === schema.users ? userSet : table === schema.refreshTokens ? refreshSet : passwordResetSet,
+    }));
+    const tx = { execute, select: txSelect, update: txUpdate };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(repo.setSuperuser(1, 12, true)).resolves.toBe('updated');
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(txUpdate).toHaveBeenNthCalledWith(1, schema.users);
+    expect(userSet).toHaveBeenCalledWith(
+      expect.objectContaining({ isSuperuser: true, tokenVersion: expect.objectContaining({ op: 'sql' }), updatedAt: expect.any(Date) }),
+    );
+    expect(txUpdate).toHaveBeenNthCalledWith(2, schema.refreshTokens);
+    expect(refreshSet).toHaveBeenCalledWith({ revokedAt: expect.any(Date) });
+    expect(txUpdate).toHaveBeenNthCalledWith(3, schema.passwordResetTokens);
+    expect(passwordResetSet).toHaveBeenCalledWith({ usedAt: expect.any(Date) });
+    expect(userWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'eq', left: schema.users.id, right: 12 }));
+    expect(refreshWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'and' }));
+    expect(passwordResetWhere).toHaveBeenCalledWith(expect.objectContaining({ op: 'and' }));
+  });
+
+  it('setSuperuser rechecks the requester after taking the lifecycle lock', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: true, isSuperuser: false, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: true, provisioningMethod: 'local' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const tx = { execute, select: vi.fn().mockReturnValue({ from: lifecycleFrom }), update: vi.fn() };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(repo.setSuperuser(1, 12, false)).resolves.toBe('requester_not_superuser');
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  it('setSuperuser rejects a shared-account promotion without writing', async () => {
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: true, isSuperuser: true, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: false, provisioningMethod: 'shared' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn().mockReturnValue({ from: lifecycleFrom }),
+      update: vi.fn(),
+    };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(repo.setSuperuser(1, 12, true)).resolves.toBe('shared_target');
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  it('setSuperuser leaves sessions untouched for an idempotent transition', async () => {
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: true, isSuperuser: true, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: false, provisioningMethod: 'local' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn().mockReturnValue({ from: lifecycleFrom }),
+      update: vi.fn(),
+    };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(repo.setSuperuser(1, 12, false)).resolves.toBe('unchanged');
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  it('setSuperuser prevents demotion of the last active superuser', async () => {
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: true, isSuperuser: true, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: true, provisioningMethod: 'local' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const countWhere = vi.fn().mockResolvedValue([{ total: 0 }]);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn().mockReturnValueOnce({ from: lifecycleFrom }).mockReturnValueOnce({ from: countFrom }),
+      update: vi.fn(),
+    };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(repo.setSuperuser(1, 12, false)).resolves.toBe('last_superuser');
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  it('updateManagedUser serializes deactivation and protects the last active superuser', async () => {
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: true, isSuperuser: true, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: true, provisioningMethod: 'local' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const countWhere = vi.fn().mockResolvedValue([{ total: 0 }]);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn().mockReturnValueOnce({ from: lifecycleFrom }).mockReturnValueOnce({ from: countFrom }),
+      update: vi.fn(),
+    };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(repo.updateManagedUser(1, 12, { active: false })).resolves.toEqual({ status: 'last_superuser' });
+    expect(tx.execute).toHaveBeenCalledOnce();
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  it('deleteManagedUser serializes deletion and protects the last active superuser', async () => {
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: true, isSuperuser: true, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: true, provisioningMethod: 'local' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const countWhere = vi.fn().mockResolvedValue([{ total: 0 }]);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn().mockReturnValueOnce({ from: lifecycleFrom }).mockReturnValueOnce({ from: countFrom }),
+      delete: vi.fn(),
+    };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(repo.deleteManagedUser(1, 12)).resolves.toBe('last_superuser');
+    expect(tx.execute).toHaveBeenCalledOnce();
+    expect(tx.delete).not.toHaveBeenCalled();
   });
 
   it('clearLockout resets the attempt counter and the lock timestamp', async () => {

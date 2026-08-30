@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Permission } from '@bookorbit/types';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import * as schema from '../../db/schema';
 import { HardcoverRepository } from './hardcover.repository';
@@ -124,6 +125,17 @@ describe('HardcoverRepository', () => {
 
     await expect(repo.findBookStatesByBookIds(7, [42])).resolves.toEqual([bookStateRow]);
     expect(bookStateQuery.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('findBookStatesByBookIds binds large ID lists as one PostgreSQL array parameter', async () => {
+    const { repo, bookStateQuery } = makeRepository();
+    const bookIds = Array.from({ length: 65_535 }, (_, index) => index + 1);
+
+    await repo.findBookStatesByBookIds(7, bookIds);
+
+    const config = bookStateQuery.findMany.mock.calls[0]![0] as { where: Parameters<PgDialect['sqlToQuery']>[0] };
+    const query = new PgDialect().sqlToQuery(config.where);
+    expect(query.params).toEqual([7, bookIds]);
   });
 
   it('upsertBookState inserts or updates per-book state', async () => {

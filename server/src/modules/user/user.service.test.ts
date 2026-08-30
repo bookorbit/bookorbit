@@ -35,8 +35,10 @@ describe('UserService', () => {
     findAll: vi.fn(),
     findAssignable: vi.fn(),
     update: vi.fn(),
+    updateManagedUser: vi.fn(),
     countOtherSuperusers: vi.fn(),
     delete: vi.fn(),
+    deleteManagedUser: vi.fn(),
     setSuperuser: vi.fn(),
     assignViewerLibraries: vi.fn(),
     findLibraryIdsByUserId: vi.fn(),
@@ -75,6 +77,9 @@ describe('UserService', () => {
     userRepo.findByEmail.mockResolvedValue(null);
     userRepo.generateResetToken.mockResolvedValue('reset-token');
     userRepo.findExistingLibraryIds.mockImplementation((ids: number[]) => Promise.resolve(ids));
+    userRepo.updateManagedUser.mockResolvedValue({ status: 'updated', user: { id: 2 } });
+    userRepo.deleteManagedUser.mockResolvedValue('updated');
+    userRepo.setSuperuser.mockResolvedValue('updated');
   });
 
   it('createUser rejects duplicate usernames', async () => {
@@ -226,7 +231,7 @@ describe('UserService', () => {
 
   it('updateUser prevents deactivating the last administrator', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
-    userRepo.countOtherSuperusers.mockResolvedValue(0);
+    userRepo.updateManagedUser.mockResolvedValue({ status: 'last_superuser' });
 
     await expect(service.updateUser(2, { active: false }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
@@ -240,7 +245,7 @@ describe('UserService', () => {
 
   it('updateUser throws if repository update returns null after checks', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
-    userRepo.update.mockResolvedValue(null);
+    userRepo.updateManagedUser.mockResolvedValue({ status: 'updated' });
 
     await expect(service.updateUser(2, { name: 'x' }, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -441,32 +446,26 @@ describe('UserService', () => {
   });
 
   it('deleteUser throws when target user does not exist', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue(null);
-    userRepo.countOtherSuperusers.mockResolvedValue(0);
+    userRepo.deleteManagedUser.mockResolvedValue('target_not_found');
 
     await expect(service.deleteUser(88, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('deleteUser blocks non-superusers from deleting superuser accounts', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
-    userRepo.countOtherSuperusers.mockResolvedValue(1);
+    userRepo.deleteManagedUser.mockResolvedValue('requester_not_superuser');
 
     await expect(service.deleteUser(2, reqUser({ isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('deleteUser blocks deleting the last superuser', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
-    userRepo.countOtherSuperusers.mockResolvedValue(0);
+    userRepo.deleteManagedUser.mockResolvedValue('last_superuser');
 
     await expect(service.deleteUser(2, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('deleteUser deletes non-superuser targets', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
-    userRepo.countOtherSuperusers.mockResolvedValue(3);
-
     await expect(service.deleteUser(2, reqUser({ isSuperuser: false }))).resolves.toBeUndefined();
-    expect(userRepo.delete).toHaveBeenCalledWith(2);
+    expect(userRepo.deleteManagedUser).toHaveBeenCalledWith(1, 2);
   });
 
   it('setPermissions blocks modifying own permissions', async () => {
@@ -508,32 +507,40 @@ describe('UserService', () => {
   });
 
   it('setSuperuser throws when target user does not exist', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue(null);
+    userRepo.setSuperuser.mockResolvedValue('target_not_found');
 
     await expect(service.setSuperuser(22, false, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('setSuperuser prevents removing the last administrator', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true });
-    userRepo.countOtherSuperusers.mockResolvedValue(0);
+    userRepo.setSuperuser.mockResolvedValue('last_superuser');
 
     await expect(service.setSuperuser(2, false, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('setSuperuser writes the target superuser flag when allowed', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
-
     await expect(service.setSuperuser(2, true, reqUser({ isSuperuser: true }))).resolves.toBeUndefined();
-    expect(userRepo.setSuperuser).toHaveBeenCalledWith(2, true);
+    expect(userRepo.setSuperuser).toHaveBeenCalledWith(1, 2, true);
   });
 
-  it('setSuperuser skips last-admin check when target is already non-superuser', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false });
+  it('setSuperuser accepts an idempotent transition', async () => {
+    userRepo.setSuperuser.mockResolvedValue('unchanged');
 
     await service.setSuperuser(2, false, reqUser({ isSuperuser: true }));
 
-    expect(userRepo.countOtherSuperusers).not.toHaveBeenCalled();
-    expect(userRepo.setSuperuser).toHaveBeenCalledWith(2, false);
+    expect(userRepo.setSuperuser).toHaveBeenCalledWith(1, 2, false);
+  });
+
+  it('setSuperuser blocks promoting a shared account', async () => {
+    userRepo.setSuperuser.mockResolvedValue('shared_target');
+
+    await expect(service.setSuperuser(2, true, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('setSuperuser rejects an actor demoted after request authentication', async () => {
+    userRepo.setSuperuser.mockResolvedValue('requester_not_superuser');
+
+    await expect(service.setSuperuser(2, true, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('getLibraryIds throws when target user does not exist', async () => {

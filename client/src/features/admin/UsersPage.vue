@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useAuth } from '@/features/auth/composables/useAuth'
 import { useUsers, type UserRow } from './composables/useUsers'
 import { useSelfRegistration } from './composables/useSelfRegistration'
 import UserFormDrawer from './UserFormDrawer.vue'
@@ -22,6 +23,7 @@ const HEADER_ACTIONS_TARGET = '#settings-header-actions'
 
 const { t } = useI18n()
 const { isSuperuser, hasPermission } = usePermissions()
+const { user: currentUser } = useAuth()
 
 const {
   users,
@@ -56,7 +58,10 @@ const drawerOpen = ref(false)
 const editingUser = ref<Partial<AuthUser> | null>(null)
 const resetUrl = ref<string | null>(null)
 const deleteConfirmUser = ref<UserRow | null>(null)
+const superuserConfirm = ref<{ user: UserRow; isSuperuser: boolean } | null>(null)
 const deleting = ref(false)
+const changingSuperuser = ref(false)
+const superuserError = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const busyUserId = ref<number | null>(null)
 /**
@@ -94,6 +99,23 @@ const pageSubtitle = computed(() =>
     count: summary.value.total,
   }),
 )
+
+const superuserDialogTitle = computed(() =>
+  superuserConfirm.value?.isSuperuser
+    ? t('adminFeature.userForm.superuserAccess.promoteDialogTitle')
+    : t('adminFeature.userForm.superuserAccess.demoteDialogTitle'),
+)
+const superuserDialogDescription = computed(() => {
+  const pending = superuserConfirm.value
+  if (!pending) return ''
+  return pending.isSuperuser
+    ? t('adminFeature.userForm.superuserAccess.promoteDialogBody', { name: pending.user.name })
+    : t('adminFeature.userForm.superuserAccess.demoteDialogBody', { name: pending.user.name })
+})
+const superuserConfirmLabel = computed(() => {
+  if (changingSuperuser.value) return t('adminFeature.userForm.superuserAccess.changing')
+  return superuserConfirm.value?.isSuperuser ? t('adminFeature.userForm.superuserAccess.promote') : t('adminFeature.userForm.superuserAccess.demote')
+})
 
 onMounted(async () => {
   headerSlotAvailable.value = document.getElementById(HEADER_ACTIONS_TARGET.slice(1)) !== null
@@ -214,6 +236,51 @@ function requestDeleteUser(user: UserRow) {
 
 function cancelDeleteUser() {
   deleteConfirmUser.value = null
+}
+
+function requestSuperuserChange(nextIsSuperuser: boolean) {
+  if (
+    !isSuperuser.value ||
+    currentUser.value?.id === undefined ||
+    !editingUser.value?.id ||
+    editingUser.value.id === currentUser.value?.id ||
+    editingUser.value.provisioningMethod === 'shared'
+  ) {
+    return
+  }
+  superuserError.value = null
+  superuserConfirm.value = { user: editingUser.value as UserRow, isSuperuser: nextIsSuperuser }
+}
+
+function cancelSuperuserChange() {
+  if (changingSuperuser.value) return
+  superuserConfirm.value = null
+  superuserError.value = null
+}
+
+async function confirmSuperuserChange() {
+  const pending = superuserConfirm.value
+  if (!pending || changingSuperuser.value) return
+  changingSuperuser.value = true
+  superuserError.value = null
+  try {
+    const res = await api(`/api/v1/users/${pending.user.id}/superuser`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isSuperuser: pending.isSuperuser }),
+    })
+    if (!res.ok) {
+      superuserError.value = t('adminFeature.userForm.superuserAccess.changeError')
+      return
+    }
+    superuserConfirm.value = null
+    drawerOpen.value = false
+    await reload()
+  } catch {
+    superuserError.value = t('adminFeature.userForm.superuserAccess.changeError')
+  } finally {
+    changingSuperuser.value = false
+  }
 }
 
 async function confirmDeleteUser() {
@@ -443,8 +510,11 @@ async function saveDefaultLibraryAccess() {
       :user="editingUser"
       :libraries="libraries"
       :default-library-ids="defaultLibraryIdsArray"
+      :can-manage-superuser="isSuperuser"
+      :current-user-id="currentUser?.id"
       @close="closeDrawer"
       @saved="onSaved"
+      @request-superuser-change="requestSuperuserChange"
     />
     <ResetLinkModal v-if="resetUrl" :reset-url="resetUrl" @close="clearResetUrl" />
 
@@ -457,5 +527,18 @@ async function saveDefaultLibraryAccess() {
       @confirm="confirmDeleteUser"
       @cancel="cancelDeleteUser"
     />
+
+    <ConfirmDialog
+      :open="superuserConfirm !== null"
+      :destructive="superuserConfirm?.isSuperuser === false"
+      :title="superuserDialogTitle"
+      :description="superuserDialogDescription"
+      :confirm-label="superuserConfirmLabel"
+      :busy="changingSuperuser"
+      @confirm="confirmSuperuserChange"
+      @cancel="cancelSuperuserChange"
+    >
+      <p v-if="superuserError" role="alert" class="mt-3 text-sm text-destructive">{{ superuserError }}</p>
+    </ConfirmDialog>
   </div>
 </template>
