@@ -22,11 +22,11 @@ import type { ConcreteBookMediaKind } from '@bookorbit/types';
 class AtLeastOneSearchTermConstraint implements ValidatorConstraintInterface {
   validate(_: unknown, args: ValidationArguments): boolean {
     const obj = args.object as MetadataSearchDto;
-    return !!(obj.bookId || obj.title?.trim() || obj.isbn?.trim());
+    return !!(obj.bookId || obj.title?.trim() || obj.author?.trim() || obj.isbn?.trim());
   }
 
   defaultMessage(): string {
-    return 'At least one of bookId, title, or isbn must be provided';
+    return 'At least one of bookId, title, author, or isbn must be provided';
   }
 }
 

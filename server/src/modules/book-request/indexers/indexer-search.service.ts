@@ -313,11 +313,19 @@ export class IndexerSearchService {
       // a plugin awaiting a dead promise, an HTTP client that loses its own timeout - holds one of
       // the three search slots for the life of the process and `Promise.all` below never resolves,
       // so the picker spins with no error to show for it.
-      const releases = await withDeadline(
+      let releases = await withDeadline(
         adapter.search(indexerScopedQuery, config, deadline),
         deadline,
         () => new IndexerSearchException('timeout', `${config.name} did not answer in time`),
       );
+      if (releases.length === 0 && indexerQuery.kind === 'titleAuthor' && query.author?.trim()) {
+        const titleOnlyQuery = { ...indexerScopedQuery, author: null };
+        releases = await withDeadline(
+          adapter.search(titleOnlyQuery, config, deadline),
+          deadline,
+          () => new IndexerSearchException('timeout', `${config.name} did not answer in time`),
+        );
+      }
       return { config, releases, query: indexerQuery };
     } catch (error) {
       const failure: IndexerSearchFailure = error instanceof IndexerSearchException ? error.failure : 'error';

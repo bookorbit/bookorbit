@@ -98,7 +98,7 @@ export const bookRequestDownloads = pgTable(
     /** Grabbed by the automation rather than by a person, which is what makes it retryable. */
     automated: boolean('automated').notNull().default(false),
     releaseTitle: varchar('release_title', { length: 500 }).notNull(),
-    releaseGuid: varchar('release_guid', { length: 500 }),
+    releaseGuid: text('release_guid'),
     releaseSizeBytes: bigint('release_size_bytes', { mode: 'number' }),
     releaseSeeders: integer('release_seeders'),
     releaseFormat: varchar('release_format', { length: 20 }),

@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsString, MaxLength, Min } from 'class-validator';
-import type { InspectBookRequestReleasePayload } from '@bookorbit/types';
+import { MAX_INDEXER_RELEASE_GUID_LENGTH, type InspectBookRequestReleasePayload } from '@bookorbit/types';
 
 export class InspectBookRequestReleaseDto implements InspectBookRequestReleasePayload {
   @Type(() => Number)
@@ -9,6 +9,6 @@ export class InspectBookRequestReleaseDto implements InspectBookRequestReleasePa
   indexerId!: number;
 
   @IsString()
-  @MaxLength(500)
+  @MaxLength(MAX_INDEXER_RELEASE_GUID_LENGTH)
   releaseGuid!: string;
 }

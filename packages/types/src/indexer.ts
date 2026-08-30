@@ -14,6 +14,9 @@ import { REQUEST_CREDENTIAL_ERROR_CODES } from "./request-credential";
 export const INDEXER_ADAPTER_TYPES = ["torznab"] as const;
 export type IndexerAdapterType = (typeof INDEXER_ADAPTER_TYPES)[number];
 
+/** Maximum size of an opaque release identifier accepted from an indexer feed and grab request. */
+export const MAX_INDEXER_RELEASE_GUID_LENGTH = 4_096;
+
 /**
  * A built-in type name, or the slug an externally loaded adapter chose for itself. Anywhere a
  * value arrives from the database or the wire it is this, not the closed union: a row can name an

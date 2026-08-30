@@ -1,0 +1,1 @@
+ALTER TABLE "book_request_downloads" ALTER COLUMN "release_guid" SET DATA TYPE text;

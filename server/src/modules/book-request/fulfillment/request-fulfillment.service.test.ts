@@ -367,6 +367,18 @@ describe('RequestFulfillmentService.grab from a picked release', () => {
     );
   });
 
+  it('hands a magnet redirect from a Torznab download endpoint to the torrent client', async () => {
+    const { service, downloads, adapter } = makeService({
+      releases: { find: vi.fn().mockReturnValue(RELEASE) },
+      indexerAdapter: { fetchTorrentFile: vi.fn().mockResolvedValue({ magnet: MAGNET }) },
+    });
+
+    await service.grab(7, { indexerId: 9, releaseGuid: 'r-1' }, user());
+
+    expect(downloads.create).toHaveBeenCalledWith(expect.objectContaining({ source: 'magnet', clientHash: INFO_HASH }));
+    expect(adapter.add).toHaveBeenCalledWith(expect.objectContaining({ magnet: MAGNET, infoHash: INFO_HASH }), expect.anything());
+  });
+
   it('inspects the torrent without creating an attempt and reuses it for the following grab', async () => {
     const { service, downloads, adapter, indexerAdapter } = makeService({
       releases: { find: vi.fn().mockReturnValue(RELEASE) },

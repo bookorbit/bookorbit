@@ -93,6 +93,14 @@ book is filed. The mapping form can test whether a hardlink actually works betwe
 which is worth doing before the first grab: a mapping across filesystems copies instead, silently
 doubling the space every book takes.
 
+The same mount is necessary but is not sufficient. On Linux, `fs.protected_hardlinks=1` normally
+requires the BookOrbit process user to own the completed source file or be able to write it. The
+download client and BookOrbit commonly run with the same UID, or with a shared group that grants
+BookOrbit write access to completed files. The mapping test creates its own BookOrbit-owned source
+file, so it proves that the paths and mount permit hardlinks but cannot prove that a completed file
+owned by a different user will be linkable. If the real file cannot be linked, BookOrbit falls back
+to copying it and the book uses space twice while the original keeps seeding.
+
 BookOrbit never stops a seed on its own. Removing a torrent from its client is an explicit action
 with its own confirmation, and removing one that is still working also fails the request.
 

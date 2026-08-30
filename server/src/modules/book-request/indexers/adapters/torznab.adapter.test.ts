@@ -362,6 +362,14 @@ describe('TorznabAdapter.fetchTorrentFile', () => {
     expect(new URL(fetchMock.mock.calls.at(-1)![0].toString()).href).toBe('https://cdn.example.com/1.torrent');
   });
 
+  it('returns a magnet when a Torznab download endpoint redirects to one', async () => {
+    const magnet = 'magnet:?xt=urn:btih:c9e15763f722f23e98a29decdfae341b98d53056&dn=Dune';
+    fetchMock.mockResolvedValueOnce(redirectTo(magnet));
+
+    await expect(new TorznabAdapter().fetchTorrentFile(RELEASE, publicConfig())).resolves.toEqual({ magnet });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses a redirect to loopback', async () => {
     fetchMock.mockResolvedValueOnce(redirectTo('http://127.0.0.1:8080/secret'));
 

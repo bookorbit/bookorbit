@@ -259,43 +259,53 @@ export class BookRequestService {
     const existing = await this.dedupe.findActiveRequestFor(work);
     if (existing) return selfServe ? this.takeOnOrAttach(existing, subject) : this.attachTo(existing.id, subject);
 
-    let targetLibraryId = await this.resolveRequestedLibrary(dto.targetLibraryId ?? null, subject);
-    let targetFolderId = await this.resolveDestinationFolder(dto.targetFolderId ?? null, targetLibraryId);
+    const maySeeRequestedBooks = subject.contentFilters.exemptRequestsFromUserId === subject.id;
+    const existingBookId = maySeeRequestedBooks ? await this.dedupe.findOwnedBookFor(work, await this.reachableLibraryIds(subject)) : null;
 
-    // The instance default for this medium, which is the last rung: the requester named nowhere,
-    // and the medium is the only thing about the eventual file that is known this early.
-    //
-    // Not checked against what this user can reach, unlike a library they named themselves. The
-    // operator chose it for the whole instance, and a requester who cannot see that library is
-    // exactly who the default exists for.
-    if (targetLibraryId === null) {
-      const fallback = await this.automationSettings.resolveDestinationFor(dto.mediaKind);
+    let targetLibraryId: number | null = null;
+    let targetFolderId: number | null = null;
 
-      // The one exception to "the operator chose it for the instance". A self-server is the person
-      // filing the book, with nobody reviewing where it lands, so an unreachable default would let
-      // them write into a library they cannot even read. They are asked to name one instead.
-      if (selfServe && fallback.libraryId !== null) {
-        const reachable = await this.libraryService.findAccessibleLibraryIds(subject);
-        if (!reachable.includes(fallback.libraryId)) {
-          throw submitRefusal(
-            'SUBMIT_DEFAULT_LIBRARY_UNREACHABLE',
-            'Pick a destination library you can reach: the instance default for this medium is not one of yours',
-          );
+    if (existingBookId === null) {
+      targetLibraryId = await this.resolveRequestedLibrary(dto.targetLibraryId ?? null, subject);
+      targetFolderId = await this.resolveDestinationFolder(dto.targetFolderId ?? null, targetLibraryId);
+
+      // The instance default for this medium, which is the last rung: the requester named nowhere,
+      // and the medium is the only thing about the eventual file that is known this early.
+      //
+      // Not checked against what this user can reach, unlike a library they named themselves. The
+      // operator chose it for the whole instance, and a requester who cannot see that library is
+      // exactly who the default exists for.
+      if (targetLibraryId === null) {
+        const fallback = await this.automationSettings.resolveDestinationFor(dto.mediaKind);
+
+        // The one exception to "the operator chose it for the instance". A self-server is the person
+        // filing the book, with nobody reviewing where it lands, so an unreachable default would let
+        // them write into a library they cannot even read. They are asked to name one instead.
+        if (selfServe && fallback.libraryId !== null) {
+          const reachable = await this.libraryService.findAccessibleLibraryIds(subject);
+          if (!reachable.includes(fallback.libraryId)) {
+            throw submitRefusal(
+              'SUBMIT_DEFAULT_LIBRARY_UNREACHABLE',
+              'Pick a destination library you can reach: the instance default for this medium is not one of yours',
+            );
+          }
         }
-      }
 
-      targetLibraryId = fallback.libraryId;
-      targetFolderId = fallback.folderId;
+        targetLibraryId = fallback.libraryId;
+        targetFolderId = fallback.folderId;
+      }
     }
 
     const autoApproved = this.canAutoApprove(subject);
+    const availableOnCreate = existingBookId !== null;
     // A self-serve request is approved by construction: its requester is the person about to fulfil
     // it, so there is no decision left to make and nothing for an approver to see.
-    const settledOnCreate = autoApproved || selfServe;
+    const approvedOnCreate = autoApproved || selfServe;
+    const settledOnCreate = availableOnCreate || approvedOnCreate;
 
     // Nobody decides on this request after it is made, so there is no later point where a
     // destination could be picked, and fulfilment refuses a request that has none.
-    if (settledOnCreate && targetLibraryId === null) {
+    if (!availableOnCreate && settledOnCreate && targetLibraryId === null) {
       throw submitRefusal('SUBMIT_DESTINATION_REQUIRED', 'Pick a destination library: your own requests are approved without a second pair of eyes');
     }
 
@@ -303,7 +313,7 @@ export class BookRequestService {
       userId: subject.id,
       createdByUserId: this.attribution.createdByUserIdFor(actor, subject),
       mediaKind: dto.mediaKind,
-      status: settledOnCreate ? ('approved' as const) : ('pending' as const),
+      status: availableOnCreate ? ('available' as const) : approvedOnCreate ? ('approved' as const) : ('pending' as const),
       selfServe,
       title: work.title,
       subtitle: dto.subtitle ?? null,
@@ -325,9 +335,10 @@ export class BookRequestService {
       note: dto.note ?? null,
       targetLibraryId,
       targetFolderId,
+      matchedBookId: existingBookId,
       dedupeKey: primaryDedupeKey(work),
-      decidedByUserId: settledOnCreate ? subject.id : null,
-      decidedAt: settledOnCreate ? new Date() : null,
+      decidedByUserId: approvedOnCreate ? subject.id : null,
+      decidedAt: approvedOnCreate ? new Date() : null,
     };
     // Every other key this work could have hashed to, so a later requester who reaches it a
     // different way still collides with this row rather than opening a second one.
@@ -343,7 +354,7 @@ export class BookRequestService {
     for (let attempt = 0; row === undefined; attempt++) {
       const lastAttempt = attempt >= SUBMIT_INSERT_ATTEMPTS - 1;
       try {
-        row = await this.createRequest(selfServe, insert, aliasKeys);
+        row = await this.createRequest(selfServe && !availableOnCreate, insert, aliasKeys);
       } catch (error: unknown) {
         if (!isUniqueViolation(error)) throw error;
         const winner = await this.dedupe.findActiveRequestFor(work);
@@ -362,7 +373,7 @@ export class BookRequestService {
     }
 
     this.logger.log(
-      `[book_request.create] [end] requestId=${row.id} userId=${row.userId} createdByUserId=${row.createdByUserId ?? '-'} mediaKind=${row.mediaKind} autoApproved=${autoApproved} selfServe=${selfServe} title="${sanitizeLogValue(row.title)}" - book request created`,
+      `[book_request.create] [end] requestId=${row.id} userId=${row.userId} createdByUserId=${row.createdByUserId ?? '-'} mediaKind=${row.mediaKind} autoApproved=${autoApproved} selfServe=${selfServe} availableOnCreate=${availableOnCreate} title="${sanitizeLogValue(row.title)}" - book request created`,
     );
 
     // An auto-approving user never waits for a decision, so there is nobody to open the picker:
@@ -372,7 +383,7 @@ export class BookRequestService {
     //
     // Never for a self-server, who is on their way to the picker right now. Automation would race
     // them onto a release they did not choose, which is the opposite of what they asked for.
-    if (autoApproved && !selfServe) this.automation.considerRequest(row.id, 'auto_approval');
+    if (!availableOnCreate && autoApproved && !selfServe) this.automation.considerRequest(row.id, 'auto_approval');
 
     // Every page answers this with a fetch, so it is what puts a new submission in front of the
     // approvers without them reloading. After the create rather than after the notification: an

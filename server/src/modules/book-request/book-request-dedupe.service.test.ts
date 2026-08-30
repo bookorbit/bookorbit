@@ -219,6 +219,41 @@ describe('lowerTitleKey', () => {
   });
 });
 
+describe('BookRequestDedupeService.findOwnedBookFor', () => {
+  it('finds a present copy by any canonical ISBN and keeps the lookup library-scoped', async () => {
+    const findOwnedMatches = vi.fn().mockResolvedValue({
+      byIsbn13: new Map([['9781250301697', 42]]),
+      byTitle: new Map(),
+    });
+    const { service } = makeService({ findOwnedMatches });
+
+    const result = await service.findOwnedBookFor(
+      {
+        title: 'Dune',
+        authors: ['Frank Herbert'],
+        isbn13: '9780441013593',
+        metadataSources: [{ providerKey: 'amazon', providerId: 'edition-2', providerLabel: 'Amazon', isbn10: null, isbn13: '9781250301697' }],
+        mediaKind: 'ebook',
+      },
+      [3, 4],
+    );
+
+    expect(result).toBe(42);
+    expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593', '9781250301697'], ['dune'], [3, 4]);
+  });
+
+  it('requires the author to agree when ownership is found by title', async () => {
+    const { service } = makeService({
+      findOwnedMatches: vi.fn().mockResolvedValue({
+        byIsbn13: new Map(),
+        byTitle: new Map([['it', [owned(11, 'Stephen King'), owned(12, 'John Doe')]]]),
+      }),
+    });
+
+    await expect(service.findOwnedBookFor({ title: 'It', authors: ['John Doe'], mediaKind: 'ebook' }, null)).resolves.toBe(12);
+  });
+});
+
 describe('BookRequestDedupeService.checkAvailability', () => {
   it('returns nothing for an empty batch without touching the database', async () => {
     const { service, repo } = makeService();

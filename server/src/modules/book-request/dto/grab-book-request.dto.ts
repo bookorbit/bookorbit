@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsBase64, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { MAX_INDEXER_RELEASE_GUID_LENGTH } from '@bookorbit/types';
 
 /**
  * A grab names one of three things: a release the approver picked out of the ranked list, a
@@ -22,7 +23,7 @@ export class GrabBookRequestDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(MAX_INDEXER_RELEASE_GUID_LENGTH)
   releaseGuid?: string;
 
   @IsOptional()

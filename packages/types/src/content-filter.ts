@@ -4,7 +4,8 @@ export interface ContentFilterRules {
   includeGenreIds: number[];
   excludeGenreIds: number[];
   /**
-   * When set, a book that fulfilled a request this user made is exempt from every rule above.
+   * When set, a book that fulfilled a request this user made or joined is exempt from every rule
+   * above.
    * Carried on the rules rather than passed alongside them so the ~30 call sites that already
    * thread a `ContentFilterRules` through need no change; absent means today's behaviour.
    */

@@ -732,7 +732,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pr-meta.outputs.publish_tag }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=ci-yml-pr-image
           cache-to: type=gha,mode=max,scope=ci-yml-pr-image
 

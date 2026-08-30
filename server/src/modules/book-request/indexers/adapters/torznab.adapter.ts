@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { XMLParser } from 'fast-xml-parser';
-import type { BookRequestMediaKind, IndexerTestResult } from '@bookorbit/types';
+import { MAX_INDEXER_RELEASE_GUID_LENGTH, type BookRequestMediaKind, type IndexerTestResult } from '@bookorbit/types';
 
 import { readBoundedBytes, ResponseTooLargeError } from '../../../../common/utils/bounded-response';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
@@ -12,10 +12,11 @@ import {
   type ReleaseCandidate,
   type ReleaseQuery,
   type ResolvedIndexerConfig,
+  type TorrentFetchResult,
 } from '../indexer-adapter';
 // An ISBN is the one query a tracker almost never indexes, so it stays out of the search text.
 import { buildSearchText } from '../search-text';
-import { MAX_TORRENT_FILE_BYTES } from '../../fulfillment/torrent.utils';
+import { infoHashFromMagnet, MAX_TORRENT_FILE_BYTES } from '../../fulfillment/torrent.utils';
 
 /**
  * A generous ceiling on a feed document, not an expectation. A hundred extended results run to a
@@ -30,7 +31,7 @@ const MAX_XML_RESPONSE_BYTES = 16 * 1024 * 1024;
  * search. Ten times what any search asks any indexer for, and no honest title or link is 4KB.
  */
 const MAX_FEED_ITEMS = 500;
-const MAX_FEED_FIELD_CHARS = 4_096;
+const MAX_FEED_FIELD_CHARS = MAX_INDEXER_RELEASE_GUID_LENGTH;
 const REQUEST_TIMEOUT_MS = 25_000;
 /** The same ceiling the direct fetcher uses, and for the same reason: a chain, not a loop. */
 const MAX_REDIRECTS = 5;
@@ -105,7 +106,7 @@ export class TorznabAdapter implements IndexerAdapter {
    * the strong shape: redirects followed by hand with every hop checked, the connection pinned to
    * the address that passed, the operator's egress honoured, and the body counted as it arrives.
    */
-  async fetchTorrentFile(release: ReleaseCandidate, config: ResolvedIndexerConfig): Promise<Buffer> {
+  async fetchTorrentFile(release: ReleaseCandidate, config: ResolvedIndexerConfig): Promise<TorrentFetchResult> {
     if (!release.downloadUrl) throw new IndexerSearchException('error', 'That release has no download link');
 
     const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -122,7 +123,16 @@ export class TorznabAdapter implements IndexerAdapter {
         const location = response.headers.get('location');
         void response.body?.cancel().catch(() => undefined);
         if (!location) throw new IndexerSearchException('error', `The indexer answered ${response.status} without saying where the file is`);
-        current = await ensureSafeUrl(new URL(location, current).href, { allowPrivate: config.allowPrivateAddress });
+        const redirected = new URL(location, current);
+        if (redirected.protocol === 'magnet:') {
+          try {
+            infoHashFromMagnet(redirected.href);
+          } catch (error) {
+            throw new IndexerSearchException('error', error instanceof Error ? error.message : 'The indexer returned an invalid magnet link');
+          }
+          return { magnet: redirected.href };
+        }
+        current = await ensureSafeUrl(redirected.href, { allowPrivate: config.allowPrivateAddress });
         continue;
       }
 

@@ -402,6 +402,25 @@ describe('IndexerSearchService', () => {
     expect(result.indexers[0]).toMatchObject({ ok: true, count: 0, filtered: 2 });
   });
 
+  it('retries a title and author miss with the title alone', async () => {
+    const torznab = {
+      search: vi.fn((query: { author: string | null }) => Promise.resolve(query.author ? [] : [release()])),
+    };
+    const { service } = makeService([indexer()], { torznab });
+
+    const result = await service.search(request());
+
+    expect(torznab.search).toHaveBeenCalledTimes(2);
+    expect(torznab.search).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ title: 'Dune', author: 'Frank Herbert' }),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(torznab.search).toHaveBeenNthCalledWith(2, expect.objectContaining({ title: 'Dune', author: null }), expect.anything(), expect.anything());
+    expect(result.releases).toHaveLength(1);
+  });
+
   /** Reopening the picker must not re-hit a private tracker; `refresh` is the way past that. */
   it('serves a repeat search from the cache until asked to refresh', async () => {
     const torznab = { search: vi.fn().mockResolvedValue([release()]) };

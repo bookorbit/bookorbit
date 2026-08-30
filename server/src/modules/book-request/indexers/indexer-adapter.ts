@@ -144,6 +144,9 @@ export interface ReleaseFile {
   format: string;
 }
 
+/** What a credentialed torrent download endpoint resolves to after redirects are followed. */
+export type TorrentFetchResult = Buffer | { magnet: string };
+
 export interface IndexerAdapter {
   readonly type: IndexerAdapterType;
   readonly label: string;
@@ -170,7 +173,7 @@ export interface IndexerAdapter {
   search(query: ReleaseQuery, config: ResolvedIndexerConfig, signal: AbortSignal): Promise<ReleaseCandidate[]>;
   test(config: ResolvedIndexerConfig): Promise<IndexerTestResult>;
   /** Private trackers need an authenticated .torrent fetch rather than a public magnet. */
-  fetchTorrentFile?(release: ReleaseCandidate, config: ResolvedIndexerConfig): Promise<Buffer>;
+  fetchTorrentFile?(release: ReleaseCandidate, config: ResolvedIndexerConfig): Promise<TorrentFetchResult>;
   /**
    * Sources that serve the file itself. An adapter implements this or `fetchTorrentFile`, never
    * both: which one it declares is what decides whether a grab becomes a torrent or a download.

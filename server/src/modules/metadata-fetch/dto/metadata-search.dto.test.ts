@@ -13,18 +13,10 @@ async function validateInput(input: Record<string, unknown>) {
 }
 
 describe('MetadataSearchDto', () => {
-  it('requires at least one of bookId, title, or isbn', async () => {
+  it('accepts an author-only search', async () => {
     const { errors } = await validateInput({ author: 'Frank Herbert' });
 
-    expect(errors).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          constraints: expect.objectContaining({
-            atLeastOneSearchTerm: 'At least one of bookId, title, or isbn must be provided',
-          }),
-        }),
-      ]),
-    );
+    expect(errors).toHaveLength(0);
   });
 
   it('accepts title-only searches but rejects blank title values', async () => {
@@ -36,7 +28,7 @@ describe('MetadataSearchDto', () => {
       expect.arrayContaining([
         expect.objectContaining({
           constraints: expect.objectContaining({
-            atLeastOneSearchTerm: 'At least one of bookId, title, or isbn must be provided',
+            atLeastOneSearchTerm: 'At least one of bookId, title, author, or isbn must be provided',
           }),
         }),
       ]),

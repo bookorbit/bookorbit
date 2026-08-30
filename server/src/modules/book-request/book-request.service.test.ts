@@ -123,6 +123,7 @@ function makeService(
   };
   const dedupe = {
     findActiveRequestFor: vi.fn().mockResolvedValue(undefined),
+    findOwnedBookFor: vi.fn().mockResolvedValue(null),
     checkAvailability: vi.fn().mockResolvedValue([]),
     ...overrides.dedupe,
   };
@@ -270,6 +271,35 @@ describe('BookRequestService.submit', () => {
     expect(result.subscribed).toBe(true);
     expect(repo.addSubscriber).toHaveBeenCalledWith(7, 1);
     expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('reuses an existing hidden copy when the requester may see books they request', async () => {
+    const { service, repo, dedupe, automation, notifications } = makeService({
+      dedupe: { findOwnedBookFor: vi.fn().mockResolvedValue(42) },
+    });
+    repo.create.mockResolvedValue(row({ status: 'available', matchedBookId: 42 }));
+    repo.findById.mockResolvedValue(joined({ status: 'available', matchedBookId: 42 }));
+
+    const result = await service.submit(
+      dto,
+      user({ contentFilters: { includeTagIds: [9], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [], exemptRequestsFromUserId: 1 } }),
+    );
+
+    expect(dedupe.findOwnedBookFor).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }), [1]);
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'available', matchedBookId: 42 }), expect.any(Array));
+    expect(result.request.status).toBe('available');
+    expect(automation.considerRequest).not.toHaveBeenCalled();
+    expect(notifications.notify).not.toHaveBeenCalledWith(expect.objectContaining({ type: NotificationType.BookRequestSubmitted }));
+  });
+
+  it('does not reuse a hidden copy when the requester exemption is disabled', async () => {
+    const findOwnedBookFor = vi.fn().mockResolvedValue(42);
+    const { service, repo } = makeService({ dedupe: { findOwnedBookFor } });
+
+    await service.submit(dto, user({ contentFilters: { includeTagIds: [9], excludeTagIds: [], includeGenreIds: [], excludeGenreIds: [] } }));
+
+    expect(findOwnedBookFor).not.toHaveBeenCalled();
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending', matchedBookId: null }), expect.any(Array));
   });
 
   it('does not subscribe the owner to their own live request', async () => {

@@ -22,8 +22,8 @@ type Db = NodePgDatabase<typeof schema>;
  * - excludeGenreIds: book must NOT have any of these genres.
  *
  * Exemption (applied last, over the whole set):
- * - exemptRequestsFromUserId: a book that fulfilled a request this user made passes regardless
- *   of every rule above. Absent unless an administrator ticked it on that user.
+ * - exemptRequestsFromUserId: a book that fulfilled a request this user made or joined passes
+ *   regardless of every rule above. Absent unless an administrator ticked it on that user.
  */
 export function buildContentFilterClauses(contentFilters: ContentFilterRules, db: Db): SQL[] {
   const clauses: SQL[] = [];
@@ -93,7 +93,28 @@ export function buildContentFilterClauses(contentFilters: ContentFilterRules, db
           ),
         ),
     );
-    return [or(requestedByUser, and(...clauses))!];
+    const joinedByUser = exists(
+      db
+        .select({ one: sql`1` })
+        .from(schema.bookRequestSubscribers)
+        .where(
+          and(
+            eq(schema.bookRequestSubscribers.userId, contentFilters.exemptRequestsFromUserId),
+            exists(
+              db
+                .select({ one: sql`1` })
+                .from(schema.bookRequests)
+                .where(
+                  and(
+                    eq(schema.bookRequests.id, schema.bookRequestSubscribers.requestId),
+                    sql`${schema.bookRequests.matchedBookId} = ${schema.books.id}`,
+                  ),
+                ),
+            ),
+          ),
+        ),
+    );
+    return [or(requestedByUser, joinedByUser, and(...clauses))!];
   }
 
   return clauses;

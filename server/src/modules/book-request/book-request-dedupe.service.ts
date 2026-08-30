@@ -101,6 +101,21 @@ export function matchOwnedByTitle(matches: OwnedTitleMatch[] | undefined, author
 export class BookRequestDedupeService {
   constructor(private readonly repo: BookRequestRepository) {}
 
+  /** Finds a present copy of one work inside the libraries the requester can reach. */
+  async findOwnedBookFor(work: WorkIdentity, accessibleLibraryIds: number[] | null): Promise<number | null> {
+    const isbn13s = [normalizeIsbn(work.isbn13), ...(work.metadataSources ?? []).map((source) => normalizeIsbn(source.isbn13))].filter(
+      (value): value is string => value !== null && value.length === 13,
+    );
+    const titleKey = lowerTitleKey(work.title);
+    const owned = await this.repo.findOwnedMatches([...new Set(isbn13s)], titleKey ? [titleKey] : [], accessibleLibraryIds);
+
+    for (const isbn13 of isbn13s) {
+      const bookId = owned.byIsbn13.get(isbn13);
+      if (bookId !== undefined) return bookId;
+    }
+    return matchOwnedByTitle(owned.byTitle.get(titleKey), work.authors?.[0]);
+  }
+
   /**
    * Annotates a batch of search candidates with "already in your library" and "already
    * requested". Three queries total regardless of batch size.

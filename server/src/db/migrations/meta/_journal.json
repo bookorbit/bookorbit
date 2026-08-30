@@ -589,6 +589,13 @@
       "when": 1787976219151,
       "tag": "0083_add_resumable_direct_downloads",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1788117062541,
+      "tag": "0084_allow_long_release_guids",
+      "breakpoints": true
     }
   ]
 }

@@ -62,6 +62,7 @@ import {
   type ReleaseCandidate,
   type ReleaseFile,
   type ResolvedIndexerConfig,
+  type TorrentFetchResult,
 } from '../indexers/indexer-adapter';
 import { IndexerConfigService } from '../indexers/indexer-config.service';
 import { IndexerRegistry } from '../indexers/indexer-registry';
@@ -375,7 +376,7 @@ export class RequestFulfillmentService {
         source: await this.attemptedSource(release),
         automated: user === null,
         releaseTitle: release.title.slice(0, 500),
-        releaseGuid: releaseGuid.slice(0, 500),
+        releaseGuid,
         releaseSizeBytes: release.sizeBytes,
         releaseSeeders: release.seeders,
         releaseFormat: resolveFormat(release)?.slice(0, 20) ?? null,
@@ -640,6 +641,15 @@ export class RequestFulfillmentService {
     }
 
     const torrentFile = await fetchTorrentFile(adapter, release, indexer);
+    if (!Buffer.isBuffer(torrentFile)) {
+      return {
+        ...snapshot,
+        source: 'magnet',
+        magnet: torrentFile.magnet,
+        infoHash: infoHashFromMagnet(torrentFile.magnet),
+        inspection: metadataUnavailableInspection('magnet'),
+      };
+    }
     const metadata = torrentMetadataFromFile(torrentFile);
     return {
       ...snapshot,
@@ -727,7 +737,7 @@ export class RequestFulfillmentService {
  * the reason is the tracker's own sentence. Letting the adapter's error through unmapped reports
  * it as a 500 with a stack trace, which loses the sentence and reads as a fault on our side.
  */
-async function fetchTorrentFile(adapter: IndexerAdapter, release: ReleaseCandidate, indexer: ResolvedIndexerConfig): Promise<Buffer> {
+async function fetchTorrentFile(adapter: IndexerAdapter, release: ReleaseCandidate, indexer: ResolvedIndexerConfig): Promise<TorrentFetchResult> {
   try {
     return await adapter.fetchTorrentFile!(release, indexer);
   } catch (error) {
