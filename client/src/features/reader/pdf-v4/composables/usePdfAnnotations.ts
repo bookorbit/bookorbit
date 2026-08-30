@@ -28,43 +28,61 @@ export function usePdfAnnotations(bookId: number) {
 
   async function load() {
     loadError.value = null
-    const res = await api(`/api/v1/books/${bookId}/annotations`)
-    if (!res.ok) {
+    try {
+      const res = await api(`/api/v1/books/${bookId}/annotations`)
+      if (!res.ok) {
+        loadError.value = 'Failed to load'
+        return
+      }
+      annotations.value = await res.json()
+    } catch {
+      // api() rejects on session expiry / network failure; surface it as a load error
+      // instead of leaving initialize() with an unhandled rejection.
       loadError.value = 'Failed to load'
-      return
     }
-    annotations.value = await res.json()
   }
 
   async function create(input: CreatePdfAnnotationInput): Promise<AnnotationItem | null> {
-    const res = await api(`/api/v1/books/${bookId}/annotations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    })
-    if (!res.ok) return null
-    const created: AnnotationItem = await res.json()
-    annotations.value = [...annotations.value, created]
-    return created
+    try {
+      const res = await api(`/api/v1/books/${bookId}/annotations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (!res.ok) return null
+      const created: AnnotationItem = await res.json()
+      annotations.value = [...annotations.value, created]
+      return created
+    } catch {
+      return null
+    }
   }
 
   async function update(id: number, patch: PdfAnnotationPatch): Promise<AnnotationItem | null> {
-    const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    })
-    if (!res.ok) return null
-    const updated: AnnotationItem = await res.json()
-    annotations.value = annotations.value.map((a) => (a.id === id ? updated : a))
-    return updated
+    try {
+      const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) return null
+      const updated: AnnotationItem = await res.json()
+      annotations.value = annotations.value.map((a) => (a.id === id ? updated : a))
+      return updated
+    } catch {
+      return null
+    }
   }
 
   async function remove(id: number): Promise<boolean> {
-    const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, { method: 'DELETE' })
-    if (!res.ok) return false
-    annotations.value = annotations.value.filter((a) => a.id !== id)
-    return true
+    try {
+      const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, { method: 'DELETE' })
+      if (!res.ok) return false
+      annotations.value = annotations.value.filter((a) => a.id !== id)
+      return true
+    } catch {
+      return false
+    }
   }
 
   return { annotations, loadError, load, create, update, remove }

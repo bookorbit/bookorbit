@@ -91,6 +91,33 @@ describe('Annotation DTO validation', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('rejects a pdf create payload with non-positive rect width or height', async () => {
+    expect(
+      (
+        await errorsFor(CreateAnnotationDto, {
+          pdf: { page: 0, rect: { x: 1, y: 2, width: 0, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+          text: 'ok',
+        })
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      (
+        await errorsFor(CreateAnnotationDto, {
+          pdf: { page: 0, rect: { x: 1, y: 2, width: 3, height: -1 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+          text: 'ok',
+        })
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      (
+        await errorsFor(CreateAnnotationDto, {
+          pdf: { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 0, height: 4 }] },
+          text: 'ok',
+        })
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
   it('accepts update payload with nullable note and optional style', async () => {
     const nullNoteErrors = await errorsFor(UpdateAnnotationDto, { note: null, style: 'highlight' });
     const normalErrors = await errorsFor(UpdateAnnotationDto, { note: 'updated', color: '#38BDF8' });

@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsNumber,
+  IsPositive,
   IsString,
   MaxLength,
   Min,
@@ -28,9 +29,11 @@ export class CreateAnnotationRectDto {
   y!: number;
 
   @IsNumber()
+  @IsPositive()
   width!: number;
 
   @IsNumber()
+  @IsPositive()
   height!: number;
 }
 
