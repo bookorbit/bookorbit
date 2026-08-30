@@ -102,6 +102,7 @@ async function handleCopy() {
             <button
               class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"
               :class="copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+              :aria-label="copied ? t('reader.selection.copied') : t('reader.selection.copy')"
               @click="handleCopy"
             >
               <Check v-if="copied" :size="15" />
@@ -116,6 +117,7 @@ async function handleCopy() {
             <button
               class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"
               :class="showColorPicker ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              :aria-label="t('reader.selection.highlight')"
               @click="handleHighlightClick"
             >
               <Highlighter :size="15" />
@@ -128,6 +130,7 @@ async function handleCopy() {
           <TooltipTrigger as-child>
             <button
               class="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              :aria-label="t('reader.note.title')"
               @click="handleNote"
             >
               <FileText :size="15" />
@@ -140,6 +143,7 @@ async function handleCopy() {
           <TooltipTrigger as-child>
             <button
               class="flex h-8 w-8 items-center justify-center rounded-lg text-destructive transition-colors hover:bg-muted"
+              :aria-label="t('reader.selection.deleteAnnotation')"
               @click="handleDelete"
             >
               <Trash2 :size="15" />

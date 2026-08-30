@@ -380,4 +380,59 @@ describe('usePdfHighlights', () => {
 
     unmount()
   })
+
+  it('retries only the failed page of a multi-page selection without duplicating the saved one', async () => {
+    const rect = { origin: { x: 12, y: 20 }, size: { width: 30, height: 8 } }
+    const makeCreated = (id: number) => ({
+      id,
+      bookId: 9,
+      cfi: null,
+      jumpFileId: 33,
+      pageno: 2,
+      text: 'x',
+      color: '#38BDF8',
+      style: 'highlight',
+      note: null,
+      chapterTitle: null,
+      origin: 'web',
+      positionStatus: 'exact',
+      chapterIndex: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+    })
+    let postCount = 0
+    apiMock.mockImplementation((_input, init) => {
+      if (init?.method === 'POST') {
+        postCount += 1
+        // page 1 succeeds, page 2 fails, retry of page 2 succeeds
+        const ok = postCount !== 2
+        return Promise.resolve(response(ok, ok ? makeCreated(100 + postCount) : null))
+      }
+      return Promise.resolve(response(true, []))
+    })
+    mocks.selScope.getFormattedSelection.mockReturnValueOnce([
+      { pageIndex: 1, rect, segmentRects: [rect] },
+      { pageIndex: 2, rect, segmentRects: [rect] },
+    ])
+    mocks.selScope.getSelectedText.mockReturnValueOnce({ toPromise: () => Promise.resolve(['page one', 'page two']) })
+
+    const { highlights, unmount } = mountHighlights()
+    await flushPromises()
+    mocks.menuListeners[0](PLACEMENT)
+    await flushPromises()
+
+    await highlights.applyHighlight('#38BDF8', 'highlight')
+    await flushPromises()
+    expect(postCount).toBe(2)
+    expect(mocks.annScope.createAnnotation).toHaveBeenCalledTimes(1)
+    expect(highlights.popupVisible.value).toBe(true)
+
+    await highlights.applyHighlight('#38BDF8', 'highlight')
+    await flushPromises()
+    expect(postCount).toBe(3)
+    expect(mocks.annScope.createAnnotation).toHaveBeenCalledTimes(2)
+    expect(highlights.popupVisible.value).toBe(false)
+
+    unmount()
+  })
 })

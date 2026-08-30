@@ -180,7 +180,9 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     return true
   }
   async function createFromSelection(color: string, style: string, note: string | null): Promise<boolean> {
-    let failed = false
+    // Drop pages as they succeed so a retry (the popup/dialog stays open on failure)
+    // only re-creates the pages that failed, never duplicating ones already persisted.
+    const remaining: PendingSelectionPage[] = []
     for (const entry of pendingSelection) {
       if (entry.rects.length === 0) continue
       const created = await store.create({
@@ -192,9 +194,10 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
         note,
       })
       if (created) renderAnnotation(created)
-      else failed = true
+      else remaining.push(entry)
     }
-    return !failed
+    pendingSelection = remaining
+    return remaining.length === 0
   }
 
   async function applyHighlight(color: string, style: string, note?: string) {
