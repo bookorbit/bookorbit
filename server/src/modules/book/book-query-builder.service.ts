@@ -173,7 +173,23 @@ export class BookQueryBuilder {
         if (userId === undefined) throw new BadRequestException('rating filter requires an authenticated user');
         return this.ratingRuleToSql(operator, value as number | undefined, valueTo as number | undefined, userId);
       case 'communityRating':
-        return this.communityRatingRuleToSql(operator, value as number | undefined, valueTo as number | undefined, rule.provider);
+        return this.communityRatingRuleToSql(
+          bookCommunityRatings.rating,
+          'communityRating',
+          operator,
+          value as number | undefined,
+          valueTo as number | undefined,
+          rule.provider,
+        );
+      case 'communityRatingCount':
+        return this.communityRatingRuleToSql(
+          bookCommunityRatings.ratingCount,
+          'communityRatingCount',
+          operator,
+          value as number | undefined,
+          valueTo as number | undefined,
+          rule.provider,
+        );
       case 'author':
         return this.authorRuleToSql(operator, value as string[]);
       case 'genre':
@@ -516,6 +532,8 @@ export class BookQueryBuilder {
   }
 
   private communityRatingRuleToSql(
+    metricColumn: AnyColumn,
+    field: 'communityRating' | 'communityRatingCount',
     operator: string,
     value: number | undefined,
     valueTo: number | undefined,
@@ -536,32 +554,32 @@ export class BookQueryBuilder {
     switch (operator) {
       case 'eq':
         this.assertNumber(value, operator, 'value');
-        return existsCommunityRating(eq(bookCommunityRatings.rating, value!));
+        return existsCommunityRating(eq(metricColumn, value!));
       case 'notEq':
         this.assertNumber(value, operator, 'value');
-        return existsCommunityRating(ne(bookCommunityRatings.rating, value!));
+        return existsCommunityRating(ne(metricColumn, value!));
       case 'gt':
         this.assertNumber(value, operator, 'value');
-        return existsCommunityRating(gt(bookCommunityRatings.rating, value!));
+        return existsCommunityRating(gt(metricColumn, value!));
       case 'gte':
         this.assertNumber(value, operator, 'value');
-        return existsCommunityRating(gte(bookCommunityRatings.rating, value!));
+        return existsCommunityRating(gte(metricColumn, value!));
       case 'lt':
         this.assertNumber(value, operator, 'value');
-        return existsCommunityRating(lt(bookCommunityRatings.rating, value!));
+        return existsCommunityRating(lt(metricColumn, value!));
       case 'lte':
         this.assertNumber(value, operator, 'value');
-        return existsCommunityRating(lte(bookCommunityRatings.rating, value!));
+        return existsCommunityRating(lte(metricColumn, value!));
       case 'between':
         this.assertNumber(value, operator, 'value');
         this.assertNumber(valueTo, operator, 'valueTo');
-        return existsCommunityRating(and(gte(bookCommunityRatings.rating, value!), lte(bookCommunityRatings.rating, valueTo!))!);
+        return existsCommunityRating(and(gte(metricColumn, value!), lte(metricColumn, valueTo!))!);
       case 'isEmpty':
-        return not(existsCommunityRating());
+        return not(existsCommunityRating(isNotNull(metricColumn)));
       case 'isNotEmpty':
-        return existsCommunityRating();
+        return existsCommunityRating(isNotNull(metricColumn));
       default:
-        throw new BadRequestException(`Invalid operator '${operator}' for communityRating field`);
+        throw new BadRequestException(`Invalid operator '${operator}' for ${field} field`);
     }
   }
 

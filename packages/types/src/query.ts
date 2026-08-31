@@ -7,6 +7,7 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
  * Most fields map directly to a DB column. The exceptions:
  * - `fileAvailability` - derived from `books.status` ('present' | 'missing')
  * - `communityRating` - from `book_community_ratings.rating` (optionally provider-specific)
+ * - `communityRatingCount` - from `book_community_ratings.rating_count` (optionally provider-specific)
  * - `readProgress` - aggregated from `reading_progress.percentage` (per-user, per-book-file)
  * - `readStatus` - stored in `user_book_status.status` (per-user)
  * - `startedAt` - from `user_book_status.started_at` (per-user)
@@ -47,6 +48,7 @@ export type StaticRuleField =
   | "fileAvailability"
   | "rating"
   | "communityRating"
+  | "communityRatingCount"
   | "readProgress"
   | "readStatus"
   | "description"
@@ -122,6 +124,7 @@ export const FIELD_OPERATORS: Record<StaticRuleField, RuleOperator[]> = {
   fileAvailability: ["isMissing", "isPresent"],
   rating: ["eq", "gt", "gte", "lt", "lte", "isEmpty", "isNotEmpty"],
   communityRating: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
+  communityRatingCount: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   readProgress: ["isUnread", "isInProgress", "isFinished"],
   readStatus: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   description: ["isEmpty", "isNotEmpty"],
@@ -189,11 +192,12 @@ export const RULE_OPERATORS: RuleOperator[] = [
 ];
 
 export type CommunityRatingProvider = CommunityRatingProviderKey | "any";
+export type CommunityRatingRuleField = "communityRating" | "communityRatingCount";
 export type RuleValue = string | number | string[] | number[];
 
 export type StandardRule = {
   type: "rule";
-  field: Exclude<StaticRuleField, "communityRating">;
+  field: Exclude<StaticRuleField, CommunityRatingRuleField>;
   operator: RuleOperator;
   value?: RuleValue;
   valueTo?: string | number;
@@ -201,7 +205,7 @@ export type StandardRule = {
 
 export type CommunityRatingRule = {
   type: "rule";
-  field: "communityRating";
+  field: CommunityRatingRuleField;
   operator: RuleOperator;
   provider?: CommunityRatingProvider;
   value?: RuleValue;

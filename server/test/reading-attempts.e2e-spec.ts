@@ -644,6 +644,14 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect((await listAttempts(bothDates.bookId)).items).toEqual([
       expect.objectContaining({ startedOn: '2026-02-01', endedOn: '2026-02-10', outcome: 'completed', origin: 'manual' }),
     ]);
+
+    const sameDay = await createBook();
+    const sameDayResponse = await patchStatus(sameDay.bookId, { startedAt: '2026-02-15', finishedAt: '2026-02-15' });
+    expect(sameDayResponse.statusCode).toBe(200);
+    expect(sameDayResponse.json()).toMatchObject({ status: 'read', startedAt: '2026-02-15', finishedAt: '2026-02-15' });
+    expect((await listAttempts(sameDay.bookId)).items).toEqual([
+      expect.objectContaining({ startedOn: '2026-02-15', endedOn: '2026-02-15', outcome: 'completed', origin: 'manual' }),
+    ]);
   });
 
   it('27. closes active lifecycle states with a date-only finish patch', async () => {

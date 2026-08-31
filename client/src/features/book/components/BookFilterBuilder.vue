@@ -11,6 +11,7 @@ import {
   isCustomRuleField,
   parseCustomRuleFieldId,
   type CommunityRatingProvider,
+  type CommunityRatingRuleField,
   type CustomMetadataFieldType,
   type CustomRuleField,
   type GroupRule,
@@ -44,7 +45,16 @@ const emit = defineEmits<{
 
 const MAX_DEPTH = 5
 const BYTES_PER_MIB = 1024 ** 2
-const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount', 'fileSize', 'rating', 'communityRating', 'metadataScore']
+const NUMERIC_FIELDS: RuleField[] = [
+  'seriesIndex',
+  'publishedYear',
+  'pageCount',
+  'fileSize',
+  'rating',
+  'communityRating',
+  'communityRatingCount',
+  'metadataScore',
+]
 const DATE_FIELDS: RuleField[] = ['publishedDate', 'addedAt', 'startedAt', 'finishedAt']
 const NO_VALUE_OPERATORS: RuleOperator[] = [
   'isEmpty',
@@ -135,6 +145,15 @@ function isNumericField(field: RuleField): boolean {
   return NUMERIC_FIELDS.includes(field) || customFieldType(field) === 'number'
 }
 
+function isCommunityRatingField(field: RuleField): field is CommunityRatingRuleField {
+  return field === 'communityRating' || field === 'communityRatingCount'
+}
+
+function providerForRule(rule: Rule): CommunityRatingProvider {
+  if (rule.field === 'communityRating' || rule.field === 'communityRatingCount') return rule.provider ?? 'any'
+  return 'any'
+}
+
 function isDateField(field: RuleField): boolean {
   return DATE_FIELDS.includes(field) || customFieldType(field) === 'date'
 }
@@ -173,7 +192,7 @@ function toEditableRule(r: Rule): EditableRule {
   return {
     field: r.field,
     operator: r.operator,
-    provider: r.field === 'communityRating' ? (r.provider ?? 'any') : 'any',
+    provider: providerForRule(r),
     value: usesChips ? '' : value,
     valueChips: usesChips ? (r.value as string[]) : [],
     valueTo,
@@ -257,7 +276,7 @@ function emitUpdate() {
               : n.rule.valueTo
             : undefined,
       }
-      return n.rule.field === 'communityRating' ? ({ ...rule, provider: n.rule.provider } as Rule) : (rule as Rule)
+      return isCommunityRatingField(n.rule.field) ? ({ ...rule, provider: n.rule.provider } as Rule) : (rule as Rule)
     })
   const isSubGroup = (props.depth ?? 0) > 0
   if (!isSubGroup && rules.length === 0 && !props.preserveIncompleteRoot) {
@@ -393,7 +412,7 @@ function valueInputType(field: RuleField, operator: RuleOperator): string {
 
 function numericInputMin(field: RuleField): string | undefined {
   if (field === 'fileSize') return '0'
-  if (field === 'communityRating') return '0'
+  if (isCommunityRatingField(field)) return '0'
   return undefined
 }
 
@@ -406,6 +425,7 @@ function numericInputMax(field: RuleField): string | undefined {
 function numericInputStep(field: RuleField): string | undefined {
   if (field === 'fileSize') return '0.1'
   if (field === 'communityRating') return '0.1'
+  if (field === 'communityRatingCount') return '1'
   return undefined
 }
 
@@ -465,7 +485,7 @@ function showValueToInput(operator: RuleOperator): boolean {
         </select>
 
         <div
-          v-if="node.rule.field === 'communityRating'"
+          v-if="isCommunityRatingField(node.rule.field)"
           class="h-9 flex items-center gap-2 rounded-md border border-input bg-background px-2 shrink-0"
         >
           <img

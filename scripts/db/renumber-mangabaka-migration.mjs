@@ -3,18 +3,19 @@
 // regenerates its snapshot after an upstream sync.
 //
 // Upstream adds migrations at the same index our MangaBaka migration occupies,
-// so every sync conflicts in _journal.json (and the snapshot). This script
-// resolves that conflict the same way the manual process did:
+// so every sync conflicts in _journal.json and meta/<idx>_snapshot.json. This
+// script resolves both the way the manual process did:
 //
 //   1. Resolve journal conflict markers (keep upstream entries, move MangaBaka last)
-//   2. Renumber all entries and rename the MangaBaka SQL file to its new index
-//   3. Delete the stale MangaBaka snapshot
-//   4. Run `drizzle-kit generate` to produce a fresh snapshot from the schema
+//   2. Resolve any conflicted snapshot files (keep upstream's side)
+//   3. Renumber all entries and rename the MangaBaka SQL file to its new index
+//   4. Write the journal WITHOUT the MangaBaka entry, then run `drizzle-kit
+//      generate` so it produces a fresh migration + snapshot from the schema
 //   5. Drop the generated duplicate SQL, rename the generated snapshot to the
 //      MangaBaka index, and fold its timestamp into the journal
 //
 // Usage (from repo root, after `git merge origin/main`):
-//   node scripts/db/renumber-mangabaka-migration.mjs
+//   pnpm db:renumber-mangabaka
 //
 // Options:
 //   --migrations-dir <path>  migrations directory (default server/src/db/migrations)
@@ -55,14 +56,10 @@ function apply(action, fn) {
   fn();
 }
 
-// Resolve git conflict markers in the journal. Markers appear inside a JSON
-// object (between the "version" and "breakpoints" lines of an entry), so the
-// raw text is not valid JSON. Each side is completed by the surrounding normal
-// segments, so we can reconstruct both full journals and merge them: keep
-// upstream's (theirs) entries, then append our extra (MangaBaka) entries.
-function resolveJournalConflicts(raw) {
-  if (!raw.includes('<<<<<<<')) return JSON.parse(raw);
-
+// Split conflicted text into normal/head/theirs segments. Markers appear inside
+// JSON objects, so the raw text is not valid JSON; each side is completed by the
+// surrounding normal segments.
+function splitConflictSegments(raw) {
   const segments = [];
   let rest = raw;
   while (rest.includes('<<<<<<<')) {
@@ -80,20 +77,36 @@ function resolveJournalConflicts(raw) {
     rest = endLineEnd === -1 ? '' : rest.slice(endLineEnd + 1);
   }
   segments.push({ type: 'normal', text: rest });
+  return segments;
+}
 
-  const build = (side) => {
-    let text = '';
-    for (const seg of segments) {
-      if (seg.type === 'normal' || seg.type === side) text += seg.text;
-    }
-    return JSON.parse(text);
-  };
+function buildSide(segments, side) {
+  let text = '';
+  for (const seg of segments) {
+    if (seg.type === 'normal' || seg.type === side) text += seg.text;
+  }
+  return text;
+}
 
-  const theirs = build('theirs');
-  const ours = build('head');
+// Resolve journal conflict markers: keep upstream's (theirs) entries, then
+// append our extra (MangaBaka) entries from the HEAD side.
+function resolveJournalConflicts(raw) {
+  if (!raw.includes('<<<<<<<')) return JSON.parse(raw);
+  const segments = splitConflictSegments(raw);
+  const theirs = JSON.parse(buildSide(segments, 'theirs'));
+  const ours = JSON.parse(buildSide(segments, 'head'));
   const theirsTags = new Set(theirs.entries.map((e) => e.tag));
   const extra = ours.entries.filter((e) => !theirsTags.has(e.tag));
   return { ...theirs, entries: [...theirs.entries, ...extra] };
+}
+
+// Resolve a conflicted snapshot file by keeping upstream's (theirs) side.
+function resolveSnapshotConflicts(path) {
+  const raw = readFileSync(path, 'utf8');
+  if (!raw.includes('<<<<<<<')) return;
+  const segments = splitConflictSegments(raw);
+  const theirs = buildSide(segments, 'theirs');
+  apply(`resolve snapshot conflict ${path} (keep upstream)`, () => writeFileSync(path, theirs));
 }
 
 function moveMangabakaToEnd(journal) {
@@ -116,6 +129,8 @@ function findMangabakaSql() {
 
 function snapshotHasMangabaka(snapshotPath) {
   if (!existsSync(snapshotPath)) return false;
+  const raw = readFileSync(snapshotPath, 'utf8');
+  if (raw.includes('<<<<<<<')) return false;
   const snap = readJson(snapshotPath);
   const bm = snap.tables?.['public.book_metadata'];
   return bm?.columns?.mangabaka_id != null;
@@ -158,6 +173,14 @@ function main() {
 
   if (hadConflicts) log('info', 'journal had conflict markers; resolved by moving MangaBaka last');
 
+  // Resolve any conflicted snapshot files in the meta dir (add/add conflicts:
+  // upstream created a snapshot at the same index as ours). Keep upstream's.
+  for (const file of readdirSync(META_DIR)) {
+    if (!file.endsWith('_snapshot.json')) continue;
+    const p = join(META_DIR, file);
+    if (readFileSync(p, 'utf8').includes('<<<<<<<')) resolveSnapshotConflicts(p);
+  }
+
   // Rename the SQL file to its new index.
   const oldSql = findMangabakaSql();
   const newSql = join(MIGRATIONS_DIR, `${newTag}.sql`);
@@ -192,10 +215,15 @@ function main() {
     return;
   }
 
+  // Write the journal WITHOUT the MangaBaka entry so drizzle-kit can read a
+  // clean journal and regenerate the migration from the schema delta.
+  const withoutMangabaka = { ...journal, entries: journal.entries.filter((e) => e.tag !== newTag) };
+  apply(`write journal without MangaBaka (${withoutMangabaka.entries.length} entries)`, () => writeJson(JOURNAL_PATH, withoutMangabaka));
+
   // Build types (schema imports @bookorbit/types) then let drizzle-kit diff the schema.
   log('info', 'building @bookorbit/types and running drizzle-kit generate');
   execFileSync('pnpm', ['--filter', '@bookorbit/types', 'build'], { cwd: ROOT, stdio: 'inherit' });
-  execFileSync('pnpm', ['--filter', 'server', 'drizzle-kit', 'generate'], { cwd: ROOT, stdio: 'inherit' });
+  execFileSync('pnpm', ['--filter', 'server', 'exec', 'drizzle-kit', 'generate'], { cwd: ROOT, stdio: 'inherit' });
 
   // drizzle-kit appended a generated entry at the end; fold it into MangaBaka.
   const generated = readJson(JOURNAL_PATH);

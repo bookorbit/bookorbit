@@ -359,6 +359,54 @@ describe('DetailsTab - present state', () => {
     )
   })
 
+  it('allows the finished date to match the started date', async () => {
+    vi.mocked(api).mockImplementation(async (input, init) => {
+      if (input === '/api/v1/books/1/status' && init?.method === 'PATCH') {
+        return makeApiResponse({
+          status: 'read',
+          source: 'manual',
+          startedAt: '2026-04-10',
+          finishedAt: '2026-04-10',
+          updatedAt: '2026-04-10T00:00:00.000Z',
+        })
+      }
+      if (input === '/api/v1/collections/membership') return makeApiResponse([])
+      return makeApiResponse({}, false)
+    })
+
+    const wrapper = mount(DetailsTab, {
+      props: {
+        book: makeBook({
+          readStatus: {
+            status: 'reading',
+            source: 'manual',
+            startedAt: '2026-04-10',
+            finishedAt: null,
+            updatedAt: '2026-04-10T00:00:00.000Z',
+          },
+        }),
+      },
+      global: globalStubs,
+    })
+
+    await wrapper.find('button[title="Edit date finished"]').trigger('click')
+    await wrapper.find('input[type="date"]').setValue('2026-04-10')
+
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Save')
+    expect(saveButton?.exists()).toBe(true)
+    await saveButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Date Finished must be on or after Date Started')
+    expect(vi.mocked(api)).toHaveBeenCalledWith(
+      '/api/v1/books/1/status',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ finishedAt: '2026-04-10' }),
+      }),
+    )
+  })
+
   it('shows validation for finished date earlier than started date and blocks save', async () => {
     vi.mocked(api).mockImplementation(async (input) => {
       if (input === '/api/v1/collections/membership') return makeApiResponse([])

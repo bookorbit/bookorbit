@@ -44,14 +44,17 @@ const NO_VALUE_OPS: RuleOperator[] = [
 ]
 
 function communityRatingProviderLabel(rule: Rule): string {
-  if (rule.field !== 'communityRating') return ''
+  if (rule.field !== 'communityRating' && rule.field !== 'communityRatingCount') return ''
   const provider = rule.provider ?? 'any'
   if (provider === 'any') return t('book.filter.anyProvider')
   return PROVIDER_SHORT_LABELS[provider] ?? provider
 }
 
 export function ruleToParts(rule: Rule): { field: string; operator: string; value: string | null } {
-  const field = rule.field === 'communityRating' ? `${fieldLabel(rule.field)} (${communityRatingProviderLabel(rule)})` : fieldLabel(rule.field)
+  const field =
+    rule.field === 'communityRating' || rule.field === 'communityRatingCount'
+      ? `${fieldLabel(rule.field)} (${communityRatingProviderLabel(rule)})`
+      : fieldLabel(rule.field)
   const operator = operatorLabel(rule.operator)
   if (NO_VALUE_OPS.includes(rule.operator)) return { field, operator, value: null }
   if (rule.operator === 'withinLast') return { field, operator, value: `${rule.value} ${t('book.filter.unit.days')}` }

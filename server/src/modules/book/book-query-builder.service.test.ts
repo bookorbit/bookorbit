@@ -136,7 +136,16 @@ const USER_CTX = { accessibleLibraryIds: [1] as number[], userId: 10 };
  * new operator is added to RuleOperator but not handled here.
  */
 function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unknown; valueTo?: unknown } {
-  const numericFields: RuleField[] = ['publishedYear', 'seriesIndex', 'pageCount', 'fileSize', 'rating', 'communityRating', 'metadataScore'];
+  const numericFields: RuleField[] = [
+    'publishedYear',
+    'seriesIndex',
+    'pageCount',
+    'fileSize',
+    'rating',
+    'communityRating',
+    'communityRatingCount',
+    'metadataScore',
+  ];
   const dateFields: RuleField[] = ['publishedDate', 'addedAt', 'startedAt', 'finishedAt'];
   const isNumericField = numericFields.includes(field);
 
@@ -551,6 +560,89 @@ describe('communityRating filter field', () => {
     expect(ruleSql).toMatchObject({ type: 'sql' });
     expect(ruleSql.values[0].whereClause.clauses[1]).toMatchObject({ type: 'eq', right: 'hardcover' });
     expect(ruleSql.values[0].whereClause.clauses[2]).toMatchObject({ type: 'ne', right: 4 });
+  });
+});
+
+describe('communityRatingCount filter field', () => {
+  it('matches any provider count with the requested numeric predicate', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 1000, provider: 'any' }) as never,
+      USER_CTX,
+    ) as any;
+
+    const ruleSql = getRuleSql(where) as any;
+    expect(ruleSql).toMatchObject({ type: 'sql' });
+    expect(ruleSql.values[0].whereClause.clauses).toHaveLength(2);
+    expect(ruleSql.values[0].whereClause.clauses[1]).toMatchObject({ type: 'gte', right: 1000 });
+    expect(collectColumnNames(ruleSql)).toContain('rating_count');
+  });
+
+  it('matches a specific provider count in the same exists subquery', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'communityRatingCount', operator: 'lt', value: 25, provider: 'hardcover' }) as never,
+      USER_CTX,
+    ) as any;
+
+    const predicates = (getRuleSql(where) as any).values[0].whereClause.clauses;
+    expect(predicates).toHaveLength(3);
+    expect(predicates[1]).toMatchObject({ type: 'eq', right: 'hardcover' });
+    expect(predicates[2]).toMatchObject({ type: 'lt', right: 25 });
+    expect(collectColumnNames(predicates[2])).toContain('rating_count');
+  });
+
+  it('treats a missing row or null count as empty', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'communityRatingCount', operator: 'isEmpty', provider: 'goodreads' }) as never,
+      USER_CTX,
+    ) as any;
+
+    const ruleSql = getRuleSql(where) as any;
+    expect(ruleSql).toMatchObject({ type: 'not' });
+    expect(ruleSql.value.values[0].whereClause.clauses[1]).toMatchObject({ type: 'eq', right: 'goodreads' });
+    expect(ruleSql.value.values[0].whereClause.clauses[2]).toMatchObject({ type: 'isNotNull' });
+    expect(collectColumnNames(ruleSql.value.values[0].whereClause.clauses[2])).toContain('rating_count');
+  });
+
+  it('requires a non-null count for isNotEmpty', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'communityRatingCount', operator: 'isNotEmpty', provider: 'goodreads' }) as never,
+      USER_CTX,
+    ) as any;
+
+    const predicates = (getRuleSql(where) as any).values[0].whereClause.clauses;
+    expect(predicates[1]).toMatchObject({ type: 'eq', right: 'goodreads' });
+    expect(predicates[2]).toMatchObject({ type: 'isNotNull' });
+    expect(collectColumnNames(predicates[2])).toContain('rating_count');
+  });
+
+  it('keeps rating and count predicates provider-specific in an AND group', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      {
+        type: 'group',
+        join: 'AND',
+        rules: [
+          { type: 'rule', field: 'communityRating', operator: 'gte', value: 4.5, provider: 'amazon' },
+          { type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 1000, provider: 'amazon' },
+        ],
+      } as never,
+      USER_CTX,
+    ) as any;
+
+    const [ratingRule, countRule] = where.clauses[1].clauses;
+    expect(ratingRule.values[0].whereClause.clauses[1]).toMatchObject({ type: 'eq', right: 'amazon' });
+    expect(countRule.values[0].whereClause.clauses[1]).toMatchObject({ type: 'eq', right: 'amazon' });
+    expect(collectColumnNames(ratingRule)).toContain('rating');
+    expect(collectColumnNames(countRule)).toContain('rating_count');
   });
 });
 

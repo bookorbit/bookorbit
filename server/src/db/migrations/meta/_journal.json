@@ -579,8 +579,15 @@
     {
       "idx": 82,
       "version": "7",
-      "when": 1787945457299,
-      "tag": "0082_add_mangabaka_columns",
+      "when": 1788151243360,
+      "tag": "0082_add_community_rating_count_filter_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1788159394964,
+      "tag": "0083_add_mangabaka_columns",
       "breakpoints": true
     }
   ]

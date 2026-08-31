@@ -157,6 +157,8 @@ export const bookCommunityRatings = pgTable(
     index('book_community_ratings_provider_idx').on(t.provider),
     index('book_community_ratings_rating_book_idx').on(t.rating, t.bookId),
     index('book_community_ratings_provider_rating_book_idx').on(t.provider, t.rating, t.bookId),
+    index('book_community_ratings_count_book_idx').on(t.ratingCount, t.bookId),
+    index('book_community_ratings_provider_count_book_idx').on(t.provider, t.ratingCount, t.bookId),
     check('book_community_ratings_rating_range_chk', sql`${t.rating} >= 0 and ${t.rating} <= 5`),
     check('book_community_ratings_count_nonnegative_chk', sql`${t.ratingCount} is null or ${t.ratingCount} >= 0`),
   ],

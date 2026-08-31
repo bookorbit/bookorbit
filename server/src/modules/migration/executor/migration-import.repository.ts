@@ -20,6 +20,22 @@ type Db = NodePgDatabase<typeof schema>;
 
 const BATCH_CHUNK_SIZE = 500;
 
+type UserBookStatusMergeItem = Omit<typeof schema.userBookStatus.$inferInsert, 'updatedAt'> & {
+  sourceUpdatedAt: Date | null;
+};
+
+function userBookStatusMergeValues(item: UserBookStatusMergeItem, updatedAt: Date): typeof schema.userBookStatus.$inferInsert {
+  return {
+    userId: item.userId,
+    bookId: item.bookId,
+    status: item.status,
+    source: item.source,
+    startedAt: item.startedAt,
+    finishedAt: item.finishedAt,
+    updatedAt,
+  };
+}
+
 function omitKeys<T extends Record<string, unknown>>(obj: T, ...keys: string[]): Partial<T> {
   const keySet = new Set(keys);
   const result = {} as Partial<T>;
@@ -196,19 +212,6 @@ export class MigrationImportRepository {
   }
 
   // --- User book statuses ---
-
-  async clearUserBookStatuses(userIds: number[], bookIds: number[]): Promise<void> {
-    const targetUserIds = uniqueNumbers(userIds);
-    const targetBookIds = uniqueNumbers(bookIds);
-    if (targetUserIds.length === 0 || targetBookIds.length === 0) return;
-    for (const userBatch of chunk(targetUserIds, BATCH_CHUNK_SIZE)) {
-      for (const bookBatch of chunk(targetBookIds, BATCH_CHUNK_SIZE)) {
-        await this.db
-          .delete(schema.userBookStatus)
-          .where(and(inArray(schema.userBookStatus.userId, userBatch), inArray(schema.userBookStatus.bookId, bookBatch)));
-      }
-    }
-  }
 
   async upsertUserBookStatus(values: typeof schema.userBookStatus.$inferInsert): Promise<void> {
     await this.db
@@ -501,12 +504,16 @@ export class MigrationImportRepository {
     }
   }
 
-  async batchUpsertUserBookStatuses(items: Array<typeof schema.userBookStatus.$inferInsert>): Promise<void> {
+  async batchMergeUserBookStatuses(items: UserBookStatusMergeItem[]): Promise<void> {
     if (items.length === 0) return;
-    for (const batch of chunk(items, BATCH_CHUNK_SIZE)) {
+
+    const timestamped = items.filter((item): item is UserBookStatusMergeItem & { sourceUpdatedAt: Date } => item.sourceUpdatedAt !== null);
+    const untimestamped = items.filter((item) => item.sourceUpdatedAt === null);
+
+    for (const batch of chunk(timestamped, BATCH_CHUNK_SIZE)) {
       await this.db
         .insert(schema.userBookStatus)
-        .values(batch)
+        .values(batch.map((item) => userBookStatusMergeValues(item, item.sourceUpdatedAt)))
         .onConflictDoUpdate({
           target: [schema.userBookStatus.userId, schema.userBookStatus.bookId],
           set: {
@@ -516,7 +523,16 @@ export class MigrationImportRepository {
             finishedAt: sql`excluded.finished_at`,
             updatedAt: sql`excluded.updated_at`,
           },
+          setWhere: sql`excluded.updated_at > ${schema.userBookStatus.updatedAt}`,
         });
+    }
+
+    for (const batch of chunk(untimestamped, BATCH_CHUNK_SIZE)) {
+      const insertedAt = new Date();
+      await this.db
+        .insert(schema.userBookStatus)
+        .values(batch.map((item) => userBookStatusMergeValues(item, insertedAt)))
+        .onConflictDoNothing();
     }
   }
 
