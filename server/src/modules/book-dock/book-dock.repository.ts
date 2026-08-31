@@ -40,6 +40,7 @@ function needsReviewCondition(): SQL {
 export interface ListOptions {
   status?: string;
   needsReview?: boolean;
+  readyToFile?: boolean;
   page: number;
   limit: number;
   sort: string;
@@ -55,6 +56,7 @@ export interface SelectionBatchOptions {
   excludedIds?: number[];
   status?: string;
   needsReview?: boolean;
+  readyToFile?: boolean;
   search?: string;
   userId: number;
   canManageAll: boolean;
@@ -65,7 +67,7 @@ export class BookDockRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findAll(opts: ListOptions): Promise<{ items: BookDockFileRow[]; total: number }> {
-    const conditions = this.buildSelectionConditions(opts.status, opts.search, opts.userId, opts.canManageAll, opts.needsReview);
+    const conditions = this.buildSelectionConditions(opts.status, opts.search, opts.userId, opts.canManageAll, opts.needsReview, opts.readyToFile);
 
     const where = conditions.length ? and(...conditions) : undefined;
 
@@ -143,8 +145,9 @@ export class BookDockRepository {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<number[]> {
-    const conditions = this.buildSelectionConditions(status, search, userId, canManageAll ?? true, needsReview);
+    const conditions = this.buildSelectionConditions(status, search, userId, canManageAll ?? true, needsReview, readyToFile);
     if (excludedIds?.length) conditions.push(notInArray(bookDockFiles.id, excludedIds));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await this.db.select({ id: bookDockFiles.id }).from(bookDockFiles).where(where);
@@ -179,7 +182,14 @@ export class BookDockRepository {
   }
 
   async findSelectionBatch(options: SelectionBatchOptions): Promise<BookDockFileRow[]> {
-    const conditions = this.buildSelectionConditions(options.status, options.search, options.userId, options.canManageAll, options.needsReview);
+    const conditions = this.buildSelectionConditions(
+      options.status,
+      options.search,
+      options.userId,
+      options.canManageAll,
+      options.needsReview,
+      options.readyToFile,
+    );
     if (options.excludedIds?.length) conditions.push(notInArray(bookDockFiles.id, options.excludedIds));
     if (options.afterId !== undefined) conditions.push(gt(bookDockFiles.id, options.afterId));
     const where = conditions.length ? and(...conditions) : undefined;
@@ -265,7 +275,14 @@ export class BookDockRepository {
     return eq(bookDockFiles.uploadedBy, userId);
   }
 
-  private buildSelectionConditions(status?: string, search?: string, userId?: number, canManageAll?: boolean, needsReview?: boolean): SQL[] {
+  private buildSelectionConditions(
+    status?: string,
+    search?: string,
+    userId?: number,
+    canManageAll?: boolean,
+    needsReview?: boolean,
+    readyToFile?: boolean,
+  ): SQL[] {
     const conditions: SQL[] = [];
     if (status === 'pending') {
       conditions.push(inArray(bookDockFiles.status, ['pending', 'extracting', 'fetching']));
@@ -273,6 +290,7 @@ export class BookDockRepository {
       conditions.push(eq(bookDockFiles.status, status));
     }
     if (needsReview) conditions.push(needsReviewCondition());
+    if (readyToFile) conditions.push(readyToFileCondition());
     if (search) conditions.push(accentInsensitiveIlike(bookDockFiles.fileName, `%${search}%`));
     if (userId !== undefined && !canManageAll) {
       conditions.push(eq(bookDockFiles.uploadedBy, userId));

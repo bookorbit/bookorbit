@@ -107,7 +107,10 @@ async function bootstrap() {
         if (!shouldServeSpaFallback(request.url)) {
           return reply.status(404).send({ statusCode: 404, message: 'Not Found', path: request.url });
         }
-        return reply.sendFile('index.html');
+        // Nest's SWC type checker does not retain @fastify/static's reply augmentation
+        // through the adapter callback, even though the plugin decorates this reply at runtime.
+        const staticReply = reply as typeof reply & { sendFile(filename: string): typeof reply };
+        return staticReply.sendFile('index.html');
       });
     };
 

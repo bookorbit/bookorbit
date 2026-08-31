@@ -184,6 +184,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     status?: string,
     search?: string,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<BookDockFinalizeResult> {
     const ids = selectAll ? [] : dedupeIds(fileIds ?? []);
     const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
@@ -202,6 +203,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
           status,
           search,
           needsReview,
+          readyToFile,
           userId,
           canManageAll,
         });
@@ -338,6 +340,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     status?: string,
     search?: string,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<BookDockFinalizePreviewResult> {
     const summary = createFinalizePreviewSummary();
     const overrideMap = new Map((overrides ?? []).map((o) => [o.fileId, o]));
@@ -351,6 +354,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       status,
       search,
       needsReview,
+      readyToFile,
       async (rows, missingIds) => {
         const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
         for (const candidate of prepared.analyses) {
@@ -384,6 +388,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     status?: string,
     search?: string,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<BookDockDiscardDuplicatesResult> {
     const startedAt = Date.now();
     this.logger.log(`[book_dock.discard_duplicates] [start] userId=${userId} selectAll=${selectAll === true} - duplicate discard started`);
@@ -403,6 +408,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         status,
         search,
         needsReview,
+        readyToFile,
         async (rows, missingIds) => {
           total += rows.length + missingIds.length;
           const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser);
@@ -587,6 +593,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     status: string | undefined,
     search: string | undefined,
     needsReview: boolean | undefined,
+    readyToFile: boolean | undefined,
     processBatch: (rows: BookDockFileRow[], missingIds: number[]) => Promise<void>,
   ): Promise<void> {
     if (selectAll) {
@@ -599,6 +606,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
           status,
           search,
           needsReview,
+          readyToFile,
           userId,
           canManageAll,
         });
@@ -721,8 +729,9 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     status?: string,
     search?: string,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<{ fileId: number; fileName: string; newName: string }[]> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search, userId, canManageAll, needsReview) : (fileIds ?? []);
+    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search, userId, canManageAll, needsReview, readyToFile) : (fileIds ?? []);
     if (!ids.length) return [];
 
     const rows = await this.repo.findByIds(ids, userId, canManageAll);

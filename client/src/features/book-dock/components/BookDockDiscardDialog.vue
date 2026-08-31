@@ -11,6 +11,7 @@ const props = defineProps<{
     excludedIds?: number[]
     status?: string
     needsReview?: boolean
+    readyToFile?: boolean
     search?: string
   }
   selectionCount: number

@@ -21,10 +21,12 @@ describe('BookDock DTO validation', () => {
       sort: 'fileName',
       order: 'asc',
       search: 'dune',
+      readyToFile: '1',
     });
 
     expect(dto.page).toBe(2);
     expect(dto.limit).toBe(30);
+    expect(dto.readyToFile).toBe(true);
     expect((await validate(dto)).length).toBe(0);
     expect((await errorsFor(ListBookDockFilesDto, { status: 'unknown' })).length).toBeGreaterThan(0);
     expect((await errorsFor(ListBookDockFilesDto, { limit: 200 })).length).toBeGreaterThan(0);
@@ -115,6 +117,7 @@ describe('BookDock DTO validation', () => {
           selectAll: true,
           status: 'error',
           search: 'abc',
+          readyToFile: true,
           targetLibraryId: null,
           targetFolderId: null,
         })

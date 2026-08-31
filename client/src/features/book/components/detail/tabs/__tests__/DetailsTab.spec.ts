@@ -304,6 +304,37 @@ describe('DetailsTab cover surface', () => {
     expect(wrapper.get('[data-test="hidden-genres"]').text()).toContain('Mystery')
   })
 
+  it('fully expands the synopsis without creating a nested scroll area', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        description: '<p>First paragraph.</p><p>Second paragraph with enough content to continue beyond the collapsed preview.</p>',
+      }),
+    )
+    await flushPromises()
+
+    const synopsis = wrapper.get('.line-clamp-4')
+    expect(synopsis.html()).toContain('Second paragraph')
+
+    const toggle = wrapper.findAll('button').find((button) => button.text() === 'Show more')
+    expect(toggle).toBeDefined()
+    expect(toggle!.attributes('aria-controls')).toBe('book-12-synopsis')
+    expect(toggle!.attributes('aria-expanded')).toBe('false')
+    expect(synopsis.attributes('id')).toBe('book-12-synopsis')
+    await toggle!.trigger('click')
+
+    expect(synopsis.classes()).not.toContain('line-clamp-4')
+    expect(synopsis.classes()).not.toContain('max-h-44')
+    expect(synopsis.classes()).not.toContain('overflow-y-auto')
+    expect(toggle!.text()).toBe('Show less')
+    expect(toggle!.attributes('aria-expanded')).toBe('true')
+
+    await toggle!.trigger('click')
+
+    expect(synopsis.classes()).toContain('line-clamp-4')
+    expect(toggle!.text()).toBe('Show more')
+    expect(toggle!.attributes('aria-expanded')).toBe('false')
+  })
+
   it('summarizes pending Kobo sync state for each affected device', async () => {
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)

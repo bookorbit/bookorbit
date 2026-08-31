@@ -5673,6 +5673,7 @@
       },
       "empty": {
         "nothingToReview": "Nothing needs review. Every ready file has a destination and a confident match.",
+        "nothingReadyToFile": "No files are ready to file.",
         "dropHint": "Or drop files anywhere on this page."
       },
       "selectAllOnPage": "Select all files on this page",

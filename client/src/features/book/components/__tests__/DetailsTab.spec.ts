@@ -281,6 +281,20 @@ describe('DetailsTab - present state', () => {
     expect(wrapper.emitted('saved')?.[0]).toEqual([updated])
   })
 
+  it('opens the personal review editor from the review summary', async () => {
+    const wrapper = mount(DetailsTab, {
+      props: { book: makeBook() },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    const writeButton = wrapper.findAll('button').find((button) => button.text() === 'Write')
+    expect(writeButton).toBeTruthy()
+    await writeButton!.trigger('click')
+
+    expect(wrapper.find('textarea').isVisible()).toBe(true)
+  })
+
   it('shows reading date fields when both dates are null and status is null', () => {
     const wrapper = mount(DetailsTab, {
       props: { book: makeBook({ status: 'present', readStatus: null }) },
@@ -335,6 +349,54 @@ describe('DetailsTab - present state', () => {
     await saveButton!.trigger('click')
     await flushPromises()
 
+    expect(vi.mocked(api)).toHaveBeenCalledWith(
+      '/api/v1/books/1/status',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ finishedAt: '2026-04-10' }),
+      }),
+    )
+  })
+
+  it('allows the finished date to match the started date', async () => {
+    vi.mocked(api).mockImplementation(async (input, init) => {
+      if (input === '/api/v1/books/1/status' && init?.method === 'PATCH') {
+        return makeApiResponse({
+          status: 'read',
+          source: 'manual',
+          startedAt: '2026-04-10',
+          finishedAt: '2026-04-10',
+          updatedAt: '2026-04-10T00:00:00.000Z',
+        })
+      }
+      if (input === '/api/v1/collections/membership') return makeApiResponse([])
+      return makeApiResponse({}, false)
+    })
+
+    const wrapper = mount(DetailsTab, {
+      props: {
+        book: makeBook({
+          readStatus: {
+            status: 'reading',
+            source: 'manual',
+            startedAt: '2026-04-10',
+            finishedAt: null,
+            updatedAt: '2026-04-10T00:00:00.000Z',
+          },
+        }),
+      },
+      global: globalStubs,
+    })
+
+    await wrapper.find('button[title="Edit date finished"]').trigger('click')
+    await wrapper.find('input[type="date"]').setValue('2026-04-10')
+
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Save')
+    expect(saveButton?.exists()).toBe(true)
+    await saveButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Date Finished must be on or after Date Started')
     expect(vi.mocked(api)).toHaveBeenCalledWith(
       '/api/v1/books/1/status',
       expect.objectContaining({

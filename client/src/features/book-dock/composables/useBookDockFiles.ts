@@ -5,8 +5,8 @@ import type { BookDockFile, BookDockFilesPage, BookDockFileStatus } from '@booko
 export type SortField = 'createdAt' | 'fileName' | 'format' | 'status' | 'fileSize' | 'attention'
 export type SortOrder = 'asc' | 'desc'
 
-/** The chip set above the list. `needsReview` is a server-side predicate, not a status. */
-export type BookDockView = 'all' | 'needsReview' | BookDockFileStatus
+/** The chip set above the list. Review and filing readiness are predicates, not processing statuses. */
+export type BookDockView = 'all' | 'needsReview' | 'readyToFile' | BookDockFileStatus
 
 export function useBookDockFiles() {
   const items = ref<BookDockFile[]>([])
@@ -17,6 +17,7 @@ export function useBookDockFiles() {
   const filters = reactive({
     status: undefined as BookDockFileStatus | undefined,
     needsReview: false,
+    readyToFile: false,
     search: '',
     page: 1,
     limit: 20,
@@ -39,6 +40,7 @@ export function useBookDockFiles() {
       const params = new URLSearchParams()
       if (filters.status) params.set('status', filters.status)
       if (filters.needsReview) params.set('needsReview', 'true')
+      if (filters.readyToFile) params.set('readyToFile', 'true')
       if (filters.search) params.set('search', filters.search)
       params.set('page', String(filters.page))
       params.set('limit', String(filters.limit))
@@ -66,19 +68,22 @@ export function useBookDockFiles() {
     clearSelection()
     filters.status = status
     filters.needsReview = false
+    filters.readyToFile = false
     filters.page = 1
     fetchFiles()
   }
 
   const activeView = computed<BookDockView>(() => {
     if (filters.needsReview) return 'needsReview'
+    if (filters.readyToFile) return 'readyToFile'
     return filters.status ?? 'all'
   })
 
   function setView(view: BookDockView) {
     clearSelection()
     filters.needsReview = view === 'needsReview'
-    filters.status = view === 'all' || view === 'needsReview' ? undefined : view
+    filters.readyToFile = view === 'readyToFile'
+    filters.status = view === 'all' || view === 'needsReview' || view === 'readyToFile' ? undefined : view
     filters.page = 1
     fetchFiles()
   }
@@ -179,6 +184,7 @@ export function useBookDockFiles() {
     excludedIds?: number[]
     status?: BookDockFileStatus
     needsReview?: boolean
+    readyToFile?: boolean
     search?: string
   } {
     if (selectAll.value) {
@@ -187,6 +193,7 @@ export function useBookDockFiles() {
         excludedIds: [...excludedIds.value],
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.needsReview ? { needsReview: true } : {}),
+        ...(filters.readyToFile ? { readyToFile: true } : {}),
         ...(filters.search ? { search: filters.search } : {}),
       }
     }

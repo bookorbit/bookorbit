@@ -131,6 +131,58 @@ describe('epub-opf-builder', () => {
     expect(count).toBe(1);
   });
 
+  it('adds xmlns:dc to <package> when source declarations are scoped to replaced metadata elements', () => {
+    const opf = `
+      <package version="3.0" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
+        <metadata xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:identifier xmlns:dc="http://purl.org/dc/elements/1.1/" id="uid">urn:uuid:abc</dc:identifier>
+          <dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">Old title</dc:title>
+          <dc:publisher xmlns:dc="http://purl.org/dc/elements/1.1/">Old publisher</dc:publisher>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, { title: 'Replacement', publisher: 'New publisher', language: 'en' });
+    const packageTag = result.newOpfXml.match(/<package\b[^>]*>/)?.[0];
+
+    expect(packageTag).toContain('xmlns:dc="http://purl.org/dc/elements/1.1/"');
+    expect(result.newOpfXml).toContain('<dc:title id="t-main">Replacement</dc:title>');
+    expect(result.newOpfXml).toContain('<dc:publisher>New publisher</dc:publisher>');
+    expect(result.newOpfXml).toContain('<dc:language>en</dc:language>');
+  });
+
+  it('does not duplicate xmlns:dc when already declared on <package>', () => {
+    const opf = `
+      <package version="3.0" unique-identifier="uid" xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <metadata>
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+          <dc:title>Old title</dc:title>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, { title: 'Replacement' });
+
+    expect(result.newOpfXml.match(/xmlns:dc=/g)).toHaveLength(1);
+  });
+
+  it('preserves an existing xmlns:dc binding on <package>', () => {
+    const opf = `
+      <package version="2.0" unique-identifier="uid" xmlns:dc="urn:publisher:dc">
+        <metadata>
+          <dc:identifier id="uid">urn:uuid:abc</dc:identifier>
+          <dc:title>Old title</dc:title>
+        </metadata>
+      </package>
+    `;
+
+    const result = build(opf, { title: 'Replacement' });
+    const packageTag = result.newOpfXml.match(/<package\b[^>]*>/)?.[0];
+
+    expect(packageTag).toContain('xmlns:dc="urn:publisher:dc"');
+    expect(packageTag).not.toContain('xmlns:dc="http://purl.org/dc/elements/1.1/"');
+  });
+
   it('strips legacy urn: provider identifiers and replaces with opf:scheme format', () => {
     const opf = `
       <package version="2.0" unique-identifier="uid" xmlns:opf="http://www.idpf.org/2007/opf">

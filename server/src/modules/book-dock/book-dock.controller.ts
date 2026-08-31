@@ -66,6 +66,7 @@ export class BookDockController {
     return this.service.listFiles({
       status: query.status,
       needsReview: query.needsReview,
+      readyToFile: query.readyToFile,
       page: query.page ?? 1,
       limit: query.limit ?? 20,
       sort: query.sort ?? 'createdAt',
@@ -172,6 +173,7 @@ export class BookDockController {
       user.id,
       this.canManageAll(user),
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -186,6 +188,7 @@ export class BookDockController {
       user.id,
       this.canManageAll(user),
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -200,6 +203,7 @@ export class BookDockController {
       user.id,
       this.canManageAll(user),
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -222,6 +226,7 @@ export class BookDockController {
       user.id,
       this.canManageAll(user),
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -236,6 +241,7 @@ export class BookDockController {
       user.id,
       this.canManageAll(user),
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -254,6 +260,7 @@ export class BookDockController {
       user.id,
       this.canManageAll(user),
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -269,6 +276,7 @@ export class BookDockController {
       dto.status,
       dto.search,
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -289,6 +297,7 @@ export class BookDockController {
       dto.status,
       dto.search,
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -309,6 +318,7 @@ export class BookDockController {
       dto.status,
       dto.search,
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 
@@ -339,6 +349,7 @@ export class BookDockController {
       dto.status,
       dto.search,
       dto.needsReview,
+      dto.readyToFile,
     );
   }
 

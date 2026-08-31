@@ -435,6 +435,11 @@ const {
 
 const personalNoteUpdatedLabel = computed(() => (props.book.personalNoteUpdatedAt ? formatDateTime(props.book.personalNoteUpdatedAt) : null))
 
+function startVisiblePersonalNoteEdit() {
+  showPersonalReview.value = true
+  startPersonalNoteEdit()
+}
+
 watch(
   () => props.book.id,
   () => {
@@ -1820,7 +1825,6 @@ watch(
       </div>
 
       <section class="rounded-xl border border-border bg-card px-4 py-3.5">
-        <!-- Synopsis. Expanding scrolls inside this block, never the column. -->
         <div>
           <div class="flex items-baseline gap-3">
             <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1828,7 +1832,10 @@ watch(
             </p>
             <button
               v-if="book.description"
+              type="button"
               class="ml-auto shrink-0 text-[11px] font-semibold text-primary transition-colors hover:underline"
+              :aria-controls="`book-${book.id}-synopsis`"
+              :aria-expanded="descriptionExpanded"
               @click="toggleDescription"
             >
               {{ descriptionExpanded ? t('book.detail.details.showLess') : t('book.detail.details.showMore') }}
@@ -1836,8 +1843,9 @@ watch(
           </div>
           <div
             v-if="book.description"
+            :id="`book-${book.id}-synopsis`"
             class="mt-2 text-sm leading-relaxed text-foreground"
-            :class="descriptionExpanded ? 'max-h-44 overflow-y-auto pr-2' : 'line-clamp-4'"
+            :class="{ 'line-clamp-4': !descriptionExpanded }"
             v-html="safeDescription"
           />
           <p v-else class="mt-2 text-sm italic text-muted-foreground">{{ t('book.detail.details.noDescription') }}</p>
@@ -1852,7 +1860,7 @@ watch(
           <button
             type="button"
             class="ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-input px-2.5 text-xs font-medium transition-colors hover:bg-muted"
-            @click="startPersonalNoteEdit"
+            @click="startVisiblePersonalNoteEdit"
           >
             <Pencil class="size-3" />
             {{ t('book.detail.details.writeReview') }}

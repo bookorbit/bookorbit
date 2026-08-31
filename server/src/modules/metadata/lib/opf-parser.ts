@@ -81,6 +81,15 @@ function parseNumber(raw: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseCalibreSeriesIndex(raw: string): string | null {
+  const parsed = parseSeriesIndex(raw);
+  if (parsed === null) return null;
+
+  // Calibre serializes whole-number series positions with a single `.0`; other
+  // fractional digits are exact user-facing labels and must remain untouched.
+  return /^\d+\.0$/.test(parsed) ? parsed.slice(0, -2) : parsed;
+}
+
 function parseBookOrbitTags(raw: string | null): string[] {
   if (!raw) return [];
   try {
@@ -461,7 +470,7 @@ export function parseOpf(xml: string): ParsedOpf {
   let seriesIndex: string | null = null;
   const rawSeriesIdx = namedMeta('calibre:series_index');
   if (rawSeriesIdx) {
-    seriesIndex = parseSeriesIndex(rawSeriesIdx);
+    seriesIndex = parseCalibreSeriesIndex(rawSeriesIdx);
   }
 
   if (!seriesName) {

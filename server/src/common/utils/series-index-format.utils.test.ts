@@ -29,6 +29,7 @@ describe('formatSeriesIndex', () => {
   it('validates and parses exact labels without normalizing their digits', () => {
     expect(['5.10', '01', '0.5'].every(isValidSeriesIndex)).toBe(true);
     expect(parseSeriesIndex(' 5.10 ')).toBe('5.10');
+    expect(parseSeriesIndex('1.0')).toBe('1.0');
     expect(parseSeriesIndex(5.1)).toBe('5.1');
     expect(['', ' ', '-1', '1e2', '1.2.3', '123456789012345678901'].some(isValidSeriesIndex)).toBe(false);
   });

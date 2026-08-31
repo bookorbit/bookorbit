@@ -135,6 +135,31 @@ describe('Migration Audiobookshelf live and backup (e2e)', { timeout: 300_000 },
     const backupExport = await adapter.exportData(backupConfig as AudiobookshelfConnectionConfig);
     expect(canonicalizeExport(backupExport)).toEqual(canonicalizeExport(liveExport));
 
+    await ctx.db.insert(schema.userBookStatus).values([
+      {
+        userId: scenario.targetUsers.theo.id,
+        bookId: scenario.targetBooks.glass.bookId,
+        status: 'read',
+        source: 'manual',
+        finishedAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+      },
+      {
+        userId: scenario.targetUsers.maya.id,
+        bookId: scenario.targetBooks.glass.bookId,
+        status: 'want_to_read',
+        source: 'manual',
+        updatedAt: new Date('2099-01-01T00:00:00.000Z'),
+      },
+      {
+        userId: scenario.targetUsers.theo.id,
+        bookId: scenario.targetBooks.map.bookId,
+        status: 'want_to_read',
+        source: 'manual',
+        updatedAt: new Date('2020-01-01T00:00:00.000Z'),
+      },
+    ]);
+
     const started = await apiJson<{ id: number; state: string }>(ctx, {
       method: 'POST',
       url: '/api/v1/migration/runs/live',
@@ -148,6 +173,30 @@ describe('Migration Audiobookshelf live and backup (e2e)', { timeout: 300_000 },
     expect(finished.report.run.state).toBe('completed');
     expect(finished.report.totals.failed).toBe(0);
     expect(finished.report.totals.unresolved).toBeGreaterThanOrEqual(1);
+
+    const mergedStatuses = await ctx.db
+      .select()
+      .from(schema.userBookStatus)
+      .where(inArray(schema.userBookStatus.userId, [scenario.targetUsers.maya.id, scenario.targetUsers.theo.id]));
+    expect(mergedStatuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          userId: scenario.targetUsers.theo.id,
+          bookId: scenario.targetBooks.glass.bookId,
+          status: 'read',
+        }),
+        expect.objectContaining({
+          userId: scenario.targetUsers.maya.id,
+          bookId: scenario.targetBooks.glass.bookId,
+          status: 'want_to_read',
+        }),
+        expect.objectContaining({
+          userId: scenario.targetUsers.theo.id,
+          bookId: scenario.targetBooks.map.bookId,
+          status: 'read',
+        }),
+      ]),
+    );
 
     await assertImportedState();
     const countsAfterFirstRun = await loadStateCounts();

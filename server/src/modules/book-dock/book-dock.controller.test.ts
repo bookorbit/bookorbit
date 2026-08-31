@@ -67,14 +67,16 @@ describe('BookDockController', () => {
     vi.clearAllMocks();
   });
 
-  it('listFiles applies defaults before delegating', async () => {
+  it('listFiles applies defaults and propagates the ready-to-file predicate', async () => {
     const { controller, service } = makeController();
     service.listFiles.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
 
-    await controller.listFiles(MOCK_USER, {});
+    await controller.listFiles(MOCK_USER, { readyToFile: true });
 
     expect(service.listFiles).toHaveBeenCalledWith({
       status: undefined,
+      needsReview: undefined,
+      readyToFile: true,
       page: 1,
       limit: 20,
       sort: 'createdAt',
@@ -143,9 +145,9 @@ describe('BookDockController', () => {
   it('bulk and finalize endpoints delegate payload fields as expected', async () => {
     const { controller, service, finalizeService, watcherService } = makeController();
 
-    await controller.bulkDiscard(MOCK_USER, { fileIds: [1], selectAll: false, excludedIds: [2], status: 'error', search: 'x' });
-    await controller.applyFetched(MOCK_USER, { fileIds: [1], selectAll: true, excludedIds: [2], status: 'ready', search: 'x' });
-    await controller.retryFetch(MOCK_USER, { fileIds: [3], selectAll: false, excludedIds: [4], status: 'error', search: 'y' });
+    await controller.bulkDiscard(MOCK_USER, { fileIds: [1], selectAll: false, excludedIds: [2], status: 'error', search: 'x', readyToFile: true });
+    await controller.applyFetched(MOCK_USER, { fileIds: [1], selectAll: true, excludedIds: [2], status: 'ready', search: 'x', readyToFile: true });
+    await controller.retryFetch(MOCK_USER, { fileIds: [3], selectAll: false, excludedIds: [4], status: 'error', search: 'y', readyToFile: true });
     await controller.refetchMetadata(MOCK_USER, 11);
     await controller.setTarget(MOCK_USER, {
       fileIds: [5],
@@ -153,8 +155,9 @@ describe('BookDockController', () => {
       excludedIds: [6],
       targetLibraryId: undefined,
       targetFolderId: undefined,
+      readyToFile: true,
     });
-    await controller.selectionSummary(MOCK_USER, { fileIds: [7], selectAll: false, excludedIds: [8] });
+    await controller.selectionSummary(MOCK_USER, { fileIds: [7], selectAll: false, excludedIds: [8], readyToFile: true });
     await controller.bulkEdit(MOCK_USER, {
       fileIds: [9],
       selectAll: false,
@@ -162,8 +165,9 @@ describe('BookDockController', () => {
       fields: { title: 'Edited' },
       enabledFields: ['title'],
       mergeArrays: false,
+      readyToFile: true,
     } as any);
-    await controller.previewNames(MOCK_USER, { fileIds: [10], selectAll: false, excludedIds: [], defaultLibraryId: 2 } as any);
+    await controller.previewNames(MOCK_USER, { fileIds: [10], selectAll: false, excludedIds: [], defaultLibraryId: 2, readyToFile: true } as any);
     await controller.previewFinalize(MOCK_USER, {
       fileIds: [10],
       selectAll: false,
@@ -171,6 +175,7 @@ describe('BookDockController', () => {
       defaultLibraryId: 2,
       defaultFolderId: 3,
       overrides: [],
+      readyToFile: true,
     } as any);
     await controller.discardFinalizeDuplicates(MOCK_USER, {
       fileIds: [10],
@@ -179,19 +184,38 @@ describe('BookDockController', () => {
       defaultLibraryId: 2,
       defaultFolderId: 3,
       overrides: [],
+      readyToFile: true,
     } as any);
     await controller.finalize(
       { id: 99, isSuperuser: true, permissions: [] } as any,
-      { fileIds: [1], defaultLibraryId: 2, defaultFolderId: 3, selectAll: false, excludedIds: [], overrides: [] } as any,
+      { fileIds: [1], defaultLibraryId: 2, defaultFolderId: 3, selectAll: false, excludedIds: [], overrides: [], readyToFile: true } as any,
     );
     await controller.rescan();
     await controller.pause();
     await controller.resume();
 
-    expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, false, undefined);
+    expect(service.bulkDiscard).toHaveBeenCalledWith([1], false, [2], 'error', 'x', MOCK_USER.id, false, undefined, true);
+    expect(service.bulkApplyFetched).toHaveBeenCalledWith([1], true, [2], 'ready', 'x', MOCK_USER.id, false, undefined, true);
+    expect(service.bulkRetryFetch).toHaveBeenCalledWith([3], false, [4], 'error', 'y', MOCK_USER.id, false, undefined, true);
+    expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, false, undefined, true);
+    expect(service.selectionSummary).toHaveBeenCalledWith([7], false, [8], undefined, undefined, MOCK_USER.id, false, undefined, true);
+    expect(service.bulkEdit).toHaveBeenCalledWith(
+      [9],
+      false,
+      [],
+      { title: 'Edited' },
+      ['title'],
+      false,
+      undefined,
+      undefined,
+      MOCK_USER.id,
+      false,
+      undefined,
+      true,
+    );
     expect(service.refetchMetadata).toHaveBeenCalledWith(11, MOCK_USER.id, false);
-    expect(finalizeService.previewNames).toHaveBeenCalledWith([10], false, [], 2, MOCK_USER.id, false, undefined, undefined, undefined);
-    expect(finalizeService.previewFinalize).toHaveBeenCalledWith(1, false, false, [10], false, [], 2, 3, [], undefined, undefined, undefined);
+    expect(finalizeService.previewNames).toHaveBeenCalledWith([10], false, [], 2, MOCK_USER.id, false, undefined, undefined, undefined, true);
+    expect(finalizeService.previewFinalize).toHaveBeenCalledWith(1, false, false, [10], false, [], 2, 3, [], undefined, undefined, undefined, true);
     expect(finalizeService.discardDuplicateCandidates).toHaveBeenCalledWith(
       1,
       false,
@@ -205,8 +229,9 @@ describe('BookDockController', () => {
       undefined,
       undefined,
       undefined,
+      true,
     );
-    expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, true, [1], false, [], 2, 3, [], undefined, undefined, undefined);
+    expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, true, [1], false, [], 2, 3, [], undefined, undefined, undefined, true);
     expect(watcherService.rescan).toHaveBeenCalled();
     expect(service.pauseProcessing).toHaveBeenCalledTimes(1);
     expect(service.resumeProcessing).toHaveBeenCalledTimes(1);
