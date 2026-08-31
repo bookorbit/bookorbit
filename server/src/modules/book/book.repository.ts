@@ -19,6 +19,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { advanceIsoTimestamp } from '../../common/utils/iso-timestamp.utils';
 import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
+import { scanStateInvalidationPaths } from '../../common/utils/scan-state-paths.utils';
 import { seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
@@ -49,6 +50,7 @@ import {
   koreaderDeviceProgress,
   koreaderProgressResets,
   libraries,
+  libraryFolders,
   narrators,
   audiobookProgress,
   readingProgress,
@@ -1716,11 +1718,6 @@ export class BookRepository {
       .where(inArray(books.id, bookIds));
   }
 
-  async findScanInvalidationFolders(bookIds: number[]): Promise<{ libraryFolderId: number; folderPath: string }[]> {
-    if (bookIds.length === 0) return [];
-    return this.db.select({ libraryFolderId: books.libraryFolderId, folderPath: books.folderPath }).from(books).where(inArray(books.id, bookIds));
-  }
-
   async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<UnscopedBookRecommendation[]> {
     if (bookIds.length === 0) return [];
 
@@ -1896,6 +1893,66 @@ export class BookRepository {
 
   async deleteByIds(bookIds: number[]): Promise<void> {
     await this.db.delete(books).where(inArray(books.id, bookIds));
+  }
+
+  async deleteByIdsAndInvalidateScanState(bookIds: number[]): Promise<void> {
+    const uniqueBookIds = [...new Set(bookIds)].sort((a, b) => a - b);
+    if (uniqueBookIds.length === 0) return;
+
+    await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ id: books.id, libraryFolderId: books.libraryFolderId, folderPath: books.folderPath })
+        .from(books)
+        .where(inArray(books.id, uniqueBookIds))
+        .orderBy(asc(books.id))
+        .for('update');
+      if (rows.length === 0) return;
+
+      const libraryFolderIds = [...new Set(rows.map((row) => row.libraryFolderId))].sort((a, b) => a - b);
+      await tx
+        .select({ id: libraryFolders.id })
+        .from(libraryFolders)
+        .where(inArray(libraryFolders.id, libraryFolderIds))
+        .orderBy(asc(libraryFolders.id))
+        .for('update');
+
+      await tx
+        .update(libraryFolders)
+        .set({ scanStateVersion: sql`${libraryFolders.scanStateVersion} + 1` })
+        .where(inArray(libraryFolders.id, libraryFolderIds));
+
+      const pathsByLibraryFolder = new Map<number, Set<string>>();
+      for (const row of rows) {
+        let paths = pathsByLibraryFolder.get(row.libraryFolderId);
+        if (!paths) {
+          paths = new Set<string>();
+          pathsByLibraryFolder.set(row.libraryFolderId, paths);
+        }
+        for (const path of scanStateInvalidationPaths(row.folderPath)) paths.add(path);
+      }
+
+      const chunkSize = 500;
+      for (const [libraryFolderId, paths] of pathsByLibraryFolder) {
+        const pathList = [...paths];
+        for (let offset = 0; offset < pathList.length; offset += chunkSize) {
+          await tx
+            .delete(schema.libraryDirScanState)
+            .where(
+              and(
+                eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId),
+                inArray(schema.libraryDirScanState.dirPath, pathList.slice(offset, offset + chunkSize)),
+              ),
+            );
+        }
+      }
+
+      await tx.delete(books).where(
+        inArray(
+          books.id,
+          rows.map((row) => row.id),
+        ),
+      );
+    });
   }
 
   async bulkSetRating(bookIds: number[], rating: number | null, userId: number): Promise<void> {

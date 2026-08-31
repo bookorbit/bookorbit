@@ -123,10 +123,9 @@ function makeRepo(overrides: Record<string, unknown> = {}) {
     findBookCardData: vi.fn().mockResolvedValue({ rows: [], authorRows: [], fileRows: [], genreRows: [] }),
     deleteBookFile: vi.fn().mockResolvedValue(undefined),
     updateBookFolderPath: vi.fn().mockResolvedValue(undefined),
-    findDirScanState: vi.fn().mockResolvedValue(new Map()),
-    upsertDirScanState: vi.fn().mockResolvedValue(undefined),
-    deleteStaleDirScanState: vi.fn().mockResolvedValue(undefined),
-    clearDirScanState: vi.fn().mockResolvedValue(undefined),
+    findDirScanStateSnapshot: vi.fn().mockResolvedValue({ version: 0, mtimes: new Map() }),
+    persistDirScanState: vi.fn().mockResolvedValue(true),
+    clearDirScanState: vi.fn().mockResolvedValue(1),
     ...overrides,
   };
 }
@@ -3501,7 +3500,7 @@ describe('incremental scan — dir state', () => {
       ['/library/Author/Book', 2000],
     ]);
     const repo = makeRepo({
-      findDirScanState: vi.fn().mockResolvedValue(storedMtimes),
+      findDirScanStateSnapshot: vi.fn().mockResolvedValue({ version: 4, mtimes: storedMtimes }),
     });
     const { service } = makeService(repo);
 
@@ -3517,7 +3516,7 @@ describe('incremental scan — dir state', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(repo.findDirScanState).toHaveBeenCalledWith(1);
+    expect(repo.findDirScanStateSnapshot).toHaveBeenCalledWith(1);
     expect(mockFindCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function), storedMtimes);
   });
 
@@ -3538,14 +3537,71 @@ describe('incremental scan — dir state', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(repo.upsertDirScanState).toHaveBeenCalledWith(
+    expect(repo.persistDirScanState).toHaveBeenCalledWith(
+      1,
       1,
       expect.arrayContaining([
         { dirPath: '/library/Author', mtimeMs: 1000 },
         { dirPath: '/library/Author/Book', mtimeMs: 2000 },
       ]),
     );
-    expect(repo.deleteStaleDirScanState).toHaveBeenCalledWith(1, new Set(['/library/Author', '/library/Author/Book']));
+  });
+
+  it('does not restore directory state invalidated while a scan is in flight', async () => {
+    const state = new Map<string, number>([['/library/Author/Book', 2000]]);
+    let version = 0;
+    let releaseWalk: (() => void) | undefined;
+    let markWalkStarted: (() => void) | undefined;
+    const walkStarted = new Promise<void>((resolve) => {
+      markWalkStarted = resolve;
+    });
+    const walkReleased = new Promise<void>((resolve) => {
+      releaseWalk = resolve;
+    });
+    const repo = makeRepo({
+      findDirScanStateSnapshot: vi.fn().mockImplementation(() => Promise.resolve({ version, mtimes: new Map(state) })),
+      clearDirScanState: vi.fn().mockImplementation(() => {
+        state.clear();
+        version += 1;
+        return Promise.resolve(version);
+      }),
+      persistDirScanState: vi
+        .fn()
+        .mockImplementation((_folderId: number, expectedVersion: number, entries: Array<{ dirPath: string; mtimeMs: number }>) => {
+          if (expectedVersion !== version) return Promise.resolve(false);
+          state.clear();
+          for (const entry of entries) state.set(entry.dirPath, entry.mtimeMs);
+          return Promise.resolve(true);
+        }),
+    });
+    const { service, jobStore } = makeService(repo);
+
+    let done = awaitScan(repo);
+    await service.startScan(1, 'manual');
+    await done;
+    await vi.waitFor(() => expect(jobStore.isRunning(1)).toBe(false));
+
+    mockFindCandidates.mockImplementationOnce(async () => {
+      markWalkStarted?.();
+      await walkReleased;
+      return {
+        candidates: [],
+        skippedDirs: new Set(),
+        unchangedDirs: new Set(['/library/Author/Book']),
+        dirMtimes: new Map([['/library/Author/Book', 2000]]),
+      };
+    });
+    repo.createScanJob.mockResolvedValueOnce({ id: 101 });
+    done = awaitScan(repo);
+    await service.startScan(1, 'manual');
+    await walkStarted;
+
+    state.clear();
+    version += 1;
+    releaseWalk?.();
+    await done;
+
+    expect(state.size).toBe(0);
   });
 
   it('clears dir state when forceFullScan is true', async () => {
@@ -3556,7 +3612,7 @@ describe('incremental scan — dir state', () => {
     await done;
 
     expect(repo.clearDirScanState).toHaveBeenCalledWith(1);
-    expect(repo.findDirScanState).not.toHaveBeenCalled();
+    expect(repo.findDirScanStateSnapshot).not.toHaveBeenCalled();
   });
 
   it('excludes books in unchanged dirs from missing detection', async () => {

@@ -12,6 +12,7 @@ function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
     orderBy: vi.fn(),
     limit: vi.fn(),
     offset: vi.fn(),
+    for: vi.fn(),
   };
 
   chain.from.mockReturnValue(chain);
@@ -19,7 +20,11 @@ function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
   chain.innerJoin.mockReturnValue(chain);
   chain.offset.mockReturnValue(chain);
 
-  if (terminalMethod === 'where') {
+  if (terminalMethod === 'for') {
+    chain.where.mockReturnValue(chain);
+    chain.orderBy.mockReturnValue(chain);
+    chain.for.mockResolvedValue(terminalResult);
+  } else if (terminalMethod === 'where') {
     chain.where.mockResolvedValue(terminalResult);
     chain.orderBy.mockReturnValue(chain);
     chain.limit.mockReturnValue(chain);
@@ -111,6 +116,73 @@ describe('BookRepository', () => {
 
     expect(db.select).toHaveBeenCalledTimes(1);
     expect(selectChain.leftJoin).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes books and invalidates their exact scan-state paths in one transaction', async () => {
+    const bookRows = [{ id: 10, libraryFolderId: 7, folderPath: '/books/Series/Book' }];
+    const bookSelect = makeSelectChain('for', bookRows);
+    const folderSelect = makeSelectChain('for', [{ id: 7 }]);
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const stateDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const bookDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const tx = {
+      select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+      delete: vi.fn().mockReturnValueOnce({ where: stateDeleteWhere }).mockReturnValueOnce({ where: bookDeleteWhere }),
+    };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<void>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await repo.deleteByIdsAndInvalidateScanState([10, 10]);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(tx.update).toHaveBeenCalledTimes(1);
+    expect(tx.delete).toHaveBeenCalledTimes(2);
+    const invalidationQuery = new PgDialect().sqlToQuery(stateDeleteWhere.mock.calls[0]![0]);
+    expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."library_folder_id" = $1');
+    expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."dir_path" in');
+    expect(invalidationQuery.params).toEqual([7, '/books/Series/Book', '/books/Series', '/books', '/']);
+    expect(invalidationQuery.params).not.toContain('/books/Sibling');
+  });
+
+  it('does not reach the book delete when scan-state invalidation fails', async () => {
+    const bookSelect = makeSelectChain('for', [{ id: 10, libraryFolderId: 7, folderPath: '/books/Book' }]);
+    const folderSelect = makeSelectChain('for', [{ id: 7 }]);
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const stateDeleteWhere = vi.fn().mockRejectedValue(new Error('invalidation failed'));
+    const tx = {
+      select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
+      update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: updateWhere }) }),
+      delete: vi.fn().mockReturnValue({ where: stateDeleteWhere }),
+    };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<void>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.deleteByIdsAndInvalidateScanState([10])).rejects.toThrow('invalidation failed');
+
+    expect(tx.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('chunks scan-state invalidation paths for large deletions', async () => {
+    const bookRows = Array.from({ length: 501 }, (_, index) => ({
+      id: index + 1,
+      libraryFolderId: 7,
+      folderPath: `/books/book-${index + 1}.epub`,
+    }));
+    const bookSelect = makeSelectChain('for', bookRows);
+    const folderSelect = makeSelectChain('for', [{ id: 7 }]);
+    const tx = {
+      select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
+      update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<void>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await repo.deleteByIdsAndInvalidateScanState(bookRows.map((row) => row.id));
+
+    expect(tx.delete).toHaveBeenCalledTimes(3);
   });
 
   it('findCards loads card rows and related collections for the current user', async () => {

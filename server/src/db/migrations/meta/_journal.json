@@ -589,6 +589,13 @@
       "when": 1788194498208,
       "tag": "0083_add_book_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1788206528114,
+      "tag": "0084_add_scan_state_version",
+      "breakpoints": true
     }
   ]
 }

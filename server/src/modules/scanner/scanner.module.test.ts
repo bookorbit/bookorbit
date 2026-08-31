@@ -41,7 +41,7 @@ describe('ScannerModule', () => {
       FileEventProcessorService,
       FileWatcherService,
     ]);
-    expect(Reflect.getMetadata('exports', ScannerModule)).toEqual([ScannerService, FileWatcherService, ScanGateway, ScannerRepository]);
+    expect(Reflect.getMetadata('exports', ScannerModule)).toEqual([ScannerService, FileWatcherService, ScanGateway]);
   });
 
   it('wires NotificationModule and BookMetadataFetchModule via forwardRef to avoid circular import issues', () => {

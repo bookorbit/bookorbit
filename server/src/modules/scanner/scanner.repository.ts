@@ -4,7 +4,6 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { scanStateInvalidationPaths } from './lib/scan-state-paths';
 import {
   authors,
   bookAuthors,
@@ -22,6 +21,7 @@ import {
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 type MoveBookToLibraryResult = Pick<typeof books.$inferSelect, 'id' | 'libraryId' | 'libraryFolderId' | 'folderPath' | 'status'> & {
   previousLibraryId: number;
   libraryChanged: boolean;
@@ -620,20 +620,51 @@ export class ScannerRepository {
 
   // ── Dir Scan State (Incremental Scan) ────────────────────────────────────
 
-  async findDirScanState(libraryFolderId: number): Promise<Map<string, number>> {
+  async findDirScanStateSnapshot(libraryFolderId: number): Promise<{ version: number; mtimes: Map<string, number> } | null> {
     const rows = await this.db
-      .select({ dirPath: schema.libraryDirScanState.dirPath, lastSeenMtimeMs: schema.libraryDirScanState.lastSeenMtimeMs })
-      .from(schema.libraryDirScanState)
-      .where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
-    return new Map(rows.map((r) => [r.dirPath, r.lastSeenMtimeMs]));
+      .select({
+        version: libraryFolders.scanStateVersion,
+        dirPath: schema.libraryDirScanState.dirPath,
+        lastSeenMtimeMs: schema.libraryDirScanState.lastSeenMtimeMs,
+      })
+      .from(libraryFolders)
+      .leftJoin(schema.libraryDirScanState, eq(schema.libraryDirScanState.libraryFolderId, libraryFolders.id))
+      .where(eq(libraryFolders.id, libraryFolderId));
+    const first = rows[0];
+    if (!first) return null;
+
+    const mtimes = new Map<string, number>();
+    for (const row of rows) {
+      if (row.dirPath !== null && row.lastSeenMtimeMs !== null) mtimes.set(row.dirPath, row.lastSeenMtimeMs);
+    }
+    return { version: first.version, mtimes };
   }
 
-  async upsertDirScanState(libraryFolderId: number, entries: Array<{ dirPath: string; mtimeMs: number }>): Promise<void> {
+  async persistDirScanState(
+    libraryFolderId: number,
+    expectedVersion: number,
+    entries: Array<{ dirPath: string; mtimeMs: number }>,
+  ): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [folder] = await tx
+        .select({ version: libraryFolders.scanStateVersion })
+        .from(libraryFolders)
+        .where(eq(libraryFolders.id, libraryFolderId))
+        .for('update');
+      if (!folder || folder.version !== expectedVersion) return false;
+
+      await this.upsertDirScanState(tx, libraryFolderId, entries);
+      await this.deleteStaleDirScanState(tx, libraryFolderId, new Set(entries.map((entry) => entry.dirPath)));
+      return true;
+    });
+  }
+
+  private async upsertDirScanState(tx: DbTransaction, libraryFolderId: number, entries: Array<{ dirPath: string; mtimeMs: number }>): Promise<void> {
     if (entries.length === 0) return;
     const CHUNK = 500;
     for (let i = 0; i < entries.length; i += CHUNK) {
       const chunk = entries.slice(i, i + CHUNK);
-      await this.db
+      await tx
         .insert(schema.libraryDirScanState)
         .values(chunk.map((e) => ({ libraryFolderId, dirPath: e.dirPath, lastSeenMtimeMs: Math.round(e.mtimeMs) })))
         .onConflictDoUpdate({
@@ -643,12 +674,12 @@ export class ScannerRepository {
     }
   }
 
-  async deleteStaleDirScanState(libraryFolderId: number, validPaths: Set<string>): Promise<void> {
+  private async deleteStaleDirScanState(tx: DbTransaction, libraryFolderId: number, validPaths: Set<string>): Promise<void> {
     if (validPaths.size === 0) {
-      await this.db.delete(schema.libraryDirScanState).where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
+      await tx.delete(schema.libraryDirScanState).where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
       return;
     }
-    const allRows = await this.db
+    const allRows = await tx
       .select({ id: schema.libraryDirScanState.id, dirPath: schema.libraryDirScanState.dirPath })
       .from(schema.libraryDirScanState)
       .where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
@@ -656,43 +687,21 @@ export class ScannerRepository {
     if (staleIds.length === 0) return;
     const CHUNK = 500;
     for (let i = 0; i < staleIds.length; i += CHUNK) {
-      await this.db.delete(schema.libraryDirScanState).where(inArray(schema.libraryDirScanState.id, staleIds.slice(i, i + CHUNK)));
+      await tx.delete(schema.libraryDirScanState).where(inArray(schema.libraryDirScanState.id, staleIds.slice(i, i + CHUNK)));
     }
   }
 
-  async clearDirScanState(libraryFolderId: number): Promise<void> {
-    await this.db.delete(schema.libraryDirScanState).where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
-  }
+  async clearDirScanState(libraryFolderId: number): Promise<number | null> {
+    return this.db.transaction(async (tx) => {
+      const [folder] = await tx
+        .update(libraryFolders)
+        .set({ scanStateVersion: sql`${libraryFolders.scanStateVersion} + 1` })
+        .where(eq(libraryFolders.id, libraryFolderId))
+        .returning({ version: libraryFolders.scanStateVersion });
+      if (!folder) return null;
 
-  /**
-   * Invalidate the incremental scan state for deleted books so a later rescan
-   * re-reads their directories and re-creates the records instead of skipping
-   * them on an unchanged mtime. Each entry names a deleted book's folder (or
-   * loose file) and the library folder that owns its scan state.
-   */
-  async invalidateDirScanState(folders: Array<{ libraryFolderId: number; folderPath: string }>): Promise<void> {
-    if (folders.length === 0) return;
-
-    const dirsByFolder = new Map<number, Set<string>>();
-    for (const { libraryFolderId, folderPath } of folders) {
-      let dirs = dirsByFolder.get(libraryFolderId);
-      if (!dirs) dirsByFolder.set(libraryFolderId, (dirs = new Set()));
-      for (const dirPath of scanStateInvalidationPaths(folderPath)) dirs.add(dirPath);
-    }
-
-    for (const [libraryFolderId, dirs] of dirsByFolder) {
-      const paths = [...dirs];
-      const CHUNK = 500;
-      for (let i = 0; i < paths.length; i += CHUNK) {
-        await this.db
-          .delete(schema.libraryDirScanState)
-          .where(
-            and(
-              eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId),
-              inArray(schema.libraryDirScanState.dirPath, paths.slice(i, i + CHUNK)),
-            ),
-          );
-      }
-    }
+      await tx.delete(schema.libraryDirScanState).where(eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId));
+      return folder.version;
+    });
   }
 }

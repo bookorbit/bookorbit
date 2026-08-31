@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   doublePrecision,
@@ -110,12 +111,14 @@ export const libraryFolders = pgTable(
       .notNull()
       .references(() => libraries.id, { onDelete: 'cascade' }),
     path: varchar('path', { length: 4096 }).notNull(),
+    scanStateVersion: bigint('scan_state_version', { mode: 'number' }).notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index('library_folders_library_id_idx').on(t.libraryId),
     uniqueIndex('library_folders_library_path_uidx').on(t.libraryId, t.path),
     unique('library_folders_id_library_id_unique').on(t.id, t.libraryId),
+    check('library_folders_scan_state_version_nonnegative_chk', sql`${t.scanStateVersion} >= 0`),
   ],
 );
 

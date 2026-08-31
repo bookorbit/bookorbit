@@ -1236,14 +1236,19 @@ export class ScannerService implements OnApplicationBootstrap {
 
         // Load stored dir mtimes for incremental scanning (unless forced full)
         let knownDirMtimes: Map<string, number> | undefined;
+        let scanStateVersion: number | undefined;
         if (!forceFullScan) {
           try {
-            knownDirMtimes = await this.scannerRepo.findDirScanState(folder.id);
+            const snapshot = await this.scannerRepo.findDirScanStateSnapshot(folder.id);
+            if (snapshot) {
+              knownDirMtimes = snapshot.mtimes;
+              scanStateVersion = snapshot.version;
+            }
           } catch {
             // If loading fails, fall back to full scan for this folder
           }
         } else {
-          await this.scannerRepo.clearDirScanState(folder.id).catch(() => {});
+          scanStateVersion = (await this.scannerRepo.clearDirScanState(folder.id).catch(() => null)) ?? undefined;
         }
 
         try {
@@ -1296,11 +1301,10 @@ export class ScannerService implements OnApplicationBootstrap {
         totals.missingCount += counts.missingCount;
 
         // Persist dir scan state after successful folder processing
-        if (dirMtimes.size > 0) {
+        if (dirMtimes.size > 0 && scanStateVersion !== undefined) {
           try {
             const entries = [...dirMtimes].map(([dirPath, mtimeMs]) => ({ dirPath, mtimeMs }));
-            await this.scannerRepo.upsertDirScanState(folder.id, entries);
-            await this.scannerRepo.deleteStaleDirScanState(folder.id, new Set(dirMtimes.keys()));
+            await this.scannerRepo.persistDirScanState(folder.id, scanStateVersion, entries);
           } catch (err) {
             this.logger.warn(
               `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} libraryFolderId=${folder.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - dir scan state persistence failed`,
