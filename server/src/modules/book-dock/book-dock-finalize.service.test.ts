@@ -698,7 +698,7 @@ describe('BookDockFinalizeService', () => {
       vi.spyOn(service as never, 'applyMetadata').mockResolvedValue(undefined as never);
       vi.spyOn(service as never, 'cleanupBookDockRecord').mockResolvedValue(undefined as never);
       mockStat.mockResolvedValueOnce({ size: 100 } as never);
-      processor.createBookRecord.mockResolvedValueOnce({ bookId: 557 });
+      processor.createUnitBookRecords.mockResolvedValueOnce({ bookIds: [557], createdBookIds: [557], attachedFileIds: [] });
       const row = makeRow({ targetLibraryId: 5, targetFolderId: 9, selectedMetadata: defaultPatternMetadata() });
       const destPath = '/library/Frank Herbert/Dune/01. Dune (1965).epub';
 
@@ -710,7 +710,17 @@ describe('BookDockFinalizeService', () => {
         bookId: 557,
       });
       expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/book.epub', destPath);
-      expect(processor.createBookRecord).toHaveBeenCalledWith(5, 9, destPath, destPath, 'Frank Herbert/Dune/01. Dune (1965).epub', 'epub', 100);
+      expect(processor.createUnitBookRecords).toHaveBeenCalledWith(5, 9, [
+        {
+          folderPath: destPath,
+          absolutePath: destPath,
+          relPath: 'Frank Herbert/Dune/01. Dune (1965).epub',
+          format: 'epub',
+          sizeBytes: 100,
+          role: 'content',
+          sortOrder: 0,
+        },
+      ]);
     });
 
     it('uses the file path as bookFolderPath in book_per_file mode', async () => {

@@ -115,9 +115,10 @@ describe('RequestWatchdogService stranded searches', () => {
 
     await service.sweep();
 
+    const after = Date.now();
     const [cutoff] = requests.findStrandedSearching.mock.calls[0] as [Date, number];
-    expect(cutoff.getTime()).toBeLessThanOrEqual(before - 30 * 60 * 1000);
-    expect(cutoff.getTime()).toBeGreaterThan(before - 31 * 60 * 1000);
+    expect(cutoff.getTime()).toBeGreaterThanOrEqual(before - 30 * 60 * 1000);
+    expect(cutoff.getTime()).toBeLessThanOrEqual(after - 30 * 60 * 1000);
   });
 
   /** No in-memory task survives a restart, so every one of these is stranded, however recent. */
