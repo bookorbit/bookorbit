@@ -253,6 +253,14 @@
           "label": "Vis rygsøjle på tegneserier",
           "hint": "Påfør rygsøjlen og glans effekt på tegneserieomslag (cbz, cbr, cb7)"
         },
+        "detailCoverTint": {
+          "single": {
+            "hint": "Kun omslagets dominerende farve"
+          },
+          "duotone": {
+            "label": "To farver"
+          }
+        },
         "shadow": {
           "title": "Dække skygge styrke",
           "hint": "Styrer dybde under omslag på tværs af gitter, liste, bord og betjeningspanel miniaturer",
@@ -447,7 +455,8 @@
         "book-covers": "Bogomslag",
         "icons": "Ikoner",
         "layout": "Layout",
-        "behavior": "Opførsel"
+        "behavior": "Opførsel",
+        "language": "Sprog"
       }
     },
     "account": {
@@ -893,8 +902,10 @@
         "reasonNoFilePathMatch": "Filsti matcher ikke nogen bog i dette bibliotek",
         "reasonNoFileHashMatch": "Filhash matchede ikke nogen bog i dette bibliotek",
         "reasonNoIsbnMatch": "ISBN matcher ikke nogen bog i dette bibliotek",
+        "reasonNoAsinMatch": "ASIN matchede ikke nogen bog i dette bibliotek",
         "reasonInsufficientSourceData": "Ikke nok metadata til at forsøge at matche",
         "reasonAmbiguousIsbnMatch": "Flere bøger matchede den samme ISBN",
+        "reasonAmbiguousAsinMatch": "Flere bøger matchede det samme ASIN",
         "reasonAmbiguousFileHashMatch": "Flere bøger matchede den samme fil hash",
         "reasonAmbiguousFilePathMatch": "Flere bøger matchede den samme filsti",
         "reasonAmbiguousTitleAuthorMatch": "Flere bøger matchede samme titel og forfatter",
@@ -935,6 +946,7 @@
         "refresh": "Opdater",
         "sourceUser": "Kilde Bruger",
         "targetUser": "Mål Bruger",
+        "doNotImport": "Importer ikke denne bruger",
         "noSourceUsersLoaded": "Ingen kildebrugere indlæst endnu.",
         "noActiveTargetUsers": "Ingen aktive målbrugere fundet. Opret eller genaktivér en BookOrbit-bruger før mapping.",
         "pathPrefixMappings": "Sti Præfiks Tilføjelser",
@@ -1065,7 +1077,15 @@
         "libraryDeleted": "\"{name}\" slettet",
         "deleteFailed": "Kunne ikke slette biblioteket",
         "refreshingCovers": "Opdatering af dækker {pct}% ({processed}/{total})",
-        "coversRefreshed": "Dækker opdateret ({count} behandlet)"
+        "coversRefreshed": "Dækker opdateret ({count} behandlet)",
+        "moreActions": "Flere handlinger for {name}",
+        "filterLabel": "Filtrer biblioteker",
+        "filterPlaceholder": "Filtrer efter navn eller sti",
+        "filterClear": "Ryd filter",
+        "sortLabel": "Sorter",
+        "noMatchesTitle": "Ingen biblioteker matcher dette filter",
+        "neverScanned": "Aldrig scannet",
+        "scanningPercent": "Scanner {pct}%"
       },
       "authorEnrichment": {
         "configuration": "Konfiguration",

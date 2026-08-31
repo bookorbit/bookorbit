@@ -92,7 +92,8 @@
       "mobileSummary": "Thema: {theme} • Accent: {accent} • Achtergrond: {background}",
       "themeMode": {
         "light": "Licht",
-        "dark": "Donker"
+        "dark": "Donker",
+        "system": "Systeem"
       },
       "theme": {
         "title": "Thema",
@@ -101,8 +102,70 @@
           "hint": "Lichte of donkere interface"
         },
         "accents": {
+          "grey": "Grijs",
+          "scarlet": "Scharlakenrood",
+          "vermilion": "Vermiljoen",
+          "rose": "Roze",
+          "copper": "Koper",
+          "orange": "Oranje",
+          "chartreuse": "Kartuizergroen",
+          "marigold": "Goudsbloem",
+          "wasabi": "Wasabi",
+          "amber": "Amber",
+          "malachite": "Malachiet",
+          "yellow": "Geel",
+          "viridian": "Viridiaansblauw",
+          "turquoise": "Turkoois",
+          "lime": "Limoen",
+          "green": "Groen",
+          "acid-green": "Gifgroen",
+          "emerald": "Smaragd",
+          "teal": "Talingblauw",
+          "electric-blue": "Elektrisch blauw",
+          "cyan": "Cyaan",
+          "jade": "Jade",
+          "ultramarine": "Ultramarijn",
           "iris": "Iris",
-          "purple": "Paars"
+          "purple": "Paars",
+          "blue": "Blauw",
+          "indigo": "Indigo",
+          "violet": "Paars",
+          "amethyst": "Amethist",
+          "fuchsia": "Fuchsia",
+          "raspberry": "Framboos",
+          "pink": "Roze",
+          "white": "Wit",
+          "rosewater": "Rozenwater",
+          "salmon": "Zalm",
+          "coral": "Koraal",
+          "sand": "Zand",
+          "peach": "Perzik",
+          "pear": "Peer",
+          "flax": "Vlasgeel",
+          "sprout": "Spruitgroen",
+          "butter": "Boter",
+          "aloe": "Aloë",
+          "lemon": "Limoen",
+          "foam": "Schuim",
+          "aqua": "Water",
+          "celadon": "Celadon",
+          "sage": "Salie",
+          "pistachio": "Pistache",
+          "mint": "Munt",
+          "seafoam": "Zeeschuim",
+          "baby-blue": "Baby Blauw",
+          "powder": "Poeder",
+          "sea-glass": "Zeegroen",
+          "bluebell": "Hyacintblauw",
+          "cornflower": "Korenbloem",
+          "thistle": "Distel",
+          "periwinkle": "Maagdenpalm",
+          "wisteria": "Wisteria",
+          "lavender": "Lavendel",
+          "mauve": "Paars",
+          "orchid": "Orchidee",
+          "rose-quartz": "Roze Quartz",
+          "blush": "Blos"
         },
         "accentColor": {
           "label": "Accentkleur",
@@ -155,6 +218,9 @@
       },
       "bookCovers": {
         "title": "Boekomslagen",
+        "coverSearch": {
+          "label": "Standaardzoeker voor albumhoezen"
+        },
         "displayMode": {
           "title": "Weergavemodus omslag",
           "hint": "Bepaalt hoe echte omslagen in boekvakken passen wanneer de verhoudingen verschillen",
@@ -729,6 +795,7 @@
         "stepReport": "Rapport",
         "stepReportTitle": "Migratierapport",
         "subtitleSource": "Configureer de databaseverbinding met je Booklore-bron.",
+        "genericSubtitleSource": "Configureer de verbinding met je bronbibliotheek-applicatie.",
         "subtitleMappings": "Koppel bron-gebruikers aan doel-gebruikers en vertaal bestandspaden.",
         "subtitleDryRun": "Bekijk wat wordt geïmporteerd voordat je de live migratie uitvoert.",
         "subtitleRun": "Start de live import en volg de voortgang.",
@@ -813,13 +880,16 @@
         "reasonNoFilePathMatch": "Bestandspad kwam niet overeen met een boek in deze bibliotheek",
         "reasonNoFileHashMatch": "Bestandshash kwam niet overeen met een boek in deze bibliotheek",
         "reasonNoIsbnMatch": "ISBN kwam niet overeen met een boek in deze bibliotheek",
+        "reasonNoAsinMatch": "ASIN kwam niet overeen met een boek in deze bibliotheek",
         "reasonInsufficientSourceData": "Onvoldoende metadata om een koppeling te proberen",
         "reasonAmbiguousIsbnMatch": "Meerdere boeken kwamen overeen met hetzelfde ISBN",
+        "reasonAmbiguousAsinMatch": "Meerdere boeken kwamen overeen met hetzelfde ASIN",
         "reasonAmbiguousFileHashMatch": "Meerdere boeken kwamen overeen met dezelfde bestandshash",
         "reasonAmbiguousFilePathMatch": "Meerdere boeken kwamen overeen met hetzelfde bestandspad",
         "reasonAmbiguousTitleAuthorMatch": "Meerdere boeken kwamen overeen met dezelfde titel en auteur",
         "reasonUnknown": "Kon de reden niet bepalen",
         "strategyIsbn": "Gekoppeld op ISBN",
+        "strategyAsin": "Geselecteerd op ASIN",
         "strategyFileHash": "Gekoppeld op bestandshash",
         "strategyPathMapping": "Gekoppeld op gekoppeld bestandspad",
         "strategyTitleAuthor": "Gekoppeld op titel en auteur",
@@ -855,6 +925,7 @@
         "refresh": "Vernieuwen",
         "sourceUser": "Bron-gebruiker",
         "targetUser": "Doel-gebruiker",
+        "doNotImport": "Importeer deze gebruiker niet",
         "noSourceUsersLoaded": "Nog geen bron-gebruikers geladen.",
         "noActiveTargetUsers": "Geen actieve doel-gebruikers gevonden. Maak een BookOrbit-gebruiker aan of schakel deze opnieuw in voordat je koppelt.",
         "pathPrefixMappings": "Padprefix-koppelingen",
@@ -959,6 +1030,7 @@
         "syncMetadataToFiles": "Metadata naar bestanden synchroniseren",
         "deleteLibrary": "Bibliotheek verwijderen",
         "bookCount": "{count, plural, =0 {geen boeken} one {# boek} other {# boeken}}",
+        "booksUnit": "{count, plural, one {boek} other {boeken}}",
         "folderCount": "{count, plural, =0 {geen mappen} one {# map} other {# mappen}}",
         "fileMode": "Bestandsmodus",
         "folderMode": "Mapmodus",
@@ -986,7 +1058,59 @@
         "libraryDeleted": "\"{name}\" verwijderd",
         "deleteFailed": "Bibliotheek verwijderen mislukt",
         "refreshingCovers": "Omslagen vernieuwen {pct}% ({processed}/{total})",
-        "coversRefreshed": "Omslagen vernieuwd ({count} verwerkt)"
+        "coversRefreshed": "Omslagen vernieuwd ({count} verwerkt)",
+        "onDiskUnit": "{size} op schijf",
+        "noFilesIndexed": "Geen bestanden geïndexeerd",
+        "formatEntry": "{format} {count}",
+        "formatOverflow": "{count, plural, one {+# formaat} other {+# formaten}}",
+        "extraFolders": "{count, plural, one {+# map} other {+# mappen}}",
+        "openLibrary": "Open {name}",
+        "moreActions": "Meer acties voor {name}",
+        "statsFailed": "Kon bibliotheektellingen niet laden. Al het andere op deze pagina werkt nog.",
+        "filterLabel": "Bibliotheken filteren",
+        "filterPlaceholder": "Filteren op naam of path",
+        "filterClear": "Filter wissen",
+        "sortLabel": "Sorteren",
+        "noMatchesTitle": "Geen bibliotheken gevonden voor dit filter",
+        "noMatchesHint": "Geen resultaten voor '{query}' op basis van naam of map-path.",
+        "totalLibraries": "{count, plural, one {# bibliotheek} other {# bibliotheken}}",
+        "neverScanned": "Nooit gescand",
+        "neverScannedHint": "Voer een scan uit om de mappen te indexeren",
+        "scanFailedAt": "Mislukt {time}",
+        "scanningPercent": "Scannen {pct}%",
+        "scanCounting": "Bestanden tellen",
+        "scanCounts": "{processed} van {total}",
+        "scanAdded": "{count, plural, one {+# toegevoegd} other {+# toegevoegd}}",
+        "scanUpdated": "{count, plural, one {# bijgewerkt} other {# bijgewerkt}}",
+        "scanMissing": "{count, plural, one {# ontbrekend} other {# ontbrekend}}",
+        "scanNoChange": "geen wijziging",
+        "outcomeSeparator": ", ",
+        "scanOutcome": "{trigger} - {outcome}",
+        "syncConfirmBody": "Dit zal de metadata in elk ondersteund bestand in {name} rechtstreeks op de schijf overschrijven. Dit kan niet ongedaan worden gemaakt.",
+        "columns": {
+          "library": "Bibliotheek",
+          "contents": "Inhoud",
+          "onDisk": "Op schijf",
+          "automation": "Automatisering",
+          "lastScan": "Laatste scan",
+          "actions": "Acties"
+        },
+        "sort": {
+          "default": "Standaardvolgorde",
+          "name": "Naam",
+          "books": "Boeken",
+          "size": "Grootte op schijf",
+          "lastScan": "Laatste scan"
+        },
+        "trigger": {
+          "manual": "Manueel",
+          "watcher": "Waarnemer",
+          "schedule": "Inplannen"
+        },
+        "capability": {
+          "watch": "Mappen bekijken",
+          "schedule": "Ingeplande scan"
+        }
       },
       "authorEnrichment": {
         "configuration": "Configuratie",
@@ -1013,7 +1137,16 @@
         "saveFailed": "Instellingen voor auteursverrijking opslaan mislukt",
         "noEligibleAuthors": "Geen in aanmerking komende auteurs gevonden",
         "noAuthorsToEnrich": "Geen auteurs om te verrijken",
-        "queueFailed": "Auteursaanvulling in de wachtrij zetten mislukt"
+        "queueFailed": "Auteursaanvulling in de wachtrij zetten mislukt",
+        "metadataPreferences": {
+          "title": "Veld bronnen",
+          "hint": "Stel de volgorde in waarmee elk veld wordt ingevuld. De eerste provider met een waarde wint.",
+          "noProviders": "Geen provider beschikbaar",
+          "saved": "Veldbronnen opgeslagen",
+          "saveFailed": "Opslaan van veldbronnen mislukt",
+          "limitedProviders": "{providers} levert alleen biografieën en foto's.",
+          "addProvider": "Voeg {provider} toe als bron"
+        }
       },
       "scoreWeights": {
         "groupLabel": "Scoregewichten",
@@ -1022,6 +1155,10 @@
         "resetToDefaultsButton": "Terug naar standaardwaarden",
         "recalculateAll": "Alles herberekenen",
         "confirmReset": "Reset bevestigen",
+        "resetDialog": {
+          "title": "Elk gewicht terugzetten naar de standaardwaarde?",
+          "description": "Alle 24 velden gaan terug naar de wegingen waarmee BookOrbit wordt geleverd. Er wordt niets opgeslagen totdat je kiest voor Opslaan en opnieuw scoren."
+        },
         "reset": "Resetten",
         "recalculate": "Herberekenen",
         "subtotal": "subtotaal: {count}",
@@ -1029,7 +1166,11 @@
         "saveFailed": "Scoregewichten opslaan mislukt",
         "recalcStarted": "Herberekening van scores gestart op de achtergrond",
         "recalcFailed": "Herberekening mislukt",
-        "resetToDefaults": "Gewichten teruggezet naar standaardwaarden. Sla op om toe te passen."
+        "resetToDefaults": "Gewichten teruggezet naar standaardwaarden. Sla op om toe te passen.",
+        "howItWorks": {
+          "title": "Hoe dit werkt.",
+          "summary": "Elk boek krijgt een score tot 100 voor de compleetheid van de metadata. Een weging heeft alleen betekenis in verhouding tot de rest; elk veld hieronder laat zien welk deel van de eindscore het bepaalt. Alles verdubbelen verandert dus niets."
+        }
       },
       "tabs": {
         "users": "Gebruikers",

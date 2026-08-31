@@ -644,7 +644,7 @@
         "selectAccount": "공유 계정을 선택하세요",
         "label": "이름",
         "labelPlaceholder": "예시: 데모 체험용 링크",
-        "expiresAt": "만료일시",
+        "expiresAt": "만료 일시",
         "optional": "(선택)",
         "create": "생성",
         "creating": "생성 중..."
@@ -774,7 +774,7 @@
       },
       "maintenance": {
         "title": "유지보수",
-        "subtitle": "백그라운드 작업, 시스템 인덱스, 유지보수 작업을 진행하세요.",
+        "subtitle": "백그라운드 작업, 시스템 색인, 유지보수 작업을 진행하세요.",
         "importGroup": "가져오기",
         "recommendationsGroup": "추천",
         "achievementsGroup": "업적",
@@ -796,7 +796,7 @@
         "getStarted": "시작하기",
         "continueSetup": "이어서 작업",
         "viewDetails": "상세 보기",
-        "refreshRecommendationIndex": "추천 인덱스 갱신",
+        "refreshRecommendationIndex": "추천용 색인 정보 갱신",
         "refreshRecommendationHint": "최신 라이브러리 변경 사항을 반영하여 추천 엔진을 업데이트하세요. 이 작업은 백그라운드에서 실행됩니다.",
         "booksQueuedForProcessing": "{count, plural, =0 {처리 대기 중인 책 없음} one {책 #권 처리 대기 중} other {책 #권 처리 대기 중}}",
         "run": "실행",
@@ -1103,7 +1103,7 @@
         "refreshingCovers": "{pct}% 표지 새로고침됨 ({processed}/{total})",
         "coversRefreshed": "표지가 새로고침되었습니다 ({count}개 항목 처리)",
         "onDiskUnit": "디스크 점유량 {size}",
-        "noFilesIndexed": "인덱싱된 파일 없음",
+        "noFilesIndexed": "색인된 파일 없음",
         "formatEntry": "{format} {count}",
         "formatOverflow": "{count, plural, one {+#개 포맷} other {+#개 포맷}}",
         "extraFolders": "{count, plural, one {+#개 폴더} other {+#개 폴더}}",
@@ -1118,7 +1118,7 @@
         "noMatchesHint": "\"{query}\"에 일치하는 이름 또는 폴더 경로가 없습니다.",
         "totalLibraries": "{count, plural, one {라이브러리 #개} other {라이브러리 #개}}",
         "neverScanned": "스캔 이력 없음",
-        "neverScannedHint": "스캔을 실행하여 폴더를 인덱싱하세요",
+        "neverScannedHint": "스캔을 실행하여 폴더를 색인하세요",
         "scanFailedAt": "실패 {time}",
         "scanningPercent": "스캔 중 {pct}%",
         "scanCounting": "파일 카운팅 중",
@@ -1168,7 +1168,7 @@
         "history": {
           "when": "일시",
           "trigger": "트리거",
-          "duration": "기간",
+          "duration": "소요 시간",
           "result": "결과",
           "status": "상태",
           "statusValue": {
@@ -1751,7 +1751,7 @@
           },
           "resetScope": {
             "title": "기본값으로 재설정하시겠습니까?",
-            "globalDescription": "이 작업은 사용자님의 전역 필드 규칙을 시스템 기본값으로 대체하고 즉시 저장합니다.",
+            "globalDescription": "이 작업은 사용자의 전역 필드 규칙을 시스템 기본값으로 대체하고 즉시 저장합니다.",
             "libraryDescription": "이 작업은 {scope}에 설정된 모든 재정의를 제거하여 전역 규칙을 다시 상속받게 하며 즉시 저장됩니다."
           },
           "removeProvider": {
@@ -1847,7 +1847,7 @@
       "tabSubtitles": {
         "providers": "외부 메타데이터 제공자를 활성화하고 자격 증명을 설정하세요.",
         "field-rules": "각 메타데이터 필드의 값을 어떤 제공자로부터 가져올지, 그리고 라이브러리 전반에 걸쳐 값들이 어떻게 병합될지 제어하세요.",
-        "custom-fields": "사용자 지정 메타데이터 필드를 정의하고, 해당 필드를 사용할 라이브러리를 선택하세요.",
+        "custom-fields": "커스텀 메타데이터 필드를 정의하고, 해당 필드를 사용할 라이브러리를 선택하세요.",
         "genre-blocklist": "원치 않는 제공자 장르 값이 책에 기록되는 것을 방지하세요.",
         "score": "메타데이터 필드에 가중치를 부여하여 가져온 결과의 신뢰도를 계산합니다.",
         "auto-fetch": "라이브러리에 새 책이 추가되면 표지, 설명 및 기타 세부 정보를 자동으로 가져옵니다.",
@@ -2342,7 +2342,7 @@
         "markAsFinishedHint": "책을 \"읽음\" 상태로 표시하기 위한 퍼센트 값",
         "kepubLimit": "KEPUB 변환 제한",
         "kepubLimitHint": "이 용량 제한을 초과하는 도서는 일반 EPUB 형식으로 전송되므로, BookOrbit이 해당 책의 독서 위치를 Kobo로 동기화하지 않습니다.",
-        "changesMustBeSaved": "변경 사항은 저장해야 적용됩니다.",
+        "changesMustBeSaved": "변경 사항은 저장 후 적용됩니다.",
         "saving": "저장 중...",
         "saveSyncSettings": "동기화 설정 저장",
         "thresholdOrderError": "독서 시작 기준값은 독서 완료 기준값보다 작아야 합니다.",
@@ -2467,7 +2467,7 @@
           "accountTitle": "계정 기본 KOReader 패턴",
           "accountDescription": "KOReader 계정용 BookOrbit 다운로드 플러그인에서 사용되는 기본 상대 폴더 및 파일 이름을 설정합니다. 기기별 규칙은 아래에서 재정의할 수 있습니다.",
           "defaultPattern": "기본 도서 경로 패턴",
-          "accountHelp": "기기에 사용자 지정 규칙이 없는 경우에 사용될 기본 KOReader 다운로드 플러그인 패턴입니다.",
+          "accountHelp": "기기에 커스텀 규칙이 없는 경우에 사용될 기본 KOReader 다운로드 플러그인 패턴입니다.",
           "accountHint": "별도의 사용자 재정의가 없는 KOReader 기기에서 사용됩니다.",
           "preview": "미리보기",
           "saveAccount": "계정 기본값 저장",
@@ -2661,7 +2661,7 @@
             "untitledBook": "제목 없는 책",
             "selected": "선택됨",
             "select": "선택",
-            "loadMore": "더보기",
+            "loadMore": "더 보기",
             "confirmTitle": "KOReader 연결 확인",
             "koreader": "KOReader",
             "bookOrbit": "BookOrbit",
@@ -2694,7 +2694,7 @@
           "untitledBook": "제목 없는 책",
           "selected": "선택됨",
           "select": "선택",
-          "loadMore": "더보기",
+          "loadMore": "더 보기",
           "loadingMore": "로딩 중...",
           "confirmLinkTitle": "KOReader 연결 확인",
           "bookId": "책 ID: {id}",
@@ -2807,51 +2807,51 @@
         "server": "서버"
       },
       "descriptions": {
-        "profile": "이름, 이메일, 비밀번호 활성 세션 설정.",
-        "appearanceTheme": "테마, 강조색, 배경, 모서리 곡률 설정.",
-        "appearanceBookCovers": "표지 그림자, 책등 효과, 기본 표지 설정.",
-        "appearanceIcons": "앱 전체에서 사용되는 아이콘 스타일 선택.",
-        "appearanceLayout": "기본 라이브러리 보기, 밀도, 간격 설정.",
-        "appearanceBehavior": "탐색 및 정렬 시 라이브러리의 동작 방식 설정.",
-        "appearanceLanguage": "인터페이스 언어 및 지역별 포매팅 설정.",
-        "readerEbook": "전자책을 위한 폰트, 간격 및 페이지 동작 설정.",
-        "readerPdf": "렌더링, 배율, PDF 페이지 맞춤 설정.",
-        "readerComics": "만화 읽기 방향, 페이지 쌍 보기 방식 설정.",
-        "readerAudio": "재생 속도, 건너뛰기 간격, 수면 타이머 설정.",
-        "readerFonts": "독서 시 사용 가능한 폰트 설정.",
-        "readerGeneral": "모든 읽기 모드가 공유하는 기본값.",
-        "notifications": "BookOrbit 알림 및 알림 발생 위치 확인.",
-        "privacy": "독서 인사이트, 공유 링크, 활동 표시 여부 설정.",
-        "restrictions": "내 계정의 연령 등급 및 숨김 콘텐츠 설정.",
-        "libraries": "스캔 경로, 감시 폴더, 및 수집 규칙 설정.",
-        "fileNaming": "저장된 파일의 폴더 및 파일명 패턴 설정.",
-        "maintenance": "재스캔, 중복 항목, 고립된 데이터, 캐시 재구축.",
-        "kobo": "동기화 엔드포인트, 스토어 프록시, 선반 매핑.",
-        "koreader": "진행도 동기화, 문서 매칭.",
-        "opds": "서드파티 리딩 앱을 위한 카탈로그 피드.",
-        "email": "SMTP 전송, 기기 전송용 주소.",
-        "hardcover": "Hardcover와 독서 상태 및 리뷰 동기화.",
-        "users": "계정, 역할, 권한, 초대.",
-        "accountActivity": "사용자별 독서 기록, 세션 활동.",
-        "magicLinks": "비밀번호 없는 공유 및 로그인 링크",
-        "oidc": "SSO 제공자, 클레임, 프로비저닝.",
-        "serverFonts": "서버의 모든 리더에 적용되는 폰트.",
-        "bookDock": "책 페이지에 표시되는 빠른 작업.",
-        "auditLog": "누가 무엇을 언제 변경했는지 확인."
+        "profile": "이름, 이메일, 비밀번호, 활성 세션 등을 관리하세요.",
+        "appearanceTheme": "테마, 강조색, 배경, 모서리 곡률 등을 설정하세요.",
+        "appearanceBookCovers": "표지 그림자, 책등 효과, 기본 표지 등을 설정하세요.",
+        "appearanceIcons": "앱 전체에서 사용되는 아이콘 스타일을 선택하세요.",
+        "appearanceLayout": "기본 라이브러리 보기, 밀도, 간격 등을 설정하세요.",
+        "appearanceBehavior": "탐색 및 정렬 시 라이브러리의 동작 방식을 설정하세요.",
+        "appearanceLanguage": "인터페이스 언어 및 지역별 포매팅 방법을 설정하세요.",
+        "readerEbook": "전자책을 위한 폰트, 간격 및 페이지 동작 등을 설정하세요.",
+        "readerPdf": "렌더링, 배율, PDF 페이지 맞춤 방식 등을 설정하세요.",
+        "readerComics": "만화 읽기 방향, 페이지 쌍 보기 방식 등을 설정하세요.",
+        "readerAudio": "재생 속도, 건너뛰기 간격, 수면 타이머 등을 설정하세요.",
+        "readerFonts": "독서 시 사용 가능한 폰트를 설정하세요.",
+        "readerGeneral": "모든 리더가 공유하는 기본값들을 설정하세요.",
+        "notifications": "BookOrbit 알림 항목 및 알림 정도를 설정하세요.",
+        "privacy": "독서 인사이트, 공유 링크, 활동 표시 여부를 설정하세요.",
+        "restrictions": "내 계정의 연령 등급 및 숨김 콘텐츠를 관리하세요.",
+        "libraries": "스캔 경로, 감시 폴더, 수집 규칙을 설정하세요.",
+        "fileNaming": "저장된 파일의 폴더 및 파일명 패턴을 지정하세요.",
+        "maintenance": "재스캔, 중복 항목, 고립된 데이터, 캐시 재구축 등의 유지보수 작업을 진행하세요.",
+        "kobo": "Kobo 동기화 엔드포인트, 스토어 프록시, 선반 매핑 등을 설정하세요.",
+        "koreader": "KOReader 진행도 동기화, 문서 매칭 등을 설정하세요.",
+        "opds": "서드파티 리딩 앱을 위한 OPDS 카탈로그 피드를 설정하세요.",
+        "email": "SMTP 전송 및 기기 전송용 주소 등을 관리하세요.",
+        "hardcover": "Hardcover와 독서 상태 및 리뷰를 동기화하세요.",
+        "users": "계정, 역할, 권한, 초대 등 사용자 관련 항목들을 설정하세요.",
+        "accountActivity": "사용자별 독서 기록, 세션 활동을 확인하세요.",
+        "magicLinks": "비밀번호 없는 공유 링크 및 로그인 링크를 관리하세요.",
+        "oidc": "SSO 제공자, 클레임, 프로비저닝 설정 등 SSO를 위한 작업을 진행하세요.",
+        "serverFonts": "서버의 모든 사용자가 사용할 수 있는 폰트를 설치하세요.",
+        "bookDock": "책을 빠르게 불러오고 정리하기 위한 도구입니다.",
+        "auditLog": "감사 로그를 통해 누가, 무엇을, 언제 변경했는지 확인하세요."
       },
       "backToApp": "라이브러리로 돌아가기"
     }
   },
   "achievements": {
     "title": "업적",
-    "tiersCount": "{earned} / {total} 티어",
+    "tiersCount": "{earned} / {total} 달성",
     "loadFailed": "업적 로드에 실패했습니다.",
     "tryAgain": "다시 시도해보세요",
     "noMatchFilter": "해당 필터에 맞는 업적이 없습니다.",
     "secretAchievement": "비밀 업적",
     "earnedOn": "{date} 획득",
     "whileReading": "\"{title}\"을(를) 읽으면서",
-    "tierProgress": "{earned} / {total} 티어",
+    "tierProgress": "{earned} / {total} 달성",
     "progressToNext": "{current} / {threshold} 충족 시 {name} 달성",
     "rarity": {
       "common": "일반",
@@ -3034,6 +3034,23 @@
       },
       "superuserTarget": "슈퍼유저",
       "superuserTargetHint": "슈퍼유저에게는 콘텐츠 제한을 적용할 수 없습니다.",
+      "superuserAccess": {
+        "title": "슈퍼유저 권한",
+        "enabled": "활성화됨",
+        "disabled": "비활성화됨",
+        "enabledHint": "이 계정은 무제한적 서버 접근 권한을 가지고 있습니다. 이미 적용된 권한, 라이브러리, 제한 설정은 권한 회수 뒤에도 유효합니다.",
+        "disabledHint": "슈퍼유저 권한은 무제한적인 서버 접근 권한을 부여하며, 하위 권한 검증, 라이브러리 할당, 콘텐츠 제한에 대한 우회를 가능하게 합니다.",
+        "selfHint": "자기 자신의 슈퍼유저 권한은 변경할 수 없습니다.",
+        "sharedHint": "공유 계정은 슈퍼유저로 지정할 수 없습니다.",
+        "promote": "슈퍼유저로 지정",
+        "demote": "슈퍼유저 권한 회수",
+        "promoteDialogTitle": "슈퍼유저로 지정하시겠습니까?",
+        "promoteDialogBody": "{name}에게 무제한적 서버 접근 권한을 부여합니다. 해당 계정의 활성 세션은 모두 종료되며, 다시 로그인해야 합니다.",
+        "demoteDialogTitle": "슈퍼유저 권한을 회수하시겠습니까?",
+        "demoteDialogBody": "{name}에게서 무제한적 접근 권한을 회수합니다. 이미 해당 계정에 적용된 권한, 라이브러리, 제한 설정은 계속 유효하며, 해당 사용자들은 다시 로그인해야 합니다.",
+        "changing": "권한 업데이트 중...",
+        "changeError": "슈퍼유저 권한을 업데이트하는 데 실패했습니다. 계정 페이지를 새로고침 후 다시 시도해주세요."
+      },
       "noRestrictions": "콘텐츠 제한 없음",
       "noRestrictionsHint": "이 사용자는 할당된 라이브러리의 모든 책에 대한 전체 접근 권한을 가집니다.",
       "addRestrictions": "+ 콘텐츠 제한 추가",
@@ -3169,7 +3186,7 @@
       "attention": {
         "title": "주의 필요",
         "count": "{count, plural, one {#개 계정} other {#개 계정}}",
-        "filter": "{count, plural, one {#개 경고} other {#개 경고}}",
+        "filter": "{count, plural, one {#개 항목 주의 필요} other {#개 항목 주의 필요}}",
         "more": "{count} 항목 추가 표시",
         "reason": {
           "locked": "{name}은(는) 너무 많은 로그인 실패로 인해 잠금 처리되었습니다.",
@@ -3271,9 +3288,9 @@
       "searchPlaceholder": "텍스트 및 메모 검색",
       "filters": "필터",
       "sortOrder": "정렬 순서",
-      "switchToCompact": "모아 보기로 전환",
+      "switchToCompact": "좁게 보기로 전환",
       "switchToComfortable": "편하게 보기로 전환",
-      "compactView": "모아 보기",
+      "compactView": "좁게 보기",
       "comfortableView": "편하게 보기"
     },
     "listItem": {
@@ -3320,7 +3337,16 @@
         "noMatch": "설정하신 필터에 맞는 하이라이트가 없습니다.",
         "resetFilters": "필터 초기화",
         "trashEmpty": "휴지통이 비어 있습니다",
-        "noAnnotations": "아직 필기가 없습니다. 웹 리더 또는 전자책 리더에서 생성한 하이라이트가 여기에 표시됩니다."
+        "noAnnotations": "아직 필기가 없습니다. 웹 리더 또는 전자책 리더에서 생성한 하이라이트가 여기에 표시됩니다.",
+        "noMatchHint": "더 짧은 문장을 입력하거나, 색상 필터와 책 필터를 초기화해 주세요.",
+        "noAnnotationsBody": "기기와 책 종류에 관계없이 모든 필기가 이곳에 수집됩니다.",
+        "readHere": "이곳에서 모아 보기",
+        "readHereBody": "리더에서 텍스트를 선택하고 색상을 고르세요.",
+        "syncKobo": "Kobo 동기화",
+        "syncKoboBody": "기기에서 생성한 필기는 다음 동기화 때 저장됩니다.",
+        "syncKoreader": "KOReader 동기화",
+        "syncKoreaderBody": "플러그인이 필기를 위치 정보와 함께 업로드합니다.",
+        "goToLibrary": "라이브러리로 이동"
       },
       "toast": {
         "movedToTrash": "휴지통으로 이동되었습니다.",
@@ -3330,8 +3356,70 @@
         "bulkTrashed": "{count, plural, =0 {0개 필기를 휴지통으로 이동했습니다.} one {#개 필기를 휴지통으로 이동했습니다.} other {#개 필기를 휴지통으로 이동했습니다.}}",
         "bulkRestored": "{count, plural, =0 {0개 필기를 복원했습니다.} one {#개 필기를 복원했습니다.} other {#개 필기를 복원했습니다.}}",
         "bulkRecolored": "{count, plural, =0 {0개 필기의 색상을 변경했습니다.} one {#개 필기의 색상을 변경했습니다.} other {#개 필기의 색상을 변경했습니다.}}",
-        "bulkRestyled": "{count, plural, =0 {0개 필기의 스타일을 변경했습니다.} one {#개 필기의 스타일을 변경했습니다.} other {#개 필기의 스타일을 변경했습니다.}}"
-      }
+        "bulkRestyled": "{count, plural, =0 {0개 필기의 스타일을 변경했습니다.} one {#개 필기의 스타일을 변경했습니다.} other {#개 필기의 스타일을 변경했습니다.}}",
+        "noteSaved": "메모가 저장되었습니다."
+      },
+      "railTitle": "필기 {marks}개 · 책 {books}권",
+      "lastTwelveMonths": "지난 12개월",
+      "colour": "색상",
+      "whereFrom": "생성된 곳",
+      "theShelf": "선반",
+      "devices": "기기",
+      "allBooks": "전체 책 {count}권",
+      "behindCount": "{count, plural, one {#개 항목 뒤에 위치} other {#개 항목 뒤에 위치}}",
+      "busiestWeek": "가장 활발했던 주",
+      "longestQuiet": "가장 긴 공백기",
+      "mostMarked": "최다 필기 도서",
+      "weekCount": "{count, plural, one {#주} other {#주}}",
+      "anchorsUnplaced": "{count, plural, one {연결 #개를 설정할 수 없습니다.} other {연결 #개를 설정할 수 없습니다.}}",
+      "reviewThem": "일괄 검토",
+      "anchorLost": "연결 없음",
+      "anchorRepaired": "수정됨",
+      "notes": "메모",
+      "review": "검토",
+      "viewLabel": "그룹화 및 정렬",
+      "views": {
+        "newest": "최신순",
+        "oldest": "오래된 순",
+        "book": "책별로",
+        "color": "색상별로",
+        "source": "소스별로"
+      },
+      "matchCount": "총 {total}개 항목 중 {shown}개",
+      "moreActions": "추가 작업",
+      "loadMore": "{count, plural, one {1개 항목 더 보기} other {#개 항목 더 보기}}",
+      "openBook": "책 열기",
+      "noteLabel": "메모",
+      "yourNote": "내 메모",
+      "notePlaceholder": "이 문장에 어떤 특별한 의미가 있었나요?",
+      "openAtThisPage": "이 페이지에서 열기",
+      "positionAndSync": "위치 & 동기화",
+      "loadFailed": "사용자의 하이라이트 정보를 불러올 수 없습니다. 나중에 다시 시도해 주세요.",
+      "chips": {
+        "dateBetween": "{from} ~ {to}",
+        "dateFrom": "{from}부터",
+        "dateUntil": "{to}까지"
+      },
+      "activitySummary": "{count, plural, one {{from} ~ {to} 기간 동안의 하이라이트 #개} other {{from} ~ {to} 기간 동안의 하이라이트 #개}}",
+      "book": "책",
+      "needsReview": "검토 필요"
+    },
+    "sources": {
+      "web": "웹",
+      "koreader": "KOReader",
+      "kobo": "Kobo"
+    },
+    "colors": {
+      "yellow": "노란색",
+      "green": "초록색",
+      "blue": "파란색",
+      "pink": "핑크색",
+      "orange": "주황색",
+      "red": "빨간색",
+      "olive": "녹갈색",
+      "cyan": "청록색",
+      "purple": "보라색",
+      "gray": "회색"
     }
   },
   "audit": {
@@ -3368,7 +3456,7 @@
     "bookImpact": "{count, plural, one {책 #권} other {책 #권}}",
     "entryDetailsLabel": "감사 이벤트 #{id}의 상세 정보",
     "detailEventId": "이벤트 ID",
-    "detailOccurredAt": "발생일시",
+    "detailOccurredAt": "발생 일시",
     "detailActor": "작업자",
     "detailCategory": "카테고리",
     "detailActionLabel": "작업",
@@ -3585,7 +3673,7 @@
       "confirmPassword": "비밀번호 확인",
       "confirmNewPassword": "새 비밀번호 확인",
       "currentPassword": "현재 비밀번호",
-      "passwordHint": "최소 8자 이상, 대문자, 소문자, 숫자 포함해야 함"
+      "passwordHint": "최소 8자 이상. 대문자, 소문자, 숫자를 포함해야 함"
     },
     "errors": {
       "generic": "오류가 발생했습니다. 다시 시도해 주세요.",
@@ -3703,7 +3791,15 @@
       "deleteAuthor": "저자 삭제"
     },
     "filters": {
-      "allLibraries": "모든 라이브러리"
+      "allLibraries": "모든 라이브러리",
+      "chips": {
+        "groupLabel": "저자 필터",
+        "all": "전체",
+        "noPortrait": "프로필 사진 없음",
+        "multipleBooks": "2권 이상 저술",
+        "recentlyAdded": "이번 주에 추가된 저자",
+        "noSortName": "정렬용 이름 없음"
+      }
     },
     "header": {
       "never": "없음",
@@ -3720,7 +3816,7 @@
       "noBiography": "약력 정보가 없습니다. 메뉴에서 메타데이터를 갱신해 주세요.",
       "previewFrom": "{provider} 데이터 미리보기. 유지하려면 메타데이터를 저장하세요.",
       "booksLabel": "책",
-      "lastAdded": "마지막 추가일시",
+      "lastAdded": "마지막 추가 일시",
       "born": "출생",
       "died": "사망",
       "website": "웹사이트",
@@ -3742,10 +3838,10 @@
       "allLoaded": "저자 {total}명 로드 완료",
       "sort": {
         "name": "이름",
-        "sortName": "정렬 기준",
+        "sortName": "정렬용 이름",
         "bookCount": "도서 수",
         "recentAdditions": "최근 추가된 항목",
-        "lastEnriched": "마지막 보강일시"
+        "lastEnriched": "마지막 보강 일시"
       },
       "empty": {
         "title": "저자 없음",
@@ -3786,7 +3882,7 @@
       "previewError": "현재 외부 저자 미리보기 메타데이터를 로드할 수 없습니다.",
       "edit": {
         "name": "이름",
-        "sortName": "정렬 기준",
+        "sortName": "정렬용 이름",
         "description": "설명",
         "image": "이미지",
         "uploading": "업로드 중...",
@@ -3850,6 +3946,16 @@
         "deleteSuccess": "저자를 삭제하여, 책 {books}권에 영향을 미쳤습니다.",
         "deleteFailed": "작성자 삭제에 실패했습니다."
       }
+    },
+    "portrait": {
+      "fromTheirBook": "프로필 사진이 아닌 저서에서 추출된 표지입니다"
+    },
+    "index": {
+      "bookCount": "{count, plural, =0 {책 없음} one {책 #권} other {책 #권}}",
+      "rowLabel": "{name}, {count, plural, =0 {책 없음} one {책 #권} other {책 #권}}",
+      "actionsFor": "{name}에 대한 작업",
+      "refreshing": "{name}의 메타데이터를 갱신하는 중",
+      "deleting": "{name}을(를) 삭제하는 중"
     }
   },
   "book": {
@@ -3899,7 +4005,13 @@
       "action": "다운로드",
       "audiobookZip": "오디오북 (ZIP)",
       "allFormatsZip": "모든 형식 (ZIP)",
-      "primaryOnlyZip": "기본 파일만 (ZIP)"
+      "primaryOnlyZip": "기본 파일만 (ZIP)",
+      "preparing": "다운로드를 준비하는 중...",
+      "preparingExport": "책 {count, plural, one {#권} other {#권}}에 대한 다운로드를 준비하는 중...",
+      "progressPercent": "{percent} / {total} 다운로드 중",
+      "progressBytes": "{transferred} 다운로드 중",
+      "failed": "다운로드에 실패했습니다.",
+      "exportFailed": "내보내기에 실패했습니다."
     },
     "sort": {
       "moveUp": "위로 이동",
@@ -3922,9 +4034,9 @@
         "readProgress": "독서 진행도",
         "readStatus": "독서 상태",
         "format": "포맷",
-        "lastReadAt": "마지막 독서일시",
-        "startedAt": "시작일시",
-        "finishedAt": "완료일시",
+        "lastReadAt": "마지막 독서 일시",
+        "startedAt": "시작 일시",
+        "finishedAt": "완료 일시",
         "random": "랜덤",
         "language": "언어",
         "metadataScore": "메타데이터 점수",
@@ -3956,12 +4068,14 @@
         "collection": "컬렉션",
         "library": "라이브러리",
         "format": "포맷",
+        "fileSize": "기본 파일 사이즈",
         "addedAt": "추가된 날짜",
         "startedAt": "시작일",
         "finishedAt": "완료일",
         "fileAvailability": "파일 사용 가능 여부",
         "rating": "평점",
         "communityRating": "커뮤니티 평점",
+        "communityRatingCount": "커뮤니티 평점 개수",
         "readProgress": "독서 진행도",
         "readStatus": "독서 상태",
         "description": "설명",
@@ -4014,7 +4128,8 @@
       "unit": {
         "days": "일",
         "weeks": "주",
-        "months": "개월"
+        "months": "개월",
+        "megabytes": "MB"
       },
       "scorePreset": {
         "outstanding": "탁월",
@@ -4023,6 +4138,9 @@
         "poor": "불량"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "예시: 10",
+      "fileSizeValueAria": "기본 파일의 크기(메가바이트 단위)",
+      "fileSizeMaximumAria": "기본 파일의 최대 크기(메가바이트 단위)",
       "valuePlaceholder": "값",
       "maxPlaceholder": "최대",
       "to": "~",
@@ -4088,7 +4206,7 @@
       "tableDensity": "테이블 밀도",
       "density": {
         "compact": "좁게",
-        "comfortable": "편안하게",
+        "comfortable": "편하게",
         "roomy": "넓게"
       },
       "presets": "프리셋",
@@ -4248,7 +4366,7 @@
           "endProgress": "최종 진행도 값은 0부터 100 사이의 범위여야 합니다."
         },
         "title": "독서 기록 추가",
-        "startedAt": "시작일시",
+        "startedAt": "시작 일시",
         "duration": "독서 시간 (분)",
         "endProgress": "최종 진행도 %",
         "optional": "선택",
@@ -4330,9 +4448,9 @@
         "isbn": "ISBN",
         "fileSize": "파일 크기",
         "library": "라이브러리",
-        "added": "추가일시",
-        "cancelDateAddedEdit": "추가일시 수정 취소",
-        "editDateAdded": "추가일시 수정",
+        "added": "추가 일시",
+        "cancelDateAddedEdit": "추가 일시 수정 취소",
+        "editDateAdded": "추가 일시 수정",
         "dateStarted": "시작일",
         "saving": "저장 중...",
         "cancelDateStartedEdit": "시작일 수정 취소",
@@ -4344,13 +4462,13 @@
         "synopsis": "줄거리",
         "noDescription": "설명 없음.",
         "dateStartedFutureError": "시작일은 미래일 수 없습니다.",
-        "dateAddedRequiredError": "추가일시는 필수 항목입니다.",
-        "dateAddedFutureError": "추가일시는 미래일 수 없습니다.",
+        "dateAddedRequiredError": "추가 일시는 필수 항목입니다.",
+        "dateAddedFutureError": "추가 일시는 미래일 수 없습니다.",
         "dateFinishedFutureError": "완료일은 미래일 수 없습니다.",
         "dateFinishedBeforeStartedError": "완료일은 시작일보다 같거나 이후여야 합니다.",
         "dateFinishedBeforeStartedErrorWithDate": "완료일은 시작일({date})과 같거나 그 이후여야 합니다.",
         "saveReadingDatesError": "독서 날짜 저장에 실패했습니다.",
-        "saveAddedDateError": "추가일시 저장에 실패했습니다.",
+        "saveAddedDateError": "추가 일시 저장에 실패했습니다.",
         "koboPendingDelete": "기기에서 제거 대기 중",
         "koboPendingDeleteTooltip": "Kobo가 다음 동기화 시 대상을 제거합니다.",
         "koboRemovedByDevice": "기기에서 제거됨",
@@ -4362,7 +4480,33 @@
         "resetHoldNotice": "{device}은(는) 여전히 이전 위치({percent})에 있습니다",
         "resetHoldRelease": "이 기기의 독서 위치 사용",
         "resetHoldReleasing": "적용 중...",
-        "resetHoldReleaseFailed": "해당 위치를 사용할 수 없습니다. 다시 시도해 주세요."
+        "resetHoldReleaseFailed": "해당 위치를 사용할 수 없습니다. 다시 시도해 주세요.",
+        "editions": "판본",
+        "editionsSummary": "{count} · {size}",
+        "moreFormats": "+{count}개 포맷",
+        "filesOnDisk": "보유 파일 수",
+        "yourReading": "내 독서 기록",
+        "lastRead": "마지막 독서 {when}",
+        "notStarted": "아직 시작하지 않음",
+        "noSessionsYet": "아직 독서 기록이 없습니다. 리더에서 이 파일을 열면 자동으로 시간, 속도, 기기별 진행도를 추적합니다.",
+        "activitySessions": "기록",
+        "activityTime": "시간",
+        "activityAverage": "평균",
+        "activityProgress": "진행도",
+        "activityDayTooltip": "{day}: {minutes}분",
+        "activityReached": "{percent} 도달",
+        "durationS": "{seconds}초",
+        "durationM": "{minutes}분",
+        "durationHm": "{hours}시간 {minutes}분",
+        "yourReview": "내 리뷰",
+        "reviewNotWritten": "아직 작성되지 않음",
+        "writeReview": "작성",
+        "collections": "컬렉션",
+        "noCollections": "없음",
+        "onDisk": "보유",
+        "detailsHeading": "상세 정보",
+        "percentUnderOne": "<1%",
+        "percentOverNinetyNine": ">99%"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {필드 없음} one {1개 필드} other {#개 필드}}",
@@ -4396,7 +4540,7 @@
         "loadedFieldsFromFile": "{count, plural, =0 {파일에서 0개 필드를 로드함} one {파일에서 1개 필드를 로드함} other {파일에서 #개 필드를 로드함}}",
         "noMetadataInFile": "파일에서 메타데이터를 찾을 수 없습니다.",
         "loadFromFile": "파일에서 불러오기",
-        "loadFromFileTooltip": "기본 책 파일에서 메타데이터 로드",
+        "loadFromFileTooltip": "기본 책 파일에서 메타데이터 불러오기",
         "writeToFile": "파일에 쓰기",
         "autoFill": "자동 채우기",
         "fetchingMetadata": "메타데이터를 불러오는 중...",
@@ -4522,10 +4666,51 @@
           "searchPrompt": "위에서 검색한 뒤, 결과를 클릭하여 메타데이터 비교를 시작하세요."
         },
         "writeAndRename": "파일에 쓰기 및 이름 변경",
-        "writeAndRenameShort": "쓰기 및 이름 변경"
+        "writeAndRenameShort": "쓰기 및 이름 변경",
+        "identityCard": "정보",
+        "catalogCard": "카탈로그",
+        "sourceCard": "소스",
+        "score": "점수",
+        "scoreTooltip": "메타데이터 점수 {score} / 100",
+        "emptyFields": "{count, plural, one {필드 비어 있음} other {필드 비어 있음}}",
+        "emptyFieldsTooltip": "아직 {fields}이(가) 채워지지 않았습니다. 온라인에서 검색해보세요.",
+        "libraryRow": "라이브러리",
+        "primaryRow": "기본",
+        "writeBackRow": "다시 쓰기",
+        "writeBackOff": "꺼짐",
+        "lastWrittenRow": "마지막 쓰기",
+        "neverWritten": "없음",
+        "fileCount": "{count, plural, =0 {파일 없음} one {파일 1개} other {파일 #개}}",
+        "unknownFormat": "알 수 없음"
       },
       "files": {
         "title": "책 파일",
+        "stats": {
+          "files": "파일 수",
+          "total": "총",
+          "runtime": "길이",
+          "formats": "포맷"
+        },
+        "filesHeading": "파일",
+        "allPresent": "모두 존재",
+        "groupedByReader": "리더별로 그룹화됨",
+        "thisFile": "선택한 파일",
+        "writeBackShort": "다시 쓰기",
+        "fieldsSet": "{filled} / {total} 설정됨",
+        "writtenSummary": "{fields} 외 {count, plural, one {#개 필드} other {#개 필드}}가 {format}에 작성됩니다.",
+        "writtenSummaryAll": "{fields} 필드가 {format}에 작성됩니다.",
+        "writtenNothing": "입력 가능한 {total}개 필드 중 아직 어느 것도 값을 가지고 있지 않습니다.",
+        "writeBackOff": "이 책에서는 다시 쓰기 기능이 꺼져있습니다.",
+        "editMetadata": "메타데이터 편집",
+        "showAllTracks": "모두 보기",
+        "collapseTracks": "접기",
+        "moreTracks": "{count, plural, one {+#개 트랙} other {+#개 트랙}}",
+        "tracksRolled": "{count, plural, one {#개 트랙} other {#개 트랙}}",
+        "fileDetails": "파일 상세 정보",
+        "openDetails": "파일 상세 정보 열기",
+        "closeDetails": "파일 상세 정보 닫기",
+        "trackFrom": "총 {total}개 트랙 중 {track}번 트랙, {time}부터",
+        "throughCopy": "이 파일을 {percent} 읽으셨습니다",
         "fileCount": "{count, plural, =0 {파일 없음} one {#개 파일} other {#개 파일}}",
         "synced": "{time} 동기화됨",
         "sortAria": "파일 정렬",
@@ -4576,7 +4761,93 @@
           "title": "파일을 삭제하시겠습니까?",
           "description": "\"{filename}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
         },
-        "deleting": "삭제 중..."
+        "deleting": "삭제 중...",
+        "folderAria": "폴더 위치",
+        "folderContents": "폴더 내용",
+        "inspectorAria": "선택된 파일",
+        "libraryRoot": "라이브러리 루트",
+        "onDisk": "보유",
+        "missing": "누락됨",
+        "backToFolder": "폴더로 돌아가기",
+        "copyPath": "전체 경로 복사",
+        "pathCopied": "경로가 클립보드에 복사되었습니다",
+        "resume": "이어서 보기",
+        "audiobook": "오디오북",
+        "writeTarget": "쓰기 대상",
+        "enabled": "활성화됨",
+        "disabled": "꺼짐",
+        "notSet": "없음",
+        "sortAdded": "추가 일시",
+        "formatCount": "{count, plural, one {#개 포맷} other {#개 포맷}}",
+        "trackCount": "{count, plural, one {#개 트랙} other {#개 트랙}}",
+        "formatsInFolder": "{count, plural, one {#개 포맷 존재} other {#개 포맷 존재}}",
+        "compositionAria": "포맷별 폴더 크기 비율",
+        "percentRead": "{percent} 읽음",
+        "trackOf": "총 {total}개 트랙 중 {track}번 트랙",
+        "groups": {
+          "ebook": "전자책",
+          "document": "문서",
+          "comic": "만화",
+          "audio": "오디오",
+          "extras": "기타"
+        },
+        "roles": {
+          "primary": "기본",
+          "content": "대체본",
+          "supplement": "부록",
+          "cover": "표지"
+        },
+        "reader": {
+          "none": "리더 없음",
+          "ebook": "전자책 리더",
+          "document": "PDF 리더",
+          "comic": "만화 리더",
+          "audio": "오디오 플레이어"
+        },
+        "spec": {
+          "format": "포맷",
+          "role": "구분",
+          "size": "크기",
+          "length": "길이",
+          "added": "추가 일시",
+          "indexed": "색인 일시",
+          "opensIn": "열람처",
+          "writeBack": "다시 쓰기",
+          "track": "트랙",
+          "targetFile": "대상 파일",
+          "notWritten": "작성되지 않음"
+        },
+        "duration": {
+          "hoursMinutes": "{hours}시간 {minutes}분",
+          "minutes": "{minutes}분",
+          "minutesSeconds": "{minutes}분 {seconds}초",
+          "seconds": "{seconds}초"
+        },
+        "positionHeading": "이 파일에서의 진행도 위치",
+        "copiesStarted": "총 {total}개 중 {started}개 파일 시작됨",
+        "nothingStarted": "아직 시작한 파일이 없습니다",
+        "throughFile": "{percent} 분량을 이 파일로 읽음",
+        "notOpened": "아직 열어 본 적 없음",
+        "lastRead": "마지막 독서 {time}",
+        "noPosition": "저장된 독서 위치 없음",
+        "trackPositionHeading": "이 트랙의 위치",
+        "totalRuntime": "총 {duration}",
+        "startsAt": "{time} 시작",
+        "trackLength": "길이 {duration}",
+        "switchFileHeading": "교체 파일",
+        "writeBackHeading": "파일 쓰기 일시",
+        "fieldsWithValue": "총 {total}개 필드 중 {filled}개가 값을 가지고 있음",
+        "lastRun": "마지막 실행 {time}",
+        "neverRun": "실행 이력 없음",
+        "historyHeading": "히스토리",
+        "timeline": {
+          "written": "{format} 파일에 메타데이터가 작성됨",
+          "writtenMany": "{format} 파일에 메타데이터가 작성됨 ×{count}건",
+          "writeDetail": "{count, plural, one {#개 필드} other {#개 필드}} · {ms}ms · {trigger}",
+          "failed": "쓰기 실패",
+          "indexed": "{name}이(가) 색인됨",
+          "indexedMany": "{count}개의 {format} 파일이 색인됨"
+        }
       },
       "highlights": {
         "note": {
@@ -4610,9 +4881,247 @@
           "hint": "독서 중 텍스트를 선택하여 하이라이트를 기록하세요."
         },
         "uncategorized": "미분류",
-        "paginationUnit": "하이라이트"
+        "paginationUnit": "하이라이트",
+        "rail": {
+          "title": "표시",
+          "unit": "{count, plural, one {하이라이트} other {하이라이트}}",
+          "withNotes": "노트 포함",
+          "chaptersMarked": "챕터 표시됨",
+          "ofChaptersMarked": "/ {total} 챕터 표시됨",
+          "colour": "색상",
+          "showOnly": "{colour}만 표시",
+          "source": "생성된 곳",
+          "health": "위치 건강",
+          "needsAttention": "{count, plural, one {#개 항목 주의 필요} other {#개 항목 주의 필요}}",
+          "anchorLost": "{count, plural, one {파일 변경으로 인해 1개 항목의 연결이 해제되었습니다} other {파일 변경으로 인해 #개 항목의 연결이 해제되었습니다}}",
+          "reAnchored": "{count, plural, one {1개 항목이 자동으로 재연결되었습니다.} other {#개 항목이 자동으로 재연결되었습니다.}}",
+          "reviewPositions": "위치 검토",
+          "span": "간격",
+          "firstMark": "첫 번째 항목",
+          "lastMark": "마지막 항목",
+          "markingDays": "표시한 일수",
+          "exportCount": "{count}개 항목 내보내기"
+        },
+        "row": {
+          "select": "이 하이라이트 선택",
+          "showMore": "더 보기",
+          "showLess": "접기",
+          "note": "메모",
+          "addNote": "메모 추가",
+          "page": "p.{page}",
+          "anchorLost": "연결 없음",
+          "reAnchored": "재연결됨"
+        },
+        "stream": {
+          "title": "스트림",
+          "searchPlaceholder": "{count}개의 하이라이트 및 메모 검색",
+          "all": "전체",
+          "notes": "메모",
+          "review": "검토",
+          "density": "편하게 보기와 좁게 보기 모드 전환",
+          "matchCount": "일치하는 항목 {total}개 중 {shown}개 표시 중",
+          "textChip": "텍스트 “{query}”",
+          "marks": "{count, plural, one {#개 표시} other {#개 표시}}",
+          "loadingMore": "불러오는 중"
+        },
+        "bulk": {
+          "selected": "{count}개 선택됨",
+          "selectAll": "{count}개 항목 전체 선택",
+          "recolour": "선택 항목 색상 재설정",
+          "recolourTo": "{colour}(으)로 색상 재설정",
+          "clear": "선택 헤제"
+        },
+        "index": {
+          "title": "색인",
+          "groupBy": "스트림 그룹화 기준",
+          "byChapter": "챕터",
+          "byColour": "색상",
+          "byDay": "일수"
+        },
+        "activity": {
+          "title": "활동을 기록하는 중",
+          "days": "{count, plural, one {#일} other {#일}}",
+          "showAll": "전체 {count}일 모두 표시",
+          "showFewer": "간략히 보기"
+        },
+        "inspector": {
+          "title": "하이라이트 상세",
+          "back": "색인으로 돌아가기",
+          "counter": "총 {total}개 항목 중 {position}개에 표시",
+          "previous": "이전 표시",
+          "next": "다음 표시",
+          "notePrompt": "중요한 이유: 메모는 검색 가능하며 내보내기 시 같이 포함됩니다.",
+          "style": "스타일",
+          "position": "위치 및 동기화",
+          "openHere": "여기서 열기"
+        },
+        "band": {
+          "title": "표시가 생성된 곳",
+          "subtitle": "표시해둔 모든 챕터가 읽은 순서대로, 지정된 컬러에 맞춰 표시됩니다",
+          "barTitle": "{chapter}, {count}개 표시",
+          "start": "시작",
+          "densest": "밀집",
+          "marks": "{count, plural, one {#개 표시} other {#개 표시}}",
+          "longestGap": "표시 없이 가장 오래 읽은 시간",
+          "chapters": "{count, plural, one {#개 챕터} other {#개 챕터}}",
+          "end": "끝"
+        },
+        "emptyStage": {
+          "title": "아직 {title}의 하이라이트가 없습니다",
+          "body": "하이라이트는 3개의 소스에서 생성되며, 이 페이지는 수집된 하이라이트를 한 군데에 모아 표시합니다.",
+          "openReader": "리더에서 열기",
+          "web": {
+            "title": "이곳에서 모아 보기",
+            "body": "리더에서 텍스트를 선택하고 색상을 고르세요."
+          },
+          "kobo": {
+            "title": "Kobo 동기화",
+            "body": "기기에서 생성된 하이라이트는 다음 동기화 때 교환됩니다."
+          },
+          "koreader": {
+            "title": "KOReader 동기화",
+            "body": "플러그인이 정확한 위치 정보와 함께 필기 데이터를 업로드합니다."
+          }
+        },
+        "shortcuts": {
+          "title": "키보드",
+          "description": "하이라이트 리스트 용 키보드 단축키.",
+          "move": "다음 / 이전 표시",
+          "open": "인스펙터 열기",
+          "back": "색인으로 돌아가기",
+          "search": "검색",
+          "note": "메모 작성",
+          "recolour": "색 재설정",
+          "select": "이 표시 선택",
+          "regroup": "스트림 재그룹화",
+          "copy": "문구 복사",
+          "reader": "리더에서 열기"
+        },
+        "railTitle": "{marks}개 표시 · {chapters}개 챕터",
+        "whenMarked": "표시된 날짜",
+        "chapters": "챕터",
+        "noChapter": "챕터 없음",
+        "views": {
+          "position": "읽은 순서대로",
+          "newest": "최신순",
+          "oldest": "오래된 순",
+          "colour": "색상별로",
+          "source": "소스별로"
+        }
       },
       "readingLog": {
+        "resetReadingState": "독서 상태 초기화",
+        "vitals": {
+          "aria": "독서 요약",
+          "notSet": "없음",
+          "started": "시작 일시",
+          "finished": "종료 일시",
+          "editStarted": "이 책을 읽기 시작한 날짜를 변경합니다",
+          "editFinished": "이 책을 끝까지 읽은 날짜를 변경합니다",
+          "totalTime": "총 시간",
+          "sessions": "기록",
+          "avgSession": "평균 시간",
+          "activeDays": "활성 일수",
+          "activeDaysOf": "{active} / {total}",
+          "pace": "속도",
+          "pacePerHour": "{percent}%/h",
+          "lastRead": "최근 읽음",
+          "whereYouRead": "독서 기기",
+          "addSession": "기록 추가",
+          "durationHm": "{hours}시간 {minutes}분",
+          "durationM": "{minutes}분",
+          "durationS": "{seconds}초"
+        },
+        "ledger": {
+          "title": "기록",
+          "none": "없음",
+          "colDay": "일시",
+          "colTime": "시간",
+          "colLength": "길이",
+          "colChange": "변동",
+          "colPosition": "독서 위치",
+          "colReached": "도달 위치",
+          "colSource": "소스",
+          "colFormat": "포맷",
+          "gapDays": "{count, plural, one {#일 간 책을 읽지 않음} other {#일 간 책을 읽지 않음}}",
+          "attemptBegan": "{index}번째 도전 시작",
+          "attemptOutsideAny": "모든 도전 범위에서 벗어남",
+          "empty": "아직 독서 기록이 없습니다",
+          "emptyHint": "리더로 책을 열어 보거나, 외부 기기와 동기화하거나, 수동으로 기록을 추가하세요."
+        },
+        "attempts": {
+          "title": "도전",
+          "none": "없음",
+          "ordinal": "{index}번째 도전",
+          "addPast": "과거 도전 추가",
+          "reread": "다시 읽기",
+          "rereadPrompt": "새로운 독서 도전을 시작하시겠습니까?",
+          "rereadResetProgress": "독서 위치를 시작 지점으로 초기화합니다. 초기화된 값이 동기화된 기기들에 반영될 수 있습니다.",
+          "rereadConfirm": "다시 읽기 시작",
+          "fieldStarted": "시작일",
+          "fieldEnded": "종료일",
+          "fieldOutcome": "결과",
+          "outcome": {
+            "completed": "완료",
+            "skimmed": "훑어봄",
+            "abandoned": "버려짐",
+            "inProgress": "읽는 중"
+          },
+          "spanRange": "{from} ~ {to}",
+          "spanSince": "{from} 시작",
+          "spanEnded": "{to} 완료",
+          "spanUnknown": "기록된 날짜 없음",
+          "sessionCount": "{count, plural, one {#개 기록} other {#개 기록}}",
+          "endBeforeStart": "종료일은 시작일과 같거나 그 이후여야 합니다.",
+          "editAria": "도전 수정",
+          "deleteAria": "도전 삭제",
+          "cancelDeleteAria": "도전 삭제 취소",
+          "confirmDeleteAria": "도전 삭제 확인",
+          "empty": "기록된 도전 없음",
+          "emptyHint": "다시 읽기를 시작하거나, 이 라이브러리가 생기기 전에 완료한 도전 기록을 추가해 보세요."
+        },
+        "records": {
+          "title": "기록",
+          "longestSession": "최장 기록",
+          "bestDay": "일간 최장 기록",
+          "longestStreak": "최장 연속 독서일",
+          "streakDays": "{count, plural, one {#일} other {#일}}",
+          "pace": "독서 속도",
+          "jumpedBack": "되돌아간 횟수",
+          "jumpedBackTimes": "{count, plural, one {#회} other {#회}}",
+          "firstOpened": "첫 번째 열람",
+          "empty": "기록 모음은 이 책의 독서 기록이 생성된 후 표시됩니다."
+        },
+        "band": {
+          "curve": "곡선",
+          "trace": "위치",
+          "switchAria": "차트 보기 모드",
+          "curveTitle": "시간에 따른 진행도 변화",
+          "traceTitle": "내가 지나온 독서의 발자취",
+          "curveSubDays": "전체 {total}일 중 {active}일 활동함",
+          "curveSubSitting": "각 기록별 진행도 및 독서 시간",
+          "traceSub": "각 막대가 한 번의 독서에서 읽은 범위를 나타냅니다",
+          "traceSubWithBacktracks": "{count, plural, one {각 막대가 한 번의 독서 기록을 나타냄, #회 되돌아감} other {각 막대가 한 번의 독서 기록을 나타냄, #회 되돌아감}}",
+          "legendPosition": "도달한 위치",
+          "legendMinutes": "읽은 시간",
+          "legendBacktrack": "되돌아감",
+          "traceEmpty": "아직 위치 기록이 없습니다",
+          "traceEmptyHint": "독서 기록이 생성되면 각 기록에서 읽은 범위와 다시 되돌아간 위치가 표시됩니다.",
+          "tooltipCovered": "{from}%에서 {to}%까지 진행함",
+          "tooltipMinutes": "{minutes}분"
+        },
+        "emptyStage": {
+          "title": "아직 이 책에 대한 기록이 없습니다",
+          "description": "웹 리더로 책을 읽는 동안 BookOrbit이 매분 자동으로 기록을 저장합니다. 외부 기기에서 작성된 기록도 동기화됩니다.",
+          "readerTitle": "이곳에서 모아 보기",
+          "readerBody": "Every minute in the BookOrbit reader is logged automatically.\nBookOrbit 리더는 매분 자동으로 독서 기록을 저장합니다.",
+          "koreaderTitle": "KOReader 동기화",
+          "koreaderBody": "플러그인이 독서 종료 시 도달한 페이지 정보를 자동으로 전달합니다.",
+          "koboTitle": "Kobo 동기화",
+          "koboBody": "기기를 연결하면 BookOrbit이 기기 내 독서 시간 카운터를 불러옵니다.",
+          "addSession": "수동으로 기록 추가",
+          "recordPast": "과거 독서 기록하기"
+        },
         "moreActionsAria": "독서 기록 작업",
         "export": {
           "button": "내보내기"
@@ -4682,10 +5191,10 @@
             "totalTime": "총 시간",
             "sessions": "기록",
             "avgSession": "평균 기록",
-            "lastRead": "최근 읽음"
+            "lastRead": "마지막 독서 일시"
           },
           "firstRead": "처음 읽음",
-          "lastRead": "최근 읽음",
+          "lastRead": "마지막 독서 일시",
           "dateStarted": "시작일",
           "dateFinished": "완료일",
           "addSession": "기록 추가"
@@ -4877,7 +5386,7 @@
         "alreadyThere": "{count}개 항목이 이미 존재합니다.",
         "collisionsHeading": "이름 충돌",
         "ineligibleHeading": "이동 불가",
-        "moreCollisions": "+ {count}개 항목"
+        "moreCollisions": "외 {count}개 항목"
       },
       "policy": {
         "suggested": "추천 선택지 사용",
@@ -5070,9 +5579,9 @@
       "newCoverAlt": "{title}의 새로운 표지",
       "unknownLibrary": "알 수 없는 라이브러리",
       "unassigned": "미지정됨",
-      "targetPath": "대상: {library} · {path}",
-      "targetUnassigned": "대상: 미지정됨",
-      "targetUnknownPath": "대상: {library} · 알 수 없는 목적지 경로"
+      "targetPath": "목적지: {library} · {path}",
+      "targetUnassigned": "목적지: 미지정됨",
+      "targetUnknownPath": "목적지: {library} · 알 수 없는 목적지 경로"
     },
     "sheet": {
       "saved": "저장됨",
@@ -5153,7 +5662,7 @@
         "refetch": "메타데이터 다시 가져오기",
         "clickToZoom": "표지를 클릭하여 확대하세요",
         "changedFields": "{count, plural, one {#개 필드} other {#개 필드}}",
-        "needMore": "제공자를 검색하거나 다른 필드를 편집하시겠습니까?"
+        "needMore": "제공자에서 검색하시거나 다른 필드를 편집하시겠습니까?"
       },
       "selection": {
         "fileToLibrary": "{count, plural, =0 {파일을 라이브러리로} one {파일 #개를 라이브러리로} other {파일 #개를 라이브러리로}}",
@@ -5162,6 +5671,7 @@
       },
       "empty": {
         "nothingToReview": "검토할 항목이 없습니다. 준비된 모든 파일이 목적지와 정확한 매칭을 가지고 있습니다.",
+        "nothingReadyToFile": "보관 준비된 파일이 없습니다.",
         "dropHint": "또는 이 페이지의 아무 곳에나 파일을 끌어다 놓으세요."
       },
       "selectAllOnPage": "이 페이지의 모든 파일 선택",
@@ -5190,6 +5700,8 @@
     }
   },
   "collection": {
+    "visibleToAll": "모든 사용자에게 표시",
+    "visibleToAllHint": "모든 사용자가 이 라이브러리를 볼 수 있지만, 수정은 소유자만 가능합니다.",
     "dialog": {
       "name": "이름",
       "icon": "아이콘",
@@ -5394,7 +5906,17 @@
         "columnsHint": "테이블 헤더의 열 표시 여부 패널을 사용하여 열을 표시하거나 숨길 수 있습니다.",
         "coverShape": "표지 모양",
         "circle": "원형",
-        "square": "정사각형"
+        "square": "정사각형",
+        "rowDensity": "행 높이",
+        "densityCompact": "좁게",
+        "densityComfortable": "편하게",
+        "densityRoomy": "넓게",
+        "coverFallback": "프로필 사진 누락 시 책 표지 대용"
+      },
+      "viewModes": {
+        "grid": "격자 보기",
+        "list": "목록 보기",
+        "table": "테이블 보기"
       }
     },
     "iconPicker": {
@@ -5505,7 +6027,7 @@
     },
     "libraryLoad": {
       "errorTitle": "라이브러리를 로드할 수 없습니다",
-      "errorDescription": "BookOrbit에서 사용자님의 라이브러리를 불러오는데 실패했습니다. 라이브러리 데이터는 삭제되지 않았습니다."
+      "errorDescription": "BookOrbit에서 사용자의 라이브러리를 불러오는데 실패했습니다. 라이브러리 데이터는 삭제되지 않았습니다."
     },
     "scroller": {
       "failedToLoad": "로드에 실패했습니다.",
@@ -5628,7 +6150,7 @@
       },
       "neglectedGems": {
         "title": "빛 바랜 보석",
-        "empty": "사용자님의 최고 평점 도서들을 모두 읽었습니다!",
+        "empty": "개인 최고 평점 도서들을 모두 읽었습니다!",
         "rating": "{rating}/5",
         "daysWaiting": "{count}일째 기다리는 중",
         "queued": "대기 중",
@@ -5649,7 +6171,7 @@
       },
       "readingGoal": {
         "title": "{year}년 독서 목표",
-        "setGoalPrompt": "진행 상황을 추적하기 전에 우선 독서 목표를 설정하세요.",
+        "setGoalPrompt": "진행 상황을 추적하기 전에 먼저 독서 목표를 설정하세요.",
         "setGoal": "목표 설정",
         "booksPerYear": "연간 도서 수",
         "ofGoal": "{goal}권 목표",
@@ -6365,7 +6887,7 @@
       },
       "dropzone": {
         "title": "이곳에 파일을 끌어다 놓거나, 클릭하여 탐색하세요",
-        "hint": "{formats} - 파일당 최대 {size} MB"
+        "hint": "{formats} (파일당 최대 {size} MB)"
       }
     }
   },
@@ -6625,7 +7147,7 @@
       "mappedUsers": "매핑된 사용자 ({count})",
       "mappedUsersExplanation": "사용자별 총계는 마이그레이션 계획과 함께 캐시된 모의 테스트 미리보기에서 가져옵니다.",
       "coverFailures": "{count}개의 표지를 가져오지 못했습니다. 상세 실패 내역은 저장되지 않습니다.",
-      "userPreviewCounts": "{statuses}개 상태, {progress}개 진행 항목, {sessions}개 독서 세션, {bookmarks}개 북마크, {annotations}개 메모, {collections}개 컬렉션 항목"
+      "userPreviewCounts": "{statuses}개 상태, {progress}개 진행도 항목, {sessions}개 독서 기록, {bookmarks}개 북마크, {annotations}개 필기, {collections}개 컬렉션 항목"
     },
     "unresolvedReason": {
       "noTitleAuthorMatch": "제목이나 저자가 일치하는 책을 찾을 수 없음",
@@ -6720,7 +7242,7 @@
     "markAllRead": "모두 읽음 처리",
     "clear": "지우기",
     "empty": "아직 알림이 없습니다",
-    "loadMore": "알림 더보기",
+    "loadMore": "알림 더 보기",
     "dismiss": "알림 해제",
     "occurrences": "{count}회 발생함",
     "occurrencesShort": "{count}회",
@@ -6842,7 +7364,7 @@
       "goToPlaceholder": "45 또는 p123",
       "jumpToLocation": "특정 위치로 이동",
       "jumpTooltip": "% 또는 페이지로 이동 (예시: 45 또는 p123)",
-      "go": "가라"
+      "go": "이동"
     },
     "settings": {
       "title": "설정",
@@ -7102,7 +7624,10 @@
       "ownedOfExpected": "라이브러리에 전체 {expected}권 중 {owned}권 보유 중"
     },
     "gaps": {
-      "label": "가능한 간격:"
+      "label": "누락 추정 권수:",
+      "missingCount": "{count, plural, one {#개 누락됨} other {#개 누락됨}}",
+      "missingList": "누락: {list}",
+      "previewMore": "{shown} +{count}"
     },
     "filters": {
       "title": "시리즈 필터",
@@ -7132,7 +7657,10 @@
         "bookCount": "도서 수",
         "recentAdditions": "최근 추가된 순",
         "readingProgress": "독서 진행도순"
-      }
+      },
+      "clearSearch": "검색 초기화",
+      "noMatchHint": "다른 라이브러리를 선택하거나 검색어를 초기화하세요.",
+      "emptyHint": "책에 시리즈 메타데이터가 포함되면 시리즈가 표시됩니다."
     },
     "detail": {
       "pageTitle": "시리즈",
@@ -7173,6 +7701,66 @@
         "ascending": "오름차순",
         "descending": "내림차순"
       }
+    },
+    "authorsPlus": "{authors} +{count}",
+    "track": {
+      "readCount": "{count, plural, one {#권 읽음} other {#권 읽음}}",
+      "readingCount": "{count, plural, one {#권 읽는 중} other {#권 읽는 중}}",
+      "unreadCount": "{count, plural, one {#권 읽지 않음} other {#권 읽지 않음}}",
+      "missingCount": "{count, plural, one {#권 누락됨} other {#권 누락됨}}",
+      "slotMissing": "{number}은(는) 라이브러리에 없음",
+      "untitled": "제목 없음"
+    },
+    "legend": {
+      "read": "읽음",
+      "reading": "읽는 중",
+      "unread": "라이브러리에 보유",
+      "missing": "누락됨"
+    },
+    "status": {
+      "label": "독서 상태를 기준으로 시리즈 필터링",
+      "all": "전체",
+      "reading": "읽는 중",
+      "unread": "읽지 않음",
+      "complete": "읽음",
+      "gaps": "누락됨",
+      "read": "읽음",
+      "inProgress": "읽는 중",
+      "hasGaps": "누락 있음",
+      "notStarted": "읽지 않음"
+    },
+    "index": {
+      "columnSeries": "시리즈",
+      "columnVolumes": "권별 정보",
+      "columnRead": "읽음",
+      "columnNext": "다음 권",
+      "columnAdded": "추가 일시",
+      "percent": "{value}%",
+      "captionReading": "{base} · {count, plural, one {#권 읽는 중} other {#권 읽는 중}}",
+      "finished": "끝까지 읽음",
+      "reading": "읽는 중",
+      "next": "다음",
+      "start": "시작"
+    },
+    "grouping": {
+      "label": "그룹화 기준",
+      "none": "그룹화 없음",
+      "letter": "문자별로",
+      "library": "라이브러리별로",
+      "status": "상태별로"
+    },
+    "libraries": {
+      "more": "+{count}권"
+    },
+    "card": {
+      "oneVolume": "단편",
+      "oneVolumeShort": "단편",
+      "volumeCount": "{count, plural, one {#권} other {#권}}",
+      "readSummary": "{base} · {read} 읽음",
+      "publishedOf": "{owned} / {total} 출판됨",
+      "complete": "완료",
+      "moreVolumes": "{count, plural, one {+#권} other {+#권}}",
+      "label": "{name}, 총 {total}권 중 {read}권 읽음"
     }
   },
   "smartScope": {
@@ -7426,8 +8014,19 @@
       "previewFailed": "미리보기를 불러오는 데 실패했습니다.",
       "executionFailed": "일괄 이름 변경에 실패했습니다.",
       "openBookDetails": "책 상세 정보 열기",
+      "openBook": "책 열기",
+      "toRenameCount": "{count, plural, =0 {이름 변경할 항목 없음} one {이름 변경할 항목 #개} other {이름 변경할 항목 #개}}",
+      "applyCount": "{count, plural, one {#개 항목 이름 변경 적용} other {#개 항목 이름 변경 적용}}",
+      "search": {
+        "placeholder": "책 또는 경로 찾기",
+        "label": "책 찾기",
+        "clear": "검색 초기화"
+      },
       "filter": {
-        "all": "모두"
+        "all": "모두",
+        "changes": "변경됨",
+        "conflicts": "충돌",
+        "unchanged": "변경 없음"
       },
       "status": {
         "willRename": "이름 변경 예정",
@@ -7436,16 +8035,110 @@
         "noPattern": "패턴 없음",
         "error": "오류"
       },
+      "group": {
+        "collision": "목적지 경로 충돌",
+        "unchanged": "이미 정상적인 항목",
+        "noPattern": "명명 패턴 없음",
+        "error": "오류 발생",
+        "includeAll": "모든 {kind} 항목을 이름 변경 대상에 포함",
+        "expand": "{kind} 펼치기",
+        "collapse": "{kind} 접기",
+        "heldBack": "이 항목들은 이름을 변경할 수 없습니다."
+      },
+      "changeKind": {
+        "ungroup": "시리즈 그룹화가 제거됨",
+        "flatten": "중복 폴더 계층이 제거됨",
+        "yearRemoved": "출판 연도가 제거됨",
+        "yearAdded": "출판 연도가 추가됨",
+        "yearCorrected": "출판 연도가 수정됨",
+        "authorSpelling": "저자 이름 철자가 수정됨",
+        "capitalisation": "대문자 변경 및 띄어쓰기 처리됨",
+        "unsafeCharacters": "안전하지 않은 문자가 제거됨",
+        "filenameRebuilt": "메타데이터를 기반으로 파일명이 재설정됨",
+        "folderRenamed": "폴더 이름이 수정됨",
+        "rebuilt": "폴더 이름 및 파일 이름이 재설정됨",
+        "restructured": "경로가 재구축됨",
+        "multiple": "다수의 변경 사항 존재"
+      },
+      "select": {
+        "ofSelected": "/ {total} 선택됨",
+        "toggleAll": "모든 이름 변경 항목 선택 또는 선택 해제",
+        "toggleGroup": "{kind} 종류의 모든 이름 변경 항목 선택 또는 선택 해제",
+        "toggleBook": "{title} 이름 변경"
+      },
+      "review": {
+        "loadMore": "더 불러오기",
+        "queue": "보류된 이름 변경 작업",
+        "position": "{index} / {total}",
+        "previous": "이전 책",
+        "next": "다음 책",
+        "keyboardHint": "이동",
+        "keyboardSkip": "뛰어넘기",
+        "skip": "뛰어넘기",
+        "include": "포함",
+        "excluded": "제외됨",
+        "back": "리스트로 돌아가기"
+      },
+      "detail": {
+        "whatChanges": "변경 대상",
+        "foldedFolders": "{count, plural, one {변경되지 않은 폴더 #개} other {변경되지 않은 폴더 #개}}",
+        "onDisk": "디스크 상 경로",
+        "today": "현재",
+        "afterRename": "이름 변경 후",
+        "showLibraryFolders": "라이브러리 폴더 보기",
+        "hideLibraryFolders": "라이브러리 폴더 숨기기",
+        "currentPath": "현재 경로",
+        "whyItMoves": "변경 사유",
+        "levelTop": "최상위 폴더",
+        "levelFolder": "{depth}번째 폴더",
+        "levelFilename": "파일 이름",
+        "levelRemoved": "삭제됨",
+        "tokenCount": "{count, plural, one {#개 토큰} other {#개 토큰}}",
+        "optionalLevel": "패턴 내 조건부 그룹에 의해 생성된 폴더 계층입니다.",
+        "removedExplainer": "명명 패턴이 이 계층의 폴더를 다루지 않으므로, {folder}은(는) 제거되며 내용물은 상위 폴더로 옮겨집니다.",
+        "conflictTitle": "다른 파일이 이미 동일한 경로를 사용 중입니다.",
+        "conflictBody": "이름 변경 시 기존 파일이 손실되므로, 이 책은 충돌이 해결되기 전까지 작업이 보류됩니다.",
+        "siblings": "{count, plural, one {같은 변경 사항이 적용되는 항목 #건} other {같은 변경 사항이 적용되는 항목 #건}}",
+        "siblingsMore": "+{count}개 항목"
+      },
       "empty": {
         "title": "작업할 라이브러리를 선택하세요",
         "description": "위에서 라이브러리를 선택하여 이름 변경 사항을 미리 확인하고, 상태별로 필터링하고, 일괄 이름 변경을 실행할 수 있습니다.",
-        "chooseLibrary": "라이브러리 선택"
+        "chooseLibrary": "라이브러리 선택",
+        "noneTitle": "검토할 항목 없음",
+        "noneDescription": "현재 필터와 일치하는 책이 없습니다. 검색어를 초기화하거나 전체 보기로 변경하세요.",
+        "noMatch": "검색 내용과 일치하는 책이 없습니다."
+      },
+      "confirmDialog": {
+        "willRename": "이름 변경 대상",
+        "skippedByYou": "건너뛴 항목",
+        "heldBack": "충돌로 보류된 항목",
+        "untouched": "변경되지 않는 항목",
+        "confirm": "{count, plural, one {#개 파일 이름 변경} other {#개 파일 이름 변경}}",
+        "cannotRename": "이름 변경 불가"
+      },
+      "run": {
+        "preparing": "준비하는 중...",
+        "preparingHint": "파일을 이동하기 전, 모든 파일이 명명 패턴과 일치하는지 검사하는 중입니다.",
+        "title": "{done} / {total} 항목 이름 변경 중",
+        "runningHint": "파일 이름이 변경되는 중입니다. 현재 파일이 완료된 후 작업을 중지할 수 있습니다.",
+        "stop": "이 파일 이후 작업 중지",
+        "resultTitle": "{done, plural, one {총 {total}개 항목 중 #개의 이름을 변경했습니다.} other {총 {total}개 항목 중 #개의 이름을 변경했습니다.}}",
+        "resultFailed": "{count, plural, one {#건 실패} other {#건 실패}}",
+        "resultSkipped": "{count, plural, one {#건 건너뜀} other {#건 건너뜀}}",
+        "dismiss": "닫기"
+      },
+      "executionError": {
+        "http": "서버가 요청을 거부했습니다 (HTTP {status}).",
+        "noBody": "서버가 응답 본문을 전송하지 않았습니다.",
+        "incomplete": "이름 변경이 완료되기 전에 연결이 종료되었습니다. 몇몇 파일의 이름 변경이 완료되지 못했을 수도 있습니다.",
+        "unknown": "이름 변경을 완료하지 못했습니다."
       }
     },
     "bookDuplicates": {
       "scanSettings": "스캔 설정",
       "title": "중복 도서",
-      "description": "잠재적인 중복 레코드를 찾기 위해 파일과 메타데이터를 스캔합니다. 스캔 과정 중에는 아무것도 삭제되지 않습니다.",
+      "description": "잠재적인 중복 레코드를 찾기 위해 파일과 메타데이터를 스캔합니다. 스캔 과정에서는 아무것도 삭제되지 않습니다.",
       "scope": "라이브러리 범위",
       "allLibraries": "접근 가능한 모든 라이브러리",
       "similarity": "제목 유사도 임계값",
@@ -7493,12 +8186,12 @@
         "progress": "진행도",
         "path": "라이브러리 경로",
         "collections": "컬렉션",
-        "added": "추가일시",
-        "updated": "수정일시"
+        "added": "추가 일시",
+        "updated": "수정 일시"
       },
       "initial": {
         "title": "중복 책 찾기",
-        "description": "라이브러리 범위와 유사도 수준을 선택한 다음 스캔을 실행하세요. 직접 삭제하기 전까지는 책이 변경되지 않습니다."
+        "description": "라이브러리 범위와 유사도 수준을 지정한 다음 스캔을 실행하세요. 직접 삭제하기 전까지는 책이 변경되지 않습니다."
       },
       "empty": {
         "title": "중복 그룹이 없습니다",
@@ -7537,7 +8230,8 @@
       },
       "actions": {
         "rename": "이름 바꾸기",
-        "split": "분할"
+        "split": "분할",
+        "merge": "병합"
       },
       "duplicates": {
         "similarity": "유사도:",
@@ -7552,12 +8246,25 @@
         "emptyDescription": "유사도 임계값을 조정하고 스캔을 클릭하여 잠재적인 중복 항목을 탐지하세요.",
         "noneFoundTitle": "중복 항목을 찾지 못했습니다",
         "noneFoundDescription": "현재 설정으로는 잠재적인 중복 데이터가 감지되지 않았습니다.",
-        "clustersFound": "{count, plural, =0 {클러스터 미발견} one {#개 클러스터 발견} other {#개 클러스터 발견}}",
-        "plusOthers": "{count, plural, =0 {+ #개 항목} one {+ #개 항목} other {+ #개 항목}}",
+        "clustersFound": "{count, plural, =0 {그룹 미발견} one {#개 그룹 발견} other {#개 그룹 발견}}",
+        "plusOthers": "{count, plural, =0 {+#개 항목} one {+#개 항목} other {+#개 항목}}",
         "percentSimilar": "{percent}% 유사",
         "pairDetails": "개체 쌍 상세 정보",
         "dismissEntityTitle": "이 개체에 연결된 모든 쌍 제거",
-        "dismissPairTitle": "이 쌍 제거"
+        "dismissPairTitle": "이 쌍 제거",
+        "groupsLabel": "예상 중복 그룹",
+        "keepThisOne": "이 개체 유지하기",
+        "mergeAway": "병합 및 삭제",
+        "notAMatch": "일치하지 않음",
+        "notAMatchTitle": "이 그룹 내의 모든 쌍 제거",
+        "selectPromptTitle": "검토하려는 그룹을 선택하세요",
+        "selectPromptDescription": "리스트에서 그룹을 선택하여 개체를 나란히 비교하세요.",
+        "backToList": "그룹 목록으로 돌아가기",
+        "noBookTitles": "이 레코드와 연결된 책이 없습니다",
+        "thresholdLabel": "최소 유사도",
+        "thresholdValue": "{percent}%+",
+        "willBeMerged": "{count, plural, one {개체 #개가 병합 및 제거됩니다} other {개체 #개가 병합 및 제거됩니다}}",
+        "chooseTargetHint": "유지할 개체를 선택하세요. 선택한 개체에 그룹의 나머지 개체들이 병합됩니다."
       },
       "dismissed": {
         "loading": "제거된 쌍 로딩 중...",
@@ -7581,7 +8288,44 @@
           "nameDesc": "이름 Z-A",
           "fewestBooks": "도서 적은 순",
           "mostBooks": "도서 많은 순"
-        }
+        },
+        "sortByLabel": "정렬 기준",
+        "entityTypeLabel": "개체 타입",
+        "resultCount": "{count, plural, =0 {개체 없음} one {개체 #개} other {개체 #개}}",
+        "selectedCount": "{count, plural, one {#개 선택됨} other {#개 선택됨}}",
+        "columns": {
+          "name": "이름",
+          "sortName": "정렬용 이름",
+          "books": "책",
+          "status": "상태",
+          "actions": "작업"
+        },
+        "selectAllOnPage": "이 페이지의 모든 개체 선택",
+        "selectEntity": "{name} 선택",
+        "actionsFor": "{name}에 대한 작업",
+        "status": {
+          "noBooks": "책 없음"
+        },
+        "filters": {
+          "all": "전체",
+          "noBooks": "책 없음"
+        },
+        "density": {
+          "label": "행 높이",
+          "comfortable": "편하게",
+          "compact": "좁게"
+        },
+        "rowsPerPage": "페이지 당 줄 수",
+        "range": "총 {total}개 항목 중 {from}-{to} 범위 표시 중",
+        "pagination": "페이지 처리",
+        "previousPage": "이전 페이지",
+        "nextPage": "다음 페이지",
+        "goToPage": "{page}페이지로 이동",
+        "morePages": "페이지 더 보기",
+        "noEntitiesDescription": "아직 이 타입의 개체는 추가되지 않았습니다.",
+        "noMatchesTitle": "일치 항목 없음",
+        "noMatchesDescription": "현재 검색어와 필터에 일치하는 개체가 없습니다.",
+        "clearFilters": "필터 초기화"
       },
       "deleteMode": {
         "label": "삭제 모드",
@@ -7623,7 +8367,7 @@
       "accessDenied": "현재 사용자에게는 누락된 리소스를 정리할 권한이 없습니다.",
       "categoriesLabel": "카테고리 정리",
       "untitled": "제목 없음",
-      "clearSelection": "선택 항목 지우기",
+      "clearSelection": "선택 해제",
       "cleanSelected": "선택 항목 {count}개 지우기",
       "selectAllMatching": "일치하는 항목 {count}개 모두 선택",
       "allSelected": "총 {count}개의 일치 항목이 선택되었습니다.",
@@ -7633,7 +8377,7 @@
         "run": "검사 시작",
         "running": "검사 중",
         "progress": "총 {total}개 도서 중 {processed}개 검사 완료",
-        "lastRun": "마지막 검사일시{at}",
+        "lastRun": "마지막 검사 일시{at}",
         "truncated": "첫 번째 결과만 표시되었습니다. 이 항목들을 정리한 후 검사를 다시 실행하여 나머지를 확인하세요."
       },
       "categories": {
@@ -7704,6 +8448,9 @@
       "sort": "정렬",
       "sortOn": "기준값",
       "resetSort": "정렬 기준 초기화",
+      "shuffle": "섞기",
+      "shuffleAria": "책 순서 섞기",
+      "shuffleHint": "새로운 순서로 랜덤하게 섞습니다.",
       "filters": "필터",
       "clear": "초기화",
       "clearAllFilters": "모든 필터 초기화",
