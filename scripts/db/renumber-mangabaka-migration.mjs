@@ -186,7 +186,7 @@ function main() {
     apply(`delete stale snapshot ${snapshotPath}`, () => rmSync(snapshotPath));
   }
 
-  if (NO_GENERATE) {
+  if (NO_GENERATE || DRY_RUN) {
     apply(`write journal (${journal.entries.length} entries)`, () => writeJson(JOURNAL_PATH, journal));
     log('ok', `MangaBaka migration renumbered to ${newTag} (snapshot not regenerated; run without --no-generate to finish)`);
     return;
