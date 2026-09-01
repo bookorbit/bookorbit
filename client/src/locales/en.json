@@ -4126,6 +4126,7 @@
       "LibraryAccessRevoke": "Revoke library access",
       "LibraryWriteMetadataToFiles": "Write metadata to files",
       "LibraryBulkRename": "Rename library files",
+        "LibraryRecomputeAddedAt": "Recompute date added",
       "BookUpload": "Upload book",
       "BookMetadataUpdate": "Update book metadata",
       "BookMetadataLocksUpdate": "Update metadata locks",
