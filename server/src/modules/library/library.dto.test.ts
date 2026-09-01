@@ -34,12 +34,19 @@ describe('Library DTO validation', () => {
   });
 
   it('CreateLibraryDto accepts every added_at source and rejects unknown ones', async () => {
-    // The library creator posts its whole form, so a source the create DTO does not
-    // declare is stripped by whitelist and rejected by forbidNonWhitelisted.
     for (const addedAtSource of ['imported', 'file_modified', 'file_created']) {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource }))).toBe(false);
     }
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource: 'bad' }))).toBe(true);
+  });
+
+  it('CreateLibraryDto survives the global whitelist rules with an added_at source', async () => {
+    // The library creator posts its whole form, and main.ts runs ValidationPipe with
+    // whitelist and forbidNonWhitelisted, so a field the DTO does not declare fails
+    // the whole request rather than being quietly dropped.
+    const dto = plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource: 'file_modified' });
+    const errors = await validate(dto as any, { whitelist: true, forbidNonWhitelisted: true });
+    expect(errors).toHaveLength(0);
   });
 
   it('CreateLibraryDto requires a non-empty icon and UpdateLibraryDto rejects empty icons when provided', async () => {
