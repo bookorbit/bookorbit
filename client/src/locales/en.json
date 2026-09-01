@@ -7975,6 +7975,32 @@
             "hint": "Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple files."
           }
         },
+        "addedAt": {
+          "title": "Date added",
+          "hint": "Choose what a book's \"date added\" reflects. This applies to books imported from now on.",
+          "options": {
+            "imported": {
+              "title": "When imported",
+              "hint": "The date BookOrbit first imported the book. This is the default."
+            },
+            "file_modified": {
+              "title": "File modified time",
+              "hint": "The file's last-modified time (mtime), often preserved when files are copied."
+            },
+            "file_created": {
+              "title": "File creation time",
+              "hint": "When the file first landed on disk (birthtime). Falls back to modified time on filesystems that don't record creation time."
+            }
+          },
+          "recompute": "Recompute now",
+          "recomputing": "Recomputing...",
+          "recomputeHint": "Update the date added for existing books using this setting.",
+          "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
+          "recomputeConfirm": "Apply this setting to the existing books in this library now? This reads dates from disk and can take a while.",
+          "recomputeConfirmWithCount": "Apply this setting to the {count} existing books in this library now? This reads dates from disk and can take a while.",
+          "recomputeDone": "Updated {updated} of {total} books.",
+          "recomputeFailed": "Could not recompute date added."
+        },
         "allowedFormats": {
           "title": "Allowed formats",
           "allowAll": "Allow all",

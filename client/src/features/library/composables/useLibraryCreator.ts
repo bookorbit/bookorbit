@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS, isFiveFieldCronExpression } from '@bookorbit/types'
-import type { CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@bookorbit/types'
+import type { AddedAtSource, CoverAspectRatio, Library, OrganizationMode, PrescanResult, RecomputeAddedAtResult } from '@bookorbit/types'
 
 export { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS }
 
@@ -30,6 +30,7 @@ function blankForm() {
     formatPriority: [...DEFAULT_FORMAT_PRIORITY] as string[],
     allowedFormats: [] as string[],
     organizationMode: 'book_per_folder' as OrganizationMode,
+    addedAtSource: 'imported' as AddedAtSource,
     excludePatterns: [] as string[],
     readingThreshold: 0.25,
     markAsFinishedPercentComplete: 98,
@@ -111,6 +112,7 @@ export function useLibraryCreator() {
     form.formatPriority = [...library.formatPriority, ...missing]
     form.allowedFormats = [...library.allowedFormats]
     form.organizationMode = library.organizationMode
+    form.addedAtSource = library.addedAtSource
     form.excludePatterns = [...library.excludePatterns]
     form.readingThreshold = library.readingThreshold
     form.markAsFinishedPercentComplete = library.markAsFinishedPercentComplete
@@ -200,6 +202,12 @@ export function useLibraryCreator() {
     }
   }
 
+  async function recomputeAddedAt(libraryId: number): Promise<RecomputeAddedAtResult> {
+    const res = await api(`/api/v1/libraries/${libraryId}/recompute-added-at`, { method: 'POST' })
+    if (!res.ok) throw new Error(await responseError(res, 'Failed to recompute date added.'))
+    return await res.json()
+  }
+
   return {
     form,
     mode,
@@ -213,6 +221,7 @@ export function useLibraryCreator() {
     initEdit,
     runPrescan,
     save,
+    recomputeAddedAt,
   }
 }
 
