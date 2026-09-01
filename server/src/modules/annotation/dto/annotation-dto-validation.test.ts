@@ -11,6 +11,7 @@ import {
   AnnotationPositionRetryDto,
 } from './annotation-hub.dto';
 import { CreateAnnotationDto } from './create-annotation.dto';
+import { AnnotationQueryDto } from './annotation-query.dto';
 import { UpdateAnnotationDto } from './update-annotation.dto';
 
 async function errorsFor<T extends object>(cls: new () => T, value: Record<string, unknown>) {
@@ -67,6 +68,15 @@ describe('Annotation DTO validation', () => {
         })
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('rejects a pdf create payload without a bookFileId', async () => {
+    const errors = await errorsFor(CreateAnnotationDto, {
+      pdf: { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+      text: 'ok',
+    });
+
+    expect(errors.length).toBeGreaterThan(0);
   });
 
   it('rejects a create payload that supplies both cfi and pdf', async () => {
@@ -130,6 +140,19 @@ describe('Annotation DTO validation', () => {
     expect((await errorsFor(UpdateAnnotationDto, { note: 123 })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateAnnotationDto, { color: 'x'.repeat(21) })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateAnnotationDto, { style: 'invalid' })).length).toBeGreaterThan(0);
+  });
+});
+
+describe('AnnotationQueryDto validation', () => {
+  it('coerces a positive bookFileId', async () => {
+    const dto = plainToInstance(AnnotationQueryDto, { page: '1', bookFileId: '42' });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.bookFileId).toBe(42);
+  });
+
+  it('rejects a non-positive bookFileId', async () => {
+    expect((await errorsFor(AnnotationQueryDto, { page: 1, bookFileId: 0 })).length).toBeGreaterThan(0);
   });
 });
 

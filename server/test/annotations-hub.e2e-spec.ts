@@ -94,6 +94,16 @@ describe('Annotations hub (e2e)', { timeout: 120_000 }, () => {
     expect(createdBody.pageno).toBe(4);
     expect(createdBody.pdf).toMatchObject({ page: 3 });
 
+    const filePage = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${pdf.bookId}/annotations?page=1&pageSize=100&bookFileId=${pdf.bookFileId}&sortBy=position&sortDir=asc`,
+      headers: authHeader(owner.accessToken),
+    });
+    expect(filePage.statusCode).toBe(200);
+    const filePageBody = filePage.json() as { items: { jumpFileId: number | null; pdf: { page: number } | null }[]; total: number };
+    expect(filePageBody.total).toBe(1);
+    expect(filePageBody.items[0]).toMatchObject({ jumpFileId: pdf.bookFileId, pdf: { page: 3 } });
+
     const response = await ctx.app.inject({
       method: 'GET',
       url: `/api/v1/annotations?status=active&search=${marker}`,
@@ -107,6 +117,31 @@ describe('Annotations hub (e2e)', { timeout: 120_000 }, () => {
     expect(body.total).toBe(1);
     // These are exactly the fields annotationReaderRoute() uses to build ?format=pdf&page=4.
     expect(body.items[0]).toMatchObject({ jumpFileId: pdf.bookFileId, jumpFileFormat: 'pdf', cfi: null, pageno: 4 });
+
+    const geometry = { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] };
+    const missingFile = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${pdf.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { pdf: geometry, text: 'missing file id' },
+    });
+    expect(missingFile.statusCode).toBe(400);
+
+    const wrongBook = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${pdf.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { pdf: geometry, bookFileId: epub.bookFileId, text: 'wrong book' },
+    });
+    expect(wrongBook.statusCode).toBe(400);
+
+    const wrongFormat = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${epub.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { pdf: geometry, bookFileId: epub.bookFileId, text: 'wrong format' },
+    });
+    expect(wrongFormat.statusCode).toBe(400);
   });
 
   it('is isolated per user', async () => {

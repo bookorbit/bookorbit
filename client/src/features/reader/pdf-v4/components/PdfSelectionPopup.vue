@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Copy, FileText, Highlighter, Trash2 } from '@lucide/vue'
 import { ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
@@ -14,6 +14,7 @@ const props = defineProps<{
   showBelow: boolean
   selectedText: string
   overlappingAnnotationId: number | null
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -22,20 +23,32 @@ const emit = defineEmits<{
   note: []
   deleteAnnotation: [id: number]
   dismiss: []
+  resize: []
 }>()
 
 const colors = ANNOTATION_HIGHLIGHT_COLORS
 const styles = [
-  { id: 'highlight', label: 'H' },
-  { id: 'underline', label: 'U' },
-  { id: 'strikethrough', label: 'S' },
-  { id: 'squiggly', label: '~' },
+  { id: 'highlight', label: 'H', nameKey: 'reader.selection.styles.highlight' },
+  { id: 'underline', label: 'U', nameKey: 'reader.selection.styles.underline' },
+  { id: 'strikethrough', label: 'S', nameKey: 'reader.selection.styles.strikethrough' },
+  { id: 'squiggly', label: '~', nameKey: 'reader.selection.styles.squiggly' },
 ]
 
 const showColorPicker = ref(false)
 const copied = ref(false)
 const selectedColor = ref<string>(ANNOTATION_HIGHLIGHT_COLORS[0].hex)
 const selectedStyle = ref('highlight')
+const rootElement = ref<HTMLElement | null>(null)
+
+defineExpose({ getElement: () => rootElement.value })
+
+watch(
+  [() => props.visible, showColorPicker],
+  () => {
+    void nextTick(() => emit('resize'))
+  },
+  { flush: 'post' },
+)
 
 function handleHighlightClick() {
   if (showColorPicker.value) {
@@ -86,11 +99,11 @@ async function handleCopy() {
 <template>
   <div
     v-if="visible"
+    ref="rootElement"
     class="absolute z-[60] select-none"
     :style="{
       left: `${position.x}px`,
       top: `${position.y}px`,
-      transform: showBelow ? 'translateX(-50%)' : 'translateX(-50%) translateY(-100%)',
     }"
     @mousedown.stop
     @pointerdown.stop
@@ -103,6 +116,7 @@ async function handleCopy() {
               class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"
               :class="copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
               :aria-label="copied ? t('reader.selection.copied') : t('reader.selection.copy')"
+              :disabled="props.disabled"
               @click="handleCopy"
             >
               <Check v-if="copied" :size="15" />
@@ -118,6 +132,7 @@ async function handleCopy() {
               class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"
               :class="showColorPicker ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'"
               :aria-label="t('reader.selection.highlight')"
+              :disabled="props.disabled"
               @click="handleHighlightClick"
             >
               <Highlighter :size="15" />
@@ -131,6 +146,7 @@ async function handleCopy() {
             <button
               class="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               :aria-label="t('reader.note.title')"
+              :disabled="props.disabled"
               @click="handleNote"
             >
               <FileText :size="15" />
@@ -144,6 +160,7 @@ async function handleCopy() {
             <button
               class="flex h-8 w-8 items-center justify-center rounded-lg text-destructive transition-colors hover:bg-muted"
               :aria-label="t('reader.selection.deleteAnnotation')"
+              :disabled="props.disabled"
               @click="handleDelete"
             >
               <Trash2 :size="15" />
@@ -161,10 +178,12 @@ async function handleCopy() {
             class="h-6 w-6 rounded-full border-2 transition-all hover:scale-110"
             :class="selectedColor === c.hex ? 'scale-110 border-foreground' : 'border-transparent'"
             :style="{ background: c.hex }"
-            :title="c.label"
+            :aria-label="t('reader.selection.color', { color: t(`annotations.colors.${c.name}`) })"
+            :aria-pressed="selectedColor === c.hex"
+            :disabled="props.disabled"
             @click="selectColor(c.hex)"
           >
-            <span class="sr-only">{{ c.label }}</span>
+            <span class="sr-only">{{ t(`annotations.colors.${c.name}`) }}</span>
           </button>
         </div>
         <div class="flex gap-1 px-0.5">
@@ -175,12 +194,16 @@ async function handleCopy() {
             :class="
               selectedStyle === s.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:bg-muted'
             "
+            :aria-label="t('reader.selection.style', { style: t(s.nameKey) })"
+            :aria-pressed="selectedStyle === s.id"
+            :disabled="props.disabled"
             @click="selectStyle(s.id)"
           >
             {{ s.label }}
           </button>
           <button
             class="ml-1 flex-1 rounded bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            :disabled="props.disabled"
             @click="handleApply"
           >
             {{ t('reader.selection.apply') }}

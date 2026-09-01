@@ -49,29 +49,29 @@ describe('usePdfAnnotations', () => {
   })
 
   it('loads annotations for the book', async () => {
-    apiMock.mockResolvedValueOnce(response(true, [makeAnnotation(1)]))
-    const store = usePdfAnnotations(9)
+    apiMock.mockResolvedValueOnce(response(true, { items: [makeAnnotation(1)], total: 1, page: 1, pageSize: 100, stats: {} }))
+    const store = usePdfAnnotations(9, 33)
 
     await store.load()
 
-    expect(apiMock).toHaveBeenCalledWith('/api/v1/books/9/annotations')
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/books/9/annotations?page=1&pageSize=100&sortBy=position&sortDir=asc&bookFileId=33')
     expect(store.annotations.value).toHaveLength(1)
-    expect(store.loadError.value).toBeNull()
+    expect(store.loadError.value).toBe(false)
   })
 
   it('records a load error without throwing', async () => {
     apiMock.mockResolvedValueOnce(response(false))
-    const store = usePdfAnnotations(9)
+    const store = usePdfAnnotations(9, 33)
 
     await store.load()
 
-    expect(store.loadError.value).toBe('Failed to load')
+    expect(store.loadError.value).toBe(true)
   })
 
   it('posts a pdf position and appends the created annotation', async () => {
     const created = makeAnnotation(42)
     apiMock.mockResolvedValueOnce(response(true, created))
-    const store = usePdfAnnotations(9)
+    const store = usePdfAnnotations(9, 33)
 
     const result = await store.create({ pdf: PDF_POSITION, bookFileId: 33, text: 'Selection 42', color: '#FACC15', style: 'highlight', note: null })
 
@@ -87,7 +87,7 @@ describe('usePdfAnnotations', () => {
   })
 
   it('patches an existing annotation in place', async () => {
-    const store = usePdfAnnotations(9)
+    const store = usePdfAnnotations(9, 33)
     store.annotations.value = [makeAnnotation(1)]
     apiMock.mockResolvedValueOnce(response(true, { ...makeAnnotation(1), color: '#38BDF8', style: 'underline' }))
 
@@ -99,7 +99,7 @@ describe('usePdfAnnotations', () => {
   })
 
   it('removes an annotation when the delete succeeds', async () => {
-    const store = usePdfAnnotations(9)
+    const store = usePdfAnnotations(9, 33)
     store.annotations.value = [makeAnnotation(1), makeAnnotation(2)]
     apiMock.mockResolvedValueOnce(response(true))
 
@@ -111,7 +111,7 @@ describe('usePdfAnnotations', () => {
   })
 
   it('keeps the annotation when the delete fails', async () => {
-    const store = usePdfAnnotations(9)
+    const store = usePdfAnnotations(9, 33)
     store.annotations.value = [makeAnnotation(1)]
     apiMock.mockResolvedValueOnce(response(false))
 
@@ -119,5 +119,20 @@ describe('usePdfAnnotations', () => {
 
     expect(removed).toBe(false)
     expect(store.annotations.value).toHaveLength(1)
+  })
+
+  it('loads additional bounded pages without duplicating rows', async () => {
+    apiMock
+      .mockResolvedValueOnce(response(true, { items: [makeAnnotation(1)], total: 2, page: 1, pageSize: 100, stats: {} }))
+      .mockResolvedValueOnce(response(true, { items: [makeAnnotation(1), makeAnnotation(2)], total: 2, page: 2, pageSize: 100, stats: {} }))
+    const store = usePdfAnnotations(9, 33)
+
+    await store.load()
+    expect(store.hasMore.value).toBe(true)
+    await store.loadMore()
+
+    expect(apiMock).toHaveBeenLastCalledWith('/api/v1/books/9/annotations?page=2&pageSize=100&sortBy=position&sortDir=asc&bookFileId=33')
+    expect(store.annotations.value.map((annotation) => annotation.id)).toEqual([1, 2])
+    expect(store.hasMore.value).toBe(false)
   })
 })

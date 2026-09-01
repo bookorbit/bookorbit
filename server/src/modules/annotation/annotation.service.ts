@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
@@ -34,6 +34,10 @@ export class AnnotationService {
 
   async getAnnotationsPaginated(bookId: number, user: RequestUser, query: AnnotationQueryDto): Promise<AnnotationListResponse> {
     await this.bookService.verifyBookAccess(bookId, user);
+    if (query.bookFileId != null) {
+      const file = await this.bookService.verifyFileAccess(query.bookFileId, user);
+      if (file.bookId !== bookId) throw new BadRequestException('The selected file does not belong to this book');
+    }
 
     const filters = this.buildFilters(query);
     const sort = this.buildSort(query);
@@ -64,6 +68,7 @@ export class AnnotationService {
           positionStatus: dto.positionStatus as AnnotationListResponse['items'][number]['positionStatus'],
           chapterIndex: dto.chapterIndex,
           createdAt: dto.createdAt instanceof Date ? dto.createdAt.toISOString() : String(dto.createdAt),
+          pdf: dto.pdf,
         };
       }),
       total,
@@ -78,6 +83,12 @@ export class AnnotationService {
 
   async createAnnotation(bookId: number, user: RequestUser, dto: CreateAnnotationDto): Promise<AnnotationResponseDto> {
     await this.bookService.verifyBookAccess(bookId, user);
+    if (dto.pdf && dto.bookFileId == null) throw new BadRequestException('bookFileId is required for pdf annotations');
+    if (dto.bookFileId != null) {
+      const file = await this.bookService.verifyFileAccess(dto.bookFileId, user);
+      if (file.bookId !== bookId) throw new BadRequestException('The selected file does not belong to this book');
+      if (dto.pdf && file.format?.toLowerCase() !== 'pdf') throw new BadRequestException('PDF annotations require a PDF book file');
+    }
     const startedAtMs = Date.now();
     const format = dto.pdf ? 'pdf' : 'cfi';
     this.logger.log(`[annotation.create] [start] bookId=${bookId} userId=${user.id} format=${format} - create annotation started`);
@@ -93,7 +104,7 @@ export class AnnotationService {
       };
       const row = dto.pdf
         ? await this.annotationRepo.createPdf(
-            { ...base, bookFileId: dto.bookFileId ?? null },
+            { ...base, bookFileId: dto.bookFileId! },
             { page: dto.pdf.page, pos0: JSON.stringify({ page: dto.pdf.page, rect: dto.pdf.rect, rects: dto.pdf.rects }) },
           )
         : await this.annotationRepo.create({ ...base, cfi: dto.cfi!, bookFileId: dto.bookFileId ?? null });
@@ -146,6 +157,7 @@ export class AnnotationService {
       dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
       hasNote: query.hasNote || undefined,
       needsReview: query.needsReview || undefined,
+      bookFileId: query.bookFileId,
     };
   }
 

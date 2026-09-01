@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_STYLE } from './annotation.constants';
@@ -68,6 +68,7 @@ function makeService() {
   };
   const bookService = {
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
+    verifyFileAccess: vi.fn().mockResolvedValue({ id: 50, bookId: 5, format: 'pdf' }),
   };
   const achievementEvents = {
     emit: vi.fn(),
@@ -261,10 +262,51 @@ describe('AnnotationService', () => {
 
       await service.createAnnotation(5, makeUser(), {
         pdf: { page: 0, rect: { x: 0, y: 0, width: 1, height: 1 }, rects: [{ x: 0, y: 0, width: 1, height: 1 }] },
+        bookFileId: 50,
         text: 'text',
       });
 
       expect(achievementEvents.emit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ userId: 1, bookId: 5, annotationId: 77 }));
+    });
+
+    it('rejects a pdf annotation without a book file', async () => {
+      const { service, annotationRepo } = makeService();
+
+      await expect(
+        service.createAnnotation(5, makeUser(), {
+          pdf: { page: 0, rect: { x: 0, y: 0, width: 1, height: 1 }, rects: [{ x: 0, y: 0, width: 1, height: 1 }] },
+          text: 'text',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(annotationRepo.createPdf).not.toHaveBeenCalled();
+    });
+
+    it('rejects a pdf annotation whose file belongs to another book', async () => {
+      const { service, annotationRepo, bookService } = makeService();
+      bookService.verifyFileAccess.mockResolvedValue({ id: 50, bookId: 6, format: 'pdf' });
+
+      await expect(
+        service.createAnnotation(5, makeUser(), {
+          pdf: { page: 0, rect: { x: 0, y: 0, width: 1, height: 1 }, rects: [{ x: 0, y: 0, width: 1, height: 1 }] },
+          bookFileId: 50,
+          text: 'text',
+        }),
+      ).rejects.toThrow('does not belong');
+      expect(annotationRepo.createPdf).not.toHaveBeenCalled();
+    });
+
+    it('rejects a pdf annotation anchored to a non-pdf file', async () => {
+      const { service, annotationRepo, bookService } = makeService();
+      bookService.verifyFileAccess.mockResolvedValue({ id: 50, bookId: 5, format: 'epub' });
+
+      await expect(
+        service.createAnnotation(5, makeUser(), {
+          pdf: { page: 0, rect: { x: 0, y: 0, width: 1, height: 1 }, rects: [{ x: 0, y: 0, width: 1, height: 1 }] },
+          bookFileId: 50,
+          text: 'text',
+        }),
+      ).rejects.toThrow('require a PDF');
+      expect(annotationRepo.createPdf).not.toHaveBeenCalled();
     });
   });
 
@@ -611,6 +653,30 @@ describe('AnnotationService', () => {
       const result = await service.getAnnotationsPaginated(5, makeUser(), { page: 1 });
 
       expect(result.items[0].createdAt).toBe('2026-03-15T12:00:00.000Z');
+    });
+
+    it('includes pdf geometry in paginated items', async () => {
+      const { service, annotationRepo } = makeService();
+      const pdf = { page: 2, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] };
+      annotationRepo.findPaginated.mockResolvedValue({ items: [makeAnnotationRow({ cfi: null, pdfPos0: JSON.stringify(pdf) })], total: 1 });
+      annotationRepo.getStats.mockResolvedValue(makeStatsResult());
+      annotationRepo.getDistinctChapters.mockResolvedValue([]);
+
+      const result = await service.getAnnotationsPaginated(5, makeUser(), { page: 1 });
+
+      expect(result.items[0].pdf).toEqual(pdf);
+    });
+
+    it('verifies and forwards a file-scoped filter', async () => {
+      const { service, annotationRepo, bookService } = makeService();
+      annotationRepo.findPaginated.mockResolvedValue({ items: [], total: 0 });
+      annotationRepo.getStats.mockResolvedValue(makeStatsResult());
+      annotationRepo.getDistinctChapters.mockResolvedValue([]);
+
+      await service.getAnnotationsPaginated(5, makeUser(), { page: 1, bookFileId: 50 });
+
+      expect(bookService.verifyFileAccess).toHaveBeenCalledWith(50, expect.objectContaining({ id: 1 }));
+      expect(annotationRepo.findPaginated.mock.calls[0][2]).toMatchObject({ bookFileId: 50 });
     });
 
     it('returns empty items and zero total when no annotations match', async () => {

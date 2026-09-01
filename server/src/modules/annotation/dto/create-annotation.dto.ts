@@ -68,6 +68,18 @@ class ExactlyOneLocationConstraint implements ValidatorConstraintInterface {
   }
 }
 
+@ValidatorConstraint({ name: 'pdfRequiresBookFile', async: false })
+class PdfRequiresBookFileConstraint implements ValidatorConstraintInterface {
+  validate(_value: unknown, args: ValidationArguments): boolean {
+    const dto = args.object as CreateAnnotationDto;
+    return dto.pdf == null || dto.bookFileId != null;
+  }
+
+  defaultMessage(): string {
+    return 'bookFileId is required for pdf annotations';
+  }
+}
+
 export class CreateAnnotationDto {
   @IsOptional()
   @IsString()
@@ -89,6 +101,7 @@ export class CreateAnnotationDto {
   // Anchored to an always-present property so the class-level check runs even
   // when cfi/pdf are absent (an @IsOptional property short-circuits its own validators).
   @Validate(ExactlyOneLocationConstraint)
+  @Validate(PdfRequiresBookFileConstraint)
   @IsString()
   @IsNotEmpty()
   text!: string;

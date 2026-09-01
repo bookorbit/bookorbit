@@ -1,5 +1,5 @@
-import { ref } from 'vue'
-import type { AnnotationItem, AnnotationPdfPosition } from '@bookorbit/types'
+import { computed, ref } from 'vue'
+import type { AnnotationItem, AnnotationListResponse, AnnotationPdfPosition } from '@bookorbit/types'
 import { api } from '@/lib/api'
 
 export interface PdfAnnotationPatch {
@@ -22,24 +22,76 @@ export interface CreatePdfAnnotationInput {
  * reader. Talks to the same `/books/:bookId/annotations` endpoints as the EPUB
  * reader; only the create payload carries a PDF position instead of a CFI.
  */
-export function usePdfAnnotations(bookId: number) {
+const PAGE_SIZE = 100
+
+export function usePdfAnnotations(bookId: number, bookFileId: number) {
   const annotations = ref<AnnotationItem[]>([])
-  const loadError = ref<string | null>(null)
+  const total = ref(0)
+  const loadError = ref(false)
+  const loading = ref(false)
+  const loadingMore = ref(false)
+  const nextPage = ref(1)
+  const hasMore = computed(() => annotations.value.length < total.value)
 
   async function load() {
-    loadError.value = null
+    if (loading.value) return false
+    loading.value = true
+    loadError.value = false
+    annotations.value = []
+    total.value = 0
+    nextPage.value = 1
     try {
-      const res = await api(`/api/v1/books/${bookId}/annotations`)
+      const res = await api(annotationPageUrl(1))
       if (!res.ok) {
-        loadError.value = 'Failed to load'
-        return
+        loadError.value = true
+        return false
       }
-      annotations.value = await res.json()
+      const page: AnnotationListResponse = await res.json()
+      annotations.value = page.items
+      total.value = page.total
+      nextPage.value = 2
+      return true
     } catch {
-      // api() rejects on session expiry / network failure; surface it as a load error
-      // instead of leaving initialize() with an unhandled rejection.
-      loadError.value = 'Failed to load'
+      loadError.value = true
+      return false
+    } finally {
+      loading.value = false
     }
+  }
+
+  async function loadMore() {
+    if (loading.value || loadingMore.value || !hasMore.value) return false
+    loadingMore.value = true
+    loadError.value = false
+    try {
+      const res = await api(annotationPageUrl(nextPage.value))
+      if (!res.ok) {
+        loadError.value = true
+        return false
+      }
+      const page: AnnotationListResponse = await res.json()
+      const knownIds = new Set(annotations.value.map((annotation) => annotation.id))
+      annotations.value = [...annotations.value, ...page.items.filter((annotation) => !knownIds.has(annotation.id))]
+      total.value = page.total
+      nextPage.value += 1
+      return true
+    } catch {
+      loadError.value = true
+      return false
+    } finally {
+      loadingMore.value = false
+    }
+  }
+
+  function annotationPageUrl(page: number) {
+    const query = new URLSearchParams({
+      page: String(page),
+      pageSize: String(PAGE_SIZE),
+      sortBy: 'position',
+      sortDir: 'asc',
+      bookFileId: String(bookFileId),
+    })
+    return `/api/v1/books/${bookId}/annotations?${query.toString()}`
   }
 
   async function create(input: CreatePdfAnnotationInput): Promise<AnnotationItem | null> {
@@ -52,6 +104,7 @@ export function usePdfAnnotations(bookId: number) {
       if (!res.ok) return null
       const created: AnnotationItem = await res.json()
       annotations.value = [...annotations.value, created]
+      total.value += 1
       return created
     } catch {
       return null
@@ -79,11 +132,12 @@ export function usePdfAnnotations(bookId: number) {
       const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, { method: 'DELETE' })
       if (!res.ok) return false
       annotations.value = annotations.value.filter((a) => a.id !== id)
+      total.value = Math.max(0, total.value - 1)
       return true
     } catch {
       return false
     }
   }
 
-  return { annotations, loadError, load, create, update, remove }
+  return { annotations, total, loadError, loading, loadingMore, hasMore, load, loadMore, create, update, remove }
 }

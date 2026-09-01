@@ -71,6 +71,7 @@ export interface HubSort {
 }
 
 export interface AnnotationFilters {
+  bookFileId?: number;
   colors?: string[];
   search?: string;
   chapter?: string;
@@ -704,6 +705,12 @@ export class AnnotationRepository {
   private buildConditions(bookId: number, userId: number, filters: AnnotationFilters): SQL[] {
     const conditions = this.baseConditions(bookId, userId);
 
+    if (filters.bookFileId !== undefined) {
+      conditions.push(
+        sql`exists (select 1 from ${annotationPositions} ap_file where ap_file.annotation_id = ${annotations.id} and ap_file.book_file_id = ${filters.bookFileId})`,
+      );
+    }
+
     if (filters.colors && filters.colors.length > 0) {
       conditions.push(inArray(annotations.color, filters.colors));
     }
@@ -737,7 +744,28 @@ export class AnnotationRepository {
   private buildOrderBy(sort: AnnotationSort) {
     const direction = sort.dir === 'desc' ? desc : asc;
     if (sort.by === 'position') {
-      return [sql`${annotationPositions.pos0} ${sql.raw(sort.dir === 'desc' ? 'desc' : 'asc')} nulls last`, direction(annotations.id)];
+      const sqlDirection = sql.raw(sort.dir === 'desc' ? 'desc' : 'asc');
+      const pdfPage = sql`(
+        select case
+          when ap_pdf.extras ->> 'pageno' ~ '^[0-9]+$' then (ap_pdf.extras ->> 'pageno')::int
+          else null
+        end
+        from ${annotationPositions} ap_pdf
+        where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
+        limit 1
+      )`;
+      const pdfY = sql`(
+        select ((regexp_match(ap_pdf.pos0, '"y"[[:space:]]*:[[:space:]]*(-?[0-9]+(?:[.][0-9]+)?)'))[1])::numeric
+        from ${annotationPositions} ap_pdf
+        where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
+        limit 1
+      )`;
+      return [
+        sql`${pdfPage} ${sqlDirection} nulls last`,
+        sql`${pdfY} ${sqlDirection} nulls last`,
+        sql`${annotationPositions.pos0} ${sqlDirection} nulls last`,
+        direction(annotations.id),
+      ];
     }
     return [direction(annotations.createdAt), direction(annotations.id)];
   }

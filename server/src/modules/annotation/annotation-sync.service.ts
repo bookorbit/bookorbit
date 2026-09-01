@@ -579,7 +579,8 @@ export class AnnotationSyncService {
     const edits = editsRaw.slice(0, Math.max(remaining, 0));
     remaining -= edits.length;
 
-    const addsRaw = remaining > 0 ? await this.syncRepo.findAddCandidates(userId, source, deviceId, bookId, remaining + 1) : [];
+    const requiredAddFormats: AnnotationPositionFormat[] | undefined = source === 'koreader' ? ['xpointer', 'cfi'] : undefined;
+    const addsRaw = remaining > 0 ? await this.syncRepo.findAddCandidates(userId, source, deviceId, bookId, remaining + 1, requiredAddFormats) : [];
     const adds = addsRaw.slice(0, Math.max(remaining, 0));
 
     const more = deletesRaw.length > deletes.length || editsRaw.length > edits.length || addsRaw.length > adds.length;

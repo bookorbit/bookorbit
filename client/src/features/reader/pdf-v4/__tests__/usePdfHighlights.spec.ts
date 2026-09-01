@@ -14,11 +14,19 @@ const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: Request
 
 const mocks = vi.hoisted(() => {
   const rect = { origin: { x: 12, y: 20 }, size: { width: 30, height: 8 } }
+  const annotationEventListeners: Array<(event: { type: string }) => void> = []
+  const pluginAnnotationIds = new Set<string>()
   return {
     rect,
+    pluginAnnotationIds,
     annScope: {
       createAnnotation: vi.fn<(pageIndex: number, object: unknown) => void>(),
       purgeAnnotation: vi.fn<(pageIndex: number, id: string) => void>(),
+      getAnnotationById: vi.fn<(id: string) => object | null>(() => ({})),
+      onAnnotationEvent: (listener: (event: { type: string }) => void) => {
+        annotationEventListeners.push(listener)
+        return () => {}
+      },
     },
     selScope: {
       getFormattedSelection: vi.fn<() => Array<{ pageIndex: number; rect: unknown; segmentRects: unknown[] }>>(() => [
@@ -45,17 +53,18 @@ const mocks = vi.hoisted(() => {
       })),
     },
     menuListeners: [] as Array<(placement: SelectionMenuPlacement | null) => void>,
+    annotationEventListeners,
   }
 })
 
 vi.mock('@/lib/api', () => ({ api: apiMock }))
 
 vi.mock('@embedpdf/plugin-annotation/vue', () => ({
-  useAnnotationCapability: () => ({ provides: { value: { forDocument: () => mocks.annScope } } }),
+  useAnnotationCapability: () => ({ provides: { __v_isRef: true, value: { forDocument: () => mocks.annScope } } }),
 }))
 
 vi.mock('@embedpdf/plugin-selection/vue', () => ({
-  useSelectionCapability: () => ({ provides: { value: { forDocument: () => mocks.selScope } } }),
+  useSelectionCapability: () => ({ provides: { __v_isRef: true, value: { forDocument: () => mocks.selScope } } }),
   useSelectionPlugin: () => ({
     plugin: {
       __v_isRef: true,
@@ -78,8 +87,13 @@ const fakeSurface = {
   querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 20, width: 400, height: 500 }) }),
 } as unknown as HTMLElement
 
+const fakePopup = { offsetWidth: 160, offsetHeight: 46 } as HTMLElement
+
 function response(ok: boolean, payload: unknown = null): ApiResponse {
-  return { ok, json: async () => payload }
+  return {
+    ok,
+    json: async () => (Array.isArray(payload) ? { items: payload, total: payload.length, page: 1, pageSize: 100, stats: {} } : payload),
+  }
 }
 
 type Highlights = ReturnType<typeof usePdfHighlights>
@@ -89,7 +103,13 @@ function mountHighlights(): { highlights: Highlights; unmount: () => void } {
   const wrapper = mount(
     defineComponent({
       setup() {
-        highlights = usePdfHighlights({ bookId: 9, fileId: 33, documentId: () => 'doc-1', getSurface: () => fakeSurface })
+        highlights = usePdfHighlights({
+          bookId: 9,
+          fileId: 33,
+          documentId: () => 'doc-1',
+          getSurface: () => fakeSurface,
+          getPopup: () => fakePopup,
+        })
         return () => h('div')
       },
     }),
@@ -109,10 +129,23 @@ const PLACEMENT: SelectionMenuPlacement = {
 describe('usePdfHighlights', () => {
   beforeEach(() => {
     apiMock.mockReset()
+    mocks.pluginAnnotationIds.clear()
     mocks.annScope.createAnnotation.mockReset()
+    mocks.annScope.createAnnotation.mockImplementation((_pageIndex, object) => {
+      mocks.pluginAnnotationIds.add((object as { id: string }).id)
+    })
     mocks.annScope.purgeAnnotation.mockReset()
+    mocks.annScope.purgeAnnotation.mockImplementation((_pageIndex, id) => {
+      mocks.pluginAnnotationIds.delete(id)
+    })
+    mocks.annScope.getAnnotationById.mockReset()
+    mocks.annScope.getAnnotationById.mockImplementation((id) => (mocks.pluginAnnotationIds.has(id) ? {} : null))
     mocks.selScope.clear.mockReset()
+    mocks.scrollScope.getRectPositionForPage.mockReset()
+    mocks.scrollScope.getRectPositionForPage.mockReturnValue({ origin: { x: 100, y: 200 }, size: { width: 40, height: 10 } })
     mocks.menuListeners.length = 0
+    mocks.annotationEventListeners.length = 0
+    ;(fakePopup as unknown as { offsetWidth: number }).offsetWidth = 160
   })
 
   it('shows the popup for a selection and persists then renders a new highlight', async () => {
@@ -223,6 +256,43 @@ describe('usePdfHighlights', () => {
     expect(mocks.annScope.createAnnotation).toHaveBeenCalledTimes(1)
     expect(mocks.annScope.createAnnotation.mock.calls[0][0]).toBe(2)
 
+    unmount()
+  })
+
+  it('restores a persisted highlight replaced by EmbedPDF’s initial annotation load', async () => {
+    apiMock.mockResolvedValue(
+      response(true, [
+        {
+          id: 7,
+          bookId: 9,
+          cfi: null,
+          jumpFileId: 33,
+          pageno: 3,
+          text: 'existing',
+          color: '#FACC15',
+          style: 'highlight',
+          note: null,
+          chapterTitle: null,
+          origin: 'web',
+          positionStatus: 'exact',
+          chapterIndex: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          pdf: { page: 2, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+        },
+      ]),
+    )
+    const { unmount } = mountHighlights()
+    await flushPromises()
+    const attemptsBeforePluginLoad = mocks.annScope.createAnnotation.mock.calls.length
+    expect(attemptsBeforePluginLoad).toBe(1)
+    expect(mocks.pluginAnnotationIds.has('bo-7')).toBe(true)
+    expect(mocks.annotationEventListeners).toHaveLength(1)
+
+    mocks.pluginAnnotationIds.clear()
+    mocks.annotationEventListeners[0]({ type: 'loaded' })
+
+    expect(mocks.annScope.createAnnotation.mock.calls.length).toBe(attemptsBeforePluginLoad + 1)
+    expect(mocks.pluginAnnotationIds.has('bo-7')).toBe(true)
     unmount()
   })
 
@@ -432,6 +502,116 @@ describe('usePdfHighlights', () => {
     expect(postCount).toBe(3)
     expect(mocks.annScope.createAnnotation).toHaveBeenCalledTimes(2)
     expect(highlights.popupVisible.value).toBe(false)
+
+    unmount()
+  })
+
+  it('serializes rapid highlight saves so one selection creates one annotation', async () => {
+    let resolvePost!: (value: ApiResponse) => void
+    const deferredPost = new Promise<ApiResponse>((resolve) => {
+      resolvePost = resolve
+    })
+    apiMock.mockImplementation((_input, init) => {
+      if (init?.method === 'POST') return deferredPost
+      return Promise.resolve(response(true, []))
+    })
+    const { highlights, unmount } = mountHighlights()
+    await flushPromises()
+    mocks.menuListeners[0](PLACEMENT)
+    await flushPromises()
+
+    const first = highlights.applyHighlight('#38BDF8', 'highlight')
+    const second = highlights.applyHighlight('#38BDF8', 'highlight')
+
+    expect(highlights.isSaving.value).toBe(true)
+    expect(apiMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1)
+    expect(await second).toBe(false)
+
+    resolvePost(
+      response(true, {
+        id: 88,
+        bookId: 9,
+        cfi: null,
+        jumpFileId: 33,
+        pageno: 2,
+        text: 'selected text',
+        color: '#38BDF8',
+        style: 'highlight',
+        note: null,
+        chapterTitle: null,
+        origin: 'web',
+        positionStatus: 'exact',
+        chapterIndex: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+      }),
+    )
+    expect(await first).toBe(true)
+    expect(highlights.annotations.value).toHaveLength(1)
+    expect(highlights.isSaving.value).toBe(false)
+
+    unmount()
+  })
+
+  it('clamps the popup to both horizontal viewer edges', async () => {
+    apiMock.mockResolvedValue(response(true, []))
+    const { highlights, unmount } = mountHighlights()
+    await flushPromises()
+
+    mocks.scrollScope.getRectPositionForPage
+      .mockReturnValueOnce({ origin: { x: -100, y: 200 }, size: { width: 10, height: 10 } })
+      .mockReturnValueOnce({ origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } })
+    mocks.menuListeners[0](PLACEMENT)
+    await flushPromises()
+    expect(highlights.popupPosition.value.x).toBe(8)
+
+    mocks.scrollScope.getRectPositionForPage
+      .mockReturnValueOnce({ origin: { x: 900, y: 200 }, size: { width: 10, height: 10 } })
+      .mockReturnValueOnce({ origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } })
+    mocks.menuListeners[0](PLACEMENT)
+    await flushPromises()
+    expect(highlights.popupPosition.value.x).toBe(632)
+
+    ;(fakePopup as unknown as { offsetWidth: number }).offsetWidth = 300
+    mocks.scrollScope.getRectPositionForPage
+      .mockReturnValueOnce({ origin: { x: 900, y: 200 }, size: { width: 10, height: 10 } })
+      .mockReturnValueOnce({ origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } })
+    highlights.repositionPopup()
+    expect(highlights.popupPosition.value.x).toBe(492)
+
+    unmount()
+  })
+
+  it('clears popup selection state after deleting an overlapping annotation', async () => {
+    const annotation = {
+      id: 7,
+      bookId: 9,
+      cfi: null,
+      jumpFileId: 33,
+      pageno: 2,
+      text: 'existing',
+      color: '#FACC15',
+      style: 'highlight',
+      note: null,
+      chapterTitle: null,
+      origin: 'web',
+      positionStatus: 'exact',
+      chapterIndex: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+    }
+    apiMock.mockImplementation((_input, init) => Promise.resolve(init?.method === 'DELETE' ? response(true) : response(true, [annotation])))
+    const { highlights, unmount } = mountHighlights()
+    await flushPromises()
+    mocks.menuListeners[0](PLACEMENT)
+    await flushPromises()
+    expect(highlights.overlappingAnnotationId.value).toBe(7)
+
+    expect(await highlights.deleteAnnotation(7)).toBe(true)
+
+    expect(highlights.overlappingAnnotationId.value).toBeNull()
+    expect(highlights.popupVisible.value).toBe(false)
+    expect(mocks.selScope.clear).toHaveBeenCalled()
 
     unmount()
   })

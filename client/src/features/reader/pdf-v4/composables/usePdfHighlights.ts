@@ -22,6 +22,7 @@ interface UsePdfHighlightsOptions {
   documentId: () => string
   /** The positioned viewer surface that hosts the page layers and the popup. */
   getSurface: () => HTMLElement | null
+  getPopup: () => HTMLElement | null
 }
 
 /**
@@ -30,8 +31,8 @@ interface UsePdfHighlightsOptions {
  * (via usePdfAnnotations) as the single source of truth. The annotation plugin is
  * only a render surface, so no plugin events feed back into persistence.
  */
-export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: UsePdfHighlightsOptions) {
-  const store = usePdfAnnotations(bookId)
+export function usePdfHighlights({ bookId, fileId, documentId, getSurface, getPopup }: UsePdfHighlightsOptions) {
+  const store = usePdfAnnotations(bookId, fileId)
   const { provides: annotationCapability } = useAnnotationCapability()
   const { provides: selectionCapability } = useSelectionCapability()
   const { plugin: selectionPlugin } = useSelectionPlugin()
@@ -44,6 +45,7 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
   const overlappingAnnotationId = ref<number | null>(null)
   const showNoteDialog = ref(false)
   const noteText = ref('')
+  const isSaving = ref(false)
 
   // Only this file's PDF highlights: a book may hold several files (e.g. an EPUB
   // and a PDF, or two PDFs), and their annotations share one book-scoped list.
@@ -51,10 +53,10 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
 
   const renderedIds = new Set<number>()
   let pendingSelection: PendingSelectionPage[] = []
-  let initialRenderDone = false
   // Bumped on every placement and clear so a slow captureSelection() cannot
   // apply its result after the selection has already changed or been cleared.
   let selectionGeneration = 0
+  let lastPlacement: SelectionMenuPlacement | null = null
 
   function annScope() {
     return annotationCapability.value?.forDocument(documentId()) ?? null
@@ -63,13 +65,24 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     return selectionCapability.value?.forDocument(documentId()) ?? null
   }
 
-  function renderAnnotation(annotation: AnnotationItem) {
+  function renderAnnotation(annotation: AnnotationItem): boolean {
     const scope = annScope()
-    if (!scope) return
+    if (!scope) return false
     const built = buildPdfAnnotationObject(annotation)
-    if (!built) return
-    scope.createAnnotation(built.pageIndex, built.object)
-    renderedIds.add(annotation.id)
+    if (!built) return false
+    try {
+      if (scope.getAnnotationById(built.object.id)) {
+        renderedIds.add(annotation.id)
+        return true
+      }
+      renderedIds.delete(annotation.id)
+      scope.createAnnotation(built.pageIndex, built.object)
+      if (!scope.getAnnotationById(built.object.id)) return false
+      renderedIds.add(annotation.id)
+      return true
+    } catch {
+      return false
+    }
   }
 
   function unrenderAnnotation(annotation: AnnotationItem) {
@@ -83,9 +96,8 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     const scope = annScope()
     if (!scope) return
     for (const annotation of fileAnnotations.value) {
-      if (!renderedIds.has(annotation.id)) renderAnnotation(annotation)
+      renderAnnotation(annotation)
     }
-    initialRenderDone = true
   }
 
   async function captureSelection(): Promise<PendingSelectionPage[]> {
@@ -126,9 +138,17 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     const baseTop = pageRect.top - surfaceRect.top
     const offsetX = target.origin.x - pageOrigin.origin.x
     const offsetY = target.origin.y - pageOrigin.origin.y
+    const popup = getPopup()
+    const popupWidth = popup?.offsetWidth ?? 160
+    const popupHeight = popup?.offsetHeight ?? 46
+    const margin = 8
+    const anchorX = baseLeft + offsetX + target.size.width / 2
+    const anchorY = placement.suggestTop ? baseTop + offsetY : baseTop + offsetY + target.size.height
+    const maxX = Math.max(margin, surfaceRect.width - popupWidth - margin)
+    const maxY = Math.max(margin, surfaceRect.height - popupHeight - margin)
     popupPosition.value = {
-      x: baseLeft + offsetX + target.size.width / 2,
-      y: placement.suggestTop ? baseTop + offsetY : baseTop + offsetY + target.size.height,
+      x: Math.min(Math.max(anchorX - popupWidth / 2, margin), maxX),
+      y: Math.min(Math.max(placement.suggestTop ? anchorY - popupHeight - margin : anchorY + margin, margin), maxY),
     }
     popupShowBelow.value = !placement.suggestTop
     return true
@@ -137,9 +157,11 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
   async function onMenuPlacement(placement: SelectionMenuPlacement | null) {
     const generation = ++selectionGeneration
     if (!placement || !placement.isVisible) {
+      lastPlacement = null
       popupVisible.value = false
       return
     }
+    lastPlacement = placement
     if (!positionPopup(placement)) return
     const selectionRect = fromRect(placement.rect)
     const overlapping = findOverlappingAnnotation(fileAnnotations.value, placement.pageIndex, selectionRect)?.id ?? null
@@ -156,6 +178,11 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
 
   function dismissPopup() {
     popupVisible.value = false
+    lastPlacement = null
+  }
+
+  function repositionPopup() {
+    if (lastPlacement) positionPopup(lastPlacement)
   }
 
   function clearSelection() {
@@ -179,11 +206,14 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     renderAnnotation(updated)
     return true
   }
-  async function createFromSelection(color: string, style: string, note: string | null): Promise<boolean> {
-    // Drop pages as they succeed so a retry (the popup/dialog stays open on failure)
-    // only re-creates the pages that failed, never duplicating ones already persisted.
+  async function createFromSelection(
+    selection: PendingSelectionPage[],
+    color: string,
+    style: string,
+    note: string | null,
+  ): Promise<{ ok: boolean; remaining: PendingSelectionPage[] }> {
     const remaining: PendingSelectionPage[] = []
-    for (const entry of pendingSelection) {
+    for (const entry of selection) {
       if (entry.rects.length === 0) continue
       const created = await store.create({
         pdf: toPdfPosition(entry.page, entry.rects),
@@ -196,23 +226,33 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
       if (created) renderAnnotation(created)
       else remaining.push(entry)
     }
-    pendingSelection = remaining
-    return remaining.length === 0
+    return { ok: remaining.length === 0, remaining }
   }
 
-  async function applyHighlight(color: string, style: string, note?: string) {
-    let ok: boolean
-    if (overlappingAnnotationId.value !== null) {
-      const patch: { color: string; style: string; note?: string } = { color, style }
-      if (note !== undefined) patch.note = note
-      ok = await restyleExisting(overlappingAnnotationId.value, patch)
-    } else {
-      ok = await createFromSelection(color, style, note ?? null)
+  async function applyHighlight(color: string, style: string, note?: string): Promise<boolean> {
+    if (isSaving.value) return false
+    const generation = selectionGeneration
+    const annotationId = overlappingAnnotationId.value
+    const selection = pendingSelection.map((entry) => ({ ...entry, rects: entry.rects.map((rect) => ({ ...rect })) }))
+    isSaving.value = true
+    try {
+      let ok: boolean
+      if (annotationId !== null) {
+        const patch: { color: string; style: string; note?: string } = { color, style }
+        if (note !== undefined) patch.note = note
+        ok = await restyleExisting(annotationId, patch)
+      } else {
+        const result = await createFromSelection(selection, color, style, note ?? null)
+        ok = result.ok
+        if (generation === selectionGeneration) pendingSelection = result.remaining
+      }
+      if (!ok || generation !== selectionGeneration) return ok
+      clearSelection()
+      dismissPopup()
+      return true
+    } finally {
+      isSaving.value = false
     }
-    // Keep the selection mark and popup on failure so the user can retry without losing it.
-    if (!ok) return
-    clearSelection()
-    dismissPopup()
   }
 
   function openNoteDialog() {
@@ -221,16 +261,28 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     dismissPopup()
   }
 
-  async function saveNote(note: string) {
-    const ok =
-      overlappingAnnotationId.value !== null
-        ? await restyleExisting(overlappingAnnotationId.value, { note })
-        : await createFromSelection(DEFAULT_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_STYLE, note)
-    // Keep the dialog open and the typed note intact on failure so it is not lost.
-    if (!ok) return
-    showNoteDialog.value = false
-    noteText.value = ''
-    clearSelection()
+  async function saveNote(note: string): Promise<boolean> {
+    if (isSaving.value) return false
+    const generation = selectionGeneration
+    const annotationId = overlappingAnnotationId.value
+    const selection = pendingSelection.map((entry) => ({ ...entry, rects: entry.rects.map((rect) => ({ ...rect })) }))
+    isSaving.value = true
+    try {
+      let ok: boolean
+      if (annotationId !== null) ok = await restyleExisting(annotationId, { note })
+      else {
+        const result = await createFromSelection(selection, DEFAULT_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_STYLE, note)
+        ok = result.ok
+        if (generation === selectionGeneration) pendingSelection = result.remaining
+      }
+      if (!ok || generation !== selectionGeneration) return ok
+      showNoteDialog.value = false
+      noteText.value = ''
+      clearSelection()
+      return true
+    } finally {
+      isSaving.value = false
+    }
   }
 
   function cancelNoteDialog() {
@@ -250,24 +302,55 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     })
   }
 
-  async function deleteAnnotation(id: number) {
+  async function deleteAnnotation(id: number): Promise<boolean> {
     const annotation = store.annotations.value.find((entry) => entry.id === id) ?? null
     const removed = await store.remove(id)
     if (removed && annotation) unrenderAnnotation(annotation)
+    if (!removed) return false
+    if (overlappingAnnotationId.value === id) {
+      showNoteDialog.value = false
+      noteText.value = ''
+      clearSelection()
+      dismissPopup()
+    }
+    return true
   }
 
-  async function initialize() {
-    await store.load()
-    if (annScope()) renderAll()
+  function clearRenderedAnnotations() {
+    for (const annotation of fileAnnotations.value) {
+      if (renderedIds.has(annotation.id)) unrenderAnnotation(annotation)
+    }
+    renderedIds.clear()
+  }
+
+  async function retryLoad() {
+    clearRenderedAnnotations()
+    const loaded = await store.load()
+    if (loaded && annScope()) renderAll()
+    return loaded
+  }
+
+  async function loadMore() {
+    return store.loadMore()
   }
 
   watch(
-    annotationCapability,
-    (capability) => {
-      if (capability && !initialRenderDone && fileAnnotations.value.length > 0) renderAll()
+    [annotationCapability, () => documentId()],
+    ([capability, docId], _previous, onCleanup) => {
+      if (!capability || !docId) return
+      const scope = capability.forDocument(docId)
+      const unsubscribe = scope.onAnnotationEvent((event) => {
+        if (event.type === 'loaded') renderAll()
+      })
+      if (fileAnnotations.value.length > 0) renderAll()
+      onCleanup(unsubscribe)
     },
     { immediate: true },
   )
+
+  watch(fileAnnotations, () => {
+    if (annScope()) renderAll()
+  })
 
   watch(
     [selectionPlugin, () => documentId()],
@@ -283,7 +366,7 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     renderedIds.clear()
   })
 
-  void initialize()
+  void retryLoad()
 
   return {
     annotations: fileAnnotations,
@@ -295,11 +378,19 @@ export function usePdfHighlights({ bookId, fileId, documentId, getSurface }: Use
     overlappingAnnotationId,
     showNoteDialog,
     noteText,
+    isSaving,
+    loading: store.loading,
+    loadingMore: store.loadingMore,
+    hasMore: store.hasMore,
     applyHighlight,
     openNoteDialog,
     saveNote,
     cancelNoteDialog,
     dismissPopup,
+    repositionPopup,
+    retryLoad,
+    loadMore,
+    renderAll,
     navigateTo,
     deleteAnnotation,
   }

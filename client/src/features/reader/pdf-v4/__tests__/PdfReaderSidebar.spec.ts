@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { MatchFlag, type SearchResult } from '@embedpdf/models'
+import type { AnnotationItem } from '@bookorbit/types'
 
 const mocks = vi.hoisted(() => ({
   searchState: {
@@ -100,6 +101,26 @@ function makeResult(rects: SearchResult['rects'] = []): SearchResult {
       truncatedLeft: false,
       truncatedRight: false,
     },
+  }
+}
+
+function makeAnnotation(id: number): AnnotationItem {
+  return {
+    id,
+    bookId: 9,
+    cfi: null,
+    jumpFileId: 33,
+    pageno: 3,
+    text: `Selection ${id}`,
+    color: '#FACC15',
+    style: 'highlight',
+    note: null,
+    chapterTitle: null,
+    origin: 'web',
+    positionStatus: 'exact',
+    chapterIndex: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    pdf: { page: 2, rect: { x: 10, y: 20, width: 30, height: 8 }, rects: [{ x: 10, y: 20, width: 30, height: 8 }] },
   }
 }
 
@@ -227,5 +248,70 @@ describe('PdfReaderSidebar', () => {
     expect(mocks.searchScope.stopSearch).toHaveBeenCalled()
     expect(document.activeElement).toBe(input.element)
     wrapper.unmount()
+  })
+
+  it('shows an accessible retry state instead of an empty highlight list after load failure', async () => {
+    const wrapper = mount(PdfReaderSidebar, {
+      props: { documentId: 'doc-1', activeTab: 'highlights', headerVisible: true, annotations: [], loadError: true },
+    })
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('Could not load highlights')
+    expect(wrapper.text()).not.toContain('No highlights yet')
+    await wrapper.get('[role="alert"] button').trigger('click')
+    expect(wrapper.emitted('retryHighlights')).toHaveLength(1)
+  })
+
+  it('virtualizes highlight rows and keeps delete available without hover', async () => {
+    const wrapper = mount(PdfReaderSidebar, {
+      props: { documentId: 'doc-1', activeTab: 'highlights', headerVisible: true, annotations: [makeAnnotation(1)] },
+    })
+
+    const deleteButton = wrapper.get('button[aria-label="Delete highlight"]')
+    expect(deleteButton.classes()).toContain('opacity-100')
+    expect(wrapper.find('[data-testid="search-results"]').exists()).toBe(true)
+  })
+
+  it('exposes tabs as a labelled tablist wired to the visible panel', () => {
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs).toHaveLength(4)
+    expect(tabs.map((tab) => tab.text())).toEqual(['Pages', 'Contents', 'Search', 'Notes'])
+
+    const active = tabs[2]
+    expect(active.attributes('aria-selected')).toBe('true')
+    expect(active.attributes('tabindex')).toBe('0')
+    expect(tabs[0].attributes('tabindex')).toBe('-1')
+
+    const panel = wrapper.get('[role="tabpanel"]')
+    expect(panel.attributes('id')).toBe(active.attributes('aria-controls'))
+    expect(panel.attributes('aria-labelledby')).toBe(active.attributes('id'))
+  })
+
+  it('moves between tabs with arrow keys', async () => {
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
+    const tabList = wrapper.get('[role="tablist"]')
+
+    await tabList.trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.emitted('update:activeTab')?.at(-1)).toEqual(['highlights'])
+
+    await tabList.trigger('keydown', { key: 'ArrowLeft' })
+    expect(wrapper.emitted('update:activeTab')?.at(-1)).toEqual(['contents'])
+
+    await tabList.trigger('keydown', { key: 'Home' })
+    expect(wrapper.emitted('update:activeTab')?.at(-1)).toEqual(['thumbnails'])
+
+    await tabList.trigger('keydown', { key: 'End' })
+    expect(wrapper.emitted('update:activeTab')?.at(-1)).toEqual(['highlights'])
+
+    await tabList.trigger('keydown', { key: 'a' })
+    expect(wrapper.emitted('update:activeTab')).toHaveLength(4)
+  })
+
+  it('prompts for a query instead of showing an empty search list', async () => {
+    const wrapper = mount(PdfReaderSidebar, { props: { documentId: 'doc-1', activeTab: 'search', headerVisible: true, annotations: [] } })
+
+    expect(wrapper.text()).toContain('Type a term to search this PDF.')
+    expect(wrapper.find('[data-testid="search-results"]').exists()).toBe(false)
   })
 })

@@ -296,6 +296,15 @@ describe('AnnotationRepository', () => {
 
       expect(db._queries[0].offset).toHaveBeenCalledWith(20);
     });
+
+    it('orders PDF positions by page and vertical geometry before the stable id', async () => {
+      const db = makeDb([], [{ count: 0 }]);
+      const repo = new AnnotationRepository(db as never);
+
+      await repo.findPaginated(5, 10, { bookFileId: 42 }, { by: 'position', dir: 'asc' }, 1, 25);
+
+      expect(db._queries[0].orderBy.mock.calls[0]).toHaveLength(4);
+    });
   });
 
   describe('getStats', () => {
