@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import type { AnnotationItem, AnnotationListResponse, AnnotationPdfPosition } from '@bookorbit/types'
-import { api } from '@/lib/api'
+import { api, getValidToken } from '@/lib/api'
 
 export interface PdfAnnotationPatch {
   note?: string | null
@@ -32,6 +32,24 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
   const loadingMore = ref(false)
   const nextPage = ref(1)
   const hasMore = computed(() => annotations.value.length < total.value)
+  let mutationRevision = 0
+
+  async function fetchAnnotationPage(page: number): Promise<Response> {
+    const token = await getValidToken()
+    const headers = new Headers()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+    return fetch(annotationPageUrl(page), { headers, credentials: 'include' })
+  }
+
+  async function fetchStableAnnotationPage(pageNumber: number): Promise<AnnotationListResponse | null> {
+    while (true) {
+      const requestRevision = mutationRevision
+      const res = await fetchAnnotationPage(pageNumber)
+      if (!res.ok) return null
+      const page: AnnotationListResponse = await res.json()
+      if (requestRevision === mutationRevision) return page
+    }
+  }
 
   async function load() {
     if (loading.value) return false
@@ -41,12 +59,11 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
     total.value = 0
     nextPage.value = 1
     try {
-      const res = await api(annotationPageUrl(1))
-      if (!res.ok) {
+      const page = await fetchStableAnnotationPage(1)
+      if (!page) {
         loadError.value = true
         return false
       }
-      const page: AnnotationListResponse = await res.json()
       annotations.value = page.items
       total.value = page.total
       nextPage.value = 2
@@ -64,12 +81,11 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
     loadingMore.value = true
     loadError.value = false
     try {
-      const res = await api(annotationPageUrl(nextPage.value))
-      if (!res.ok) {
+      const page = await fetchStableAnnotationPage(nextPage.value)
+      if (!page) {
         loadError.value = true
         return false
       }
-      const page: AnnotationListResponse = await res.json()
       const knownIds = new Set(annotations.value.map((annotation) => annotation.id))
       annotations.value = [...annotations.value, ...page.items.filter((annotation) => !knownIds.has(annotation.id))]
       total.value = page.total
@@ -105,6 +121,7 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
       const created: AnnotationItem = await res.json()
       annotations.value = [...annotations.value, created]
       total.value += 1
+      mutationRevision += 1
       return created
     } catch {
       return null
@@ -121,6 +138,7 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
       if (!res.ok) return null
       const updated: AnnotationItem = await res.json()
       annotations.value = annotations.value.map((a) => (a.id === id ? updated : a))
+      mutationRevision += 1
       return updated
     } catch {
       return null
@@ -129,15 +147,30 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
 
   async function remove(id: number): Promise<boolean> {
     try {
-      const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, { method: 'DELETE' })
+      const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, {
+        method: 'DELETE',
+      })
       if (!res.ok) return false
       annotations.value = annotations.value.filter((a) => a.id !== id)
       total.value = Math.max(0, total.value - 1)
+      mutationRevision += 1
       return true
     } catch {
       return false
     }
   }
 
-  return { annotations, total, loadError, loading, loadingMore, hasMore, load, loadMore, create, update, remove }
+  return {
+    annotations,
+    total,
+    loadError,
+    loading,
+    loadingMore,
+    hasMore,
+    load,
+    loadMore,
+    create,
+    update,
+    remove,
+  }
 }

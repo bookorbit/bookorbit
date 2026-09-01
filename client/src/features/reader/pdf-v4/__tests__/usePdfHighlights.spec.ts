@@ -29,23 +29,39 @@ const mocks = vi.hoisted(() => {
       },
     },
     selScope: {
-      getFormattedSelection: vi.fn<() => Array<{ pageIndex: number; rect: unknown; segmentRects: unknown[] }>>(() => [
-        { pageIndex: 1, rect, segmentRects: [rect] },
-      ]),
+      getFormattedSelection: vi.fn<
+        () => Array<{
+          pageIndex: number
+          rect: unknown
+          segmentRects: unknown[]
+        }>
+      >(() => [{ pageIndex: 1, rect, segmentRects: [rect] }]),
       getSelectedText: vi.fn<() => { toPromise: () => Promise<string[]> }>(() => ({
         toPromise: () => Promise.resolve(['selected text']),
       })),
       clear: vi.fn<() => void>(),
     },
     scrollScope: {
-      getRectPositionForPage: vi.fn<() => { origin: { x: number; y: number }; size: { width: number; height: number } }>(() => ({
+      getRectPositionForPage: vi.fn<
+        () => {
+          origin: { x: number; y: number }
+          size: { width: number; height: number }
+        }
+      >(() => ({
         origin: { x: 100, y: 200 },
         size: { width: 40, height: 10 },
       })),
       scrollToPage: vi.fn<(options: Record<string, unknown>) => void>(),
     },
     viewportScope: {
-      getMetrics: vi.fn<() => { scrollLeft: number; scrollTop: number; clientWidth: number; clientHeight: number }>(() => ({
+      getMetrics: vi.fn<
+        () => {
+          scrollLeft: number
+          scrollTop: number
+          clientWidth: number
+          clientHeight: number
+        }
+      >(() => ({
         scrollLeft: 0,
         scrollTop: 0,
         clientWidth: 800,
@@ -57,14 +73,21 @@ const mocks = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/lib/api', () => ({ api: apiMock }))
+vi.mock('@/lib/api', () => ({
+  api: apiMock,
+  getValidToken: () => Promise.resolve(null),
+}))
 
 vi.mock('@embedpdf/plugin-annotation/vue', () => ({
-  useAnnotationCapability: () => ({ provides: { __v_isRef: true, value: { forDocument: () => mocks.annScope } } }),
+  useAnnotationCapability: () => ({
+    provides: { __v_isRef: true, value: { forDocument: () => mocks.annScope } },
+  }),
 }))
 
 vi.mock('@embedpdf/plugin-selection/vue', () => ({
-  useSelectionCapability: () => ({ provides: { __v_isRef: true, value: { forDocument: () => mocks.selScope } } }),
+  useSelectionCapability: () => ({
+    provides: { __v_isRef: true, value: { forDocument: () => mocks.selScope } },
+  }),
   useSelectionPlugin: () => ({
     plugin: {
       __v_isRef: true,
@@ -84,7 +107,14 @@ vi.mock('@embedpdf/plugin-scroll/vue', () => ({
 
 const fakeSurface = {
   getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
-  querySelector: () => ({ getBoundingClientRect: () => ({ left: 12, top: 20, width: 400, height: 500 }) }),
+  querySelector: () => ({
+    getBoundingClientRect: () => ({
+      left: 12,
+      top: 20,
+      width: 400,
+      height: 500,
+    }),
+  }),
 } as unknown as HTMLElement
 
 const fakePopup = { offsetWidth: 160, offsetHeight: 46 } as HTMLElement
@@ -92,7 +122,16 @@ const fakePopup = { offsetWidth: 160, offsetHeight: 46 } as HTMLElement
 function response(ok: boolean, payload: unknown = null): ApiResponse {
   return {
     ok,
-    json: async () => (Array.isArray(payload) ? { items: payload, total: payload.length, page: 1, pageSize: 100, stats: {} } : payload),
+    json: async () =>
+      Array.isArray(payload)
+        ? {
+            items: payload,
+            total: payload.length,
+            page: 1,
+            pageSize: 100,
+            stats: {},
+          }
+        : payload,
   }
 }
 
@@ -129,6 +168,7 @@ const PLACEMENT: SelectionMenuPlacement = {
 describe('usePdfHighlights', () => {
   beforeEach(() => {
     apiMock.mockReset()
+    vi.stubGlobal('fetch', apiMock)
     mocks.pluginAnnotationIds.clear()
     mocks.annScope.createAnnotation.mockReset()
     mocks.annScope.createAnnotation.mockImplementation((_pageIndex, object) => {
@@ -142,7 +182,10 @@ describe('usePdfHighlights', () => {
     mocks.annScope.getAnnotationById.mockImplementation((id) => (mocks.pluginAnnotationIds.has(id) ? {} : null))
     mocks.selScope.clear.mockReset()
     mocks.scrollScope.getRectPositionForPage.mockReset()
-    mocks.scrollScope.getRectPositionForPage.mockReturnValue({ origin: { x: 100, y: 200 }, size: { width: 40, height: 10 } })
+    mocks.scrollScope.getRectPositionForPage.mockReturnValue({
+      origin: { x: 100, y: 200 },
+      size: { width: 40, height: 10 },
+    })
     mocks.menuListeners.length = 0
     mocks.annotationEventListeners.length = 0
     ;(fakePopup as unknown as { offsetWidth: number }).offsetWidth = 160
@@ -167,7 +210,11 @@ describe('usePdfHighlights', () => {
             positionStatus: 'exact',
             chapterIndex: null,
             createdAt: '2026-01-01T00:00:00.000Z',
-            pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+            pdf: {
+              page: 1,
+              rect: { x: 12, y: 20, width: 30, height: 8 },
+              rects: [{ x: 12, y: 20, width: 30, height: 8 }],
+            },
           }),
         )
       }
@@ -244,7 +291,11 @@ describe('usePdfHighlights', () => {
           positionStatus: 'exact',
           chapterIndex: null,
           createdAt: '2026-01-01T00:00:00.000Z',
-          pdf: { page: 2, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+          pdf: {
+            page: 2,
+            rect: { x: 1, y: 2, width: 3, height: 4 },
+            rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+          },
         },
       ]),
     )
@@ -277,7 +328,11 @@ describe('usePdfHighlights', () => {
           positionStatus: 'exact',
           chapterIndex: null,
           createdAt: '2026-01-01T00:00:00.000Z',
-          pdf: { page: 2, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+          pdf: {
+            page: 2,
+            rect: { x: 1, y: 2, width: 3, height: 4 },
+            rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+          },
         },
       ]),
     )
@@ -314,7 +369,11 @@ describe('usePdfHighlights', () => {
           positionStatus: 'exact',
           chapterIndex: null,
           createdAt: '2026-01-01T00:00:00.000Z',
-          pdf: { page: 2, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+          pdf: {
+            page: 2,
+            rect: { x: 1, y: 2, width: 3, height: 4 },
+            rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+          },
         },
         {
           id: 8,
@@ -331,7 +390,11 @@ describe('usePdfHighlights', () => {
           positionStatus: 'exact',
           chapterIndex: null,
           createdAt: '2026-01-01T00:00:00.000Z',
-          pdf: { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] },
+          pdf: {
+            page: 0,
+            rect: { x: 1, y: 2, width: 3, height: 4 },
+            rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+          },
         },
         {
           id: 9,
@@ -382,7 +445,11 @@ describe('usePdfHighlights', () => {
             positionStatus: 'exact',
             chapterIndex: null,
             createdAt: '2026-01-01T00:00:00.000Z',
-            pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+            pdf: {
+              page: 1,
+              rect: { x: 12, y: 20, width: 30, height: 8 },
+              rects: [{ x: 12, y: 20, width: 30, height: 8 }],
+            },
           },
         ]),
       )
@@ -468,7 +535,11 @@ describe('usePdfHighlights', () => {
       positionStatus: 'exact',
       chapterIndex: null,
       createdAt: '2026-01-01T00:00:00.000Z',
-      pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+      pdf: {
+        page: 1,
+        rect: { x: 12, y: 20, width: 30, height: 8 },
+        rects: [{ x: 12, y: 20, width: 30, height: 8 }],
+      },
     })
     let postCount = 0
     apiMock.mockImplementation((_input, init) => {
@@ -484,7 +555,9 @@ describe('usePdfHighlights', () => {
       { pageIndex: 1, rect, segmentRects: [rect] },
       { pageIndex: 2, rect, segmentRects: [rect] },
     ])
-    mocks.selScope.getSelectedText.mockReturnValueOnce({ toPromise: () => Promise.resolve(['page one', 'page two']) })
+    mocks.selScope.getSelectedText.mockReturnValueOnce({
+      toPromise: () => Promise.resolve(['page one', 'page two']),
+    })
 
     const { highlights, unmount } = mountHighlights()
     await flushPromises()
@@ -543,7 +616,11 @@ describe('usePdfHighlights', () => {
         positionStatus: 'exact',
         chapterIndex: null,
         createdAt: '2026-01-01T00:00:00.000Z',
-        pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+        pdf: {
+          page: 1,
+          rect: { x: 12, y: 20, width: 30, height: 8 },
+          rects: [{ x: 12, y: 20, width: 30, height: 8 }],
+        },
       }),
     )
     expect(await first).toBe(true)
@@ -559,23 +636,41 @@ describe('usePdfHighlights', () => {
     await flushPromises()
 
     mocks.scrollScope.getRectPositionForPage
-      .mockReturnValueOnce({ origin: { x: -100, y: 200 }, size: { width: 10, height: 10 } })
-      .mockReturnValueOnce({ origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } })
+      .mockReturnValueOnce({
+        origin: { x: -100, y: 200 },
+        size: { width: 10, height: 10 },
+      })
+      .mockReturnValueOnce({
+        origin: { x: 0, y: 0 },
+        size: { width: 0, height: 0 },
+      })
     mocks.menuListeners[0](PLACEMENT)
     await flushPromises()
     expect(highlights.popupPosition.value.x).toBe(8)
 
     mocks.scrollScope.getRectPositionForPage
-      .mockReturnValueOnce({ origin: { x: 900, y: 200 }, size: { width: 10, height: 10 } })
-      .mockReturnValueOnce({ origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } })
+      .mockReturnValueOnce({
+        origin: { x: 900, y: 200 },
+        size: { width: 10, height: 10 },
+      })
+      .mockReturnValueOnce({
+        origin: { x: 0, y: 0 },
+        size: { width: 0, height: 0 },
+      })
     mocks.menuListeners[0](PLACEMENT)
     await flushPromises()
     expect(highlights.popupPosition.value.x).toBe(632)
 
     ;(fakePopup as unknown as { offsetWidth: number }).offsetWidth = 300
     mocks.scrollScope.getRectPositionForPage
-      .mockReturnValueOnce({ origin: { x: 900, y: 200 }, size: { width: 10, height: 10 } })
-      .mockReturnValueOnce({ origin: { x: 0, y: 0 }, size: { width: 0, height: 0 } })
+      .mockReturnValueOnce({
+        origin: { x: 900, y: 200 },
+        size: { width: 10, height: 10 },
+      })
+      .mockReturnValueOnce({
+        origin: { x: 0, y: 0 },
+        size: { width: 0, height: 0 },
+      })
     highlights.repositionPopup()
     expect(highlights.popupPosition.value.x).toBe(492)
 
@@ -598,7 +693,11 @@ describe('usePdfHighlights', () => {
       positionStatus: 'exact',
       chapterIndex: null,
       createdAt: '2026-01-01T00:00:00.000Z',
-      pdf: { page: 1, rect: { x: 12, y: 20, width: 30, height: 8 }, rects: [{ x: 12, y: 20, width: 30, height: 8 }] },
+      pdf: {
+        page: 1,
+        rect: { x: 12, y: 20, width: 30, height: 8 },
+        rects: [{ x: 12, y: 20, width: 30, height: 8 }],
+      },
     }
     apiMock.mockImplementation((_input, init) => Promise.resolve(init?.method === 'DELETE' ? response(true) : response(true, [annotation])))
     const { highlights, unmount } = mountHighlights()

@@ -3,8 +3,16 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 
-const props = defineProps<{ selectedText: string; modelValue: string; saving?: boolean }>()
-const emit = defineEmits<{ save: [note: string]; cancel: []; 'update:modelValue': [value: string] }>()
+const props = defineProps<{
+  selectedText: string
+  modelValue: string
+  saving?: boolean
+}>()
+const emit = defineEmits<{
+  save: [note: string]
+  cancel: []
+  'update:modelValue': [value: string]
+}>()
 
 function handleBackdropClick() {
   if (!props.saving) emit('cancel')
@@ -25,7 +33,7 @@ function handleSave() {
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50" @click.self="handleBackdropClick">
+    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/35 p-4" @click.self="handleBackdropClick">
       <div class="bg-card text-card-foreground rounded-lg shadow-2xl p-4 w-full max-w-sm flex flex-col gap-3">
         <p class="text-sm font-medium">{{ t('reader.note.title') }}</p>
         <p class="text-xs text-muted-foreground line-clamp-2 italic">"{{ selectedText }}"</p>
