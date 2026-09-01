@@ -40,6 +40,7 @@ import {
   DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
   DEFAULT_LIBRARY_ORGANIZATION_MODE,
   LIBRARY_METADATA_PRECEDENCE_DEFAULT,
+  MIN_VALID_FILE_TIME_MS,
 } from './library.constants';
 import { LibraryRepository } from './library.repository';
 import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
@@ -146,6 +147,7 @@ export class LibraryService {
       formatPriority: dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY],
       allowedFormats: dto.allowedFormats ?? [],
       organizationMode: dto.organizationMode ?? DEFAULT_LIBRARY_ORGANIZATION_MODE,
+      addedAtSource: dto.addedAtSource ?? DEFAULT_LIBRARY_ADDED_AT_SOURCE,
       excludePatterns: dto.excludePatterns ?? [],
       coverAspectRatio: dto.coverAspectRatio ?? DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
       readingThreshold: dto.readingThreshold ?? 0.25,
@@ -446,22 +448,26 @@ export class LibraryService {
       return { source, total: 0, updated: 0, skipped: 'source is imported' };
     }
 
-    const [countRow] = await this.libraryRepo.countBooksByLibrary(libraryId);
-    const total = countRow?.count ?? 0;
+    try {
+      const [countRow] = await this.libraryRepo.countBooksByLibrary(libraryId);
+      const total = countRow?.count ?? 0;
 
-    if (source === 'file_modified') {
-      const updated = await this.libraryRepo.recomputeAddedAtFromMtime(libraryId);
+      const updated =
+        source === 'file_modified'
+          ? await this.libraryRepo.recomputeAddedAtFromMtime(libraryId)
+          : await this.recomputeAddedAtFromBirthtime(libraryId);
+
       this.logger.log(
-        `[${event}] [end] libraryId=${libraryId} source=file_modified durationMs=${Date.now() - startedAt} total=${total} updated=${updated} - recompute completed`,
+        `[${event}] [end] libraryId=${libraryId} source=${source} durationMs=${Date.now() - startedAt} total=${total} updated=${updated} - recompute completed`,
       );
       return { source, total, updated };
+    } catch (err) {
+      const error = err as Error;
+      this.logger.error(
+        `[${event}] [fail] libraryId=${libraryId} source=${source} durationMs=${Date.now() - startedAt} errorClass=${error?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(error?.message ?? '')}" - recompute failed`,
+      );
+      throw err;
     }
-
-    const updated = await this.recomputeAddedAtFromBirthtime(libraryId);
-    this.logger.log(
-      `[${event}] [end] libraryId=${libraryId} source=file_created durationMs=${Date.now() - startedAt} total=${total} updated=${updated} - recompute completed`,
-    );
-    return { source, total, updated };
   }
 
   private async recomputeAddedAtFromBirthtime(libraryId: number): Promise<number> {
@@ -588,15 +594,10 @@ function normalizeAddedAtSource(source: string | null | undefined): AddedAtSourc
   return source === 'file_modified' || source === 'file_created' ? source : DEFAULT_LIBRARY_ADDED_AT_SOURCE;
 }
 
-// Mirrors the scanner's usable-time guard: some filesystems report birthtime as
-// epoch 0 when they do not track creation time, so anything at or below this is
-// treated as unavailable.
-const MIN_VALID_TIME_MS = 1000;
-
 function usableTime(date: Date | undefined): Date | undefined {
   if (!(date instanceof Date)) return undefined;
   const ms = date.getTime();
-  if (Number.isNaN(ms) || ms <= MIN_VALID_TIME_MS) return undefined;
+  if (Number.isNaN(ms) || ms <= MIN_VALID_FILE_TIME_MS) return undefined;
   return date;
 }
 

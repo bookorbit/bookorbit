@@ -33,6 +33,15 @@ describe('Library DTO validation', () => {
     ).toBe(false);
   });
 
+  it('CreateLibraryDto accepts every added_at source and rejects unknown ones', async () => {
+    // The library creator posts its whole form, so a source the create DTO does not
+    // declare is stripped by whitelist and rejected by forbidNonWhitelisted.
+    for (const addedAtSource of ['imported', 'file_modified', 'file_created']) {
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource }))).toBe(false);
+    }
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource: 'bad' }))).toBe(true);
+  });
+
   it('CreateLibraryDto requires a non-empty icon and UpdateLibraryDto rejects empty icons when provided', async () => {
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', folders: ['/books/scifi'] }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', icon: '   ', folders: ['/books/scifi'] }))).toBe(true);

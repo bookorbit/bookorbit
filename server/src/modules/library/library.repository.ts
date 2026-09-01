@@ -7,7 +7,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, libraryFolders, libraries } from '../../db/schema';
-import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
+import { LIBRARY_BOOK_STATUS_PRESENT, MIN_VALID_FILE_TIME_SECONDS } from './library.constants';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -254,7 +254,7 @@ export class LibraryRepository {
         minMtime: sql<Date>`min(${bookFiles.mtime})`.as('min_mtime'),
       })
       .from(bookFiles)
-      .where(and(eq(bookFiles.role, 'content'), sql`${bookFiles.mtime} is not null`))
+      .where(and(eq(bookFiles.role, 'content'), sql`${bookFiles.mtime} > to_timestamp(${MIN_VALID_FILE_TIME_SECONDS})`))
       .groupBy(bookFiles.bookId)
       .as('earliest');
 

@@ -21,3 +21,9 @@ export const LIBRARY_METADATA_PRECEDENCE_DEFAULT = ['folderStructure', 'embedded
 
 export const LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN = 1;
 export const LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX = 10000;
+
+// Some filesystems report a file time as epoch 0 (or a tiny value) when they do
+// not track it, so anything at or below this is treated as unavailable rather
+// than as a real date. Mirrors the scanner's own guard.
+export const MIN_VALID_FILE_TIME_MS = 1000;
+export const MIN_VALID_FILE_TIME_SECONDS = MIN_VALID_FILE_TIME_MS / 1000;
