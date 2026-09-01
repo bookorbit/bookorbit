@@ -29,7 +29,13 @@ const emit = defineEmits<{
 
 const ADDED_AT_SOURCES: AddedAtSource[] = ['imported', 'file_modified', 'file_created']
 
-const recomputeDisabled = computed(() => props.recomputingAddedAt || !props.storedAddedAtSource || props.storedAddedAtSource === 'imported')
+const recomputeDisabled = computed(
+  () =>
+    props.recomputingAddedAt ||
+    !props.storedAddedAtSource ||
+    props.storedAddedAtSource === 'imported' ||
+    props.addedAtSource !== props.storedAddedAtSource,
+)
 const showSaveFirstHint = computed(() => props.canRecomputeAddedAt && props.addedAtSource !== props.storedAddedAtSource)
 
 function selectAddedAtSource(source: AddedAtSource) {
@@ -175,17 +181,18 @@ function onPatternKeydown(e: KeyboardEvent) {
       </div>
     </div>
 
-    <!-- Date added -->
     <div>
-      <p class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-1">
+      <p id="added-at-title" class="text-[11px] font-semibold uppercase tracking-widest text-foreground mb-1">
         {{ t('library.creator.scanner.addedAt.title') }}
       </p>
-      <p class="text-xs text-muted-foreground mb-3">{{ t('library.creator.scanner.addedAt.hint') }}</p>
-      <div class="space-y-2">
+      <p id="added-at-hint" class="text-xs text-muted-foreground mb-3">{{ t('library.creator.scanner.addedAt.hint') }}</p>
+      <div role="radiogroup" aria-labelledby="added-at-title" aria-describedby="added-at-hint" class="space-y-2">
         <button
           v-for="source in ADDED_AT_SOURCES"
           :key="source"
           type="button"
+          role="radio"
+          :aria-checked="addedAtSource === source"
           class="w-full text-left rounded-lg border p-3 transition-colors"
           :class="addedAtSource === source ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card hover:border-primary/40'"
           @click="selectAddedAtSource(source)"
