@@ -1,3 +1,4 @@
+import type { Dirent } from 'fs';
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
@@ -41,6 +42,19 @@ export function isDiscDirectory(name: string): boolean {
 export function stemOf(name: string): string {
   const i = name.lastIndexOf('.');
   return i > 0 ? name.slice(0, i) : name;
+}
+
+// A symlinked *file* is a valid content/sidecar candidate once resolved to a
+// regular file - this is how debrid/rclone-backed libraries (Shelfarr's
+// reference import mode, decypharr, Zurg, blackhole-style setups) publish
+// content without a full local copy. Symlinked *directories* are still never
+// followed here, to avoid introducing traversal loops or letting a scan
+// escape the library root through a redirected subfolder.
+async function resolveFileEntry(fullPath: string, entry: Dirent): Promise<boolean> {
+  if (entry.isFile() && !entry.isSymbolicLink()) return true;
+  if (!entry.isSymbolicLink()) return false;
+  const resolved = await stat(fullPath).catch(() => null);
+  return resolved?.isFile() ?? false;
 }
 
 function buildExcludeMatcher(patterns: string[]): (name: string) => boolean {
@@ -141,7 +155,7 @@ async function collectByDir(
 
     if (entry.isDirectory() && !entry.isSymbolicLink()) {
       subdirs.push(full);
-    } else if (entry.isFile() && !entry.isSymbolicLink()) {
+    } else if (await resolveFileEntry(full, entry)) {
       if (full.length > MAX_PATH_LENGTH) {
         logger?.(`Path exceeds ${MAX_PATH_LENGTH} characters, skipping: ${full}`);
         continue;
@@ -384,7 +398,7 @@ export async function buildSingleBookCandidate(
       } else {
         nonDiscDirs.push({ name: entry.name, path: full });
       }
-    } else if (entry.isFile() && !entry.isSymbolicLink() && full.length <= MAX_PATH_LENGTH) {
+    } else if (full.length <= MAX_PATH_LENGTH && (await resolveFileEntry(full, entry))) {
       filePaths.push(full);
     }
   }
@@ -392,10 +406,10 @@ export async function buildSingleBookCandidate(
   for (const discDir of discDirs) {
     const discEntries = await readdir(discDir, { withFileTypes: true }).catch(() => []);
     for (const entry of discEntries) {
-      if (!entry.isFile() || entry.isSymbolicLink() || entry.name.startsWith('.')) continue;
+      if (entry.name.startsWith('.')) continue;
       if (shouldExclude(entry.name)) continue;
       const full = join(discDir, entry.name);
-      if (full.length <= MAX_PATH_LENGTH) filePaths.push(full);
+      if (full.length <= MAX_PATH_LENGTH && (await resolveFileEntry(full, entry))) filePaths.push(full);
     }
   }
 
