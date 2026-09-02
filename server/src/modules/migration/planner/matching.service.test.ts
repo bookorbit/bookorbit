@@ -237,7 +237,10 @@ describe('MatchingService private lookups', () => {
         { match_key: 'foundation|isaac asimov', book_id: 20, match_level: 'approx' },
       ],
     });
-    const service = new MatchingService({ execute } as never);
+    // The strategy runs each chunk in its own transaction (SET LOCAL statement_timeout, then
+    // the real query), so `execute` is called twice per chunk rather than once.
+    const transaction = vi.fn((cb: (tx: { execute: typeof execute }) => unknown) => cb({ execute }));
+    const service = new MatchingService({ execute, transaction } as never);
 
     const lookup = await (service as never).batchLookupTitleAuthors([
       sourceBook({ sourceBookId: 'exact', title: 'Dune', author: 'Frank Herbert' }),
@@ -246,7 +249,8 @@ describe('MatchingService private lookups', () => {
 
     expect(lookup.get('dune|frank herbert')).toEqual({ kind: 'found', bookId: 10 });
     expect(lookup.get('foundation|isaac asimov')).toEqual({ kind: 'found', bookId: 20 });
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it('batchLookupFileHashes returns found, ambiguous, and none results', async () => {
@@ -309,7 +313,8 @@ describe('MatchingService private lookups', () => {
         { match_key: 'dune|frank herbert', book_id: 2, match_level: 'exact' },
       ],
     });
-    const service = new MatchingService({ execute } as never);
+    const transaction = vi.fn((cb: (tx: { execute: typeof execute }) => unknown) => cb({ execute }));
+    const service = new MatchingService({ execute, transaction } as never);
 
     const result = await (service as never).batchLookupTitleAuthors([
       sourceBook({ sourceBookId: 'ambiguous', title: 'Dune', author: 'Frank Herbert' }),
@@ -417,7 +422,8 @@ describe('MatchingService private lookups', () => {
 
   it('batchLookupTitleAuthors queries by bounded chunks rather than per source book', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const service = new MatchingService({ execute } as never);
+    const transaction = vi.fn((cb: (tx: { execute: typeof execute }) => unknown) => cb({ execute }));
+    const service = new MatchingService({ execute, transaction } as never);
     const books = Array.from({ length: 1_001 }, (_, index) =>
       sourceBook({ sourceBookId: `title-${index}`, title: `Title ${index}`, author: `Author ${index}` }),
     );
@@ -425,6 +431,7 @@ describe('MatchingService private lookups', () => {
 
     await (service as never).batchLookupTitleAuthors(books);
 
-    expect(execute).toHaveBeenCalledTimes(3);
+    expect(transaction).toHaveBeenCalledTimes(3);
+    expect(execute).toHaveBeenCalledTimes(6);
   });
 });

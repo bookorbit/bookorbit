@@ -390,51 +390,60 @@ export class MatchingService {
         }),
         sql`, `,
       );
-      const queryResult = await this.db.execute<TitleAuthorLookupRow>(sql`
-        with source_candidates(match_key, title, authors, author_patterns) as (
-          values ${values}
-        ),
-        candidate_matches as (
-          select
-            source_candidates.match_key,
-            ${schema.bookMetadata.bookId} as book_id,
-            bool_or(
+      // This fuzzy-match query (unnest + lateral join + unaccent/ILIKE across the whole
+      // authors table) is legitimately expensive, and now that chunks for this strategy run
+      // concurrently, contention between them can push a single chunk past the pool's default
+      // 30s statement_timeout (db.module.ts) even though each one used to fit comfortably when
+      // run one at a time. SET LOCAL scopes the override to just this transaction, same pattern
+      // already used in SeriesIdentityService's startup backfill.
+      const queryResult = await this.db.transaction(async (tx) => {
+        await tx.execute(sql`SET LOCAL statement_timeout = 0`);
+        return tx.execute<TitleAuthorLookupRow>(sql`
+          with source_candidates(match_key, title, authors, author_patterns) as (
+            values ${values}
+          ),
+          candidate_matches as (
+            select
+              source_candidates.match_key,
+              ${schema.bookMetadata.bookId} as book_id,
+              bool_or(
+                lower(${schema.bookMetadata.title}) = lower(source_candidates.title)
+                and lower(${schema.authors.name}) = lower(source_author.author)
+              ) as exact_match,
+              bool_or(
+                lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) =
+                  lower(public.bookorbit_unaccent(source_candidates.title))
+                and ${accentInsensitiveIlike(schema.authors.name, sql`'%' || source_author.author_pattern || '%'`)}
+              ) as approx_match
+            from source_candidates
+            cross join lateral unnest(source_candidates.authors, source_candidates.author_patterns)
+              as source_author(author, author_pattern)
+            inner join ${schema.bookMetadata} on (
               lower(${schema.bookMetadata.title}) = lower(source_candidates.title)
-              and lower(${schema.authors.name}) = lower(source_author.author)
-            ) as exact_match,
-            bool_or(
-              lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) =
+              or lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) =
                 lower(public.bookorbit_unaccent(source_candidates.title))
-              and ${accentInsensitiveIlike(schema.authors.name, sql`'%' || source_author.author_pattern || '%'`)}
-            ) as approx_match
-          from source_candidates
-          cross join lateral unnest(source_candidates.authors, source_candidates.author_patterns)
-            as source_author(author, author_pattern)
-          inner join ${schema.bookMetadata} on (
-            lower(${schema.bookMetadata.title}) = lower(source_candidates.title)
-            or lower(public.bookorbit_unaccent(${schema.bookMetadata.title})) =
-              lower(public.bookorbit_unaccent(source_candidates.title))
+            )
+            inner join ${schema.bookAuthors} on ${schema.bookAuthors.bookId} = ${schema.bookMetadata.bookId}
+            inner join ${schema.authors} on ${schema.authors.id} = ${schema.bookAuthors.authorId}
+            group by source_candidates.match_key, ${schema.bookMetadata.bookId}
+          ),
+          ranked_matches as (
+            select
+              match_key,
+              book_id,
+              case when exact_match then 'exact' else 'approx' end as match_level,
+              row_number() over (
+                partition by match_key, case when exact_match then 'exact' else 'approx' end
+                order by book_id
+              ) as match_rank
+            from candidate_matches
+            where exact_match or approx_match
           )
-          inner join ${schema.bookAuthors} on ${schema.bookAuthors.bookId} = ${schema.bookMetadata.bookId}
-          inner join ${schema.authors} on ${schema.authors.id} = ${schema.bookAuthors.authorId}
-          group by source_candidates.match_key, ${schema.bookMetadata.bookId}
-        ),
-        ranked_matches as (
-          select
-            match_key,
-            book_id,
-            case when exact_match then 'exact' else 'approx' end as match_level,
-            row_number() over (
-              partition by match_key, case when exact_match then 'exact' else 'approx' end
-              order by book_id
-            ) as match_rank
-          from candidate_matches
-          where exact_match or approx_match
-        )
-        select match_key, book_id, match_level
-        from ranked_matches
-        where match_rank <= 2
-      `);
+          select match_key, book_id, match_level
+          from ranked_matches
+          where match_rank <= 2
+        `);
+      });
       return queryResult.rows;
     });
 
