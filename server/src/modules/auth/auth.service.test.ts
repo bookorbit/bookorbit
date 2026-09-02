@@ -108,6 +108,11 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     hasActiveByUserId: vi.fn().mockResolvedValue(true),
     countActiveByUserId: vi.fn().mockResolvedValue(0),
   };
+  const oidcProviderService = { findEnabled: vi.fn().mockResolvedValue([]) };
+  const authenticationPolicy = {
+    assertPasswordLoginEnabled: vi.fn(),
+    isPasswordLoginEnabled: vi.fn().mockReturnValue(true),
+  };
 
   const service = new AuthService(
     userService as never,
@@ -119,10 +124,25 @@ function makeService(dbOverrides?: Record<string, unknown>) {
     { emit: vi.fn() } as never,
     magicLinkRepo as never,
     appSettings as never,
+    oidcProviderService as never,
+    authenticationPolicy as never,
     db,
   );
 
-  return { service, db, userService, jwtService, config, systemMailService, appSettings, oidcSessionRepo, oidcDiscovery, magicLinkRepo };
+  return {
+    service,
+    db,
+    userService,
+    jwtService,
+    config,
+    systemMailService,
+    appSettings,
+    oidcSessionRepo,
+    oidcDiscovery,
+    magicLinkRepo,
+    oidcProviderService,
+    authenticationPolicy,
+  };
 }
 
 describe('AuthService', () => {
@@ -182,6 +202,30 @@ describe('AuthService', () => {
         appSettings.getValue.mockResolvedValue(value);
         await expect(service.setupStatus()).resolves.toEqual({ needsSetup: false, allowRegistration: false });
       }
+    });
+  });
+
+  describe('loginOptions', () => {
+    it('returns password and registration policy with the enabled OIDC providers atomically', async () => {
+      const { service, appSettings, oidcProviderService } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
+      oidcProviderService.findEnabled.mockResolvedValue([
+        { slug: 'sso', displayName: 'SSO', enabled: true, iconUrl: null, clientId: 'client', scopes: 'openid', issuerUri: 'secret' },
+      ]);
+
+      await expect(service.loginOptions()).resolves.toEqual({
+        passwordLoginEnabled: true,
+        allowRegistration: true,
+        oidcProviders: [{ slug: 'sso', displayName: 'SSO', enabled: true, iconUrl: null, clientId: 'client', scopes: 'openid' }],
+      });
+    });
+
+    it('never advertises registration when password authentication is disabled', async () => {
+      const { service, appSettings, authenticationPolicy } = makeService();
+      appSettings.getValue.mockResolvedValue('true');
+      authenticationPolicy.isPasswordLoginEnabled.mockReturnValue(false);
+
+      await expect(service.loginOptions()).resolves.toMatchObject({ passwordLoginEnabled: false, allowRegistration: false });
     });
   });
 
@@ -392,6 +436,17 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
+    it('rejects a disabled password login before lookup or lockout mutation', async () => {
+      const { service, db, userService, authenticationPolicy } = makeService();
+      authenticationPolicy.assertPasswordLoginEnabled.mockImplementation(() => {
+        throw new ForbiddenException({ message: 'Password authentication is disabled', errorCode: LoginErrorCode.PASSWORD_AUTH_DISABLED });
+      });
+
+      await expect(service.login({ username: 'jdoe', password: 'wrong' }, makeReply())).rejects.toThrow(ForbiddenException);
+      expect(userService.findByUsername).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
     it('throws UnauthorizedException when user not found', async () => {
       const { service, userService } = makeService();
       userService.findByUsername.mockResolvedValue(null);
@@ -639,6 +694,27 @@ describe('AuthService', () => {
       await expect(service.refresh(makeRequest({ refresh_token: 'unknown-token' }), makeReply())).rejects.toThrow(UnauthorizedException);
     });
 
+    it('revokes a password refresh token when password authentication is disabled', async () => {
+      const { service, db, authenticationPolicy } = makeService();
+      const reply = makeReply();
+      authenticationPolicy.isPasswordLoginEnabled.mockReturnValue(false);
+      (db.query as never as Record<string, Record<string, vi.Mock>>).refreshTokens.findFirst.mockResolvedValue({
+        id: 9,
+        userId: 5,
+        authenticationMethod: 'password',
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+
+      await expect(service.refresh(makeRequest({ refresh_token: 'password-session' }), reply)).rejects.toThrow(UnauthorizedException);
+      expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith({ revokedAt: expect.any(Date) });
+      expect((reply as unknown as { setCookie: vi.Mock }).setCookie).toHaveBeenCalledWith(
+        'refresh_token',
+        '',
+        expect.objectContaining({ maxAge: 0 }),
+      );
+    });
+
     it('returns access-only success for a recently rotated token reuse', async () => {
       const { service, db, jwtService } = makeService();
       const reply = makeReply();
@@ -667,7 +743,7 @@ describe('AuthService', () => {
 
       await expect(service.refresh(makeRequest({ refresh_token: 'recently-rotated-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
 
-      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 7 });
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 7, amr: 'legacy' });
       expect(db.transaction).not.toHaveBeenCalled();
       expect((db as unknown as Record<string, vi.Mock>).set).toHaveBeenCalledWith(expect.objectContaining({ lastAuthenticatedAt: expect.any(Date) }));
       expect(db.delete).not.toHaveBeenCalled();
@@ -885,7 +961,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.refresh(makeRequest({ refresh_token: 'oldest-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
-      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 9 });
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 9, amr: 'legacy' });
       expect(db.transaction).not.toHaveBeenCalled();
       const setCookieCalls = (reply as unknown as { setCookie: vi.Mock }).setCookie.mock.calls;
       expect(setCookieCalls.map(([name]) => name)).toEqual(['access_token']);
@@ -959,7 +1035,7 @@ describe('AuthService', () => {
       (db.where as vi.Mock).mockResolvedValueOnce({ rowCount: 0 });
 
       await expect(service.refresh(makeRequest({ refresh_token: 'racing-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
-      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 3 });
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 3, amr: 'legacy' });
       // No refresh cookie was set on the race-loser path
       const setCookieCalls = (reply as unknown as { setCookie: vi.Mock }).setCookie.mock.calls;
       expect(setCookieCalls.map(([name]) => name)).toEqual(['access_token']);
@@ -1045,7 +1121,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.refresh(makeRequest({ refresh_token: 'widened-grace-token' }), reply)).resolves.toEqual({ accessToken: 'signed-jwt' });
-      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 4 });
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: 5, ver: 4, amr: 'legacy' });
     });
 
     it('throws UnauthorizedException when token is expired', async () => {
@@ -1089,6 +1165,24 @@ describe('AuthService', () => {
   });
 
   describe('validateUser', () => {
+    it('rejects password and legacy access tokens in SSO-only mode before loading the user', async () => {
+      const { service, userService, authenticationPolicy } = makeService();
+      authenticationPolicy.isPasswordLoginEnabled.mockReturnValue(false);
+
+      await expect(service.validateUser(1, 1, 'password')).rejects.toThrow(UnauthorizedException);
+      await expect(service.validateUser(1, 1, 'legacy')).rejects.toThrow(UnauthorizedException);
+      expect(userService.findByIdWithPermissions).not.toHaveBeenCalled();
+    });
+
+    it.each(['oidc', 'magic_link'] as const)('accepts an active %s session in SSO-only mode', async (authenticationMethod) => {
+      const { service, userService, authenticationPolicy } = makeService();
+      authenticationPolicy.isPasswordLoginEnabled.mockReturnValue(false);
+      const user = makeFullUser({ tokenVersion: 2 });
+      userService.findByIdWithPermissions.mockResolvedValue(user);
+
+      await expect(service.validateUser(1, 2, authenticationMethod)).resolves.toEqual({ ...user, authenticationMethod });
+    });
+
     it('throws UnauthorizedException when user not found', async () => {
       const { service, userService } = makeService();
       userService.findByIdWithPermissions.mockResolvedValue(null);
@@ -1135,6 +1229,60 @@ describe('AuthService', () => {
 
       const result = await service.validateUser(1, 2);
       expect(result).toEqual(user);
+    });
+  });
+
+  /**
+   * The resolution a caller acting on somebody's behalf gets. Every rule `validateUser` applies
+   * except the token version, which belongs to a token the caller does not hold; the point of the
+   * shared helper is that a way in that is closed to a login stays closed to a delegated call.
+   */
+  describe('findActingUser', () => {
+    it('returns null when the user does not exist', async () => {
+      const { service, userService } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(null);
+
+      await expect(service.findActingUser(1)).resolves.toBeNull();
+    });
+
+    it('returns null when the user is deactivated', async () => {
+      const { service, userService } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ active: false }));
+
+      await expect(service.findActingUser(1)).resolves.toBeNull();
+    });
+
+    it('returns null for a shared user whose magic links were all revoked', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ provisioningMethod: 'shared' }));
+      magicLinkRepo.hasActiveByUserId.mockResolvedValue(false);
+
+      await expect(service.findActingUser(1)).resolves.toBeNull();
+    });
+
+    it('returns a shared user who still has a live magic link', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      const user = makeFullUser({ provisioningMethod: 'shared' });
+      userService.findByIdWithPermissions.mockResolvedValue(user);
+      magicLinkRepo.hasActiveByUserId.mockResolvedValue(true);
+
+      await expect(service.findActingUser(1)).resolves.toEqual(user);
+    });
+
+    it('never asks about magic links for an ordinary account', async () => {
+      const { service, userService, magicLinkRepo } = makeService();
+      userService.findByIdWithPermissions.mockResolvedValue(makeFullUser({ provisioningMethod: 'local' }));
+
+      await service.findActingUser(1);
+      expect(magicLinkRepo.hasActiveByUserId).not.toHaveBeenCalled();
+    });
+
+    it('ignores the token version, which belongs to a token this caller does not hold', async () => {
+      const { service, userService } = makeService();
+      const user = makeFullUser({ tokenVersion: 9 });
+      userService.findByIdWithPermissions.mockResolvedValue(user);
+
+      await expect(service.findActingUser(1)).resolves.toEqual(user);
     });
   });
 

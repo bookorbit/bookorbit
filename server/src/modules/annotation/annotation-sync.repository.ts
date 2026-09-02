@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, getTableColumns, inArray, isNotNull, isNull, notExists, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, getTableColumns, inArray, isNotNull, isNull, notExists, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -226,7 +226,14 @@ export class AnnotationSyncRepository {
   }
 
   /** Active annotations of the book with no sync state for this device (push-down adds). */
-  async findAddCandidates(userId: number, source: AnnotationSyncSource, deviceId: string, bookId: number, limit: number): Promise<AnnotationRow[]> {
+  async findAddCandidates(
+    userId: number,
+    source: AnnotationSyncSource,
+    deviceId: string,
+    bookId: number,
+    limit: number,
+    requiredPositionFormats?: AnnotationPositionFormat[],
+  ): Promise<AnnotationRow[]> {
     return this.db
       .select(getTableColumns(annotations))
       .from(annotations)
@@ -247,6 +254,14 @@ export class AnnotationSyncRepository {
                 ),
               ),
           ),
+          requiredPositionFormats?.length
+            ? exists(
+                this.db
+                  .select({ one: sql`1` })
+                  .from(annotationPositions)
+                  .where(and(eq(annotationPositions.annotationId, annotations.id), inArray(annotationPositions.format, requiredPositionFormats))),
+              )
+            : undefined,
         ),
       )
       .orderBy(asc(annotations.id))

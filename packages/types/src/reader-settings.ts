@@ -4,6 +4,14 @@ export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
 
 export const EPUB_FONT_SIZE_MIN = 6;
 export const EPUB_FONT_SIZE_MAX = 32;
+export const EPUB_PARAGRAPH_SPACING_MIN = 0;
+export const EPUB_PARAGRAPH_SPACING_MAX = 2;
+export const EPUB_LETTER_SPACING_MIN = 0;
+export const EPUB_LETTER_SPACING_MAX = 0.2;
+export const EPUB_WORD_SPACING_MIN = 0;
+export const EPUB_WORD_SPACING_MAX = 0.5;
+export const EPUB_TEXT_INDENT_MIN = 0;
+export const EPUB_TEXT_INDENT_MAX = 4;
 export const CBX_SPREAD_GAP_MIN = 0;
 export const CBX_SPREAD_GAP_MAX = 64;
 
@@ -57,7 +65,10 @@ export function getFormatGroup(format: string): ReaderFormatGroup {
 /** Formats a given reader can open, so a caller can ask for "another file this same reader handles". */
 export function getOpenableFormatsForGroup(group: ReaderFormatGroup): string[] {
   return Object.entries(FORMAT_TO_GROUP)
-    .filter(([format, formatGroup]) => formatGroup === group && READER_OPENABLE_FORMATS.has(format))
+    .filter(
+      ([format, formatGroup]) =>
+        formatGroup === group && READER_OPENABLE_FORMATS.has(format),
+    )
     .map(([format]) => format);
 }
 
@@ -71,6 +82,10 @@ export interface EpubReaderSettings {
   fontStyle: FontStyle;
   fontSize: number; // EPUB_FONT_SIZE_MIN-EPUB_FONT_SIZE_MAX
   lineHeight: number; // 0.8-3.0
+  paragraphSpacing: number; // EPUB_PARAGRAPH_SPACING_MIN-EPUB_PARAGRAPH_SPACING_MAX em; 0 preserves publisher spacing
+  letterSpacing: number | null; // null preserves publisher spacing
+  wordSpacing: number | null; // null preserves publisher spacing
+  textIndent: number | null; // null preserves publisher first-line indentation
   maxColumnCount: number; // 1-10
   gap: number; // 0-0.5 (column gap as fraction)
   maxInlineSize: number; // 400-1600 (max content width in px)
@@ -123,7 +138,11 @@ export type ReaderSettingsMap = {
   audio: AudioReaderSettings;
 };
 
-export type ReaderSettings = EpubReaderSettings | PdfReaderSettings | CbxReaderSettings | AudioReaderSettings;
+export type ReaderSettings =
+  | EpubReaderSettings
+  | PdfReaderSettings
+  | CbxReaderSettings
+  | AudioReaderSettings;
 
 export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
   themeName: "default",
@@ -133,6 +152,10 @@ export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
   fontStyle: "normal",
   fontSize: 16,
   lineHeight: 1.5,
+  paragraphSpacing: EPUB_PARAGRAPH_SPACING_MIN,
+  letterSpacing: null,
+  wordSpacing: null,
+  textIndent: null,
   maxColumnCount: 2,
   gap: 0.05,
   maxInlineSize: 720,

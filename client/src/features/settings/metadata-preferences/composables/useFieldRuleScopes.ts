@@ -99,6 +99,7 @@ export function useFieldRuleScopes() {
         maxCount: source.options?.genres.maxCount ?? null,
       },
       saveProviderIds: source.options?.saveProviderIds ?? true,
+      providerIdMode: source.options?.providerIdMode ?? 'preferExisting',
     }
   }
 

@@ -586,8 +586,29 @@
     {
       "idx": 83,
       "version": "7",
-      "when": 1788159394964,
-      "tag": "0083_add_mangabaka_columns",
+      "when": 1788194498208,
+      "tag": "0083_add_book_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1788206528114,
+      "tag": "0084_add_scan_state_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1788321273908,
+      "tag": "0085_add_authentication_method",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1788380862588,
+      "tag": "0086_add_mangabaka_columns",
       "breakpoints": true
     }
   ]

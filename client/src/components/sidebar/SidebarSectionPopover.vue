@@ -21,7 +21,7 @@ defineProps<{
       <span
         v-if="count > 0"
         aria-hidden="true"
-        class="absolute -bottom-0.5 -right-0.5 rounded-md bg-(--shell-accent-tint) px-1 text-[11px] font-semibold leading-tight tabular-nums text-muted-foreground"
+        class="absolute -bottom-0.5 -right-0.5 rounded-md bg-(--shell-accent-tint) px-1 text-[11px] font-semibold leading-tight tabular-nums text-sidebar-count-foreground"
       >
         {{ formatCompactNumber(count) }}
       </span>

@@ -102,6 +102,32 @@ describe('BookDock metadata normalization', () => {
     expect(normalizeBookDockMetadata({ duration: 1200, durationSeconds: 2400 })).toEqual({ durationSeconds: 2400 });
   });
 
+  it('normalizes legacy numeric series indexes while preserving exact string labels', () => {
+    expect(
+      normalizeBookDockMetadata({
+        seriesIndex: 3,
+        seriesMemberships: [
+          { seriesName: 'Legacy', seriesIndex: 2.5 },
+          { seriesName: 'Exact', seriesIndex: '5.10' },
+          { seriesName: 'Invalid', seriesIndex: 'volume-three' },
+        ],
+      }),
+    ).toEqual({
+      seriesIndex: '3',
+      seriesMemberships: [
+        { seriesName: 'Legacy', seriesIndex: '2.5' },
+        { seriesName: 'Exact', seriesIndex: '5.10' },
+        { seriesName: 'Invalid', seriesIndex: null },
+      ],
+    });
+  });
+
+  it('normalizes malformed primary series indexes to null', () => {
+    expect(normalizeBookDockMetadata({ seriesIndex: Number.NaN })).toEqual({ seriesIndex: null });
+    expect(normalizeBookDockMetadata({ seriesIndex: '1.2.3' })).toEqual({ seriesIndex: null });
+    expect(normalizeBookDockMetadata({ seriesIndex: {} })).toEqual({ seriesIndex: null });
+  });
+
   it('normalizes pipeline source names to the BookDock contract and drops unknown fields', () => {
     expect(
       normalizeBookDockMetadataSources({

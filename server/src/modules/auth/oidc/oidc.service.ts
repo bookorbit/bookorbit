@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, Unauthorize
 import { ConfigService } from '@nestjs/config';
 import { compare } from 'bcryptjs';
 import type { FastifyReply } from 'fastify';
-import { AuditAction, AuditResource, OidcCallbackResponse, OidcErrorCode, Permission } from '@bookorbit/types';
+import { AuditAction, AuditResource, AuthenticationMethod, OidcCallbackResponse, OidcErrorCode, Permission } from '@bookorbit/types';
 import type { OidcAutoProvision, OidcClaimMapping } from '@bookorbit/types';
 
 import { AUDIT_EVENT, AuditEventsService } from '../../audit/audit-events.service';
@@ -18,6 +18,7 @@ import { OidcSessionRepository } from './oidc-session.repository';
 import { OidcStateService } from './oidc-state.service';
 import { OidcTokenClientService } from './oidc-token-client.service';
 import { OidcTokenValidatorService } from './oidc-token-validator.service';
+import { AuthenticationPolicyService } from '../../../common/services/authentication-policy.service';
 
 function isUniqueViolation(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -61,6 +62,7 @@ export class OidcService {
     private readonly authService: AuthService,
     private readonly auditEvents: AuditEventsService,
     private readonly configService: ConfigService,
+    private readonly authenticationPolicy: AuthenticationPolicyService,
   ) {
     this.appUrl = (this.configService.get<string>('app.appUrl') ?? 'http://localhost:5173').replace(/\/$/, '');
   }
@@ -112,25 +114,23 @@ export class OidcService {
     return this.identityRepo.findByUser(userId);
   }
 
-  async unlinkIdentity(userId: number, providerId: number, password: string): Promise<void> {
-    const hash = await this.userService.findPasswordHashById(userId);
-    if (!hash) throw new BadRequestException('User not found');
+  async unlinkIdentity(
+    userId: number,
+    providerId: number,
+    password: string | undefined,
+    authenticationMethod: AuthenticationMethod = AuthenticationMethod.Legacy,
+  ): Promise<void> {
+    if (this.authenticationPolicy.isPasswordLoginEnabled() && authenticationMethod !== AuthenticationMethod.Oidc) {
+      if (!password) throw new BadRequestException('Password confirmation is required');
+      const hash = await this.userService.findPasswordHashById(userId);
+      if (!hash) throw new BadRequestException('User not found');
 
-    const valid = await compare(password, hash);
-    if (!valid) throw new BadRequestException('Incorrect password');
+      const valid = await compare(password, hash);
+      if (!valid) throw new BadRequestException('Incorrect password');
+    }
 
     const identity = await this.identityRepo.findByUserAndProvider(userId, providerId);
     if (!identity) throw new NotFoundException('No identity linked to this provider');
-
-    // D4: Check if user has local password OR another linked identity
-    const user = await this.userService.findById(userId);
-    if (!user) throw new BadRequestException('User not found');
-
-    const identityCount = await this.identityRepo.countByUser(userId);
-    const hasLocalAuth = user.provisioningMethod !== 'oidc';
-    if (!hasLocalAuth && identityCount <= 1) {
-      throw new BadRequestException('Cannot unlink: this is your only authentication method. Set a password first.');
-    }
 
     await this.identityRepo.remove(userId, providerId);
 
@@ -272,7 +272,7 @@ export class OidcService {
       description: `User logged in via OIDC (issuer: ${disc.issuer})`,
     });
 
-    const authResult = await this.authService.issueTokensForUser(user.id, reply);
+    const authResult = await this.authService.issueTokensForUser(user.id, reply, AuthenticationMethod.Oidc);
     return { mode: 'login' as const, ...authResult } as OidcCallbackResponse;
   }
 

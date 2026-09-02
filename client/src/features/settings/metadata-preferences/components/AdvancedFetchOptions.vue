@@ -28,6 +28,10 @@ function setSaveProviderIds(value: boolean) {
   emit('change', { ...props.options, saveProviderIds: value })
 }
 
+function setExistingProviderIdsOnly(value: boolean) {
+  emit('change', { ...props.options, providerIdMode: value ? 'existingOnly' : 'preferExisting' })
+}
+
 function setMaxCount(event: Event) {
   const value = (event.target as HTMLInputElement).valueAsNumber
   emit('change', { ...props.options, genres: { ...props.options.genres, maxCount: Number.isNaN(value) ? null : value } })
@@ -41,7 +45,7 @@ function setMaxCount(event: Event) {
       <h3 class="settings-group-label mb-0!">{{ t('settings.metadata.fieldRules.advanced.title') }}</h3>
     </div>
 
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <div class="h-full rounded-lg border border-border bg-background/60 p-4 shadow-xs">
         <div class="flex items-start justify-between gap-4">
           <span id="combine-genres-label" class="text-sm font-medium leading-5 text-foreground">
@@ -103,6 +107,24 @@ function setMaxCount(event: Event) {
         </div>
         <p id="store-provider-ids-hint" class="mt-2 text-xs leading-relaxed text-muted-foreground">
           {{ t('settings.metadata.fieldRules.advanced.storeProviderIds.hint') }}
+        </p>
+      </div>
+
+      <div class="h-full rounded-lg border border-border bg-background/60 p-4 shadow-xs">
+        <div class="flex items-start justify-between gap-4">
+          <span id="existing-provider-ids-only-label" class="text-sm font-medium leading-5 text-foreground">
+            {{ t('settings.metadata.fieldRules.advanced.existingProviderIdsOnly.label') }}
+          </span>
+          <ToggleSwitch
+            :model-value="options.providerIdMode === 'existingOnly'"
+            :disabled="disabled"
+            aria-labelledby="existing-provider-ids-only-label"
+            aria-describedby="existing-provider-ids-only-hint"
+            @update:model-value="setExistingProviderIdsOnly"
+          />
+        </div>
+        <p id="existing-provider-ids-only-hint" class="mt-2 text-xs leading-relaxed text-muted-foreground">
+          {{ t('settings.metadata.fieldRules.advanced.existingProviderIdsOnly.hint') }}
         </p>
       </div>
     </div>

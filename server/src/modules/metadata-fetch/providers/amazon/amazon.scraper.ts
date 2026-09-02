@@ -64,7 +64,8 @@ export function extractAsins(html: string, limit: number): string[] {
   $('div[data-component-type="s-search-result"]').each((_, el) => {
     if (results.length >= limit) return false;
 
-    const titleText = $(el).find('[data-cy=title-recipe]').text().toLowerCase();
+    const titleText = $(el).find('[data-cy=title-recipe]').text().trim().toLowerCase();
+    if (titleText.startsWith('sponsored')) return;
     if (SKIP_TITLE_PATTERNS.test(titleText)) return;
 
     // Collect all /dp/ASIN links with their visible label within this result block.

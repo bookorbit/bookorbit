@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Aperture, BookCopy, CircleArrowUp, FolderOpen, Heart, Orbit } from '@lucide/vue'
+import { Permission, type Library } from '@bookorbit/types'
 import { formatCompactNumber, formatNumber } from '@/i18n/formatters'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail, SidebarSeparator, useSidebar } from '@/components/ui/sidebar'
 import SidebarZone from '@/components/sidebar/SidebarZone.vue'
@@ -24,7 +25,6 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useScanProgress, getSocket } from '@/features/scanner/composables/useScanProgress'
 import { useLibraryUploadEvents } from '@/features/library/composables/useLibraryUploadEvents'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
-import type { Library } from '@bookorbit/types'
 import CreateSmartScopeDialog from '@/features/smart-scope/components/CreateSmartScopeDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
@@ -32,11 +32,12 @@ import { useLibraryCreationRedirect } from '@/features/library/composables/useLi
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import SettingsSidebar from '@/features/settings/components/SettingsSidebar.vue'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
+import { useBookRequestSummary } from '@/features/book-requests/composables/useBookRequestSummary'
+import { useBookRequestProgress } from '@/features/book-requests/composables/useBookRequestProgress'
 
 const { t } = useI18n()
 const route = useRoute()
 const { state, isMobile, setOpenMobile } = useSidebar()
-const { zones } = useSidebarNav()
 const { libraries, fetchLibraries, refreshLibraries, reorderLibraries } = useLibraries()
 const { smartScopes, fetchSmartScopes, reorderSmartScopes } = useSmartScopes()
 const { collections, fetchCollections, reorderCollections } = useCollections()
@@ -47,6 +48,12 @@ const { version, updateAvailable, latestVersion, loadAppInfo } = useAppInfo()
 const { hasUnseen: hasUnseenWhatsNew } = useWhatsNew()
 const { fetchSummary: fetchBookDockSummary, subscribe: subscribeBookDockSummary } = useBookDockSummary()
 const { fetchCounts: fetchBrowseCounts, refreshCounts: refreshBrowseCounts } = useBrowseCounts()
+const { summary: bookRequestSummary, fetchSummary: fetchBookRequestSummary, refreshSummary: refreshBookRequestSummary } = useBookRequestSummary()
+const outstandingRequestTotal = computed(() =>
+  hasPermission(Permission.ManageBookRequests) ? (bookRequestSummary.value?.active ?? 0) : (bookRequestSummary.value?.mine ?? 0),
+)
+const { zones } = useSidebarNav(() => outstandingRequestTotal.value)
+const requestProgress = hasPermission(Permission.BookRequestAccess) ? useBookRequestProgress() : null
 useLibraryScanRefresh()
 
 const SUPPORT_URL = 'https://ko-fi.com/neonbookorbit'
@@ -152,12 +159,23 @@ onMounted(async () => {
   void fetchSmartScopes()
   void fetchCollections()
   void fetchBrowseCounts()
+  if (hasPermission(Permission.BookRequestAccess)) void fetchBookRequestSummary()
   void loadAppInfo()
   if (hasPermission('book_dock_access')) {
     void fetchBookDockSummary()
     subscribeBookDockSummary()
   }
 })
+
+requestProgress?.onRequestsChanged(() => {
+  void refreshBookRequestSummary()
+})
+
+if (requestProgress) {
+  watch(requestProgress.connected, (connected) => {
+    if (connected) void refreshBookRequestSummary()
+  })
+}
 
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
 const stopLibraryUploadListener = onLibraryUploadCompleted((event) => {
@@ -213,7 +231,7 @@ onUnmounted(() => stopLibraryUploadListener())
             v-for="entry in zone.entries"
             :key="entry.id"
             :is-active="entry.isActive"
-            :tooltip="entry.label"
+            :tooltip="entry.badge?.label ?? entry.label"
             :to="entry.to"
             :icon="entry.icon"
             :label="entry.label"
@@ -221,7 +239,9 @@ onUnmounted(() => stopLibraryUploadListener())
             @navigate="handleNavigate"
           >
             <template #badge>
-              <SidebarBadge v-if="entry.badge !== null">{{ formatCompactNumber(entry.badge) }}</SidebarBadge>
+              <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
+                formatCompactNumber(entry.badge.value)
+              }}</SidebarBadge>
             </template>
           </SidebarNavItem>
         </SidebarZone>

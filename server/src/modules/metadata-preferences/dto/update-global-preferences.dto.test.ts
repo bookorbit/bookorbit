@@ -132,6 +132,7 @@ describe('UpdateGlobalPreferencesDto', () => {
           maxCount: 3,
         },
         saveProviderIds: true,
+        providerIdMode: 'existingOnly',
       },
     });
 
@@ -152,6 +153,7 @@ describe('UpdateGlobalPreferencesDto', () => {
           mode: 'merge',
         },
         saveProviderIds: true,
+        providerIdMode: 'preferExisting',
       },
     });
 
@@ -173,6 +175,7 @@ describe('UpdateGlobalPreferencesDto', () => {
           maxCount: null,
         },
         saveProviderIds: true,
+        providerIdMode: 'preferExisting',
       },
     };
 
@@ -196,6 +199,7 @@ describe('UpdateGlobalPreferencesDto', () => {
       options: {
         genres: { mode: 'merge', maxCount },
         saveProviderIds: true,
+        providerIdMode: 'preferExisting',
       },
     });
 
@@ -220,6 +224,7 @@ describe('UpdateGlobalPreferencesDto', () => {
           maxCount: 0,
         },
         saveProviderIds: 'yes',
+        providerIdMode: 'unsupported',
       },
     });
 

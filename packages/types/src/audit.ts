@@ -73,6 +73,27 @@ export enum AuditAction {
 
   BookDockFinalize = "book_dock.finalize",
 
+  BookRequestCreate = "book_request.create",
+  BookRequestApprove = "book_request.approve",
+  BookRequestReject = "book_request.reject",
+  BookRequestCancel = "book_request.cancel",
+  BookRequestFulfill = "book_request.fulfill",
+  BookRequestGrab = "book_request.grab",
+  BookRequestImport = "book_request.import",
+  BookRequestRemoveDownload = "book_request.remove_download",
+  BookRequestDelete = "book_request.delete",
+
+  DownloadClientCreate = "download_client.create",
+  DownloadClientUpdate = "download_client.update",
+  DownloadClientDelete = "download_client.delete",
+
+  RequestIndexerCreate = "request_indexer.create",
+  RequestIndexerUpdate = "request_indexer.update",
+  RequestIndexerDelete = "request_indexer.delete",
+  RequestIndexerPluginInspect = "request_indexer.plugin.inspect",
+  RequestIndexerPluginInstall = "request_indexer.plugin.install",
+  RequestIndexerPluginRemove = "request_indexer.plugin.remove",
+
   AuthorUpdate = "author.update",
   AuthorDelete = "author.delete",
   AuthorMerge = "author.merge",
@@ -128,6 +149,9 @@ export enum AuditResource {
   Collection = "collection",
   SmartScope = "smart_scope",
   BookDockFile = "book_dock_file",
+  BookRequest = "book_request",
+  DownloadClient = "download_client",
+  RequestIndexer = "request_indexer",
   Author = "author",
   AppSettings = "app_settings",
   Genre = "genre",

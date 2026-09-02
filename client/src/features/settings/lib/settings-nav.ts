@@ -5,6 +5,7 @@ import {
   BookMarked,
   BookOpen,
   Database,
+  DownloadCloud,
   FileText,
   Filter,
   Folder,
@@ -16,6 +17,7 @@ import {
   LayoutGrid,
   Library,
   LibraryBig,
+  Link2,
   Lock,
   Mail,
   Palette,
@@ -25,6 +27,7 @@ import {
   Server,
   Shield,
   ShieldCheck,
+  ShieldUser,
   SlidersHorizontal,
   Smartphone,
   Sparkles,
@@ -45,6 +48,9 @@ export interface SettingsNavContext {
   isDemoRestricted: boolean
 }
 
+/** Live signals the rail renders beside a row. Resolved by the nav, not stored in this file. */
+export type SettingsNavStatus = 'libraryScan'
+
 export interface SettingsNavItem {
   id: string
   routeName: string
@@ -53,6 +59,7 @@ export interface SettingsNavItem {
   icon: Component
   /** Extra English search terms so the rail search finds a page by concept, not just by title. */
   keywords?: string
+  status?: SettingsNavStatus
   isVisible?: (context: SettingsNavContext) => boolean
   children?: SettingsNavItem[]
 }
@@ -239,70 +246,80 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         descriptionKey: 'settings.nav.descriptions.libraries',
         icon: Folder,
         keywords: 'library folder path scan watch ignore mount storage',
+        status: 'libraryScan',
         isVisible: anyPermission('manage_libraries'),
       },
       {
-        id: 'metadata-providers',
+        id: 'metadata',
         routeName: 'settings-metadata-providers',
-        labelKey: 'settings.metadata.tabs.providers',
-        descriptionKey: 'settings.metadata.tabSubtitles.providers',
+        labelKey: 'settings.common.nav.metadata',
         icon: Database,
-        keywords: 'provider source google books open library comicvine priority credentials',
-        isVisible: anyPermission('manage_metadata_config'),
-      },
-      {
-        id: 'metadata-field-rules',
-        routeName: 'settings-metadata-field-rules',
-        labelKey: 'settings.metadata.tabs.field-rules',
-        descriptionKey: 'settings.metadata.tabSubtitles.field-rules',
-        icon: SlidersHorizontal,
-        keywords: 'field rule merge strategy overwrite protect title author series',
-        isVisible: anyPermission('manage_metadata_config'),
-      },
-      {
-        id: 'metadata-custom-fields',
-        routeName: 'settings-metadata-custom-fields',
-        labelKey: 'settings.metadata.tabs.custom-fields',
-        descriptionKey: 'settings.metadata.tabSubtitles.custom-fields',
-        icon: Tag,
-        keywords: 'custom field column attribute picker',
-        isVisible: anyPermission('manage_libraries'),
-      },
-      {
-        id: 'metadata-score',
-        routeName: 'settings-metadata-score',
-        labelKey: 'settings.metadata.tabs.score',
-        descriptionKey: 'settings.metadata.tabSubtitles.score',
-        icon: Star,
-        keywords: 'score weight match confidence similarity threshold',
-        isVisible: anyPermission('manage_metadata_config'),
-      },
-      {
-        id: 'metadata-auto-fetch',
-        routeName: 'settings-metadata-auto-fetch',
-        labelKey: 'settings.metadata.tabs.auto-fetch',
-        descriptionKey: 'settings.metadata.tabSubtitles.auto-fetch',
-        icon: Zap,
-        keywords: 'auto fetch schedule missing fields import books conditions',
-        isVisible: anyPermission('manage_metadata_config'),
-      },
-      {
-        id: 'metadata-authors',
-        routeName: 'settings-metadata-authors',
-        labelKey: 'settings.metadata.tabs.authors',
-        descriptionKey: 'settings.metadata.tabSubtitles.authors',
-        icon: Sparkles,
-        keywords: 'author biography photo enrichment',
-        isVisible: anyPermission('manage_metadata_config'),
-      },
-      {
-        id: 'metadata-genre-blocklist',
-        routeName: 'settings-metadata-genre-blocklist',
-        labelKey: 'settings.metadata.tabs.genre-blocklist',
-        descriptionKey: 'settings.metadata.tabSubtitles.genre-blocklist',
-        icon: Filter,
-        keywords: 'genre tag blocklist exclude ignore',
-        isVisible: anyPermission('manage_metadata_config'),
+        keywords: 'metadata provider field rule score author genre custom field',
+        children: [
+          {
+            id: 'metadata-providers',
+            routeName: 'settings-metadata-providers',
+            labelKey: 'settings.metadata.tabs.providers',
+            descriptionKey: 'settings.metadata.tabSubtitles.providers',
+            icon: Database,
+            keywords: 'provider source google books open library comicvine priority credentials',
+            isVisible: anyPermission('manage_metadata_config'),
+          },
+          {
+            id: 'metadata-field-rules',
+            routeName: 'settings-metadata-field-rules',
+            labelKey: 'settings.metadata.tabs.field-rules',
+            descriptionKey: 'settings.metadata.tabSubtitles.field-rules',
+            icon: SlidersHorizontal,
+            keywords: 'field rule merge strategy overwrite protect title author series',
+            isVisible: anyPermission('manage_metadata_config'),
+          },
+          {
+            id: 'metadata-custom-fields',
+            routeName: 'settings-metadata-custom-fields',
+            labelKey: 'settings.metadata.tabs.custom-fields',
+            descriptionKey: 'settings.metadata.tabSubtitles.custom-fields',
+            icon: Tag,
+            keywords: 'custom field column attribute picker',
+            isVisible: anyPermission('manage_libraries'),
+          },
+          {
+            id: 'metadata-score',
+            routeName: 'settings-metadata-score',
+            labelKey: 'settings.metadata.tabs.score',
+            descriptionKey: 'settings.metadata.tabSubtitles.score',
+            icon: Star,
+            keywords: 'score weight match confidence similarity threshold',
+            isVisible: anyPermission('manage_metadata_config'),
+          },
+          {
+            id: 'metadata-auto-fetch',
+            routeName: 'settings-metadata-auto-fetch',
+            labelKey: 'settings.metadata.tabs.auto-fetch',
+            descriptionKey: 'settings.metadata.tabSubtitles.auto-fetch',
+            icon: Zap,
+            keywords: 'auto fetch schedule missing fields import books conditions',
+            isVisible: anyPermission('manage_metadata_config'),
+          },
+          {
+            id: 'metadata-authors',
+            routeName: 'settings-metadata-authors',
+            labelKey: 'settings.metadata.tabs.authors',
+            descriptionKey: 'settings.metadata.tabSubtitles.authors',
+            icon: Sparkles,
+            keywords: 'author biography photo enrichment',
+            isVisible: anyPermission('manage_metadata_config'),
+          },
+          {
+            id: 'metadata-genre-blocklist',
+            routeName: 'settings-metadata-genre-blocklist',
+            labelKey: 'settings.metadata.tabs.genre-blocklist',
+            descriptionKey: 'settings.metadata.tabSubtitles.genre-blocklist',
+            icon: Filter,
+            keywords: 'genre tag blocklist exclude ignore',
+            isVisible: anyPermission('manage_metadata_config'),
+          },
+        ],
       },
       {
         id: 'file-naming',
@@ -365,6 +382,13 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         keywords: 'email smtp kindle send to device template sender',
         isVisible: anyPermission('email_send', 'manage_email'),
       },
+    ],
+  },
+  {
+    id: 'accounts',
+    labelKey: 'settings.nav.groups.accounts',
+    icon: Link2,
+    items: [
       {
         id: 'hardcover',
         routeName: 'settings-hardcover',
@@ -400,49 +424,58 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
     icon: Server,
     items: [
       {
-        id: 'users',
+        id: 'users-access',
         routeName: 'settings-admin-users',
-        labelKey: 'settings.admin.tabs.users',
-        descriptionKey: 'settings.nav.descriptions.users',
-        icon: Users,
-        keywords: 'user role permission invite admin superuser account',
-        isVisible: anyPermission('manage_users'),
+        labelKey: 'settings.common.nav.usersAccess',
+        icon: ShieldUser,
+        keywords: 'user role permission invite admin superuser sso login access',
+        children: [
+          {
+            id: 'users',
+            routeName: 'settings-admin-users',
+            labelKey: 'settings.admin.tabs.users',
+            descriptionKey: 'settings.nav.descriptions.users',
+            icon: Users,
+            keywords: 'user role permission invite admin superuser account',
+            isVisible: anyPermission('manage_users'),
+          },
+          {
+            id: 'account-activity',
+            routeName: 'settings-admin-account-activity',
+            labelKey: 'settings.admin.tabs.account-activity',
+            descriptionKey: 'settings.nav.descriptions.accountActivity',
+            icon: Activity,
+            keywords: 'activity session login usage reading insights',
+            isVisible: anyPermission('view_user_activity'),
+          },
+          {
+            id: 'magic-links',
+            routeName: 'settings-admin-magic-links',
+            labelKey: 'settings.admin.tabs.magic-links',
+            descriptionKey: 'settings.nav.descriptions.magicLinks',
+            icon: KeyRound,
+            keywords: 'magic link share passwordless expiry token invite',
+            isVisible: superuserOnly,
+          },
+          {
+            id: 'oidc',
+            routeName: 'settings-admin-oidc',
+            labelKey: 'settings.admin.tabs.oidc',
+            descriptionKey: 'settings.nav.descriptions.oidc',
+            icon: ShieldCheck,
+            keywords: 'oidc sso single sign on auth provider claims',
+            isVisible: anyPermission('manage_app_settings'),
+          },
+        ],
       },
       {
-        id: 'account-activity',
-        routeName: 'settings-admin-account-activity',
-        labelKey: 'settings.admin.tabs.account-activity',
-        descriptionKey: 'settings.nav.descriptions.accountActivity',
-        icon: Activity,
-        keywords: 'activity session login usage reading insights',
-        isVisible: anyPermission('view_user_activity'),
-      },
-      {
-        id: 'magic-links',
-        routeName: 'settings-admin-magic-links',
-        labelKey: 'settings.admin.tabs.magic-links',
-        descriptionKey: 'settings.nav.descriptions.magicLinks',
-        icon: KeyRound,
-        keywords: 'magic link share passwordless expiry token invite',
-        isVisible: superuserOnly,
-      },
-      {
-        id: 'oidc',
-        routeName: 'settings-admin-oidc',
-        labelKey: 'settings.admin.tabs.oidc',
-        descriptionKey: 'settings.nav.descriptions.oidc',
-        icon: ShieldCheck,
-        keywords: 'oidc sso single sign on auth provider claims',
-        isVisible: anyPermission('manage_app_settings'),
-      },
-      {
-        id: 'server-fonts',
-        routeName: 'settings-admin-server-fonts',
-        labelKey: 'settings.admin.tabs.server-fonts',
-        descriptionKey: 'settings.nav.descriptions.serverFonts',
-        icon: Type,
-        keywords: 'server font upload typeface available readers',
-        isVisible: anyPermission('manage_app_settings'),
+        id: 'requests',
+        routeName: 'settings-admin-requests',
+        labelKey: 'settings.system.tabs.requests',
+        descriptionKey: 'settings.nav.descriptions.requests',
+        icon: DownloadCloud,
+        keywords: 'request download client qbittorrent torrent magnet path mapping hardlink',
+        isVisible: anyPermission(Permission.ManageAppSettings),
       },
       {
         id: 'book-dock',
@@ -452,6 +485,15 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         icon: PanelBottom,
         keywords: 'dock quick action book page toolbar',
         isVisible: anyPermission(Permission.ManageBookDock),
+      },
+      {
+        id: 'server-fonts',
+        routeName: 'settings-admin-server-fonts',
+        labelKey: 'settings.admin.tabs.server-fonts',
+        descriptionKey: 'settings.nav.descriptions.serverFonts',
+        icon: Type,
+        keywords: 'server font upload typeface available readers',
+        isVisible: anyPermission('manage_app_settings'),
       },
       {
         id: 'audit-log',
@@ -470,12 +512,19 @@ function isItemVisible(item: SettingsNavItem, context: SettingsNavContext): bool
   return item.isVisible ? item.isVisible(context) : true
 }
 
+/** A grouping row is only a destination through its children, so it dies with the last of them. */
+function visibleItem(item: SettingsNavItem, context: SettingsNavContext): SettingsNavItem | null {
+  if (!isItemVisible(item, context)) return null
+  if (!item.children) return item
+  const children = item.children.filter((child) => isItemVisible(child, context))
+  if (children.length === 0) return null
+  return { ...item, children }
+}
+
 export function visibleSettingsNav(context: SettingsNavContext): SettingsNavGroup[] {
   return SETTINGS_NAV.map((group) => ({
     ...group,
-    items: group.items
-      .filter((item) => isItemVisible(item, context))
-      .map((item) => (item.children ? { ...item, children: item.children.filter((child) => isItemVisible(child, context)) } : item)),
+    items: group.items.map((item) => visibleItem(item, context)).filter((item): item is SettingsNavItem => item !== null),
   })).filter((group) => group.items.length > 0)
 }
 

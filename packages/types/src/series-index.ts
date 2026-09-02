@@ -48,8 +48,9 @@ export function compareSeriesIndices(a: SeriesIndex, b: SeriesIndex): number {
 }
 
 export function formatSeriesIndex(value: SeriesIndex | null): string | null {
-  if (value == null) return null;
-  const [whole, fraction] = value.split(".");
+  const parsed = parseSeriesIndex(value);
+  if (parsed == null) return null;
+  const [whole, fraction] = parsed.split(".");
   const padded = whole.padStart(2, "0");
   return fraction === undefined ? padded : `${padded}.${fraction}`;
 }

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, TriangleAlert, UserPlus, X } from '@lucide/vue'
-import { Permission, type AuthUser, type DefaultLibraryAccessConfig, type UserListSortField, type UserListState } from '@bookorbit/types'
+import { Permission, type DefaultLibraryAccessConfig, type UserListSortField, type UserListState } from '@bookorbit/types'
 
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
@@ -10,6 +10,7 @@ import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import { useLoginOptions } from '@/features/auth/composables/useLoginOptions'
 import { useUsers, type UserRow } from './composables/useUsers'
 import { useSelfRegistration } from './composables/useSelfRegistration'
 import UserFormDrawer from './UserFormDrawer.vue'
@@ -24,6 +25,8 @@ const HEADER_ACTIONS_TARGET = '#settings-header-actions'
 const { t } = useI18n()
 const { isSuperuser, hasPermission } = usePermissions()
 const { user: currentUser } = useAuth()
+const { loginOptions, fetchLoginOptions } = useLoginOptions()
+const passwordLoginEnabled = computed(() => loginOptions.value?.passwordLoginEnabled === true)
 
 const {
   users,
@@ -55,7 +58,7 @@ const {
 } = useUsers()
 
 const drawerOpen = ref(false)
-const editingUser = ref<Partial<AuthUser> | null>(null)
+const editingUser = ref<UserRow | null>(null)
 const resetUrl = ref<string | null>(null)
 const deleteConfirmUser = ref<UserRow | null>(null)
 const superuserConfirm = ref<{ user: UserRow; isSuperuser: boolean } | null>(null)
@@ -119,7 +122,7 @@ const superuserConfirmLabel = computed(() => {
 
 onMounted(async () => {
   headerSlotAvailable.value = document.getElementById(HEADER_ACTIONS_TARGET.slice(1)) !== null
-  await Promise.all([reload(), loadStatic()])
+  await Promise.all([reload(), loadStatic(), fetchLoginOptions().catch(() => undefined)])
   if (canManageAppSettings.value) await loadSelfRegistration()
 })
 
@@ -163,6 +166,16 @@ function openById(userId: number) {
   if (match) openEdit(match)
 }
 
+const canDeleteEditingUser = computed(() => !!editingUser.value && canManage(editingUser.value))
+
+/** Deleting from inside the editor closes it first: the confirm is the page's, and so is the list. */
+function handleDrawerDelete() {
+  const user = editingUser.value
+  if (!user) return
+  drawerOpen.value = false
+  requestDeleteUser(user)
+}
+
 function closeDrawer() {
   drawerOpen.value = false
 }
@@ -176,7 +189,7 @@ function canManage(user: UserRow): boolean {
 }
 
 function isPasswordResettable(user: UserRow): boolean {
-  return user.provisioningMethod !== 'oidc' && user.provisioningMethod !== 'shared'
+  return passwordLoginEnabled.value && user.provisioningMethod !== 'oidc' && user.provisioningMethod !== 'shared'
 }
 
 function isLocked(user: UserRow): boolean {
@@ -353,7 +366,7 @@ async function saveDefaultLibraryAccess() {
       <p class="hidden text-sm text-muted-foreground lg:block">{{ pageSubtitle }}</p>
       <Button size="sm" type="button" @click="openCreate">
         <UserPlus :size="14" aria-hidden="true" />
-        {{ t('adminFeature.usersPage.createUser') }}
+        {{ passwordLoginEnabled ? t('adminFeature.usersPage.createUser') : t('adminFeature.userForm.createSharedAccount') }}
       </Button>
     </Teleport>
 
@@ -365,6 +378,7 @@ async function saveDefaultLibraryAccess() {
         :items="attention"
         :total="summary.attention"
         :busy-user-id="busyUserId"
+        :password-login-enabled="passwordLoginEnabled"
         @unlock="handleUnlock"
         @send-reset-link="handleResetPassword"
         @open="openById"
@@ -458,6 +472,7 @@ async function saveDefaultLibraryAccess() {
             :is-locked="isLocked"
             :is-resettable="isPasswordResettable"
             :needs-attention="needsAttention"
+            :password-login-enabled="passwordLoginEnabled"
             @sort="handleSort"
             @edit="openEdit"
             @unlock="unlockUser"
@@ -490,7 +505,7 @@ async function saveDefaultLibraryAccess() {
 
     <NewAccountDefaults
       v-if="showDefaults"
-      :show-self-registration="canManageAppSettings"
+      :show-self-registration="canManageAppSettings && passwordLoginEnabled"
       :show-library-defaults="canManageUserDefaults"
       :allow-registration="allowRegistration"
       :saving-self-registration="savingSelfRegistration"
@@ -512,9 +527,12 @@ async function saveDefaultLibraryAccess() {
       :default-library-ids="defaultLibraryIdsArray"
       :can-manage-superuser="isSuperuser"
       :current-user-id="currentUser?.id"
+      :can-delete="canDeleteEditingUser"
+      :password-login-enabled="passwordLoginEnabled"
       @close="closeDrawer"
       @saved="onSaved"
       @request-superuser-change="requestSuperuserChange"
+      @delete="handleDrawerDelete"
     />
     <ResetLinkModal v-if="resetUrl" :reset-url="resetUrl" @close="clearResetUrl" />
 

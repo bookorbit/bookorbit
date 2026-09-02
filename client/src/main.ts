@@ -10,6 +10,7 @@ import { i18n } from './i18n'
 import { useLocaleStore } from './stores/locale'
 import { useAuth } from './features/auth/composables/useAuth'
 import { useSetupStatus } from './features/auth/composables/useSetupStatus'
+import { useLoginOptions } from './features/auth/composables/useLoginOptions'
 
 // Chrome 124+ blocks aria-hidden from being applied to an element that contains
 // a focused descendant. Reka UI's dialog uses the aria-hidden package which sets
@@ -49,7 +50,7 @@ await localeStore.setLocale(localeStore.locale)
 // app.use(router) triggers initial navigation and guard execution.
 const { fetchSetupStatus, needsSetup } = useSetupStatus()
 try {
-  await fetchSetupStatus()
+  await Promise.all([fetchSetupStatus(), useLoginOptions().fetchLoginOptions()])
 } catch {
   // If setup-status check fails, continue with normal auth bootstrap.
 }

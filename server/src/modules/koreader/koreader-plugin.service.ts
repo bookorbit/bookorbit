@@ -5,14 +5,11 @@ import type { ReadStatus, UserBookStatus } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { syncEstimateSessionIdPrefix } from '../../common/utils/sync-estimate-session.utils';
 import { ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
-import { ReadingSessionService } from '../reading-session/reading-session.service';
 import { UserBookNoteService, type UserBookNoteDto } from '../user-book-note/user-book-note.service';
 import { UserBookStatusService } from '../user-book-status/user-book-status.service';
 import type { BookStateDto, BookStatesUploadDto, BulkProgressDto, MatchCheckDto, SweepCompleteDto } from './dto';
 import { KoreaderPluginRepository } from './koreader-plugin.repository';
-import { buildDeviceSessionIdPrefix } from './koreader-stats.util';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderService, type BulkProgressEntry } from './koreader.service';
 
@@ -98,7 +95,6 @@ export class KoreaderPluginService {
     private readonly userBookStatusService: UserBookStatusService,
     private readonly userBookNoteService: UserBookNoteService,
     private readonly achievementEvents: AchievementEventsService,
-    private readonly readingSessions: ReadingSessionService,
   ) {}
 
   async matchCheck(user: RequestUser, dto: MatchCheckDto): Promise<MatchCheckResult> {
@@ -267,21 +263,6 @@ export class KoreaderPluginService {
       annotationsUpserted: dto.annotationsUpserted,
     });
     await this.koreaderRepo.restoreDevice(user.id, dto.deviceId);
-
-    // This device reports KOReader's own page timings, and a sweep backfills them from a zero
-    // watermark the first time, so reading that had only been estimated from sync pushes now
-    // arrives measured. Only the estimates a measured session actually overlaps are retired,
-    // and it runs on every sweep so a failure here is retried rather than left double counted.
-    await this.readingSessions
-      .discardSupersededSyncEstimates(user, {
-        estimateSessionIdPrefix: syncEstimateSessionIdPrefix(dto.deviceId),
-        measuredSessionIdPrefix: buildDeviceSessionIdPrefix(dto.deviceId),
-      })
-      .catch((error: unknown) => {
-        this.logger.warn(
-          `[${SWEEP_EVENT}] [fail] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} durationMs=${Date.now() - startedAtMs} errorClass=${error instanceof Error ? error.constructor.name : 'UnknownError'} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - discarding superseded sync estimates failed`,
-        );
-      });
 
     const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
     const libraryVersion = await this.computeLibraryVersion(user.id, accessibleLibraryIds);

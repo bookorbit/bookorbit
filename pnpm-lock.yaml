@@ -320,6 +320,12 @@ importers:
         specifier: ^3.3.11
         version: 3.3.11(typescript@6.0.3)
 
+  packages/plugin-api:
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/types:
     devDependencies:
       typescript:
@@ -331,6 +337,9 @@ importers:
       7z-wasm:
         specifier: ^1.2.0
         version: 1.2.0
+      '@bookorbit/plugin-api':
+        specifier: workspace:*
+        version: link:../packages/plugin-api
       '@bookorbit/types':
         specifier: workspace:*
         version: link:../packages/types
@@ -478,6 +487,9 @@ importers:
       socket.io:
         specifier: ^4.8.3
         version: 4.8.3(supports-color@10.2.2)
+      undici:
+        specifier: ^8.10.0
+        version: 8.10.0
       unzipper:
         specifier: ^0.12.5
         version: 0.12.5

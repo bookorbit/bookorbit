@@ -9,7 +9,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { formatNumber } from '@/i18n/formatters'
 import { relativeTimestamp } from '../lib/relative-time'
 
-const props = defineProps<{ items: UserAttentionItem[]; total: number; busyUserId: number | null }>()
+const props = defineProps<{ items: UserAttentionItem[]; total: number; busyUserId: number | null; passwordLoginEnabled: boolean }>()
 const emit = defineEmits<{ unlock: [id: number]; sendResetLink: [id: number]; open: [id: number] }>()
 
 const { t } = useI18n()
@@ -18,7 +18,7 @@ const collapsed = ref(false)
 
 /** OIDC and shared accounts have no password here, so there is no link to send. */
 function isResettable(item: UserAttentionItem): boolean {
-  return item.provisioningMethod !== 'oidc' && item.provisioningMethod !== 'shared'
+  return props.passwordLoginEnabled && item.provisioningMethod !== 'oidc' && item.provisioningMethod !== 'shared'
 }
 
 function detail(item: UserAttentionItem): string {
@@ -41,6 +41,9 @@ function actionLabel(item: UserAttentionItem): string {
 }
 
 function unavailableHint(item: UserAttentionItem): string {
+  if (!props.passwordLoginEnabled && item.provisioningMethod !== 'oidc' && item.provisioningMethod !== 'shared') {
+    return t('adminFeature.usersPage.resetPasswordDisabledHintFull')
+  }
   return item.provisioningMethod === 'oidc'
     ? t('adminFeature.usersPage.resetPasswordOidcHintFull')
     : t('adminFeature.usersPage.resetPasswordSharedHintFull')

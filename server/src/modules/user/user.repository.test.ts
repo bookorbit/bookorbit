@@ -28,6 +28,7 @@ vi.mock('bcryptjs', () => ({ hash: vi.fn() }));
 import { hash } from 'bcryptjs';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { eq, ilike, sql } from 'drizzle-orm';
+import { Permission } from '@bookorbit/types';
 
 import * as schema from '../../db/schema';
 import { UserRepository } from './user.repository';
@@ -63,7 +64,15 @@ describe('UserRepository', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    repo = new UserRepository(db as any);
+    repo = new UserRepository(
+      db as any,
+      {
+        lockAdministratorAvailability: vi.fn((tx: { execute: () => unknown }) => tx.execute()),
+        assertUsableOidcSuperuser: vi.fn(),
+        isPasswordLoginEnabled: vi.fn().mockReturnValue(true),
+        hasEnabledOidcIdentityForUser: vi.fn().mockResolvedValue(true),
+      } as any,
+    );
 
     db.update.mockImplementation(() => ({ set: updateSet }));
     db.insert.mockImplementation(() => ({ values: insertValues }));
@@ -634,6 +643,34 @@ describe('UserRepository', () => {
     expect(tx.delete).not.toHaveBeenCalled();
   });
 
+  it('deleteManagedUser finishes dependent cleanup before deleting the user row', async () => {
+    const lifecycleWhere = vi.fn().mockResolvedValue([
+      { id: 1, active: false, isSuperuser: false, provisioningMethod: 'local' },
+      { id: 12, active: true, isSuperuser: false, provisioningMethod: 'local' },
+    ]);
+    const lifecycleFrom = vi.fn().mockReturnValue({ where: lifecycleWhere });
+    const order: string[] = [];
+    const deleteWhere = vi.fn().mockImplementation(() => {
+      order.push('delete');
+      return Promise.resolve();
+    });
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn().mockReturnValue({ from: lifecycleFrom }),
+      delete: vi.fn().mockReturnValue({ where: deleteWhere }),
+    };
+    db.transaction.mockImplementation((callback) => callback(tx as never));
+
+    await expect(
+      repo.deleteManagedUser(1, 12, () => {
+        order.push('cleanup');
+        return Promise.resolve();
+      }),
+    ).resolves.toBe('updated');
+
+    expect(order).toEqual(['cleanup', 'delete']);
+  });
+
   it('clearLockout resets the attempt counter and the lock timestamp', async () => {
     await repo.clearLockout(12);
 
@@ -664,6 +701,70 @@ describe('UserRepository', () => {
     expect(txInsertValues).toHaveBeenCalledWith([
       { userId: 7, permissionName: 'library_download' },
       { userId: 7, permissionName: 'kobo_sync' },
+    ]);
+  });
+
+  /**
+   * Enforced here rather than in the service because this is the one line every assignment path
+   * reaches, OIDC auto-provisioning included, and that path skips the service entirely.
+   */
+  it('setPermissions grants a permission that would otherwise be inert without its dependency', async () => {
+    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    db.transaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) =>
+      cb({
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+        insert: vi.fn().mockReturnValue({ values: txInsertValues }),
+      }),
+    );
+
+    await repo.setPermissions(7, [Permission.BookRequestSelfFulfill]);
+
+    expect(txInsertValues).toHaveBeenCalledWith([
+      { userId: 7, permissionName: Permission.BookRequestSelfFulfill },
+      { userId: 7, permissionName: Permission.BookRequestAccess },
+    ]);
+  });
+
+  /**
+   * Moderating the queue is a superset of using it. Without this a `manage_book_requests` grant
+   * produced an account the queue websocket rejected and the summary route answered 403 to.
+   */
+  it('setPermissions pulls book request access in behind the moderator and auto-approve grants', async () => {
+    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    db.transaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) =>
+      cb({
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+        insert: vi.fn().mockReturnValue({ values: txInsertValues }),
+      }),
+    );
+
+    await repo.setPermissions(7, [Permission.ManageBookRequests]);
+    expect(txInsertValues).toHaveBeenCalledWith([
+      { userId: 7, permissionName: Permission.ManageBookRequests },
+      { userId: 7, permissionName: Permission.BookRequestAccess },
+    ]);
+
+    await repo.setPermissions(7, [Permission.BookRequestAutoApprove]);
+    expect(txInsertValues).toHaveBeenLastCalledWith([
+      { userId: 7, permissionName: Permission.BookRequestAutoApprove },
+      { userId: 7, permissionName: Permission.BookRequestAccess },
+    ]);
+  });
+
+  it('setPermissions does not duplicate a dependency that was already selected', async () => {
+    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    db.transaction.mockImplementation(async (cb: (tx: unknown) => Promise<void>) =>
+      cb({
+        delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+        insert: vi.fn().mockReturnValue({ values: txInsertValues }),
+      }),
+    );
+
+    await repo.setPermissions(7, [Permission.BookRequestAccess, Permission.BookRequestSelfFulfill]);
+
+    expect(txInsertValues).toHaveBeenCalledWith([
+      { userId: 7, permissionName: Permission.BookRequestAccess },
+      { userId: 7, permissionName: Permission.BookRequestSelfFulfill },
     ]);
   });
 

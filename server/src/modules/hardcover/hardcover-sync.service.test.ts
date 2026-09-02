@@ -304,6 +304,47 @@ describe('HardcoverSyncService', () => {
       expect(mockClient.query).not.toHaveBeenCalled();
     });
 
+    it('does not treat a digit-prefixed Hardcover slug as a changed numeric book id', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockRepo.findBookSyncData.mockResolvedValue({ ...readingBook, hardcoverMetadataId: '84-charing-cross-road' });
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: 277100,
+        lastSyncedAt: new Date('2024-02-01T00:00:00Z'),
+        lastSyncedStatus: 'reading',
+        lastSyncedProgress: 42,
+        lastSyncedRating: null,
+        lastSyncedStartedAt: '2024-01-01',
+        lastSyncedFinishedAt: null,
+      });
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+
+      expect(mockMatchService.matchBook).not.toHaveBeenCalled();
+      expect(mockClient.query).not.toHaveBeenCalled();
+    });
+
+    it('re-syncs when a complete numeric Hardcover metadata id changes', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      const changedBook = { ...readingBook, hardcoverMetadataId: '84' };
+      mockRepo.findBookSyncData.mockResolvedValue(changedBook);
+      mockRepo.findBookState.mockResolvedValue({
+        hardcoverBookId: 277100,
+        lastSyncedAt: new Date('2024-02-01T00:00:00Z'),
+        lastSyncedStatus: 'reading',
+        lastSyncedProgress: 42,
+        lastSyncedRating: null,
+        lastSyncedStartedAt: '2024-01-01',
+        lastSyncedFinishedAt: null,
+      });
+      mockMatchService.matchBook.mockResolvedValue(null);
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+
+      expect(mockMatchService.matchBook).toHaveBeenCalledWith(1, 'tok', changedBook);
+      warnSpy.mockRestore();
+    });
+
     it('stores no_match error when match fails', async () => {
       const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
       mockSettingsService.getTokenForUser.mockResolvedValue('tok');

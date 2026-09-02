@@ -12,6 +12,7 @@ const permState = {
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ name: 'settings-appearance-theme' }),
+  useRouter: () => ({ push: vi.fn<(to: { name: string }) => void>() }),
 }))
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
@@ -57,7 +58,7 @@ describe('SettingsSidebar', () => {
   it('collapses to one popover per group when the sidebar is a rail', () => {
     const wrapper = mountSidebar({ rail: true, su: true })
     expect(wrapper.findComponent({ name: 'SettingsNav' }).exists()).toBe(false)
-    expect(wrapper.findAll('[data-testid="rail-group"]')).toHaveLength(4)
+    expect(wrapper.findAll('[data-testid="rail-group"]')).toHaveLength(5)
   })
 
   it('flattens nested destinations into the rail popovers', () => {

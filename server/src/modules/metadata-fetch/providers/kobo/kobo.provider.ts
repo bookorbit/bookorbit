@@ -9,7 +9,7 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { normalizeMaxCandidates, sleep } from '../provider-utils';
+import { normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import { fetchKoboHtmlWithCloudscraper } from './kobo-cloudscraper.fetcher';
 import {
   buildKoboBookUrl,
@@ -62,14 +62,18 @@ export class KoboProvider implements IdentifiableProvider {
     const links = await this.searchBookLinks(params, config, maxCandidates, params.signal);
     const results: MetadataCandidate[] = [];
 
-    for (const link of links.slice(0, maxCandidates)) {
-      if (params.signal?.aborted) break;
-      if (results.length > 0) {
-        await sleep(PROVIDER_DELAYS_MS.KOBO_BETWEEN_REQUESTS, params.signal);
+    try {
+      for (const link of links.slice(0, maxCandidates)) {
+        if (params.signal?.aborted) break;
+        if (results.length > 0) {
+          await sleep(PROVIDER_DELAYS_MS.KOBO_BETWEEN_REQUESTS, params.signal);
+        }
+        const candidate = await this.fetchByUrl(link.url, link.providerId, params.signal);
+        if (candidate) results.push(candidate);
+        if (params.signal?.aborted) break;
       }
-      const candidate = await this.fetchByUrl(link.url, link.providerId, params.signal);
-      if (candidate) results.push(candidate);
-      if (params.signal?.aborted) break;
+    } catch (err) {
+      rethrowWithPartialCandidates(err, results);
     }
 
     return results;

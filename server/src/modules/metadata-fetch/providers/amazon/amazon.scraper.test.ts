@@ -41,6 +41,21 @@ describe('AmazonScraper', () => {
       const result = extractAsins(html, 5);
       expect(result).toEqual(['GOOD123456']);
     });
+
+    it('should skip sponsored cards before following unrelated format links', () => {
+      const html = `
+        <div data-component-type="s-search-result" data-asin="SPONSOR001">
+          <div data-cy="title-recipe">Sponsored Sponsored result</div>
+          <a href="/dp/SERIES0001">Book 1 of 3: A Series</a>
+        </div>
+        <div data-component-type="s-search-result" data-asin="B123456789">
+          <div data-cy="title-recipe">Wanted Book</div>
+          <a href="/dp/B123456789">Kindle</a>
+        </div>
+      `;
+
+      expect(extractAsins(html, 5)).toEqual(['B123456789']);
+    });
   });
 
   describe('parseBookPage', () => {

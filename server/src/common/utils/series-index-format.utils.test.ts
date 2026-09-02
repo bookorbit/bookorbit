@@ -26,6 +26,14 @@ describe('formatSeriesIndex', () => {
     expect(formatSeriesIndex('5.11')).toBe('05.11');
   });
 
+  it('formats legacy numeric values and rejects malformed runtime values', () => {
+    expect(formatSeriesIndex(3 as never)).toBe('03');
+    expect(formatSeriesIndex(2.5 as never)).toBe('02.5');
+    expect(formatSeriesIndex(Number.NaN as never)).toBeNull();
+    expect(formatSeriesIndex('not-an-index' as never)).toBeNull();
+    expect(formatSeriesIndex({} as never)).toBeNull();
+  });
+
   it('validates and parses exact labels without normalizing their digits', () => {
     expect(['5.10', '01', '0.5'].every(isValidSeriesIndex)).toBe(true);
     expect(parseSeriesIndex(' 5.10 ')).toBe('5.10');

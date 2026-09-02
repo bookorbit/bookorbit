@@ -38,16 +38,6 @@ export class OidcLoginError extends Error {
 }
 
 export function useOidc() {
-  async function getPublicProviders(): Promise<OidcProviderPublic[]> {
-    try {
-      const res = await fetch('/api/v1/app-settings/oidc/providers/public')
-      if (!res.ok) return []
-      return res.json()
-    } catch {
-      return []
-    }
-  }
-
   async function initiateLogin(provider: OidcProviderPublic): Promise<void> {
     if (!provider.enabled) {
       throw new OidcLoginError(undefined, 'OIDC provider is not enabled')
@@ -112,5 +102,5 @@ export function useOidc() {
     return res.json() as Promise<OidcCallbackResponse>
   }
 
-  return { getPublicProviders, initiateLogin, exchangeCode }
+  return { initiateLogin, exchangeCode }
 }

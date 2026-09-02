@@ -45,6 +45,8 @@ export type AnnotationWithCfi = AnnotationRow & {
   cfiExtras: Record<string, unknown> | null;
   jumpFileId: number | null;
   pageno: number | null;
+  pdfPos0?: string | null;
+  pdfStatus?: string | null;
 };
 export type HubAnnotationRow = AnnotationWithCfi & { bookTitle: string | null; author: string | null; jumpFileFormat: string | null };
 
@@ -69,6 +71,7 @@ export interface HubSort {
 }
 
 export interface AnnotationFilters {
+  bookFileId?: number;
   colors?: string[];
   search?: string;
   chapter?: string;
@@ -155,6 +158,12 @@ export class AnnotationRepository {
         pageno: sql<
           number | null
         >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
+        pdfPos0: sql<
+          string | null
+        >`(select ap4.pos0 from annotation_positions ap4 where ap4.annotation_id = ${annotations.id} and ap4.format = 'pdf' limit 1)`,
+        pdfStatus: sql<
+          string | null
+        >`(select ap5.status from annotation_positions ap5 where ap5.annotation_id = ${annotations.id} and ap5.format = 'pdf' limit 1)`,
       })
       .from(annotations)
       .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
@@ -307,6 +316,38 @@ export class AnnotationRepository {
         status: 'exact',
       });
       return { ...row, cfi, cfiStatus: 'exact', cfiExtras: null, jumpFileId: bookFileId ?? null, pageno: null };
+    });
+  }
+
+  /**
+   * Creates an annotation and its `pdf` position in one transaction. The geometry JSON is
+   * stored in pos0, the 1-based page in `extras.pageno` (so the hub can derive a page deep
+   * link), and bookFileId anchors the jump target. Returns the row shaped like the read model.
+   */
+  async createPdf(data: NewAnnotation & { bookFileId?: number | null }, pdf: { page: number; pos0: string }): Promise<AnnotationWithCfi> {
+    const { bookFileId, ...annotationData } = data;
+    const pageno = pdf.page + 1;
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.insert(annotations).values(annotationData).returning();
+      await tx.insert(annotationPositions).values({
+        annotationId: row.id,
+        userId: row.userId,
+        bookFileId: bookFileId ?? null,
+        format: 'pdf',
+        pos0: pdf.pos0,
+        status: 'exact',
+        extras: { pageno },
+      });
+      return {
+        ...row,
+        cfi: null,
+        cfiStatus: null,
+        cfiExtras: null,
+        jumpFileId: bookFileId ?? null,
+        pageno,
+        pdfPos0: pdf.pos0,
+        pdfStatus: 'exact',
+      };
     });
   }
 
@@ -664,6 +705,12 @@ export class AnnotationRepository {
   private buildConditions(bookId: number, userId: number, filters: AnnotationFilters): SQL[] {
     const conditions = this.baseConditions(bookId, userId);
 
+    if (filters.bookFileId !== undefined) {
+      conditions.push(
+        sql`exists (select 1 from ${annotationPositions} ap_file where ap_file.annotation_id = ${annotations.id} and ap_file.book_file_id = ${filters.bookFileId})`,
+      );
+    }
+
     if (filters.colors && filters.colors.length > 0) {
       conditions.push(inArray(annotations.color, filters.colors));
     }
@@ -697,7 +744,28 @@ export class AnnotationRepository {
   private buildOrderBy(sort: AnnotationSort) {
     const direction = sort.dir === 'desc' ? desc : asc;
     if (sort.by === 'position') {
-      return [sql`${annotationPositions.pos0} ${sql.raw(sort.dir === 'desc' ? 'desc' : 'asc')} nulls last`, direction(annotations.id)];
+      const sqlDirection = sql.raw(sort.dir === 'desc' ? 'desc' : 'asc');
+      const pdfPage = sql`(
+        select case
+          when ap_pdf.extras ->> 'pageno' ~ '^[0-9]+$' then (ap_pdf.extras ->> 'pageno')::int
+          else null
+        end
+        from ${annotationPositions} ap_pdf
+        where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
+        limit 1
+      )`;
+      const pdfY = sql`(
+        select ((regexp_match(ap_pdf.pos0, '"y"[[:space:]]*:[[:space:]]*(-?[0-9]+(?:[.][0-9]+)?)'))[1])::numeric
+        from ${annotationPositions} ap_pdf
+        where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
+        limit 1
+      )`;
+      return [
+        sql`${pdfPage} ${sqlDirection} nulls last`,
+        sql`${pdfY} ${sqlDirection} nulls last`,
+        sql`${annotationPositions.pos0} ${sqlDirection} nulls last`,
+        direction(annotations.id),
+      ];
     }
     return [direction(annotations.createdAt), direction(annotations.id)];
   }

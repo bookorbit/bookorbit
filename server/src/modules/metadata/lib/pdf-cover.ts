@@ -11,7 +11,7 @@ export async function extractPdfCover(absolutePath: string): Promise<Buffer | nu
   const outPrefix = join(tmpDir, 'cover');
 
   try {
-    await execFileAsync('pdftoppm', ['-jpeg', '-singlefile', '-r', '150', '-f', '1', '-l', '1', absolutePath, outPrefix]);
+    await execFileAsync('pdftoppm', ['-jpeg', '-singlefile', '-cropbox', '-r', '150', '-f', '1', '-l', '1', absolutePath, outPrefix]);
     return await readFile(`${outPrefix}.jpg`);
   } finally {
     await rm(tmpDir, { recursive: true, force: true });

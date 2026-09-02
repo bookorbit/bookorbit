@@ -90,6 +90,9 @@ function makeService() {
       return undefined;
     }),
   };
+  const authenticationPolicy = {
+    isPasswordLoginEnabled: vi.fn().mockReturnValue(true),
+  };
 
   const service = new OidcService(
     providerService as never,
@@ -106,6 +109,7 @@ function makeService() {
     authService as never,
     auditEvents as never,
     configService as never,
+    authenticationPolicy as never,
   );
 
   return {
@@ -121,6 +125,7 @@ function makeService() {
     tokenValidator,
     identityRepo,
     groupMapping,
+    authenticationPolicy,
   };
 }
 
@@ -244,6 +249,29 @@ describe('OidcService', () => {
   });
 
   describe('unlinkIdentity', () => {
+    it('lets an OIDC-authenticated session unlink without sending a password', async () => {
+      const { service, userService, identityRepo } = makeService();
+      userService.findById.mockResolvedValue({ id: 5, provisioningMethod: 'local' });
+      identityRepo.findByUserAndProvider.mockResolvedValue({ id: 1, oidcSubject: 'sub-1', oidcIssuer: 'https://issuer.example' });
+
+      await service.unlinkIdentity(5, 1, undefined, 'oidc');
+
+      expect(userService.findPasswordHashById).not.toHaveBeenCalled();
+      expect(identityRepo.remove).toHaveBeenCalledWith(5, 1);
+    });
+
+    it('lets an SSO-only session unlink without a password but leaves final-method checks to the repository', async () => {
+      const { service, userService, identityRepo, authenticationPolicy } = makeService();
+      authenticationPolicy.isPasswordLoginEnabled.mockReturnValue(false);
+      userService.findById.mockResolvedValue({ id: 5, provisioningMethod: 'local' });
+      identityRepo.findByUserAndProvider.mockResolvedValue({ id: 1, oidcSubject: 'sub-1', oidcIssuer: 'https://issuer.example' });
+
+      await service.unlinkIdentity(5, 1, undefined, 'magic_link');
+
+      expect(userService.findPasswordHashById).not.toHaveBeenCalled();
+      expect(identityRepo.remove).toHaveBeenCalledWith(5, 1);
+    });
+
     it('throws BadRequestException when password is incorrect', async () => {
       const { service, userService } = makeService();
       const bcrypt = await import('bcryptjs');

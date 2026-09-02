@@ -15,7 +15,10 @@ function makePrefs(providers: MetadataProviderKey[] = [key('goodreads'), key('go
     },
     {} as Record<MetadataField, FieldPreference>,
   )
-  return { fields, options: { genres: { mode: 'merge', blocklist: [], maxCount: null }, saveProviderIds: true } }
+  return {
+    fields,
+    options: { genres: { mode: 'merge', blocklist: [], maxCount: null }, saveProviderIds: true, providerIdMode: 'preferExisting' },
+  }
 }
 
 const LIBRARIES = [
@@ -234,7 +237,11 @@ describe('useFieldRuleScopes', () => {
 
   it('discards a changed advanced option back to the stored value', async () => {
     const { api } = await setup()
-    api.setOptions({ genres: { mode: 'firstProvider', blocklist: [], maxCount: 999 }, saveProviderIds: false })
+    api.setOptions({
+      genres: { mode: 'firstProvider', blocklist: [], maxCount: 999 },
+      saveProviderIds: false,
+      providerIdMode: 'existingOnly',
+    })
     await nextTick()
 
     api.discard()
@@ -243,13 +250,18 @@ describe('useFieldRuleScopes', () => {
     expect(api.isDirty.value).toBe(false)
     expect(api.optionsDraft.value?.genres.maxCount).toBeNull()
     expect(api.optionsDraft.value?.saveProviderIds).toBe(true)
+    expect(api.optionsDraft.value?.providerIdMode).toBe('preferExisting')
   })
 
   it('counts a changed advanced option as unsaved on the global scope', async () => {
     const { api } = await setup()
     expect(api.isDirty.value).toBe(false)
 
-    api.setOptions({ genres: { mode: 'firstProvider', blocklist: [], maxCount: 12 }, saveProviderIds: false })
+    api.setOptions({
+      genres: { mode: 'firstProvider', blocklist: [], maxCount: 12 },
+      saveProviderIds: false,
+      providerIdMode: 'existingOnly',
+    })
     await nextTick()
 
     expect(api.isDirty.value).toBe(true)
@@ -257,5 +269,6 @@ describe('useFieldRuleScopes', () => {
     const put = requests.find((request) => request.method === 'PUT')
     const body = put?.body as MetadataFetchPreferences
     expect(body.options?.genres.maxCount).toBe(12)
+    expect(body.options?.providerIdMode).toBe('existingOnly')
   })
 })

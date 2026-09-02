@@ -143,7 +143,7 @@ describe('MagicLinkService', () => {
       const result = await service.loginWithToken('valid-token', reply, '10.0.0.1');
 
       expect(magicLinkRepo.updateUsage).toHaveBeenCalledWith(5);
-      expect(authService.issueTokensForUser).toHaveBeenCalledWith(2, reply);
+      expect(authService.issueTokensForUser).toHaveBeenCalledWith(2, reply, 'magic_link');
       expect(result).toEqual({ accessToken: 'jwt', user: {} });
       expect(auditEvents.emit).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ action: 'magic_link.login' }));
     });

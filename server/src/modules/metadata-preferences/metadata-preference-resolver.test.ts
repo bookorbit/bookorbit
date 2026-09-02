@@ -79,6 +79,7 @@ describe('MetadataPreferenceResolver', () => {
     expect(defaults.options).toEqual({
       genres: { mode: 'merge', blocklist: [], maxCount: null },
       saveProviderIds: true,
+      providerIdMode: 'preferExisting',
     });
   });
 
@@ -152,6 +153,7 @@ describe('MetadataPreferenceResolver', () => {
       options: {
         genres: { mode: 'invalid', blocklist: [42], maxCount: 0 },
         saveProviderIds: 'yes',
+        providerIdMode: 'unsupported',
       },
     } as unknown as MetadataFetchPreferences;
 
@@ -171,6 +173,7 @@ describe('MetadataPreferenceResolver', () => {
           maxCount: 3,
         },
         saveProviderIds: true,
+        providerIdMode: 'preferExisting',
       },
     } as unknown as MetadataFetchPreferences;
 
@@ -185,20 +188,44 @@ describe('MetadataPreferenceResolver', () => {
     const missingLimit = resolver.resolve(
       {
         fields: defaults.fields,
-        options: { genres: { mode: 'merge', blocklist: [] }, saveProviderIds: true },
+        options: { genres: { mode: 'merge', blocklist: [] }, saveProviderIds: true, providerIdMode: 'preferExisting' },
       } as unknown as MetadataFetchPreferences,
       null,
     );
     const invalidLimit = resolver.resolve(
       {
         fields: defaults.fields,
-        options: { genres: { mode: 'merge', blocklist: [], maxCount: 51 }, saveProviderIds: true },
+        options: { genres: { mode: 'merge', blocklist: [], maxCount: 51 }, saveProviderIds: true, providerIdMode: 'preferExisting' },
       },
       null,
     );
 
     expect(missingLimit.options?.genres.maxCount).toBeNull();
     expect(invalidLimit.options?.genres.maxCount).toBeNull();
+  });
+
+  it('preserves existing-only provider identity mode and defaults legacy preferences', () => {
+    const defaults = resolver.getDefaultPreferences();
+    const strict = resolver.resolve(
+      {
+        fields: defaults.fields,
+        options: { ...defaults.options!, providerIdMode: 'existingOnly' },
+      },
+      null,
+    );
+    const legacy = resolver.resolve(
+      {
+        fields: defaults.fields,
+        options: {
+          genres: defaults.options!.genres,
+          saveProviderIds: true,
+        },
+      } as unknown as MetadataFetchPreferences,
+      null,
+    );
+
+    expect(strict.options?.providerIdMode).toBe('existingOnly');
+    expect(legacy.options?.providerIdMode).toBe('preferExisting');
   });
 
   it('preserves explicit provider selections when applying forward compatibility', () => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertCircle, ArrowRight, Check, ChevronRight, Copy, FolderPlus, PenLine, RotateCw, Trash2, Wand2 } from '@lucide/vue'
+import { AlertCircle, ArrowRight, Check, ChevronRight, Copy, Files, FolderPlus, PenLine, RotateCw, Trash2, Wand2 } from '@lucide/vue'
 import type { BookDockFile } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
@@ -71,12 +71,27 @@ const conflictLabel = computed(() => {
   return t(`bookDock.layout.conflict.${props.conflict.status}`)
 })
 
+/** A unit's anchor row describes only its primary file, so the row must state the whole unit. */
+const isUnit = computed(() => props.file.unitFiles.length > 1)
+
+const unitSizeBytes = computed(() => {
+  const sizes = props.file.unitFiles.map((file) => file.fileSize).filter((size): size is number => size != null)
+  return sizes.length ? sizes.reduce((total, size) => total + size, 0) : null
+})
+
 const subtitle = computed(() => {
   const parts = [author.value || t('bookDock.layout.row.noAuthor')]
-  if (props.file.fileSize != null) parts.push(formatBytes(props.file.fileSize))
+  const sizeBytes = isUnit.value ? unitSizeBytes.value : props.file.fileSize
+  if (sizeBytes != null) parts.push(formatBytes(sizeBytes))
   if (props.file.format) parts.push(props.file.format.toUpperCase())
   return parts.join(' · ')
 })
+
+function unitFileDetail(file: BookDockFile['unitFiles'][number]): string {
+  const parts = [t(`bookDock.layout.unit.role.${file.role}`)]
+  if (file.fileSize != null) parts.push(formatBytes(file.fileSize))
+  return parts.join(' · ')
+}
 
 function onSelect(event: MouseEvent) {
   emit('select', props.file.id, event.shiftKey)
@@ -139,6 +154,16 @@ function onRetry() {
       </button>
 
       <span class="row-meta flex shrink-0 items-center gap-1.5">
+        <!-- The row's own name is the primary file's, so without this a 31-track audiobook reads
+             as a single mp3 until someone expands it. -->
+        <span
+          v-if="isUnit"
+          class="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10.5px] font-semibold text-muted-foreground"
+        >
+          <Files class="size-2.5" aria-hidden="true" />
+          {{ t('bookDock.layout.unit.fileCount', { count: props.file.unitFiles.length }) }}
+        </span>
+
         <!-- Known before finalize rather than discovered during it. -->
         <span
           v-if="props.conflict"
@@ -257,6 +282,25 @@ function onRetry() {
     </div>
 
     <div v-if="props.expanded" class="border-t border-border bg-muted/25 px-3 py-2.5 sm:pl-[3.4rem]">
+      <!-- Read-only on purpose: a unit is filed whole, so "finalize track 7 of 31" is not a
+           thing the interface should let anyone express. -->
+      <div v-if="isUnit" class="mb-2.5 rounded-lg border border-border bg-card p-3">
+        <p class="mb-2 text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
+          {{ t('bookDock.layout.unit.filesHeading', { count: props.file.unitFiles.length }) }}
+        </p>
+        <ol class="grid gap-1">
+          <li
+            v-for="(unitFile, unitFileIndex) in props.file.unitFiles"
+            :key="`${unitFileIndex}:${unitFile.fileName}`"
+            class="flex min-w-0 items-baseline gap-2 text-xs"
+          >
+            <span class="w-6 shrink-0 text-right tabular-nums text-muted-foreground">{{ unitFileIndex + 1 }}</span>
+            <span class="min-w-0 flex-1 truncate text-foreground">{{ unitFile.fileName }}</span>
+            <span class="shrink-0 text-muted-foreground">{{ unitFileDetail(unitFile) }}</span>
+          </li>
+        </ol>
+      </div>
+
       <div class="rounded-lg border border-border bg-card p-3">
         <div class="mb-2 flex items-center gap-2">
           <p class="text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">

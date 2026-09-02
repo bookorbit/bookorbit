@@ -452,28 +452,6 @@ export class KoreaderPluginRepository {
     return lastSweepAt;
   }
 
-  /**
-   * Whether this device has swept since the given moment, which is what separates a device
-   * currently reporting its own page timings from one that only speaks the sync protocol.
-   *
-   * Bounded rather than "ever": a plugin that is removed, or stops working, would otherwise
-   * leave the device permanently unable to have its reading recorded at all.
-   */
-  async hasSweepSince(userId: number, deviceId: string, since: Date): Promise<boolean> {
-    const [row] = await this.db
-      .select({ deviceId: schema.koreaderDeviceSweeps.deviceId })
-      .from(schema.koreaderDeviceSweeps)
-      .where(
-        and(
-          eq(schema.koreaderDeviceSweeps.userId, userId),
-          eq(schema.koreaderDeviceSweeps.deviceId, deviceId),
-          gte(schema.koreaderDeviceSweeps.lastSweepAt, since),
-        ),
-      )
-      .limit(1);
-    return row != null;
-  }
-
   async listSweeps(userId: number) {
     return this.db
       .select()

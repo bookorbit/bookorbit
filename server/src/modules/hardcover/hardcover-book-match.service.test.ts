@@ -144,6 +144,7 @@ describe('HardcoverBookMatchService', () => {
     const result = await makeService().matchBook(1, 'tok', book);
     expect(result?.matchMethod).toBe('metadata_id');
     expect(result?.hardcoverBookId).toBe(77);
+    expect(mockClient.query).toHaveBeenCalledWith(1, 'tok', expect.stringContaining('query FindBookById'), { id: 77 });
   });
 
   it('matches by metadata slug when hardcoverMetadataId is not numeric', async () => {
@@ -165,6 +166,42 @@ describe('HardcoverBookMatchService', () => {
       'tok',
       expect.stringContaining('query FindBookBySlug'),
       expect.objectContaining({ slug: 'fyrebirds' }),
+    );
+  });
+
+  it('treats a digit-prefixed Hardcover slug as a slug instead of a partial numeric ID', async () => {
+    mockRepo.findBookState.mockResolvedValue(undefined);
+    mockClient.query.mockImplementation((_userId, _token, query: string) => {
+      if (query.includes('query FindBookById')) {
+        return { books: [{ id: 84, editions: [{ id: 24634818, pages: 284 }] }] };
+      }
+      if (query.includes('query FindBookBySlug')) {
+        return { books: [{ id: 277100, editions: [{ id: 15528636, pages: 114, isbn_13: '9780140143508' }] }] };
+      }
+      throw new Error('Unexpected query');
+    });
+    const book = {
+      ...baseBook,
+      title: '84, Charing Cross Road',
+      hardcoverMetadataId: '84-charing-cross-road',
+      isbn13: '9780140143508',
+    };
+
+    const result = await makeService().matchBook(1, 'tok', book);
+
+    expect(result).toEqual({
+      hardcoverBookId: 277100,
+      hardcoverEditionId: 15528636,
+      editionPages: 114,
+      editionAudioSeconds: null,
+      matchMethod: 'metadata_id',
+    });
+    expect(mockClient.query).toHaveBeenCalledTimes(1);
+    expect(mockClient.query).toHaveBeenCalledWith(1, 'tok', expect.stringContaining('query FindBookBySlug'), {
+      slug: '84-charing-cross-road',
+    });
+    expect(mockRepo.upsertBookState).toHaveBeenCalledWith(
+      expect.objectContaining({ hardcoverBookId: 277100, hardcoverEditionId: 15528636, matchMethod: 'metadata_id' }),
     );
   });
 

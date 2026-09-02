@@ -697,29 +697,42 @@ describe('ReadingSessionRepository - deleteSessionByBook', () => {
   });
 });
 
-describe('ReadingSessionRepository - deleteSupersededSyncEstimates', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  function makeHarness(
-    supersededPages: Array<
-      Array<{ id: number; startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null; libraryId: number }>
-    >,
-    survivingByLibrary: Array<Array<{ startedAt: Date; endedAt: Date; durationSeconds: number; progressDelta: number | null }>> = [],
+describe('ReadingSessionRepository - deleteLegacyKoreaderSyncEstimatesBatch', () => {
+  function makeCleanupHarness(
+    rows: Array<{
+      id: number;
+      userId: number;
+      libraryId: number;
+      startedAt: Date;
+      endedAt: Date;
+      durationSeconds: number;
+      progressDelta: number | null;
+      userSettings: Record<string, unknown>;
+    }>,
   ) {
-    const pages = [...supersededPages];
-    const remaining = [...survivingByLibrary];
-
-    // One chain serves both callers: the paged lookup takes .orderBy().limit(), the recompute
-    // awaits the .where() itself, so the chain is a thenable that also carries .orderBy.
-    const where = vi.fn(() => ({
-      orderBy: vi.fn().mockReturnValue({ limit: vi.fn(() => Promise.resolve(pages.shift() ?? [])) }),
-      then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
-        Promise.resolve(remaining.shift() ?? []).then(resolve, reject),
-    }));
-    const select = vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where }) }) });
-
+    const initialLimit = vi.fn().mockResolvedValue(rows);
+    const initialSelect = {
+      from: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({ orderBy: vi.fn().mockReturnValue({ limit: initialLimit }) }),
+          }),
+        }),
+      }),
+    };
+    const survivingSessions = [
+      {
+        startedAt: new Date('2026-07-01T10:00:00.000Z'),
+        endedAt: new Date('2026-07-01T10:05:00.000Z'),
+        durationSeconds: 300,
+        progressDelta: 1,
+      },
+    ];
+    const recomputeWhere = vi.fn().mockResolvedValue(survivingSessions);
+    const recomputeSelect = {
+      from: vi.fn().mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where: recomputeWhere }) }),
+    };
+    const select = vi.fn().mockReturnValue(recomputeSelect).mockReturnValueOnce(initialSelect);
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
     const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
@@ -727,63 +740,68 @@ describe('ReadingSessionRepository - deleteSupersededSyncEstimates', () => {
       if (table === userReadingDailyStats) return { values: dailyValues };
       throw new Error('Unexpected table in insert');
     });
+    const tx = { select, delete: deleteFn, insert, execute: vi.fn().mockResolvedValue(undefined) };
+    const transaction = vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx));
 
-    const tx = { execute: vi.fn().mockResolvedValue(undefined), select, delete: deleteFn, insert };
-    const transaction = vi.fn(async (cb: (trx: typeof tx) => Promise<unknown>) => cb(tx));
-    const repo = new ReadingSessionRepository({ transaction } as never);
-
-    return { repo, tx, deleteFn, dailyValues, transaction, select };
+    return {
+      repo: new ReadingSessionRepository({ transaction } as never),
+      deleteFn,
+      dailyValues,
+      initialLimit,
+      recomputeWhere,
+      transaction,
+    };
   }
 
-  const estimate = (id: number, day: string, libraryId = 3) => ({
-    id,
-    startedAt: new Date(`${day}T10:00:00.000Z`),
-    endedAt: new Date(`${day}T10:30:00.000Z`),
-    durationSeconds: 1800,
-    progressDelta: 3,
-    libraryId,
-  });
+  it('deletes one bounded batch and rebuilds the affected daily totals', async () => {
+    const { repo, deleteFn, dailyValues, initialLimit } = makeCleanupHarness([
+      {
+        id: 9,
+        userId: 7,
+        libraryId: 3,
+        startedAt: new Date('2026-07-01T09:45:00.000Z'),
+        endedAt: new Date('2026-07-01T10:00:00.000Z'),
+        durationSeconds: 900,
+        progressDelta: 4,
+        userSettings: { timezone: 'UTC' },
+      },
+    ]);
 
-  it('keeps estimates that no measured session overlaps', async () => {
-    // A sweep that uploaded nothing, or only part of the history, must not erase the rest.
-    const { repo, deleteFn, dailyValues } = makeHarness([[]]);
+    await expect(repo.deleteLegacyKoreaderSyncEstimatesBatch(500)).resolves.toEqual({ deleted: 1 });
 
-    await expect(repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:')).resolves.toEqual({ deleted: 0 });
-    expect(deleteFn).not.toHaveBeenCalled();
-    expect(dailyValues).not.toHaveBeenCalled();
-  });
-
-  it('deletes the overlapped estimates and rebuilds the days they were counted on', async () => {
-    const { repo, deleteFn, dailyValues } = makeHarness(
-      [[estimate(5, '2026-04-15')]],
-      // What survives that day: the measured session the plugin derived for the same reading.
-      [[{ startedAt: new Date('2026-04-15T10:02:00.000Z'), endedAt: new Date('2026-04-15T10:26:00.000Z'), durationSeconds: 1440, progressDelta: 3 }]],
-    );
-
-    await expect(repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:')).resolves.toEqual({ deleted: 1 });
-
+    expect(initialLimit).toHaveBeenCalledWith(500);
     expect(deleteFn).toHaveBeenCalledWith(readingSessions);
+    expect(deleteFn).toHaveBeenCalledWith(userReadingDailyStats);
     expect(dailyValues).toHaveBeenCalledWith([
-      expect.objectContaining({ day: '2026-04-15', readingSeconds: 1440, progressDelta: 3, sessionsCount: 1 }),
+      expect.objectContaining({ userId: 7, libraryId: 3, day: '2026-07-01', readingSeconds: 300, sessionsCount: 1 }),
     ]);
   });
 
-  it('pages the selection rather than reading a whole history into memory', async () => {
-    const pageSize = 500;
-    const firstPage = Array.from({ length: pageSize }, (_, index) => estimate(index + 1, '2026-04-15'));
-    const { repo, deleteFn } = makeHarness([firstPage, [estimate(pageSize + 1, '2026-04-16')]], [[]]);
+  it('does not rewrite daily totals when no legacy estimates remain', async () => {
+    const { repo, deleteFn, dailyValues, transaction } = makeCleanupHarness([]);
 
-    await expect(repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:')).resolves.toEqual({ deleted: pageSize + 1 });
+    await expect(repo.deleteLegacyKoreaderSyncEstimatesBatch(500)).resolves.toEqual({ deleted: 0 });
 
-    // One delete per page, rather than one delete of everything gathered up front.
-    expect(deleteFn.mock.calls.filter((call) => call[0] === readingSessions)).toHaveLength(2);
+    expect(deleteFn).not.toHaveBeenCalled();
+    expect(dailyValues).not.toHaveBeenCalled();
+    expect(transaction).toHaveBeenCalledOnce();
   });
 
-  it('does the whole retirement in one transaction', async () => {
-    const { repo, transaction } = makeHarness([[]]);
+  it('recomputes sparse history in bounded date ranges', async () => {
+    const row = (id: number, day: string) => ({
+      id,
+      userId: 7,
+      libraryId: 3,
+      startedAt: new Date(`${day}T09:45:00.000Z`),
+      endedAt: new Date(`${day}T10:00:00.000Z`),
+      durationSeconds: 900,
+      progressDelta: 4,
+      userSettings: { timezone: 'UTC' },
+    });
+    const { repo, recomputeWhere } = makeCleanupHarness([row(9, '2024-01-01'), row(10, '2026-07-01')]);
 
-    await repo.deleteSupersededSyncEstimates(7, 'ks-abcdef123456-', 'kor:device01:');
+    await repo.deleteLegacyKoreaderSyncEstimatesBatch(500);
 
-    expect(transaction).toHaveBeenCalledOnce();
+    expect(recomputeWhere).toHaveBeenCalledTimes(2);
   });
 });

@@ -404,11 +404,41 @@
     outline-offset: -1px;
   }
 
+  .settings-input {
+    @apply mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50;
+  }
+  /* `.settings-input` with its own top margin dropped, for a field whose wrapper already owns the
+     spacing between label, control and hint. */
+  .settings-control {
+    @apply h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50;
+  }
+  .settings-control[aria-invalid='true'] {
+    @apply border-destructive focus-visible:border-destructive focus-visible:ring-destructive/40;
+  }
   .settings-card {
     @apply overflow-hidden rounded-lg border border-border bg-card divide-y divide-border shadow-xs;
   }
   .settings-row {
     @apply flex flex-col gap-3 bg-card px-4 py-3.5 md:flex-row md:items-center md:justify-between md:px-5 md:py-4;
+  }
+  .settings-card-header {
+    @apply flex items-center justify-between gap-4 bg-card px-4 py-2.5 md:px-5;
+  }
+  .settings-card-title {
+    @apply text-xs font-semibold uppercase tracking-wider text-foreground;
+  }
+  .settings-state-pill {
+    @apply shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary;
+  }
+  /* Hints and summaries are 12px. Past roughly 62 characters a line that small stops being
+     scannable, and a settings card is read in glances rather than in paragraphs. */
+  .settings-prose {
+    @apply max-w-[62ch];
+  }
+  /* Settings that only exist while their parent switch is on. The rail says so at a glance,
+     which a `v-if` block alone never does. */
+  .settings-subgroup {
+    @apply divide-y divide-border border-l-2 border-primary/30 bg-card;
   }
   .settings-loading-state {
     @apply flex items-center justify-center rounded-lg border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground shadow-xs;

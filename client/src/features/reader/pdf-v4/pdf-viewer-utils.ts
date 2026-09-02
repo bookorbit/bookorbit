@@ -1,4 +1,4 @@
-import { Rotation, type PdfBookmarkObject } from '@embedpdf/models'
+import { PdfActionType, Rotation, type PdfBookmarkObject } from '@embedpdf/models'
 import { ScrollStrategy } from '@embedpdf/plugin-scroll'
 import { SpreadMode } from '@embedpdf/plugin-spread'
 import { ZoomMode, type ZoomLevel } from '@embedpdf/plugin-zoom'
@@ -7,6 +7,7 @@ import type { PdfReaderSettings } from '@bookorbit/types'
 export interface FlatPdfBookmark {
   bookmark: PdfBookmarkObject
   depth: number
+  pageIndex: number | null
 }
 
 export function toScrollStrategy(mode: PdfReaderSettings['scrollMode']): ScrollStrategy {
@@ -40,8 +41,34 @@ export function fromRotation(rotation: Rotation): PdfReaderSettings['rotation'] 
   return 0
 }
 
+export function getPdfBookmarkPageIndex(bookmark: PdfBookmarkObject): number | null {
+  const target = bookmark.target
+  const destination =
+    target?.type === 'destination' ? target.destination : target?.action.type === PdfActionType.Goto ? target.action.destination : null
+  return destination && Number.isInteger(destination.pageIndex) && destination.pageIndex >= 0 ? destination.pageIndex : null
+}
+
 export function flattenPdfBookmarks(bookmarks: PdfBookmarkObject[], depth = 0): FlatPdfBookmark[] {
-  return bookmarks.flatMap((bookmark) => [{ bookmark, depth }, ...flattenPdfBookmarks(bookmark.children ?? [], depth + 1)])
+  return bookmarks.flatMap((bookmark) => [
+    { bookmark, depth, pageIndex: getPdfBookmarkPageIndex(bookmark) },
+    ...flattenPdfBookmarks(bookmark.children ?? [], depth + 1),
+  ])
+}
+
+export function findActivePdfBookmarkIndex(bookmarks: FlatPdfBookmark[], currentPage: number): number | null {
+  if (!Number.isInteger(currentPage) || currentPage < 1) return null
+
+  const currentPageIndex = currentPage - 1
+  let activeIndex: number | null = null
+  let activePageIndex = -1
+
+  for (const [index, bookmark] of bookmarks.entries()) {
+    if (bookmark.pageIndex === null || bookmark.pageIndex > currentPageIndex || bookmark.pageIndex < activePageIndex) continue
+    activeIndex = index
+    activePageIndex = bookmark.pageIndex
+  }
+
+  return activeIndex
 }
 
 export function safeExternalPdfUrl(uri: string): URL | null {

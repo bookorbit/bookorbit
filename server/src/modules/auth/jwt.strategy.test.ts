@@ -52,7 +52,16 @@ describe('JwtStrategy.validate', () => {
 
     const result = await strategy.validate({ sub: 1, ver: 2 });
     expect(result).toEqual(user);
-    expect(authService.validateUser).toHaveBeenCalledWith(1, 2);
+    expect(authService.validateUser).toHaveBeenCalledWith(1, 2, 'legacy');
+  });
+
+  it('passes the authentication method through to user validation', async () => {
+    const { strategy, authService } = makeStrategy();
+    authService.validateUser.mockResolvedValue({ id: 1 });
+
+    await strategy.validate({ sub: 1, ver: 2, amr: 'oidc' });
+
+    expect(authService.validateUser).toHaveBeenCalledWith(1, 2, 'oidc');
   });
 
   it('throws UnauthorizedException when validateUser returns null', async () => {

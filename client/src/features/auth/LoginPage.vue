@@ -8,6 +8,7 @@ import { ACCENT_OPTIONS, ACCENT_ROWS, RADIUS_OPTIONS, BACKGROUND_OPTIONS, useThe
 import { LoginError, useAuth } from './composables/useAuth'
 import { useOidc } from './composables/useOidc'
 import { useSetupStatus } from './composables/useSetupStatus'
+import { useLoginOptions } from './composables/useLoginOptions'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const { t } = useI18n()
@@ -52,8 +53,11 @@ function closeAll() {
 }
 
 const { login } = useAuth()
-const { getPublicProviders, initiateLogin } = useOidc()
-const { allowRegistration, setupStatusError } = useSetupStatus()
+const { initiateLogin } = useOidc()
+const { setupStatusError } = useSetupStatus()
+const { loginOptions, loginOptionsError, fetchLoginOptions } = useLoginOptions()
+const passwordLoginEnabled = computed(() => loginOptions.value?.passwordLoginEnabled === true)
+const allowRegistration = computed(() => loginOptions.value?.allowRegistration === true)
 
 const route = useRoute()
 const justRegistered = computed(() => route.query.registered === '1')
@@ -67,6 +71,10 @@ const oidcLoadingSlug = ref<string | null>(null)
 
 function resolveLoginError(err: unknown): string {
   if (!(err instanceof Error)) return t('auth.login.errors.invalidCredentials')
+
+  if (err instanceof LoginError && err.errorCode === LoginErrorCode.PASSWORD_AUTH_DISABLED) {
+    return t('auth.login.errors.passwordDisabled')
+  }
 
   if (err instanceof LoginError && err.errorCode === LoginErrorCode.ACCOUNT_LOCKED) {
     const minutes = Math.max(1, Math.ceil((err.retryAfterSeconds ?? 0) / 60))
@@ -85,7 +93,11 @@ function resolveLoginError(err: unknown): string {
 }
 
 onMounted(async () => {
-  oidcProviders.value = await getPublicProviders()
+  try {
+    oidcProviders.value = (await fetchLoginOptions()).oidcProviders
+  } catch {
+    error.value = t('auth.login.errors.optionsUnavailable')
+  }
 })
 
 async function handleSubmit() {
@@ -251,7 +263,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         {{ t('auth.login.registeredNotice') }}
       </div>
 
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <form v-if="passwordLoginEnabled" @submit.prevent="handleSubmit" class="space-y-4">
         <div class="space-y-1.5 animate-fade-up" style="animation-delay: 80ms">
           <label for="username" class="text-sm font-medium text-foreground">{{ t('auth.fields.username') }}</label>
           <input
@@ -277,7 +289,9 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         </div>
 
         <div v-if="error" role="alert" class="text-sm text-destructive animate-shake">{{ error }}</div>
-        <div v-if="setupStatusError" class="text-sm text-destructive animate-shake">{{ setupStatusError }}</div>
+        <div v-if="setupStatusError || loginOptionsError" class="text-sm text-destructive animate-shake">
+          {{ t('auth.login.errors.optionsUnavailable') }}
+        </div>
 
         <button
           type="submit"
@@ -290,13 +304,13 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
       </form>
 
       <template v-if="oidcProviders.length > 0">
-        <div class="flex items-center gap-3 my-6">
+        <div v-if="passwordLoginEnabled" class="flex items-center gap-3 my-6">
           <div class="flex-1 h-px bg-border" />
           <span class="text-sm text-muted-foreground">{{ t('auth.login.orDivider') }}</span>
           <div class="flex-1 h-px bg-border" />
         </div>
 
-        <div class="space-y-3">
+        <div class="space-y-3" :class="passwordLoginEnabled ? '' : 'mt-2'">
           <button
             v-for="provider in oidcProviders"
             :key="provider.slug"
@@ -311,7 +325,7 @@ async function handleOidcLogin(provider: OidcProviderPublic) {
         </div>
       </template>
 
-      <p class="mt-6 text-center text-sm text-muted-foreground">
+      <p v-if="passwordLoginEnabled" class="mt-6 text-center text-sm text-muted-foreground">
         <RouterLink to="/forgot-password" class="text-primary hover:underline">{{ t('auth.login.forgotPassword') }}</RouterLink>
       </p>
 

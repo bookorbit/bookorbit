@@ -33,7 +33,7 @@ function formatLabel(format: string | null): string {
 
     <!-- A two-column grid rather than per-row flex, so every value lines up on the same
          edge no matter how long the label beside it is. -->
-    <dl class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-2.5 py-3 text-xs">
+    <dl class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-2.5 py-3 text-xs">
       <dt class="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">{{ t('book.detail.editMetadata.libraryRow') }}</dt>
       <dd class="truncate text-right font-medium" :title="book.libraryName">{{ book.libraryName }}</dd>
 

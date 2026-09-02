@@ -33,6 +33,7 @@ import { KoreaderPluginService } from './koreader-plugin.service';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderService } from './koreader.service';
 import { KoreaderStatsService } from './koreader-stats.service';
+import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cleanup.service';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { KoreaderStatsService } from './koreader-stats.service';
     KoreaderBookmarkExchangeService,
     KoreaderBookmarkRepository,
     KoreaderStatsService,
+    KoreaderSyncEstimateCleanupService,
   ],
   exports: [KoreaderService, KoreaderRepository],
 })

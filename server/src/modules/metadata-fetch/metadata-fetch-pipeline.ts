@@ -61,7 +61,9 @@ const AUDIOBOOK_PROVIDER_KEYS = new Set<MetadataProviderKey>([
 type ProviderSelectionDiagnostics = Pick<
   MetadataFetchDiagnostics,
   'activeProviders' | 'fieldRuleProviders' | 'disabledFieldRuleProviders' | 'enabledUnreferencedProviders' | 'throttledProviders'
->;
+> & {
+  missingExistingProviderIdCount: number;
+};
 
 type ConfiguredProviderSelection = Pick<
   MetadataFetchDiagnostics,
@@ -131,10 +133,17 @@ export class MetadataFetchPipeline {
     diagnostics: MetadataFetchDiagnostics;
   }> {
     const { preferences, registeredKeys, providerConfig } = await this.resolveProviderPreferenceContext(libraryId);
-    const providerSelection = this.deriveProviderSet(preferences, registeredKeys, providerConfig);
+    const existingProviderIdsOnly = preferences.options?.providerIdMode === 'existingOnly' && params.existingProviderIds !== undefined;
+    const providerSelection = this.deriveProviderSet(
+      preferences,
+      registeredKeys,
+      providerConfig,
+      existingProviderIdsOnly ? params.existingProviderIds : undefined,
+    );
+    const providerSearchParams = existingProviderIdsOnly ? { ...params, existingProviderIdsOnly: true } : params;
     const searchParams = providerSelection.activeProviders.some((provider) => AUDIOBOOK_PROVIDER_KEYS.has(provider))
-      ? { ...params, includeAudiobookProviders: true }
-      : params;
+      ? { ...providerSearchParams, includeAudiobookProviders: true }
+      : providerSearchParams;
 
     // Thread rich title format preference and chapter inclusion flag for MangaBaka.
     if (preferences.options?.richTitleFormat !== undefined) {
@@ -263,12 +272,18 @@ export class MetadataFetchPipeline {
     preferences: MetadataFetchPreferences,
     registeredKeys: MetadataProviderKey[],
     providerConfig: ProviderConfigurations,
+    requiredProviderIds?: Partial<Record<MetadataProviderKey, string>>,
   ): ProviderSelectionDiagnostics {
     const configuredProviderSelection = this.deriveConfiguredProviderSelection(preferences, registeredKeys, providerConfig);
 
     const activeProviders: MetadataProviderKey[] = [];
     const throttledProviders: MetadataProviderKey[] = [];
+    let missingExistingProviderIdCount = 0;
     for (const key of configuredProviderSelection.configuredFieldRuleProviders) {
+      if (requiredProviderIds && !this.hasExistingProviderIdentity(key, requiredProviderIds)) {
+        missingExistingProviderIdCount += 1;
+        continue;
+      }
       if (this.throttleTracker.isThrottled(key)) {
         throttledProviders.push(key);
         this.logger.warn(
@@ -285,7 +300,13 @@ export class MetadataFetchPipeline {
       disabledFieldRuleProviders: configuredProviderSelection.disabledFieldRuleProviders,
       enabledUnreferencedProviders: configuredProviderSelection.enabledUnreferencedProviders,
       throttledProviders,
+      missingExistingProviderIdCount,
     };
+  }
+
+  private hasExistingProviderIdentity(provider: MetadataProviderKey, providerIds: Partial<Record<MetadataProviderKey, string>>): boolean {
+    const identityProvider = provider === MetadataProviderKey.AUDNEXUS ? MetadataProviderKey.AUDIBLE : provider;
+    return Boolean(providerIds[identityProvider]);
   }
 
   private buildDiagnostics(
@@ -295,11 +316,14 @@ export class MetadataFetchPipeline {
   ): MetadataFetchDiagnostics {
     const candidateProviders = [...new Set(candidates.map((candidate) => candidate.provider))];
     const resolvedFieldCount = Object.keys(resolved).length;
+    const { missingExistingProviderIdCount, ...diagnosticProviderSelection } = providerSelection;
 
     let reason: MetadataFetchDiagnostics['reason'] = null;
     if (resolvedFieldCount === 0) {
       if (providerSelection.activeProviders.length === 0) {
-        reason = providerSelection.throttledProviders.length > 0 ? 'providers_throttled' : 'no_active_providers';
+        if (providerSelection.throttledProviders.length > 0) reason = 'providers_throttled';
+        else if (missingExistingProviderIdCount > 0) reason = 'no_existing_provider_ids';
+        else reason = 'no_active_providers';
       } else if (candidates.length === 0) {
         reason = 'no_candidates';
       } else {
@@ -308,7 +332,7 @@ export class MetadataFetchPipeline {
     }
 
     return {
-      ...providerSelection,
+      ...diagnosticProviderSelection,
       candidateProviders,
       candidateCount: candidates.length,
       resolvedFieldCount,

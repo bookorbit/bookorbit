@@ -22,6 +22,7 @@ const props = defineProps<{
   isLocked: (user: UserRow) => boolean
   isResettable: (user: UserRow) => boolean
   needsAttention: (user: UserRow) => boolean
+  passwordLoginEnabled: boolean
 }>()
 
 const emit = defineEmits<{
@@ -47,6 +48,9 @@ function lastActiveLabel(user: UserRow): string {
 }
 
 function resetHint(user: UserRow): string {
+  if (!props.passwordLoginEnabled && user.provisioningMethod !== 'oidc' && user.provisioningMethod !== 'shared') {
+    return t('adminFeature.usersPage.resetPasswordDisabledHintFull')
+  }
   if (user.provisioningMethod === 'oidc') return t('adminFeature.usersPage.resetPasswordOidcHintFull')
   return t('adminFeature.usersPage.resetPasswordSharedHintFull')
 }

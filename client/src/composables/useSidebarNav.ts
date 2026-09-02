@@ -1,8 +1,8 @@
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, type RouteLocationNormalizedLoaded, type RouteLocationRaw } from 'vue-router'
-import { Highlighter, LayoutDashboard, Library, PackageOpen, Users, Wrench } from '@lucide/vue'
-import type { BrowseCounts, SidebarSectionId } from '@bookorbit/types'
+import { BookPlus, Highlighter, LayoutDashboard, Library, PackageOpen, Users, Wrench } from '@lucide/vue'
+import { Permission, type BrowseCounts, type SidebarSectionId } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import { useBrowseCounts } from '@/composables/useBrowseCounts'
@@ -13,7 +13,16 @@ export type SidebarZoneId = (typeof SIDEBAR_ZONE_IDS)[number]
 interface NavContext {
   hasPermission: (name: string) => boolean
   bookDockTotal: number
+  outstandingRequestTotal: number
+  outstandingRequestLabel: string
   browseCounts: BrowseCounts | null
+}
+
+export interface SidebarNavBadge {
+  value: number
+  label?: string
+  /** `accent` colours the chip: the number is work waiting on the user, not a library total. */
+  tone?: 'default' | 'accent'
 }
 
 export interface SidebarNavEntry {
@@ -26,7 +35,7 @@ export interface SidebarNavEntry {
   /** Any-of: the entry is shown when the user holds at least one of these permissions. */
   permission?: string | string[]
   visible?: (context: NavContext) => boolean
-  badge?: (context: NavContext) => number | null
+  badge?: (context: NavContext) => SidebarNavBadge | null
   tourId?: string
 }
 
@@ -36,7 +45,7 @@ export interface ResolvedSidebarNavEntry {
   icon: Component
   to: RouteLocationRaw
   isActive: boolean
-  badge: number | null
+  badge: SidebarNavBadge | null
   tourId?: string
 }
 
@@ -63,10 +72,10 @@ function routeNameStartsWith(route: RouteLocationNormalizedLoaded, prefix: strin
 }
 
 /** Browse badges stay out of the row until the counts have loaded and there is something to count. */
-function browseBadge(key: keyof BrowseCounts): (context: NavContext) => number | null {
+function browseBadge(key: keyof BrowseCounts): (context: NavContext) => SidebarNavBadge | null {
   return (context) => {
     const total = context.browseCounts?.[key] ?? 0
-    return total > 0 ? total : null
+    return total > 0 ? { value: total } : null
   }
 }
 
@@ -87,8 +96,20 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     to: { name: 'book-dock' },
     isActive: (route) => route.name === 'book-dock',
     permission: 'book_dock_access',
-    badge: (context) => (context.bookDockTotal > 0 ? context.bookDockTotal : null),
+    badge: (context) => (context.bookDockTotal > 0 ? { value: context.bookDockTotal, tone: 'accent' } : null),
     tourId: 'book-dock-btn',
+  },
+  {
+    id: 'book-requests',
+    labelKey: 'bookRequests.title',
+    icon: BookPlus,
+    zone: 'primary',
+    to: { name: 'book-requests' },
+    // The drawer routes are children of this one, so the row has to stay lit while one is open.
+    isActive: (route) => routeNameStartsWith(route, 'book-request'),
+    permission: 'book_request_access',
+    badge: (context) =>
+      context.outstandingRequestTotal > 0 ? { value: context.outstandingRequestTotal, label: context.outstandingRequestLabel, tone: 'accent' } : null,
   },
   {
     id: 'tools',
@@ -148,18 +169,27 @@ export function resolveNavEntry(entry: SidebarNavEntry, context: NavContext, rou
   } satisfies ResolvedSidebarNavEntry
 }
 
-export function useSidebarNav() {
+export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0) {
   const { t } = useI18n()
   const route = useRoute()
   const { hasPermission } = usePermissions()
   const { summary: bookDockSummary } = useBookDockSummary()
   const { counts: browseCounts } = useBrowseCounts()
 
-  const context = computed<NavContext>(() => ({
-    hasPermission,
-    bookDockTotal: bookDockSummary.value.total,
-    browseCounts: browseCounts.value,
-  }))
+  const context = computed<NavContext>(() => {
+    const outstandingRequestTotal = getOutstandingRequestTotal()
+    const outstandingRequestLabelKey = hasPermission(Permission.ManageBookRequests)
+      ? 'components.sidebar.requestBadge.allActive'
+      : 'components.sidebar.requestBadge.mineActive'
+
+    return {
+      hasPermission,
+      bookDockTotal: bookDockSummary.value.total,
+      outstandingRequestTotal,
+      outstandingRequestLabel: t(outstandingRequestLabelKey, { count: outstandingRequestTotal }),
+      browseCounts: browseCounts.value,
+    }
+  })
 
   const zones = computed<SidebarNavZone[]>(() =>
     SIDEBAR_ZONE_IDS.map((zoneId) => ({

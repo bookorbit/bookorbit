@@ -14,6 +14,8 @@ import {
   MetadataProviderKey,
   MERGE_STRATEGIES,
   MergeStrategy,
+  PROVIDER_ID_FETCH_MODES,
+  ProviderIdFetchMode,
 } from '@bookorbit/types';
 
 import { normalizeGenreBlocklist } from '../../common/utils/genre-fetch-options.utils';
@@ -30,6 +32,7 @@ const DEFAULT_MERGE_STRATEGY: MergeStrategy = 'overwriteIfProvided';
 const MERGE_STRATEGY_SET = new Set<MetadataMergeStrategy>(MERGE_STRATEGIES);
 const GENRE_MERGE_STRATEGY_SET = new Set<MetadataMergeStrategy>(GENRE_MERGE_STRATEGIES);
 const GENRE_MERGE_MODE_SET = new Set(GENRE_MERGE_MODES);
+const PROVIDER_ID_FETCH_MODE_SET = new Set(PROVIDER_ID_FETCH_MODES);
 
 const PROVIDERS_WITH_ITUNES: MetadataProviderKey[] = [
   MetadataProviderKey.GOODREADS,
@@ -82,6 +85,7 @@ export class MetadataPreferenceResolver {
         maxCount: null,
       },
       saveProviderIds: true,
+      providerIdMode: 'preferExisting',
     };
     return { fields, options };
   }
@@ -141,7 +145,11 @@ export class MetadataPreferenceResolver {
 
   private normalizeOptions(value: unknown, fallback: MetadataFetchOptions): MetadataFetchOptions {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return { genres: { ...fallback.genres, blocklist: [...fallback.genres.blocklist] }, saveProviderIds: fallback.saveProviderIds };
+      return {
+        genres: { ...fallback.genres, blocklist: [...fallback.genres.blocklist] },
+        saveProviderIds: fallback.saveProviderIds,
+        providerIdMode: fallback.providerIdMode,
+      };
     }
 
     const candidate = value as Partial<MetadataFetchOptions>;
@@ -154,10 +162,14 @@ export class MetadataPreferenceResolver {
     const blocklist = normalizeGenreBlocklist(genresCandidate.blocklist, fallback.genres.blocklist);
     const maxCount = this.normalizeGenreMaxCount(genresCandidate.maxCount, fallback.genres.maxCount);
     const saveProviderIds = typeof candidate.saveProviderIds === 'boolean' ? candidate.saveProviderIds : fallback.saveProviderIds;
+    const providerIdMode = PROVIDER_ID_FETCH_MODE_SET.has(candidate.providerIdMode as ProviderIdFetchMode)
+      ? (candidate.providerIdMode as ProviderIdFetchMode)
+      : fallback.providerIdMode;
 
     return {
       genres: { mode, blocklist, maxCount },
       saveProviderIds,
+      providerIdMode,
     };
   }
 

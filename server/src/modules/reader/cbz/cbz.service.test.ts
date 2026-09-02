@@ -16,7 +16,7 @@ vi.mock('node-unrar-js', () => {
 
   return { createExtractorFromData: vi.fn(), UnrarError: MockUnrarError };
 });
-vi.mock('../../../common/sevenzip', () => ({ getSevenZip: vi.fn() }));
+vi.mock('../../../common/sevenzip', () => ({ getSevenZip: vi.fn(), createSevenZipTempId: (prefix: string) => `${prefix}_test` }));
 vi.mock('../../../common/comic-format-detect', () => ({
   detectComicContainerFormat: vi.fn().mockImplementation((_path: string, fmt: string) => Promise.resolve(fmt)),
 }));

@@ -1889,7 +1889,7 @@ watch(
         </h3>
 
         <dl class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.publisher') }}</dt>
             <template v-if="book.publisher">
               <Tooltip>
@@ -1901,37 +1901,37 @@ watch(
             </template>
             <dd v-else class="truncate text-[13px] font-medium">-</dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.published') }}</dt>
             <dd class="truncate text-[13px] font-medium">
               {{ book.publishedDate ? formatDisplayDate(book.publishedDate) : book.publishedYear || '-' }}
             </dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.language') }}</dt>
             <dd class="truncate text-[13px] font-medium capitalize">{{ book.language || '-' }}</dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.pages') }}</dt>
             <dd class="truncate text-[13px] font-medium">{{ book.pageCount || '-' }}</dd>
           </div>
           <div
             v-if="book.audioMetadata?.durationSeconds != null"
-            class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0"
+            class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0"
           >
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.duration') }}</dt>
             <dd class="truncate text-[13px] font-medium">{{ formatDuration(book.audioMetadata.durationSeconds) }}</dd>
           </div>
           <div
             v-if="book.audioMetadata?.durationSeconds != null"
-            class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0"
+            class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0"
           >
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.edition') }}</dt>
             <dd class="truncate text-[13px] font-medium">
               {{ book.audioMetadata.abridged ? t('book.detail.details.abridged') : t('book.detail.details.unabridged') }}
             </dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.isbn') }}</dt>
             <dd v-if="book.isbn13 || book.isbn10" class="truncate text-right text-[13px] font-medium font-mono">
               <div v-if="book.isbn13">{{ book.isbn13 }}</div>
@@ -1939,15 +1939,15 @@ watch(
             </dd>
             <dd v-else class="truncate text-[13px] font-medium">-</dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.fileSize') }}</dt>
             <dd class="truncate text-[13px] font-medium">{{ formatFileSize(primaryFile?.sizeBytes) }}</dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.library') }}</dt>
             <dd class="truncate text-[13px] font-medium">{{ book.libraryName || '-' }}</dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.added') }}</dt>
             <template v-if="editingAddedDate">
               <dd class="mt-1">
@@ -2006,7 +2006,7 @@ watch(
           </div>
           <HardcoverBookSyncGridItem :book-id="book.id" />
           <StorygraphBookSyncGridItem :book-id="book.id" />
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.dateStarted') }}</dt>
             <template v-if="isEditingReadingDate('startedAt')">
               <dd class="mt-1">
@@ -2049,7 +2049,7 @@ watch(
               </button>
             </dd>
           </div>
-          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[7px] last:border-b-0">
+          <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">
             <dt class="shrink-0 text-[11px] font-medium text-muted-foreground">{{ t('book.detail.details.dateFinished') }}</dt>
             <template v-if="isEditingReadingDate('finishedAt')">
               <dd class="mt-1">

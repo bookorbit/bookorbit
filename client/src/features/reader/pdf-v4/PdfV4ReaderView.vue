@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { EmbedPDF } from '@embedpdf/core/vue'
-import { createPluginRegistration, type PluginBatchRegistrations, type PluginRegistry } from '@embedpdf/core'
+import { createPluginRegistration, type PluginBatchRegistrations, type PluginRegistry, type PluginRegistryConfig } from '@embedpdf/core'
 import { usePdfiumEngine } from '@embedpdf/engines/vue'
 import pdfiumWasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
 import { LockModeType } from '@embedpdf/plugin-annotation'
@@ -51,6 +51,12 @@ const { onActivity, elapsedMinutes } = useReadingSession(
 )
 const progress = useReaderProgress(props.bookId, props.fileId, elapsedMinutes, 0, { trackingEnabled })
 const absolutePdfiumWasmUrl = new URL(pdfiumWasmUrl, window.location.href).href
+const embedPdfConfig: PluginRegistryConfig = {
+  permissions: {
+    enforceDocumentPermissions: true,
+    overrides: { modifyAnnotations: true },
+  },
+}
 
 const {
   engine,
@@ -110,6 +116,7 @@ function buildPlugins(settings: PdfReaderSettings): PluginBatchRegistrations {
     createPluginRegistration(HistoryPluginPackage),
     createPluginRegistration(AnnotationPluginPackage, {
       autoOpenLinks: false,
+      autoCommit: false,
       locked: { type: LockModeType.All },
     }),
     createPluginRegistration(ThumbnailPluginPackage, {
@@ -184,9 +191,9 @@ async function loadReader() {
       progress.load(),
       api(`/api/v1/books/files/${props.fileId}/serve`, { signal: abortController.signal }),
     ])
-    if (!response.ok) throw new Error(`The PDF request failed with status ${response.status}.`)
+    if (!response.ok) throw new Error(t('reader.pdf.requestFailed', { status: response.status }))
     const buffer = await response.arrayBuffer()
-    if (buffer.byteLength === 0) throw new Error('The PDF request returned an empty document.')
+    if (buffer.byteLength === 0) throw new Error(t('reader.pdf.emptyDocument'))
     if (sequence !== loadSequence || abortController.signal.aborted) return
     const settings = bookSettings.effective.value as PdfReaderSettings
     initialPage.value = parseDeepLinkPage() ?? progress.pageNumber.value ?? 1
@@ -195,7 +202,7 @@ async function loadReader() {
     readerReady.value = true
   } catch (error) {
     if (sequence !== loadSequence || abortController.signal.aborted) return
-    documentError.value = error instanceof Error ? error : new Error('The PDF could not be loaded.')
+    documentError.value = error instanceof Error ? error : new Error(t('reader.pdf.loadFallback'))
   } finally {
     if (documentAbortController === abortController) documentAbortController = null
   }
@@ -211,7 +218,7 @@ async function handleEmbedInitialized(registry: PluginRegistry) {
 
   const documentManager = registry.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)?.provides()
   if (!documentManager) {
-    documentError.value = new Error('The PDF document manager could not be initialized.')
+    documentError.value = new Error(t('reader.pdf.managerError'))
     return
   }
 
@@ -234,11 +241,11 @@ async function handleEmbedInitialized(registry: PluginRegistry) {
       if (sequence !== loadSequence || registry.isDestroyed()) return
     }
 
-    documentError.value = new Error('The PDF engine opened this document without any pages.')
+    documentError.value = new Error(t('reader.pdf.engineNoPages'))
   } catch (error) {
     if (sequence !== loadSequence || registry.isDestroyed()) return
     if (documentId && documentManager.getDocumentState(documentId)?.status === 'error') return
-    documentError.value = error instanceof Error ? error : new Error('The PDF could not be opened by the document engine.')
+    documentError.value = error instanceof Error ? error : new Error(t('reader.pdf.engineOpenError'))
   }
 }
 
@@ -271,7 +278,7 @@ onUnmounted(() => {
             class="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
             @click="handleBack"
           >
-            Go back
+            {{ t('reader.header.goBack') }}
           </button>
           <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleRetry">
             {{ t('reader.retry') }}
@@ -287,7 +294,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <EmbedPDF v-else :engine="engine" :plugins="plugins" :on-initialized="handleEmbedInitialized">
+    <EmbedPDF v-else :engine="engine" :plugins="plugins" :config="embedPdfConfig" :on-initialized="handleEmbedInitialized">
       <template #default="{ pluginsReady, activeDocumentId, activeDocument }">
         <div v-if="!pluginsReady || !activeDocumentId || !activeDocument" class="absolute inset-0 flex items-center justify-center bg-background">
           <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
@@ -298,6 +305,8 @@ onUnmounted(() => {
         <PdfReaderContent
           v-else
           :document-id="activeDocumentId"
+          :book-id="props.bookId"
+          :file-id="props.fileId"
           :initial-page="initialPage"
           :settings="effectiveSettings"
           :peek-mode="props.peekMode"

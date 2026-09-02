@@ -4,6 +4,7 @@ import { BookDockService } from './book-dock.service';
 
 vi.mock('fs/promises', () => ({
   unlink: vi.fn(),
+  rmdir: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { unlink } from 'fs/promises';
@@ -46,6 +47,8 @@ function makeService() {
     setTargetsByIds: vi.fn(),
     countsByStatus: vi.fn(),
     getStatistics: vi.fn(),
+    findUnitFiles: vi.fn().mockResolvedValue([]),
+    findUnitFilesByDockFileIds: vi.fn().mockResolvedValue(new Map()),
   };
   const ingestService = {
     retryFetch: vi.fn(),

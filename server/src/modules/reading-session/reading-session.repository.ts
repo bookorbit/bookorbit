@@ -17,7 +17,7 @@ import {
   splitReadingSessionByDay,
   type ReadingDailyStatsSegment,
 } from '../../common/utils/reading-daily-stats.utils';
-import { toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
+import { resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, readingSessionSyncCursors, readingSessions, userReadingDailyStats } from '../../db/schema';
@@ -27,6 +27,30 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const MIN_READING_SESSION_SECONDS = 10;
 const ESTIMATE_CLEANUP_PAGE_SIZE = 500;
+const CLEANUP_DAILY_STATS_MAX_SPAN_DAYS = 31;
+
+function groupDateKeysByMaxSpan(days: Iterable<string>): string[][] {
+  const sorted = [...new Set(days)].sort();
+  const groups: string[][] = [];
+  let group: string[] = [];
+  let firstDayNumber = 0;
+
+  for (const day of sorted) {
+    const dayNumber = Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 86_400_000);
+    if (group.length === 0 || dayNumber - firstDayNumber < CLEANUP_DAILY_STATS_MAX_SPAN_DAYS) {
+      if (group.length === 0) firstDayNumber = dayNumber;
+      group.push(day);
+      continue;
+    }
+
+    groups.push(group);
+    group = [day];
+    firstDayNumber = dayNumber;
+  }
+
+  if (group.length > 0) groups.push(group);
+  return groups;
+}
 
 export type SaveReadingSessionResult =
   | { kind: 'saved' }
@@ -578,94 +602,66 @@ export class ReadingSessionRepository {
     });
   }
 
-  /**
-   * Drops the estimates a device made for reading it has since reported real page timings for.
-   *
-   * Scoped by overlap rather than by device, because a sweep is not proof that the measured
-   * history covers the estimated one. A device may upload no page stats at all, or only the
-   * window its local statistics database still holds, and deleting everything on the strength
-   * of "this device now has the plugin" would erase reading nothing replaced.
-   *
-   * Run on every sweep, not only the first. It is idempotent, it costs one indexed lookup when
-   * there is nothing to retire, and a sweep whose cleanup failed is retried by the next one
-   * rather than leaving the double count in place forever.
-   */
-  async deleteSupersededSyncEstimates(
-    userId: number,
-    estimateSessionIdPrefix: string,
-    measuredSessionIdPrefix: string,
-    timeZone = 'UTC',
-  ): Promise<{ deleted: number }> {
+  async deleteLegacyKoreaderSyncEstimatesBatch(limit: number): Promise<{ deleted: number }> {
     return this.db.transaction(async (tx) => {
-      const daysByLibrary = new Map<number, Set<string>>();
-      let deleted = 0;
-      let cursor = 0;
+      // The exact id shape was reserved by the removed estimator. Plugin-measured sessions use
+      // the `kor:` namespace, so this cannot match supported KOReader telemetry.
+      const rows = await tx
+        .select({
+          id: readingSessions.id,
+          userId: readingSessions.userId,
+          libraryId: books.libraryId,
+          startedAt: readingSessions.startedAt,
+          endedAt: readingSessions.endedAt,
+          durationSeconds: readingSessions.durationSeconds,
+          progressDelta: readingSessions.progressDelta,
+          userSettings: schema.users.settings,
+        })
+        .from(readingSessions)
+        .innerJoin(books, eq(books.id, readingSessions.bookId))
+        .innerJoin(schema.users, eq(schema.users.id, readingSessions.userId))
+        .where(and(eq(readingSessions.source, 'koreader'), sql<boolean>`${readingSessions.sessionId} ~ ${'^ks-[0-9a-f]{12}-[0-9a-f]{32}$'}`))
+        .orderBy(readingSessions.id)
+        .limit(limit);
 
-      for (;;) {
-        const rows = await tx
-          .select({
-            id: readingSessions.id,
-            startedAt: readingSessions.startedAt,
-            endedAt: readingSessions.endedAt,
-            durationSeconds: readingSessions.durationSeconds,
-            progressDelta: readingSessions.progressDelta,
-            libraryId: books.libraryId,
-          })
-          .from(readingSessions)
-          .innerJoin(books, eq(books.id, readingSessions.bookId))
-          .where(
-            and(
-              eq(readingSessions.userId, userId),
-              like(readingSessions.sessionId, `${estimateSessionIdPrefix}%`),
-              gt(readingSessions.id, cursor),
-              sql`exists (
-                select 1
-                from reading_sessions measured
-                where measured.user_id = ${userId}
-                  and measured.session_id like ${`${measuredSessionIdPrefix}%`}
-                  and measured.started_at < ${readingSessions.endedAt}
-                  and measured.ended_at > ${readingSessions.startedAt}
-              )`,
-            ),
-          )
-          .orderBy(readingSessions.id)
-          .limit(ESTIMATE_CLEANUP_PAGE_SIZE);
+      if (rows.length === 0) return { deleted: 0 };
 
-        if (rows.length === 0) break;
-        cursor = rows[rows.length - 1]!.id;
-
-        for (const row of rows) {
-          const days = daysByLibrary.get(row.libraryId) ?? new Set<string>();
-          for (const day of getReadingSessionDayKeys(
-            { startedAt: row.startedAt, endedAt: row.endedAt, durationSeconds: row.durationSeconds, progressDelta: row.progressDelta ?? null },
-            timeZone,
-          )) {
-            days.add(day);
-          }
-          daysByLibrary.set(row.libraryId, days);
+      const affected = new Map<string, { userId: number; libraryId: number; timeZone: string; days: Set<string> }>();
+      for (const row of rows) {
+        const timeZone = resolveTimeZone((row.userSettings as { timezone?: unknown } | null)?.timezone, 'UTC');
+        const key = `${row.userId}:${row.libraryId}`;
+        const group = affected.get(key) ?? { userId: row.userId, libraryId: row.libraryId, timeZone, days: new Set<string>() };
+        for (const day of getReadingSessionDayKeys(
+          {
+            startedAt: row.startedAt,
+            endedAt: row.endedAt,
+            durationSeconds: row.durationSeconds,
+            progressDelta: row.progressDelta ?? null,
+          },
+          timeZone,
+        )) {
+          group.days.add(day);
         }
-
-        // Deleted rows sit behind the cursor, so paging is unaffected by removing them.
-        await tx.delete(readingSessions).where(
-          and(
-            eq(readingSessions.userId, userId),
-            inArray(
-              readingSessions.id,
-              rows.map((row) => row.id),
-            ),
-          ),
-        );
-        deleted += rows.length;
-
-        if (rows.length < ESTIMATE_CLEANUP_PAGE_SIZE) break;
+        affected.set(key, group);
       }
 
-      // Ascending so concurrent writers take the per-library locks in one order.
-      for (const libraryId of [...daysByLibrary.keys()].sort((a, b) => a - b)) {
-        await this.recomputeDailyStats(tx, userId, libraryId, [...daysByLibrary.get(libraryId)!], timeZone);
+      await tx.delete(readingSessions).where(
+        inArray(
+          readingSessions.id,
+          rows.map((row) => row.id),
+        ),
+      );
+
+      const groups = [...affected.values()].sort((left, right) => left.userId - right.userId || left.libraryId - right.libraryId);
+      for (const group of groups) {
+        // Keep each recompute's database range bounded even when one batch contains sparse
+        // sessions from years apart.
+        for (const days of groupDateKeysByMaxSpan(group.days)) {
+          await this.recomputeDailyStats(tx, group.userId, group.libraryId, days, group.timeZone);
+        }
       }
 
-      return { deleted };
+      return { deleted: rows.length };
     });
   }
 

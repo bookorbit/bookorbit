@@ -186,17 +186,4 @@ describe('KoreaderPluginRepository', () => {
       await expect(repo.listDevicePluginVersions(7)).resolves.toEqual([]);
     });
   });
-  describe('hasSweepSince', () => {
-    it('reports a device that has swept inside the window', async () => {
-      db.select.mockReturnValue(makeQueryChain([{ deviceId: 'device-12' }]));
-
-      await expect(repo.hasSweepSince(7, 'device-12', new Date('2026-07-26T00:00:00.000Z'))).resolves.toBe(true);
-    });
-
-    it('reports a device whose last sweep predates the window, or that never swept at all', async () => {
-      db.select.mockReturnValue(makeQueryChain([]));
-
-      await expect(repo.hasSweepSince(7, 'device-12', new Date('2026-07-26T00:00:00.000Z'))).resolves.toBe(false);
-    });
-  });
 });

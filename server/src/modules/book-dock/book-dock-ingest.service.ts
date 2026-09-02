@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { basename, extname, join } from 'path';
+import { basename, extname, join, relative, sep } from 'path';
 import { mkdir, realpath, stat } from 'fs/promises';
 import { Readable } from 'stream';
 
@@ -11,6 +11,8 @@ import { SUPPORTED_BOOK_FORMATS, UploadValidatorService } from '../upload/upload
 import { UploadStorageService } from '../upload/upload-storage.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { MetadataFetchPipeline } from '../metadata-fetch/metadata-fetch-pipeline';
+import { interpretRelease } from '../scanner/lib/release-plan';
+import { buildSingleBookCandidate } from '../scanner/lib/walk';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockMetadataService } from './book-dock-metadata.service';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
@@ -163,6 +165,76 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     this.extractMetadataAsync(row.id, ext, metadataQueuePriority(row));
 
     return row.id;
+  }
+
+  /**
+   * A folder dropped into the dock, read as books rather than as loose files. Returns how many
+   * units it created.
+   *
+   * The folder is read once with the scanner's own `buildSingleBookCandidate`, which already
+   * handles disc subdirectories, natural sort, roles and covers. Its file list then goes through
+   * the release interpreter for **grouping**, because `buildSingleBookCandidate` returns exactly
+   * one candidate for any folder whatever it holds: a dropped 60-issue comic run would otherwise
+   * become one book of 60 files, and the dock would disagree with the request pipeline about the
+   * same folder.
+   */
+  async ingestUnitDirectory(unitDirectory: string): Promise<number> {
+    const candidate = await buildSingleBookCandidate(unitDirectory, unitDirectory, [], (message) =>
+      this.logger.debug(`[book_dock.ingest_unit] ${sanitizeLogValue(message)}`),
+    );
+    if (!candidate) return 0;
+
+    const byPath = new Map(candidate.files.map((file) => [file.absolutePath, file]));
+    const plan = interpretRelease(
+      candidate.files.map((file) => ({ path: relative(unitDirectory, file.absolutePath).split(sep).join('/'), sizeBytes: file.sizeBytes })),
+      { rootName: basename(unitDirectory) },
+    );
+
+    let created = 0;
+    for (const unit of plan.units) {
+      const primaryPath = join(unitDirectory, unit.primaryPath);
+      if (await this.repo.findByAbsolutePath(primaryPath)) continue;
+
+      const primary = byPath.get(primaryPath);
+      if (!primary?.format || !SUPPORTED_BOOK_FORMATS.has(primary.format)) continue;
+
+      // One unit per folder is the ordinary case, and it owns the folder outright. Several units
+      // share it, so none of them may claim it: claiming would make the others invisible to the
+      // watcher, and deleting one would take the whole folder with it.
+      const owned = plan.units.length === 1;
+
+      const row = await this.repo.createUnit(
+        {
+          fileName: basename(primaryPath),
+          absolutePath: primaryPath,
+          fileSize: primary.sizeBytes,
+          format: primary.format,
+          unitDirectory: owned ? unitDirectory : null,
+          status: 'pending',
+        },
+        unit.files.map((file) => {
+          const stat = byPath.get(join(unitDirectory, file.path));
+          return {
+            absolutePath: join(unitDirectory, file.path),
+            fileName: basename(file.path),
+            fileSize: stat?.sizeBytes ?? file.sizeBytes,
+            format: file.format,
+            role: file.role,
+            sortOrder: file.sortOrder,
+          };
+        }),
+      );
+
+      this.extractMetadataAsync(row.id, primary.format, metadataQueuePriority(row));
+      created++;
+    }
+
+    if (created > 0) {
+      this.logger.log(
+        `[book_dock.ingest_unit] [end] path="${sanitizeLogValue(unitDirectory)}" units=${created} files=${candidate.files.length} - folder ingested as units`,
+      );
+    }
+    return created;
   }
 
   private extractMetadataAsync(fileId: number, format: string, priority?: BookDockWorkPriority): boolean {

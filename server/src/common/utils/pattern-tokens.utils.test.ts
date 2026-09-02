@@ -92,5 +92,21 @@ describe('pattern-tokens.utils', () => {
 
       expect(tokens['seriesIndex']).toBe('05.02');
     });
+
+    it('normalizes legacy numeric series indexes and omits malformed runtime values', () => {
+      const legacy = buildPatternTokens({
+        metadata: { ...metadata, seriesIndex: 3 } as never,
+        originalStem: 'book',
+        format: 'epub',
+      });
+      const malformed = buildPatternTokens({
+        metadata: { ...metadata, seriesIndex: 'volume-three' } as never,
+        originalStem: 'book',
+        format: 'epub',
+      });
+
+      expect(legacy['seriesIndex']).toBe('03');
+      expect(malformed['seriesIndex']).toBeUndefined();
+    });
   });
 });

@@ -27,6 +27,7 @@ vi.mock('crypto', async () => {
 
 vi.mock('../../../../common/sevenzip', () => ({
   getSevenZip: vi.fn(),
+  createSevenZipTempId: (prefix: string) => `${prefix}_test`,
 }));
 
 vi.mock('./comic-info-builder', () => ({

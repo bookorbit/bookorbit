@@ -594,7 +594,7 @@
     "httpMethod": "GET",
     "path": "/scanner/libraries/:id/scan-history",
     "permissions": ["Permission.ManageLibraries"],
-    "libraryAccess": ["viewer"],
+    "libraryAccess": ["'viewer'"],
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []

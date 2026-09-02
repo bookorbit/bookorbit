@@ -17,9 +17,11 @@ import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
+import { USER_DELETING, UserEventsService, type UserDeletingEvent } from './user-events.service';
 import { UserRepository, type UserListQuery } from './user.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UserStatisticsService } from '../user-statistics/user-statistics.service';
+import { AuthenticationPolicyService } from '../../common/services/authentication-policy.service';
 
 /** The band is a to-do list, not a second roster. */
 const ATTENTION_BAND_LIMIT = 8;
@@ -35,6 +37,8 @@ export class UserService {
     private readonly contentFilterRepo: ContentFilterRepository,
     private readonly appSettingsService: AppSettingsService,
     private readonly userStatistics: UserStatisticsService,
+    private readonly events: UserEventsService,
+    private readonly authenticationPolicy: AuthenticationPolicyService,
   ) {}
 
   findByUsername(username: string) {
@@ -128,6 +132,7 @@ export class UserService {
   }
 
   async createUser(dto: CreateUserDto) {
+    this.authenticationPolicy.assertPasswordLoginEnabled();
     const existing = await this.userRepo.findByUsername(dto.username);
     if (existing) throw new ConflictException('Username already taken');
     const existingEmail = await this.userRepo.findByEmail(dto.email);
@@ -330,10 +335,40 @@ export class UserService {
     if (id === requestingUser.id) {
       throw new ConflictException('You cannot delete your own account');
     }
-    const result = await this.userRepo.deleteManagedUser(requestingUser.id, id);
+    const result = await this.userRepo.deleteManagedUser(requestingUser.id, id, () => this.announceDeletion(id));
     if (result === 'target_not_found') throw new NotFoundException('User not found');
     if (result === 'requester_not_superuser') throw new ForbiddenException('Only administrators can delete administrator accounts');
     if (result === 'last_superuser') throw new ConflictException('Cannot delete the last administrator');
+  }
+
+  /**
+   * Gives everything holding work on this account's behalf the chance to stop it, before the
+   * cascade removes the only rows that say the work exists.
+   *
+   * Awaited, because running afterwards would be pointless: a torrent whose attempt row is gone
+   * cannot be found again. Failures are logged and the deletion proceeds - an account the operator
+   * asked to remove must go, and the alternative to a leaked torrent is an account that cannot be
+   * deleted at all.
+   */
+  private async announceDeletion(userId: number): Promise<void> {
+    const pending: Promise<void>[] = [];
+    const event: UserDeletingEvent = { userId, waitFor: (work) => pending.push(work) };
+    try {
+      this.events.emit(USER_DELETING, event);
+    } catch (error: unknown) {
+      // A listener that threw before it could register anything, which is still not a reason to
+      // refuse the deletion; whatever it holds is reported here and left running.
+      pending.push(Promise.reject(error instanceof Error ? error : new Error(String(error))));
+    }
+    if (pending.length === 0) return;
+
+    for (const outcome of await Promise.allSettled(pending)) {
+      if (outcome.status !== 'rejected') continue;
+      const message = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      this.logger.warn(
+        `[user.delete] [fail] userId=${userId} error="${sanitizeLogValue(message)}" - work belonging to this account could not be stopped before deletion`,
+      );
+    }
   }
 
   setPermissionsDirectly(userId: number, permissionNames: Permission[]) {
@@ -367,6 +402,9 @@ export class UserService {
     if (result === 'requester_not_superuser') throw new ForbiddenException('Only administrators can change superuser status');
     if (result === 'target_not_found') throw new NotFoundException('User not found');
     if (result === 'shared_target') throw new BadRequestException('Shared accounts cannot be made superuser');
+    if (result === 'target_no_oidc') {
+      throw new ConflictException('An administrator must link an enabled OIDC provider while password authentication is disabled');
+    }
     if (result === 'last_superuser') throw new ConflictException('Cannot remove the last administrator');
   }
 
@@ -389,6 +427,7 @@ export class UserService {
   }
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {
+    this.authenticationPolicy.assertPasswordLoginEnabled();
     const target = await this.userRepo.findByIdWithPermissions(targetUserId);
     if (!target) throw new NotFoundException('User not found');
     if (target.isSuperuser && !requestingUser.isSuperuser) {
@@ -506,5 +545,9 @@ export class UserService {
       excludeGenreIds: dto.excludeGenreIds ?? [],
     };
     await this.contentFilterRepo.replaceFilters(targetUserId, filters);
+
+    if (dto.seeOwnRequestedBooks !== undefined) {
+      await this.userRepo.update(targetUserId, { seeOwnRequestedBooks: dto.seeOwnRequestedBooks });
+    }
   }
 }

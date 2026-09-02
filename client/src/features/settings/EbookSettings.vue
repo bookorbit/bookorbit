@@ -1,13 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { EpubReaderSettings, FontNamedInstance } from '@bookorbit/types'
-import { isCustomFontCssFamily } from '@bookorbit/types'
+import {
+  EPUB_LETTER_SPACING_MAX,
+  EPUB_LETTER_SPACING_MIN,
+  EPUB_PARAGRAPH_SPACING_MAX,
+  EPUB_PARAGRAPH_SPACING_MIN,
+  EPUB_TEXT_INDENT_MAX,
+  EPUB_TEXT_INDENT_MIN,
+  EPUB_WORD_SPACING_MAX,
+  EPUB_WORD_SPACING_MIN,
+  isCustomFontCssFamily,
+  type EpubReaderSettings,
+  type FontNamedInstance,
+} from '@bookorbit/types'
 import { useReaderDefaultSettings } from '@/features/reader/shared/composables/useReaderSettings'
 import { useCustomFonts } from '@/features/reader/epub/composables/useCustomFonts'
 import { themes } from '@/features/reader/epub/constants/themes'
 import { BUILTIN_READER_FONT_OPTIONS } from '@/features/reader/shared/constants/font-options'
 import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display'
+import { formatNumber } from '@/i18n/formatters'
 import {
   FONT_WEIGHT_LABEL_KEYS,
   builtInVariants,
@@ -32,6 +44,13 @@ const props = withDefaults(
 
 const { t } = useI18n()
 const fontStyleSelectId = `ebook-font-style-${useId()}`
+const paragraphSpacingInputId = `ebook-paragraph-spacing-${useId()}`
+const letterSpacingSourceId = `ebook-letter-spacing-source-${useId()}`
+const letterSpacingInputId = `ebook-letter-spacing-${useId()}`
+const wordSpacingSourceId = `ebook-word-spacing-source-${useId()}`
+const wordSpacingInputId = `ebook-word-spacing-${useId()}`
+const textIndentSourceId = `ebook-text-indent-source-${useId()}`
+const textIndentInputId = `ebook-text-indent-${useId()}`
 
 const { effective, load, update, reset } = useReaderDefaultSettings<EpubReaderSettings>('epub')
 
@@ -77,11 +96,90 @@ function fontStyleLabel(variant: FontNamedInstance): string {
   return t('settings.reader.fonts.weightItalicOf', { weight: base })
 }
 
-const selectedFontStyle = computed(() => variantKey({ weight: effective.value.fontWeight, style: effective.value.fontStyle }))
+const selectedFontStyle = computed(() =>
+  variantKey({
+    weight: effective.value.fontWeight,
+    style: effective.value.fontStyle,
+  }),
+)
+const paragraphSpacingLabel = computed(() =>
+  effective.value.paragraphSpacing === EPUB_PARAGRAPH_SPACING_MIN
+    ? t('settings.reader.ebook.paragraphSpacingDefault')
+    : t('settings.reader.ebook.paragraphSpacingValue', {
+        value: formatNumber(effective.value.paragraphSpacing, {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }),
+      }),
+)
+const letterSpacingValue = computed(() => effective.value.letterSpacing ?? EPUB_LETTER_SPACING_MIN)
+const wordSpacingValue = computed(() => effective.value.wordSpacing ?? EPUB_WORD_SPACING_MIN)
+const textIndentValue = computed(() => effective.value.textIndent ?? EPUB_TEXT_INDENT_MIN)
+const letterSpacingLabel = computed(() => formatEmValue(letterSpacingValue.value, 2))
+const wordSpacingLabel = computed(() => formatEmValue(wordSpacingValue.value, 2))
+const textIndentLabel = computed(() => formatEmValue(textIndentValue.value, 2))
 
 function selectFontStyle(event: Event) {
   const chosen = fontStyleOptions.value.find((option) => option.value === (event.target as HTMLSelectElement).value)
-  if (chosen) update({ fontWeight: chosen.variant.weight, fontStyle: chosen.variant.style })
+  if (chosen)
+    update({
+      fontWeight: chosen.variant.weight,
+      fontStyle: chosen.variant.style,
+    })
+}
+
+function setParagraphSpacing(event: Event) {
+  update({
+    paragraphSpacing: Number((event.target as HTMLInputElement).value),
+  })
+}
+
+function formatEmValue(value: number, maximumFractionDigits: number): string {
+  return t('settings.reader.ebook.emValue', {
+    value: formatNumber(value, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits,
+    }),
+  })
+}
+
+function setLetterSpacingSource(event: Event) {
+  const source = (event.target as HTMLSelectElement).value
+  update({
+    letterSpacing: source === 'book' ? null : (effective.value.letterSpacing ?? 0),
+  })
+}
+
+function setWordSpacingSource(event: Event) {
+  const source = (event.target as HTMLSelectElement).value
+  update({
+    wordSpacing: source === 'book' ? null : (effective.value.wordSpacing ?? 0),
+  })
+}
+
+function setTextIndentSource(event: Event) {
+  const source = (event.target as HTMLSelectElement).value
+  update({
+    textIndent: source === 'book' ? null : (effective.value.textIndent ?? 0),
+  })
+}
+
+function setLetterSpacing(event: Event) {
+  update({
+    letterSpacing: Math.round(Number((event.target as HTMLInputElement).value) * 100) / 100,
+  })
+}
+
+function setWordSpacing(event: Event) {
+  update({
+    wordSpacing: Math.round(Number((event.target as HTMLInputElement).value) * 20) / 20,
+  })
+}
+
+function setTextIndent(event: Event) {
+  update({
+    textIndent: Math.round(Number((event.target as HTMLInputElement).value) * 4) / 4,
+  })
 }
 
 /**
@@ -91,7 +189,10 @@ function selectFontStyle(event: Event) {
 function selectFontFamily(event: Event) {
   const fontFamily = (event.target as HTMLSelectElement).value || null
   const variants = variantsForFamily(fontFamily)
-  const current = { weight: effective.value.fontWeight, style: effective.value.fontStyle }
+  const current = {
+    weight: effective.value.fontWeight,
+    style: effective.value.fontStyle,
+  }
 
   if (variants.some((variant) => isSameVariant(variant, current))) {
     update({ fontFamily })
@@ -127,7 +228,15 @@ function reconcileSavedFont() {
       weight: effective.value.fontWeight,
       style: effective.value.fontStyle,
     })
-    update(fallback ? { fontFamily: null, fontWeight: fallback.weight, fontStyle: fallback.style } : { fontFamily: null })
+    update(
+      fallback
+        ? {
+            fontFamily: null,
+            fontWeight: fallback.weight,
+            fontStyle: fallback.style,
+          }
+        : { fontFamily: null },
+    )
   }
 }
 
@@ -501,6 +610,32 @@ function setFixedLayoutSpreadNone() {
           />
         </div>
 
+        <!-- Paragraph spacing -->
+        <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <div class="mb-3">
+            <div class="flex items-center justify-between gap-3">
+              <label :for="paragraphSpacingInputId" class="settings-label">
+                {{ t('settings.reader.ebook.paragraphSpacing') }}
+              </label>
+              <span class="settings-value">{{ paragraphSpacingLabel }}</span>
+            </div>
+            <p class="settings-hint">
+              {{ t('settings.reader.ebook.paragraphSpacingHint') }}
+            </p>
+          </div>
+          <input
+            :id="paragraphSpacingInputId"
+            type="range"
+            :min="EPUB_PARAGRAPH_SPACING_MIN"
+            :max="EPUB_PARAGRAPH_SPACING_MAX"
+            step="0.1"
+            class="w-full accent-primary cursor-pointer"
+            :value="effective.paragraphSpacing"
+            :aria-valuetext="paragraphSpacingLabel"
+            @input="setParagraphSpacing"
+          />
+        </div>
+
         <!-- Justify -->
         <div class="settings-row">
           <div>
@@ -535,6 +670,123 @@ function setFixedLayoutSpreadNone() {
         {{ t('settings.reader.ebook.advanced') }}
       </p>
       <div class="settings-card">
+        <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <label :for="letterSpacingSourceId" class="settings-label">{{ t('settings.reader.ebook.letterSpacing') }}</label>
+              <p class="settings-hint">
+                {{ t('settings.reader.ebook.letterSpacingHint') }}
+              </p>
+            </div>
+            <select
+              :id="letterSpacingSourceId"
+              class="text-xs border border-border rounded-md px-2 py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              :value="effective.letterSpacing === null ? 'book' : 'custom'"
+              @change="setLetterSpacingSource"
+            >
+              <option value="book">
+                {{ t('settings.reader.ebook.bookDefault') }}
+              </option>
+              <option value="custom">
+                {{ t('settings.reader.ebook.custom') }}
+              </option>
+            </select>
+          </div>
+          <div v-if="effective.letterSpacing !== null" class="flex items-center gap-3">
+            <input
+              :id="letterSpacingInputId"
+              type="range"
+              :min="EPUB_LETTER_SPACING_MIN"
+              :max="EPUB_LETTER_SPACING_MAX"
+              step="0.01"
+              class="w-full accent-primary cursor-pointer"
+              :value="letterSpacingValue"
+              :aria-label="t('settings.reader.ebook.letterSpacing')"
+              :aria-valuetext="letterSpacingLabel"
+              @input="setLetterSpacing"
+            />
+            <span class="settings-value w-16 text-right">{{ letterSpacingLabel }}</span>
+          </div>
+        </div>
+
+        <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <label :for="wordSpacingSourceId" class="settings-label">{{ t('settings.reader.ebook.wordSpacing') }}</label>
+              <p class="settings-hint">
+                {{ t('settings.reader.ebook.wordSpacingHint') }}
+              </p>
+            </div>
+            <select
+              :id="wordSpacingSourceId"
+              class="text-xs border border-border rounded-md px-2 py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              :value="effective.wordSpacing === null ? 'book' : 'custom'"
+              @change="setWordSpacingSource"
+            >
+              <option value="book">
+                {{ t('settings.reader.ebook.bookDefault') }}
+              </option>
+              <option value="custom">
+                {{ t('settings.reader.ebook.custom') }}
+              </option>
+            </select>
+          </div>
+          <div v-if="effective.wordSpacing !== null" class="flex items-center gap-3">
+            <input
+              :id="wordSpacingInputId"
+              type="range"
+              :min="EPUB_WORD_SPACING_MIN"
+              :max="EPUB_WORD_SPACING_MAX"
+              step="0.05"
+              class="w-full accent-primary cursor-pointer"
+              :value="wordSpacingValue"
+              :aria-label="t('settings.reader.ebook.wordSpacing')"
+              :aria-valuetext="wordSpacingLabel"
+              @input="setWordSpacing"
+            />
+            <span class="settings-value w-16 text-right">{{ wordSpacingLabel }}</span>
+          </div>
+        </div>
+
+        <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <label :for="textIndentSourceId" class="settings-label">{{ t('settings.reader.ebook.textIndent') }}</label>
+              <p class="settings-hint">
+                {{ t('settings.reader.ebook.textIndentHint') }}
+              </p>
+            </div>
+            <select
+              :id="textIndentSourceId"
+              class="text-xs border border-border rounded-md px-2 py-1.5 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              :value="effective.textIndent === null ? 'book' : 'custom'"
+              @change="setTextIndentSource"
+            >
+              <option value="book">
+                {{ t('settings.reader.ebook.bookDefault') }}
+              </option>
+              <option value="custom">
+                {{ t('settings.reader.ebook.custom') }}
+              </option>
+            </select>
+          </div>
+          <div v-if="effective.textIndent !== null" class="flex items-center gap-3">
+            <input
+              :id="textIndentInputId"
+              type="range"
+              :min="EPUB_TEXT_INDENT_MIN"
+              :max="EPUB_TEXT_INDENT_MAX"
+              step="0.25"
+              class="w-full accent-primary cursor-pointer"
+              :value="textIndentValue"
+              :aria-label="t('settings.reader.ebook.textIndent')"
+              :aria-valuetext="textIndentLabel"
+              @input="setTextIndent"
+            />
+            <span class="settings-value w-16 text-right">{{ textIndentLabel }}</span>
+          </div>
+        </div>
+
         <!-- Max inline size -->
         <div class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
           <div class="mb-3">

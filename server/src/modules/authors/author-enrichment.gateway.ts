@@ -2,7 +2,7 @@ import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Permission, type AuthorEnrichmentStatusEvent } from '@bookorbit/types';
+import { Permission, type AuthenticationMethod, type AuthorEnrichmentStatusEvent } from '@bookorbit/types';
 import { Server, Socket } from 'socket.io';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -47,8 +47,8 @@ export class AuthorEnrichmentGateway implements OnGatewayInit, OnGatewayConnecti
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new UnauthorizedException('No token provided');
 
-      const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
-      const user = await this.authService.validateUser(payload.sub, payload.ver);
+      const payload = this.jwtService.verify<{ sub: number; ver: number; amr?: AuthenticationMethod }>(token, { algorithms: ['HS256'] });
+      const user = await this.authService.validateUser(payload.sub, payload.ver, payload.amr ?? 'legacy');
       if (!user) throw new UnauthorizedException('User not found or token revoked');
 
       this.assertCanViewStatus(user);

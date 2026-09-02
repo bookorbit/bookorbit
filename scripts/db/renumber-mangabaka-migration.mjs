@@ -163,6 +163,19 @@ function main() {
   const raw = readFileSync(JOURNAL_PATH, 'utf8');
   const hadConflicts = raw.includes('<<<<<<<');
   let journal = resolveJournalConflicts(raw);
+
+  // The merge may have dropped our MangaBaka entry entirely (upstream's
+  // migration took the slot and git auto-merged the journal). If the SQL file
+  // still exists but the journal has no entry, re-add it at the end.
+  const mangabakaSql = findMangabakaSql();
+  if (!journal.entries.some((e) => e.tag.includes(MANGABAKA_TAG))) {
+    if (!mangabakaSql) throw new Error(`no migration matching *${MANGABAKA_TAG}* found in journal or migrations dir`);
+    const when = Date.now();
+    const tag = `${String(journal.entries.length).padStart(4, '0')}_add_mangabaka_columns`;
+    log('info', `journal lost the MangaBaka entry; re-adding as ${tag}`);
+    journal = { ...journal, entries: [...journal.entries, { idx: journal.entries.length, version: '7', when, tag, breakpoints: true }] };
+  }
+
   journal = moveMangabakaToEnd(journal);
   journal = renumber(journal);
 

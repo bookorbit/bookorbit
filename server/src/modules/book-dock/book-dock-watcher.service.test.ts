@@ -4,12 +4,16 @@ vi.mock('../scanner/lib/classify', () => ({
 
 vi.mock('../scanner/lib/stability', () => ({
   waitForStability: vi.fn(),
+  waitForDirectoryStability: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('fs/promises', () => ({
   mkdir: vi.fn(),
   readdir: vi.fn(),
   realpath: vi.fn().mockImplementation((p: string) => Promise.resolve(p)),
+  // A path under the dock root is a loose file unless a test says otherwise, which is what
+  // `isUnitDirectory` asks about.
+  stat: vi.fn().mockResolvedValue({ isDirectory: () => false }),
   unlink: vi.fn(),
 }));
 
@@ -17,11 +21,11 @@ vi.mock('chokidar', () => ({
   watch: vi.fn(),
 }));
 
-import { mkdir, readdir, realpath, unlink } from 'fs/promises';
+import { mkdir, readdir, realpath, stat, unlink } from 'fs/promises';
 import { watch } from 'chokidar';
 
 import { isPrimaryFormat } from '../scanner/lib/classify';
-import { waitForStability } from '../scanner/lib/stability';
+import { waitForDirectoryStability, waitForStability } from '../scanner/lib/stability';
 import { BookDockWatcherService } from './book-dock-watcher.service';
 
 function makeService(bookDockPath = '/data/book-dock') {
@@ -30,9 +34,11 @@ function makeService(bookDockPath = '/data/book-dock') {
   };
   const ingestService = {
     ingestFromWatchedFolder: vi.fn(),
+    ingestUnitDirectory: vi.fn().mockResolvedValue(0),
   };
   const repo = {
     findByAbsolutePath: vi.fn(),
+    findByUnitDirectory: vi.fn().mockResolvedValue(undefined),
     deleteById: vi.fn(),
     countsByStatus: vi.fn().mockResolvedValue({ pending: 1, ready: 2, error: 0, total: 3 }),
   };
@@ -154,7 +160,11 @@ describe('BookDockWatcherService', () => {
     expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
   });
 
-  it('walkAndIngest skips covers folder and ingests supported files recursively', async () => {
+  /**
+   * The recursion this replaced turned a dropped folder of 31 tracks into 31 independent rows,
+   * each resolving its own destination from its own chapter-named tags.
+   */
+  it('walkAndIngest skips covers, ingests loose files, and hands folders over whole', async () => {
     const { service, ingestService } = makeService();
     vi.mocked(isPrimaryFormat).mockImplementation((path: string) => path.endsWith('.epub') || path.endsWith('.pdf'));
     vi.mocked(readdir).mockImplementation((dir: string) => {
@@ -177,8 +187,65 @@ describe('BookDockWatcherService', () => {
     await (service as any).walkAndIngest('/data/book-dock');
 
     expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/root.epub');
-    expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/nested/inner.pdf');
-    expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalledWith('/data/book-dock/nested/note.txt');
+    expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalledWith('/data/book-dock/nested/inner.pdf');
+    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/nested');
+    expect(ingestService.ingestUnitDirectory).not.toHaveBeenCalledWith('/data/book-dock/covers');
+  });
+
+  it('leaves a directory alone once a unit row has claimed it', async () => {
+    const { service, ingestService, repo } = makeService();
+    repo.findByUnitDirectory.mockResolvedValue({ id: 4 });
+
+    await (service as any).ingestUnitDirectory('/data/book-dock/request-7-audiobook');
+
+    expect(ingestService.ingestUnitDirectory).not.toHaveBeenCalled();
+  });
+
+  /** A dropped folder fires one `add` per file inside it, never a usable `addDir`. */
+  it('routes a file event inside a folder to that folder as a unit', async () => {
+    const { service, ingestService } = makeService();
+
+    await (service as any).process('create', '/data/book-dock/Neuromancer/Chapter 3.mp3');
+
+    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
+    expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A folder still being copied is not yet a book: interpreting it now reads a partial snapshot,
+   * and the row it creates claims the directory so the tracks that follow are never looked at.
+   */
+  it('waits for a dropped folder to stop growing before interpreting it', async () => {
+    const { service, ingestService } = makeService();
+    const order: string[] = [];
+    vi.mocked(waitForDirectoryStability).mockImplementationOnce(() => {
+      order.push('wait');
+      return Promise.resolve();
+    });
+    ingestService.ingestUnitDirectory.mockImplementation(() => {
+      order.push('ingest');
+      return Promise.resolve(1);
+    });
+
+    await (service as any).ingestUnitDirectory('/data/book-dock/Neuromancer');
+
+    expect(waitForDirectoryStability).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
+    expect(order).toEqual(['wait', 'ingest']);
+  });
+
+  /**
+   * The other way a unit arrives: chokidar's `addDir` for the folder itself, which is a directory
+   * one level below the root rather than a file. Only `stat` tells the two apart.
+   */
+  it('routes an event for the folder itself to the unit path', async () => {
+    const { service, ingestService } = makeService();
+    vi.mocked(stat).mockResolvedValueOnce({ isDirectory: () => true } as never);
+
+    await (service as any).process('create', '/data/book-dock/Neuromancer');
+
+    expect(stat).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
+    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
+    expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
   });
 
   it('onModuleDestroy clears timers and unsubscribes active watcher', async () => {

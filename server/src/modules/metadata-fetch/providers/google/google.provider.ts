@@ -9,6 +9,7 @@ import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
 import { PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { buildRequestSignal } from '../provider-utils';
+import { GoogleCoverValidator } from './google-cover-validator';
 import { mapGoogleVolume } from './google.mapper';
 import { GoogleBooksResponse, GoogleVolumeItem } from './google.types';
 
@@ -21,6 +22,7 @@ export class GoogleProvider implements IdentifiableProvider {
   readonly identifiable = true as const;
 
   private readonly logger = new Logger(GoogleProvider.name);
+  private readonly coverValidator = new GoogleCoverValidator();
 
   constructor(private readonly providerConfig: ProviderConfigService) {}
 
@@ -29,7 +31,7 @@ export class GoogleProvider implements IdentifiableProvider {
     if (!enabled || !apiKey.trim()) return [];
     const query = this.buildQuery(params);
     if (!query) return [];
-    return this.fetchVolumes(query, apiKey, params.signal);
+    return this.fetchVolumes(query, apiKey, params.validateCoverPlaceholders ?? false, params.signal);
   }
 
   async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
@@ -73,7 +75,7 @@ export class GoogleProvider implements IdentifiableProvider {
     return parts.length ? parts.join(' ') : null;
   }
 
-  private async fetchVolumes(query: string, apiKey: string, signal?: AbortSignal): Promise<MetadataCandidate[]> {
+  private async fetchVolumes(query: string, apiKey: string, validateCoverPlaceholders: boolean, signal?: AbortSignal): Promise<MetadataCandidate[]> {
     const url = this.buildUrl('/volumes', { q: query, maxResults: '10', printType: 'books' }, apiKey);
     const startedAt = Date.now();
     const safeQuery = sanitizeLogValue(query);
@@ -88,7 +90,8 @@ export class GoogleProvider implements IdentifiableProvider {
         return [];
       }
       const body = (await res.json()) as GoogleBooksResponse;
-      const items = (body.items ?? []).map(mapGoogleVolume);
+      const mappedItems = (body.items ?? []).map(mapGoogleVolume);
+      const items = validateCoverPlaceholders ? await this.coverValidator.filterCandidates(mappedItems, signal) : mappedItems;
       this.logger.log(
         `[google] [end] op=search query="${safeQuery}" status=${res.status} resultCount=${items.length} durationMs=${Date.now() - startedAt}`,
       );

@@ -16,8 +16,15 @@ import {
   validateSync,
 } from 'class-validator';
 import { plainToInstance, Type } from 'class-transformer';
-import { ALL_METADATA_FIELDS, GENRE_MERGE_MODES, GENRE_MERGE_STRATEGIES, MAX_METADATA_GENRE_COUNT, MetadataProviderKey } from '@bookorbit/types';
-import type { GenreMergeMode, MetadataField, MetadataMergeStrategy } from '@bookorbit/types';
+import {
+  ALL_METADATA_FIELDS,
+  GENRE_MERGE_MODES,
+  GENRE_MERGE_STRATEGIES,
+  MAX_METADATA_GENRE_COUNT,
+  MetadataProviderKey,
+  PROVIDER_ID_FETCH_MODES,
+} from '@bookorbit/types';
+import type { GenreMergeMode, MetadataField, MetadataMergeStrategy, ProviderIdFetchMode } from '@bookorbit/types';
 const PROVIDER_KEYS = Object.values(MetadataProviderKey);
 
 export class FieldPreferenceDto {
@@ -58,6 +65,9 @@ export class MetadataFetchOptionsDto {
 
   @IsBoolean()
   saveProviderIds!: boolean;
+
+  @IsIn(PROVIDER_ID_FETCH_MODES)
+  providerIdMode!: ProviderIdFetchMode;
 }
 
 @ValidatorConstraint({ name: 'isFieldPreferencesMap', async: false })

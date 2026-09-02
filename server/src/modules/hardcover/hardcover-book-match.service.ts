@@ -3,6 +3,7 @@ import type { HardcoverEdition as HardcoverEditionSummary, HardcoverEditionsResu
 
 import { parsePublishedDateKey } from '../../common/utils/published-date.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { parseHardcoverBookId } from './hardcover-id.utils';
 import type { BookSyncData } from './hardcover.repository';
 import { HardcoverClientService } from './hardcover-client.service';
 import { HardcoverRepository } from './hardcover.repository';
@@ -241,8 +242,8 @@ export class HardcoverBookMatchService {
     let match: HardcoverBookMatch | null = null;
 
     if (book.hardcoverMetadataId) {
-      const id = parseInt(book.hardcoverMetadataId, 10);
-      if (!isNaN(id)) {
+      const id = parseHardcoverBookId(book.hardcoverMetadataId);
+      if (id !== null) {
         match = await this.matchByHardcoverId(userId, token, id, book);
       } else {
         match = await this.matchByHardcoverSlug(userId, token, book.hardcoverMetadataId, book);

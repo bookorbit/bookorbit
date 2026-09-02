@@ -10,9 +10,6 @@ import type { KoreaderPluginRepository } from './koreader-plugin.repository';
 import { KoreaderPluginService } from './koreader-plugin.service';
 import type { KoreaderRepository } from './koreader.repository';
 import type { KoreaderService } from './koreader.service';
-import { syncEstimateSessionIdPrefix } from '../../common/utils/sync-estimate-session.utils';
-import { buildDeviceSessionIdPrefix } from './koreader-stats.util';
-import type { ReadingSessionService } from '../reading-session/reading-session.service';
 
 const DEVICE_ID = 'abcdef12-3456-7890-abcd-ef1234567890';
 const HASH_A = 'a'.repeat(32);
@@ -55,7 +52,6 @@ describe('KoreaderPluginService', () => {
     normalizeNote: (value: string | null | undefined) => string | null;
   };
   let achievementEvents: { emit: ReturnType<typeof vi.fn> };
-  let readingSessions: { discardSupersededSyncEstimates: ReturnType<typeof vi.fn> };
   let service: KoreaderPluginService;
 
   beforeEach(() => {
@@ -94,8 +90,6 @@ describe('KoreaderPluginService', () => {
       },
     };
     achievementEvents = { emit: vi.fn() };
-    readingSessions = { discardSupersededSyncEstimates: vi.fn().mockResolvedValue({ deleted: 0 }) };
-
     service = new KoreaderPluginService(
       koreaderRepo as unknown as KoreaderRepository,
       pluginRepo as unknown as KoreaderPluginRepository,
@@ -103,7 +97,6 @@ describe('KoreaderPluginService', () => {
       userBookStatusService as unknown as UserBookStatusService,
       userBookNoteService as unknown as UserBookNoteService,
       achievementEvents as unknown as AchievementEventsService,
-      readingSessions as unknown as ReadingSessionService,
     );
   });
 
@@ -531,38 +524,6 @@ describe('KoreaderPluginService', () => {
         annotationsUpserted: 4,
       });
       expect(result).toEqual({ ok: true, lastSweepAt: '2026-06-09T10:00:00.000Z', libraryVersion: expect.stringMatching(/^[0-9a-f]{16}$/) });
-    });
-
-    it('retires only the estimates a measured session actually overlaps', async () => {
-      // A sweep is not proof the measured history covers the estimated one: a device may upload
-      // no page stats at all, or only the window its local statistics database still holds.
-      const dto = { ...deviceFields(), booksMatched: 3, pageStatsUploaded: 0, annotationsUpserted: 4 } as SweepCompleteDto;
-
-      await service.sweepComplete(makeUser(), dto);
-
-      expect(readingSessions.discardSupersededSyncEstimates).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), {
-        estimateSessionIdPrefix: syncEstimateSessionIdPrefix(DEVICE_ID),
-        measuredSessionIdPrefix: buildDeviceSessionIdPrefix(DEVICE_ID),
-      });
-    });
-
-    it('runs on every sweep, so a sweep whose cleanup failed is retried by the next one', async () => {
-      const dto = { ...deviceFields(), booksMatched: 3, pageStatsUploaded: 120, annotationsUpserted: 4 } as SweepCompleteDto;
-      readingSessions.discardSupersededSyncEstimates.mockRejectedValueOnce(new Error('deadlock detected'));
-
-      await service.sweepComplete(makeUser(), dto);
-      await service.sweepComplete(makeUser(), dto);
-
-      expect(readingSessions.discardSupersededSyncEstimates).toHaveBeenCalledTimes(2);
-    });
-
-    it('still records the sweep when retiring the estimates fails', async () => {
-      readingSessions.discardSupersededSyncEstimates.mockRejectedValue(new Error('deadlock detected'));
-      const dto = { ...deviceFields(), booksMatched: 3, pageStatsUploaded: 120, annotationsUpserted: 4 } as SweepCompleteDto;
-
-      await expect(service.sweepComplete(makeUser(), dto)).resolves.toEqual(
-        expect.objectContaining({ ok: true, lastSweepAt: '2026-06-09T10:00:00.000Z' }),
-      );
     });
   });
 });

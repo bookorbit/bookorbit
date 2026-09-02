@@ -18,7 +18,7 @@ function mountToolbar(overrides: Partial<InstanceType<typeof PdfReaderToolbar>['
       totalPages: 240,
       zoomPercent: 100,
       sidebarOpen: false,
-      searchOpen: false,
+      showSidebarToggle: true,
       settingsOpen: false,
       panActive: true,
       fullscreen: false,
@@ -54,20 +54,34 @@ describe('PdfReaderToolbar', () => {
     expect((input.element as HTMLInputElement).value).toBe('240')
   })
 
-  it('keeps search available outside fullscreen and exposes responsive tools', async () => {
+  it('exposes responsive tools without duplicating sidebar destinations', async () => {
     const wrapper = mountToolbar()
 
-    expect(wrapper.findAll('button[aria-label="Search document"]')).toHaveLength(1)
     expect(wrapper.find('button[aria-label="More PDF tools"]').exists()).toBe(true)
+    // Search and Highlights are rail/sheet destinations now, so the toolbar must not offer them.
+    expect(wrapper.find('button[aria-label="Search document"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Highlights"]').exists()).toBe(false)
 
     const buttons = wrapper.findAll('button')
-    await buttons.find((button) => button.text().trim() === 'Search')!.trigger('click')
+    expect(buttons.some((button) => button.text().trim() === 'Search')).toBe(false)
+
     await buttons.find((button) => button.text().trim() === 'Select text')!.trigger('click')
     await buttons.find((button) => button.text().trim() === 'Pan')!.trigger('click')
 
-    expect(wrapper.emitted('toggleSearch')).toHaveLength(1)
     expect(wrapper.emitted('selectTool')).toHaveLength(1)
     expect(wrapper.emitted('togglePan')).toHaveLength(1)
+  })
+
+  it('only offers the navigation toggle where there is no rail', async () => {
+    const withRail = mountToolbar({ showSidebarToggle: false })
+    expect(withRail.find('button[aria-label="Document navigation"]').exists()).toBe(false)
+
+    const sheet = mountToolbar({ showSidebarToggle: true })
+    const toggle = sheet.get('button[aria-label="Document navigation"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+
+    await toggle.trigger('click')
+    expect(sheet.emitted('toggleSidebar')).toHaveLength(1)
   })
 
   it('shows the header pin only while fullscreen', async () => {

@@ -1,3 +1,6 @@
+import { Test } from '@nestjs/testing';
+
+import { DB } from '../../db';
 import { AnnotationRepository } from './annotation.repository';
 
 function makeRow(overrides?: Record<string, unknown>) {
@@ -70,12 +73,19 @@ function makeDb(...results: unknown[]) {
   return db;
 }
 
+async function makeRepository(db: ReturnType<typeof makeDb>): Promise<AnnotationRepository> {
+  const module = await Test.createTestingModule({
+    providers: [AnnotationRepository, { provide: DB, useValue: db }],
+  }).compile();
+  return module.get(AnnotationRepository);
+}
+
 describe('AnnotationRepository', () => {
   describe('findByBookId', () => {
     it('queries with filters and returns the joined rows', async () => {
       const rows = [makeRow(), makeRow({ id: 2 })];
       const db = makeDb(rows);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.findByBookId(5, 10);
 
@@ -87,7 +97,7 @@ describe('AnnotationRepository', () => {
 
     it('returns empty array when no annotations match', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.findByBookId(5, 10);
 
@@ -99,7 +109,7 @@ describe('AnnotationRepository', () => {
     it('inserts the annotation and its cfi position in a transaction', async () => {
       const row = makeRow();
       const db = makeDb([row], []);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.create({
         userId: 10,
@@ -115,13 +125,22 @@ describe('AnnotationRepository', () => {
       expect(db.transaction).toHaveBeenCalled();
       expect(db.insert).toHaveBeenCalledTimes(2);
       const positionValues = db._queries[1].values.mock.calls[0][0] as Record<string, unknown>;
-      expect(positionValues).toMatchObject({ annotationId: 1, format: 'cfi', pos0: 'epubcfi(/6/4!/4/2/1:0)', status: 'exact' });
-      expect(result).toMatchObject({ ...row, cfi: 'epubcfi(/6/4!/4/2/1:0)', cfiStatus: 'exact' });
+      expect(positionValues).toMatchObject({
+        annotationId: 1,
+        format: 'cfi',
+        pos0: 'epubcfi(/6/4!/4/2/1:0)',
+        status: 'exact',
+      });
+      expect(result).toMatchObject({
+        ...row,
+        cfi: 'epubcfi(/6/4!/4/2/1:0)',
+        cfiStatus: 'exact',
+      });
     });
 
     it('does not leak the cfi into the annotations insert payload', async () => {
       const db = makeDb([makeRow()], []);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       await repo.create({
         userId: 10,
@@ -140,11 +159,59 @@ describe('AnnotationRepository', () => {
     });
   });
 
+  describe('createPdf', () => {
+    it('inserts the annotation and a pdf position with pageno extras in a transaction', async () => {
+      const row = makeRow({ cfi: null, cfiStatus: null });
+      const db = makeDb([row], []);
+      const repo = await makeRepository(db);
+      const pos0 = JSON.stringify({
+        page: 3,
+        rect: { x: 1, y: 2, width: 3, height: 4 },
+        rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+      });
+
+      const result = await repo.createPdf(
+        {
+          userId: 10,
+          bookId: 5,
+          bookFileId: 42,
+          text: 'selected text',
+          color: 'yellow',
+          style: 'highlight',
+          note: null,
+          chapterTitle: null,
+        },
+        { page: 3, pos0 },
+      );
+
+      expect(db.transaction).toHaveBeenCalled();
+      expect(db.insert).toHaveBeenCalledTimes(2);
+      const annotationValues = db._queries[0].values.mock.calls[0][0] as Record<string, unknown>;
+      expect(annotationValues).not.toHaveProperty('bookFileId');
+      const positionValues = db._queries[1].values.mock.calls[0][0] as Record<string, unknown>;
+      expect(positionValues).toMatchObject({
+        annotationId: 1,
+        format: 'pdf',
+        pos0,
+        status: 'exact',
+        bookFileId: 42,
+        extras: { pageno: 4 },
+      });
+      expect(result).toMatchObject({
+        cfi: null,
+        pageno: 4,
+        jumpFileId: 42,
+        pdfPos0: pos0,
+        pdfStatus: 'exact',
+      });
+    });
+  });
+
   describe('update', () => {
     it('bumps the version and re-reads the row with its position', async () => {
       const updated = makeRow({ note: 'updated', version: 2 });
       const db = makeDb([{ id: 1 }], [updated]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.update(5, 1, 10, { note: 'updated' });
 
@@ -156,7 +223,7 @@ describe('AnnotationRepository', () => {
 
     it('returns null when annotation does not exist or belongs to different user/book', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.update(5, 99, 10, { note: 'x' });
 
@@ -167,7 +234,7 @@ describe('AnnotationRepository', () => {
   describe('softDelete', () => {
     it('marks the row deleted instead of removing it', async () => {
       const db = makeDb([{ id: 1 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.softDelete(5, 1, 10);
 
@@ -181,7 +248,7 @@ describe('AnnotationRepository', () => {
 
     it('returns false when nothing matched', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.softDelete(5, 99, 10);
 
@@ -193,7 +260,7 @@ describe('AnnotationRepository', () => {
     it('clears deletedAt and bumps the version', async () => {
       const restored = makeRow({ version: 3 });
       const db = makeDb([restored]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.restore(1, 10);
 
@@ -205,7 +272,7 @@ describe('AnnotationRepository', () => {
 
     it('returns null when the annotation is not trashed', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.restore(1, 10);
 
@@ -218,7 +285,7 @@ describe('AnnotationRepository', () => {
   describe('purge', () => {
     it('hard-deletes when every device acked the deletion', async () => {
       const db = makeDb([{ id: 1 }], []);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.purge(1, 10);
 
@@ -228,7 +295,7 @@ describe('AnnotationRepository', () => {
 
     it('reports pending_device_sync when unacked device state blocks the purge', async () => {
       const db = makeDb([], [], [{ id: 1 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.purge(1, 10);
 
@@ -237,7 +304,7 @@ describe('AnnotationRepository', () => {
 
     it('reports not_found when no trashed row exists', async () => {
       const db = makeDb([], [], []);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.purge(1, 10);
 
@@ -248,7 +315,7 @@ describe('AnnotationRepository', () => {
   describe('findPaginated', () => {
     it('returns items and total count', async () => {
       const db = makeDb([makeRow()], [{ count: 1 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.findPaginated(5, 10, {}, { by: 'position', dir: 'asc' }, 1, 25);
 
@@ -258,7 +325,7 @@ describe('AnnotationRepository', () => {
 
     it('returns empty result when no annotations match', async () => {
       const db = makeDb([], [{ count: 0 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.findPaginated(5, 10, {}, { by: 'position', dir: 'asc' }, 1, 25);
 
@@ -268,18 +335,33 @@ describe('AnnotationRepository', () => {
 
     it('applies offset based on page and pageSize', async () => {
       const db = makeDb([], [{ count: 0 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       await repo.findPaginated(5, 10, {}, { by: 'position', dir: 'asc' }, 3, 10);
 
       expect(db._queries[0].offset).toHaveBeenCalledWith(20);
+    });
+
+    it('orders PDF positions by page and vertical geometry before the stable id', async () => {
+      const db = makeDb([], [{ count: 0 }]);
+      const repo = await makeRepository(db);
+
+      await repo.findPaginated(5, 10, { bookFileId: 42 }, { by: 'position', dir: 'asc' }, 1, 25);
+
+      expect(db._queries[0].orderBy.mock.calls[0]).toHaveLength(4);
     });
   });
 
   describe('getStats', () => {
     it('returns aggregated stats', async () => {
       const db = makeDb(
-        [{ totalHighlights: 5, chaptersWithHighlights: 2, highlightsWithNotes: 3 }],
+        [
+          {
+            totalHighlights: 5,
+            chaptersWithHighlights: 2,
+            highlightsWithNotes: 3,
+          },
+        ],
         [
           { color: 'yellow', count: 3 },
           { color: '#4ADE80', count: 2 },
@@ -289,7 +371,7 @@ describe('AnnotationRepository', () => {
           { origin: 'koreader', count: 1 },
         ],
       );
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.getStats(5, 10, {});
 
@@ -308,31 +390,72 @@ describe('AnnotationRepository', () => {
 
     it('folds the chapter and activity groupings into per-chapter and per-day entries', async () => {
       const db = makeDb(
-        [{ totalHighlights: 3, chaptersWithHighlights: 2, highlightsWithNotes: 0 }],
+        [
+          {
+            totalHighlights: 3,
+            chaptersWithHighlights: 2,
+            highlightsWithNotes: 0,
+          },
+        ],
         [],
         [],
         [
-          { title: 'Cetology', color: 'yellow', count: 1, chapterIndex: 28, cfiSpineStep: 58, firstCreatedAt: new Date('2026-04-09T00:00:00Z') },
-          { title: 'Loomings', color: 'yellow', count: 1, chapterIndex: 0, cfiSpineStep: 2, firstCreatedAt: new Date('2026-04-02T00:00:00Z') },
-          { title: 'Loomings', color: '#38BDF8', count: 1, chapterIndex: 0, cfiSpineStep: 2, firstCreatedAt: new Date('2026-04-03T00:00:00Z') },
+          {
+            title: 'Cetology',
+            color: 'yellow',
+            count: 1,
+            chapterIndex: 28,
+            cfiSpineStep: 58,
+            firstCreatedAt: new Date('2026-04-09T00:00:00Z'),
+          },
+          {
+            title: 'Loomings',
+            color: 'yellow',
+            count: 1,
+            chapterIndex: 0,
+            cfiSpineStep: 2,
+            firstCreatedAt: new Date('2026-04-02T00:00:00Z'),
+          },
+          {
+            title: 'Loomings',
+            color: '#38BDF8',
+            count: 1,
+            chapterIndex: 0,
+            cfiSpineStep: 2,
+            firstCreatedAt: new Date('2026-04-03T00:00:00Z'),
+          },
         ],
         [
           { day: '2026-04-02', origin: 'kobo', count: 2 },
           { day: '2026-04-09', origin: 'web', count: 1 },
         ],
       );
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.getStats(5, 10, {});
 
       expect(result.chapterBreakdown.map((c) => c.title)).toEqual(['Loomings', 'Cetology']);
-      expect(result.chapterBreakdown[0]).toMatchObject({ count: 2, chapterIndex: 0, order: 0 });
+      expect(result.chapterBreakdown[0]).toMatchObject({
+        count: 2,
+        chapterIndex: 0,
+        order: 0,
+      });
       expect(result.activity.map((a) => a.day)).toEqual(['2026-04-09', '2026-04-02']);
     });
 
     it('returns zero stats when no annotations exist', async () => {
-      const db = makeDb([{ totalHighlights: 0, chaptersWithHighlights: 0, highlightsWithNotes: 0 }], [], []);
-      const repo = new AnnotationRepository(db as never);
+      const db = makeDb(
+        [
+          {
+            totalHighlights: 0,
+            chaptersWithHighlights: 0,
+            highlightsWithNotes: 0,
+          },
+        ],
+        [],
+        [],
+      );
+      const repo = await makeRepository(db);
 
       const result = await repo.getStats(5, 10, {});
 
@@ -345,7 +468,7 @@ describe('AnnotationRepository', () => {
   describe('getDistinctChapters', () => {
     it('returns distinct chapter titles', async () => {
       const db = makeDb([{ chapterTitle: 'Chapter 1' }, { chapterTitle: 'Chapter 2' }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.getDistinctChapters(5, 10);
 
@@ -354,7 +477,7 @@ describe('AnnotationRepository', () => {
 
     it('filters out null chapter titles', async () => {
       const db = makeDb([{ chapterTitle: null }, { chapterTitle: 'Chapter 1' }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.getDistinctChapters(5, 10);
 
@@ -364,8 +487,19 @@ describe('AnnotationRepository', () => {
 
   describe('findHubPaginated', () => {
     it('returns hub items and total while applying the notes-only and date filters', async () => {
-      const db = makeDb([makeRow({ bookTitle: 'Book', author: 'Author', jumpFileId: 1, jumpFileFormat: 'mobi', pageno: null })], [{ count: 1 }]);
-      const repo = new AnnotationRepository(db as never);
+      const db = makeDb(
+        [
+          makeRow({
+            bookTitle: 'Book',
+            author: 'Author',
+            jumpFileId: 1,
+            jumpFileFormat: 'mobi',
+            pageno: null,
+          }),
+        ],
+        [{ count: 1 }],
+      );
+      const repo = await makeRepository(db);
 
       const result = await repo.findHubPaginated(
         10,
@@ -395,7 +529,7 @@ describe('AnnotationRepository', () => {
 
     it('orders by book title when sort.by is book', async () => {
       const db = makeDb([], [{ count: 0 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       await repo.findHubPaginated(10, { status: 'active' }, { by: 'book', dir: 'asc' }, 1, 25);
 
@@ -406,7 +540,7 @@ describe('AnnotationRepository', () => {
   describe('countHub', () => {
     it('counts matching annotations without joining the book tables', async () => {
       const db = makeDb([{ total: 18000 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       await expect(repo.countHub(10, { status: 'active' })).resolves.toBe(18000);
       expect(db._queries[0].leftJoin).not.toHaveBeenCalled();
@@ -414,7 +548,7 @@ describe('AnnotationRepository', () => {
 
     it('returns zero when the count query yields no row', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       await expect(repo.countHub(10, { status: 'trashed' })).resolves.toBe(0);
     });
@@ -423,9 +557,12 @@ describe('AnnotationRepository', () => {
   describe('getHubStats', () => {
     it('returns the aggregate row including the notes-only filter', async () => {
       const db = makeDb([{ books: 2, withNotes: 1, web: 1, koreader: 1, kobo: 0 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
-      const row = await repo.getHubStats(10, { status: 'active', hasNote: true });
+      const row = await repo.getHubStats(10, {
+        status: 'active',
+        hasNote: true,
+      });
 
       expect(row).toMatchObject({ books: 2, withNotes: 1 });
     });
@@ -434,9 +571,13 @@ describe('AnnotationRepository', () => {
   describe('findHubAll', () => {
     it('returns every matching hub row for export', async () => {
       const db = makeDb([makeRow(), makeRow({ id: 2 })]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
-      const rows = await repo.findHubAll(10, { status: 'active', hasNote: true, dateTo: new Date('2026-02-01T00:00:00Z') });
+      const rows = await repo.findHubAll(10, {
+        status: 'active',
+        hasNote: true,
+        dateTo: new Date('2026-02-01T00:00:00Z'),
+      });
 
       expect(rows).toHaveLength(2);
     });
@@ -445,7 +586,7 @@ describe('AnnotationRepository', () => {
   describe('findHubById', () => {
     it('returns the hub row when found', async () => {
       const db = makeDb([makeRow({ bookTitle: 'Book' })]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const row = await repo.findHubById(10, 1);
 
@@ -454,7 +595,7 @@ describe('AnnotationRepository', () => {
 
     it('returns null when not found', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       expect(await repo.findHubById(10, 99)).toBeNull();
     });
@@ -463,9 +604,12 @@ describe('AnnotationRepository', () => {
   describe('findHubBookFacets', () => {
     it('returns book facets with counts for active annotations and applies the limit', async () => {
       const db = makeDb([{ bookId: 5, bookTitle: 'Book', author: 'Author', count: 3 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
-      const rows = await repo.findHubBookFacets(10, { status: 'active', limit: 20 });
+      const rows = await repo.findHubBookFacets(10, {
+        status: 'active',
+        limit: 20,
+      });
 
       expect(rows).toEqual([{ bookId: 5, bookTitle: 'Book', author: 'Author', count: 3 }]);
       expect(db._queries[0].orderBy).toHaveBeenCalled();
@@ -474,7 +618,7 @@ describe('AnnotationRepository', () => {
 
     it('queries the trashed set when status is trashed', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       await repo.findHubBookFacets(10, { status: 'trashed', limit: 20 });
 
@@ -483,9 +627,13 @@ describe('AnnotationRepository', () => {
 
     it('adds a search filter and forwards a custom limit when a term is provided', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
-      await repo.findHubBookFacets(10, { status: 'active', q: 'dune', limit: 10 });
+      await repo.findHubBookFacets(10, {
+        status: 'active',
+        q: 'dune',
+        limit: 10,
+      });
 
       expect(db._queries[0].where).toHaveBeenCalled();
       expect(db._queries[0].limit).toHaveBeenCalledWith(10);
@@ -495,14 +643,19 @@ describe('AnnotationRepository', () => {
   describe('findHubBookFacet', () => {
     it('returns the single pinned facet row', async () => {
       const db = makeDb([{ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
-      expect(await repo.findHubBookFacet(10, 'active', 99)).toEqual({ bookId: 99, bookTitle: 'Pinned', author: null, count: 7 });
+      expect(await repo.findHubBookFacet(10, 'active', 99)).toEqual({
+        bookId: 99,
+        bookTitle: 'Pinned',
+        author: null,
+        count: 7,
+      });
     });
 
     it('returns null when the book has no annotations for the status', async () => {
       const db = makeDb([]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       expect(await repo.findHubBookFacet(10, 'active', 99)).toBeNull();
     });
@@ -511,7 +664,7 @@ describe('AnnotationRepository', () => {
   describe('bulkSetDeleted', () => {
     it('returns 0 for an empty id list without querying', async () => {
       const db = makeDb();
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       expect(await repo.bulkSetDeleted(10, [], true)).toBe(0);
       expect(db.update).not.toHaveBeenCalled();
@@ -519,7 +672,7 @@ describe('AnnotationRepository', () => {
 
     it('soft-deletes the given ids and returns the affected count', async () => {
       const db = makeDb([{ id: 1 }, { id: 2 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const affected = await repo.bulkSetDeleted(10, [1, 2], true);
 
@@ -529,19 +682,21 @@ describe('AnnotationRepository', () => {
 
     it('restores when deleted is false', async () => {
       const db = makeDb([{ id: 1 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const affected = await repo.bulkSetDeleted(10, [1], false);
 
       expect(affected).toBe(1);
-      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({ deletedAt: null });
+      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({
+        deletedAt: null,
+      });
     });
   });
 
   describe('bulkRestyle', () => {
     it('returns 0 when there are no ids or no patch fields', async () => {
       const db = makeDb();
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       expect(await repo.bulkRestyle(10, [], { color: 'yellow' })).toBe(0);
       expect(await repo.bulkRestyle(10, [1], {})).toBe(0);
@@ -550,19 +705,25 @@ describe('AnnotationRepository', () => {
 
     it('applies the restyle patch and returns the affected count', async () => {
       const db = makeDb([{ id: 1 }, { id: 2 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
-      const affected = await repo.bulkRestyle(10, [1, 2], { color: '#38BDF8', style: 'underline' });
+      const affected = await repo.bulkRestyle(10, [1, 2], {
+        color: '#38BDF8',
+        style: 'underline',
+      });
 
       expect(affected).toBe(2);
-      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({ color: '#38BDF8', style: 'underline' });
+      expect(db._queries[0].set.mock.calls[0][0]).toMatchObject({
+        color: '#38BDF8',
+        style: 'underline',
+      });
     });
   });
 
   describe('findTrashed', () => {
     it('returns trashed rows filtered by book', async () => {
       const db = makeDb([makeRow({ deletedAt: new Date('2026-01-02T00:00:00Z') })]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const rows = await repo.findTrashed(10, 5);
 
@@ -573,7 +734,7 @@ describe('AnnotationRepository', () => {
   describe('findPaginated with filters', () => {
     it('applies color, search, chapter and date filters with position sort', async () => {
       const db = makeDb([makeRow()], [{ count: 1 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       const result = await repo.findPaginated(
         5,
@@ -596,7 +757,7 @@ describe('AnnotationRepository', () => {
 
     it('orders by createdAt when sort.by is createdAt', async () => {
       const db = makeDb([], [{ count: 0 }]);
-      const repo = new AnnotationRepository(db as never);
+      const repo = await makeRepository(db);
 
       await repo.findPaginated(5, 10, {}, { by: 'createdAt', dir: 'asc' }, 1, 25);
 

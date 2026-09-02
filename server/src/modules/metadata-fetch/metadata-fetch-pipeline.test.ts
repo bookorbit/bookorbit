@@ -125,6 +125,95 @@ describe('MetadataFetchPipeline', () => {
     expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
   });
 
+  it('restricts established-book refreshes to providers with stored ids in existing-only mode', async () => {
+    const preferences = createPreferences();
+    preferences.options = {
+      genres: { mode: 'merge', blocklist: [], maxCount: null },
+      saveProviderIds: true,
+      providerIdMode: 'existingOnly',
+    };
+    preferencesService.getGlobal.mockResolvedValue(preferences);
+    resolver.resolve.mockReturnValue(preferences);
+    resolver.withForwardCompatibility.mockReturnValue(preferences);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'stored-google', { title: 'Fetched Title' })));
+
+    const params = {
+      title: 'Query',
+      existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-google' },
+    };
+    const { resolved } = await pipeline.runWithSources(params, {});
+
+    expect(resolved.title).toBe('Fetched Title');
+    expect(fetchService.search).toHaveBeenCalledWith({ ...params, existingProviderIdsOnly: true }, [MetadataProviderKey.GOOGLE]);
+  });
+
+  it('reports when existing-only mode has no stored ids for active field-rule providers', async () => {
+    const preferences = createPreferences();
+    preferences.options = {
+      genres: { mode: 'merge', blocklist: [], maxCount: null },
+      saveProviderIds: true,
+      providerIdMode: 'existingOnly',
+    };
+    preferencesService.getGlobal.mockResolvedValue(preferences);
+    resolver.resolve.mockReturnValue(preferences);
+    resolver.withForwardCompatibility.mockReturnValue(preferences);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+
+    const { diagnostics, resolved } = await pipeline.runWithSources({ title: 'Query', existingProviderIds: {} }, {});
+
+    expect(resolved).toEqual({});
+    expect(diagnostics.reason).toBe('no_existing_provider_ids');
+    expect(diagnostics.activeProviders).toEqual([]);
+    expect(fetchService.search).not.toHaveBeenCalled();
+  });
+
+  it('lets AudNexus refresh through an existing Audible id in existing-only mode', async () => {
+    const preferences = createPreferences((fields) => {
+      for (const field of ALL_METADATA_FIELDS) fields[field].providers = [MetadataProviderKey.AUDNEXUS];
+    });
+    preferences.options = {
+      genres: { mode: 'merge', blocklist: [], maxCount: null },
+      saveProviderIds: true,
+      providerIdMode: 'existingOnly',
+    };
+    preferencesService.getGlobal.mockResolvedValue(preferences);
+    resolver.resolve.mockReturnValue(preferences);
+    resolver.withForwardCompatibility.mockReturnValue(preferences);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.AUDNEXUS }] as never);
+    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.AUDNEXUS, 'B0EXISTING', { title: 'Audio Title' })));
+
+    const params = {
+      title: 'Audio Title',
+      existingProviderIds: { [MetadataProviderKey.AUDIBLE]: 'B0EXISTING' },
+      isAudiobook: true,
+    };
+    await pipeline.run(params, {});
+
+    expect(fetchService.search).toHaveBeenCalledWith({ ...params, existingProviderIdsOnly: true, includeAudiobookProviders: true }, [
+      MetadataProviderKey.AUDNEXUS,
+    ]);
+  });
+
+  it('keeps identity discovery enabled when strict preferences are used outside an established-book refresh', async () => {
+    const preferences = createPreferences();
+    preferences.options = {
+      genres: { mode: 'merge', blocklist: [], maxCount: null },
+      saveProviderIds: true,
+      providerIdMode: 'existingOnly',
+    };
+    preferencesService.getGlobal.mockResolvedValue(preferences);
+    resolver.resolve.mockReturnValue(preferences);
+    resolver.withForwardCompatibility.mockReturnValue(preferences);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.search.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'new-google', { title: 'Discovered Title' })));
+
+    const resolved = await pipeline.run({ title: 'Query' }, {});
+
+    expect(resolved.title).toBe('Discovered Title');
+    expect(fetchService.search).toHaveBeenCalledWith({ title: 'Query' }, [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
+  });
+
   describe('series expected counts', () => {
     function primePreferences() {
       const global = createPreferences();
@@ -510,7 +599,11 @@ describe('MetadataFetchPipeline', () => {
           mergeStrategy: 'overwriteIfProvided',
         };
       });
-      prefs.options = { genres: { mode: 'firstProvider', blocklist: [], maxCount: null }, saveProviderIds: true };
+      prefs.options = {
+        genres: { mode: 'firstProvider', blocklist: [], maxCount: null },
+        saveProviderIds: true,
+        providerIdMode: 'preferExisting',
+      };
       preferencesService.getGlobal.mockResolvedValue(prefs);
       resolver.resolve.mockReturnValue(prefs);
       resolver.withForwardCompatibility.mockReturnValue(prefs);
@@ -955,6 +1048,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'merge', blocklist: [], maxCount: null },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -985,6 +1079,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'merge', blocklist: [], maxCount: null },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1018,6 +1113,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: ['Adult'], maxCount: 3 },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1042,6 +1138,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: null },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1067,6 +1164,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: 2 },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1091,6 +1189,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'merge', blocklist: ['audiobook', ' Adult '], maxCount: null },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1121,6 +1220,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'merge', blocklist: ['Adult'], maxCount: 3 },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1151,6 +1251,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: ['Audiobook'], maxCount: null },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1181,6 +1282,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: 2 },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1211,6 +1313,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: null },
       saveProviderIds: true,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1236,6 +1339,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: null },
       saveProviderIds: true,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1267,6 +1371,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: null },
       saveProviderIds: true,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1294,6 +1399,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: null },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);
@@ -1318,6 +1424,7 @@ describe('MetadataFetchPipeline', () => {
     prefs.options = {
       genres: { mode: 'firstProvider', blocklist: [], maxCount: null },
       saveProviderIds: false,
+      providerIdMode: 'preferExisting',
     };
 
     preferencesService.getGlobal.mockResolvedValue(prefs);

@@ -1,4 +1,18 @@
-import { allowsAudiobookProviders, buildRequestSignal, normalizeMaxCandidates, sleep, stripHtml } from './provider-utils';
+import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+
+import { ProviderThrottleError } from '../provider-throttle.error';
+import {
+  allowsAudiobookProviders,
+  buildRequestSignal,
+  normalizeMaxCandidates,
+  rethrowWithPartialCandidates,
+  sleep,
+  stripHtml,
+} from './provider-utils';
+
+function candidate(providerId: string): MetadataCandidate {
+  return { provider: MetadataProviderKey.GOODREADS, providerId, title: `Book ${providerId}` };
+}
 
 describe('provider-utils', () => {
   describe('allowsAudiobookProviders', () => {
@@ -73,6 +87,54 @@ describe('provider-utils', () => {
       controller.abort();
 
       expect(signal.aborted).toBe(true);
+    });
+  });
+
+  describe('rethrowWithPartialCandidates', () => {
+    it('carries the candidates gathered before the throttle, keeping the retry-after and reason', () => {
+      const gathered = [candidate('1'), candidate('2')];
+
+      try {
+        rethrowWithPartialCandidates(new ProviderThrottleError(30, 'bot challenge'), gathered);
+        expect.unreachable('should have rethrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(ProviderThrottleError);
+        const throttle = err as ProviderThrottleError;
+        expect(throttle.partialCandidates).toEqual(gathered);
+        expect(throttle.retryAfterSeconds).toBe(30);
+        expect(throttle.message).toBe('Provider throttled (bot challenge)');
+      }
+    });
+
+    it('snapshots the candidates so a later push cannot change what was salvaged', () => {
+      const gathered = [candidate('1')];
+
+      try {
+        rethrowWithPartialCandidates(new ProviderThrottleError(), gathered);
+        expect.unreachable('should have rethrown');
+      } catch (err) {
+        gathered.push(candidate('2'));
+        expect((err as ProviderThrottleError).partialCandidates).toHaveLength(1);
+      }
+    });
+
+    it('leaves candidates attached by an inner loop alone', () => {
+      const inner = [candidate('inner')];
+      const original = new ProviderThrottleError(undefined, 'HTTP 429', inner);
+
+      expect(() => rethrowWithPartialCandidates(original, [candidate('outer')])).toThrow(original);
+    });
+
+    it('rethrows anything that is not a throttle untouched', () => {
+      const failure = new Error('bad upstream response');
+
+      expect(() => rethrowWithPartialCandidates(failure, [candidate('1')])).toThrow(failure);
+    });
+
+    it('rethrows the original throttle when nothing was gathered', () => {
+      const original = new ProviderThrottleError(30);
+
+      expect(() => rethrowWithPartialCandidates(original, [])).toThrow(original);
     });
   });
 });

@@ -142,6 +142,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     replaceCommunityRatings: vi.fn(),
     withTransaction: vi.fn(),
     deleteByIds: vi.fn(),
+    deleteByIdsAndInvalidateScanState: vi.fn(),
     findAllIds: vi.fn(),
     findIdsByWhere: vi.fn(),
     findCardsCollapsed: vi.fn(),
@@ -2240,13 +2241,13 @@ describe('BookService', () => {
         { id: 3, title: 'Dune' },
         { id: 4, title: null },
       ]);
-      bookRepo.deleteByIds.mockResolvedValue(undefined);
+      bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue(undefined);
       mockRm.mockRejectedValue(new Error('cannot delete'));
 
       const result = await service.deleteBooks([3, 4], user);
 
       expect(libraryService.verifyUserAccess).toHaveBeenCalledTimes(2);
-      expect(bookRepo.deleteByIds).toHaveBeenCalledWith([3, 4]);
+      expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([3, 4]);
       expect(mockRm).toHaveBeenCalledWith('/tmp/books/covers/3', { recursive: true, force: true });
       expect(mockRm).toHaveBeenCalledWith('/tmp/books/covers/4', { recursive: true, force: true });
       expect(mockRm).toHaveBeenCalledWith('/tmp/library/book3.epub', { force: true });
@@ -2272,7 +2273,7 @@ describe('BookService', () => {
         Promise.resolve([...ids].reverse().map((id) => ({ id, title: `Book ${id}` }))),
       );
       bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
-      bookRepo.deleteByIds.mockResolvedValue(undefined);
+      bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue(undefined);
 
       const result = await service.deleteBooks(bookIds, user);
 
@@ -2282,6 +2283,35 @@ describe('BookService', () => {
       expect(result.books[0]).toEqual({ id: 1, title: 'Book 1' });
       expect(result.books[24]).toEqual({ id: 25, title: 'Book 25' });
       expect(result.omitted).toBe(5);
+    });
+
+    it('deletes books through the scan-state-aware repository transaction', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
+      bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
+      bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue(undefined);
+
+      await service.deleteBooks([3], user);
+
+      expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([3]);
+    });
+
+    it('does not commit book deletion when scan state invalidation fails', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const warnSpy = vi.spyOn((service as unknown as { logger: { warn: (message: string) => void } }).logger, 'warn').mockImplementation();
+
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
+      bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
+      bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
+      bookRepo.deleteByIdsAndInvalidateScanState.mockRejectedValue(new Error('db down'));
+
+      await expect(service.deleteBooks([3], user)).rejects.toThrow('db down');
+      expect(warnSpy).toHaveBeenCalled();
+      expect(mockRm).not.toHaveBeenCalled();
     });
 
     it('returns queued=0 when embed-all is already running', async () => {

@@ -10,8 +10,8 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
-import { basename, dirname, extname, join, resolve } from 'path';
-import { access as fsAccess, readFile, stat, unlink } from 'fs/promises';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path';
+import { access as fsAccess, readFile, rmdir, stat, unlink } from 'fs/promises';
 import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -28,7 +28,17 @@ import type {
   ComicMetadataFields,
   MetadataSeriesMembership,
 } from '@bookorbit/types';
-import { MetadataProviderKey, NotificationType, Permission, parseSeriesIndex, resolveUploadPath } from '@bookorbit/types';
+import {
+  DEFAULT_FORMAT_PRIORITY,
+  isAudioFormat,
+  MetadataProviderKey,
+  NotificationType,
+  parseSeriesIndex,
+  Permission,
+  resolveUploadPath,
+} from '@bookorbit/types';
+import type { BookRequestImportFormats } from '@bookorbit/types';
+import type { FileRole } from '../scanner/lib/classify';
 import { BookReadService } from '../book/book-read.service';
 import { NotificationService } from '../notification/notification.service';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -44,7 +54,7 @@ import { AppSettingsService } from '../app-settings/app-settings.service';
 import { LibraryService } from '../library/library.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
-import { UploadProcessorService } from '../upload/upload-processor.service';
+import { UploadProcessorService, type UnitBookFileInput, type UnitBookRecords } from '../upload/upload-processor.service';
 import { UploadStorageService } from '../upload/upload-storage.service';
 import { UploadValidatorService } from '../upload/upload-validator.service';
 import { BookDockRepository } from './book-dock.repository';
@@ -53,7 +63,7 @@ import { BookDockGateway } from './book-dock.gateway';
 import { normalizeBookDockMetadata } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue } from './book-dock-work-queue';
-import type { BookDockFileRow } from '../../db/schema';
+import type { BookDockFileRow, BookDockUnitFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 type LibraryRow = typeof libraries.$inferSelect;
@@ -74,6 +84,7 @@ const MAX_PUBLISHED_YEAR = 2200;
 const PUBLISHED_YEAR_RANGE_CONSTRAINT = 'book_metadata_published_year_range_chk';
 const INVALID_PUBLISHED_YEAR_MESSAGE = `Invalid metadata: published year must be between ${MIN_PUBLISHED_YEAR} and ${MAX_PUBLISHED_YEAR}.`;
 const INVALID_METADATA_MESSAGE = 'Invalid metadata values for this file. Review metadata fields and try again.';
+const INTERNAL_FAILURE_MESSAGE = 'Filing this book failed inside BookOrbit. Check the server log for the cause.';
 const METADATA_PROVIDER_KEYS = new Set<MetadataProviderKey>(Object.values(MetadataProviderKey));
 
 type NormalizedFinalizeMetadata = {
@@ -113,6 +124,14 @@ type NormalizedFinalizeMetadata = {
   comicMetadata: ComicMetadataFields | undefined;
 };
 
+type PlacedUnitFile = {
+  sourcePath: string;
+  destPath: string;
+  format: string | null;
+  role: FileRole;
+  sortOrder: number | null;
+};
+
 type FinalizeCandidateAnalysis = {
   fileId: number;
   fileName: string;
@@ -125,7 +144,76 @@ type FinalizeCandidateAnalysis = {
   folder?: LibraryFolderRow;
   format?: string;
   destPath?: string;
+  /** Every file this row places, primary first. One entry for an ordinary single-file row. */
+  placement?: PlacedUnitFile[];
+  /**
+   * The folder every file of the unit shares, which is what `books.folderPath` has to be. Not the
+   * primary's own directory: a disc-foldered unit puts the primary inside `CD 1`, and taking the
+   * dirname there would file the book under the disc rather than under the book.
+   */
+  bookFolderPath?: string;
 };
+
+/**
+ * What of a unit actually gets placed, given the target library and the instance's format setting.
+ *
+ * Two separate rules meet here. A `book_per_file` library cannot hold a multi-file book at all:
+ * `folderPath` is the file's own path, and `findLooseFileCandidates` emits one candidate per
+ * primary file while intentionally discarding covers and sidecars, so placing a folder there is
+ * not a preference but data loss on the next scan. The format setting is the operator's own
+ * choice about editions, and applies in both modes.
+ *
+ * Multipart audio is never reduced by either: its parts are one book, not competing editions, so
+ * where it cannot be represented it holds for a human rather than importing a third of a book.
+ */
+function reduceUnitForLibrary(
+  unitFiles: BookDockUnitFileRow[],
+  library: LibraryRow,
+  importFormats: BookRequestImportFormats,
+): { files: BookDockUnitFileRow[]; hold?: string } {
+  if (unitFiles.length === 0) return { files: unitFiles };
+
+  const content = unitFiles.filter((file) => file.role === 'content');
+  const looseFileLibrary = library.organizationMode === 'book_per_file';
+  // Sidecars have nowhere to live in a loose-file library, which is exactly what the scanner does
+  // with them there too.
+  const kept = looseFileLibrary ? content : unitFiles;
+  if (content.length <= 1) return { files: kept };
+
+  const multipartAudio = content.every((file) => file.format !== null && isAudioFormat(file.format));
+  if (multipartAudio) {
+    if (!looseFileLibrary) return { files: kept };
+    return {
+      files: content,
+      hold: `This is one audiobook in ${content.length} parts, and "${library.name}" stores one book per file. Choose a library that stores one book per folder.`,
+    };
+  }
+
+  if (importFormats === 'all') return { files: kept };
+
+  const priority = library.formatPriority?.length ? library.formatPriority : [...DEFAULT_FORMAT_PRIORITY];
+  const best = [...content].sort((a, b) => formatRank(a.format, priority) - formatRank(b.format, priority))[0]!;
+  // The chosen format keeps the artwork and sidecars that came with the unit; the other formats go.
+  return { files: looseFileLibrary ? [best] : [best, ...unitFiles.filter((file) => file.role !== 'content')] };
+}
+
+function formatRank(format: string | null, priority: string[]): number {
+  if (!format) return Number.MAX_SAFE_INTEGER;
+  const index = priority.indexOf(format.toLowerCase());
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+/**
+ * The folder a unit lands in. Normally the directory of the pattern result, but a pattern with no
+ * path separator resolves to a bare filename whose `dirname()` is the library folder root - which
+ * would drop every unit there and merge unrelated books into one. So a directoryless result falls
+ * back to a folder named for the file, matching what `book_per_folder` does by default.
+ */
+function unitDestinationFolder(destPath: string, folderPath: string): string {
+  const parent = dirname(destPath);
+  if (resolve(parent) !== resolve(folderPath)) return parent;
+  return join(folderPath, basename(destPath, extname(destPath)));
+}
 
 @Injectable()
 export class BookDockFinalizeService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
@@ -289,30 +377,44 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       const analysis = await this.classifyDestination(preparedAnalysis, existingDestinations);
       if (analysis.status !== 'ready') return this.analysisToFileResult(analysis);
 
-      const { destPath, folder, library, format } = analysis;
-      if (!destPath || !folder || !library || !format) {
+      const { destPath, folder, library, format, placement } = analysis;
+      if (!destPath || !folder || !library || !format || !placement) {
         return { fileId: row.id, fileName: row.fileName, success: false, message: 'Finalization target could not be resolved' };
       }
 
-      await this.storage.moveToPath(row.absolutePath, destPath);
+      // Every file of the unit, or the single file that is the whole unit. Moved one at a time and
+      // remembered as they land, so a failure part-way can put back exactly what was moved.
+      const moved: Array<{ from: string; to: string }> = [];
+      try {
+        for (const file of placement) {
+          await this.storage.moveToPath(file.sourcePath, file.destPath);
+          moved.push({ from: file.destPath, to: file.sourcePath });
+        }
+      } catch (err) {
+        await this.undoMoves(moved);
+        throw err;
+      }
+
       const persistedDestPath = (await resolveExistingPathSpelling(destPath, folder.path)) ?? destPath;
 
       let bookId: number;
+      let written: UnitBookRecords | null = null;
       try {
-        const { size } = await stat(persistedDestPath);
-        const bookFolderPath = library.organizationMode === 'book_per_file' ? persistedDestPath : dirname(persistedDestPath);
-        ({ bookId } = await this.processor.createBookRecord(
-          library.id,
-          folder.id,
-          bookFolderPath,
-          persistedDestPath,
-          persistedDestPath.substring(folder.path.length + 1),
-          format,
-          size,
-        ));
-        await this.applyMetadata(bookId, row);
+        // The primary is first and the siblings after, because the book row that carries
+        // `primaryFileId` is the one created for the first file. Ordering here is the whole
+        // mechanism by which a 31-track audiobook points at track one rather than at whichever
+        // row happened to insert first.
+        written = await this.createUnitBookRecord(library, folder, placement, persistedDestPath, format, preparedAnalysis.bookFolderPath);
+        bookId = written.bookIds[0]!;
+        // Several ids only in a loose-file library, where each format is its own book. They are the
+        // same work, so they get the same metadata rather than one of them getting all of it.
+        for (const created of written.bookIds) await this.applyMetadata(created, row);
       } catch (err) {
-        await this.storage.moveToPath(destPath, row.absolutePath).catch(() => {});
+        // The books committed before the failure, and metadata runs against services that cannot
+        // join that transaction, so the compensation is explicit: take back exactly what this unit
+        // wrote, then put the files back where they came from.
+        if (written) await this.undoUnitBookRecords(written, row.id);
+        await this.undoMoves(moved);
         throw err;
       }
 
@@ -478,6 +580,12 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
       this.validator.validateFormat(row.fileName, library.allowedFormats);
 
+      const unitFiles = row.unitDirectory ? await this.repo.findUnitFiles(row.id) : [];
+      const reduced = reduceUnitForLibrary(unitFiles, library, await this.appSettings.getBookRequestImportFormats());
+      if (reduced.hold) {
+        return { fileId: row.id, fileName: row.fileName, row, status: 'unsupported_layout', message: reduced.hold };
+      }
+
       const patternDestPath = await this.resolveDestination(library, folder.path, row, format);
       let destPath = patternDestPath;
       if (override?.targetFileName) {
@@ -490,9 +598,14 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         destPath = candidate;
       }
 
+      const { files: placement, bookFolderPath } = this.resolvePlacement(row, reduced.files, destPath, folder.path, library);
+      // The primary's own destination follows the placement, which for a unit means it sits inside
+      // the unit folder rather than at the path the naming pattern produced directly.
+      destPath = placement[0]!.destPath;
+
       const newName = destPath.substring(folder.path.length + 1);
 
-      return { fileId: row.id, fileName: row.fileName, row, status: 'ready', newName, library, folder, format, destPath };
+      return { fileId: row.id, fileName: row.fileName, row, status: 'ready', newName, library, folder, format, destPath, placement, bookFolderPath };
     } catch (error) {
       return {
         fileId: row.id,
@@ -526,11 +639,153 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     return { analyses, existingDestinations };
   }
 
+  /**
+   * Where each file of the unit lands. A single-file row keeps today's rename-by-pattern exactly,
+   * so nothing about an ordinary upload changes. A unit takes the **directory** of the pattern
+   * result and keeps the original file names inside it: the scanner recovers track order from
+   * those names, and renaming tracks by pattern would need an index token for no gain.
+   */
+  private resolvePlacement(
+    row: BookDockFileRow,
+    unitFiles: BookDockUnitFileRow[],
+    destPath: string,
+    folderPath: string,
+    library: LibraryRow,
+  ): { files: PlacedUnitFile[]; bookFolderPath: string } {
+    if (unitFiles.length === 0) {
+      return {
+        files: [{ sourcePath: row.absolutePath, destPath, format: row.format, role: 'content', sortOrder: 0 }],
+        bookFolderPath: library.organizationMode === 'book_per_file' ? destPath : dirname(destPath),
+      };
+    }
+
+    const primaryIndex = unitFiles.findIndex((file) => file.absolutePath === row.absolutePath);
+    // Primary first: `createBookRecord` sets `primaryFileId` only on the call that creates the book.
+    const ordered = primaryIndex > 0 ? [unitFiles[primaryIndex]!, ...unitFiles.filter((_, index) => index !== primaryIndex)] : unitFiles;
+
+    // A loose-file library has no folder to put a unit in: what survives the reduction lands flat,
+    // each file taking the pattern's own name with its own extension, so the formats stay siblings
+    // rather than one of them keeping a name that belongs to another.
+    if (library.organizationMode === 'book_per_file') {
+      const stem = basename(destPath, extname(destPath));
+      return {
+        files: ordered.map((file, index) => ({
+          sourcePath: file.absolutePath,
+          destPath: index === 0 ? destPath : join(dirname(destPath), this.validator.sanitizeFilename(`${stem}${extname(file.fileName)}`)),
+          format: file.format,
+          role: (file.role as FileRole) ?? 'content',
+          sortOrder: file.sortOrder,
+        })),
+        bookFolderPath: destPath,
+      };
+    }
+
+    const destinationFolder = unitDestinationFolder(destPath, folderPath);
+    return {
+      files: ordered.map((file) => ({
+        sourcePath: file.absolutePath,
+        // The path *within* the unit, not the bare file name: a two-disc audiobook holds two files
+        // called `track01.mp3`, and flattening them makes the second overwrite the first.
+        destPath: join(destinationFolder, this.unitRelativeName(row, file)),
+        format: file.format,
+        role: (file.role as FileRole) ?? 'content',
+        sortOrder: file.sortOrder,
+      })),
+      bookFolderPath: destinationFolder,
+    };
+  }
+
+  /** Each segment sanitized on its own, so the subdirectory survives rather than the separator. */
+  private unitRelativeName(row: BookDockFileRow, file: BookDockUnitFileRow): string {
+    if (!row.unitDirectory) return this.validator.sanitizeFilename(file.fileName);
+    const within = relative(row.unitDirectory, file.absolutePath);
+    if (!within || within.startsWith('..') || isAbsolute(within)) return this.validator.sanitizeFilename(file.fileName);
+    return within
+      .split(sep)
+      .map((segment) => this.validator.sanitizeFilename(segment))
+      .join(sep);
+  }
+
+  /** Undoes a part-placed unit. Never throws: it runs while another error is on its way up. */
+  private async undoMoves(moved: Array<{ from: string; to: string }>): Promise<void> {
+    for (const move of moved) {
+      await this.storage.moveToPath(move.from, move.to).catch(() => {});
+    }
+  }
+
+  /**
+   * Turns a placed unit into book rows. In `book_per_folder` every file shares one `folderPath`,
+   * so `createBookRecord` folds them into a single book. In `book_per_file` each file *is* its own
+   * folderPath, so several formats become several books - which is that mode's normal state, and
+   * what its next scan would produce anyway.
+   *
+   * Returns every book created, primary first, so the caller can give each one the metadata: two
+   * extra books with the same title and none of its metadata would be worse than not importing
+   * them at all.
+   */
+  private async createUnitBookRecord(
+    library: LibraryRow,
+    folder: LibraryFolderRow,
+    placement: PlacedUnitFile[],
+    persistedPrimaryPath: string,
+    primaryFormat: string,
+    bookFolderPath: string | undefined,
+  ): Promise<UnitBookRecords> {
+    if (placement.length === 0) throw new Error('Finalization placed no files');
+
+    const loose = library.organizationMode === 'book_per_file';
+    const sharedFolderPath = bookFolderPath ?? dirname(persistedPrimaryPath);
+    const files: UnitBookFileInput[] = [];
+
+    for (const [index, file] of placement.entries()) {
+      const absolutePath = index === 0 ? persistedPrimaryPath : file.destPath;
+      const format = index === 0 ? primaryFormat : (file.format ?? extname(absolutePath).toLowerCase().slice(1));
+      const { size } = await stat(absolutePath);
+      files.push({
+        folderPath: loose ? absolutePath : sharedFolderPath,
+        absolutePath,
+        relPath: absolutePath.substring(folder.path.length + 1),
+        format,
+        sizeBytes: size,
+        role: file.role,
+        sortOrder: file.sortOrder,
+      });
+    }
+
+    return this.processor.createUnitBookRecords(library.id, folder.id, files);
+  }
+
+  /** Never throws: it runs while the error that caused it is already on its way up. */
+  private async undoUnitBookRecords(written: UnitBookRecords, dockFileId: number): Promise<void> {
+    try {
+      await this.processor.deleteUnitBookRecords(written);
+    } catch (err) {
+      this.logger.error(
+        `[book_dock.finalize_rollback] [fail] dockFileId=${dockFileId} bookIds=${written.createdBookIds.join(',')} error="${sanitizeLogValue(
+          err instanceof Error ? err.message : String(err),
+        )}" - could not take back the book rows this unit created`,
+      );
+    }
+  }
+
   private async classifyDestination(
     analysis: FinalizeCandidateAnalysis,
     existingDestinations: Map<string, number>,
   ): Promise<FinalizeCandidateAnalysis> {
     if (analysis.status !== 'ready' || !analysis.destPath || !analysis.library) return analysis;
+
+    // Every target path of a unit, not only the primary's: a folder that collides on track 7 is
+    // just as unplaceable as one that collides on track 1.
+    for (const file of analysis.placement ?? []) {
+      if (file.destPath === analysis.destPath) continue;
+      const taken = await fsAccess(file.destPath).then(
+        () => true,
+        () => false,
+      );
+      if (taken) {
+        return { ...analysis, status: 'destination_conflict', message: 'A file with this name already exists at the target location' };
+      }
+    }
 
     try {
       await fsAccess(analysis.destPath);
@@ -641,6 +896,9 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
     const row = await this.repo.findById(fileId);
     if (!row) return;
+    // Another module put this row here and runs its own checks before filing it. Racing it would
+    // either file the wrong book into the right library or file it before those checks ran.
+    if (row.autoFinalizeSuppressed) return;
     if (!shouldAutoFinalize(row, settings.metadataMode, settings.threshold)) return;
 
     const autoFinalizeMetadata = resolveAutoFinalizeMetadata(settings.metadataMode, row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata);
@@ -668,6 +926,35 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     } else {
       this.logger.warn(`Auto-finalize skipped for Book Dock file ${fileId}: ${result.message}`);
     }
+  }
+
+  /**
+   * Finalize one row on behalf of the module that owns it, after that module's own verification
+   * has passed. Deliberately not the public `finalize()`: that one is a user-initiated batch and
+   * announces itself with a "finalization completed" notification, which is not what a request
+   * landing in a library should say.
+   *
+   * Metadata is merged the same way the standard path merges it, rather than following the Book
+   * Dock's auto-finalize metadata mode: that mode is an operator preference about unattended dock
+   * files, and it does not govern a file another module vouched for.
+   */
+  async finalizeManagedFile(fileId: number, override: { libraryId?: number; folderId?: number }): Promise<BookDockFinalizeFileResult> {
+    const row = await this.repo.findById(fileId);
+    if (!row) {
+      return { fileId, fileName: `book-dock-file-${fileId}`, success: false, message: 'Book Dock file not found' };
+    }
+
+    const merged = mergeBookDockMetadata(row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata);
+    const rowForFinalize = merged ? { ...row, selectedMetadata: merged } : row;
+
+    const overrideMap = new Map<number, FinalizeOverrideEntry>();
+    if (override.libraryId !== undefined || override.folderId !== undefined) {
+      overrideMap.set(fileId, { libraryId: override.libraryId, folderId: override.folderId });
+    }
+
+    const result = await this.finalizeFile(rowForFinalize, undefined, undefined, overrideMap, 0, true);
+    if (result.success) this.emitChange();
+    return result;
   }
 
   private enqueueAutoFinalize(fileId: number): void {
@@ -703,6 +990,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       if (rows.length === 0) break;
 
       for (const row of rows) {
+        if (row.autoFinalizeSuppressed) continue;
         if (shouldAutoFinalize(row, settings.metadataMode, settings.threshold) && this.autoFinalizeQueue.enqueue(row.id)) {
           queued++;
         }
@@ -904,10 +1192,18 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       const thumbPath = row.coverPath.replace(/\.\w+$/, '_thumb.jpg');
       await safeUnlink(thumbPath);
     }
+    // The unit's files have all been moved into the library by now, so what is left is the empty
+    // directory they came out of. The child rows go with the anchor via the cascade.
+    if (row.unitDirectory) await removeEmptyDirectory(row.unitDirectory);
     await this.repo.deleteById(row.id);
   }
 
+  /** Discarding a unit throws away every file in it. Discarding track 1 of 31 is not a thing. */
   private async cleanupDiscardedBookDockFile(row: BookDockFileRow): Promise<void> {
+    if (row.unitDirectory) {
+      for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
+      await removeEmptyDirectory(row.unitDirectory);
+    }
     await safeUnlink(row.absolutePath);
     if (row.coverPath) {
       await safeUnlink(row.coverPath);
@@ -939,6 +1235,14 @@ async function safeUnlink(path: string): Promise<void> {
   } catch {
     // file may already be deleted
   }
+}
+
+/**
+ * Deliberately non-recursive. A directory that still holds files is one the dock did not fully
+ * account for, and leaving it for a human to look at is far better than deleting what is in it.
+ */
+async function removeEmptyDirectory(path: string): Promise<void> {
+  await rmdir(path).catch(() => {});
 }
 
 function createFinalizePreviewSummary(): BookDockFinalizePreviewResult {
@@ -1204,10 +1508,27 @@ function resolveFinalizeErrorMessage(error: unknown): string {
   if (isBookMetadataConstraintViolation(error)) {
     return INVALID_METADATA_MESSAGE;
   }
+  // A database error is not a sentence for a requester to read. One shipped verbatim - a whole
+  // failed SELECT, table and column names included - into the request drawer of the person who
+  // asked for the book. The detail belongs in the log, which already has the original error.
+  if (isDatabaseError(error)) {
+    return INTERNAL_FAILURE_MESSAGE;
+  }
   if (error instanceof Error && error.message) {
     return error.message;
   }
   return 'Finalization failed';
+}
+
+/**
+ * A `pg` error carries a five-character SQLSTATE. Drizzle wraps it in a `DrizzleQueryError` whose
+ * own message is the failed query, so the chain is walked rather than the outermost error read.
+ */
+function isDatabaseError(error: unknown): boolean {
+  for (const entry of iterateErrorChain(error)) {
+    if (/^[0-9A-Z]{5}$/.test(asString(entry.code))) return true;
+  }
+  return false;
 }
 
 function isPublishedYearConstraintViolation(error: unknown): boolean {

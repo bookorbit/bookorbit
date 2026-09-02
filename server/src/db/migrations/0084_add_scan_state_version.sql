@@ -1,0 +1,2 @@
+ALTER TABLE "library_folders" ADD COLUMN "scan_state_version" bigint DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "library_folders" ADD CONSTRAINT "library_folders_scan_state_version_nonnegative_chk" CHECK ("library_folders"."scan_state_version" >= 0);

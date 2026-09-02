@@ -92,6 +92,17 @@ export class LibraryService {
     }));
   }
 
+  /**
+   * Which of these users can open this library. Callers that hold user ids rather than whole
+   * users - a notifier resolving one link per recipient, for instance - cannot ask
+   * `verifyUserAccess`, which needs the superuser flag handed to it.
+   */
+  async findUserIdsWithAccess(libraryId: number, userIds: number[]): Promise<Set<number>> {
+    if (userIds.length === 0) return new Set();
+    const rows = await this.libraryRepo.findUserIdsWithAccess(libraryId, userIds);
+    return new Set(rows.map(({ id }) => id));
+  }
+
   async findAccessibleLibraryIds(user: RequestUser): Promise<number[]> {
     const ids = user.isSuperuser ? await this.libraryRepo.findAllIds() : await this.libraryRepo.findAccessibleIdsForUser(user.id);
     return ids.map(({ id }) => id);

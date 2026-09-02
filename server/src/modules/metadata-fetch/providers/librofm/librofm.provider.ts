@@ -8,7 +8,7 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import type { IdentifiableProvider } from '../metadata-provider';
 import type { MetadataSearchParams } from '../metadata-search-params';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
-import { allowsAudiobookProviders, buildRequestSignal, normalizeMaxCandidates, sleep } from '../provider-utils';
+import { allowsAudiobookProviders, buildRequestSignal, normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import { mapLibroFmAudiobook } from './librofm.mapper';
 import type { LibroFmDetailsResponse, LibroFmSearchResponse } from './librofm.types';
 
@@ -24,6 +24,7 @@ export class LibroFmProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.LIBROFM;
   readonly label = 'Libro.fm';
   readonly identifiable = true as const;
+  readonly mediaKinds = ['audiobook'] as const;
 
   private readonly logger = new Logger(LibroFmProvider.name);
 
@@ -48,10 +49,14 @@ export class LibroFmProvider implements IdentifiableProvider {
     const maxCandidates = normalizeMaxCandidates(params.maxCandidatesPerProvider, PROVIDER_LIMITS.LIBROFM_MAX_RESULTS);
     const isbns = await this.searchIsbns(query, maxCandidates, params.signal);
     const candidates: MetadataCandidate[] = [];
-    for (const isbn of isbns) {
-      if (candidates.length > 0) await sleep(PROVIDER_DELAYS_MS.LIBROFM_BETWEEN_REQUESTS, params.signal);
-      const candidate = await this.fetchByIsbn(isbn, params.signal);
-      if (candidate) candidates.push(candidate);
+    try {
+      for (const isbn of isbns) {
+        if (candidates.length > 0) await sleep(PROVIDER_DELAYS_MS.LIBROFM_BETWEEN_REQUESTS, params.signal);
+        const candidate = await this.fetchByIsbn(isbn, params.signal);
+        if (candidate) candidates.push(candidate);
+      }
+    } catch (err) {
+      rethrowWithPartialCandidates(err, candidates);
     }
     return candidates;
   }

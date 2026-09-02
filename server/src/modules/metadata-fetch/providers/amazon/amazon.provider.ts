@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
+import { amazonRequestHeaders, isAmazonBotChallenge } from '../../../../common/utils/amazon-http.utils';
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { amazonOrigin } from '../../../../common/utils/metadata-provider-hosts.utils';
 import { fetchWithThrottle } from '../../fetch-with-throttle';
@@ -9,20 +10,8 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { buildRequestSignal, normalizeMaxCandidates, sleep } from '../provider-utils';
+import { buildRequestSignal, normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import { extractAsins, parseBookPage } from './amazon.scraper';
-
-const HEADERS: HeadersInit = {
-  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'accept-language': 'en-US,en;q=0.9',
-  'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not_A Brand";v="24"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"macOS"',
-  'sec-fetch-dest': 'document',
-  'sec-fetch-mode': 'navigate',
-  'sec-fetch-site': 'none',
-};
 
 @Injectable()
 export class AmazonProvider implements IdentifiableProvider {
@@ -42,12 +31,16 @@ export class AmazonProvider implements IdentifiableProvider {
     const asins = await this.searchAsins(params, domain, cookie, maxCandidates, params.signal);
 
     const results: MetadataCandidate[] = [];
-    for (const asin of asins.slice(0, maxCandidates)) {
-      if (results.length > 0) {
-        await sleep(PROVIDER_DELAYS_MS.AMAZON_BETWEEN_REQUESTS, params.signal);
+    try {
+      for (const asin of asins.slice(0, maxCandidates)) {
+        if (results.length > 0) {
+          await sleep(PROVIDER_DELAYS_MS.AMAZON_BETWEEN_REQUESTS, params.signal);
+        }
+        const candidate = await this.fetchByAsin(asin, domain, cookie, params.signal);
+        if (candidate) results.push(candidate);
       }
-      const candidate = await this.fetchByAsin(asin, domain, cookie, params.signal);
-      if (candidate) results.push(candidate);
+    } catch (err) {
+      rethrowWithPartialCandidates(err, results);
     }
     return results;
   }
@@ -61,7 +54,7 @@ export class AmazonProvider implements IdentifiableProvider {
   private async searchAsins(params: MetadataSearchParams, domain: string, cookie: string, limit: number, signal?: AbortSignal): Promise<string[]> {
     const query = params.isbn?.trim() || [params.title, params.author].filter(Boolean).join(' ');
     if (!query) return [];
-    const url = `${amazonOrigin(domain)}/s?k=${encodeURIComponent(query)}&i=stripbooks`;
+    const url = `${amazonOrigin(domain)}/gp/aw/s?k=${encodeURIComponent(query)}&i=stripbooks`;
     const html = await this.fetchHtml(url, cookie, 'search', query, undefined, signal);
     return html ? extractAsins(html, limit) : [];
   }
@@ -105,7 +98,7 @@ export class AmazonProvider implements IdentifiableProvider {
     providerId?: string,
     signal?: AbortSignal,
   ): Promise<string | null> {
-    const headers: HeadersInit = cookie ? { ...HEADERS, cookie } : HEADERS;
+    const headers = amazonRequestHeaders(url, cookie);
     const startedAt = Date.now();
     const safeQuery = query ? sanitizeLogValue(query) : undefined;
     const safeProviderId = providerId ? sanitizeLogValue(providerId) : undefined;
@@ -119,6 +112,9 @@ export class AmazonProvider implements IdentifiableProvider {
         return null;
       }
       const html = await res.text();
+      if (isAmazonBotChallenge(html)) {
+        throw new ProviderThrottleError(undefined, 'bot challenge');
+      }
       this.logger.log(
         `[amazon] [end] op=${op}${safeQuery ? ` query="${safeQuery}"` : ''}${safeProviderId ? ` providerId="${safeProviderId}"` : ''} status=${res.status} durationMs=${Date.now() - startedAt}`,
       );

@@ -234,6 +234,7 @@ These are the variables you are most likely to need during development. See `ser
 | `LIBRARY_BROWSE_ROOT` | Library folder picker root         | `/`                                                       |
 | `APP_URL`             | Base URL for email links           | `http://localhost:5173`                                   |
 | `SWAGGER_ENABLED`     | Serve Swagger UI and OpenAPI JSON  | `false`                                                   |
+| `DISABLE_LOCAL_AUTH`  | Disable password authentication    | `false`                                                   |
 
 ---
 

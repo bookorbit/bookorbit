@@ -51,6 +51,15 @@ describe('ContentFilterRepository', () => {
     });
   });
 
+  it('findByUserId carries the exemption only for a user who has it', async () => {
+    mockDb.where.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await expect(repo.findByUserId(7)).resolves.not.toHaveProperty('exemptRequestsFromUserId');
+
+    mockDb.where.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockDb.limit.mockResolvedValueOnce([{ seeOwnRequestedBooks: true }]);
+    await expect(repo.findByUserId(7)).resolves.toMatchObject({ exemptRequestsFromUserId: 7 });
+  });
+
   it('findByUserIdWithNames returns named include and exclude items', async () => {
     mockDb.where
       .mockResolvedValueOnce([
@@ -67,6 +76,7 @@ describe('ContentFilterRepository', () => {
       excludeTags: [{ id: 2, name: 'Horror' }],
       includeGenres: [{ id: 3, name: 'Fantasy' }],
       excludeGenres: [{ id: 4, name: 'Thriller' }],
+      seeOwnRequestedBooks: false,
     });
   });
 

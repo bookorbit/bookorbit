@@ -3,11 +3,19 @@ import { Readable } from 'stream';
 import { mkdir, realpath, stat } from 'fs/promises';
 
 import { BookDockIngestService } from './book-dock-ingest.service';
+import { buildSingleBookCandidate } from '../scanner/lib/walk';
 
 vi.mock('fs/promises', () => ({
   mkdir: vi.fn().mockResolvedValue(undefined),
   realpath: vi.fn().mockImplementation((p: string) => Promise.resolve(p)),
   stat: vi.fn(),
+}));
+
+// Only the folder read is mocked; the interpreter is left real, because what this covers is
+// exactly whether its grouping is applied to the folder's files.
+vi.mock('../scanner/lib/walk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../scanner/lib/walk')>()),
+  buildSingleBookCandidate: vi.fn(),
 }));
 
 const mockedStat = vi.mocked(stat);
@@ -22,6 +30,7 @@ function makeService(bookDockPath = '/books/book-dock') {
 
   const repo = {
     create: vi.fn(),
+    createUnit: vi.fn().mockImplementation((data: Record<string, unknown>) => Promise.resolve({ id: 900, ...data })),
     findById: vi.fn(),
     findByAbsolutePath: vi.fn().mockResolvedValue(null),
     findSelectionBatch: vi.fn(),
@@ -285,6 +294,77 @@ describe('BookDockIngestService', () => {
 
       expect(result).toBeNull();
       expect(metadataService.extractAndSave).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ingestUnitDirectory', () => {
+    function candidateFile(absolutePath: string, format: string, role = 'content') {
+      return { absolutePath, relPath: absolutePath, ino: 1n, sizeBytes: 10, mtime: new Date(), format, role };
+    }
+
+    /**
+     * The bug this replaced: `walkAndIngest` created one row per file, so a 31-track audiobook
+     * became 31 books, each resolving its destination from its own chapter-named ID3 tags.
+     */
+    it('makes one unit out of a multipart audiobook folder, anchored on track one', async () => {
+      const { service, repo } = makeService();
+      vi.mocked(buildSingleBookCandidate).mockResolvedValue({
+        folderPath: '/books/book-dock/Neuromancer',
+        files: [
+          candidateFile('/books/book-dock/Neuromancer/Chapter 1.mp3', 'mp3'),
+          candidateFile('/books/book-dock/Neuromancer/Chapter 2.mp3', 'mp3'),
+          candidateFile('/books/book-dock/Neuromancer/cover.jpg', 'jpg', 'cover'),
+        ],
+      } as never);
+
+      await expect(service.ingestUnitDirectory('/books/book-dock/Neuromancer')).resolves.toBe(1);
+
+      expect(repo.createUnit).toHaveBeenCalledTimes(1);
+      const [anchor, files] = repo.createUnit.mock.calls[0];
+      expect(anchor).toMatchObject({ fileName: 'Chapter 1.mp3', unitDirectory: '/books/book-dock/Neuromancer', format: 'mp3' });
+      expect(files.map((file: { fileName: string; sortOrder: number | null }) => [file.fileName, file.sortOrder])).toEqual([
+        ['Chapter 1.mp3', 0],
+        ['Chapter 2.mp3', 1],
+        ['cover.jpg', null],
+      ]);
+    });
+
+    /**
+     * `buildSingleBookCandidate` returns one candidate for any folder, so without the interpreter
+     * a dropped comic run would become a single book of sixty files.
+     */
+    it('makes one unit per issue out of a dropped comic run', async () => {
+      const { service, repo } = makeService();
+      vi.mocked(buildSingleBookCandidate).mockResolvedValue({
+        folderPath: '/books/book-dock/Saga',
+        files: [candidateFile('/books/book-dock/Saga/Saga 001.cbz', 'cbz'), candidateFile('/books/book-dock/Saga/Saga 002.cbz', 'cbz')],
+      } as never);
+
+      await expect(service.ingestUnitDirectory('/books/book-dock/Saga')).resolves.toBe(2);
+
+      // None of them owns the folder: claiming it would hide the others from the watcher, and
+      // deleting one would take the whole folder with it.
+      for (const [anchor] of repo.createUnit.mock.calls) expect(anchor.unitDirectory).toBeNull();
+    });
+
+    it('ignores a folder with no supported book file', async () => {
+      const { service, repo } = makeService();
+      vi.mocked(buildSingleBookCandidate).mockResolvedValue(null as never);
+
+      await expect(service.ingestUnitDirectory('/books/book-dock/empty')).resolves.toBe(0);
+      expect(repo.createUnit).not.toHaveBeenCalled();
+    });
+
+    it('skips a unit whose primary file already has a row', async () => {
+      const { service, repo } = makeService();
+      repo.findByAbsolutePath.mockResolvedValue({ id: 3 });
+      vi.mocked(buildSingleBookCandidate).mockResolvedValue({
+        folderPath: '/books/book-dock/Dune',
+        files: [candidateFile('/books/book-dock/Dune/Dune.epub', 'epub')],
+      } as never);
+
+      await expect(service.ingestUnitDirectory('/books/book-dock/Dune')).resolves.toBe(0);
+      expect(repo.createUnit).not.toHaveBeenCalled();
     });
   });
 

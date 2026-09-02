@@ -19,6 +19,7 @@ import { BookService } from '../book/book.service';
 import { HARDCOVER_STATUS } from './hardcover.constants';
 import { HardcoverBookMatchService } from './hardcover-book-match.service';
 import { HardcoverClientService } from './hardcover-client.service';
+import { parseHardcoverBookId } from './hardcover-id.utils';
 import {
   attemptOwnedReadId,
   type HardcoverReadCandidate,
@@ -840,7 +841,7 @@ export class HardcoverSyncService {
     if (!state?.lastSyncedAt) return true;
     if (book.attemptsUpdatedAt && book.attemptsUpdatedAt > state.lastSyncedAt) return true;
     if (book.hardcoverMetadataId && state.syncError === 'no_match') return true;
-    const metadataHardcoverId = this.parseNumericHardcoverMetadataId(book.hardcoverMetadataId);
+    const metadataHardcoverId = parseHardcoverBookId(book.hardcoverMetadataId);
     if (metadataHardcoverId !== null && metadataHardcoverId !== state.hardcoverBookId) return true;
     if (book.status !== state.lastSyncedStatus) return true;
     if (book.progress !== state.lastSyncedProgress) return true;
@@ -850,12 +851,6 @@ export class HardcoverSyncService {
     if (startDate !== state.lastSyncedStartedAt) return true;
     if (endDate !== state.lastSyncedFinishedAt) return true;
     return false;
-  }
-
-  private parseNumericHardcoverMetadataId(value: string | null | undefined): number | null {
-    if (!value) return null;
-    const id = parseInt(value, 10);
-    return isNaN(id) ? null : id;
   }
 
   private buildAttemptSnapshot(book: BookSyncData) {

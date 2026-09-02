@@ -18,6 +18,7 @@ function resetEnv(): void {
   delete process.env.JWT_EXPIRES_IN;
   delete process.env.JWT_REFRESH_EXPIRES_IN;
   delete process.env.SETUP_BOOTSTRAP_TOKEN;
+  delete process.env.DISABLE_LOCAL_AUTH;
   delete process.env.APP_DATA_PATH;
   delete process.env.BOOK_DOCK_PATH;
   delete process.env.LIBRARY_BROWSE_ROOT;
@@ -93,9 +94,21 @@ describe('config', () => {
       jwtRefreshExpiresIn: '7d',
       setupBootstrapToken: '',
       refreshRotationGraceMs: 30_000,
+      passwordLoginEnabled: true,
     });
     expect(emailConfig().encryptionKey).toBe('');
     expect(migrationConfig()).toEqual({ encryptionKey: '', importRoot: undefined });
+  });
+
+  it('disables password login only for an enabled DISABLE_LOCAL_AUTH flag', () => {
+    for (const value of ['true', '1', 'yes', 'on']) {
+      process.env.DISABLE_LOCAL_AUTH = value;
+      expect(authConfig().passwordLoginEnabled).toBe(false);
+    }
+    for (const value of ['false', '0', 'no', 'off', 'invalid']) {
+      process.env.DISABLE_LOCAL_AUTH = value;
+      expect(authConfig().passwordLoginEnabled).toBe(true);
+    }
   });
 
   it('resolves the configured migration import root', () => {

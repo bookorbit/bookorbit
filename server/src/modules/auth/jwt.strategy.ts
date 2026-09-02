@@ -4,6 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import { AuthService } from './auth.service';
+import type { AuthenticationMethod } from '@bookorbit/types';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -18,8 +19,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: number; ver: number }) {
-    const user = await this.authService.validateUser(payload.sub, payload.ver);
+  async validate(payload: { sub: number; ver: number; amr?: AuthenticationMethod }) {
+    const user = await this.authService.validateUser(payload.sub, payload.ver, payload.amr ?? 'legacy');
     if (!user) throw new UnauthorizedException();
     return user;
   }

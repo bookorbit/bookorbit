@@ -37,7 +37,7 @@ describe('BookDockGateway', () => {
 
     await gateway.handleConnection(client);
 
-    expect(authService.validateUser).toHaveBeenCalledWith(8, 3);
+    expect(authService.validateUser).toHaveBeenCalledWith(8, 3, 'legacy');
     expect(client.disconnect).toHaveBeenCalledTimes(1);
   });
 

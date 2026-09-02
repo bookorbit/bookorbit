@@ -498,7 +498,25 @@ describe('AnnotationSyncService', () => {
       expect(result.adds).toHaveLength(1);
       expect(result.more).toBe(false);
       expect(repo.findEditCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 10);
-      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 9);
+      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 9, ['xpointer', 'cfi']);
+    });
+
+    it('requests KOReader-compatible positions before add pagination', async () => {
+      const compatible = makeAnnotationRow({ id: 500 });
+      repo.findAddCandidates.mockImplementation((_userId, _source, _deviceId, _bookId, _limit, requiredFormats) =>
+        requiredFormats?.includes('cfi') ? [compatible] : Array.from({ length: 101 }, (_, index) => makeAnnotationRow({ id: index + 1 })),
+      );
+
+      const result = await service.computePushDown(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 100);
+
+      expect(result.adds.map((row) => row.id)).toEqual([500]);
+      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 101, ['xpointer', 'cfi']);
+    });
+
+    it('does not filter Kobo add candidates by KOReader position formats', async () => {
+      await service.computePushDown(USER_ID, 'kobo', DEVICE_ID, BOOK_ID, 10);
+
+      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'kobo', DEVICE_ID, BOOK_ID, 11, undefined);
     });
 
     it('reports more when a category overflows the remaining budget', async () => {

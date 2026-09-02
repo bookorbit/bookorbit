@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { Rotation } from '@embedpdf/models'
+import { PdfActionType, PdfZoomMode, Rotation, type PdfDestinationObject } from '@embedpdf/models'
 import { ScrollStrategy } from '@embedpdf/plugin-scroll'
 import { SpreadMode } from '@embedpdf/plugin-spread'
 import { ZoomMode } from '@embedpdf/plugin-zoom'
 import type { PdfReaderSettings } from '@bookorbit/types'
-import { flattenPdfBookmarks, fromRotation, safeExternalPdfUrl, toRotation, toScrollStrategy, toSpreadMode, toZoomLevel } from '../pdf-viewer-utils'
+import {
+  findActivePdfBookmarkIndex,
+  flattenPdfBookmarks,
+  fromRotation,
+  getPdfBookmarkPageIndex,
+  safeExternalPdfUrl,
+  toRotation,
+  toScrollStrategy,
+  toSpreadMode,
+  toZoomLevel,
+} from '../pdf-viewer-utils'
 
 const settings: PdfReaderSettings = {
   scrollMode: 'vertical',
@@ -12,6 +22,10 @@ const settings: PdfReaderSettings = {
   zoomMode: 'fit-page',
   customScale: 1,
   rotation: 0,
+}
+
+function destination(pageIndex: number): PdfDestinationObject {
+  return { pageIndex, zoom: { mode: PdfZoomMode.FitPage }, view: [] }
 }
 
 describe('PDF viewer settings mapping', () => {
@@ -58,6 +72,37 @@ describe('flattenPdfBookmarks', () => {
       ['Chapter two', 1],
       ['Section', 2],
     ])
+  })
+
+  it('resolves direct and local goto destinations to page indexes', () => {
+    expect(getPdfBookmarkPageIndex({ title: 'Direct', target: { type: 'destination', destination: destination(4) } })).toBe(4)
+    expect(
+      getPdfBookmarkPageIndex({
+        title: 'Action',
+        target: { type: 'action', action: { type: PdfActionType.Goto, destination: destination(7) } },
+      }),
+    ).toBe(7)
+    expect(
+      getPdfBookmarkPageIndex({ title: 'Website', target: { type: 'action', action: { type: PdfActionType.URI, uri: 'https://example.com' } } }),
+    ).toBeNull()
+  })
+
+  it('selects the nearest outline destination at or before the current page', () => {
+    const entries = flattenPdfBookmarks([
+      { title: 'Chapter five', target: { type: 'destination', destination: destination(50) } },
+      {
+        title: 'Chapter six',
+        target: { type: 'destination', destination: destination(73) },
+        children: [
+          { title: 'Aggregates', target: { type: 'destination', destination: destination(78) } },
+          { title: 'Factories', target: { type: 'destination', destination: destination(82) } },
+        ],
+      },
+    ])
+
+    expect(entries[findActivePdfBookmarkIndex(entries, 74) ?? -1]?.bookmark.title).toBe('Chapter six')
+    expect(entries[findActivePdfBookmarkIndex(entries, 80) ?? -1]?.bookmark.title).toBe('Aggregates')
+    expect(findActivePdfBookmarkIndex(entries, 1)).toBeNull()
   })
 })
 

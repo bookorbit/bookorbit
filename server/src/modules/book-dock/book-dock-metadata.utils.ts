@@ -1,4 +1,4 @@
-import { MetadataProviderKey, type BookDockMetadata } from '@bookorbit/types';
+import { MetadataProviderKey, parseSeriesIndex, type BookDockMetadata } from '@bookorbit/types';
 
 const PASSTHROUGH_FIELDS = [
   'title',
@@ -14,7 +14,6 @@ const PASSTHROUGH_FIELDS = [
   'isbn10',
   'isbn13',
   'seriesName',
-  'seriesIndex',
   'genres',
   'coverUrl',
   'abridged',
@@ -54,6 +53,8 @@ export function normalizeBookDockMetadata(value: unknown): BookDockMetadata | nu
   for (const field of PASSTHROUGH_FIELDS) {
     if (value[field] !== undefined) target[field] = value[field];
   }
+
+  if (value.seriesIndex !== undefined) target.seriesIndex = parseSeriesIndex(value.seriesIndex);
 
   const durationSeconds = value.durationSeconds !== undefined ? value.durationSeconds : value.duration;
   if (durationSeconds !== undefined) target.durationSeconds = durationSeconds;
@@ -112,7 +113,7 @@ function copySeriesMemberships(source: Record<string, unknown>, target: BookDock
   target.seriesMemberships = source.seriesMemberships.flatMap((value) => {
     if (!isRecord(value) || typeof value.seriesName !== 'string') return [];
     const membership: NonNullable<BookDockMetadata['seriesMemberships']>[number] = { seriesName: value.seriesName };
-    if (value.seriesIndex === null || typeof value.seriesIndex === 'string') membership.seriesIndex = value.seriesIndex;
+    if (value.seriesIndex !== undefined) membership.seriesIndex = parseSeriesIndex(value.seriesIndex);
     return [membership];
   });
 }

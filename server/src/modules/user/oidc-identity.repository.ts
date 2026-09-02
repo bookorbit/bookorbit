@@ -1,15 +1,19 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
+import { AuthenticationPolicyService } from '../../common/services/authentication-policy.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class OidcIdentityRepository {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly authenticationPolicy: AuthenticationPolicyService,
+  ) {}
 
   async findByProviderAndSubject(providerId: number, oidcSubject: string) {
     return this.db.query.oidcIdentities.findFirst({
@@ -52,11 +56,22 @@ export class OidcIdentityRepository {
   }
 
   async remove(userId: number, providerId: number) {
-    const [row] = await this.db
-      .delete(schema.oidcIdentities)
-      .where(and(eq(schema.oidcIdentities.userId, userId), eq(schema.oidcIdentities.providerId, providerId)))
-      .returning();
-    return row ?? null;
+    return this.db.transaction(async (tx) => {
+      await this.authenticationPolicy.lockAdministratorAvailability(tx);
+      const [row] = await tx
+        .delete(schema.oidcIdentities)
+        .where(and(eq(schema.oidcIdentities.userId, userId), eq(schema.oidcIdentities.providerId, providerId)))
+        .returning();
+      if (!row) return null;
+
+      const user = await tx.query.users.findFirst({ where: eq(schema.users.id, userId) });
+      const needsOidcMethod = !this.authenticationPolicy.isPasswordLoginEnabled() || user?.provisioningMethod === 'oidc';
+      if (needsOidcMethod && !(await this.authenticationPolicy.hasEnabledOidcIdentityForUser(tx, userId))) {
+        throw new ConflictException('Cannot unlink the last enabled sign-in provider for this account');
+      }
+      await this.authenticationPolicy.assertUsableOidcSuperuser(tx);
+      return row;
+    });
   }
 
   async removeAllForUser(userId: number) {

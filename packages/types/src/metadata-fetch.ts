@@ -104,6 +104,8 @@ export interface MetadataProviderInfo {
   label: string;
   identifiable: boolean;
   selectedByFieldRules?: boolean;
+  /** Zero-based priority for the effective Cover field rule. Absent when the provider is not used for covers. */
+  coverPriority?: number;
 }
 
 /**
@@ -133,7 +135,8 @@ export interface MangabakaCollectionSummary {
   countOther: number;
 }
 
-export type MetadataFetchEmptyReason = "no_active_providers" | "providers_throttled" | "no_candidates" | "no_resolved_fields";
+export type MetadataFetchEmptyReason =
+  "no_active_providers" | "no_existing_provider_ids" | "providers_throttled" | "no_candidates" | "no_resolved_fields";
 
 export interface MetadataFetchDiagnostics {
   reason: MetadataFetchEmptyReason | null;

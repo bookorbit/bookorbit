@@ -64,6 +64,12 @@ export class AuthController {
   }
 
   @Public()
+  @Get('login-options')
+  loginOptions() {
+    return this.authService.loginOptions();
+  }
+
+  @Public()
   @Throttle({ default: { limit: 3, ttl: ONE_MINUTE_MS } })
   @Post('setup')
   @HttpCode(HttpStatus.CREATED)
@@ -194,7 +200,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   oidcUnlinkIdentity(@CurrentUser() user: RequestUser, @Param('providerId', ParseIntPipe) providerId: number, @Body() dto: OidcUnlinkDto) {
-    return this.oidcService.unlinkIdentity(user.id, providerId, dto.password);
+    return this.oidcService.unlinkIdentity(user.id, providerId, dto.password, user.authenticationMethod);
   }
 
   @Post('magic-links')

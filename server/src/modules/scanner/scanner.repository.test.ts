@@ -330,49 +330,79 @@ describe('ScannerRepository', () => {
     });
   });
 
-  it('handles directory scan state lookups and upserts', async () => {
-    const { repo, queues, db } = makeRepo();
+  it('loads a versioned directory scan-state snapshot', async () => {
+    const { repo, queues } = makeRepo();
     queues.select.push([
-      { dirPath: '/books/a', lastSeenMtimeMs: 100 },
-      { dirPath: '/books/b', lastSeenMtimeMs: 200 },
+      { version: 7, dirPath: '/books/a', lastSeenMtimeMs: 100 },
+      { version: 7, dirPath: '/books/b', lastSeenMtimeMs: 200 },
     ]);
+
+    const snapshot = await repo.findDirScanStateSnapshot(7);
+
+    expect(snapshot?.version).toBe(7);
+    expect(snapshot?.mtimes).toEqual(
+      new Map([
+        ['/books/a', 100],
+        ['/books/b', 200],
+      ]),
+    );
+  });
+
+  it('returns an empty snapshot for a folder without state and null for a missing folder', async () => {
+    const { repo, queues } = makeRepo();
+    queues.select.push([{ version: 3, dirPath: null, lastSeenMtimeMs: null }]);
+    queues.select.push([]);
+
+    await expect(repo.findDirScanStateSnapshot(7)).resolves.toEqual({ version: 3, mtimes: new Map() });
+    await expect(repo.findDirScanStateSnapshot(8)).resolves.toBeNull();
+  });
+
+  it('persists directory scan state atomically when the version still matches', async () => {
+    const { repo, queues, db } = makeRepo();
+    queues.select.push([{ version: 7 }]);
     queues.insert.push([]);
     queues.insert.push([]);
-
-    const map = await repo.findDirScanState(7);
-    expect(map.get('/books/a')).toBe(100);
-    expect(map.get('/books/b')).toBe(200);
-
-    await repo.upsertDirScanState(7, []);
-    expect(db.insert).toHaveBeenCalledTimes(0);
+    queues.select.push([
+      { id: 1, dirPath: '/books/0' },
+      { id: 2, dirPath: '/stale' },
+    ]);
 
     const entries = Array.from({ length: 501 }, (_, i) => ({ dirPath: `/books/${i}`, mtimeMs: i + 0.4 }));
-    await repo.upsertDirScanState(7, entries);
+    await expect(repo.persistDirScanState(7, 7, entries)).resolves.toBe(true);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
     expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(db.delete).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes stale directory scan state across all branch paths', async () => {
+  it('skips directory scan-state persistence after the version changes', async () => {
     const { repo, queues, db } = makeRepo();
+    queues.select.push([{ version: 8 }]);
 
-    await repo.deleteStaleDirScanState(7, new Set());
-    expect(db.delete).toHaveBeenCalledTimes(1);
+    await expect(repo.persistDirScanState(7, 7, [{ dirPath: '/books', mtimeMs: 100 }])).resolves.toBe(false);
 
-    queues.select.push([
-      { id: 1, dirPath: '/keep' },
-      { id: 2, dirPath: '/drop' },
-    ]);
-    await repo.deleteStaleDirScanState(7, new Set(['/keep']));
-    expect(db.delete).toHaveBeenCalledTimes(2);
-
-    queues.select.push([{ id: 3, dirPath: '/keep-only' }]);
-    await repo.deleteStaleDirScanState(7, new Set(['/keep-only']));
-    expect(db.delete).toHaveBeenCalledTimes(2);
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
   });
 
-  it('clears directory scan state for a library folder', async () => {
-    const { repo, db } = makeRepo();
-    await repo.clearDirScanState(21);
+  it('clears directory scan state under the folder lock and returns its version', async () => {
+    const { repo, queues, db } = makeRepo();
+    queues.update.push([{ version: 9 }]);
+
+    await expect(repo.clearDirScanState(21)).resolves.toBe(9);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.update).toHaveBeenCalledTimes(1);
     expect(db.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear directory scan state when the library folder no longer exists', async () => {
+    const { repo, queues, db } = makeRepo();
+    queues.update.push([]);
+
+    await expect(repo.clearDirScanState(21)).resolves.toBeNull();
+
+    expect(db.delete).not.toHaveBeenCalled();
   });
 
   it('findRecentScanJobs reads the newest jobs for one library', async () => {

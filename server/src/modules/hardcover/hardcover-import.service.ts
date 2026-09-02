@@ -18,6 +18,7 @@ import { UserBookStatusService } from '../user-book-status/user-book-status.serv
 import { ReadingAttemptService } from '../user-book-status/reading-attempt.service';
 import { HARDCOVER_STATUS } from './hardcover.constants';
 import { HardcoverClientService } from './hardcover-client.service';
+import { parseHardcoverBookId } from './hardcover-id.utils';
 import { HardcoverImportFuzzyIndex } from './hardcover-import-fuzzy-index';
 import { type HardcoverImportLocalBook, HardcoverRepository } from './hardcover.repository';
 import { HardcoverSettingsService } from './hardcover-settings.service';
@@ -317,7 +318,7 @@ export class HardcoverImportService {
     for (const book of books) {
       const metadataId = book.hardcoverMetadataId?.trim();
       if (metadataId) {
-        const numericId = parseNumericId(metadataId);
+        const numericId = parseHardcoverBookId(metadataId);
         if (numericId != null) pushUnique(indexes.byHardcoverId, numericId, book);
         else pushUnique(indexes.byHardcoverSlug, normalizeSlug(metadataId), book);
       }
@@ -615,12 +616,6 @@ function pushUnique<K>(map: Map<K, HardcoverImportLocalBook[]>, key: K, book: Ha
     return;
   }
   if (!current.some((candidate) => candidate.bookId === book.bookId)) current.push(book);
-}
-
-function parseNumericId(value: string): number | null {
-  if (!/^\d+$/.test(value)) return null;
-  const id = Number(value);
-  return Number.isSafeInteger(id) ? id : null;
 }
 
 function normalizeIsbn(value: string | null | undefined): string | null {

@@ -64,6 +64,24 @@ export const KOREADER_EXACT_HIGHLIGHT_COLORS = [
 
 export const ANNOTATION_COLOR_FILTER_OPTIONS = [...ANNOTATION_HIGHLIGHT_COLORS, ...KOREADER_EXACT_HIGHLIGHT_COLORS] as const;
 
+export interface AnnotationRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * A PDF highlight's geometry, in unscaled PDF page coordinate space (points,
+ * top-left origin). `page` is the zero-based page index. `rect` is the bounding
+ * box and `rects` are the per-line segment quads used to render the markup.
+ */
+export interface AnnotationPdfPosition {
+  page: number;
+  rect: AnnotationRect;
+  rects: AnnotationRect[];
+}
+
 export interface AnnotationItem {
   id: number;
   bookId: number;
@@ -79,6 +97,8 @@ export interface AnnotationItem {
   positionStatus: AnnotationPositionStatus | null;
   chapterIndex: number | null;
   createdAt: string;
+  /** Present for PDF highlights; null/absent for EPUB and device-synced formats. */
+  pdf?: AnnotationPdfPosition | null;
 }
 
 /**

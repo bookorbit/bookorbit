@@ -1557,7 +1557,7 @@ export class BookService {
         return row ? [row] : [];
       });
       const files = await this.bookRepo.findAllFilesByBookIds(bookIds);
-      await this.bookRepo.deleteByIds(bookIds);
+      await this.bookRepo.deleteByIdsAndInvalidateScanState(deletedBookIds);
       const deleteTargets = [
         ...rows.map((row) => ({
           path: join(this.appDataPath, 'covers', String(row.id)),

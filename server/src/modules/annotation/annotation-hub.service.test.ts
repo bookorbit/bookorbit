@@ -192,6 +192,18 @@ describe('AnnotationHubService', () => {
       expect(result.stats.withNotes).toBe(1);
       expect(result.stats.originBreakdown).toEqual([{ origin: 'web', count: 1 }]);
     });
+
+    it('surfaces a PDF annotation with the fields the hub deep link needs (pdf format, pageno, null cfi)', async () => {
+      const { service, annotationRepo } = makeService();
+      annotationRepo.findHubPaginated.mockResolvedValueOnce({
+        items: [makeHubRow({ cfi: null, cfiStatus: null, cfiExtras: null, jumpFileFormat: 'pdf', pageno: 4 })],
+        total: 1,
+      });
+
+      const result = await service.list(10, {});
+
+      expect(result.items[0]).toMatchObject({ cfi: null, jumpFileId: 9, jumpFileFormat: 'pdf', pageno: 4 });
+    });
   });
 
   describe('listBooks', () => {

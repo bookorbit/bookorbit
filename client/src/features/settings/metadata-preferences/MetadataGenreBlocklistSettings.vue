@@ -66,6 +66,7 @@ function withBlocklist(prefs: MetadataFetchPreferences, blocklist: string[]): Me
         maxCount: prefs.options?.genres.maxCount ?? null,
       },
       saveProviderIds: prefs.options?.saveProviderIds ?? true,
+      providerIdMode: prefs.options?.providerIdMode ?? 'preferExisting',
     },
   }
 }

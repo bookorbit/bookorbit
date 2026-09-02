@@ -29,6 +29,7 @@ services:
       NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-auto}
       BOOK_DOCK_PATH: ${BOOK_DOCK_PATH:-}
       LIBRARY_BROWSE_ROOT: ${LIBRARY_BROWSE_ROOT:-}
+      DISABLE_LOCAL_AUTH: ${DISABLE_LOCAL_AUTH:-false}
     depends_on:
       postgres:
         condition: service_healthy

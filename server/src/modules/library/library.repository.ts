@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, getTableColumns, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { AccessLevel, ContentFilterRules, LibraryStats } from '@bookorbit/types';
 
@@ -225,6 +225,24 @@ export class LibraryRepository {
       });
     }
     return stats;
+  }
+
+  /**
+   * Which of these users can open this library, answered in one query rather than one per user.
+   *
+   * A superuser holds no row in the access table and reaches every library anyway, so the flag is
+   * read alongside the grants: filtering on grants alone would report an administrator as having
+   * access to nothing.
+   */
+  findUserIdsWithAccess(libraryId: number, userIds: number[]) {
+    return this.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .leftJoin(
+        schema.userLibraryAccess,
+        and(eq(schema.userLibraryAccess.userId, schema.users.id), eq(schema.userLibraryAccess.libraryId, libraryId)),
+      )
+      .where(and(inArray(schema.users.id, userIds), or(eq(schema.users.isSuperuser, true), isNotNull(schema.userLibraryAccess.userId))));
   }
 
   async hasUserAccess(userId: number, libraryId: number): Promise<boolean> {

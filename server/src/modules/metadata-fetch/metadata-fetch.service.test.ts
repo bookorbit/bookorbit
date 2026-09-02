@@ -402,6 +402,94 @@ describe('MetadataFetchService', () => {
     expect(google.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune', author: 'Frank Herbert' }));
   });
 
+  it('does not search for a replacement when an exact lookup returns null in existing-only mode', async () => {
+    const google: IdentifiableProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: true,
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'replacement-id', 'Dune')]),
+      lookupById: vi.fn().mockResolvedValue(null),
+    };
+    registry.select.mockReturnValue([google]);
+
+    const results = await firstValueFrom(
+      service
+        .search({
+          title: 'Dune',
+          existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' },
+          existingProviderIdsOnly: true,
+        })
+        .pipe(toArray()),
+    );
+
+    expect(results).toEqual([]);
+    expect(google.lookupById).toHaveBeenCalledOnce();
+    expect(google.search).not.toHaveBeenCalled();
+  });
+
+  it('does not search for a replacement when an exact lookup fails relevance in existing-only mode', async () => {
+    const google: IdentifiableProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: true,
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'replacement-id', 'Dune')]),
+      lookupById: vi.fn().mockResolvedValue(candidate(MetadataProviderKey.GOOGLE, 'stored-id', 'Completely Unrelated')),
+    };
+    registry.select.mockReturnValue([google]);
+
+    const results = await firstValueFrom(
+      service
+        .search({
+          title: 'Dune',
+          author: 'Frank Herbert',
+          existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'stored-id' },
+          existingProviderIdsOnly: true,
+        })
+        .pipe(toArray()),
+    );
+
+    expect(results).toEqual([]);
+    expect(google.search).not.toHaveBeenCalled();
+  });
+
+  it('does not query a provider without a stored identity in existing-only mode', async () => {
+    const google: IdentifiableProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: true,
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.GOOGLE, 'new-id', 'Dune')]),
+      lookupById: vi.fn(),
+    };
+    registry.select.mockReturnValue([google]);
+
+    const results = await firstValueFrom(service.search({ title: 'Dune', existingProviderIds: {}, existingProviderIdsOnly: true }).pipe(toArray()));
+
+    expect(results).toEqual([]);
+    expect(google.lookupById).not.toHaveBeenCalled();
+    expect(google.search).not.toHaveBeenCalled();
+  });
+
+  it('allows AudNexus to use an existing Audible identity without discovery fallbacks', async () => {
+    const audnexus: MetadataProvider = {
+      key: MetadataProviderKey.AUDNEXUS,
+      label: 'AudNexus',
+      identifiable: false,
+      search: vi.fn().mockResolvedValue([candidate(MetadataProviderKey.AUDNEXUS, 'B0EXISTING', 'Dune')]),
+    };
+    registry.select.mockReturnValue([audnexus]);
+
+    const params = {
+      title: 'Dune',
+      existingProviderIds: { [MetadataProviderKey.AUDIBLE]: 'B0EXISTING' },
+      existingProviderIdsOnly: true,
+    };
+    const results = await firstValueFrom(service.search(params).pipe(toArray()));
+
+    expect(results).toEqual([candidate(MetadataProviderKey.AUDNEXUS, 'B0EXISTING', 'Dune')]);
+    expect(audnexus.search).toHaveBeenCalledOnce();
+    expect(audnexus.search).toHaveBeenCalledWith(expect.objectContaining(params));
+  });
+
   it('isolates provider failures so one provider error does not fail the full stream', async () => {
     const failing: MetadataProvider = {
       key: MetadataProviderKey.GOODREADS,

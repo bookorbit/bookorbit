@@ -746,7 +746,11 @@ async function autoFill() {
 
   const preview = result.metadata
   if (Object.keys(preview).length === 0) {
-    toast.info(metadataRefreshEmptyMessage(result.diagnostics, props.book), { closeButton: true, duration: AUTO_FILL_EMPTY_TOAST_DURATION_MS })
+    const message =
+      result.diagnostics.reason === 'no_existing_provider_ids'
+        ? t('book.detail.editMetadata.noExistingProviderIds')
+        : metadataRefreshEmptyMessage(result.diagnostics, props.book)
+    toast.info(message, { closeButton: true, duration: AUTO_FILL_EMPTY_TOAST_DURATION_MS })
     return
   }
 

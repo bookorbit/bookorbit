@@ -56,6 +56,7 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   SETUP_BOOTSTRAP_TOKEN: z.string().optional(),
+  DISABLE_LOCAL_AUTH: booleanEnvFlag('DISABLE_LOCAL_AUTH'),
   APP_DATA_PATH: z.string().default('/data'),
   BOOK_DOCK_PATH: z
     .string()
@@ -72,6 +73,7 @@ const envSchema = z.object({
   TRUST_PROXY: trustProxyEnv(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   MIGRATION_ENCRYPTION_KEY: z.string().optional(),
+  BOOK_REQUEST_ENCRYPTION_KEY: z.string().optional(),
   MIGRATION_IMPORT_ROOT: z
     .string()
     .transform((val) => val.trim())

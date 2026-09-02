@@ -145,8 +145,12 @@ export class MetadataFetchService {
     } catch (error) {
       if (error instanceof ProviderThrottleError) {
         this.throttleTracker.record(provider.key, error.retryAfterSeconds);
+        // A provider throttled part-way through hands back what it had already assembled. The
+        // cooldown covers the requests it can no longer make; it is not a reason to drop finished
+        // candidates, and the status event still tells the client the provider was cut short.
+        const salvaged = filterAndRank([...error.partialCandidates], params);
         this.logger.warn(
-          `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} errorClass=ProviderThrottleError error="provider throttled" - provider fetch failed`,
+          `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} resultCount=${salvaged.length} errorClass=ProviderThrottleError error="provider throttled" - provider fetch failed`,
         );
         return [];
       }
@@ -167,6 +171,12 @@ export class MetadataFetchService {
         const rankedLookup = filterAndRank([lookupResult], params, 1);
         if (rankedLookup.length > 0) return rankedLookup;
       }
+      if (params.existingProviderIdsOnly) return [];
+    }
+
+    if (params.existingProviderIdsOnly) {
+      if (provider.key !== MetadataProviderKey.AUDNEXUS || !params.existingProviderIds?.[MetadataProviderKey.AUDIBLE]) return [];
+      return filterAndRank(await provider.search(params), params, 1);
     }
 
     return this.searchAndRankProvider(provider, params);

@@ -79,6 +79,16 @@ describe('validateEnv', () => {
     ).toThrow('OIDC_ALLOW_LOCAL_ISSUERS must be one of true/false/1/0/yes/no/on/off');
   });
 
+  it('accepts boolean-like values for DISABLE_LOCAL_AUTH', () => {
+    for (const DISABLE_LOCAL_AUTH of ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']) {
+      expect(() => validateEnv({ ...BASE_ENV, DISABLE_LOCAL_AUTH })).not.toThrow();
+    }
+  });
+
+  it('rejects invalid DISABLE_LOCAL_AUTH values', () => {
+    expect(() => validateEnv({ ...BASE_ENV, DISABLE_LOCAL_AUTH: 'maybe' })).toThrow('DISABLE_LOCAL_AUTH must be one of true/false/1/0/yes/no/on/off');
+  });
+
   it('accepts boolean-like values for SWAGGER_ENABLED', () => {
     for (const SWAGGER_ENABLED of ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']) {
       expect(() =>

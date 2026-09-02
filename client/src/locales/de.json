@@ -2831,6 +2831,7 @@
         "notifications": "Was BookOrbit erzählt und wo.",
         "privacy": "Lese-Einsichten, gemeinsame Links und Aktivitätssichtbarkeit.",
         "restrictions": "Altersbewertungen und verborgene Inhalte für dieses Konto.",
+        "libraries": "Scanne Pfade, beobachtete Ordner und ErfassungesRegeln.",
         "accountActivity": "Lese- und Sitzungsaktivität pro Benutzer."
       }
     }
@@ -3027,6 +3028,10 @@
       },
       "superuserTarget": "Superuser-Ziel",
       "superuserTargetHint": "Inhaltseinschränkungen können nicht auf Superuser angewendet werden.",
+      "superuserAccess": {
+        "enabled": "Aktiviert",
+        "disabled": "Deaktiviert"
+      },
       "noRestrictions": "Keine Inhaltseinschränkungen",
       "noRestrictionsHint": "Dieser Benutzer hat vollen Zugriff auf alle Bücher in seinen zugewiesenen Bibliotheken.",
       "addRestrictions": "+ Inhaltseinschränkungen hinzufügen",
@@ -3062,7 +3067,11 @@
         "username": "Benutzername",
         "email": "E-Mail",
         "access": "Zugriff",
-        "status": "Status"
+        "status": "Status",
+        "actions": "Aktionen",
+        "user": "Benutzer",
+        "libraries": "Bibliotheken",
+        "lastActive": "Zuletzt aktiv"
       },
       "adminBadge": "Administrator",
       "permissionCount": "{count, plural, =0 {keine Berechtigungen} one {eine Berechtigung} other {# Berechtigungen}}",
@@ -3070,6 +3079,7 @@
       "contentRestrictionsActive": "Inhaltseinschränkungen aktiv",
       "statusActive": "Aktiv",
       "statusInactive": "Inaktiv",
+      "lockedBadge": "Gesperrt",
       "resetPassword": "Passwort zurücksetzen",
       "resetPasswordOidcHint": "OIDC-Benutzer setzen Passwörter bei ihrem Identitätsanbieter zurück",
       "resetPasswordSharedHint": "Gemeinsame Konten haben keine Passwörter",
@@ -3154,6 +3164,9 @@
         "reason": {
           "locked": "{name} ist nach zu vielen fehlgeschlagenen Anmeldungen gesperrt",
           "neverSignedIn": "{name} hat sich noch nie angemeldet"
+        },
+        "action": {
+          "unlock": "Jetzt freischalten"
         },
         "collapse": "Ausblenden",
         "expand": "Anzeigen"
@@ -3289,6 +3302,8 @@
         "resetFilters": "Filter zurücksetzen",
         "trashEmpty": "Papierkorb ist leer",
         "noAnnotations": "Noch keine Markierungen. Im Web oder auf Ihrem E-Reader erstellte Markierungen erscheinen hier.",
+        "readHere": "Hier lesen",
+        "syncKobo": "Mit Kobo synchronisieren",
         "syncKoreaderBody": "Das Plugin lädt Anmerkungen mit ihren Positionen hoch.",
         "goToLibrary": "Gehe zur Bibliothek"
       },
@@ -3309,6 +3324,8 @@
       "whereFrom": "Woher sie kommen",
       "theShelf": "Das Regal",
       "devices": "Geräte",
+      "busiestWeek": "Fleißigste Woche",
+      "mostMarked": "Meistmarkiert",
       "reviewThem": "Diese überprüfen",
       "anchorLost": "Anker verloren",
       "anchorRepaired": "Repariert",
@@ -3386,8 +3403,23 @@
     "quickDates": "Schnellauswahl Datum",
     "today": "Heute",
     "sevenDays": "7 Tage",
+    "thirtyDays": "30 Tage",
+    "userId": "Benutzer: #{id}",
+    "userIdCompact": "#{id}",
+    "detailEventId": "Event-ID",
+    "detailOccurredAt": "Aufgetreten",
+    "detailActor": "Akteur",
+    "detailCategory": "Kategorie",
+    "detailActionLabel": "Aktionen",
+    "detailEventTypeLabel": "Ereignistyp",
+    "detailIpLabel": "IP-Adresse",
+    "detailResourceLabel": "Ressource",
+    "detailResourceIdLabel": "Ressourcen-ID",
+    "detailTargetTypeLabel": "Zieltyp",
+    "detailTargetIdLabel": "Ziel-ID",
     "detailAction": "Aktion: {value}",
     "detailIp": "IP: {value}",
+    "untitledBook": "Unbenannt",
     "showing": "Zeige {from}-{to} von {total}",
     "prev": "Zurück",
     "chips": {
@@ -3398,22 +3430,41 @@
     },
     "filterLabels": {
       "action": "Aktion",
+      "actor": "Akteur",
+      "resource": "Ressource",
       "userId": "Benutzer-ID",
       "from": "Von",
       "to": "Bis"
     },
     "filterPlaceholders": {
+      "actor": "Benutzername",
       "action": "z. B. auth.login",
       "userId": "z. B. 1"
     },
     "columns": {
       "when": "Wann",
+      "actor": "Akteur",
+      "event": "Event",
+      "target": "Ziel",
+      "impact": "Auswirkung",
       "user": "Benutzer",
       "action": "Aktion",
       "description": "Beschreibung",
       "ip": "IP"
     },
+    "categories": {
+      "books": "Bücher",
+      "users": "Benutzer",
+      "libraries": "Bibliotheken",
+      "collections": "Sammlungen",
+      "integrations": "Integrationen",
+      "settings": "Einstellungen",
+      "other": "Andere"
+    },
     "resourceLabels": {
+      "User": "Benutzer",
+      "Library": "Bibliothek",
+      "Book": "Buch",
       "Collection": "Sammlung",
       "SmartScope": "Intelligenter Bereich",
       "BookDockFile": "Buchdock-Datei",
@@ -3435,7 +3486,16 @@
       "ReadingInsightsProfile": "Leseprofil"
     },
     "actionLabels": {
-      "AuthSessionRevoke": "Sitzung widerrufen"
+      "AuthLogin": "Anmelden",
+      "AuthLogout": "Abmelden",
+      "AuthSessionRevoke": "Sitzung widerrufen",
+      "UserCreate": "Benutzer erstellen",
+      "UserUpdate": "Benutzer aktualisieren",
+      "UserDelete": "Benutzer löschen",
+      "BookUpload": "Buch hochladen",
+      "BookDelete": "Buch löschen",
+      "BookBulkDelete": "Bücher löschen",
+      "EntityManagerSplit": "Entität aufteilen"
     }
   },
   "auth": {
@@ -3469,6 +3529,7 @@
       "signingIn": "Anmeldung läuft...",
       "orDivider": "oder",
       "forgotPassword": "Passwort vergessen?",
+      "signUp": "Registrieren",
       "errors": {
         "invalidCredentials": "Ungültiger Benutzername oder ungültiges Passwort",
         "tooManyAttempts": "Zu viele Anmeldeversuche. Bitte warten Sie eine Minute und versuchen Sie es erneut."
@@ -3512,6 +3573,9 @@
         "invalidOrExpired": "Ungültiger oder abgelaufener Link zum Zurücksetzen. Bitte fordern Sie einen neuen an."
       }
     },
+    "register": {
+      "signIn": "Anmelden"
+    },
     "setup": {
       "title": "Ersteinrichtung",
       "subtitle": "Erstellen Sie das erste Administratorkonto.",
@@ -3548,7 +3612,13 @@
       "deleteAuthor": "Autor löschen"
     },
     "filters": {
-      "allLibraries": "Alle Bibliotheken"
+      "allLibraries": "Alle Bibliotheken",
+      "chips": {
+        "all": "Alle",
+        "noPortrait": "Kein Portrait",
+        "multipleBooks": "2+ Bücher",
+        "noSortName": "Keine Namenssortierung"
+      }
     },
     "header": {
       "never": "Nie",
@@ -3565,7 +3635,12 @@
       "noBiography": "Keine Biografie verfügbar. Verwenden Sie das Menü, um Metadaten zu aktualisieren.",
       "previewFrom": "Vorschau von {provider}. Speichern Sie die Metadaten, um sie dauerhaft zu übernehmen.",
       "booksLabel": "Bücher",
-      "lastAdded": "Zuletzt hinzugefügt"
+      "lastAdded": "Zuletzt hinzugefügt",
+      "born": "Geburtsdatum",
+      "died": "Gestorben",
+      "website": "Webseite",
+      "genres": "Genres",
+      "influences": "Beeinflusst"
     },
     "list": {
       "title": "Autoren",
@@ -3746,6 +3821,25 @@
       "moveDown": "Nach unten verschieben",
       "ascending": "Aufsteigend",
       "descending": "Absteigend",
+      "fields": {
+        "author": "Autor",
+        "title": "Titel",
+        "series": "Reihen",
+        "seriesIndex": "Reihe #",
+        "addedAt": "Datum Hinzugefügt",
+        "updatedAt": "Datum aktualisiert",
+        "pageCount": "Seitenzahl",
+        "rating": "Bewertung",
+        "publisher": "Verlag",
+        "fileSize": "Dateigröße",
+        "readStatus": "Lesestatus",
+        "format": "Format",
+        "lastReadAt": "Zuletzt gelesen",
+        "startedAt": "Datum angefangen",
+        "random": "Zufällig",
+        "language": "Sprache"
+      },
+      "customFieldFallback": "Benutzerdefiniertes Feld",
       "remove": "Entfernen",
       "emptyState": "Keine Sortierung konfiguriert. Titel aufsteigend wird verwendet.",
       "addLevel": "Sortierebene hinzufügen"
@@ -3755,6 +3849,48 @@
       "all": "ALLE",
       "any": "BELIEBIG",
       "ofFollowingRules": "der folgenden Regeln",
+      "fields": {
+        "title": "Titel",
+        "publisher": "Verlag",
+        "language": "Sprache",
+        "series": "Reihen",
+        "seriesIndex": "Nummer in der Reihe",
+        "pageCount": "Seitenzahl",
+        "author": "Autor",
+        "genre": "Genre",
+        "tag": "Tag",
+        "collection": "Sammlung",
+        "library": "Bibliothek",
+        "format": "Format",
+        "addedAt": "Datum hinzugefügt",
+        "startedAt": "Datum angefangen",
+        "rating": "Bewertung",
+        "isbn": "ISBN",
+        "cover": "Cover"
+      },
+      "operators": {
+        "contains": "enthält",
+        "endsWith": "endet mit",
+        "eq": "ist",
+        "notEq": "ist nicht",
+        "isEmpty": "ist leer",
+        "isNotEmpty": "ist nicht leer",
+        "gt": "größer als",
+        "gte": "mindestens",
+        "lt": "weniger als",
+        "lte": "höchstens",
+        "between": "zwischen",
+        "before": "vor",
+        "after": "nach",
+        "isMissing": "fehlt",
+        "isPresent": "ist vorhanden",
+        "isUnread": "ist ungelesen",
+        "isLocked": "ist gesperrt",
+        "isUpNext": "ist als nächstes",
+        "isTrue": "ist Wahr",
+        "isFalse": "ist nicht"
+      },
+      "customFieldFallback": "Benutzerdefiniertes Feld",
       "anyProvider": "Beliebiger Anbieter",
       "communityRatingProvider": "Anbieter der Community-Bewertung",
       "loadingLibraries": "Bibliotheken werden geladen ...",
@@ -3765,7 +3901,8 @@
       "unit": {
         "days": "Tage",
         "weeks": "Wochen",
-        "months": "Monate"
+        "months": "Monate",
+        "megabytes": "MB"
       },
       "scorePreset": {
         "outstanding": "Hervorragend",
@@ -3774,6 +3911,7 @@
         "poor": "Schlecht"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "z.B. 10",
       "valuePlaceholder": "Wert",
       "maxPlaceholder": "Max.",
       "to": "bis",
@@ -4104,8 +4242,22 @@
         "koboNotSyncedTooltip": "Für die nächste Kobo-Synchronisierung vorgemerkt.",
         "filesNotFound": "Dateien nicht gefunden",
         "filesNotFoundDescription": "Die Datei(en) für dieses Buch können auf dem Datenträger nicht mehr gefunden werden. Die Metadaten sind weiterhin verfügbar. Führen Sie einen Bibliotheks-Scan durch, um dies zu bestätigen, oder entfernen Sie den Eintrag.",
+        "resetHoldReleasing": "Veröffentlichen...",
+        "editions": "Ausgabe",
+        "yourReading": "Deine Lesungen",
         "noSessionsYet": "Noch keine Lesesitzungen. Das Öffnen dieses Buches im Reader verfolgt Zeit, Tempo und Fortschritt pro Gerät.",
-        "activitySessions": "Sitzungen"
+        "activitySessions": "Sitzungen",
+        "activityTime": "Zeit",
+        "activityAverage": "Durchschn.",
+        "activityProgress": "Fortschritt",
+        "durationS": "{seconds}s",
+        "durationM": "{minutes}m",
+        "writeReview": "Schreiben",
+        "noCollections": "Keine",
+        "onDisk": "Auf dem Datenträger",
+        "detailsHeading": "Details",
+        "percentUnderOne": "<1%",
+        "percentOverNinetyNine": ">99%"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {keine Felder} one {ein Feld} other {# Felder}}",
@@ -4221,6 +4373,10 @@
           "pickCoverSource": "Cover-Quelle wählen",
           "pickFromProvider": "Von einem anderen Anbieter wählen",
           "pickSource": "Quelle wählen",
+          "genreWriteMode": {
+            "merge": "Zusammenführen",
+            "replace": "Ersetzen"
+          },
           "empty": "leer",
           "showLess": "Weniger anzeigen",
           "showMore": "Mehr anzeigen",
@@ -4269,10 +4425,33 @@
           "selectVolume": "Select this volume"
         },
         "writeAndRename": "In Datei schreiben & umbenennen",
-        "writeAndRenameShort": "Schreiben & umbenennen"
+        "writeAndRenameShort": "Schreiben & umbenennen",
+        "identityCard": "Identität",
+        "catalogCard": "Katalog",
+        "sourceCard": "Quelle",
+        "score": "Bewertung",
+        "libraryRow": "Bibliothek",
+        "primaryRow": "Primär",
+        "writeBackRow": "Zurückschreiben",
+        "writeBackOff": "Aus",
+        "lastWrittenRow": "Zuletzt geschrieben",
+        "neverWritten": "Nie",
+        "unknownFormat": "Unbekannt"
       },
       "files": {
         "title": "Buchdateien",
+        "stats": {
+          "files": "Dateien",
+          "total": "Insgesamt",
+          "runtime": "Laufzeit",
+          "formats": "Formate"
+        },
+        "filesHeading": "Dateien",
+        "thisFile": "Diese Datei",
+        "writeBackShort": "Zurückschreiben",
+        "showAllTracks": "Alle anzeigen",
+        "collapseTracks": "Einklappen",
+        "fileDetails": "Dateiinformationen",
         "fileCount": "{count, plural, =0 {keine Dateien} one {# Datei} other {# Dateien}}",
         "synced": "Synchronisiert {time}",
         "sortAria": "Dateien sortieren",
@@ -4323,7 +4502,50 @@
           "title": "Datei löschen?",
           "description": "Sind Sie sicher, dass Sie \"{filename}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
         },
-        "deleting": "Wird gelöscht ..."
+        "deleting": "Wird gelöscht ...",
+        "libraryRoot": "Bibliotheks-Hauptverzeichnis",
+        "onDisk": "Auf dem Datenträger",
+        "missing": "Fehlt",
+        "resume": "Fortsetzen",
+        "audiobook": "Hörbuch",
+        "enabled": "Aktiviert",
+        "disabled": "Aus",
+        "notSet": "nicht festgelegt",
+        "sortAdded": "Hinzugefügt",
+        "groups": {
+          "ebook": "E-Book",
+          "document": "Dokument",
+          "comic": "Comic",
+          "audio": "Audio",
+          "extras": "Extras"
+        },
+        "roles": {
+          "primary": "Primär",
+          "content": "Abwechselnd",
+          "supplement": "Ergänzung",
+          "cover": "Cover"
+        },
+        "reader": {
+          "none": "Kein Reader",
+          "document": "PDF-Reader"
+        },
+        "spec": {
+          "format": "Format",
+          "role": "Rolle",
+          "size": "Größe",
+          "length": "Länge",
+          "added": "Hinzugefügt",
+          "indexed": "Indiziert",
+          "opensIn": "Öffnen in",
+          "writeBack": "Zurückschreiben",
+          "track": "Spur"
+        },
+        "duration": {
+          "minutes": "{minutes}m",
+          "seconds": "{seconds}s"
+        },
+        "neverRun": "Nie gestartet",
+        "historyHeading": "Verlauf"
       },
       "highlights": {
         "note": {
@@ -4357,27 +4579,110 @@
           "hint": "Wählen Sie Text beim Lesen aus, um Markierungen zu erstellen"
         },
         "uncategorized": "Nicht kategorisiert",
-        "paginationUnit": "Markierungen"
+        "paginationUnit": "Markierungen",
+        "rail": {
+          "title": "Markierungen",
+          "colour": "Farbe",
+          "span": "Bereich",
+          "firstMark": "Erste Markierung",
+          "lastMark": "Letzte Markierung"
+        },
+        "row": {
+          "showMore": "Mehr anzeigen",
+          "showLess": "Weniger anzeigen",
+          "note": "Notiz",
+          "addNote": "Notiz hinzufügen",
+          "page": "S. {page}"
+        },
+        "stream": {
+          "title": "Der Stream",
+          "all": "Alle",
+          "notes": "Notizen",
+          "review": "Überprüfen"
+        },
+        "index": {
+          "title": "Index",
+          "byChapter": "Kapitel",
+          "byColour": "Farben",
+          "byDay": "Tage"
+        },
+        "activity": {
+          "showFewer": "Weniger anzeigen"
+        },
+        "inspector": {
+          "next": "Nächste Markierung",
+          "style": "Stil",
+          "openHere": "Hier eröffnen"
+        },
+        "band": {
+          "start": "Start",
+          "densest": "Dichtest",
+          "end": "Ende"
+        },
+        "shortcuts": {
+          "title": "Tastatur",
+          "search": "Suche",
+          "recolour": "Neu färben"
+        },
+        "chapters": "Kapitel",
+        "noChapter": "Keine Kapitel",
+        "views": {
+          "colour": "Nach Farbe",
+          "source": "Nach Quelle"
+        }
       },
       "readingLog": {
         "vitals": {
+          "notSet": "Nicht festgelegt",
+          "started": "Begonnen",
+          "finished": "Beendet",
+          "totalTime": "Gesamtzeit",
           "sessions": "Sitzungen",
           "avgSession": "Durchschnittliche Sitzung",
-          "addSession": "Sitzung hinzufügen"
+          "pace": "Tempo",
+          "lastRead": "Zuletzt gelesen",
+          "addSession": "Sitzung hinzufügen",
+          "durationM": "{minutes}m",
+          "durationS": "{seconds}s"
         },
         "ledger": {
           "title": "Sitzungen",
+          "none": "keine",
+          "colDay": "Tag",
+          "colTime": "Zeit",
+          "colLength": "Länge",
+          "colChange": "Ändern",
+          "colReached": "Erreicht",
+          "colSource": "Quelle",
+          "colFormat": "Format",
           "empty": "Noch keine Sitzungen aufgezeichnet",
           "emptyHint": "Öffnen Sie das Buch im Reader, synchronisieren Sie ein Gerät oder fügen Sie eine Sitzung per Hand hinzu."
         },
         "attempts": {
+          "title": "Versuche",
+          "none": "keine",
+          "reread": "Erneut gelesen",
+          "fieldStarted": "Begonnen",
+          "fieldEnded": "Beendet",
+          "fieldOutcome": "Ergebnis",
+          "outcome": {
+            "completed": "Abgeschlossen",
+            "skimmed": "Überflogen",
+            "abandoned": "Aufgegeben"
+          },
+          "spanEnded": "endet {to}",
           "sessionCount": "{count, plural, one {# Sitzung} other {# Sitzungen}}"
         },
         "records": {
+          "title": "Datensätze",
           "longestSession": "Längste Sitzung",
+          "bestDay": "Bester Tag",
           "empty": "Die Aufzeichnungen erscheinen, sobald dieses Buch Sitzungen hat."
         },
         "band": {
+          "curve": "Kurve",
+          "trace": "Aufzeichnung",
+          "switchAria": "Diagramm-Ansicht",
           "curveSubSitting": "Eine Sitzung, Sitzung für Sitzung",
           "traceSub": "Jeder Balken zeigt die Spanne einer Sitzung",
           "traceSubWithBacktracks": "{count, plural, one {Jeder Balken zeigt eine Sitzung, # zurückgesprungen} other {Jeder Balken zeigt eine Sitzung, # zurückgesprungen}}",
@@ -4541,7 +4846,8 @@
         "seriesPlaceholder": "Reihe",
         "moveUp": "Nach oben verschieben",
         "moveDown": "Nach unten verschieben",
-        "removeSeries": "Reihe entfernen"
+        "removeSeries": "Reihe entfernen",
+        "totalPlaceholder": "von"
       }
     },
     "table": {
@@ -4622,6 +4928,16 @@
       "text": {
         "openDetails": "Details öffnen"
       }
+    },
+    "move": {
+      "currentLibrary": "Aktuell",
+      "continue": "Fortsetzen",
+      "back": "Zurück",
+      "policy": {
+        "keep_both": "Beide behalten",
+        "merge": "Zusammenführen",
+        "skip": "Überspringen"
+      }
     }
   },
   "bookMetadataFetch": {
@@ -4694,6 +5010,7 @@
     "apply": "Anwenden",
     "done": "Fertig",
     "discard": "Verwerfen",
+    "deselect": "Abwählen",
     "finalize": "Abschließen",
     "rescan": "Erneut scannen",
     "uploadAction": "Hochladen",
@@ -4815,6 +5132,36 @@
       "alreadyExistsSaveAs": "Existiert bereits - speichern als:",
       "renamePlaceholder": "z. B. {name} (2)",
       "import": "Importieren"
+    },
+    "layout": {
+      "pause": "Pausieren",
+      "resume": "Fortsetzen",
+      "filter": {
+        "all": "Alle",
+        "pending": "Ausstehend",
+        "ready": "Bereit",
+        "error": "Fehler"
+      },
+      "row": {
+        "file": "Datei",
+        "noMatch": "Kein Treffer",
+        "applied": "Angewandt"
+      },
+      "sort": {
+        "label": "Sortieren nach",
+        "fileName": "Dateiname",
+        "fileSize": "Größe",
+        "format": "Format",
+        "status": "Status"
+      },
+      "conflict": {
+        "duplicate": "Duplikat",
+        "destination_conflict": "Pfad bereits vergeben",
+        "invalid_target": "Ungültiges Ziel",
+        "access_denied": "Kein Zugriff",
+        "invalid_format": "Ungültiges Format",
+        "error": "Würde scheitern"
+      }
     }
   },
   "collection": {
@@ -4906,7 +5253,9 @@
         "title": "Gefällt Ihnen BookOrbit?",
         "body": "Wenn BookOrbit Ihnen bei Ihrer Bibliothek hilft, geben Sie dem Projekt doch einen Stern auf GitHub. Das hilft mehr Menschen, die App zu entdecken, und unterstützt die weitere Entwicklung.",
         "cta": "BookOrbit auf GitHub mit Stern versehen"
-      }
+      },
+      "surfaceOpacityValue": "{value}%",
+      "surfaceBrightnessValue": "{value}%"
     },
     "sidebar": {
       "dashboard": "Übersicht",
@@ -4927,8 +5276,13 @@
       "supportAria": "BookOrbit auf Ko-fi unterstützen",
       "sectionHeader": {
         "add": "Hinzufügen",
+        "showAll": "Alle anzeigen",
+        "rowsShown": "Zeilen angezeigt",
         "reorder": "Neu anordnen",
         "doneReordering": "Anordnen abgeschlossen"
+      },
+      "zones": {
+        "browse": "Durchsuchen"
       }
     },
     "selectionActionBar": {
@@ -4987,7 +5341,16 @@
         "columnsHint": "Verwende das Spaltensichtbarkeits-Panel in der Tabellenkopfzeile, um Spalten ein- oder auszublenden.",
         "coverShape": "Coverform",
         "circle": "Kreis",
-        "square": "Quadrat"
+        "square": "Quadrat",
+        "rowDensity": "Zeilen-Höhe",
+        "densityCompact": "Kompakt",
+        "densityComfortable": "Gemütlich",
+        "densityRoomy": "Geräumig"
+      },
+      "viewModes": {
+        "grid": "Gitteransicht",
+        "list": "Listenansicht",
+        "table": "Tabellen-Ansicht"
       }
     },
     "iconPicker": {
@@ -5013,6 +5376,10 @@
       "dark": "Dunkel",
       "system": "System"
     },
+    "languagePicker": {
+      "suggested": "Empfohlen",
+      "results": "Ergebnisse"
+    },
     "userAvatar": {
       "profilePicture": "Profilbild",
       "profilePictureOf": "Profilbild von {name}"
@@ -5027,6 +5394,16 @@
         "typeAndEnter": "Eingeben und Enter drücken zum Hinzufügen",
         "pressEnter": "Enter drücken zum Hinzufügen"
       }
+    },
+    "entityIndex": {
+      "sortBy": "Sortieren nach",
+      "sort": {
+        "name": "Name",
+        "bookCount": "Anzahl Bücher"
+      },
+      "ascending": "Aufsteigend",
+      "descending": "Absteigend",
+      "noMatches": "Keine Treffer"
     }
   },
   "customIcons": {
@@ -5082,6 +5459,9 @@
       "tabs": {
         "widgets": "Widgets",
         "shelves": "Regale"
+      },
+      "shelfLayout": {
+        "wide": "Breite Zeilen"
       },
       "reorderHintWidget": "Ziehen zum Neuanordnen. Umschalten, um ein Widget ein- oder auszublenden.",
       "reorderHintShelf": "Ziehen zum Neuanordnen. Umschalten, um ein Regal ein- oder auszublenden.",
@@ -5568,6 +5948,21 @@
       "column": {
         "progress": "Fortschritt"
       }
+    },
+    "linkedBooks": {
+      "retry": "Erneut versuchen",
+      "untitled": "Unbenannt",
+      "matchMethod": {
+        "isbn": "ISBN",
+        "title": "Titel",
+        "cached": "Zwischengespeichert",
+        "manual": "Manuell"
+      },
+      "status": {
+        "linked": "Verknüpft"
+      },
+      "current": "Aktuell",
+      "useThis": "Verwenden"
     }
   },
   "library": {
@@ -5896,6 +6291,10 @@
       "testConnection": "Verbindung testen",
       "saveAndValidate": "Speichern und validieren",
       "validatedWithWarnings": "Quelle mit Warnungen validiert",
+      "types": {
+        "booklore": "Booklore",
+        "grimmory": "Grimmory"
+      },
       "fields": {
         "type": "Quelltyp",
         "name": "Quellname",
@@ -5907,7 +6306,9 @@
         "passwordNotSet": "Kein Passwort festgelegt",
         "database": "Datenbank",
         "mediaRootPath": "Medien-Stammpfad",
-        "ssl": "TLS/SSL verwenden"
+        "ssl": "TLS/SSL verwenden",
+        "apiMode": "Live API",
+        "apiToken": "API-Token"
       },
       "mediaPath": {
         "hintRequired": "Erforderlich für den Import von Buchcovern.",
@@ -6136,6 +6537,7 @@
     "clear": "Löschen",
     "empty": "Noch keine Benachrichtigungen",
     "loadMore": "Weitere Benachrichtigungen laden",
+    "occurrencesShort": "x{count}",
     "preferences": {
       "title": "Benachrichtigungen",
       "subtitle": "Wählen Sie, welche Benachrichtigungskategorien Sie erhalten möchten.",
@@ -6145,7 +6547,31 @@
       "saveFailed": "Speichern der Einstellungen fehlgeschlagen",
       "savePreferenceFailed": "Speichern der Einstellung fehlgeschlagen",
       "whatsNewToggle": "\"Neuigkeiten\" nach Updates anzeigen",
-      "whatsNewToggleHint": "Ein Popup, das nach App-Updates neue Funktionen hervorhebt. Das Archiv bleibt in jedem Fall verfügbar."
+      "whatsNewToggleHint": "Ein Popup, das nach App-Updates neue Funktionen hervorhebt. Das Archiv bleibt in jedem Fall verfügbar.",
+      "groups": {
+        "library": "Bibliothek",
+        "files": "Dateien",
+        "personal": "Persönlich"
+      },
+      "levels": {
+        "off": {
+          "short": "Aus"
+        },
+        "problems": {
+          "short": "Probleme"
+        },
+        "all": {
+          "short": "Alle"
+        }
+      },
+      "categories": {
+        "bookDock": {
+          "label": "Book Dock"
+        },
+        "koboSync": {
+          "label": "Kobo-Synchronisierung"
+        }
+      }
     }
   },
   "reader": {
@@ -6191,22 +6617,59 @@
     "settings": {
       "title": "Einstellungen",
       "ariaLabel": "Lesereinstellungen",
+      "modeLabel": "Farbmodus",
       "mode": {
         "light": "Hell",
         "dark": "Dunkel"
       },
+      "textSize": "Schriftgröße",
+      "pixels": "{value} px",
+      "percent": "{value}%",
+      "pageColor": "Seitenfarbe",
+      "font": "Schriftart",
       "fontBuiltIn": "Integriert",
       "fontYours": "Ihre Schriftarten",
+      "fontStyle": "Stil",
+      "pageWidth": "Seitenbreite",
+      "pageWidthNarrow": "Schmal",
+      "pageWidthMedium": "Mittel",
+      "pageWidthWide": "Breit",
+      "pageWidthFull": "Voll",
       "readingFlow": "Lesefluss",
+      "flow": {
+        "paginated": "Seiten",
+        "scrolled": "Scrollen"
+      },
       "pageSpreads": "Doppelseiten",
       "pageSpreadsHint": "Wählen Sie, wie dieses bildbasierte EPUB Seiten paart.",
       "spread": {
         "bookDefault": "Buchvorgabe",
         "singlePage": "Einzelseite"
       },
+      "columns": "Spalten",
       "columnGap": "Spaltenabstand",
       "justifyText": "Text ausrichten",
-      "hyphenation": "Silbentrennung"
+      "hyphenation": "Silbentrennung",
+      "themes": {
+        "default": "Standard",
+        "gray": "Grau",
+        "sepia": "Sepia",
+        "crimson": "Scharlachrot",
+        "meadow": "Wiese",
+        "rosewood": "Rosenholz",
+        "azure": "Azure",
+        "dawnlight": "Morgenlicht",
+        "ember": "Glut",
+        "aurora": "Aurora",
+        "ocean": "Ozean",
+        "mist": "Nebel",
+        "amoled": "AMOLED"
+      },
+      "fonts": {
+        "serif": "Serife",
+        "sansSerif": "Sans-Serif",
+        "monospace": "Monospace"
+      }
     },
     "search": {
       "placeholder": "Im Buch suchen (mind. {min} Zeichen)...",
@@ -6302,10 +6765,14 @@
       "readingDirection": "Leserichtung",
       "pageView": "Seitenansicht",
       "spreadAlignmentLabel": "Doppelseitenausrichtung",
+      "spreadGap": "Abstandsgröße",
+      "spreadGapValue": "{value}px",
       "forceTwoPage": "Zwei Seiten erzwingen",
       "widePages": "Breite Seiten",
       "firstPage": "Erste Seite",
       "lastPage": "Letzte Seite",
+      "zoomOut": "Verkleinern",
+      "zoomIn": "Vergrößern",
       "fit": {
         "page": "Seite einpassen",
         "width": "Seitenbreite",
@@ -6337,6 +6804,10 @@
         "black": "Schwarz",
         "gray": "Grau",
         "white": "Weiß"
+      },
+      "nextIssue": {
+        "action": "Als Nächstes lesen",
+        "untitled": "Unbenannt"
       }
     },
     "audiobook": {
@@ -6446,6 +6917,50 @@
         "ascending": "Aufsteigend",
         "descending": "Absteigend"
       }
+    },
+    "track": {
+      "untitled": "Unbenannt"
+    },
+    "legend": {
+      "read": "Lesen",
+      "reading": "Lesen",
+      "missing": "Fehlt"
+    },
+    "status": {
+      "all": "Alle",
+      "reading": "Lesen",
+      "unread": "Ungelesen",
+      "complete": "Vollständig",
+      "gaps": "Abstände",
+      "read": "Lesen",
+      "hasGaps": "Hat Lücken",
+      "notStarted": "Nicht begonnen"
+    },
+    "index": {
+      "columnSeries": "Reihe",
+      "columnVolumes": "Band",
+      "columnRead": "Lesen",
+      "columnNext": "Als nächstes",
+      "columnAdded": "Hinzugefügt",
+      "percent": "{value}%",
+      "reading": "Lesen",
+      "next": "Nächste",
+      "start": "Start"
+    },
+    "grouping": {
+      "label": "Gruppieren nach",
+      "none": "Keine Gruppierung",
+      "letter": "Nach Buchstaben",
+      "library": "Meine Bibliothek",
+      "status": "Nach Status"
+    },
+    "libraries": {
+      "more": "+{count}"
+    },
+    "card": {
+      "oneVolume": "Ein Band",
+      "oneVolumeShort": "1. Band",
+      "complete": "Vollständig"
     }
   },
   "smartScope": {
@@ -6695,8 +7210,15 @@
       "previewFailed": "Vorschau konnte nicht geladen werden",
       "executionFailed": "Massenumbenennung fehlgeschlagen",
       "openBookDetails": "Buchdetails öffnen",
+      "openBook": "Buch öffnen",
+      "search": {
+        "label": "Finde ein Buch"
+      },
       "filter": {
-        "all": "Alle"
+        "all": "Alle",
+        "changes": "Änderungen",
+        "conflicts": "Konflikte",
+        "unchanged": "Unverändert"
       },
       "status": {
         "willRename": "Wird umbenannt",
@@ -6705,10 +7227,33 @@
         "noPattern": "Kein Muster",
         "error": "Fehler"
       },
+      "group": {
+        "error": "Fehlerhaft"
+      },
+      "review": {
+        "loadMore": "Mehr laden",
+        "next": "Nächstes Buch",
+        "keyboardHint": "verschieben",
+        "keyboardSkip": "überspringen",
+        "skip": "Überspringen",
+        "include": "Einbeziehen",
+        "excluded": "Ausgeschlossen"
+      },
+      "detail": {
+        "onDisk": "Auf dem Datenträger",
+        "today": "Heute",
+        "levelTop": "Hauptordner",
+        "levelFilename": "Dateiname",
+        "levelRemoved": "Entfernt"
+      },
       "empty": {
         "title": "Bibliothek zum Starten auswählen",
         "description": "Wählen Sie oben eine Bibliothek aus, um Umbenennungsänderungen in der Vorschau anzuzeigen, nach Status zu filtern und den Massenumbenennungslauf anzuwenden.",
         "chooseLibrary": "Bibliothek wählen"
+      },
+      "run": {
+        "preparing": "Vorbereiten…",
+        "dismiss": "Verwerfen"
       }
     },
     "bookDuplicates": {
@@ -6789,7 +7334,8 @@
       },
       "actions": {
         "rename": "Umbenennen",
-        "split": "Aufteilen"
+        "split": "Aufteilen",
+        "merge": "Zusammenführen"
       },
       "duplicates": {
         "similarity": "Ähnlichkeit:",
@@ -6809,7 +7355,10 @@
         "percentSimilar": "{percent} % ähnlich",
         "pairDetails": "Paardetails",
         "dismissEntityTitle": "Alle Paare für diese Entität verwerfen",
-        "dismissPairTitle": "Dieses Paar verwerfen"
+        "dismissPairTitle": "Dieses Paar verwerfen",
+        "mergeAway": "Trotzdem Zusammenführen",
+        "notAMatch": "Kein Treffer",
+        "thresholdValue": "{percent}%+"
       },
       "dismissed": {
         "loading": "Verworfene Paare werden geladen...",
@@ -6833,7 +7382,32 @@
           "nameDesc": "Name Z-A",
           "fewestBooks": "Wenigste Bücher",
           "mostBooks": "Meiste Bücher"
-        }
+        },
+        "sortByLabel": "Sortieren nach",
+        "entityTypeLabel": "Entitätstyp",
+        "columns": {
+          "name": "Name",
+          "sortName": "Name sortieren",
+          "books": "Bücher",
+          "status": "Status",
+          "actions": "Aktionen"
+        },
+        "status": {
+          "noBooks": "Keine Bücher"
+        },
+        "filters": {
+          "all": "Alle",
+          "noBooks": "Keine Bücher"
+        },
+        "density": {
+          "label": "Zeilen-Höhe",
+          "comfortable": "Komfortabel",
+          "compact": "Kompakt"
+        },
+        "pagination": "Seitennummerierung",
+        "nextPage": "Nächste Seite",
+        "morePages": "Weitere Seiten",
+        "noMatchesTitle": "Keine Treffer"
       },
       "deleteMode": {
         "label": "Löschmodus",
@@ -6869,6 +7443,21 @@
         "title": "Entitäten zusammenführen",
         "description": "Wählen Sie, welche Entität behalten werden soll. Die anderen werden in sie zusammengeführt und entfernt."
       }
+    },
+    "missingResources": {
+      "untitled": "Unbenannt",
+      "sweep": {
+        "title": "Cover-Überprüfung",
+        "run": "Überprüfung ausführen",
+        "running": "Überprüfe"
+      },
+      "coverSource": {
+        "extracted": "Extrahiert",
+        "custom": "Benutzerdefiniert"
+      },
+      "confirm": {
+        "action": "Bereinigen"
+      }
     }
   },
   "views": {
@@ -6885,6 +7474,7 @@
       "sort": "Sortieren",
       "sortOn": "Nach",
       "resetSort": "Sortierung auf Standard zurücksetzen",
+      "shuffle": "Zufällig",
       "filters": "Filter",
       "clear": "Löschen",
       "clearAllFilters": "Alle Filter löschen",
@@ -7087,7 +7677,8 @@
       "book-covers": "Buchcover",
       "icons": "Symbole",
       "layout": "Anzeigelayout",
-      "behavior": "Bibliotheksverhalten"
+      "behavior": "Bibliotheksverhalten",
+      "language": "Sprache"
     },
     "reader": {
       "general": "Lese-Einstellungen",
@@ -7131,6 +7722,7 @@
       "privacy": "Datenschutz und Freigabe",
       "notifications": "Benachrichtigungen",
       "restrictions": "Inhaltsbeschränkungen"
-    }
+    },
+    "collections": "Sammlungen"
   }
 }
