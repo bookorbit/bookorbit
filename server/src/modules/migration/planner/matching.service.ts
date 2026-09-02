@@ -16,6 +16,9 @@ type TitleAuthorMatchLevel = 'exact' | 'approx';
 type TitleAuthorLookupRow = { match_key: string; book_id: number; match_level: TitleAuthorMatchLevel };
 
 const LOOKUP_CHUNK_SIZE = 500;
+// Bounds how many LOOKUP_CHUNK_SIZE queries run at once per strategy. High enough to cut
+// wall-clock time substantially on large libraries, low enough not to overwhelm the DB pool.
+const LOOKUP_CONCURRENCY = 4;
 
 function found(bookId: number): LookupResult {
   return { kind: 'found', bookId };
@@ -29,6 +32,24 @@ export class MatchingService {
 
   constructor(@Inject(DB) private readonly db: Db) {}
 
+  // Splits items into LOOKUP_CHUNK_SIZE-sized chunks and runs fn against them with bounded
+  // concurrency, instead of one DB round-trip at a time. Each strategy's chunk loop used to
+  // await sequentially; at 30k+ source books that meant dozens of round-trips back to back
+  // per strategy, on top of the strategies themselves also running sequentially.
+  private async runChunked<T, R>(items: T[], chunkSize: number, concurrency: number, fn: (chunk: T[]) => Promise<R>): Promise<R[]> {
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+      chunks.push(items.slice(i, i + chunkSize));
+    }
+
+    const results: R[] = [];
+    for (let i = 0; i < chunks.length; i += concurrency) {
+      const batch = chunks.slice(i, i + concurrency);
+      results.push(...(await Promise.all(batch.map((chunk) => fn(chunk)))));
+    }
+    return results;
+  }
+
   async matchBooks(
     sourceBooks: SourceBook[],
     pathMappings: PathMapping[],
@@ -39,11 +60,15 @@ export class MatchingService {
     const matches: PlannedBookMatch[] = [];
     const unresolved: PlannedUnresolvedBook[] = [];
 
-    const isbnIndex = await this.batchLookupIsbns(sourceBooks);
-    const asinIndex = await this.batchLookupAsins(sourceBooks);
-    const hashIndex = await this.batchLookupFileHashes(sourceBooks);
-    const filePathIndex = await this.batchLookupFilePaths(sourceBooks, pathMappings);
-    const titleAuthorIndex = await this.batchLookupTitleAuthors(sourceBooks);
+    // The five strategies are independent lookups merged below by priority, so nothing
+    // requires them to run one after another.
+    const [isbnIndex, asinIndex, hashIndex, filePathIndex, titleAuthorIndex] = await Promise.all([
+      this.batchLookupIsbns(sourceBooks),
+      this.batchLookupAsins(sourceBooks),
+      this.batchLookupFileHashes(sourceBooks),
+      this.batchLookupFilePaths(sourceBooks, pathMappings),
+      this.batchLookupTitleAuthors(sourceBooks),
+    ]);
 
     sourceBooksLoop: for (const sourceBook of sourceBooks) {
       const attempts: MatchAttempt[] = [];
@@ -142,13 +167,14 @@ export class MatchingService {
     const bookIdsByIsbn = new Map<string, number[]>();
 
     const allIsbns13 = [...isbn13s];
-    for (let i = 0; i < allIsbns13.length; i += LOOKUP_CHUNK_SIZE) {
-      const chunk = allIsbns13.slice(i, i + LOOKUP_CHUNK_SIZE);
+    const isbn13Batches = await this.runChunked(allIsbns13, LOOKUP_CHUNK_SIZE, LOOKUP_CONCURRENCY, (chunk) => {
       const normalizedTargetIsbn13 = normalizedIsbnSql(schema.bookMetadata.isbn13);
-      const rows = await this.db
+      return this.db
         .select({ bookId: schema.bookMetadata.bookId, isbn13: normalizedTargetIsbn13 })
         .from(schema.bookMetadata)
         .where(inArray(normalizedTargetIsbn13, chunk));
+    });
+    for (const rows of isbn13Batches) {
       for (const row of rows) {
         const isbn = normalizeIsbn(row.isbn13);
         if (!isbn) continue;
@@ -159,13 +185,14 @@ export class MatchingService {
     }
 
     const allIsbns10 = [...isbn10s];
-    for (let i = 0; i < allIsbns10.length; i += LOOKUP_CHUNK_SIZE) {
-      const chunk = allIsbns10.slice(i, i + LOOKUP_CHUNK_SIZE);
+    const isbn10Batches = await this.runChunked(allIsbns10, LOOKUP_CHUNK_SIZE, LOOKUP_CONCURRENCY, (chunk) => {
       const normalizedTargetIsbn10 = normalizedIsbnSql(schema.bookMetadata.isbn10);
-      const rows = await this.db
+      return this.db
         .select({ bookId: schema.bookMetadata.bookId, isbn10: normalizedTargetIsbn10 })
         .from(schema.bookMetadata)
         .where(inArray(normalizedTargetIsbn10, chunk));
+    });
+    for (const rows of isbn10Batches) {
       for (const row of rows) {
         const isbn = normalizeIsbn(row.isbn10);
         if (!isbn) continue;
@@ -209,11 +236,10 @@ export class MatchingService {
     const bookIdsByAsin = new Map<string, Set<number>>();
     const allAsins = [...asins];
 
-    for (let i = 0; i < allAsins.length; i += LOOKUP_CHUNK_SIZE) {
-      const chunk = allAsins.slice(i, i + LOOKUP_CHUNK_SIZE);
+    const asinBatches = await this.runChunked(allAsins, LOOKUP_CHUNK_SIZE, LOOKUP_CONCURRENCY, (chunk) => {
       const normalizedTargetAmazonId = normalizedAsinSql(schema.bookMetadata.amazonId);
       const normalizedTargetAudibleId = normalizedAsinSql(schema.bookMetadata.audibleId);
-      const rows = await this.db
+      return this.db
         .select({
           bookId: schema.bookMetadata.bookId,
           amazonId: normalizedTargetAmazonId,
@@ -221,7 +247,9 @@ export class MatchingService {
         })
         .from(schema.bookMetadata)
         .where(or(inArray(normalizedTargetAmazonId, chunk), inArray(normalizedTargetAudibleId, chunk)));
+    });
 
+    for (const rows of asinBatches) {
       for (const row of rows) {
         const matchedAsins = new Set([normalizeAsin(row.amazonId), normalizeAsin(row.audibleId)]);
         matchedAsins.delete(null);
@@ -267,12 +295,13 @@ export class MatchingService {
     const bookIdsByHash = new Map<string, number[]>();
     const allHashes = [...hashes];
 
-    for (let i = 0; i < allHashes.length; i += LOOKUP_CHUNK_SIZE) {
-      const chunk = allHashes.slice(i, i + LOOKUP_CHUNK_SIZE);
-      const rows = await this.db
+    const hashBatches = await this.runChunked(allHashes, LOOKUP_CHUNK_SIZE, LOOKUP_CONCURRENCY, (chunk) =>
+      this.db
         .select({ bookId: schema.bookFiles.bookId, hash: schema.bookFiles.fileHash })
         .from(schema.bookFiles)
-        .where(inArray(schema.bookFiles.fileHash, chunk));
+        .where(inArray(schema.bookFiles.fileHash, chunk)),
+    );
+    for (const rows of hashBatches) {
       for (const row of rows) {
         if (!row.hash) continue;
         const existing = bookIdsByHash.get(row.hash) ?? [];
@@ -306,12 +335,13 @@ export class MatchingService {
 
     const bookIdsByPath = new Map<string, Set<number>>();
     const allMappedPaths = [...mappedPaths];
-    for (let i = 0; i < allMappedPaths.length; i += LOOKUP_CHUNK_SIZE) {
-      const chunk = allMappedPaths.slice(i, i + LOOKUP_CHUNK_SIZE);
-      const rows = await this.db
+    const pathBatches = await this.runChunked(allMappedPaths, LOOKUP_CHUNK_SIZE, LOOKUP_CONCURRENCY, (chunk) =>
+      this.db
         .select({ bookId: schema.bookFiles.bookId, absolutePath: schema.bookFiles.absolutePath })
         .from(schema.bookFiles)
-        .where(inArray(schema.bookFiles.absolutePath, chunk));
+        .where(inArray(schema.bookFiles.absolutePath, chunk)),
+    );
+    for (const rows of pathBatches) {
       for (const row of rows) {
         const bookIds = bookIdsByPath.get(row.absolutePath) ?? new Set<number>();
         bookIds.add(row.bookId);
@@ -345,8 +375,7 @@ export class MatchingService {
 
     const matchesByKey = new Map<string, { exact: Set<number>; approx: Set<number> }>();
     const allCandidates = [...candidates.values()];
-    for (let i = 0; i < allCandidates.length; i += LOOKUP_CHUNK_SIZE) {
-      const chunk = allCandidates.slice(i, i + LOOKUP_CHUNK_SIZE);
+    const titleAuthorBatches = await this.runChunked(allCandidates, LOOKUP_CHUNK_SIZE, LOOKUP_CONCURRENCY, async (chunk) => {
       const values = sql.join(
         chunk.map(({ cacheKey, title, authors }) => {
           const authorValues = sql.join(
@@ -406,8 +435,11 @@ export class MatchingService {
         from ranked_matches
         where match_rank <= 2
       `);
+      return queryResult.rows;
+    });
 
-      for (const row of queryResult.rows) {
+    for (const rows of titleAuthorBatches) {
+      for (const row of rows) {
         const matches = matchesByKey.get(row.match_key) ?? { exact: new Set<number>(), approx: new Set<number>() };
         matches[row.match_level].add(row.book_id);
         matchesByKey.set(row.match_key, matches);
