@@ -273,6 +273,25 @@ function dismissQuerySelectionBanner() {
   showQuerySelectionBanner.value = false
 }
 
+// Lets a genre/tag pill on the book detail page (or anywhere else) deep-link into this
+// library pre-filtered, by reusing the same quick-filter rule shape the table's genre/tag
+// column chips already produce (see VirtualBookTable.vue's getChipsActionFn). Filter state
+// here is otherwise local/localStorage-only, not route-driven, so this is read once on
+// arrival and then stripped from the URL rather than kept live in sync with it.
+function applyQuickFilterFromRoute() {
+  const field = route.query.quickFilterField
+  const value = route.query.quickFilterValue
+  if (typeof field !== 'string' || typeof value !== 'string') return
+  if (field !== 'genre' && field !== 'tag') return
+
+  handleQuickFilter({ type: 'rule', field, operator: 'includesAny', value: [value] })
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.quickFilterField
+  delete nextQuery.quickFilterValue
+  void router.replace({ query: nextQuery })
+}
+
 watch(
   libraryId,
   (id) => {
@@ -286,6 +305,7 @@ watch(
         savedFilter.value = undefined
         filter.value = undefined
       }
+      applyQuickFilterFromRoute()
     } else {
       savedFilter.value = undefined
       filter.value = undefined
