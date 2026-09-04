@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { SQL, and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 import { DB } from '../../db';
 import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';

@@ -188,8 +188,6 @@ describe('CatalogService', () => {
     expect(selectChains[0]?.limit).toHaveBeenCalledWith(20);
   });
 
-  // --- the reason this file changed: a suggestion must follow book visibility ---
-
   it('joins tag suggestions through to books so only reachable vocabulary is offered', async () => {
     const { service, setSelectDistinctRows, selectDistinctChains } = makeService([4, 9]);
     setSelectDistinctRows([{ name: 'erotica' }]);
