@@ -56,7 +56,7 @@ describe('useAuthorBooks', () => {
     expect(mockFetchAuthorBooks).not.toHaveBeenCalled()
   })
 
-  it('skips fetch when already loading', async () => {
+  it('does not fire a second request while one is in flight', async () => {
     const authorId = ref(1)
     let resolveFirst!: (v: AuthorBooksPage) => void
     mockFetchAuthorBooks.mockImplementation(
@@ -68,12 +68,70 @@ describe('useAuthorBooks', () => {
 
     const { load } = useAuthorBooks(authorId)
     const firstLoad = load(true)
-    const secondLoad = load(true)
+    const secondLoad = load(false)
 
     resolveFirst(makePage([makeBook(1)]))
     await Promise.all([firstLoad, secondLoad])
 
     expect(mockFetchAuthorBooks).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads with the new flag when collapseSeries changes during an unresolved load', async () => {
+    const authorId = ref(1)
+    let resolveFirst!: (v: AuthorBooksPage) => void
+    mockFetchAuthorBooks
+      .mockImplementationOnce(
+        () =>
+          new Promise<AuthorBooksPage>((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockResolvedValueOnce(makePage([makeBook(50)], 1, 4))
+
+    const { load, items, total, bookTotal, collapseSeries } = useAuthorBooks(authorId)
+    const flatLoad = load(true)
+
+    // The toggle flips while the flat request is still out, so the reset it asks for is the one
+    // that has to win.
+    collapseSeries.value = true
+    void load(true)
+
+    resolveFirst(makePage([makeBook(1), makeBook(2), makeBook(3), makeBook(4)], 4, 4))
+    await flatLoad
+    await vi.waitFor(() => expect(mockFetchAuthorBooks).toHaveBeenCalledTimes(2))
+
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ collapseSeries: false }))
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(2, 1, expect.objectContaining({ collapseSeries: true, page: 0 }))
+    expect(items.value).toHaveLength(1)
+    expect(items.value[0]!.id).toBe(50)
+    expect(total.value).toBe(1)
+    expect(bookTotal.value).toBe(4)
+  })
+
+  it('keeps the error of a stale request off the page when a reset is queued behind it', async () => {
+    const authorId = ref(1)
+    let rejectFirst!: (e: unknown) => void
+    mockFetchAuthorBooks
+      .mockImplementationOnce(
+        () =>
+          new Promise<AuthorBooksPage>((_resolve, reject) => {
+            rejectFirst = reject
+          }),
+      )
+      .mockResolvedValueOnce(makePage([makeBook(7)], 1))
+
+    const { load, error, items, collapseSeries } = useAuthorBooks(authorId)
+    const flatLoad = load(true)
+
+    collapseSeries.value = true
+    void load(true)
+
+    rejectFirst(new Error('stale request failed'))
+    await flatLoad
+    await vi.waitFor(() => expect(items.value).toHaveLength(1))
+
+    expect(error.value).toBeNull()
+    expect(items.value[0]!.id).toBe(7)
   })
 
   it('skips non-reset load when no more items to load', async () => {

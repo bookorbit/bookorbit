@@ -23,9 +23,18 @@ export function useAuthorBooks(authorId: Ref<number>) {
   const page = ref(0)
   const hasMore = computed(() => items.value.length < total.value)
 
+  /**
+   * Set when a reset arrives while a request is in flight: the query changed under it, so the
+   * pending response is stale and the list has to be rebuilt once that request settles.
+   */
+  let resetQueued = false
+
   async function load(reset = false): Promise<void> {
     if (!authorId.value || Number.isNaN(authorId.value)) return
-    if (loading.value) return
+    if (loading.value) {
+      if (reset) resetQueued = true
+      return
+    }
     if (!reset && !hasMore.value) return
 
     loading.value = true
@@ -46,14 +55,21 @@ export function useAuthorBooks(authorId: Ref<number>) {
         collapseSeries: collapseSeries.value,
       })
 
-      items.value = reset ? data.items : [...items.value, ...data.items]
-      total.value = data.total
-      bookTotal.value = data.bookTotal
-      page.value += 1
+      // Dropped on purpose when a reset is queued: these rows answer the previous query.
+      if (!resetQueued) {
+        items.value = reset ? data.items : [...items.value, ...data.items]
+        total.value = data.total
+        bookTotal.value = data.bookTotal
+        page.value += 1
+      }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load books'
+      if (!resetQueued) error.value = err instanceof Error ? err.message : 'Failed to load books'
     } finally {
       loading.value = false
+      if (resetQueued) {
+        resetQueued = false
+        void load(true)
+      }
     }
   }
 

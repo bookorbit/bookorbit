@@ -183,7 +183,7 @@ export class AuthorsService {
    * The collapsed half of {@link findBooks}: the same author scope, run through the book module's
    * collapsed query so a series arrives as one card carrying its `collapsedSeries` payload. The
    * per-series counts come out of that query scoped to the rows it saw, so they say "books by this
-   * author in the series" — which is the number an author page should show.
+   * author in the series" - which is the number an author page should show.
    *
    * `total` is the row count the collapsed query reports, so paging still walks the list it is
    * actually rendering; `bookTotal` counts the books behind those rows for the callers that speak

@@ -45,7 +45,7 @@ export type AuthorsPage = {
 
 /**
  * `total` counts rows in the page's own unit, so it is the number of cards once
- * `collapseSeries` folds a series into one card — that is what paginating and "is there more"
+ * `collapseSeries` folds a series into one card - that is what paginating and "is there more"
  * have to be driven by. `bookTotal` stays the number of books behind those rows, for the
  * places that count books rather than cards. The two are equal while the list is flat.
  */

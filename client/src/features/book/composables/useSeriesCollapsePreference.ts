@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 
 /**
  * A place whose collapse state is remembered. `authorPages` is a single flag rather than an id,
- * so every author page shares it — see the type in `@bookorbit/types` for why.
+ * so every author page shares it - see the type in `@bookorbit/types` for why.
  */
 export type CollapseScope = { libraryId?: number; collectionId?: number; smartScopeId?: number; authorPages?: boolean }
 

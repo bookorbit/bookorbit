@@ -28,7 +28,7 @@ export function resolveCollapsePreference(
   ctx: { libraryId?: number; collectionId?: number; smartScopeId?: number; authorPages?: boolean },
 ): boolean {
   if (!prefs) return false;
-  // Author pages resolve to their own flag and stop there — they deliberately do not inherit the
+  // Author pages resolve to their own flag and stop there - they deliberately do not inherit the
   // global default, and the library filter on an author page is a filter, not a scope to override.
   if (ctx.authorPages) return prefs.authorPages ?? false;
   if (ctx.smartScopeId !== undefined) {

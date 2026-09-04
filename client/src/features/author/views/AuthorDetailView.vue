@@ -66,7 +66,7 @@ const {
 
 // One flag for every author page, so the state carries from one author to the next rather than
 // being re-chosen per author; the toggle below writes it back. Tracked rather than read once,
-// because on a cold load of an author URL the signed-in user — and so the preference — can
+// because on a cold load of an author URL the signed-in user - and so the preference - can
 // arrive after this component is set up.
 const { getEffectivePreference, setPreference } = useSeriesCollapsePreference()
 watch(
@@ -153,8 +153,8 @@ const {
   books.value = books.value.filter((b) => b.id !== id)
   if (books.value.length === previousLength) return
 
-  // Only a plain book card carries a delete action — a collapsed series row opens the series
-  // instead — so the card that just went is worth exactly one row and one book.
+  // Only a plain book card carries a delete action - a collapsed series row opens the series
+  // instead - so the card that just went is worth exactly one row and one book.
   total.value = Math.max(0, total.value - 1)
   bookTotal.value = Math.max(0, bookTotal.value - 1)
   if (author.value) {
