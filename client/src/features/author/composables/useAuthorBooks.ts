@@ -8,13 +8,17 @@ const PAGE_SIZE = 50
 
 export function useAuthorBooks(authorId: Ref<number>) {
   const items = ref<BookCard[]>([])
+  /** Rows, so it keeps matching `items` once a series arrives as a single collapsed card. */
   const total = ref(0)
+  /** Books behind those rows. Equal to `total` while the list is flat. */
+  const bookTotal = ref(0)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
   const sort = ref<AuthorBookSort>('addedAt')
   const order = ref<SortDirection>('desc')
   const libraryId = ref<number | null>(null)
+  const collapseSeries = ref(false)
 
   const page = ref(0)
   const hasMore = computed(() => items.value.length < total.value)
@@ -39,10 +43,12 @@ export function useAuthorBooks(authorId: Ref<number>) {
         sort: sort.value,
         order: order.value,
         libraryId: libraryId.value,
+        collapseSeries: collapseSeries.value,
       })
 
       items.value = reset ? data.items : [...items.value, ...data.items]
       total.value = data.total
+      bookTotal.value = data.bookTotal
       page.value += 1
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load books'
@@ -54,12 +60,14 @@ export function useAuthorBooks(authorId: Ref<number>) {
   return {
     items,
     total,
+    bookTotal,
     loading,
     error,
     hasMore,
     sort,
     order,
     libraryId,
+    collapseSeries,
     load,
   }
 }

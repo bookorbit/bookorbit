@@ -65,6 +65,19 @@ describe('Authors DTO validation', () => {
     expect((await errorsFor(ListAuthorBooksDto, { size: '101' })).length).toBeGreaterThan(0);
   });
 
+  it('reads collapseSeries out of the query string', async () => {
+    const dto = plainToInstance(ListAuthorBooksDto, { collapseSeries: 'true' });
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.collapseSeries).toBe(true);
+
+    // Anything that is not the string "true" means flat, so a stray value cannot switch it on.
+    const off = plainToInstance(ListAuthorBooksDto, { collapseSeries: 'false' });
+    expect(await validate(off)).toHaveLength(0);
+    expect(off.collapseSeries).toBe(false);
+
+    expect(plainToInstance(ListAuthorBooksDto, {}).collapseSeries).toBeUndefined();
+  });
+
   it('normalizes metadata provider query values and rejects unknown providers', async () => {
     const dto = plainToInstance(ListAuthorMetadataDto, {
       q: 'Jane Doe',

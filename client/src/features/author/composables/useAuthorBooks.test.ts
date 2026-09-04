@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
-import type { BookCard, BooksPage } from '@bookorbit/types'
+import type { AuthorBooksPage, BookCard } from '@bookorbit/types'
 
 vi.mock('../api/author', () => ({
   fetchAuthorBooks: vi.fn<typeof import('../api/author').fetchAuthorBooks>(),
@@ -15,8 +15,8 @@ function makeBook(id: number): BookCard {
   return { id, title: `Book ${id}` } as BookCard
 }
 
-function makePage(items: BookCard[], total = items.length): BooksPage {
-  return { items, total, page: 0, size: 50 }
+function makePage(items: BookCard[], total = items.length, bookTotal = total): AuthorBooksPage {
+  return { items, total, bookTotal, page: 0, size: 50 }
 }
 
 describe('useAuthorBooks', () => {
@@ -58,10 +58,10 @@ describe('useAuthorBooks', () => {
 
   it('skips fetch when already loading', async () => {
     const authorId = ref(1)
-    let resolveFirst!: (v: BooksPage) => void
+    let resolveFirst!: (v: AuthorBooksPage) => void
     mockFetchAuthorBooks.mockImplementation(
       () =>
-        new Promise<BooksPage>((resolve) => {
+        new Promise<AuthorBooksPage>((resolve) => {
           resolveFirst = resolve
         }),
     )
@@ -101,6 +101,46 @@ describe('useAuthorBooks', () => {
     expect(items.value).toHaveLength(2)
     expect(total.value).toBe(5)
     expect(hasMore.value).toBe(true)
+  })
+
+  it('sends collapseSeries only once it is turned on', async () => {
+    const authorId = ref(1)
+    mockFetchAuthorBooks.mockResolvedValue(makePage([makeBook(1)]))
+
+    const { load, collapseSeries } = useAuthorBooks(authorId)
+    await load(true)
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(1, 1, expect.objectContaining({ collapseSeries: false }))
+
+    collapseSeries.value = true
+    await load(true)
+
+    expect(mockFetchAuthorBooks).toHaveBeenNthCalledWith(2, 1, expect.objectContaining({ collapseSeries: true }))
+  })
+
+  it('paginates on rows while keeping the book count separately', async () => {
+    const authorId = ref(1)
+    // 30 collapsed rows standing for 200 books: the row count is what says there is more to load,
+    // and the book count must not be the thing driving it.
+    mockFetchAuthorBooks.mockResolvedValueOnce(makePage([makeBook(1), makeBook(2)], 30, 200))
+
+    const { load, items, total, bookTotal, hasMore } = useAuthorBooks(authorId)
+    await load(true)
+
+    expect(items.value).toHaveLength(2)
+    expect(total.value).toBe(30)
+    expect(bookTotal.value).toBe(200)
+    expect(hasMore.value).toBe(true)
+  })
+
+  it('stops loading once every row has arrived, however many books they stand for', async () => {
+    const authorId = ref(1)
+    mockFetchAuthorBooks.mockResolvedValueOnce(makePage([makeBook(1), makeBook(2)], 2, 200))
+
+    const { load, hasMore, bookTotal } = useAuthorBooks(authorId)
+    await load(true)
+
+    expect(hasMore.value).toBe(false)
+    expect(bookTotal.value).toBe(200)
   })
 
   it('resets items and page on reset=true', async () => {
@@ -199,14 +239,15 @@ describe('useAuthorBooks', () => {
     expect(loading.value).toBe(false)
   })
 
-  it('passes sort, order, and libraryId to fetchAuthorBooks', async () => {
+  it('passes sort, order, libraryId, and collapseSeries to fetchAuthorBooks', async () => {
     const authorId = ref(5)
     mockFetchAuthorBooks.mockResolvedValue(makePage([]))
 
-    const { load, sort, order, libraryId } = useAuthorBooks(authorId)
+    const { load, sort, order, libraryId, collapseSeries } = useAuthorBooks(authorId)
     sort.value = 'title'
     order.value = 'asc'
     libraryId.value = 7
+    collapseSeries.value = true
 
     await load(true)
 
@@ -216,6 +257,7 @@ describe('useAuthorBooks', () => {
       sort: 'title',
       order: 'asc',
       libraryId: 7,
+      collapseSeries: true,
     })
   })
 
@@ -270,10 +312,10 @@ describe('useAuthorBooks', () => {
     await load(true)
     expect(items.value).toHaveLength(1)
 
-    let resolve!: (v: BooksPage) => void
+    let resolve!: (v: AuthorBooksPage) => void
     mockFetchAuthorBooks.mockImplementation(
       () =>
-        new Promise<BooksPage>((r) => {
+        new Promise<AuthorBooksPage>((r) => {
           resolve = r
         }),
     )

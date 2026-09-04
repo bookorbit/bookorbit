@@ -31,6 +31,10 @@ export class BookReadService {
     return this.bookRepo.findCardsByBookIds(bookIds, userId);
   }
 
+  findCardsCollapsed(opts: Parameters<BookRepository['findCardsCollapsed']>[0]) {
+    return this.bookRepo.findCardsCollapsed(opts);
+  }
+
   countWhere(where: SQL | undefined): Promise<number> {
     return this.bookRepo.countWhere(where);
   }

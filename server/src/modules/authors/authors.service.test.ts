@@ -42,6 +42,7 @@ describe('AuthorsService', () => {
     findPage: vi.fn(),
     findById: vi.fn(),
     findBookIdsPage: vi.fn(),
+    buildBooksWhere: vi.fn(),
     updateAuthorById: vi.fn(),
     findVisibleAuthorIds: vi.fn(),
     countDistinctBooks: vi.fn(),
@@ -57,6 +58,8 @@ describe('AuthorsService', () => {
 
   const bookReadService = {
     findCardsByBookIds: vi.fn(),
+    findCardsCollapsed: vi.fn(),
+    countWhere: vi.fn(),
   };
 
   const libraryService = {
@@ -354,7 +357,7 @@ describe('AuthorsService', () => {
 
     const page = await service.findBooks(reqUser(), 99, {});
 
-    expect(page).toEqual({ items: [], total: 0, page: 0, size: 50 });
+    expect(page).toEqual({ items: [], total: 0, bookTotal: 0, page: 0, size: 50 });
     expect(authorsRepo.findById).not.toHaveBeenCalled();
   });
 
@@ -374,8 +377,117 @@ describe('AuthorsService', () => {
 
     const result = await service.findBooks(reqUser(), 10, {});
 
-    expect(result).toEqual({ items: [], total: 0, page: 0, size: 50 });
+    expect(result).toEqual({ items: [], total: 0, bookTotal: 0, page: 0, size: 50 });
     expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
+  });
+
+  describe('findBooks with collapseSeries', () => {
+    const AUTHOR_WHERE = { fake: 'where' } as any;
+
+    function collapsedRow(id: number, seriesName: string, bookCount: number) {
+      return {
+        ...makeBookRow(id, `${seriesName} #1`),
+        seriesId: id * 100,
+        seriesName,
+        bookCount,
+        readCount: 0,
+        coverBookIds: [id],
+        coverUpdatedAtByBookId: null,
+        seriesLatestAddedAt: new Date('2026-08-01T00:00:00.000Z'),
+        firstVolumeBookId: id,
+        latestVolumeBookId: id,
+        firstUnreadBookId: id,
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      };
+    }
+
+    function emptyCollapsedResult(rows: ReturnType<typeof collapsedRow>[], total: number) {
+      return {
+        rows,
+        authorRows: [],
+        fileRows: [],
+        genreRows: [],
+        tagRows: [],
+        progressRows: [],
+        statusRows: [],
+        narratorRows: [],
+        seriesMembershipRows: [],
+        total,
+      };
+    }
+
+    beforeEach(() => {
+      authorsRepo.findById.mockResolvedValue({ id: 10, name: 'Author', bookCount: 200 });
+      authorsRepo.buildBooksWhere.mockReturnValue(AUTHOR_WHERE);
+    });
+
+    it('routes to the collapsed query instead of the flat one', async () => {
+      bookReadService.findCardsCollapsed.mockResolvedValue(emptyCollapsedResult([collapsedRow(1, 'Discworld', 41)], 30));
+      bookReadService.countWhere.mockResolvedValue(200);
+
+      const result = await service.findBooks(reqUser(), 10, { collapseSeries: true });
+
+      expect(authorsRepo.findBookIdsPage).not.toHaveBeenCalled();
+      expect(bookReadService.findCardsCollapsed).toHaveBeenCalledWith(
+        expect.objectContaining({ where: AUTHOR_WHERE, limit: 50, offset: 0, userId: 7 }),
+      );
+      expect(result.items[0]!.collapsedSeries).toEqual(expect.objectContaining({ bookCount: 41 }));
+    });
+
+    it('reports rows as total and books as bookTotal', async () => {
+      bookReadService.findCardsCollapsed.mockResolvedValue(emptyCollapsedResult([collapsedRow(1, 'Discworld', 41)], 30));
+      bookReadService.countWhere.mockResolvedValue(200);
+
+      const result = await service.findBooks(reqUser(), 10, { collapseSeries: true });
+
+      expect(result.total).toBe(30);
+      expect(result.bookTotal).toBe(200);
+    });
+
+    it('counts books over the same scope the collapsed rows came from', async () => {
+      bookReadService.findCardsCollapsed.mockResolvedValue(emptyCollapsedResult([], 0));
+      bookReadService.countWhere.mockResolvedValue(0);
+
+      await service.findBooks(reqUser(), 10, { collapseSeries: true });
+
+      expect(bookReadService.countWhere).toHaveBeenCalledWith(AUTHOR_WHERE);
+    });
+
+    it('maps the author sort onto the collapsed sort spec', async () => {
+      bookReadService.findCardsCollapsed.mockResolvedValue(emptyCollapsedResult([], 0));
+      bookReadService.countWhere.mockResolvedValue(0);
+
+      await service.findBooks(reqUser(), 10, { collapseSeries: true, sort: 'title', order: 'asc', page: 2, size: 20 });
+
+      expect(bookReadService.findCardsCollapsed).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: [{ field: 'title', dir: 'asc' }], limit: 20, offset: 40 }),
+      );
+    });
+
+    it('scopes the collapsed query by author id, libraries, and content filters', async () => {
+      bookReadService.findCardsCollapsed.mockResolvedValue(emptyCollapsedResult([], 0));
+      bookReadService.countWhere.mockResolvedValue(0);
+      libraryService.findAll.mockResolvedValue([{ id: 3 }]);
+
+      await service.findBooks({ ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES }, 10, { collapseSeries: true });
+
+      expect(authorsRepo.buildBooksWhere).toHaveBeenCalledWith({
+        authorId: 10,
+        libraryIds: [3],
+        contentFilters: EMPTY_CONTENT_FILTER_RULES,
+      });
+    });
+
+    it('leaves the flat path untouched when the flag is absent', async () => {
+      authorsRepo.findBookIdsPage.mockResolvedValue({ bookIds: [], total: 7, page: 0, size: 50 });
+
+      const result = await service.findBooks(reqUser(), 10, {});
+
+      expect(bookReadService.findCardsCollapsed).not.toHaveBeenCalled();
+      // Nothing is folded, so the two counts are the same number.
+      expect(result.total).toBe(7);
+      expect(result.bookTotal).toBe(7);
+    });
   });
 
   it('findBooks passes sort, order, size, and libraryId to findBookIdsPage', async () => {
