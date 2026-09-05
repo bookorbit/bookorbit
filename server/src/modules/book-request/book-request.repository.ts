@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, ilike, inArray, isNull, lt, notExists, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, ilike, inArray, isNull, lt, notExists, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { ACTIVE_BOOK_REQUEST_STATUSES } from '@bookorbit/types';
+import { ACTIVE_BOOK_REQUEST_STATUSES, AUDIO_FORMAT_LIST, COMIC_FORMAT_LIST, EBOOK_FORMAT_LIST } from '@bookorbit/types';
 import type {
   BookRequestMediaKind,
   BookRequestRequesterOption,
@@ -17,6 +17,7 @@ import {
   authors,
   bookAuthors,
   bookDockFiles,
+  bookFiles,
   bookMetadata,
   bookRequestDedupeAliases,
   bookRequestDismissals,
@@ -84,6 +85,12 @@ const ABANDONABLE_SELF_SERVE_STATUSES: readonly BookRequestStatus[] = ['approved
  * under, so it cannot collide with a lock any other feature takes on the same user id.
  */
 const SELF_SERVE_CAP_LOCK_NAMESPACE = 248_001;
+
+const OWNED_FORMATS_BY_MEDIA_KIND: Record<BookRequestMediaKind, readonly string[]> = {
+  ebook: EBOOK_FORMAT_LIST,
+  audiobook: AUDIO_FORMAT_LIST,
+  comic: COMIC_FORMAT_LIST,
+};
 
 export interface ListRequestsOptions {
   page: number;
@@ -703,20 +710,33 @@ export class BookRequestRepository {
    * The title probe carries each match's authors back with it, because a title on its own is not
    * an identity: three different books called "It" would otherwise all read as owned.
    */
-  async findOwnedMatches(isbn13s: string[], lowerTitles: string[], libraryIds: number[] | null): Promise<OwnedMatchLookup> {
+  async findOwnedMatches(
+    isbn13s: string[],
+    lowerTitles: string[],
+    libraryIds: number[] | null,
+    mediaKind: BookRequestMediaKind,
+  ): Promise<OwnedMatchLookup> {
     const byIsbn13 = new Map<string, number>();
     const byTitle = new Map<string, OwnedTitleMatch[]>();
     if (libraryIds !== null && libraryIds.length === 0) return { byIsbn13, byTitle };
 
     const scope = libraryIds !== null ? [inArray(books.libraryId, libraryIds)] : [];
     const present = eq(books.status, 'present');
+    const hasRequestedMedia = exists(
+      this.db
+        .select({ id: bookFiles.id })
+        .from(bookFiles)
+        .where(
+          and(eq(bookFiles.bookId, books.id), eq(bookFiles.role, 'content'), inArray(bookFiles.format, [...OWNED_FORMATS_BY_MEDIA_KIND[mediaKind]])),
+        ),
+    );
 
     if (isbn13s.length) {
       const rows = await this.db
         .select({ bookId: books.id, isbn13: bookMetadata.isbn13 })
         .from(bookMetadata)
         .innerJoin(books, eq(books.id, bookMetadata.bookId))
-        .where(and(inArray(bookMetadata.isbn13, isbn13s), present, ...scope));
+        .where(and(inArray(bookMetadata.isbn13, isbn13s), present, hasRequestedMedia, ...scope));
       for (const row of rows) if (row.isbn13 && !byIsbn13.has(row.isbn13)) byIsbn13.set(row.isbn13, row.bookId);
     }
 
@@ -728,7 +748,7 @@ export class BookRequestRepository {
         .innerJoin(books, eq(books.id, bookMetadata.bookId))
         .leftJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
         .leftJoin(authors, eq(authors.id, bookAuthors.authorId))
-        .where(and(inArray(titleKey, lowerTitles), present, ...scope));
+        .where(and(inArray(titleKey, lowerTitles), present, hasRequestedMedia, ...scope));
 
       const byBookId = new Map<number, OwnedTitleMatch>();
       for (const row of rows) {

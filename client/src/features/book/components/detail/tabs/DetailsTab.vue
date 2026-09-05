@@ -1203,7 +1203,10 @@ watch(
           class="w-28 shrink-0 sm:w-36 @min-[46rem]/book-detail:flex @min-[46rem]/book-detail:h-full @min-[46rem]/book-detail:w-full @min-[46rem]/book-detail:items-center @min-[46rem]/book-detail:justify-center"
           :class="hasCover && coverLoaded && !coverFailed ? 'cursor-zoom-in' : ''"
         >
-          <div class="w-full @min-[46rem]/book-detail:max-h-full" :style="{ maxWidth: coverMaxWidth }">
+          <div
+            class="w-full @min-[46rem]/book-detail:max-h-full @min-[46rem]/book-detail:max-w-[var(--detail-cover-max-width)]"
+            :style="{ '--detail-cover-max-width': coverMaxWidth }"
+          >
             <BookCoverSurface
               class="book-cover-surface--spine-fitted group relative w-full overflow-hidden rounded-lg shadow-lg shadow-black/40"
               :disable-spine="isPrimaryAudio"
@@ -1869,7 +1872,7 @@ watch(
       </section>
 
       <BookReadingActivityCard
-        class="@min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:flex-1"
+        class="@min-[46rem]/book-detail:flex-1"
         :stats="readingStats"
         :sessions="readingSessions"
         :loading="readingLogLoading"
