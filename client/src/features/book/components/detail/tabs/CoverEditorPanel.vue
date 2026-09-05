@@ -147,162 +147,164 @@ onUnmounted(() => clearTimeout(debounceTimer))
 </script>
 
 <template>
-  <div class="flex flex-row gap-5 md:gap-3 lg:flex-col">
-    <!-- Cover image -->
-    <div
-      class="relative w-36 shrink-0 lg:w-full overflow-hidden rounded-lg bg-muted shadow-md"
-      :class="hasCover ? 'cursor-zoom-in' : ''"
-      :style="{ aspectRatio: coverAspectRatio }"
-      @click="handleCoverClick"
-    >
-      <img v-if="hasCover" :src="activeSrc" :alt="book.title ?? ''" class="w-full h-full object-contain" @error="hideOnError" />
-      <BookCoverPlaceholder
-        v-else
-        :title="book.title"
-        :author-line="book.authors.map((a) => a.name).join(', ') || null"
-        :is-audio="isPrimaryAudio"
-        :seed="coverSeed"
-      />
-      <button
-        type="button"
-        class="absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-md border shadow-sm backdrop-blur-sm transition-colors"
-        :class="
-          props.locked
-            ? 'border-primary/40 bg-primary/25 text-primary hover:bg-primary/35'
-            : 'border-input bg-background/90 text-muted-foreground hover:bg-muted hover:text-foreground'
-        "
-        :title="props.locked ? t('book.detail.coverEditor.unlockCover') : t('book.detail.coverEditor.lockCover')"
-        :disabled="props.disabled"
-        @click.stop="handleToggleLock"
-      >
-        <Lock v-if="props.locked" class="size-4" />
-        <LockOpen v-else class="size-4" />
-      </button>
-    </div>
-
-    <!-- Lightbox -->
-    <Teleport to="body">
+  <div class="@container/cover-editor">
+    <div class="flex min-w-0 flex-col gap-3 @min-[21rem]/cover-editor:flex-row @min-[21rem]/cover-editor:gap-5">
+      <!-- Cover image -->
       <div
-        v-if="lightboxOpen && hasCover"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-        @click="handleCloseLightbox"
+        class="relative w-full shrink-0 overflow-hidden rounded-lg bg-muted shadow-md @min-[21rem]/cover-editor:w-36"
+        :class="hasCover ? 'cursor-zoom-in' : ''"
+        :style="{ aspectRatio: coverAspectRatio }"
+        @click="handleCoverClick"
       >
+        <img v-if="hasCover" :src="activeSrc" :alt="book.title ?? ''" class="h-full w-full object-contain" @error="hideOnError" />
+        <BookCoverPlaceholder
+          v-else
+          :title="book.title"
+          :author-line="book.authors.map((a) => a.name).join(', ') || null"
+          :is-audio="isPrimaryAudio"
+          :seed="coverSeed"
+        />
         <button
-          class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          type="button"
+          class="absolute right-2 bottom-2 flex size-7 items-center justify-center rounded-md border shadow-sm backdrop-blur-sm transition-colors"
+          :class="
+            props.locked
+              ? 'border-primary/40 bg-primary/25 text-primary hover:bg-primary/35'
+              : 'border-input bg-background/90 text-muted-foreground hover:bg-muted hover:text-foreground'
+          "
+          :title="props.locked ? t('book.detail.coverEditor.unlockCover') : t('book.detail.coverEditor.lockCover')"
+          :disabled="props.disabled"
+          @click.stop="handleToggleLock"
+        >
+          <Lock v-if="props.locked" class="size-4" />
+          <LockOpen v-else class="size-4" />
+        </button>
+      </div>
+
+      <!-- Lightbox -->
+      <Teleport to="body">
+        <div
+          v-if="lightboxOpen && hasCover"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
           @click="handleCloseLightbox"
         >
-          <X class="size-5" />
-        </button>
-        <img :src="activeSrc" :alt="book.title ?? ''" class="max-h-[90vh] max-w-[90vw] rounded-lg shadow-2xl object-contain" @click.stop />
-      </div>
-    </Teleport>
+          <button
+            class="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            @click="handleCloseLightbox"
+          >
+            <X class="size-5" />
+          </button>
+          <img :src="activeSrc" :alt="book.title ?? ''" class="max-h-[90vh] max-w-[90vw] rounded-lg shadow-2xl object-contain" @click.stop />
+        </div>
+      </Teleport>
 
-    <!-- Controls: beside thumbnail on mobile, stacked below on desktop -->
-    <div class="flex-1 flex flex-col gap-3 lg:contents">
-      <!-- Mode toggle -->
-      <div class="flex gap-1 p-0.5 rounded-lg bg-muted">
+      <!-- Controls follow the space assigned by the parent layout, not the viewport width. -->
+      <div class="flex min-w-0 flex-1 flex-col gap-3">
+        <!-- Mode toggle -->
+        <div class="flex gap-1 p-0.5 rounded-lg bg-muted">
+          <button
+            class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="mode === 'file' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :disabled="controlsDisabled"
+            @click="handleSelectFileMode"
+          >
+            <ImagePlus class="size-3.5" />
+            {{ t('book.detail.coverEditor.fileTab') }}
+          </button>
+          <button
+            class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="mode === 'url' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            :disabled="controlsDisabled"
+            @click="handleSelectUrlMode"
+          >
+            <Link class="size-3.5" />
+            {{ t('book.detail.coverEditor.urlTab') }}
+          </button>
+        </div>
+
+        <!-- File input -->
+        <div v-if="mode === 'file'">
+          <label
+            class="flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+            :class="controlsDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
+          >
+            <Upload class="size-3.5 shrink-0" />
+            <span class="truncate">{{ pendingFile ? pendingFile.name : t('book.detail.coverEditor.chooseImage') }}</span>
+            <input type="file" accept="image/*" class="hidden" :disabled="controlsDisabled" @change="onFileChange" />
+          </label>
+        </div>
+
+        <!-- URL input -->
+        <div v-else class="flex flex-col gap-2">
+          <input
+            v-model="urlInput"
+            class="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:ring-1 focus:ring-ring transition-shadow"
+            :disabled="controlsDisabled"
+            @input="onUrlInput"
+          />
+        </div>
+
+        <!-- Search Button -->
         <button
-          class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :class="mode === 'file' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
+          class="flex items-center justify-center gap-2 w-full h-9 rounded-lg border border-input bg-background text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="controlsDisabled"
-          @click="handleSelectFileMode"
+          @click="handleOpenSearch"
         >
-          <ImagePlus class="size-3.5" />
-          {{ t('book.detail.coverEditor.fileTab') }}
+          <Search class="size-3.5" />
+          {{ t('book.detail.coverEditor.findCoverOnline') }}
         </button>
-        <button
-          class="flex flex-1 items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :class="mode === 'url' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'"
-          :disabled="controlsDisabled"
-          @click="handleSelectUrlMode"
-        >
-          <Link class="size-3.5" />
-          {{ t('book.detail.coverEditor.urlTab') }}
-        </button>
-      </div>
 
-      <!-- File input -->
-      <div v-if="mode === 'file'">
-        <label
-          class="flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
-          :class="controlsDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
-        >
-          <Upload class="size-3.5 shrink-0" />
-          <span class="truncate">{{ pendingFile ? pendingFile.name : t('book.detail.coverEditor.chooseImage') }}</span>
-          <input type="file" accept="image/*" class="hidden" :disabled="controlsDisabled" @change="onFileChange" />
-        </label>
-      </div>
-
-      <!-- URL input -->
-      <div v-else class="flex flex-col gap-2">
-        <input
-          v-model="urlInput"
-          class="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:ring-1 focus:ring-ring transition-shadow"
-          :disabled="controlsDisabled"
-          @input="onUrlInput"
+        <!-- Cover Search Drawer -->
+        <CoverSearchDrawer
+          :open="isSearchOpen"
+          :initial-title="book.title ?? ''"
+          :initial-author="book.authors?.[0]?.name ?? ''"
+          :is-audiobook="isPrimaryAudio"
+          @update:open="handleSearchOpenChange"
+          @select="handleSearchSelect"
         />
-      </div>
 
-      <!-- Search Button -->
-      <button
-        class="flex items-center justify-center gap-2 w-full h-9 rounded-lg border border-input bg-background text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="controlsDisabled"
-        @click="handleOpenSearch"
-      >
-        <Search class="size-3.5" />
-        {{ t('book.detail.coverEditor.findCoverOnline') }}
-      </button>
+        <!-- Error -->
+        <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
 
-      <!-- Cover Search Drawer -->
-      <CoverSearchDrawer
-        :open="isSearchOpen"
-        :initial-title="book.title ?? ''"
-        :initial-author="book.authors?.[0]?.name ?? ''"
-        :is-audiobook="isPrimaryAudio"
-        @update:open="handleSearchOpenChange"
-        @select="handleSearchSelect"
-      />
-
-      <!-- Error -->
-      <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
-
-      <!-- Actions -->
-      <div class="flex flex-col gap-1.5">
-        <button
-          v-if="hasPending"
-          class="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          :disabled="uploading || controlsDisabled"
-          @click="handleConfirm"
-        >
-          {{ uploading ? t('book.detail.coverEditor.saving') : t('book.detail.coverEditor.saveCover') }}
-        </button>
-        <button
-          v-if="hasPending"
-          class="w-full h-8 rounded-lg border border-input bg-background text-xs hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="uploading || controlsDisabled"
-          @click="cancelPending"
-        >
-          {{ t('common.cancel') }}
-        </button>
-        <button
-          v-if="book.coverSource === 'custom'"
-          class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="uploading || controlsDisabled"
-          @click="handleRevert"
-        >
-          <RotateCcw class="size-3" />
-          {{ t('book.detail.coverEditor.revertToOriginal') }}
-        </button>
-        <button
-          v-if="hasPermission('library_edit_metadata')"
-          class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          :disabled="reExtractingCover || controlsDisabled"
-          @click="reExtractCover"
-        >
-          <Loader2 v-if="reExtractingCover" class="size-3 animate-spin" />
-          <Image v-else class="size-3" />
-          {{ t('book.detail.coverEditor.regenerateCover') }}
-        </button>
+        <!-- Actions -->
+        <div class="flex flex-col gap-1.5">
+          <button
+            v-if="hasPending"
+            class="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            :disabled="uploading || controlsDisabled"
+            @click="handleConfirm"
+          >
+            {{ uploading ? t('book.detail.coverEditor.saving') : t('book.detail.coverEditor.saveCover') }}
+          </button>
+          <button
+            v-if="hasPending"
+            class="w-full h-8 rounded-lg border border-input bg-background text-xs hover:bg-muted transition-colors disabled:opacity-50"
+            :disabled="uploading || controlsDisabled"
+            @click="cancelPending"
+          >
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            v-if="book.coverSource === 'custom'"
+            class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            :disabled="uploading || controlsDisabled"
+            @click="handleRevert"
+          >
+            <RotateCcw class="size-3" />
+            {{ t('book.detail.coverEditor.revertToOriginal') }}
+          </button>
+          <button
+            v-if="hasPermission('library_edit_metadata')"
+            class="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            :disabled="reExtractingCover || controlsDisabled"
+            @click="reExtractCover"
+          >
+            <Loader2 v-if="reExtractingCover" class="size-3 animate-spin" />
+            <Image v-else class="size-3" />
+            {{ t('book.detail.coverEditor.regenerateCover') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

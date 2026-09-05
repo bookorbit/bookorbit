@@ -81,6 +81,16 @@ describe('CoverEditorPanel', () => {
     vi.useRealTimers()
   })
 
+  it('sizes its layout from its own column instead of the viewport', () => {
+    const wrapper = mountPanel()
+    const container = wrapper.get('.\\@container\\/cover-editor')
+    const layout = container.get(':scope > div')
+
+    expect(layout.classes()).toContain('@min-[21rem]/cover-editor:flex-row')
+    expect(layout.classes()).not.toContain('lg:flex-col')
+    expect(layout.get(':scope > div').classes()).toContain('@min-[21rem]/cover-editor:w-36')
+  })
+
   it('disables every visible cover mutation control when the parent is disabled', () => {
     const { pendingUrl } = setupEditor()
     pendingUrl.value = 'https://example.com/cover.jpg'

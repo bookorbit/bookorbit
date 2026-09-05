@@ -1,6 +1,6 @@
 import { ZipArchive } from 'archiver';
 import { createWriteStream } from 'fs';
-import { mkdtemp, readdir, rm } from 'fs/promises';
+import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import * as unzipper from 'unzipper';
@@ -8,6 +8,9 @@ import * as unzipper from 'unzipper';
 import { readComicInfoFromZip, writeComicInfoToZip } from './cbz-zip-patcher';
 
 let testRoot: string;
+
+const MAX_ZIP_COMMENT_BYTES = 0xffff;
+const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
 
 beforeEach(async () => {
   testRoot = await mkdtemp(join(tmpdir(), 'bookorbit-cbz-roundtrip-'));
@@ -23,9 +26,9 @@ function pageBytes(index: number): Buffer {
   return bytes;
 }
 
-async function writeArchive(filePath: string, entries: Array<{ path: string; content: Buffer }>): Promise<void> {
+async function writeArchive(filePath: string, entries: Array<{ path: string; content: Buffer }>, comment = ''): Promise<void> {
   const output = createWriteStream(filePath);
-  const archive = new ZipArchive({ zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 }, comment });
 
   await new Promise<void>((resolve, reject) => {
     output.on('close', resolve);
@@ -35,6 +38,15 @@ async function writeArchive(filePath: string, entries: Array<{ path: string; con
     for (const entry of entries) archive.append(entry.content, { name: entry.path });
     void archive.finalize();
   });
+}
+
+async function readArchiveComment(filePath: string): Promise<string> {
+  const contents = await readFile(filePath);
+  const endRecordOffset = contents.lastIndexOf(ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE);
+  if (endRecordOffset < 0) throw new Error('ZIP end of central directory record not found');
+
+  const commentLength = contents.readUInt16LE(endRecordOffset + 20);
+  return contents.subarray(endRecordOffset + 22, endRecordOffset + 22 + commentLength).toString('utf-8');
 }
 
 async function readArchive(filePath: string): Promise<Array<{ path: string; content: Buffer }>> {
@@ -84,5 +96,16 @@ describe('cbz zip round trip', () => {
     await writeComicInfoToZip(target, '<ComicInfo/>');
 
     await expect(readdir(testRoot)).resolves.toEqual(['volume.cbz']);
+  });
+
+  it('updates comic info and preserves an archive comment at the ZIP format limit', async () => {
+    const target = join(testRoot, 'volume.cbz');
+    const archiveComment = 'x'.repeat(MAX_ZIP_COMMENT_BYTES);
+    await writeArchive(target, comicPages(3), archiveComment);
+
+    await writeComicInfoToZip(target, '<ComicInfo><Title>Updated</Title></ComicInfo>');
+
+    await expect(readComicInfoFromZip(target)).resolves.toBe('<ComicInfo><Title>Updated</Title></ComicInfo>');
+    await expect(readArchiveComment(target)).resolves.toBe(archiveComment);
   });
 });
