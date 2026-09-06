@@ -95,7 +95,7 @@ function formatBadgeStyle(format: string) {
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-col rounded-xl border border-border bg-card px-3.5 py-3" :aria-label="t('book.detail.details.yourReading')">
+  <section class="flex flex-col rounded-xl border border-border bg-card px-3.5 py-3" :aria-label="t('book.detail.details.yourReading')">
     <div class="flex items-baseline gap-2">
       <h3 class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {{ t('book.detail.details.yourReading') }}

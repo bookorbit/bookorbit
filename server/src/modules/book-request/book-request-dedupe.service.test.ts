@@ -239,7 +239,7 @@ describe('BookRequestDedupeService.findOwnedBookFor', () => {
     );
 
     expect(result).toBe(42);
-    expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593', '9781250301697'], ['dune'], [3, 4]);
+    expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593', '9781250301697'], ['dune'], [3, 4], 'ebook');
   });
 
   it('requires the author to agree when ownership is found by title', async () => {
@@ -293,6 +293,29 @@ describe('BookRequestDedupeService.checkAvailability', () => {
 
     const [result] = await service.checkAvailability([{ title: 'Dune', isbn13: '9780441013593', mediaKind: 'ebook' }], 1, null);
     expect(result.ownedBookId).toBe(42);
+  });
+
+  it('checks ownership separately for each requested media kind', async () => {
+    const findOwnedMatches = vi.fn().mockImplementation((_isbns, _titles, _libraries, mediaKind: string) =>
+      Promise.resolve({
+        byIsbn13: mediaKind === 'ebook' ? new Map([['9780441013593', 42]]) : new Map(),
+        byTitle: new Map(),
+      }),
+    );
+    const { service } = makeService({ findOwnedMatches });
+
+    const results = await service.checkAvailability(
+      [
+        { title: 'Dune', isbn13: '9780441013593', mediaKind: 'ebook' },
+        { title: 'Dune', isbn13: '9780441013593', mediaKind: 'comic' },
+      ],
+      1,
+      null,
+    );
+
+    expect(results.map((result) => result.ownedBookId)).toEqual([42, null]);
+    expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593'], ['dune'], null, 'ebook');
+    expect(findOwnedMatches).toHaveBeenCalledWith(['9780441013593'], ['dune'], null, 'comic');
   });
 
   it('falls back to a title match when the candidate has no ISBN', async () => {
@@ -368,7 +391,7 @@ describe('BookRequestDedupeService.checkAvailability', () => {
   it('scopes ownership to the libraries the caller can reach', async () => {
     const { service, repo } = makeService();
     await service.checkAvailability([{ title: 'Dune', mediaKind: 'ebook' }], 1, [3, 4]);
-    expect(repo.findOwnedMatches).toHaveBeenCalledWith([], ['dune'], [3, 4]);
+    expect(repo.findOwnedMatches).toHaveBeenCalledWith([], ['dune'], [3, 4], 'ebook');
   });
 
   it('keeps results aligned with the input order', async () => {

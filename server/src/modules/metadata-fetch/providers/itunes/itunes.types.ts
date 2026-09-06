@@ -8,7 +8,8 @@ export interface ITunesResult {
   releaseDate?: string;
   genres?: string[];
   artworkUrl100?: string;
-  kind: 'ebook' | 'audiobook';
+  kind?: string;
+  wrapperType?: string;
   trackViewUrl?: string;
   collectionViewUrl?: string;
   averageUserRating?: number;
