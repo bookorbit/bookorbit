@@ -14,9 +14,10 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { ICON_VALUE_MAX_LENGTH, type CoverAspectRatio, type OrganizationMode } from '@bookorbit/types';
+import { ICON_VALUE_MAX_LENGTH, type AddedAtSource, type CoverAspectRatio, type OrganizationMode } from '@bookorbit/types';
 
 import {
+  LIBRARY_ADDED_AT_SOURCES,
   LIBRARY_COVER_ASPECT_RATIOS,
   LIBRARY_FILE_WRITE_MAX_SIZE_MB_MAX,
   LIBRARY_FILE_WRITE_MAX_SIZE_MB_MIN,
@@ -90,6 +91,10 @@ export class UpdateLibraryDto {
   @IsOptional()
   @IsIn(LIBRARY_ORGANIZATION_MODES)
   organizationMode?: OrganizationMode;
+
+  @IsOptional()
+  @IsIn(LIBRARY_ADDED_AT_SOURCES)
+  addedAtSource?: AddedAtSource;
 
   @IsOptional()
   @IsArray()

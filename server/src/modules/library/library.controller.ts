@@ -123,6 +123,19 @@ export class LibraryController {
     return this.libraryService.getStats(id);
   }
 
+  @Post(':id/recompute-added-at')
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryRecomputeAddedAt,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Recomputed added_at for library #${req.params['id']}`,
+  })
+  recomputeAddedAt(@Param('id', ParseIntPipe) id: number) {
+    return this.libraryService.recomputeAddedAt(id);
+  }
+
   @Post(':id/write-metadata-to-files')
   @RequireLibraryAccess('editor')
   @RequirePermission(Permission.LibraryEditMetadata)

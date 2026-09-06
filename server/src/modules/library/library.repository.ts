@@ -7,7 +7,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, books, libraryFolders, libraries } from '../../db/schema';
-import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
+import { LIBRARY_BOOK_STATUS_PRESENT, MIN_VALID_FILE_TIME_SECONDS } from './library.constants';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -243,6 +243,48 @@ export class LibraryRepository {
         and(eq(schema.userLibraryAccess.userId, schema.users.id), eq(schema.userLibraryAccess.libraryId, libraryId)),
       )
       .where(and(inArray(schema.users.id, userIds), or(eq(schema.users.isSuperuser, true), isNotNull(schema.userLibraryAccess.userId))));
+  }
+
+  // Sets each book's added_at to the earliest mtime across its content files.
+  // Books with no content-file mtime are left untouched. Single set-based UPDATE.
+  async recomputeAddedAtFromMtime(libraryId: number): Promise<number> {
+    const earliest = this.db
+      .select({
+        bookId: bookFiles.bookId,
+        minMtime: sql<Date>`min(${bookFiles.mtime})`.as('min_mtime'),
+      })
+      .from(bookFiles)
+      .where(and(eq(bookFiles.role, 'content'), sql`${bookFiles.mtime} > to_timestamp(${MIN_VALID_FILE_TIME_SECONDS})`))
+      .groupBy(bookFiles.bookId)
+      .as('earliest');
+
+    const result = await this.db
+      .update(books)
+      .set({ addedAt: sql`${earliest.minMtime}`, updatedAt: new Date() })
+      .from(earliest)
+      .where(and(eq(books.id, earliest.bookId), eq(books.libraryId, libraryId)));
+
+    return result.rowCount ?? 0;
+  }
+
+  countBooksByLibrary(libraryId: number): Promise<{ count: number }[]> {
+    return this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(books)
+      .where(eq(books.libraryId, libraryId));
+  }
+
+  // Content-file paths per book for on-disk birthtime recompute (file_created).
+  findContentFilePathsByLibrary(libraryId: number) {
+    return this.db
+      .select({ bookId: bookFiles.bookId, absolutePath: bookFiles.absolutePath })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(and(eq(books.libraryId, libraryId), eq(bookFiles.role, 'content')));
+  }
+
+  async updateBookAddedAt(bookId: number, addedAt: Date): Promise<void> {
+    await this.db.update(books).set({ addedAt, updatedAt: new Date() }).where(eq(books.id, bookId));
   }
 
   async hasUserAccess(userId: number, libraryId: number): Promise<boolean> {

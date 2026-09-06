@@ -6025,6 +6025,32 @@
             "hint": "Behandelt jede Datei als einzelnes Buch. Am besten geeignet für Bibliotheken mit einem Format pro Titel. Vermeiden Sie dies, wenn Ihre Hörbücher mehrere Dateien umfassen."
           }
         },
+        "addedAt": {
+          "title": "Hinzugefügt am",
+          "hint": "Legen Sie fest, worauf sich das „Hinzugefügt am“ eines Buchs bezieht. Dies gilt für ab jetzt importierte Bücher.",
+          "options": {
+            "imported": {
+              "title": "Beim Import",
+              "hint": "Das Datum, an dem BookOrbit das Buch erstmals importiert hat. Dies ist die Standardeinstellung."
+            },
+            "file_modified": {
+              "title": "Änderungszeit der Datei",
+              "hint": "Die letzte Änderungszeit der Datei (mtime), oft beim Kopieren beibehalten."
+            },
+            "file_created": {
+              "title": "Erstellungszeit der Datei",
+              "hint": "Wann die Datei erstmals auf dem Datenträger angelegt wurde (birthtime). Fällt bei Dateisystemen, die keine Erstellungszeit speichern, auf die Änderungszeit zurück."
+            }
+          },
+          "recompute": "Jetzt neu berechnen",
+          "recomputing": "Wird neu berechnet …",
+          "recomputeHint": "Aktualisiert das Hinzufügedatum vorhandener Bücher anhand dieser Einstellung.",
+          "recomputeSaveFirst": "Speichern Sie zuerst Ihre Änderungen und berechnen Sie dann vorhandene Bücher neu.",
+          "recomputeConfirm": "Diese Einstellung jetzt auf die vorhandenen Bücher dieser Bibliothek anwenden? Dabei werden die Daten vom Datenträger gelesen, was eine Weile dauern kann.",
+          "recomputeConfirmWithCount": "Diese Einstellung jetzt auf die {count} vorhandenen Bücher dieser Bibliothek anwenden? Dabei werden die Daten vom Datenträger gelesen, was eine Weile dauern kann.",
+          "recomputeDone": "{updated} von {total} Büchern aktualisiert.",
+          "recomputeFailed": "Hinzufügedatum konnte nicht neu berechnet werden."
+        },
         "allowedFormats": {
           "title": "Zulässige Formate",
           "allowAll": "Alle zulassen",

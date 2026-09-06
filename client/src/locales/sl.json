@@ -5727,6 +5727,32 @@
             "hint": "Vsako datoteko obravnava kot posamezno knjigo. Najbolj primerno za knjižnice z eno obliko na naslov. Izogibajte se, če vaše zvočne knjige obsegajo več datotek."
           }
         },
+        "addedAt": {
+          "title": "Datum dodajanja",
+          "hint": "Izberite, kaj predstavlja »datum dodajanja« knjige. To velja za knjige, uvožene od zdaj naprej.",
+          "options": {
+            "imported": {
+              "title": "Ob uvozu",
+              "hint": "Datum, ko je BookOrbit knjigo prvič uvozil. To je privzeta nastavitev."
+            },
+            "file_modified": {
+              "title": "Čas spremembe datoteke",
+              "hint": "Čas zadnje spremembe datoteke (mtime), pogosto ohranjen ob kopiranju datotek."
+            },
+            "file_created": {
+              "title": "Čas ustvarjanja datoteke",
+              "hint": "Kdaj se je datoteka prvič pojavila na disku (birthtime). Na datotečnih sistemih, ki ne beležijo časa ustvarjanja, se vrne na čas spremembe."
+            }
+          },
+          "recompute": "Preračunaj zdaj",
+          "recomputing": "Preračunavanje …",
+          "recomputeHint": "Posodobi datum dodajanja obstoječih knjig s to nastavitvijo.",
+          "recomputeSaveFirst": "Najprej shranite spremembe, nato preračunajte obstoječe knjige.",
+          "recomputeConfirm": "Ali želite to nastavitev zdaj uporabiti za obstoječe knjige v tej knjižnici? To prebere datume z diska in lahko traja nekaj časa.",
+          "recomputeConfirmWithCount": "Ali želite to nastavitev zdaj uporabiti za {count} obstoječih knjig v tej knjižnici? To prebere datume z diska in lahko traja nekaj časa.",
+          "recomputeDone": "Posodobljenih {updated} od {total} knjig.",
+          "recomputeFailed": "Datuma dodajanja ni bilo mogoče preračunati."
+        },
         "allowedFormats": {
           "title": "Dovoljene oblike",
           "allowAll": "Dovoli vse",

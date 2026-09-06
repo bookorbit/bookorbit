@@ -4889,6 +4889,32 @@
             "hint": "Behandelt elk bestand als een afzonderlijk boek. Het meest geschikt voor bibliotheken met één formaat per titel. Vermijd dit als uw luisterboeken uit meerdere bestanden bestaan."
           }
         },
+        "addedAt": {
+          "title": "Toegevoegd op",
+          "hint": "Kies waarnaar de datum \"toegevoegd op\" van een boek verwijst. Dit geldt voor boeken die vanaf nu worden geïmporteerd.",
+          "options": {
+            "imported": {
+              "title": "Bij import",
+              "hint": "De datum waarop BookOrbit het boek voor het eerst importeerde. Dit is de standaard."
+            },
+            "file_modified": {
+              "title": "Wijzigingstijd van bestand",
+              "hint": "De laatste wijzigingstijd van het bestand (mtime), vaak behouden bij het kopiëren van bestanden."
+            },
+            "file_created": {
+              "title": "Aanmaaktijd van bestand",
+              "hint": "Wanneer het bestand voor het eerst op schijf verscheen (birthtime). Valt terug op de wijzigingstijd bij bestandssystemen die geen aanmaaktijd vastleggen."
+            }
+          },
+          "recompute": "Nu opnieuw berekenen",
+          "recomputing": "Bezig met berekenen…",
+          "recomputeHint": "Werk de datum toegevoegd-op van bestaande boeken bij met deze instelling.",
+          "recomputeSaveFirst": "Sla eerst je wijzigingen op en bereken daarna bestaande boeken opnieuw.",
+          "recomputeConfirm": "Deze instelling nu toepassen op de bestaande boeken in deze bibliotheek? Hierbij worden datums van schijf gelezen en dit kan even duren.",
+          "recomputeConfirmWithCount": "Deze instelling nu toepassen op de {count} bestaande boeken in deze bibliotheek? Hierbij worden datums van schijf gelezen en dit kan even duren.",
+          "recomputeDone": "{updated} van {total} boeken bijgewerkt.",
+          "recomputeFailed": "Kon de datum toegevoegd-op niet opnieuw berekenen."
+        },
         "allowedFormats": {
           "title": "Toegestane formaten",
           "allowAll": "Alle toestaan",

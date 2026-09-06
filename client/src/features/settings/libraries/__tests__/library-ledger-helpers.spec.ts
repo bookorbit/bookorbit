@@ -17,6 +17,7 @@ function library(overrides: Partial<Library> & Pick<Library, 'id' | 'name'>): Li
     formatPriority: [],
     allowedFormats: [],
     organizationMode: 'book_per_folder',
+    addedAtSource: 'imported',
     excludePatterns: [],
     readingThreshold: 10,
     markAsFinishedPercentComplete: 90,

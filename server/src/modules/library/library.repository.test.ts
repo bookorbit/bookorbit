@@ -4,7 +4,14 @@ vi.mock('drizzle-orm', () => ({
   getTableColumns: vi.fn(() => ({})),
   inArray: vi.fn((left: unknown, right: unknown[]) => ({ op: 'inArray', left, right })),
   isNotNull: vi.fn((value: unknown) => ({ op: 'isNotNull', value })),
-  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+    op: 'sql',
+    text: strings.join(''),
+    values,
+    as: vi.fn(function (this: unknown) {
+      return this;
+    }),
+  })),
 }));
 
 import { books, libraries } from '../../db/schema';
@@ -40,6 +47,22 @@ describe('LibraryRepository', () => {
     txUpdate.mockImplementation(() => ({ set: txUpdateSet }));
     txUpdateSet.mockReturnValue({ where: txUpdateWhere });
     txUpdateWhere.mockResolvedValue(undefined);
+  });
+
+  it('recomputeAddedAtFromMtime ignores epoch placeholder mtimes', async () => {
+    // Filesystems that do not track a time report it as epoch 0. Accepting those
+    // would rewrite added_at to 1970 instead of leaving the import time in place,
+    // so the query floor has to match the scanner's usable-time guard.
+    const selectWhere = vi.fn(() => ({ groupBy: vi.fn(() => ({ as: vi.fn(() => ({ bookId: {}, minMtime: {} })) })) }));
+    db.select.mockReturnValue({ from: vi.fn(() => ({ where: selectWhere })) });
+    db.update.mockReturnValue({ set: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn().mockResolvedValue({ rowCount: 3 }) })) })) });
+
+    await expect(repo.recomputeAddedAtFromMtime(7)).resolves.toBe(3);
+
+    const clauses = selectWhere.mock.calls[0][0].clauses;
+    const mtimeClause = clauses.find((clause: { op: string }) => clause.op === 'sql');
+    expect(mtimeClause.text).toContain('to_timestamp');
+    expect(mtimeClause.text).not.toContain('is not null');
   });
 
   it('updateDisplayOrders updates each library order entry in one transaction', async () => {

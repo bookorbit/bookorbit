@@ -6681,6 +6681,32 @@
             "hint": "Trata cada arquivo como um livro individual. Mais adequado para bibliotecas com um formato por título. Evite se seus audiolivros abrangerem vários arquivos."
           }
         },
+        "addedAt": {
+          "title": "Data de adição",
+          "hint": "Escolha o que a \"data de adição\" de um livro reflete. Aplica-se aos livros importados a partir de agora.",
+          "options": {
+            "imported": {
+              "title": "Na importação",
+              "hint": "A data em que o BookOrbit importou o livro pela primeira vez. Esta é a predefinição."
+            },
+            "file_modified": {
+              "title": "Data de modificação do ficheiro",
+              "hint": "A data da última modificação do ficheiro (mtime), muitas vezes preservada ao copiar ficheiros."
+            },
+            "file_created": {
+              "title": "Data de criação do ficheiro",
+              "hint": "Quando o ficheiro surgiu no disco pela primeira vez (birthtime). Recorre à data de modificação em sistemas de ficheiros que não registam a data de criação."
+            }
+          },
+          "recompute": "Recalcular agora",
+          "recomputing": "A recalcular…",
+          "recomputeHint": "Atualiza a data de adição dos livros existentes com esta definição.",
+          "recomputeSaveFirst": "Guarde primeiro as alterações e depois recalcule os livros existentes.",
+          "recomputeConfirm": "Aplicar esta definição agora aos livros existentes nesta biblioteca? Esta ação lê as datas do disco e pode demorar algum tempo.",
+          "recomputeConfirmWithCount": "Aplicar esta definição agora aos {count} livros existentes nesta biblioteca? Esta ação lê as datas do disco e pode demorar algum tempo.",
+          "recomputeDone": "{updated} de {total} livros atualizados.",
+          "recomputeFailed": "Não foi possível recalcular a data de adição."
+        },
         "allowedFormats": {
           "title": "Formatos permitidos",
           "allowAll": "Permitir todos",
