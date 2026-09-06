@@ -1274,7 +1274,8 @@
           "comicvine": "Metadane komiksu z ComicVine. Wymagany jest darmowy klucz API ze strony Comicvine.gamespot.com.",
           "ranobedb": "Metadane japońskiej powieści lekkiej z RanobeDB. Nie wymaga konfiguracji.",
           "lubimyczytac": "Katalog książek polskich (lubimyczytac.pl). Zadrapuje strony książek publicznych. Nie wymaga konfiguracji.",
-          "aladin": "Metadane koreańskiej książki od Aladyna (알라딘). Wymagany jest klucz TTB ze strony aladin.co.kr."
+          "aladin": "Metadane koreańskiej książki od Aladyna (알라딘). Wymagany jest klucz TTB ze strony aladin.co.kr.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books wymaga klucza API, zanim będzie można go włączyć",
@@ -1325,6 +1326,10 @@
           "storeProviderIds": {
             "label": "Przechowuj identyfikatory dostawców na książkach",
             "hint": "Podczas pobierania metadanych zapisz zwrócone identyfikatory dostawców (ISBN, ASIN, Goodreads ID itp.) w rekordzie księgowym, aby zapewnić dokładniejsze wyszukiwania w przyszłości."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3715,6 +3720,23 @@
           "noResults": "Nie znaleziono żadnych wyników",
           "noResultsHint": "Spróbuj dostosować tytuł lub autora",
           "searchPrompt": "Wyszukaj powyżej, a następnie kliknij wynik, aby rozpocząć porównywanie metadanych."
+        },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
         },
         "writeAndRename": "Zapisz do pliku i zmień nazwę",
         "writeAndRenameShort": "Napisz i zmień nazwę"

@@ -249,6 +249,7 @@ const currentSource = computed<MetadataSource>(() => ({
   durationSeconds: passthroughMetadata.value.durationSeconds ?? null,
   abridged: passthroughMetadata.value.abridged ?? null,
   hardcoverEditionId: passthroughMetadata.value.hardcoverEditionId ?? null,
+  mangabakaSeriesId: passthroughMetadata.value.mangabakaSeriesId ?? null,
   communityRatings: (passthroughMetadata.value.communityRatings ?? []).map((rating) => ({
     ...rating,
     ratingCount: rating.ratingCount ?? null,
@@ -270,6 +271,7 @@ const providerIds = computed<ProviderIds>(() => ({
   ranobedb: passthroughMetadata.value.ranobedbId ?? null,
   lubimyczytac: passthroughMetadata.value.lubimyczytacId ?? null,
   aladin: passthroughMetadata.value.aladinId ?? null,
+  mangabaka: passthroughMetadata.value.mangabakaId ?? null,
 }))
 
 function openSearch() {

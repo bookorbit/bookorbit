@@ -40,6 +40,8 @@ const FIELD_LABEL_KEY: Record<MetadataScoreField, string> = {
   itunesId: 'itunesId',
   koboId: 'koboId',
   aladinId: 'aladinId',
+  mangabakaId: 'mangabakaId',
+  mangabakaSeriesId: 'mangabakaSeriesId',
 }
 
 export function scoreFieldLabelKey(field: MetadataScoreField): string {

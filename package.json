@@ -33,7 +33,7 @@
     "format:check": "pnpm --filter server format:check && pnpm --filter client format:check",
     "test": "pnpm run test:charts && pnpm run test:pr-policy && pnpm run test:server && pnpm run test:client",
     "test:charts": "node --test scripts/star-history/generate.test.mjs scripts/crowdin-stats/generate.test.mjs",
-    "test:pr-policy": "node --test scripts/validate-locale-pr.test.mjs",
+    "test:pr-policy": "node --test scripts/validate-locale-pr.test.mjs scripts/db/renumber-mangabaka-migration.test.mjs",
     "test:server": "pnpm --filter server test",
     "test:client": "pnpm --filter client test:unit --run",
     "e2e:run": "node ./scripts/e2e/run-suite.mjs",
@@ -48,6 +48,7 @@
     "db:migrate": "pnpm --filter server db:migrate",
     "db:reset": "bash ./scripts/db/reset.sh",
     "db:seed": "bash ./scripts/db/seed-baseline.sh",
+    "db:renumber-mangabaka": "node scripts/db/renumber-mangabaka-migration.mjs",
     "e2e:db:prepare": "bash ./scripts/e2e/prepare-db.sh",
     "e2e:db:migrate": "pnpm --filter server e2e:db:migrate",
     "prepare": "husky"

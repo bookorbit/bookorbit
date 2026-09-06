@@ -15,6 +15,7 @@ const PROVIDER_HEX: Record<string, string> = {
   kobo: '#e23434',
   lubimyczytac: '#f47373',
   aladin: '#3E7FFF',
+  mangabaka: '#0d9488',
   auto: '#8B5CF6',
 }
 
@@ -35,6 +36,7 @@ export const PROVIDER_SHORT_LABELS: Record<string, string> = {
   kobo: 'Kobo',
   lubimyczytac: 'LubimyCzytac',
   aladin: 'Aladin',
+  mangabaka: 'MangaBaka',
   auto: 'Fetched',
 }
 

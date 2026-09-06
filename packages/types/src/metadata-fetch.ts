@@ -16,6 +16,7 @@ export const MetadataProviderKey = {
   KOBO: "kobo",
   LUBIMYCZYTAC: "lubimyczytac",
   ALADIN: "aladin",
+  MANGABAKA: "mangabaka",
 } as const;
 
 export const COMMUNITY_RATING_PROVIDER_KEYS = [
@@ -27,6 +28,7 @@ export const COMMUNITY_RATING_PROVIDER_KEYS = [
   MetadataProviderKey.RANOBEDB,
   MetadataProviderKey.AMAZON,
   MetadataProviderKey.AUDIBLE,
+  MetadataProviderKey.MANGABAKA,
 ] as const;
 
 export type CommunityRatingProviderKey = (typeof COMMUNITY_RATING_PROVIDER_KEYS)[number];
@@ -50,6 +52,8 @@ export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof Meta
 export interface MetadataSeriesMembership {
   seriesName: string;
   seriesIndex?: SeriesIndex | null;
+  /** Total books in the series as reported by the provider (e.g. MangaBaka collection volume count). */
+  expectedBookCount?: number | null;
 }
 
 export interface BookCommunityRating {
@@ -92,6 +96,7 @@ export interface MetadataCandidate {
   comicMetadata?: ComicMetadataFields;
   communityRating?: number;
   communityRatingCount?: number;
+  mangabakaSeriesId?: string;
 }
 
 export interface MetadataProviderInfo {
@@ -115,6 +120,19 @@ export type MetadataProviderSearchOutcome = "timeout" | "throttled" | "failed";
 export interface MetadataProviderSearchStatus {
   provider: MetadataProviderKey;
   outcome: MetadataProviderSearchOutcome;
+}
+
+export interface MangabakaCollectionSummary {
+  id: string;
+  title: string;
+  language: string;
+  languageDisplay: string;
+  publisher: string;
+  medium: string;
+  type: string;
+  countMain: number;
+  countExtra: number;
+  countOther: number;
 }
 
 export type MetadataFetchEmptyReason =
@@ -164,5 +182,6 @@ export interface MetadataSource {
   durationSeconds: number | null;
   abridged: boolean | null;
   hardcoverEditionId: string | null;
+  mangabakaSeriesId?: string | null;
   communityRatings: BookCommunityRating[];
 }

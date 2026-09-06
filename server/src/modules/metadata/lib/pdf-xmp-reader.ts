@@ -32,6 +32,8 @@ export interface XmpParsed {
   koboId: string | null;
   lubimyczytacId: string | null;
   aladinId: string | null;
+  mangabakaId: string | null;
+  mangabakaSeriesId: string | null;
   itunesId: string | null;
 }
 
@@ -177,6 +179,8 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     koboId: str(merged[`${px}:koboId`]),
     lubimyczytacId: str(merged[`${px}:lubimyczytacId`]),
     aladinId: str(merged[`${px}:aladinId`]),
+    mangabakaId: str(merged[`${px}:mangabakaId`]),
+    mangabakaSeriesId: str(merged[`${px}:mangabakaSeriesId`]),
     itunesId: str(merged[`${px}:itunesId`]),
   };
 }

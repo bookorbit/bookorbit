@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey, MetadataProviderSearchOutcome, MetadataProviderSearchStatus } from '@bookorbit/types';
-import { filter, from, map, merge, Observable, switchMap } from 'rxjs';
+import { MangabakaCollectionSummary, MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { from, merge, Observable, switchMap } from 'rxjs';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { filterAndRank } from './candidate-relevance';
@@ -10,6 +10,7 @@ import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { ProviderRegistry } from './provider-registry';
 import { PROVIDER_TIMEOUT_MS as PROVIDER_TIMEOUTS } from './providers/provider-constants';
 import { isIdentifiable, MetadataProvider } from './providers/metadata-provider';
+import { MangabakaProvider } from './providers/mangabaka/mangabaka.provider';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 import { sanitizeLogError } from './providers/provider-utils';
 
@@ -17,19 +18,6 @@ interface TimedProviderResult {
   results: MetadataCandidate[];
   timedOut: boolean;
 }
-
-interface ProviderSearchResult {
-  candidates: MetadataCandidate[];
-  /** Null when the provider ran to completion, whether or not it found anything. */
-  outcome: MetadataProviderSearchOutcome | null;
-}
-
-/**
- * A search reports two different things: the records it found, and whether a provider was cut off
- * before it could finish. Without the second, an interrupted search is indistinguishable from a
- * genuinely empty one.
- */
-export type MetadataSearchEvent = { kind: 'candidate'; candidate: MetadataCandidate } | { kind: 'status'; status: MetadataProviderSearchStatus };
 
 export interface StoredProviderContext {
   libraryId: number;
@@ -50,20 +38,12 @@ export class MetadataFetchService {
     private readonly metadataFetchRepository: MetadataFetchRepository,
   ) {}
 
-  search(params: MetadataSearchParams, keys?: MetadataProviderKey[]): Observable<MetadataSearchEvent> {
+  search(params: MetadataSearchParams, keys?: MetadataProviderKey[]): Observable<MetadataCandidate> {
     const providers = this.registry.select(keys);
     return merge(
       ...providers.map((provider) =>
-        from(this.fetchFromProviderWithThrottleHandling(provider, params)).pipe(switchMap((result) => from(toSearchEvents(provider.key, result)))),
+        from(this.fetchFromProviderWithThrottleHandling(provider, params)).pipe(switchMap((providerResults) => from(providerResults))),
       ),
-    );
-  }
-
-  /** Candidate-only view of `search`, for callers that have no use for provider status. */
-  searchCandidates(params: MetadataSearchParams, keys?: MetadataProviderKey[]): Observable<MetadataCandidate> {
-    return this.search(params, keys).pipe(
-      filter((event): event is Extract<MetadataSearchEvent, { kind: 'candidate' }> => event.kind === 'candidate'),
-      map((event) => event.candidate),
     );
   }
 
@@ -71,6 +51,20 @@ export class MetadataFetchService {
     const provider = this.registry.find(key);
     if (!provider || !isIdentifiable(provider)) return null;
     return provider.lookupById(providerId);
+  }
+
+  async getMangabakaCollections(seriesId: number): Promise<MangabakaCollectionSummary[]> {
+    const provider = this.registry.find(MetadataProviderKey.MANGABAKA);
+    if (!provider) return [];
+    const mangabaka = provider as MangabakaProvider;
+    return mangabaka.fetchSeriesCollections(seriesId);
+  }
+
+  async getMangabakaWorks(collectionId: string, seriesId: number, preferredLanguage?: string): Promise<MetadataCandidate[]> {
+    const provider = this.registry.find(MetadataProviderKey.MANGABAKA);
+    if (!provider) return [];
+    const mangabaka = provider as MangabakaProvider;
+    return mangabaka.fetchCollectionWorks(collectionId, seriesId, preferredLanguage);
   }
 
   async getStoredProviderIds(bookId: number, user: RequestUser): Promise<Partial<Record<MetadataProviderKey, string>>> {
@@ -125,10 +119,11 @@ export class MetadataFetchService {
       [MetadataProviderKey.RANOBEDB]: row.ranobedbId ?? undefined,
       [MetadataProviderKey.LUBIMYCZYTAC]: row.lubimyczytacId ?? undefined,
       [MetadataProviderKey.ALADIN]: row.aladinId ?? undefined,
+      [MetadataProviderKey.MANGABAKA]: row.mangabakaId ?? undefined,
     };
   }
 
-  private async fetchFromProviderWithThrottleHandling(provider: MetadataProvider, params: MetadataSearchParams): Promise<ProviderSearchResult> {
+  private async fetchFromProviderWithThrottleHandling(provider: MetadataProvider, params: MetadataSearchParams): Promise<MetadataCandidate[]> {
     const startedAt = Date.now();
     this.logger.log(`[metadata_fetch.provider_search] [start] provider=${provider.key} - provider fetch started`);
 
@@ -139,14 +134,14 @@ export class MetadataFetchService {
         this.logger.warn(
           `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} errorClass=TimeoutError error="provider search timed out" - provider fetch failed`,
         );
-        return { candidates: [], outcome: 'timeout' };
+        return [];
       }
 
       this.throttleTracker.clearOnSuccess(provider.key);
       this.logger.log(
         `[metadata_fetch.provider_search] [end] provider=${provider.key} durationMs=${Date.now() - startedAt} resultCount=${results.length} - provider fetch completed`,
       );
-      return { candidates: results, outcome: null };
+      return results;
     } catch (error) {
       if (error instanceof ProviderThrottleError) {
         this.throttleTracker.record(provider.key, error.retryAfterSeconds);
@@ -157,14 +152,14 @@ export class MetadataFetchService {
         this.logger.warn(
           `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} resultCount=${salvaged.length} errorClass=ProviderThrottleError error="provider throttled" - provider fetch failed`,
         );
-        return { candidates: salvaged, outcome: 'throttled' };
+        return [];
       }
 
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       this.logger.warn(
         `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${sanitizeLogError(error)}" - provider fetch failed`,
       );
-      return { candidates: [], outcome: 'failed' };
+      return [];
     }
   }
 
@@ -237,12 +232,6 @@ export class MetadataFetchService {
       controller.abort();
     });
   }
-}
-
-function toSearchEvents(provider: MetadataProviderKey, result: ProviderSearchResult): MetadataSearchEvent[] {
-  const events: MetadataSearchEvent[] = result.candidates.map((candidate) => ({ kind: 'candidate', candidate }));
-  if (result.outcome) events.push({ kind: 'status', status: { provider, outcome: result.outcome } });
-  return events;
 }
 
 function hasText(v: string | undefined): boolean {

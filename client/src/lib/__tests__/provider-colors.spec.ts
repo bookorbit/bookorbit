@@ -17,6 +17,10 @@ describe('getProviderColor', () => {
     expect(getProviderColor('librofm')).toBe('#62B9B6')
   })
 
+  it('returns the MangaBaka brand color', () => {
+    expect(getProviderColor('mangabaka')).toBe('#0d9488')
+  })
+
   it('returns default color for unknown provider', () => {
     const result = getProviderColor('unknown-provider')
     expect(result).toBeTruthy()
@@ -38,6 +42,7 @@ describe('getProviderColor', () => {
       'ranobedb',
       'kobo',
       'aladin',
+      'mangabaka',
       'auto',
     ]
     for (const provider of providers) {
@@ -66,6 +71,7 @@ describe('PROVIDER_SHORT_LABELS', () => {
       'ranobedb',
       'kobo',
       'aladin',
+      'mangabaka',
     ]
     for (const provider of providers) {
       expect(PROVIDER_SHORT_LABELS[provider]).toBeTruthy()

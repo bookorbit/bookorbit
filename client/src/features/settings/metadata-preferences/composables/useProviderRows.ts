@@ -177,5 +177,6 @@ export function useProviderRows(): ComputedRef<ProviderRowDef[]> {
         blockedMessage: t('settings.metadata.providers.blocked.aladin'),
       },
     },
+    { key: 'mangabaka', label: 'MangaBaka', group: 'comics', hint: t('settings.metadata.providers.hints.mangabaka'), fields: [] },
   ])
 }

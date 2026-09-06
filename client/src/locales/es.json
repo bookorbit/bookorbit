@@ -1573,7 +1573,8 @@
           "comicvine": "Metadatos de cómics de ComicVine. Se requiere una clave API gratuita de comicvine.gamespot.com.",
           "ranobedb": "Metadatos de novelas ligeras japonesas de RanobeDB. No se requiere configuración.",
           "lubimyczytac": "Catálogo de libros polacos (lubimyczytac.pl). Raspa páginas de libros públicos. No se requiere configuración.",
-          "aladin": "Metadatos de libros coreanos de Aladin (알라딘). Se requiere una clave TTB de aladin.co.kr."
+          "aladin": "Metadatos de libros coreanos de Aladin (알라딘). Se requiere una clave TTB de aladin.co.kr.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books requiere una clave API antes de poder habilitarse",
@@ -1631,6 +1632,10 @@
           "storeProviderIds": {
             "label": "Almacenar ID de proveedores en libros",
             "hint": "Al recuperar metadatos, guarde los ID de proveedor devueltos (ISBN, ASIN, Goodreads ID, etc.) en el registro del libro para realizar búsquedas futuras más precisas."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -4668,6 +4673,23 @@
           "searchInterruptedHint": "Inténtelo de nuevo, o limite el ámbito de búsqueda.",
           "searchPrompt": "Busque arriba y luego haga clic en un resultado para comenzar a comparar metadatos."
         },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
+        },
         "writeAndRename": "Escribir en archivo y cambiar nombre",
         "writeAndRenameShort": "Escribir y cambiar nombre",
         "identityCard": "Identidad",
@@ -4716,7 +4738,7 @@
         "throughCopy": "Has completado el {percent} de esta copia.",
         "fileCount": "{count, plural, =0 {sin archivos} one {# archivo} other {# archivos} many {# archivos}}",
         "synced": "Sincronizado {time}",
-        "sortAria": "Ordene archivos",
+        "sortAria": "ordenar archivos",
         "syncHistory": "Historial de sincronización",
         "metadataWriteBack": "Reescritura de metadatos",
         "relative": {

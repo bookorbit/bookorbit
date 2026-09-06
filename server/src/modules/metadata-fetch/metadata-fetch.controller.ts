@@ -1,6 +1,6 @@
-import { Controller, Get, MessageEvent, Query, Sse } from '@nestjs/common';
+import { Controller, Get, MessageEvent, Param, ParseIntPipe, Query, Sse } from '@nestjs/common';
 import {
-  METADATA_PROVIDER_STATUS_EVENT,
+  MangabakaCollectionSummary,
   MetadataCandidate,
   MetadataProviderInfo,
   MetadataProviderKey,
@@ -14,7 +14,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { LookupMetadataDto } from './dto/lookup-metadata.dto';
 import { MetadataSearchDto } from './dto/metadata-search.dto';
-import { MetadataFetchService, MetadataSearchEvent } from './metadata-fetch.service';
+import { MetadataFetchService } from './metadata-fetch.service';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
 import { ProviderRegistry } from './provider-registry';
 import { MetadataSearchParams } from './providers/metadata-search-params';
@@ -120,12 +120,22 @@ export class MetadataFetchController {
     return this.metadataFetchService
       .search(params, providerKeys)
       .pipe(
-        map((event: MetadataSearchEvent) =>
-          event.kind === 'candidate'
-            ? { data: applyGenreFetchOptionsToCandidate(event.candidate, blockedGenreTokens, genreOptions?.maxCount) }
-            : { type: METADATA_PROVIDER_STATUS_EVENT, data: event.status },
-        ),
+        map((candidate: MetadataCandidate) => ({ data: applyGenreFetchOptionsToCandidate(candidate, blockedGenreTokens, genreOptions?.maxCount) })),
       );
+  }
+
+  @Get('mangabaka/series/:seriesId/collections')
+  async getMangabakaCollections(@Param('seriesId', ParseIntPipe) seriesId: number): Promise<MangabakaCollectionSummary[]> {
+    return this.metadataFetchService.getMangabakaCollections(seriesId);
+  }
+
+  @Get('mangabaka/collections/:collectionId/works')
+  async getMangabakaWorks(
+    @Param('collectionId') collectionId: string,
+    @Query('seriesId', ParseIntPipe) seriesId: number,
+    @Query('preferredLanguage') preferredLanguage?: string,
+  ): Promise<MetadataCandidate[]> {
+    return this.metadataFetchService.getMangabakaWorks(collectionId, seriesId, preferredLanguage);
   }
 
   @Get('lookup')

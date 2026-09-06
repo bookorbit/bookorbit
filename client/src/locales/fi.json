@@ -1248,7 +1248,8 @@
           "audnexus": "Yhteisön ohjaamat äänikirjan metatiedot. Asennusta ei tarvita.",
           "comicvine": "Comic book metadata ComicVinesta. Ilmainen API-avain vaaditaan Comicvine.gamespot.com:lta.",
           "ranobedb": "Japanin kevyt uusi metatiedot RanobeDB. Ei asetuksia tarvita.",
-          "lubimyczytac": "Puolan kirjaluettelo (lubimyczytac.pl). Scrapes julkinen kirja-sivut. Ei asennus tarvita."
+          "lubimyczytac": "Puolan kirjaluettelo (lubimyczytac.pl). Scrapes julkinen kirja-sivut. Ei asennus tarvita.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books vaatii API-avaimen ennen kuin se voidaan ottaa käyttöön",
@@ -1299,6 +1300,10 @@
           "storeProviderIds": {
             "label": "Tallenna palveluntarjoajan tunnukset kirjoihin",
             "hint": "Kun haet metatietoja, tallenna palautetut palveluntarjoajan tunnukset (ISBN, ASIN, Goodreads ID, jne.) kirjatietueeseen tarkempia tulevia hakuja."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3717,6 +3722,23 @@
           "noResults": "Tuloksia ei löytynyt",
           "noResultsHint": "Yritä muuttaa otsikkoa tai kirjoittajaa",
           "searchPrompt": "Etsi edellä, sitten klikkaa tulosta aloittaaksesi metadatan vertailun."
+        },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
         },
         "writeAndRename": "Kirjoita tiedostoon & Nimeä uudelleen",
         "writeAndRenameShort": "Kirjoita & Uudelleennimeä"

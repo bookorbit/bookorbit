@@ -9,6 +9,7 @@ import { useCoverVersions } from '../../../composables/useCoverVersions'
 import type { MetadataPatch } from '../../../composables/useMetadataDiff'
 import MetadataSearchPanel from './MetadataSearchPanel.vue'
 import MetadataDiffPanel from './MetadataDiffPanel.vue'
+import MangabakaVolumeBrowser from '../mangabaka/MangabakaVolumeBrowser.vue'
 
 const props = defineProps<{ book: BookDetail; lockedFields: BookMetadataLockField[] }>()
 const emit = defineEmits<{
@@ -65,6 +66,7 @@ const {
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
+const lastSearchTitle = ref<string | undefined>(undefined)
 const drawerTitle = computed(() =>
   view.value === 'search' ? t('book.detail.editMetadata.searchDrawer.searchTitle') : t('book.detail.editMetadata.searchDrawer.compareTitle'),
 )
@@ -87,6 +89,7 @@ function runMetadataSearch(params: { title: string; author: string; isbn: string
 function handleSearch(params: { title: string; author: string; isbn: string }) {
   selectedCandidate.value = null
   view.value = 'search'
+  lastSearchTitle.value = params.title
   runMetadataSearch(params)
 }
 
@@ -173,7 +176,11 @@ function handleApply(patch: { formPatch: MetadataPatch; coverUrl?: string }) {
             @clear-filter="handleClearProviderFilter"
             @select-field-rules="handleSelectFieldRules"
             @select="handleSelect"
-          />
+          >
+            <template #results-extra>
+              <MangabakaVolumeBrowser :candidates="filteredResults" :query-title="lastSearchTitle" @select="handleSelect" />
+            </template>
+          </MetadataSearchPanel>
 
           <MetadataDiffPanel
             v-else-if="view === 'diff' && selectedCandidate"

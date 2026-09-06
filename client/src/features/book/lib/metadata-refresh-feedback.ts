@@ -20,6 +20,7 @@ const PROVIDER_LABELS: Record<MetadataProviderKeyType, string> = {
   [MetadataProviderKey.KOBO]: 'Kobo',
   [MetadataProviderKey.LUBIMYCZYTAC]: 'LubimyCzytac',
   [MetadataProviderKey.ALADIN]: 'Aladin',
+  [MetadataProviderKey.MANGABAKA]: 'MangaBaka',
 }
 
 export function metadataRefreshEmptyMessage(diagnostics: MetadataFetchDiagnostics, book: BookDetail): string {

@@ -51,6 +51,7 @@ describe('MetadataPreferenceResolver', () => {
       MetadataProviderKey.RANOBEDB,
       MetadataProviderKey.AMAZON,
       MetadataProviderKey.AUDIBLE,
+      MetadataProviderKey.MANGABAKA,
     ]);
 
     const fieldsWithoutItunes: (keyof typeof defaults.fields)[] = [

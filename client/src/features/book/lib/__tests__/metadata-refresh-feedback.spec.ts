@@ -29,6 +29,7 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     communityRatings: [],
     coverSource: null,
     hardcoverEditionId: null,
+    mangabakaSeriesId: null,
     providerIds: {},
     authors: [{ id: 1, name: 'Hanya Yanagihara', sortName: null }],
     genres: [],
