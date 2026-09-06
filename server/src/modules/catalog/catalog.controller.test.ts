@@ -6,6 +6,10 @@ import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
+function reqUser(): RequestUser {
+  return { id: 7, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES } as RequestUser;
+}
+
 function makeController() {
   const service = {
     searchAuthors: vi.fn(),
@@ -31,9 +35,9 @@ describe('CatalogController', () => {
     const expected = [{ name: 'Frank Herbert' }];
     service.searchAuthors.mockResolvedValue(expected);
 
-    const result = await controller.searchAuthors({ q: 'Frank' });
+    const result = await controller.searchAuthors(reqUser(), { q: 'Frank' });
 
-    expect(service.searchAuthors).toHaveBeenCalledWith('Frank');
+    expect(service.searchAuthors).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 'Frank');
     expect(result).toEqual(expected);
   });
 
@@ -41,57 +45,57 @@ describe('CatalogController', () => {
     const { controller, service } = makeController();
     const query = new SearchCatalogQueryDto();
 
-    await controller.searchAuthors(query);
+    await controller.searchAuthors(reqUser(), query);
 
-    expect(service.searchAuthors).toHaveBeenCalledWith('');
+    expect(service.searchAuthors).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), '');
   });
 
   it('delegates genre queries to the catalog service', async () => {
     const { controller, service } = makeController();
 
-    await controller.searchGenres({ q: 'Fantasy' });
+    await controller.searchGenres(reqUser(), { q: 'Fantasy' });
 
-    expect(service.searchGenres).toHaveBeenCalledWith('Fantasy');
+    expect(service.searchGenres).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 'Fantasy');
   });
 
   it('delegates tag queries to the catalog service', async () => {
     const { controller, service } = makeController();
 
-    await controller.searchTags({ q: 'Space Opera' });
+    await controller.searchTags(reqUser(), { q: 'Space Opera' });
 
-    expect(service.searchTags).toHaveBeenCalledWith('Space Opera');
+    expect(service.searchTags).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 'Space Opera');
   });
 
   it('delegates narrator queries to the catalog service', async () => {
     const { controller, service } = makeController();
 
-    await controller.searchNarrators({ q: 'Ray Porter' });
+    await controller.searchNarrators(reqUser(), { q: 'Ray Porter' });
 
-    expect(service.searchNarrators).toHaveBeenCalledWith('Ray Porter');
+    expect(service.searchNarrators).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 'Ray Porter');
   });
 
   it('delegates publisher queries to the catalog service', async () => {
     const { controller, service } = makeController();
 
-    await controller.searchPublishers({ q: 'Orbit' });
+    await controller.searchPublishers(reqUser(), { q: 'Orbit' });
 
-    expect(service.searchPublishers).toHaveBeenCalledWith('Orbit');
+    expect(service.searchPublishers).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 'Orbit');
   });
 
   it('delegates series queries to the catalog service', async () => {
     const { controller, service } = makeController();
 
-    await controller.searchSeries({ q: 'Expanse' });
+    await controller.searchSeries(reqUser(), { q: 'Expanse' });
 
-    expect(service.searchSeries).toHaveBeenCalledWith('Expanse');
+    expect(service.searchSeries).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 'Expanse');
   });
 
   it('delegates language queries to the catalog service', async () => {
     const { controller, service } = makeController();
 
-    await controller.searchLanguages({ q: 'English' });
+    await controller.searchLanguages(reqUser(), { q: 'English' });
 
-    expect(service.searchLanguages).toHaveBeenCalledWith('English');
+    expect(service.searchLanguages).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), 'English');
   });
 
   it('passes current user id to collection search', async () => {
