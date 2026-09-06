@@ -867,28 +867,19 @@ describe('BookService', () => {
       await expect(service.getThumbnailPath(9, makeUser())).rejects.toThrow('permission denied');
     });
 
-    it('returns file info with unknown format fallback', async () => {
+    it('returns file info with unknown format fallback without touching the filesystem', async () => {
       const { service, bookRepo } = makeService();
       bookRepo.findFileById.mockResolvedValue({ id: 10, absolutePath: '/books/test.book', format: null, bookId: 1, libraryId: 7 });
-      mockStat.mockResolvedValue({ size: 1234 } as never);
 
       const result = await service.getFileInfo(10, makeUser());
 
       expect(result).toEqual({
         path: '/books/test.book',
-        size: 1234,
         format: 'unknown',
         bookId: 1,
         originalFilename: 'test.book',
       });
-    });
-
-    it('throws NotFoundException when file exists in DB but is missing on disk', async () => {
-      const { service, bookRepo } = makeService();
-      bookRepo.findFileById.mockResolvedValue({ id: 10, absolutePath: '/books/missing.book', format: null, bookId: 1, libraryId: 7 });
-      mockStat.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
-
-      await expect(service.getFileInfo(10, makeUser())).rejects.toThrow(NotFoundException);
+      expect(mockStat).not.toHaveBeenCalled();
     });
   });
 

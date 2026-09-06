@@ -1,11 +1,11 @@
-import { createReadStream } from 'fs';
-import { stat } from 'fs/promises';
-
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyReply } from 'fastify';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import { isMissingFilesystemEntry } from '../../../common/utils/fs-error.utils';
+import { sendFileWithRanges } from '../../../common/utils/http-range.utils';
+import type { FileRangeRequest } from '../../../common/utils/http-range.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { DB } from '../../../db/db.module';
 import * as schema from '../../../db/schema';
@@ -32,7 +32,7 @@ export class KoboDownloadService {
     private readonly bookAccessService: KoboBookAccessService,
   ) {}
 
-  async streamBook(userId: number, bookId: number, reply: FastifyReply) {
+  async streamBook(userId: number, bookId: number, reply: FastifyReply, range: FileRangeRequest = {}) {
     const book = await this.db.query.books.findFirst({ where: eq(schema.books.id, bookId) });
     if (!book) throw new NotFoundException('Book not found');
 
@@ -47,11 +47,11 @@ export class KoboDownloadService {
     const format = (file.format ?? 'epub').toLowerCase();
 
     if (format === 'pdf') {
-      return this.streamFile(file.absolutePath, file.id, format, reply);
+      return this.streamFile(file.absolutePath, file.id, format, reply, range);
     }
 
     if (format === 'kepub') {
-      return this.streamFile(file.absolutePath, file.id, 'kepub.epub', reply);
+      return this.streamFile(file.absolutePath, file.id, 'kepub.epub', reply, range);
     }
 
     if (format === 'epub') {
@@ -59,36 +59,47 @@ export class KoboDownloadService {
       const limitBytes = settings.kepubConversionLimitMb * 1024 * 1024;
       const withinLimit = !file.sizeBytes || file.sizeBytes <= limitBytes;
       if (settings.convertToKepub && withinLimit) {
-        return this.streamKepub(file.absolutePath, file.fileHash ?? 'nohash', bookId, file.id, settings.forceEnableHyphenation, reply);
+        return this.streamKepub(file.absolutePath, file.fileHash ?? 'nohash', bookId, file.id, settings.forceEnableHyphenation, reply, range);
       }
     }
 
-    return this.streamFile(file.absolutePath, file.id, format, reply);
+    return this.streamFile(file.absolutePath, file.id, format, reply, range);
   }
 
-  private async streamFile(absolutePath: string, fileId: number, format: string, reply: FastifyReply) {
+  private async streamFile(absolutePath: string, fileId: number, format: string, reply: FastifyReply, range: FileRangeRequest) {
     try {
-      const { size } = await stat(absolutePath);
-      reply.header('Content-Length', size);
-      reply.header('Content-Disposition', `attachment; filename="book-${fileId}.${format}"`);
-      reply.type(MIME[format] ?? 'application/octet-stream');
-      reply.send(createReadStream(absolutePath));
-    } catch {
-      throw new NotFoundException('File not found on disk');
+      await sendFileWithRanges(reply, {
+        path: absolutePath,
+        contentType: MIME[format] ?? 'application/octet-stream',
+        contentDisposition: `attachment; filename="book-${fileId}.${format}"`,
+        rangeHeader: range.rangeHeader,
+        ifRangeHeader: range.ifRangeHeader,
+      });
+    } catch (err) {
+      if (isMissingFilesystemEntry(err)) throw new NotFoundException('File not found on disk');
+      throw err;
     }
   }
 
-  private async streamKepub(sourcePath: string, fileHash: string, bookId: number, fileId: number, hyphenate: boolean, reply: FastifyReply) {
+  private async streamKepub(
+    sourcePath: string,
+    fileHash: string,
+    bookId: number,
+    fileId: number,
+    hyphenate: boolean,
+    reply: FastifyReply,
+    range: FileRangeRequest,
+  ) {
     const start = Date.now();
     try {
       const cachedPath = await this.kepubConversionService.getKepubPath({ sourcePath, fileHash, bookId, hyphenate });
-      return this.streamFile(cachedPath, fileId, 'kepub.epub', reply);
+      return this.streamFile(cachedPath, fileId, 'kepub.epub', reply, range);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       this.logger.warn(
         `[kobo.download] [fail] bookId=${bookId} fileId=${fileId} durationMs=${Date.now() - start} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - kepub conversion failed, falling back to epub`,
       );
-      return this.streamFile(sourcePath, fileId, 'epub', reply);
+      return this.streamFile(sourcePath, fileId, 'epub', reply, {});
     }
   }
 }
