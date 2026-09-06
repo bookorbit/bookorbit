@@ -230,19 +230,73 @@ describe('DetailsTab cover surface', () => {
     expect(surfaces.every((surface) => surface.attributes('style')?.includes('aspect-ratio: 2 / 1'))).toBe(true)
   })
 
-  it('only constrains cover width from the observed slot height in the wide layout', async () => {
+  it('constrains cover width to the column height remaining above its actions', async () => {
     const wrapper = mountDetails(makeBook())
     await flushPromises()
 
     const surface = wrapper.get('.book-cover-surface')
     const frame = surface.element.parentElement as HTMLElement
+    const column = wrapper.get<HTMLElement>('[data-test="cover-column"]')
+    const actions = wrapper.get<HTMLElement>('[data-test="cover-actions"]')
 
-    resizeObserverCallbacks.at(-1)?.([{ contentRect: { height: 220 } } as ResizeObserverEntry], {} as ResizeObserver)
+    Object.defineProperty(column.element, 'clientHeight', { configurable: true, value: 320 })
+    vi.spyOn(actions.element, 'getBoundingClientRect').mockReturnValue({ height: 84 } as DOMRect)
+
+    resizeObserverCallbacks.at(-1)?.([], {} as ResizeObserver)
     await flushPromises()
 
     expect(frame.style.maxWidth).toBe('')
     expect(frame.style.getPropertyValue('--detail-cover-max-width')).toBe('146px')
     expect(frame.classList).toContain('@min-[46rem]/book-detail:max-w-[var(--detail-cover-max-width)]')
+  })
+
+  it('anchors wide-layout covers beside the top of the metadata column', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const surface = wrapper.get('.book-cover-surface')
+    const slot = surface.element.parentElement?.parentElement as HTMLElement
+
+    expect(slot.classList).toContain('@min-[46rem]/book-detail:items-start')
+    expect(slot.classList).toContain('@min-[46rem]/book-detail:justify-end')
+    expect(slot.classList).not.toContain('@min-[46rem]/book-detail:items-center')
+  })
+
+  it('keeps wide-layout actions immediately after the cover instead of at the bottom of the column', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const column = wrapper.get<HTMLElement>('[data-test="cover-column"]')
+    const actions = wrapper.get<HTMLElement>('[data-test="cover-actions"]')
+    const coverRow = column.element.firstElementChild as HTMLElement
+
+    expect(actions.element.parentElement).toBe(column.element)
+    expect(coverRow.nextElementSibling).toBe(actions.element)
+    expect(coverRow.classList).not.toContain('@min-[46rem]/book-detail:flex-1')
+  })
+
+  it('lets the discovery shelf follow the natural height of the detail content', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const layout = wrapper.get<HTMLElement>('[data-test="details-layout"]')
+    const shelf = wrapper.get<HTMLElement>('[data-test="discovery-shelf"]')
+
+    expect(shelf.element.parentElement).toBe(layout.element)
+    expect(layout.element.classList).toContain('@min-[46rem]/book-detail:content-start')
+    expect(layout.element.classList).not.toContain('@min-[46rem]/book-detail:h-full')
+    expect(layout.element.classList).not.toContain('@min-[46rem]/book-detail:grid-rows-[minmax(0,1fr)_clamp(11.25rem,29%,17.5rem)]')
+  })
+
+  it('uses the responsive synopsis clamp until the full description is opened', async () => {
+    const wrapper = mountDetails(makeBook({ description: '<p>A synopsis</p>' }))
+    await flushPromises()
+
+    const synopsis = wrapper.get<HTMLElement>('[data-test="synopsis-copy"]')
+
+    expect(synopsis.element.classList).toContain('synopsis-copy--clamped')
+    await wrapper.get(`[aria-controls="book-${wrapper.props('book').id}-synopsis"]`).trigger('click')
+    expect(synopsis.element.classList).not.toContain('synopsis-copy--clamped')
   })
 
   it('forces spine overlay off for audiobook details covers', async () => {
@@ -335,7 +389,7 @@ describe('DetailsTab cover surface', () => {
     )
     await flushPromises()
 
-    const synopsis = wrapper.get('.line-clamp-4')
+    const synopsis = wrapper.get('[data-test="synopsis-copy"]')
     expect(synopsis.html()).toContain('Second paragraph')
 
     const toggle = wrapper.findAll('button').find((button) => button.text() === 'Show more')
@@ -345,7 +399,7 @@ describe('DetailsTab cover surface', () => {
     expect(synopsis.attributes('id')).toBe('book-12-synopsis')
     await toggle!.trigger('click')
 
-    expect(synopsis.classes()).not.toContain('line-clamp-4')
+    expect(synopsis.classes()).not.toContain('synopsis-copy--clamped')
     expect(synopsis.classes()).not.toContain('max-h-44')
     expect(synopsis.classes()).not.toContain('overflow-y-auto')
     expect(toggle!.text()).toBe('Show less')
@@ -353,7 +407,7 @@ describe('DetailsTab cover surface', () => {
 
     await toggle!.trigger('click')
 
-    expect(synopsis.classes()).toContain('line-clamp-4')
+    expect(synopsis.classes()).toContain('synopsis-copy--clamped')
     expect(toggle!.text()).toBe('Show more')
     expect(toggle!.attributes('aria-expanded')).toBe('false')
   })
