@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createReadStream } from 'fs';
+import { basename } from 'path';
 
 import { NotificationType } from '@bookorbit/types';
 import type { BookFile } from '../../db/schema';
@@ -311,14 +312,7 @@ export class EmailSendOrchestrator {
   }
 
   private buildAttachmentFilename(file: BookFile): string {
-    const ext = file.format ? `.${file.format.toLowerCase()}` : '';
-    const base = file.relPath
-      ? (file.relPath
-          .split('/')
-          .pop()
-          ?.replace(/\.[^.]+$/, '') ?? 'book')
-      : 'book';
-    return `${base}${ext}`;
+    return basename(file.absolutePath);
   }
 
   private buildFromHeader(fromName: string | null | undefined, fromAddress: string | null | undefined): string | undefined {

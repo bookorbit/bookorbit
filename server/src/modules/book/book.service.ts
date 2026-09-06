@@ -30,7 +30,7 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
-import { basename, dirname, extname, join } from 'path';
+import { basename, dirname, extname, join, relative } from 'path';
 
 import {
   BOOK_METADATA_LOCK_FIELDS,
@@ -1463,6 +1463,7 @@ export class BookService {
 
       await this.bookRepo.updateBookFile(fileId, {
         absolutePath: newAbsolutePath !== file.absolutePath ? newAbsolutePath : undefined,
+        relPath: newAbsolutePath !== file.absolutePath ? relative(file.libraryFolderPath, newAbsolutePath) : undefined,
       });
 
       this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} - rename file completed`);
