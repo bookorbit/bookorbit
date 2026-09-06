@@ -3,7 +3,7 @@ import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { basename } from 'path';
 
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import type { FastifyReply } from 'fastify';
 
@@ -41,6 +41,10 @@ import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pag
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
+import { isMissingFilesystemEntry } from '../../common/utils/fs-error.utils';
+import { sendFileWithRanges } from '../../common/utils/http-range.utils';
+import type { FileRangeRequest, FileStreamResult } from '../../common/utils/http-range.utils';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { storageConfig } from '../../config/config';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
@@ -136,6 +140,8 @@ const ROOT_SECTIONS: KoreaderCatalogEntry[] = [
 
 @Injectable()
 export class KoreaderCatalogService {
+  private readonly logger = new Logger(KoreaderCatalogService.name);
+
   constructor(
     private readonly opdsBookService: OpdsBookService,
     private readonly bookService: BookService,
@@ -493,27 +499,48 @@ export class KoreaderCatalogService {
     }
   }
 
-  async streamFile(user: RequestUser, fileId: number, reply: FastifyReply): Promise<void> {
-    const file = await this.bookService.verifyFileAccess(fileId, user);
-    if (file.role !== 'content') {
-      throw new NotFoundException('File not found');
-    }
-
-    const format = this.normalizeFormat(file.format);
-    const filename = await this.bookService.resolveDownloadFilename({
-      bookId: file.bookId,
-      absolutePath: file.absolutePath,
-      format: file.format,
-    });
+  async streamFile(user: RequestUser, fileId: number, reply: FastifyReply, options: FileRangeRequest = {}): Promise<void> {
+    const event = 'koreader.catalog_download';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] fileId=${fileId} userId=${user.id} range="${sanitizeLogValue(options.rangeHeader ?? '')}" - catalog download started`,
+    );
 
     try {
-      const { size } = await stat(file.absolutePath);
-      reply.header('Content-Disposition', contentDispositionHeader('attachment', filename, 'download'));
-      reply.header('Content-Length', size);
-      reply.type(fileMimeType(format));
-      reply.send(createReadStream(file.absolutePath));
-    } catch {
-      throw new NotFoundException('File not found on disk');
+      const file = await this.bookService.verifyFileAccess(fileId, user);
+      if (file.role !== 'content') {
+        throw new NotFoundException('File not found');
+      }
+
+      const format = this.normalizeFormat(file.format);
+      const filename = await this.bookService.resolveDownloadFilename({
+        bookId: file.bookId,
+        absolutePath: file.absolutePath,
+        format: file.format,
+      });
+
+      let result: FileStreamResult;
+      try {
+        result = await sendFileWithRanges(reply, {
+          path: file.absolutePath,
+          contentType: fileMimeType(format),
+          contentDisposition: contentDispositionHeader('attachment', filename, 'download'),
+          rangeHeader: options.rangeHeader,
+          ifRangeHeader: options.ifRangeHeader,
+        });
+      } catch (err) {
+        if (isMissingFilesystemEntry(err)) throw new NotFoundException('File not found on disk');
+        throw err;
+      }
+      this.logger.log(
+        `[${event}] [end] fileId=${fileId} userId=${user.id} durationMs=${Date.now() - startedAt} status=${result.status} sizeBytes=${result.size} sentBytes=${result.status === 416 ? 0 : result.end - result.start + 1} partial=${result.partial} - catalog download completed`,
+      );
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[${event}] [fail] fileId=${fileId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - catalog download failed`,
+      );
+      throw err;
     }
   }
 

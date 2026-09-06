@@ -99,7 +99,13 @@ export class KoreaderCatalogController {
   }
 
   @Get('files/:fileId/download')
-  download(@CurrentUser() user: RequestUser, @Param('fileId', ParseIntPipe) fileId: number, @Res() reply: FastifyReply) {
-    return this.catalogService.streamFile(user, fileId, reply);
+  download(
+    @CurrentUser() user: RequestUser,
+    @Param('fileId', ParseIntPipe) fileId: number,
+    @Res() reply: FastifyReply,
+    @Headers('range') rangeHeader?: string,
+    @Headers('if-range') ifRangeHeader?: string,
+  ) {
+    return this.catalogService.streamFile(user, fileId, reply, { rangeHeader, ifRangeHeader });
   }
 }

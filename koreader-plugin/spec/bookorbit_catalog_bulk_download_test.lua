@@ -145,11 +145,13 @@ package.loaded["bookorbit_state_manager"] = {
 }
 
 local transfers = {}
+local resume_keys = {}
 local transfer_result_hash
 package.loaded["bookorbit_download_transfer"] = {
     sweepStale = function() return 0 end,
     run = function(opts)
         table.insert(transfers, opts.destination)
+        table.insert(resume_keys, opts.resume_key or false)
         files[opts.destination] = { size = opts.expected_bytes or 0 }
         local hash = transfer_result_hash and transfer_result_hash(opts) or nil
         hashes[opts.destination] = hash
@@ -274,6 +276,7 @@ end
 local function resetRun()
     scheduled = {}
     transfers = {}
+    resume_keys = {}
     for path in pairs(files) do files[path] = nil end
     for path in pairs(hashes) do hashes[path] = nil end
     link_batches = {}
@@ -318,7 +321,7 @@ transfer_result_hash = function(opts)
     return "hash" .. tostring(opts.expected_bytes)
 end
 Catalog.client = makeClient{
-    capabilities = { "catalogBulkManifest" },
+    capabilities = { "catalogBulkManifest", "resumableDownload" },
     manifest = function(params)
         if not params.cursor then
             return {
@@ -342,6 +345,7 @@ Catalog:startBulkSource{ kind = "filter", label = "All", total = 3, params = { s
 assertEqual(prevent_calls, 1, "starting a bulk download prevents standby")
 drain()
 assertEqual(#transfers, 3, "every manifest book transfers once")
+assertEqual(resume_keys[1], "f101", "a bulk transfer names its temporary file after the remote file too")
 assertEqual(calls.manifest, 2, "enumeration follows the cursor to completion")
 assertEqual(calls.detail, 0, "manifest run issues no per-book detail request")
 assertEqual(calls.match, 0, "a verified manifest hash needs no match request")

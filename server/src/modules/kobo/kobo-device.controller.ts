@@ -97,7 +97,10 @@ export class KoboDeviceController {
     if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     const startedAt = Date.now();
     try {
-      await this.downloadService.streamBook(user.id, id, reply);
+      await this.downloadService.streamBook(user.id, id, reply, {
+        rangeHeader: req.headers.range,
+        ifRangeHeader: req.headers['if-range'],
+      });
       await this.historyService.recordSuccess({
         userId: user.id,
         deviceId: device.deviceId,

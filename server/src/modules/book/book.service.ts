@@ -16,6 +16,7 @@ import { inArray, type SQL } from 'drizzle-orm';
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { resolveIsAudiobook } from '../../common/utils/book-media.utils';
+import { isMissingFilesystemEntry } from '../../common/utils/fs-error.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { naturalCompare } from '../../common/utils/natural-sort.utils';
@@ -294,11 +295,6 @@ export class BookService {
 
   private async checkBookPassesContentFilters(bookId: number, contentFilters: ContentFilterRules): Promise<boolean> {
     return this.bookRepo.checkBookPassesContentFilters(bookId, contentFilters);
-  }
-
-  private isMissingFilesystemEntry(err: unknown): boolean {
-    const code = (err as NodeJS.ErrnoException | undefined)?.code;
-    return code === 'ENOENT' || code === 'ENOTDIR';
   }
 
   private async verifyLibraryAccessForBookIds(bookIds: number[], user: RequestUser): Promise<{ id: number; libraryId: number }[]> {
@@ -1265,7 +1261,7 @@ export class BookService {
       const cover = findPreferredBookCoverFileName(files);
       return cover ? join(dir, cover) : null;
     } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) return null;
+      if (isMissingFilesystemEntry(err)) return null;
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       const pathValue = sanitizeLogValue(dir);
@@ -1284,7 +1280,7 @@ export class BookService {
       await access(path);
       return path;
     } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) return null;
+      if (isMissingFilesystemEntry(err)) return null;
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       const pathValue = sanitizeLogValue(path);
@@ -1408,22 +1404,10 @@ export class BookService {
     }
   }
 
-  async getFileInfo(
-    fileId: number,
-    user: RequestUser,
-  ): Promise<{ path: string; size: number; format: string; bookId: number; originalFilename: string }> {
+  async getFileInfo(fileId: number, user: RequestUser): Promise<{ path: string; format: string; bookId: number; originalFilename: string }> {
     const file = await this.verifyFileAccess(fileId, user);
-    let size: number;
-    try {
-      ({ size } = await stat(file.absolutePath));
-    } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) {
-        throw new NotFoundException(`File ${fileId} not found on disk`);
-      }
-      throw err;
-    }
     const originalFilename = basename(file.absolutePath);
-    return { path: file.absolutePath, size, format: file.format ?? 'unknown', bookId: file.bookId, originalFilename };
+    return { path: file.absolutePath, format: file.format ?? 'unknown', bookId: file.bookId, originalFilename };
   }
 
   async resolveDownloadFilename(file: { bookId: number; absolutePath: string; format: string | null }): Promise<string> {
@@ -2923,7 +2907,7 @@ export class BookService {
       const { size } = await stat(file.absolutePath);
       return size;
     } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) {
+      if (isMissingFilesystemEntry(err)) {
         throw new NotFoundException(`File for book ${file.bookId} is missing on disk`);
       }
       throw err;

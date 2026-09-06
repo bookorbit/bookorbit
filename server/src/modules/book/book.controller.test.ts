@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import { ZipArchive } from 'archiver';
 import { createReadStream } from 'fs';
-import { stat } from 'fs/promises';
+import { open, stat } from 'fs/promises';
 import { Permission } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -36,12 +36,29 @@ vi.mock('fs/promises', async () => {
   const actual = await vi.importActual('fs/promises');
   return {
     ...actual,
+    open: vi.fn(),
     stat: vi.fn(),
   };
 });
 
 const mockStat = stat as MockedFunction<typeof stat>;
+const mockOpen = open as MockedFunction<typeof open>;
 const mockCreateReadStream = createReadStream as MockedFunction<typeof createReadStream>;
+
+// The two file routes hand the path to the stream helper, which opens it once and
+// takes both the identity and the bytes off that descriptor. Cover and thumbnail
+// routes still use the path-based stat and createReadStream.
+let downloadHandle: { stat: MockedFunction<never>; createReadStream: MockedFunction<never>; close: MockedFunction<never> };
+
+function stubOpen(size: number) {
+  downloadHandle = {
+    stat: vi.fn(() => Promise.resolve({ size: BigInt(size), mtimeNs: 5_000_000_000n, ino: 42n })) as never,
+    createReadStream: vi.fn(() => ({ stream: true })) as never,
+    close: vi.fn(() => Promise.resolve(undefined)) as never,
+  };
+  mockOpen.mockResolvedValue(downloadHandle as never);
+  return downloadHandle;
+}
 
 function makeUser(): RequestUser {
   return {
@@ -180,8 +197,10 @@ describe('BookController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStat.mockReset();
+    mockOpen.mockReset();
     mockCreateReadStream.mockReset();
     mockCreateReadStream.mockReturnValue({ stream: true } as never);
+    stubOpen(100);
   });
 
   it('throws NotFoundException when cover is missing', async () => {
@@ -269,11 +288,11 @@ describe('BookController', () => {
     const { reply, headers } = makeReply();
     bookService.getFileInfo.mockResolvedValue({
       path: '/tmp/book.epub',
-      size: 100,
       format: 'epub',
       bookId: 5,
       originalFilename: 'book.epub',
     });
+    stubOpen(100);
     bookService.resolveDownloadFilename.mockResolvedValue('caf\u00e9.epub');
 
     await controller.downloadFile(1, makeUser(), reply);
@@ -281,7 +300,29 @@ describe('BookController', () => {
     expect(headers['Accept-Ranges']).toBe('bytes');
     expect(headers['Content-Disposition']).toBe(`attachment; filename="caf_.epub"; filename*=UTF-8''caf%C3%A9.epub`);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
-    expect(mockCreateReadStream).toHaveBeenCalledWith('/tmp/book.epub');
+    expect(downloadHandle.createReadStream).toHaveBeenCalledWith({ start: 0 });
+  });
+
+  it('serves a partial download when a client resumes an interrupted transfer', async () => {
+    const { controller, bookService } = makeController();
+    const { reply, headers } = makeReply();
+    bookService.getFileInfo.mockResolvedValue({
+      path: '/tmp/book.epub',
+      format: 'epub',
+      bookId: 5,
+      originalFilename: 'book.epub',
+    });
+    stubOpen(1000);
+    bookService.resolveDownloadFilename.mockResolvedValue('book.epub');
+
+    await controller.downloadFile(1, makeUser(), reply, 'bytes=600-', '"3e8-12a05f200-2a"');
+
+    expect(reply.status).toHaveBeenCalledWith(206);
+    expect(headers['Content-Range']).toBe('bytes 600-999/1000');
+    expect(headers['Content-Length']).toBe(400);
+    expect(headers['ETag']).toBe('"3e8-12a05f200-2a"');
+    expect(mockOpen).toHaveBeenCalledWith('/tmp/book.epub', 'r');
+    expect(downloadHandle.createReadStream).toHaveBeenCalledWith({ start: 600, end: 999 });
   });
 
   it('serves inline content-disposition for file stream route', async () => {
@@ -289,11 +330,11 @@ describe('BookController', () => {
     const { reply, headers } = makeReply();
     bookService.getFileInfo.mockResolvedValue({
       path: '/tmp/book.epub',
-      size: 100,
       format: 'epub',
       bookId: 5,
       originalFilename: 'book.epub',
     });
+    stubOpen(100);
 
     await controller.serveFile(1, makeUser(), undefined, reply);
 
@@ -305,18 +346,18 @@ describe('BookController', () => {
     const { reply, headers } = makeReply();
     bookService.getFileInfo.mockResolvedValue({
       path: '/tmp/book.pdf',
-      size: 500,
       format: 'pdf',
       bookId: 5,
       originalFilename: 'book.pdf',
     });
+    stubOpen(500);
 
     await controller.serveFile(1, makeUser(), 'bytes=10-19', reply);
 
     expect(reply.status).toHaveBeenCalledWith(206);
     expect(headers['Content-Range']).toBe('bytes 10-19/500');
     expect(headers['Content-Length']).toBe(10);
-    expect(mockCreateReadStream).toHaveBeenCalledWith('/tmp/book.pdf', { start: 10, end: 19 });
+    expect(downloadHandle.createReadStream).toHaveBeenCalledWith({ start: 10, end: 19 });
   });
 
   it('returns 416 for unsatisfiable ranges instead of attempting stream', async () => {
@@ -324,17 +365,18 @@ describe('BookController', () => {
     const { reply, headers } = makeReply();
     bookService.getFileInfo.mockResolvedValue({
       path: '/tmp/book.epub',
-      size: 100,
       format: 'epub',
       bookId: 5,
       originalFilename: 'book.epub',
     });
+    stubOpen(100);
 
     await controller.serveFile(1, makeUser(), 'bytes=120-130', reply);
 
     expect(reply.status).toHaveBeenCalledWith(416);
     expect(headers['Content-Range']).toBe('bytes */100');
-    expect(mockCreateReadStream).not.toHaveBeenCalled();
+    expect(downloadHandle.createReadStream).not.toHaveBeenCalled();
+    expect(downloadHandle.close).toHaveBeenCalledTimes(1);
   });
 
   it('streams server-sent events for bulk metadata refresh progress', async () => {
@@ -764,6 +806,34 @@ describe('BookController', () => {
     await expect(controller.downloadFile(1, makeUser(), reply)).rejects.toThrow('fs unavailable');
   });
 
+  it('reports a file that vanished from disk as not found on both file routes', async () => {
+    const { controller, bookService } = makeController();
+    bookService.getFileInfo.mockResolvedValue({
+      path: '/tmp/book.epub',
+      format: 'epub',
+      bookId: 5,
+      originalFilename: 'book.epub',
+    });
+    bookService.resolveDownloadFilename.mockResolvedValue('book.epub');
+    mockOpen.mockRejectedValue(Object.assign(new Error('gone'), { code: 'ENOENT' }));
+
+    await expect(controller.downloadFile(1, makeUser(), makeReply().reply)).rejects.toThrow('File 1 not found on disk');
+    await expect(controller.serveFile(1, makeUser(), undefined, makeReply().reply)).rejects.toThrow('File 1 not found on disk');
+  });
+
+  it('propagates a file read failure that is not a missing file', async () => {
+    const { controller, bookService } = makeController();
+    bookService.getFileInfo.mockResolvedValue({
+      path: '/tmp/book.epub',
+      format: 'epub',
+      bookId: 5,
+      originalFilename: 'book.epub',
+    });
+    mockOpen.mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
+
+    await expect(controller.serveFile(1, makeUser(), undefined, makeReply().reply)).rejects.toThrow('denied');
+  });
+
   it('uses fallback object when no file progress exists', async () => {
     const { controller, bookService } = makeController();
     const user = makeUser();
@@ -997,11 +1067,11 @@ describe('BookController', () => {
     const { reply, headers } = makeReply();
     bookService.getFileInfo.mockResolvedValue({
       path: '/tmp/book.epub',
-      size: 100,
       format: 'epub',
       bookId: 5,
       originalFilename: 'book.epub',
     });
+    stubOpen(100);
     bookService.resolveDownloadFilename.mockResolvedValue('ok-\uD83D\uDE00-\uD800.epub');
 
     await controller.downloadFile(1, makeUser(), reply);

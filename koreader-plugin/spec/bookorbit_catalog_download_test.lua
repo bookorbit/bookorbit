@@ -244,8 +244,12 @@ package.loaded["bookorbit_download_transfer"].run = function(opts)
     return nil, "cancelled"
 end
 Catalog.runOffThread = function(_, fn) return fn() end
+local server_capabilities = {}
 Catalog.client = {
     downloadCatalogFile = function() return true end,
+    getPluginVersion = function()
+        return { serverVersion = "1.0", capabilities = server_capabilities }
+    end,
 }
 Catalog.showRetry = function()
     error("a cancelled download must not offer a retry")
@@ -270,5 +274,28 @@ Catalog:downloadFile("/mnt/onboard/library/Cancelled.epub", detail, { id = 9, si
 assertEqual(Catalog.download_generation > generation_before, true, "cancelling advances the download generation")
 assertEqual(transfer_opts.is_current(), false, "a late child result is refused after cancellation")
 assertEqual(shown_widget.text, "Download cancelled.", "the dismissed dialog is not resurrected by late progress")
+
+-- Resuming is only safe against a server that answers Range requests. An older
+-- one would restart the body at byte zero and append it to bytes already on
+-- disk, so the temporary file stays named after the attempt until the server
+-- advertises the capability.
+local Capabilities = require("bookorbit_capabilities")
+package.loaded["bookorbit_download_transfer"].run = function(opts)
+    transfer_opts = opts
+    return nil, "cancelled"
+end
+
+Capabilities.reset()
+server_capabilities = {}
+Catalog:downloadFile("/mnt/onboard/library/Resumable.epub", detail, { id = 9, sizeBytes = 100 })
+assertEqual(transfer_opts.resume_key, nil, "a server without the capability gets no resume key")
+
+Capabilities.reset()
+server_capabilities = { "resumableDownload" }
+Catalog:downloadFile("/mnt/onboard/library/Resumable.epub", detail, { id = 9, sizeBytes = 100 })
+assertEqual(transfer_opts.resume_key, "f9", "a server that answers ranges gets a key naming the remote file")
+
+Catalog:downloadFile("/mnt/onboard/library/Resumable.epub", detail, { sizeBytes = 100 })
+assertEqual(transfer_opts.resume_key, nil, "a file without an id cannot be named for a resume")
 
 print("bookorbit_catalog_download_test.lua: ok")

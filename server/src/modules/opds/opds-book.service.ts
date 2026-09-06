@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { SQL, and, count, eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -679,6 +679,12 @@ export class OpdsBookService {
       title: file.title ?? `book-${bookId}`,
       authorName: authorRow?.name ?? '',
     };
+  }
+
+  async getDownloadTarget(bookId: number, fileId?: number): Promise<{ absolutePath: string; format: string }> {
+    const file = await this.getBookFiles(bookId, fileId);
+    if (!file) throw new NotFoundException('File not found');
+    return { absolutePath: file.absolutePath, format: file.format };
   }
 
   private async buildSmartScopeWhere(
