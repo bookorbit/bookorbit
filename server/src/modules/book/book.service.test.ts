@@ -5129,7 +5129,16 @@ describe('BookService', () => {
       const { service, bookRepo, libraryService } = makeService();
       const user = makeUser({ id: 1 });
       const fileId = 100;
-      const file = { absolutePath: '/path/to/old.epub', filename: 'old.epub', format: 'epub', role: 'content', bookId: 10, libraryId: 1 };
+      const file = {
+        absolutePath: '/library/Author/old.epub',
+        relPath: 'Author/old.epub',
+        libraryFolderPath: '/library',
+        filename: 'old.epub',
+        format: 'epub',
+        role: 'content',
+        bookId: 10,
+        libraryId: 1,
+      };
 
       bookRepo.findFileById = vi.fn().mockResolvedValue(file);
       libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
@@ -5139,9 +5148,10 @@ describe('BookService', () => {
 
       await service.renameFile(fileId, { filename: 'new.epub' }, user);
 
-      expect(rename).toHaveBeenCalledWith('/path/to/old.epub', '/path/to/new.epub');
+      expect(rename).toHaveBeenCalledWith('/library/Author/old.epub', '/library/Author/new.epub');
       expect(bookRepo.updateBookFile).toHaveBeenCalledWith(fileId, {
-        absolutePath: '/path/to/new.epub',
+        absolutePath: '/library/Author/new.epub',
+        relPath: 'Author/new.epub',
       });
     });
 
@@ -5149,7 +5159,15 @@ describe('BookService', () => {
       const { service, bookRepo, libraryService } = makeService();
       const user = makeUser({ id: 1 });
       const fileId = 100;
-      const file = { absolutePath: '/path/to/old.epub', filename: 'old.epub', format: 'epub', role: 'content', bookId: 10, libraryId: 1 };
+      const file = {
+        absolutePath: '/path/to/old.epub',
+        libraryFolderPath: '/path/to',
+        filename: 'old.epub',
+        format: 'epub',
+        role: 'content',
+        bookId: 10,
+        libraryId: 1,
+      };
 
       bookRepo.findFileById = vi.fn().mockResolvedValue(file);
       libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
@@ -5165,7 +5183,15 @@ describe('BookService', () => {
       const { service, bookRepo, libraryService } = makeService();
       const user = makeUser({ id: 1 });
       const fileId = 100;
-      const file = { absolutePath: '/path/to/old.epub', filename: 'old.epub', format: 'epub', role: 'content', bookId: 10, libraryId: 1 };
+      const file = {
+        absolutePath: '/path/to/old.epub',
+        libraryFolderPath: '/path/to',
+        filename: 'old.epub',
+        format: 'epub',
+        role: 'content',
+        bookId: 10,
+        libraryId: 1,
+      };
 
       bookRepo.findFileById = vi.fn().mockResolvedValue(file);
       libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
@@ -5178,6 +5204,7 @@ describe('BookService', () => {
       expect(rename).not.toHaveBeenCalled();
       expect(bookRepo.updateBookFile).toHaveBeenCalledWith(fileId, {
         absolutePath: undefined,
+        relPath: undefined,
       });
     });
   });

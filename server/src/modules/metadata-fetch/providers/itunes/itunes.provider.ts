@@ -13,6 +13,17 @@ import { ITunesResponse } from './itunes.types';
 
 const SEARCH_URL = 'https://itunes.apple.com/search';
 const LOOKUP_URL = 'https://itunes.apple.com/lookup';
+type ITunesMediaKind = 'ebook' | 'audiobook';
+
+function mediaKindOf(result: ITunesResponse['results'][number]): ITunesMediaKind | null {
+  if (result.kind === 'ebook' || result.kind === 'audiobook') return result.kind;
+  if (result.wrapperType === 'audiobook') return 'audiobook';
+  return null;
+}
+
+function matchesMediaKind(result: ITunesResponse['results'][number], expected: ITunesMediaKind): boolean {
+  return mediaKindOf(result) === expected;
+}
 
 @Injectable()
 export class ITunesProvider implements IdentifiableProvider {
@@ -33,7 +44,8 @@ export class ITunesProvider implements IdentifiableProvider {
 
     const url = new URL(SEARCH_URL);
     url.searchParams.set('term', query);
-    url.searchParams.set('entity', params.isAudiobook ? 'audiobook' : 'ebook');
+    const mediaKind: ITunesMediaKind = params.isAudiobook ? 'audiobook' : 'ebook';
+    url.searchParams.set('entity', mediaKind);
     url.searchParams.set('limit', '10');
     const requestUrl = url.toString();
     const startedAt = Date.now();
@@ -49,6 +61,7 @@ export class ITunesProvider implements IdentifiableProvider {
       }
       const body = (await res.json()) as ITunesResponse;
       const results = body.results
+        .filter((result) => matchesMediaKind(result, mediaKind))
         .map((r) => {
           try {
             return mapITunesResult(r, coverResolution);
@@ -75,7 +88,7 @@ export class ITunesProvider implements IdentifiableProvider {
     }
   }
 
-  async lookupById(providerId: string, signal?: AbortSignal): Promise<MetadataCandidate | null> {
+  async lookupById(providerId: string, signal?: AbortSignal, params?: MetadataSearchParams): Promise<MetadataCandidate | null> {
     const { enabled, coverResolution } = await this.providerConfig.getConfig().then((c) => c.itunes);
     if (!enabled) return null;
 
@@ -95,9 +108,12 @@ export class ITunesProvider implements IdentifiableProvider {
       }
       const body = (await res.json()) as ITunesResponse;
       let result: MetadataCandidate | null = null;
-      if (body.results.length > 0) {
+      const rawResult = body.results[0];
+      const expectedMediaKind: ITunesMediaKind | undefined =
+        params?.isAudiobook === undefined ? undefined : params.isAudiobook ? 'audiobook' : 'ebook';
+      if (rawResult && (expectedMediaKind === undefined || matchesMediaKind(rawResult, expectedMediaKind))) {
         try {
-          result = mapITunesResult(body.results[0], coverResolution);
+          result = mapITunesResult(rawResult, coverResolution);
         } catch (err) {
           this.logger.warn(`[itunes] failed to map lookup result providerId="${providerId}": ${err instanceof Error ? err.message : String(err)}`);
         }

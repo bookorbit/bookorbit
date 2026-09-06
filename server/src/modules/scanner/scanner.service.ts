@@ -45,6 +45,7 @@ interface BookEntry {
 interface FileByPathEntry {
   id: number;
   bookId: number;
+  relPath: string | null;
   ino: bigint;
   sizeBytes: number | null;
   mtime: Date | null;
@@ -291,6 +292,7 @@ export class ScannerService implements OnApplicationBootstrap {
       id: number;
       bookId: number;
       absolutePath: string;
+      relPath: string | null;
       ino: bigint;
       sizeBytes: number | null;
       mtime: Date | null;
@@ -316,7 +318,16 @@ export class ScannerService implements OnApplicationBootstrap {
     const fileByPath = new Map<string, FileByPathEntry>(
       knownFiles.map((f) => [
         f.absolutePath,
-        { id: f.id, bookId: f.bookId, ino: f.ino, sizeBytes: f.sizeBytes, mtime: f.mtime, fileHash: f.fileHash, sortOrder: f.sortOrder ?? null },
+        {
+          id: f.id,
+          bookId: f.bookId,
+          relPath: f.relPath,
+          ino: f.ino,
+          sizeBytes: f.sizeBytes,
+          mtime: f.mtime,
+          fileHash: f.fileHash,
+          sortOrder: f.sortOrder ?? null,
+        },
       ]),
     );
 
@@ -956,10 +967,12 @@ export class ScannerService implements OnApplicationBootstrap {
         id: f.id,
         bookId: f.bookId,
         absolutePath: f.absolutePath,
+        relPath: f.relPath,
         ino: f.ino,
         sizeBytes: f.sizeBytes,
         mtime: f.mtime,
         fileHash: f.fileHash,
+        sortOrder: f.sortOrder,
       })),
     );
   }
@@ -2154,19 +2167,21 @@ export class ScannerService implements OnApplicationBootstrap {
     const sizeUnchanged = fileStat.sizeBytes === byPath.sizeBytes;
     const mtimeUnchanged = fileStat.mtime.getTime() === byPath.mtime?.getTime();
     const inoUnchanged = fileStat.ino === byPath.ino;
+    const relPathUnchanged = fileStat.relPath === byPath.relPath;
     const reassigned = byPath.bookId !== bookId;
     const sortOrderUnchanged = sortOrder === byPath.sortOrder;
 
-    if (sizeUnchanged && mtimeUnchanged && inoUnchanged && !reassigned && sortOrderUnchanged) {
+    if (sizeUnchanged && mtimeUnchanged && inoUnchanged && relPathUnchanged && !reassigned && sortOrderUnchanged) {
       return { isNew: false, reassigned: false, changed: false, fileId: byPath.id };
     }
 
     await waitForStability(fileStat.absolutePath, fileStat.mtime.getTime());
 
-    if (!sizeUnchanged || !mtimeUnchanged || !inoUnchanged || reassigned) {
+    if (!sizeUnchanged || !mtimeUnchanged || !inoUnchanged || !relPathUnchanged || reassigned) {
       await this.scannerRepo.updateBookFile(byPath.id, {
         ...(reassigned && { bookId }),
         libraryFolderId,
+        relPath: fileStat.relPath,
         ino: fileStat.ino,
         sizeBytes: fileStat.sizeBytes,
         mtime: fileStat.mtime,
@@ -2187,6 +2202,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByPath.set(fileStat.absolutePath, {
       id: byPath.id,
       bookId,
+      relPath: fileStat.relPath,
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
@@ -2242,6 +2258,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByPath.set(fileStat.absolutePath, {
       id: byIno.id,
       bookId,
+      relPath: fileStat.relPath,
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
@@ -2308,6 +2325,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByPath.set(fileStat.absolutePath, {
       id: globalByIno.file.id,
       bookId,
+      relPath: fileStat.relPath,
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
@@ -2383,6 +2401,7 @@ export class ScannerService implements OnApplicationBootstrap {
         fileByPath.set(fileStat.absolutePath, {
           id: byHash.id,
           bookId,
+          relPath: fileStat.relPath,
           ino: fileStat.ino,
           sizeBytes: fileStat.sizeBytes,
           mtime: fileStat.mtime,
@@ -2443,6 +2462,7 @@ export class ScannerService implements OnApplicationBootstrap {
         fileByPath.set(fileStat.absolutePath, {
           id: globalByHash.file.id,
           bookId,
+          relPath: fileStat.relPath,
           ino: fileStat.ino,
           sizeBytes: fileStat.sizeBytes,
           mtime: fileStat.mtime,
@@ -2485,6 +2505,7 @@ export class ScannerService implements OnApplicationBootstrap {
         {
           id: concurrent.file.id,
           bookId: concurrent.file.bookId,
+          relPath: concurrent.file.relPath,
           ino: concurrent.file.ino,
           sizeBytes: concurrent.file.sizeBytes,
           mtime: concurrent.file.mtime,
@@ -2506,6 +2527,7 @@ export class ScannerService implements OnApplicationBootstrap {
     fileByPath.set(fileStat.absolutePath, {
       id: created.id,
       bookId,
+      relPath: fileStat.relPath,
       ino: fileStat.ino,
       sizeBytes: fileStat.sizeBytes,
       mtime: fileStat.mtime,
