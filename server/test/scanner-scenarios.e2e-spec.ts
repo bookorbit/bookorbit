@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import type { FixtureEntry } from './e2e/scanner/scanner-fixture-builder';
-import { createFixtureTree, file } from './e2e/scanner/scanner-fixture-builder';
+import { createFixtureTree, file, symlink, symlinkDir } from './e2e/scanner/scanner-fixture-builder';
 import {
   assertNoIntegrityViolations,
   closeScannerE2EContext,
@@ -237,6 +237,30 @@ const bookPerFolderScenarios: ScannerScenario[] = [
     mode: 'book_per_folder',
     entries: [file('AudioBook/Discography/01.mp3'), file('AudioBook/cover.jpg')],
     expected: [{ folderPath: 'AudioBook/Discography', filePaths: ['AudioBook/Discography/01.mp3'], primaryPath: 'AudioBook/Discography/01.mp3' }],
+  },
+  {
+    id: 'book-per-folder-symlinked-audio-file-included',
+    mode: 'book_per_folder',
+    entries: [symlink('Audio/track-1.mp3'), file('Audio/track-2.mp3'), file('Audio/cover.jpg')],
+    expected: [
+      {
+        folderPath: 'Audio',
+        filePaths: ['Audio/cover.jpg', 'Audio/track-1.mp3', 'Audio/track-2.mp3'],
+        primaryPath: 'Audio/track-1.mp3',
+      },
+    ],
+  },
+  {
+    id: 'book-per-folder-symlinked-directory-excluded',
+    mode: 'book_per_folder',
+    entries: [file('AudioSymlinked/track-1.mp3'), file('AudioSymlinked/cover.jpg'), symlinkDir('AudioSymlinked/Extras', [file('bonus.mp3')])],
+    expected: [
+      {
+        folderPath: 'AudioSymlinked',
+        filePaths: ['AudioSymlinked/cover.jpg', 'AudioSymlinked/track-1.mp3'],
+        primaryPath: 'AudioSymlinked/track-1.mp3',
+      },
+    ],
   },
 ];
 
