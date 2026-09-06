@@ -809,7 +809,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: true, libraries: {}, collections: {}, smartScopes: {} },
+        seriesCollapsePreferences: { global: true, libraries: {}, collections: {}, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -826,7 +826,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: true, libraries: { '3': true }, collections: { '7': false }, smartScopes: {} },
+        seriesCollapsePreferences: { global: true, libraries: { '3': true }, collections: { '7': false }, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -843,7 +843,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: false, libraries: { '1': true, '2': false }, collections: {}, smartScopes: {} },
+        seriesCollapsePreferences: { global: false, libraries: { '1': true, '2': false }, collections: {}, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -860,7 +860,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: true, libraries: {}, collections: { '5': false, '9': true }, smartScopes: {} },
+        seriesCollapsePreferences: { global: true, libraries: {}, collections: { '5': false, '9': true }, smartScopes: {}, authorPages: false },
       },
     });
   });
@@ -897,8 +897,45 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
     expect(userRepo.update).toHaveBeenCalledWith(1, {
       settings: {
-        seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, smartScopes: { '3': true } },
+        seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, smartScopes: { '3': true }, authorPages: false },
       },
     });
+  });
+
+  it('sets the author pages flag on its own', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '3': true }, collections: {} },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { authorPages: true });
+
+    expect(userRepo.update).toHaveBeenCalledWith(1, {
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: { '3': true }, collections: {}, smartScopes: {}, authorPages: true },
+      },
+    });
+  });
+
+  it('leaves the author pages flag alone when another scope is written', async () => {
+    userRepo.findByIdWithPermissions.mockResolvedValue({
+      id: 1,
+      settings: {
+        seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, authorPages: true },
+      },
+    });
+
+    await service.updateSeriesCollapsePreferences(1, { global: true });
+
+    expect(userRepo.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          seriesCollapsePreferences: expect.objectContaining({ authorPages: true }),
+        }),
+      }),
+    );
   });
 });

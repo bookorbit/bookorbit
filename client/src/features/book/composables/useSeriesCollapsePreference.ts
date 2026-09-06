@@ -4,6 +4,12 @@ import { resolveCollapsePreference } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { api } from '@/lib/api'
 
+/**
+ * A place whose collapse state is remembered. `authorPages` is a single flag rather than an id,
+ * so every author page shares it - see the type in `@bookorbit/types` for why.
+ */
+export type CollapseScope = { libraryId?: number; collectionId?: number; smartScopeId?: number; authorPages?: boolean }
+
 export function useSeriesCollapsePreference() {
   const { user } = useAuth()
 
@@ -11,28 +17,24 @@ export function useSeriesCollapsePreference() {
     return user.value?.settings.seriesCollapsePreferences
   })
 
-  function getEffectivePreference(ctx: { libraryId?: number; collectionId?: number; smartScopeId?: number }): boolean {
+  function getEffectivePreference(ctx: CollapseScope): boolean {
     return resolveCollapsePreference(prefs.value, ctx)
   }
 
   let pendingUpdate: Promise<void> = Promise.resolve()
 
-  async function setPreference(
-    ctx: { libraryId?: number; collectionId?: number; smartScopeId?: number } | 'global',
-    value: boolean | null,
-  ): Promise<void> {
+  async function setPreference(ctx: CollapseScope | 'global', value: boolean | null): Promise<void> {
     const op = () => doSetPreference(ctx, value)
     pendingUpdate = pendingUpdate.then(op, op)
     return pendingUpdate
   }
 
-  async function doSetPreference(
-    ctx: { libraryId?: number; collectionId?: number; smartScopeId?: number } | 'global',
-    value: boolean | null,
-  ): Promise<void> {
+  async function doSetPreference(ctx: CollapseScope | 'global', value: boolean | null): Promise<void> {
     let body: Record<string, unknown>
     if (ctx === 'global') {
       body = { global: value === null ? false : value }
+    } else if (ctx.authorPages) {
+      body = { authorPages: value === null ? false : value }
     } else if (ctx.smartScopeId !== undefined) {
       body = { smartScopes: { [String(ctx.smartScopeId)]: value } }
     } else if (ctx.collectionId !== undefined) {
@@ -64,6 +66,7 @@ export function useSeriesCollapsePreference() {
       libraries: nextLibraries as Record<string, boolean>,
       collections: nextCollections as Record<string, boolean>,
       smartScopes: nextSmartScopes as Record<string, boolean>,
+      authorPages: body.authorPages !== undefined ? (body.authorPages as boolean) : (current.authorPages ?? false),
     }
 
     const previous = user.value?.settings ? { ...user.value.settings } : undefined

@@ -66,4 +66,35 @@ describe('resolveCollapsePreference', () => {
     const prefs: SeriesCollapsePreferences = { global: false, libraries: { '42': true }, collections: {} };
     expect(resolveCollapsePreference(prefs, { libraryId: 42 })).toBe(true);
   });
+
+  describe('author pages', () => {
+    it('returns the author pages flag when it is set', () => {
+      const prefs: SeriesCollapsePreferences = { global: false, libraries: {}, collections: {}, authorPages: true };
+      expect(resolveCollapsePreference(prefs, { authorPages: true })).toBe(true);
+    });
+
+    it('stays off for prefs saved before the flag existed, whatever global says', () => {
+      const prefs: SeriesCollapsePreferences = { global: true, libraries: {}, collections: {} };
+      expect(resolveCollapsePreference(prefs, { authorPages: true })).toBe(false);
+    });
+
+    it('does not inherit global, in either direction', () => {
+      const globalOn: SeriesCollapsePreferences = { global: true, libraries: {}, collections: {}, authorPages: false };
+      expect(resolveCollapsePreference(globalOn, { authorPages: true })).toBe(false);
+
+      const globalOff: SeriesCollapsePreferences = { global: false, libraries: {}, collections: {}, authorPages: true };
+      expect(resolveCollapsePreference(globalOff, { authorPages: true })).toBe(true);
+    });
+
+    it('ignores library overrides, since the author page filter is not a scope', () => {
+      const prefs: SeriesCollapsePreferences = { global: false, libraries: { '3': true }, collections: {}, authorPages: false };
+      expect(resolveCollapsePreference(prefs, { authorPages: true, libraryId: 3 })).toBe(false);
+    });
+
+    it('leaves the other scopes untouched when the flag is on', () => {
+      const prefs: SeriesCollapsePreferences = { global: false, libraries: { '3': true }, collections: {}, authorPages: true };
+      expect(resolveCollapsePreference(prefs, { libraryId: 3 })).toBe(true);
+      expect(resolveCollapsePreference(prefs, {})).toBe(false);
+    });
+  });
 });

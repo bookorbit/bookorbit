@@ -504,6 +504,7 @@ export class UserService {
       libraries: { ...currentPrefs.libraries, ...(dto.libraries ?? {}) },
       collections: { ...currentPrefs.collections, ...(dto.collections ?? {}) },
       smartScopes: { ...(currentPrefs.smartScopes ?? {}), ...(dto.smartScopes ?? {}) },
+      authorPages: dto.authorPages !== undefined ? dto.authorPages : (currentPrefs.authorPages ?? false),
     };
 
     // Remove entries set to null (deletion of overrides)
