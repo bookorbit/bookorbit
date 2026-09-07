@@ -1170,6 +1170,38 @@ describe('file identity resolution', () => {
     expect(repo.createBookFile).not.toHaveBeenCalled();
   });
 
+  it('repairs a stale relPath when the absolute path and file state are unchanged', async () => {
+    const mtime = new Date('2024-01-01');
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/new.epub', relPath: 'Author/Book/new.epub', mtime });
+    const repo = makeRepo({
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([
+        makeBookFile({
+          absolutePath: fileStat.absolutePath,
+          relPath: 'Author/Book/old.epub',
+          mtime,
+          sizeBytes: fileStat.sizeBytes,
+        }),
+      ]),
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [fileStat])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.updateBookFile).toHaveBeenCalledWith(1, expect.objectContaining({ relPath: 'Author/Book/new.epub' }));
+    expect(repo.createBookFile).not.toHaveBeenCalled();
+  });
+
   it('repairs a previously clamped inode even when the file size and mtime are unchanged', async () => {
     const mtime = new Date('2024-01-01');
     const exactIno = 14351917807348929000n;

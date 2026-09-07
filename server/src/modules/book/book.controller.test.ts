@@ -992,6 +992,11 @@ describe('BookController', () => {
     }
   });
 
+  it('requires mutation permissions for per-file rename and delete', () => {
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookController.prototype.renameFile)).toBe(Permission.LibraryEditMetadata);
+    expect(Reflect.getMetadata(PERMISSION_KEY, BookController.prototype.deleteFile)).toBe(Permission.LibraryDeleteBooks);
+  });
+
   it('preserves valid surrogate pairs while stripping lone surrogates in download filenames', async () => {
     const { controller, bookService } = makeController();
     const { reply, headers } = makeReply();

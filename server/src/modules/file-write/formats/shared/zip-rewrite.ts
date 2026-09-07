@@ -10,14 +10,18 @@ export interface ZipRewriteEntry {
   store?: boolean;
 }
 
+export interface ZipRewriteOptions {
+  comment?: string;
+}
+
 /**
  * Archiver pipes an appended stream into its queue immediately, so appending every entry of a large
  * archive up front holds one descriptor and one decompression buffer per entry until the rewrite
  * finishes. Entries are appended one at a time and their sources opened only once archiver is ready
  * for them, which keeps descriptors and memory flat regardless of entry count.
  */
-export async function writeZipArchive(tmpPath: string, entries: Iterable<ZipRewriteEntry>): Promise<void> {
-  const archive = new ZipArchive({ zlib: { level: ZLIB_COMPRESSION_LEVEL } });
+export async function writeZipArchive(tmpPath: string, entries: Iterable<ZipRewriteEntry>, options: ZipRewriteOptions = {}): Promise<void> {
+  const archive = new ZipArchive({ zlib: { level: ZLIB_COMPRESSION_LEVEL }, comment: options.comment });
   const output = createWriteStream(tmpPath);
 
   let fail!: (error: Error) => void;

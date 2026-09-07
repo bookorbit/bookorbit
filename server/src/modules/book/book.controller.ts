@@ -484,12 +484,14 @@ export class BookController {
 
   @Patch('files/:fileId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.LibraryEditMetadata)
   async renameFile(@Param('fileId', ParseIntPipe) fileId: number, @Body() dto: UpdateBookFileDto, @CurrentUser() user: RequestUser) {
     await this.bookService.renameFile(fileId, dto, user);
   }
 
   @Delete('files/:fileId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(Permission.LibraryDeleteBooks)
   async deleteFile(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
     await this.bookService.deleteFile(fileId, user);
   }

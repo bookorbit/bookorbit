@@ -13,7 +13,7 @@ type Db = NodePgDatabase<typeof schema>;
 type UpNextInSeriesRow = { id: number };
 type RandomCandidateRow = { sampleIndex: number; id: number };
 const AUDIO_FORMATS = BOOK_FORMATS.filter(isAudioFormat);
-const CONTINUE_READING_EXCLUDED_READ_STATUSES = ['unread', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
+const CONTINUE_SCROLLER_EXCLUDED_READ_STATUSES = ['unread', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
 const DISCOVERY_EXCLUDED_READ_STATUSES = ['reading', 'rereading', 'on_hold', 'read', 'skimmed', 'abandoned'] as const satisfies readonly ReadStatus[];
 // Three independent pivots per requested row tolerate moderate collisions from
 // sparse eligibility. The ceiling prevents large requests from multiplying probes.
@@ -60,7 +60,7 @@ export class DashboardRepository {
           eq(books.status, 'present'),
           or(isNull(bookFiles.format), notInArray(bookFiles.format, AUDIO_FORMATS)),
           sql`${readingProgress.percentage} > 0 and ${readingProgress.percentage} < 100`,
-          or(isNull(userBookStatus.bookId), notInArray(userBookStatus.status, [...CONTINUE_READING_EXCLUDED_READ_STATUSES])),
+          or(isNull(userBookStatus.bookId), notInArray(userBookStatus.status, [...CONTINUE_SCROLLER_EXCLUDED_READ_STATUSES])),
           ...cfClauses,
         ),
       )
@@ -92,11 +92,13 @@ export class DashboardRepository {
           inArray(bookFiles.format, AUDIO_FORMATS),
         ),
       )
+      .leftJoin(userBookStatus, and(eq(userBookStatus.bookId, books.id), eq(userBookStatus.userId, userId)))
       .where(
         and(
           inArray(books.libraryId, accessibleLibraryIds),
           eq(books.status, 'present'),
           sql`${audiobookProgress.percentage} > 0 and ${audiobookProgress.percentage} < 100`,
+          or(isNull(userBookStatus.bookId), notInArray(userBookStatus.status, [...CONTINUE_SCROLLER_EXCLUDED_READ_STATUSES])),
           ...cfClauses,
         ),
       )

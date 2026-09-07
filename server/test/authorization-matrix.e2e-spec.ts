@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
+import { access, chmod } from 'fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -91,6 +92,7 @@ interface Personas {
   koboRevoked: TestUserSession;
   bookDockUser: TestUserSession;
   uploadUser: TestUserSession;
+  downloadOnlyUser: TestUserSession;
   ownerUser: TestUserSession;
   otherUser: TestUserSession;
   targetSuperuser: TestUserSession;
@@ -224,6 +226,7 @@ describe('Authorization matrix (e2e)', () => {
       koboRevoked: await createUserAndLogin(ctx, { permissions: [Permission.KoboSync] }),
       bookDockUser: await createUserAndLogin(ctx, { permissions: [Permission.BookDockAccess, Permission.LibraryUpload] }),
       uploadUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryUpload] }),
+      downloadOnlyUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryDownload] }),
       ownerUser: await createUserAndLogin(ctx),
       otherUser: await createUserAndLogin(ctx),
       targetSuperuser: await createUserAndLogin(ctx, { isSuperuser: true }),
@@ -234,6 +237,7 @@ describe('Authorization matrix (e2e)', () => {
       grantLibraryAccess(ctx, personas.allPermsUser.userId, libraryB.libraryId, 'owner'),
       grantLibraryAccess(ctx, personas.metadataEditor.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.bookDockUser.userId, libraryA.libraryId, 'viewer'),
+      grantLibraryAccess(ctx, personas.downloadOnlyUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.ownerUser.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.opdsOwner.userId, libraryA.libraryId, 'viewer'),
       grantLibraryAccess(ctx, personas.opdsIntruder.userId, libraryA.libraryId, 'viewer'),
@@ -489,6 +493,56 @@ describe('Authorization matrix (e2e)', () => {
   });
 
   describe('guard matrix - jwt/permission/library/default-password', () => {
+    it('blocks per-file mutations for a download-only viewer without changing the file record', async () => {
+      const renameResponse = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/files/${bookA.bookFileId}`,
+        headers: authHeader(personas.downloadOnlyUser.accessToken),
+        payload: { filename: 'unauthorized-rename.epub' },
+      });
+      expectError(renameResponse, 403, 'Missing permission: library_edit_metadata');
+
+      const deleteResponse = await ctx.app.inject({
+        method: 'DELETE',
+        url: `/api/v1/books/files/${bookA.bookFileId}`,
+        headers: authHeader(personas.downloadOnlyUser.accessToken),
+      });
+      expectError(deleteResponse, 403, 'Missing permission: library_delete_books');
+
+      await expect(access(bookA.absolutePath)).resolves.toBeUndefined();
+      const [fileRow] = await ctx.db
+        .select({ id: schema.bookFiles.id, absolutePath: schema.bookFiles.absolutePath })
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.id, bookA.bookFileId));
+      expect(fileRow).toEqual({ id: bookA.bookFileId, absolutePath: bookA.absolutePath });
+    });
+
+    it('preserves the file record when physical deletion fails', async () => {
+      const failurePath = await createEpubFixture(libraryA.folderPath, `locked-${randomUUID()}/delete-failure.epub`);
+      await triggerAndWaitForLibraryScan(ctx, libraryA.libraryId);
+      const failureTarget = await locateBookByAbsolutePath(ctx, failurePath);
+      const lockedDirectory = dirname(failurePath);
+
+      await chmod(lockedDirectory, 0o555);
+      try {
+        const response = await ctx.app.inject({
+          method: 'DELETE',
+          url: `/api/v1/books/files/${failureTarget.bookFileId}`,
+          headers: authHeader(personas.allPermsUser.accessToken),
+        });
+        expectError(response, 500, 'Failed to delete file from disk');
+
+        await expect(access(failurePath)).resolves.toBeUndefined();
+        const [fileRow] = await ctx.db
+          .select({ id: schema.bookFiles.id, absolutePath: schema.bookFiles.absolutePath })
+          .from(schema.bookFiles)
+          .where(eq(schema.bookFiles.id, failureTarget.bookFileId));
+        expect(fileRow).toEqual({ id: failureTarget.bookFileId, absolutePath: failurePath });
+      } finally {
+        await chmod(lockedDirectory, 0o755);
+      }
+    });
+
     it('keeps the dashboard scroller inventory in parity with the live application', () => {
       expect(routeInventory.routes).toHaveLength(routeInventory.totalRoutes);
       const inventoryLabels = routeInventory.routes

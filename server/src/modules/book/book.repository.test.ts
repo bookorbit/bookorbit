@@ -53,6 +53,25 @@ function makeInsertChain() {
 }
 
 describe('BookRepository', () => {
+  it('updates absolute and relative book file paths together', async () => {
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn().mockReturnValue({ where });
+    const db = { update: vi.fn().mockReturnValue({ set }) };
+    const repo = new BookRepository(db as never);
+
+    await repo.updateBookFile(9, {
+      absolutePath: '/library/Author/new.epub',
+      relPath: 'Author/new.epub',
+    });
+
+    expect(set).toHaveBeenCalledWith({
+      absolutePath: '/library/Author/new.epub',
+      relPath: 'Author/new.epub',
+      updatedAt: expect.any(Date),
+    });
+    expect(where).toHaveBeenCalledOnce();
+  });
+
   it('runs callbacks inside db transactions', async () => {
     const db = {
       transaction: vi.fn((callback: (tx: { id: string }) => Promise<string>) => callback({ id: 'tx-1' })),
@@ -431,7 +450,17 @@ describe('BookRepository', () => {
     const libraryIdChain = makeSelectChain('limit', [{ libraryId: 5 }]);
     const missingLibraryChain = makeSelectChain('limit', []);
     const fileByIdChain = makeSelectChain('limit', [
-      { id: 9, absolutePath: '/books/a.epub', format: 'epub', bookId: 1, libraryId: 2, fileHash: null, sizeBytes: null },
+      {
+        id: 9,
+        absolutePath: '/books/a.epub',
+        relPath: 'a.epub',
+        libraryFolderPath: '/books',
+        format: 'epub',
+        bookId: 1,
+        libraryId: 2,
+        fileHash: null,
+        sizeBytes: null,
+      },
     ]);
     const missingFileChain = makeSelectChain('limit', []);
     const progressChain = makeSelectChain('limit', [{ percentage: 12 }]);
@@ -476,6 +505,8 @@ describe('BookRepository', () => {
     await expect(repo.findFileById(9)).resolves.toEqual({
       id: 9,
       absolutePath: '/books/a.epub',
+      relPath: 'a.epub',
+      libraryFolderPath: '/books',
       format: 'epub',
       bookId: 1,
       libraryId: 2,

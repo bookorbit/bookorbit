@@ -242,6 +242,30 @@
   {
     "file": "server/src/modules/book/book.controller.ts",
     "className": "BookController",
+    "methodName": "renameFile",
+    "httpMethod": "PATCH",
+    "path": "/books/files/:fileId",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
+    "methodName": "deleteFile",
+    "httpMethod": "DELETE",
+    "path": "/books/files/:fileId",
+    "permissions": ["Permission.LibraryDeleteBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
     "methodName": "getAudioProgress",
     "httpMethod": "GET",
     "path": "/books/:id/audio-progress",

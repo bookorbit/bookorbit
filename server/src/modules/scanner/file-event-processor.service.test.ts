@@ -393,8 +393,9 @@ describe('handleCreate — file', () => {
     const fileStat = makeFileStat();
     mockStat.mockResolvedValue(fileStat);
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
-      file: { id: 1, bookId: 5, ino: fileStat.ino, sizeBytes: Number(fileStat.size), mtime: fileStat.mtime },
+      file: { id: 1, bookId: 5, relPath: 'Author/book.epub', ino: fileStat.ino, sizeBytes: Number(fileStat.size), mtime: fileStat.mtime },
       libraryId: 1,
+      libraryFolderPath: '/books',
     } as any);
     mockRepo.findBookById.mockResolvedValue({ id: 5, status: 'present' } as any);
     mockRepo.findMissingBookByFolderPath.mockResolvedValue(null);
@@ -402,6 +403,24 @@ describe('handleCreate — file', () => {
     const result = await makeService().handleCreate('/books/Author/book.epub');
 
     expect(result).toEqual({ type: 'noop' });
+    expect(mockRepo.updateBookFile).not.toHaveBeenCalled();
+  });
+
+  it('repairs stale relPath when a watcher event matches the current file state', async () => {
+    const fileStat = makeFileStat();
+    mockStat.mockResolvedValue(fileStat);
+    mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
+      file: { id: 1, bookId: 5, relPath: 'Author/old.epub', ino: fileStat.ino, sizeBytes: Number(fileStat.size), mtime: fileStat.mtime },
+      libraryId: 1,
+      libraryFolderPath: '/books',
+    } as any);
+    mockRepo.findBookById.mockResolvedValue({ id: 5, status: 'present' } as any);
+    mockRepo.findMissingBookByFolderPath.mockResolvedValue(null);
+
+    const result = await makeService().handleCreate('/books/Author/book.epub');
+
+    expect(result).toEqual({ type: 'noop' });
+    expect(mockRepo.updateBookFile).toHaveBeenCalledWith(1, { relPath: 'Author/book.epub' });
   });
 
   it.each([
@@ -421,6 +440,7 @@ describe('handleCreate — file', () => {
         ...persistedOverrides,
       },
       libraryId: 1,
+      libraryFolderPath: '/books',
     } as any);
     mockRepo.findBookById.mockResolvedValue({ id: 5, status: 'present' } as any);
     mockRepo.findMissingBookByFolderPath.mockResolvedValue(null);
@@ -436,6 +456,7 @@ describe('handleCreate — file', () => {
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
       file: { id: 42, bookId: 10 },
       libraryId: 3,
+      libraryFolderPath: '/books',
     } as any);
     mockRepo.findBookById.mockResolvedValue({ id: 10, status: 'missing', libraryId: 3 } as any);
 
@@ -454,6 +475,7 @@ describe('handleCreate — file', () => {
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
       file: { id: 42, bookId: 10 },
       libraryId: 3,
+      libraryFolderPath: '/books',
     } as any);
     mockRepo.findBookById.mockResolvedValue({ id: 10, status: 'missing', libraryId: 3 } as any);
 
@@ -468,6 +490,7 @@ describe('handleCreate — file', () => {
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
       file: { id: 42, bookId: 10 },
       libraryId: 3,
+      libraryFolderPath: '/books',
     } as any);
     mockRepo.findBookById.mockResolvedValue({ id: 10, status: 'missing', libraryId: 3 } as any);
 
@@ -482,6 +505,7 @@ describe('handleCreate — file', () => {
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
       file: { id: 42, bookId: 10 },
       libraryId: 3,
+      libraryFolderPath: '/books',
     } as any);
     // Own book is missing - should be restored directly
     mockRepo.findBookById.mockResolvedValue({ id: 10, status: 'missing', libraryId: 3 } as any);
@@ -502,6 +526,7 @@ describe('handleCreate — file', () => {
     mockRepo.findBookFileByAbsolutePath.mockResolvedValue({
       file: { id: 42, bookId: 10 },
       libraryId: 3,
+      libraryFolderPath: '/books',
     } as any);
     // Own book is present - not missing
     mockRepo.findBookById.mockResolvedValue({ id: 10, status: 'present', libraryId: 3 } as any);

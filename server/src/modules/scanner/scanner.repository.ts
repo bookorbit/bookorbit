@@ -238,6 +238,7 @@ export class ScannerRepository {
         id: bookFiles.id,
         bookId: bookFiles.bookId,
         absolutePath: bookFiles.absolutePath,
+        relPath: bookFiles.relPath,
         ino: bookFiles.ino,
         sizeBytes: bookFiles.sizeBytes,
         mtime: bookFiles.mtime,
@@ -282,9 +283,10 @@ export class ScannerRepository {
     const whereClause =
       libraryId == null ? eq(bookFiles.absolutePath, absolutePath) : and(eq(bookFiles.absolutePath, absolutePath), eq(books.libraryId, libraryId));
     const [row] = await this.db
-      .select({ file: bookFiles, libraryId: books.libraryId, primaryFileId: books.primaryFileId })
+      .select({ file: bookFiles, libraryId: books.libraryId, primaryFileId: books.primaryFileId, libraryFolderPath: libraryFolders.path })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
       .where(whereClause)
       .limit(1);
     return row ?? null;
