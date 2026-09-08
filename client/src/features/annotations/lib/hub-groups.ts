@@ -58,7 +58,7 @@ export function hubGroupKey(item: AnnotationHubItem, mode: AnnotationHubGroupMod
     case 'source':
       return item.origin
     default:
-      return monthKey(item.createdAt)
+      return monthKey(item.highlightedAt)
   }
 }
 

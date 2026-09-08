@@ -1,4 +1,6 @@
 import { Test } from '@nestjs/testing';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { DB } from '../../db';
 import { AnnotationRepository } from './annotation.repository';
@@ -20,10 +22,16 @@ function makeRow(overrides?: Record<string, unknown>) {
     deletedAt: null,
     deviceCreatedAt: null,
     deviceUpdatedAt: null,
+    sourceCreatedAt: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
   };
+}
+
+function compileSql(fragments: unknown[]): string {
+  const dialect = new PgDialect();
+  return fragments.map((fragment) => dialect.sqlToQuery(fragment as SQL).sql).join(' ');
 }
 
 type ChainQuery = Record<string, ReturnType<typeof vi.fn>> & {
@@ -92,6 +100,7 @@ describe('AnnotationRepository', () => {
       expect(db.select).toHaveBeenCalled();
       expect(db._queries[0].leftJoin).toHaveBeenCalled();
       expect(db._queries[0].orderBy).toHaveBeenCalled();
+      expect(compileSql(db._queries[0].orderBy.mock.calls[0])).toContain('coalesce("annotations"."source_created_at", "annotations"."created_at")');
       expect(result).toEqual(rows);
     });
 
@@ -524,7 +533,10 @@ describe('AnnotationRepository', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0].jumpFileFormat).toBe('mobi');
       expect(db.select.mock.calls[0][0]).toHaveProperty('jumpFileFormat');
+      expect(db.select.mock.calls[0][0]).toHaveProperty('xpointer');
       expect(db._queries[0].where).toHaveBeenCalled();
+      expect(compileSql(db._queries[0].where.mock.calls[0])).toContain('coalesce("annotations"."source_created_at", "annotations"."created_at")');
+      expect(compileSql(db._queries[0].orderBy.mock.calls[0])).toContain('coalesce("annotations"."source_created_at", "annotations"."created_at")');
     });
 
     it('orders by book title when sort.by is book', async () => {
@@ -580,6 +592,8 @@ describe('AnnotationRepository', () => {
       });
 
       expect(rows).toHaveLength(2);
+      expect(db.select.mock.calls[0][0]).toHaveProperty('xpointer');
+      expect(compileSql(db._queries[0].orderBy.mock.calls[0])).toContain('coalesce("annotations"."source_created_at", "annotations"."created_at")');
     });
   });
 

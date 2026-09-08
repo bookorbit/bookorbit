@@ -96,6 +96,7 @@ export interface AnnotationItem {
   origin: "web" | "koreader" | "kobo";
   positionStatus: AnnotationPositionStatus | null;
   chapterIndex: number | null;
+  highlightedAt: string;
   createdAt: string;
   /** Present for PDF highlights; null/absent for EPUB and device-synced formats. */
   pdf?: AnnotationPdfPosition | null;

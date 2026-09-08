@@ -16,6 +16,7 @@ export class AnnotationResponseDto {
   origin!: string;
   positionStatus!: string | null;
   chapterIndex!: number | null;
+  highlightedAt!: Date;
   createdAt!: Date;
   pdf!: AnnotationPdfPosition | null;
 
@@ -36,6 +37,7 @@ export class AnnotationResponseDto {
     dto.positionStatus = resolvePositionStatus(row);
     const chapterIndex = (row.cfiExtras as { chapterIndex?: number } | null)?.chapterIndex;
     dto.chapterIndex = typeof chapterIndex === 'number' ? chapterIndex : null;
+    dto.highlightedAt = row.sourceCreatedAt ?? row.createdAt;
     dto.createdAt = row.createdAt;
     return dto;
   }

@@ -86,7 +86,7 @@ function isFirstOfDay(groupIndex: number, itemIndex: number): boolean {
   if (!group) return true
   const previous = group.items[itemIndex - 1]
   if (!previous) return true
-  return dayKey(previous.createdAt) !== dayKey(group.items[itemIndex]!.createdAt)
+  return dayKey(previous.highlightedAt) !== dayKey(group.items[itemIndex]!.highlightedAt)
 }
 
 function isFirstOfChapter(groupIndex: number, itemIndex: number): boolean {

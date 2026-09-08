@@ -24,7 +24,7 @@ export interface HighlightGroup {
 
 /** The day an annotation was made, in the viewer's own time zone. */
 export function highlightDay(annotation: AnnotationItem): string {
-  const date = new Date(annotation.createdAt)
+  const date = new Date(annotation.highlightedAt)
   if (Number.isNaN(date.getTime())) return ''
   const month = `${date.getMonth() + 1}`.padStart(2, '0')
   const day = `${date.getDate()}`.padStart(2, '0')

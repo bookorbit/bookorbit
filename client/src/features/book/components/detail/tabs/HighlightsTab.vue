@@ -73,7 +73,7 @@ const groups = computed<StreamGroup[]>(() =>
       const first = group.items[0]
       return {
         key: group.key,
-        label: first ? formatDate(new Date(first.createdAt), { day: 'numeric', month: 'long', year: 'numeric' }) : group.key,
+        label: first ? formatDate(new Date(first.highlightedAt), { day: 'numeric', month: 'long', year: 'numeric' }) : group.key,
         count: group.total,
         items: group.items,
       }

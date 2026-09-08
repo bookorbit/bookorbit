@@ -408,6 +408,7 @@ export const annotations = pgTable(
     // deviceCreatedAt doubles as the KOReader-side identity datetime for synced annotations.
     deviceCreatedAt: varchar('device_created_at', { length: 19 }),
     deviceUpdatedAt: varchar('device_updated_at', { length: 19 }),
+    sourceCreatedAt: timestamp('source_created_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -425,7 +426,10 @@ export const annotations = pgTable(
     // The annotations hub is an infinite stream ordered newest-first over everything a
     // user owns, so its default query sorts the whole set without this.
     index('annotations_user_created_active_idx')
-      .on(t.userId, t.createdAt.desc(), t.id.desc())
+      .on(t.userId, sql`coalesce(${t.sourceCreatedAt}, ${t.createdAt}) desc`, t.id.desc())
+      .where(sql`${t.deletedAt} is null`),
+    index('annotations_user_book_created_active_idx')
+      .on(t.userId, t.bookId, sql`coalesce(${t.sourceCreatedAt}, ${t.createdAt}) desc`, t.id.desc())
       .where(sql`${t.deletedAt} is null`),
     check('annotations_style_chk', sql`${t.style} in ('highlight', 'underline', 'strikethrough', 'squiggly', 'invert')`),
     check('annotations_origin_chk', sql`${t.origin} in ('web', 'koreader', 'kobo')`),

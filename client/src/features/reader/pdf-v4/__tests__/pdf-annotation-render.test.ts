@@ -25,6 +25,7 @@ function makeAnnotation(overrides: Partial<AnnotationItem> = {}): AnnotationItem
     origin: 'web',
     positionStatus: 'exact',
     chapterIndex: null,
+    highlightedAt: '2026-01-01T00:00:00.000Z',
     createdAt: '2026-01-01T00:00:00.000Z',
     pdf: { page: 1, rect: { x: 10, y: 20, width: 30, height: 8 }, rects: [{ x: 10, y: 20, width: 30, height: 8 }] },
     ...overrides,

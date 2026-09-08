@@ -29,6 +29,7 @@ export interface IncomingDeviceAnnotation {
    */
   externalKey?: string;
   datetime: string;
+  sourceCreatedAt?: Date | null;
   datetimeUpdated?: string | null;
   drawer?: string;
   color?: string | null;
@@ -163,6 +164,7 @@ export class AnnotationSyncService {
         result.skippedDeleted += 1;
         return;
       }
+      await this.backfillSourceCreatedAt(annotation, incoming, source, tx);
       const changed = await this.applyIncomingContent(annotation, incoming, bookFileId, tx);
       if (changed) {
         await this.syncRepo.updateState(deviceState.id, { lastAppliedVersion: changed.newVersion }, tx);
@@ -192,6 +194,7 @@ export class AnnotationSyncService {
         result.skippedDeleted += 1;
         return;
       }
+      await this.backfillSourceCreatedAt(crossDevice.annotation, incoming, source, tx);
       const state = await this.syncRepo.insertState(
         {
           annotationId: crossDevice.annotation.id,
@@ -240,6 +243,8 @@ export class AnnotationSyncService {
         return;
       }
 
+      await this.backfillSourceCreatedAt(annotation, incoming, source, tx);
+
       const isMove = !exact && position != null && position.pos0 !== incoming.pos0;
       let version = annotation.version;
       if (isMove) {
@@ -287,6 +292,7 @@ export class AnnotationSyncService {
         version: 1,
         deviceCreatedAt: incoming.datetime,
         deviceUpdatedAt: incoming.datetimeUpdated ?? null,
+        sourceCreatedAt: incoming.sourceCreatedAt ?? null,
       },
       {
         bookFileId,
@@ -307,6 +313,16 @@ export class AnnotationSyncService {
     );
     createdIds.push(createdRow.id);
     result.created += 1;
+  }
+
+  private async backfillSourceCreatedAt(
+    annotation: AnnotationRow,
+    incoming: IncomingDeviceAnnotation,
+    source: AnnotationSyncSource,
+    tx: DbTx,
+  ): Promise<void> {
+    if (annotation.origin !== source || annotation.sourceCreatedAt != null || incoming.sourceCreatedAt == null) return;
+    await this.syncRepo.setSourceCreatedAtSilent(annotation.id, incoming.sourceCreatedAt, tx);
   }
 
   /**
@@ -547,10 +563,22 @@ export class AnnotationSyncService {
   }): Promise<number> {
     const present = new Set(params.presentKeys.map((entry) => entry.k));
     const presentDatetimes = new Set(params.presentKeys.map((entry) => entry.dt));
+    const sourceCreatedAtByKey = new Map(
+      params.presentKeys.flatMap((entry) => (entry.sourceCreatedAt ? [[entry.k, entry.sourceCreatedAt] as const] : [])),
+    );
     let deletedCount = 0;
 
     await this.syncRepo.transaction(async (tx) => {
       const states = await this.syncRepo.findStatesForDeviceBook(params.userId, params.source, params.deviceId, params.bookId, tx);
+      await this.syncRepo.setSourceCreatedAtsSilent(
+        states.flatMap(({ state, annotation }) => {
+          const sourceCreatedAt = sourceCreatedAtByKey.get(state.externalKey);
+          return annotation.origin === params.source && annotation.sourceCreatedAt == null && sourceCreatedAt
+            ? [{ annotationId: annotation.id, sourceCreatedAt }]
+            : [];
+        }),
+        tx,
+      );
       for (const { state, annotation } of states) {
         if (annotation.deletedAt) continue;
         if (present.has(state.externalKey)) continue;
@@ -747,6 +775,7 @@ export class AnnotationSyncService {
 export interface DeviceKeyEntry {
   k: string;
   dt: string;
+  sourceCreatedAt?: Date | null;
 }
 
 export interface PushDownSets {

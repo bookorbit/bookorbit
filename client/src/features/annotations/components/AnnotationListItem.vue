@@ -137,7 +137,7 @@ const metadataItems = computed(() => {
   if (props.annotation.chapterTitle) items.push(props.annotation.chapterTitle)
   if (props.annotation.pageno != null) items.push(t('annotations.listItem.pageNumber', { page: props.annotation.pageno }))
   if (props.annotation.chapterIndex != null) items.push(t('annotations.listItem.chapterNumber', { chapter: props.annotation.chapterIndex + 1 }))
-  const date = formatDate(props.annotation.createdAt)
+  const date = formatDate(props.annotation.highlightedAt)
   if (date) items.push(date)
   return items
 })

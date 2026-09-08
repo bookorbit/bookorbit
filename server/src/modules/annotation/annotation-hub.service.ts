@@ -171,6 +171,7 @@ export class AnnotationHubService {
         jumpFileId: null,
         jumpFileFormat: null,
         pageno: null,
+        xpointer: null,
       },
     );
   }
@@ -266,6 +267,7 @@ export class AnnotationHubService {
       origin: row.origin,
       positionStatus: (row.cfi != null || row.cfiStatus != null ? (row.cfiStatus ?? 'exact') : null) as AnnotationHubItem['positionStatus'],
       chapterIndex: typeof chapterIndex === 'number' ? chapterIndex : null,
+      highlightedAt: (row.sourceCreatedAt ?? row.createdAt).toISOString(),
       createdAt: row.createdAt.toISOString(),
       bookTitle: row.bookTitle,
       author: row.author,

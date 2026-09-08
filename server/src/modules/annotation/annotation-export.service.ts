@@ -62,13 +62,13 @@ export class AnnotationExportService {
         .join('\n');
       lines.push(quote);
       if (row.note) lines.push('', `Note: ${row.note}`);
-      lines.push('', `<sub>${row.style}, ${row.color}, ${row.origin}, ${row.createdAt.toISOString().slice(0, 10)}</sub>`, '');
+      lines.push('', `<sub>${row.style}, ${row.color}, ${row.origin}, ${this.highlightedAt(row).toISOString().slice(0, 10)}</sub>`, '');
     }
     return lines.join('\n');
   }
 
   private toCsv(rows: HubAnnotationRow[]): string {
-    const header = ['book', 'chapter', 'text', 'note', 'color', 'style', 'origin', 'createdAt'];
+    const header = ['book', 'chapter', 'text', 'note', 'color', 'style', 'origin', 'page', 'cfi', 'xpointer', 'highlightedAt', 'createdAt'];
     const escape = (value: string | null): string => {
       const raw = value ?? '';
       return /[",\n\r]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
@@ -84,6 +84,10 @@ export class AnnotationExportService {
           escape(row.color),
           escape(row.style),
           escape(row.origin),
+          escape(row.pageno == null ? null : String(row.pageno)),
+          escape(row.cfi),
+          escape(row.xpointer),
+          escape(this.highlightedAt(row).toISOString()),
           escape(row.createdAt.toISOString()),
         ].join(','),
       );
@@ -103,11 +107,18 @@ export class AnnotationExportService {
         color: row.color,
         style: row.style,
         origin: row.origin,
+        page: row.pageno,
         cfi: row.cfi,
+        xpointer: row.xpointer,
+        highlightedAt: this.highlightedAt(row).toISOString(),
         createdAt: row.createdAt.toISOString(),
       })),
       null,
       2,
     );
+  }
+
+  private highlightedAt(row: HubAnnotationRow): Date {
+    return row.sourceCreatedAt ?? row.createdAt;
   }
 }

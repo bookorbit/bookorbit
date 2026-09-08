@@ -20,6 +20,7 @@ function makeHubRow(overrides: Record<string, unknown> = {}) {
     deletedAt: null,
     deviceCreatedAt: null,
     deviceUpdatedAt: null,
+    sourceCreatedAt: null,
     createdAt: new Date('2026-01-10T00:00:00Z'),
     updatedAt: new Date('2026-01-10T00:00:00Z'),
     bookTitle: 'A Book',
@@ -27,6 +28,7 @@ function makeHubRow(overrides: Record<string, unknown> = {}) {
     jumpFileId: 9,
     jumpFileFormat: 'fb2',
     pageno: null,
+    xpointer: null,
     ...overrides,
   };
 }
@@ -203,6 +205,27 @@ describe('AnnotationHubService', () => {
       const result = await service.list(10, {});
 
       expect(result.items[0]).toMatchObject({ cfi: null, jumpFileId: 9, jumpFileFormat: 'pdf', pageno: 4 });
+    });
+
+    it('returns source highlight time separately from ingestion time', async () => {
+      const { service, annotationRepo } = makeService();
+      annotationRepo.findHubPaginated.mockResolvedValueOnce({
+        items: [
+          makeHubRow({
+            origin: 'koreader',
+            sourceCreatedAt: new Date('2026-01-15T16:30:00.000Z'),
+            createdAt: new Date('2026-09-06T17:10:19.332Z'),
+          }),
+        ],
+        total: 1,
+      });
+
+      const result = await service.list(10, {});
+
+      expect(result.items[0]).toMatchObject({
+        highlightedAt: '2026-01-15T16:30:00.000Z',
+        createdAt: '2026-09-06T17:10:19.332Z',
+      });
     });
   });
 

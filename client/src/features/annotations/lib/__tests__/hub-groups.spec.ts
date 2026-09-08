@@ -17,6 +17,7 @@ function item(overrides: Partial<AnnotationHubItem> = {}): AnnotationHubItem {
     origin: 'web',
     positionStatus: 'exact',
     chapterIndex: null,
+    highlightedAt: '2026-08-24T10:00:00.000Z',
     createdAt: '2026-08-24T10:00:00.000Z',
     bookTitle: 'Tartufo',
     author: 'Kira Jane Buxton',
@@ -46,11 +47,11 @@ describe('HUB_VIEWS', () => {
 
 describe('hubGroupKey', () => {
   it('keys each mode off the field the server sorted by', () => {
-    const row = item({ bookId: 42, color: '#38BDF8', origin: 'kobo', createdAt: '2026-03-04T00:00:00.000Z' })
+    const row = item({ bookId: 42, color: '#38BDF8', origin: 'kobo', highlightedAt: '2026-03-04T00:00:00.000Z' })
     expect(hubGroupKey(row, 'book')).toBe('42')
     expect(hubGroupKey(row, 'color')).toBe('#38BDF8')
     expect(hubGroupKey(row, 'source')).toBe('kobo')
-    expect(hubGroupKey(row, 'month')).toBe(monthKey(row.createdAt))
+    expect(hubGroupKey(row, 'month')).toBe(monthKey(row.highlightedAt))
   })
 })
 

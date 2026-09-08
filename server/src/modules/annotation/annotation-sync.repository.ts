@@ -350,6 +350,27 @@ export class AnnotationSyncRepository {
     await ex.update(annotations).set({ deviceUpdatedAt }).where(eq(annotations.id, annotationId));
   }
 
+  async setSourceCreatedAtSilent(annotationId: number, sourceCreatedAt: Date, ex: Executor = this.db): Promise<void> {
+    await ex
+      .update(annotations)
+      .set({ sourceCreatedAt })
+      .where(and(eq(annotations.id, annotationId), isNull(annotations.sourceCreatedAt)));
+  }
+
+  async setSourceCreatedAtsSilent(entries: { annotationId: number; sourceCreatedAt: Date }[], ex: Executor = this.db): Promise<void> {
+    if (entries.length === 0) return;
+    const values = sql.join(
+      entries.map((entry) => sql`(${entry.annotationId}::int, ${entry.sourceCreatedAt}::timestamptz)`),
+      sql`, `,
+    );
+    await ex.execute(sql`
+      update ${annotations} set source_created_at = v.source_created_at
+      from (values ${values}) as v(annotation_id, source_created_at)
+      where ${annotations.id} = v.annotation_id
+        and ${annotations.sourceCreatedAt} is null
+    `);
+  }
+
   async bumpVersion(annotationId: number, ex: Executor = this.db): Promise<number> {
     const [row] = await ex
       .update(annotations)

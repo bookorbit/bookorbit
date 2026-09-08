@@ -27,6 +27,7 @@ function makeAnnotation(id: number, cfi = `epubcfi(/6/${id})`): Annotation {
     origin: 'web',
     positionStatus: 'exact',
     chapterIndex: null,
+    highlightedAt: '2026-01-01T00:00:00.000Z',
     createdAt: '2026-01-01T00:00:00.000Z',
   }
 }

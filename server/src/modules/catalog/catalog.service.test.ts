@@ -8,13 +8,14 @@ vi.mock('drizzle-orm', () => ({
 
 vi.mock('../../common/utils/accent-insensitive-search.utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../common/utils/accent-insensitive-search.utils')>()),
+  accentInsensitiveExactMatchRank: vi.fn((left: unknown, term: string) => ({ type: 'sql', left, term })),
   accentInsensitiveIlike: vi.fn((left: unknown, pattern: string) => ({ type: 'accentInsensitiveIlike', left, pattern })),
 }));
 
 import { and, eq, isNotNull } from 'drizzle-orm';
 
-import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
-import { authors, bookMetadata, bookSeries, collections, narrators } from '../../db/schema';
+import { accentInsensitiveExactMatchRank, accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { authors, bookMetadata, bookSeries, collections, genres, narrators, tags } from '../../db/schema';
 import { CatalogService } from './catalog.service';
 
 interface QueryChain<T> {
@@ -111,6 +112,20 @@ describe('CatalogService', () => {
     expect(result).toEqual([{ name: 'Ray Porter' }]);
     expect(selectChains[0]?.from).toHaveBeenCalledWith(narrators);
     expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(narrators.name);
+    expect(selectChains[0]?.limit).toHaveBeenCalledWith(15);
+  });
+
+  it.each([
+    ['genres', genres, (service: CatalogService, q: string) => service.searchGenres(q)],
+    ['tags', tags, (service: CatalogService, q: string) => service.searchTags(q)],
+  ] as const)('ranks an exact %s match before alphabetical partial matches', async (_label, table, search) => {
+    const { service, selectChains } = makeService();
+
+    await search(service, '  Young\u00a0 Adult  ');
+
+    expect(accentInsensitiveIlike).toHaveBeenCalledWith(table.name, '%Young Adult%');
+    expect(accentInsensitiveExactMatchRank).toHaveBeenCalledWith(table.name, 'Young Adult');
+    expect(selectChains[0]?.orderBy).toHaveBeenCalledWith(expect.objectContaining({ type: 'sql' }), table.name);
     expect(selectChains[0]?.limit).toHaveBeenCalledWith(15);
   });
 

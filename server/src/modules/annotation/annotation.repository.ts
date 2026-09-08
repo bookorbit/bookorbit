@@ -48,7 +48,16 @@ export type AnnotationWithCfi = AnnotationRow & {
   pdfPos0?: string | null;
   pdfStatus?: string | null;
 };
-export type HubAnnotationRow = AnnotationWithCfi & { bookTitle: string | null; author: string | null; jumpFileFormat: string | null };
+export type HubAnnotationRow = AnnotationWithCfi & {
+  bookTitle: string | null;
+  author: string | null;
+  jumpFileFormat: string | null;
+  xpointer: string | null;
+};
+
+function highlightedAt(): SQL<Date> {
+  return sql<Date>`coalesce(${annotations.sourceCreatedAt}, ${annotations.createdAt})`;
+}
 
 export interface HubFilters {
   bookId?: number;
@@ -142,6 +151,9 @@ export class AnnotationRepository {
       pageno: sql<
         number | null
       >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
+      xpointer: sql<
+        string | null
+      >`(select ap4.pos0 from annotation_positions ap4 where ap4.annotation_id = ${annotations.id} and ap4.format = 'xpointer' limit 1)`,
     };
   }
 
@@ -173,7 +185,7 @@ export class AnnotationRepository {
   async findByBookId(bookId: number, userId: number): Promise<AnnotationWithCfi[]> {
     return this.selectWithCfi()
       .where(and(...this.baseConditions(bookId, userId)))
-      .orderBy(asc(annotations.createdAt));
+      .orderBy(asc(highlightedAt()));
   }
 
   async findById(bookId: number, annotationId: number, userId: number): Promise<AnnotationWithCfi | null> {
@@ -256,7 +268,7 @@ export class AnnotationRepository {
           // The step after `/6` in an epub CFI addresses the spine itemref. Kept raw here and
           // converted to a spine index in foldChapterRows, where it can be tested.
           cfiSpineStep: sql<number | null>`min(nullif(substring(${annotationPositions.pos0} from 'epubcfi[(]/6/([0-9]+)'), '')::int)`,
-          firstCreatedAt: sql<Date>`min(${annotations.createdAt})`,
+          firstCreatedAt: sql<Date>`min(${highlightedAt()})`,
         })
         .from(annotations)
         .leftJoin(annotationPositions, cfiJoin)
@@ -264,7 +276,7 @@ export class AnnotationRepository {
         .groupBy(annotations.chapterTitle, annotations.color),
       this.db
         .select({
-          day: sql<string>`to_char(${annotations.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`,
+          day: sql<string>`to_char(${highlightedAt()} at time zone 'UTC', 'YYYY-MM-DD')`,
           origin: annotations.origin,
           count: count(),
         })
@@ -421,7 +433,7 @@ export class AnnotationRepository {
     // The hub groups a page at a time, so a grouped run only ever lands whole when the
     // rows arrive already ordered by the grouping key. Every non-date sort therefore
     // falls back to newest-first inside the group.
-    const withinGroup = [desc(annotations.createdAt), desc(annotations.id)];
+    const withinGroup = [desc(highlightedAt()), desc(annotations.id)];
     const orderBy =
       sort.by === 'book'
         ? [direction(bookMetadata.title), ...withinGroup]
@@ -429,7 +441,7 @@ export class AnnotationRepository {
           ? [direction(annotations.color), ...withinGroup]
           : sort.by === 'origin'
             ? [direction(annotations.origin), ...withinGroup]
-            : [direction(annotations.createdAt), direction(annotations.id)];
+            : [direction(highlightedAt()), direction(annotations.id)];
     const offset = (page - 1) * pageSize;
 
     const [items, totalResult] = await Promise.all([
@@ -483,7 +495,7 @@ export class AnnotationRepository {
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
       .leftJoin(books, eq(books.id, annotations.bookId))
       .where(and(...conditions))
-      .orderBy(asc(bookMetadata.title), asc(annotations.chapterTitle), asc(annotations.createdAt))
+      .orderBy(asc(bookMetadata.title), asc(annotations.chapterTitle), asc(highlightedAt()))
       .limit(limit);
     return rows as HubAnnotationRow[];
   }
@@ -546,12 +558,12 @@ export class AnnotationRepository {
   async getHubActivityWeeks(userId: number, filters: HubFilters, since: Date) {
     return this.db
       .select({
-        weekStart: sql<string>`to_char(date_trunc('week', ${annotations.createdAt} at time zone 'UTC'), 'YYYY-MM-DD')`,
+        weekStart: sql<string>`to_char(date_trunc('week', ${highlightedAt()} at time zone 'UTC'), 'YYYY-MM-DD')`,
         origin: annotations.origin,
         count: count(),
       })
       .from(annotations)
-      .where(and(...this.buildHubConditions(userId, filters), gte(annotations.createdAt, since)))
+      .where(and(...this.buildHubConditions(userId, filters), gte(highlightedAt(), since)))
       .groupBy(sql`1`, annotations.origin)
       .orderBy(sql`1`);
   }
@@ -613,7 +625,7 @@ export class AnnotationRepository {
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, annotations.bookId))
       .where(and(...conditions))
       .groupBy(annotations.bookId, bookMetadata.title)
-      .orderBy(...(params.order === 'count' ? [desc(count()), asc(bookMetadata.title)] : [desc(max(annotations.createdAt)), asc(bookMetadata.title)]))
+      .orderBy(...(params.order === 'count' ? [desc(count()), asc(bookMetadata.title)] : [desc(max(highlightedAt())), asc(bookMetadata.title)]))
       .limit(params.limit);
   }
 
@@ -685,8 +697,8 @@ export class AnnotationRepository {
         sql`exists (select 1 from ${annotationPositions} where ${annotationPositions.annotationId} = ${annotations.id} and ${annotationPositions.format} = 'cfi' and ${annotationPositions.status} <> 'exact')`,
       );
     }
-    if (filters.dateFrom) conditions.push(gte(annotations.createdAt, filters.dateFrom));
-    if (filters.dateTo) conditions.push(lte(annotations.createdAt, filters.dateTo));
+    if (filters.dateFrom) conditions.push(gte(highlightedAt(), filters.dateFrom));
+    if (filters.dateTo) conditions.push(lte(highlightedAt(), filters.dateTo));
     return conditions;
   }
 
@@ -722,10 +734,10 @@ export class AnnotationRepository {
       conditions.push(eq(annotations.chapterTitle, filters.chapter));
     }
     if (filters.dateFrom) {
-      conditions.push(gte(annotations.createdAt, filters.dateFrom));
+      conditions.push(gte(highlightedAt(), filters.dateFrom));
     }
     if (filters.dateTo) {
-      conditions.push(lte(annotations.createdAt, filters.dateTo));
+      conditions.push(lte(highlightedAt(), filters.dateTo));
     }
     if (filters.hasNote) {
       conditions.push(sql`${annotations.note} is not null and ${annotations.note} <> ''`);
@@ -767,6 +779,6 @@ export class AnnotationRepository {
         direction(annotations.id),
       ];
     }
-    return [direction(annotations.createdAt), direction(annotations.id)];
+    return [direction(highlightedAt()), direction(annotations.id)];
   }
 }

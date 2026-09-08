@@ -5,15 +5,15 @@ import type { RequestUser } from '../../common/types/request-user';
 import type { AnnotationSyncService } from '../annotation/annotation-sync.service';
 import type { PositionConverterService } from '../position-converter/position-converter.service';
 import type { AnnotationExchangeAckDto, AnnotationExchangeDto } from './dto';
-import { KoreaderAnnotationExchangeService } from './koreader-annotation-exchange.service';
+import { KoreaderAnnotationExchangeService, parseKoreaderSourceCreatedAt } from './koreader-annotation-exchange.service';
 import type { KoreaderRepository } from './koreader.repository';
 
 const DEVICE_ID = 'device-1234';
 const HASH_A = 'a'.repeat(32);
 const HASH_B = 'b'.repeat(32);
 
-function makeUser(): RequestUser {
-  return { id: 7, settings: {} } as unknown as RequestUser;
+function makeUser(timezone = 'UTC'): RequestUser {
+  return { id: 7, settings: { timezone } } as unknown as RequestUser;
 }
 
 function makeAnnotationRow(overrides: Record<string, unknown> = {}) {
@@ -31,6 +31,7 @@ function makeAnnotationRow(overrides: Record<string, unknown> = {}) {
     deletedAt: null,
     deviceCreatedAt: null,
     deviceUpdatedAt: null,
+    sourceCreatedAt: null,
     createdAt: new Date('2026-06-08T10:00:00Z'),
     updatedAt: new Date('2026-06-09T11:30:00Z'),
     ...overrides,
@@ -106,6 +107,33 @@ describe('KoreaderAnnotationExchangeService', () => {
     return { hash: HASH_A, keys: [], keysComplete: true, changes: [], ...overrides } as AnnotationExchangeDto['books'][number];
   }
 
+  it('converts KOReader wall-clock dates with the user timezone, including historical DST', () => {
+    expect(parseKoreaderSourceCreatedAt('2026-01-15 09:30:00', 'America/Denver')).toEqual(new Date('2026-01-15T16:30:00.000Z'));
+    expect(parseKoreaderSourceCreatedAt('2026-07-15 09:30:00', 'America/Denver')).toEqual(new Date('2026-07-15T15:30:00.000Z'));
+  });
+
+  it('rejects impossible or nonexistent KOReader wall-clock dates', () => {
+    expect(parseKoreaderSourceCreatedAt('2026-02-30 09:30:00', 'UTC')).toBeNull();
+    expect(parseKoreaderSourceCreatedAt('2026-03-08 02:30:00', 'America/Denver')).toBeNull();
+  });
+
+  it('passes the normalized source date into annotation ingest', async () => {
+    const change = {
+      datetime: '2026-01-15 09:30:00',
+      drawer: 'lighten',
+      posFormat: 'xpointer',
+      pos0: '/body/DocFragment[1]',
+    } as AnnotationExchangeDto['books'][number]['changes'][number];
+
+    await service.exchange(makeUser('America/Denver'), makeExchangeDto([makeBook({ changes: [change] })]));
+
+    expect(annotationSync.ingestDeviceAnnotations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        annotations: [expect.objectContaining({ datetime: change.datetime, sourceCreatedAt: new Date('2026-01-15T16:30:00.000Z') })],
+      }),
+    );
+  });
+
   it('reports unmatched hashes without processing them', async () => {
     const response = await service.exchange(makeUser(), makeExchangeDto([makeBook({ hash: HASH_B })]));
 
@@ -137,7 +165,12 @@ describe('KoreaderAnnotationExchangeService', () => {
     await service.exchange(makeUser(), makeExchangeDto([makeBook({ keys })]));
 
     expect(annotationSync.detectDeviceDeletions).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 7, deviceId: DEVICE_ID, bookId: 20, presentKeys: keys }),
+      expect.objectContaining({
+        userId: 7,
+        deviceId: DEVICE_ID,
+        bookId: 20,
+        presentKeys: [expect.objectContaining({ ...keys[0], sourceCreatedAt: new Date('2026-06-01T21:14:03.000Z') })],
+      }),
     );
   });
 
