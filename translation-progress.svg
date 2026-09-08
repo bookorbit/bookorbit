@@ -102,8 +102,8 @@
   <text x="440" y="553" text-anchor="end" class="pct-label">55%</text>
   <text x="20" y="578" class="lang-label">🇭🇺  Hungarian</text>
   <rect x="142" y="570" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="570" width="86" height="6" rx="3" class="bar-low" />
-  <text x="440" y="578" text-anchor="end" class="pct-label">35%</text>
+  <rect x="142" y="570" width="93" height="6" rx="3" class="bar-low" />
+  <text x="440" y="578" text-anchor="end" class="pct-label">38%</text>
   <text x="20" y="603" class="lang-label">🇹🇼  Chinese (T)</text>
   <rect x="142" y="595" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="595" width="0" height="6" rx="3" class="bar-low" />
