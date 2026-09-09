@@ -58,6 +58,7 @@ function makeBook(overrides = {}) {
     communityRatings: [],
     coverSource: null,
     hardcoverEditionId: null,
+    mangabakaSeriesId: null,
     providerIds: {},
     authors: [],
     genres: [],

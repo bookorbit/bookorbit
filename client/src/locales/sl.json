@@ -1406,7 +1406,8 @@
           "comicvine": "Metapodatki stripov iz ComicVine. Potreben je brezplačen API ključ s comicvine.gamespot.com.",
           "ranobedb": "Metapodatki japonskih lahkih romanov iz RanobeDB. Nastavitev ni potrebna.",
           "lubimyczytac": "Poljski katalog knjig (lubimyczytac.pl). Pridobiva podatke z javnih strani knjig. Nastavitev ni potrebna.",
-          "aladin": "Korejski metapodatki knjig iz Aladin (알라딘). Potreben je TTB ključ z aladin.co.kr."
+          "aladin": "Korejski metapodatki knjig iz Aladin (알라딘). Potreben je TTB ključ z aladin.co.kr.",
+          "mangabaka": "Metapodatki mang in lahkih romanov iz MangaBaka. Nastavitev ni potrebna."
         },
         "blocked": {
           "google": "Google Books zahteva API ključ, preden ga je mogoče omogočiti",
@@ -1463,6 +1464,10 @@
           "storeProviderIds": {
             "label": "Shrani ID-je ponudnikov na knjigah",
             "hint": "Ob pridobivanju metapodatkov shrani vrnjene ID-je ponudnikov (ISBN, ASIN, Goodreads ID itd.) na zapis knjige za natančnejše prihodnje iskanje."
+          },
+          "richTitleFormat": {
+            "label": "Bogato oblikovanje naslovov za manga zvezke",
+            "hint": "Oblikuj naslove zvezkov kot \"Serija, Zv. NN: Podnaslov, Gl. NNNN\" namesto preprostejšega \"Serija, Zv. NN - Gl. NNN\". Velja samo za MangaBaka."
           }
         },
         "library": {
@@ -4091,6 +4096,23 @@
           "noResults": "Ni najdenih rezultatov",
           "noResultsHint": "Poskusite prilagoditi naslov ali avtorja",
           "searchPrompt": "Iščite zgoraj, nato kliknite rezultat, da začnete primerjavo metapodatkov."
+        },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
         },
         "writeAndRename": "Zapiši v datoteko in preimenuj",
         "writeAndRenameShort": "Zapiši in preimenuj"

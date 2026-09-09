@@ -21,6 +21,8 @@ export const PROVIDER_ID_MAX_LENGTHS = {
   ranobedbId: 50,
   lubimyczytacId: 512,
   aladinId: 20,
+  mangabakaId: 50,
+  mangabakaSeriesId: 50,
 } as const;
 
 export type ProviderIdField = keyof typeof PROVIDER_ID_MAX_LENGTHS;

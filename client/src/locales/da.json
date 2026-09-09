@@ -1288,7 +1288,8 @@
           "comicvine": "Comic book metadata fra ComicVine. En gratis API-nøgle kræves fra comicvine.gamespot.com.",
           "ranobedb": "Japansk lys nye metadata fra RanobeDB. Ingen opsætning påkrævet.",
           "lubimyczytac": "Polsk bogkatalog (lubimyczytac.pl). Scrapes offentlige bogsider. Ingen opsætning påkrævet.",
-          "aladin": "Koreansk bog metadata fra Aladin (opdatering) - en TTB Key fra aladin.co.kr er påkrævet."
+          "aladin": "Koreansk bog metadata fra Aladin (opdatering) - en TTB Key fra aladin.co.kr er påkrævet.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books kræver en API-nøgle, før den kan aktiveres",
@@ -1339,6 +1340,10 @@
           "storeProviderIds": {
             "label": "Gem udbyder ID'er på bøger",
             "hint": "Når du henter metadata, gemme de returnerede udbyder ID'er (ISBN, ASIN, Goodreads ID, etc.) på bogens post for mere præcise fremtidige opslag."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3806,6 +3811,23 @@
           "noResults": "Ingen resultater fundet",
           "noResultsHint": "Prøv at justere titel eller forfatter",
           "searchPrompt": "Søg ovenfor, og klik derefter på et resultat for at begynde at sammenligne metadata."
+        },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
         },
         "writeAndRename": "Skriv til fil og omdøb",
         "writeAndRenameShort": "Skriv & Omdøb"

@@ -403,6 +403,8 @@ const BOOK_DOCK_PROVIDER_ID_FIELDS: Partial<Record<MetadataProviderKey, keyof Bo
   [MetadataProviderKey.RANOBEDB]: 'ranobedbId',
   [MetadataProviderKey.LUBIMYCZYTAC]: 'lubimyczytacId',
   [MetadataProviderKey.ALADIN]: 'aladinId',
+  [MetadataProviderKey.MANGABAKA]: 'mangabakaId',
+  // mangabakaSeriesId is NOT a provider ID - it's a series-level reference
 };
 
 function resolveSupportedFormat(row: Pick<BookDockFileRow, 'format' | 'absolutePath'>): string | null {

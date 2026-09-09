@@ -29,6 +29,18 @@ export interface MetadataSearchParams {
   // Hint for providers to cap deep candidate exploration in non-interactive flows
   // (e.g. auto-fill/background refresh where there is no manual candidate picking).
   maxCandidatesPerProvider?: number;
+  // When true, providers that return series-level results should resolve to the
+  // best-matching volume/issue candidate when a volume number is available.
+  resolveVolumes?: boolean;
+  // When true, MangaBaka volume titles use "Series, Vol. NN: Subtitle, Ch NNNN"
+  // format with subtitle and chapter. When false/undefined, uses simpler format.
+  richTitleFormat?: boolean;
+  // Whether the original query contains a chapter marker (e.g. "Ch 14", "c090").
+  // Passed to MangaBaka so it can include chapter in the title only when relevant.
+  includeChapter?: boolean;
+  // Preferred language for collection selection (e.g. "fr", "en").
+  // When set, pickBestCollection will prefer collections in this language.
+  preferredLanguage?: string;
   // Interactive result lists can afford bounded cover checks. Bulk metadata pipelines must not
   // multiply one provider lookup into many thumbnail requests.
   validateCoverPlaceholders?: boolean;

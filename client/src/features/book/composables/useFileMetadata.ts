@@ -29,6 +29,7 @@ export interface FileMetadata {
   ranobedbId?: string | null
   lubimyczytacId?: string | null
   aladinId?: string | null
+  mangabakaId?: string | null
   authors?: string[]
   genres?: string[]
   narrators?: string[]

@@ -40,7 +40,14 @@ describe('MetadataFetchRepository', () => {
       openLibraryId: 'open-library-1',
       itunesId: 'itunes-1',
       audibleId: 'audible-1',
+      librofmId: null,
+      koboId: null,
       comicvineId: 'comicvine-1',
+      ranobedbId: null,
+      lubimyczytacId: null,
+      aladinId: null,
+      mangabakaId: null,
+      mangabakaSeriesId: null,
     };
     limit.mockResolvedValue([row]);
 

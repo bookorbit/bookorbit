@@ -1260,7 +1260,8 @@
           "audible": "Pulls audiobook metadata z Audable. Není nutné žádné další nastavení.",
           "audnexus": "audiobook metadata, řízená komunitou. Není vyžadováno žádné nastavení.",
           "comicvine": "Metadata Comic book od ComicVine. Bezplatný API klíč je vyžadován z comicvine.gamespot.com.",
-          "lubimyczytac": "Polský katalog knih (lubimyczytac.pl). Stránky s veřejnou knihou. Není nutné nastavit."
+          "lubimyczytac": "Polský katalog knih (lubimyczytac.pl). Stránky s veřejnou knihou. Není nutné nastavit.",
+          "mangabaka": "Manga and light novel metadata from MangaBaka. No setup required."
         },
         "blocked": {
           "google": "Google Books vyžaduje API klíč, než může být povoleno",
@@ -1310,6 +1311,10 @@
           "storeProviderIds": {
             "label": "Ukládat ID poskytovatele v knihách",
             "hint": "Při načítání metadat uložte vrácené ID poskytovatele (ISBN, ASIN, Goodreads ID atd.) v knize pro přesnější budoucí vyhledávání."
+          },
+          "richTitleFormat": {
+            "label": "Rich title format for manga volumes",
+            "hint": "Compose volume titles as \"Series, Vol. NN: Subtitle, Ch NNNN\" instead of the simpler \"Series, Vol. NN - Ch NNN\". Applies to MangaBaka only."
           }
         },
         "library": {
@@ -3758,6 +3763,23 @@
           "noResults": "Nebyly nalezeny žádné výsledky",
           "noResultsHint": "Zkuste upravit název nebo autora",
           "searchPrompt": "Vyhledejte výše a poté klikněte na výsledek a začněte porovnávat metadata."
+        },
+        "mangabakaDrillDown": {
+          "sectionTitle": "MangaBaka Volumes",
+          "seriesLabel": "MangaBaka series",
+          "browseVolumes": "Browse Volumes",
+          "loadingCollections": "Loading collections...",
+          "noCollections": "No collections found for this series.",
+          "loadingVolumes": "Loading volumes...",
+          "noVolumes": "No volumes found.",
+          "volumeLabel": "Vol. {n}",
+          "volumeLabelUnknown": "Vol. ?",
+          "totalVolumeLabel": "Total Vol. {n}",
+          "coverAlt": "Volume {index} cover for {series}",
+          "volumeSelectLabel": "Select {title} ({volume})",
+          "loadError": "Couldn't load data. Please try again.",
+          "retry": "Retry",
+          "selectVolume": "Select this volume"
         },
         "writeAndRename": "Zapsat do souboru a přejmenovat",
         "writeAndRenameShort": "Zapsat a přejmenovat"

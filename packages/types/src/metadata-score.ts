@@ -22,15 +22,13 @@ export type MetadataScoreField =
   | "openLibraryId"
   | "itunesId"
   | "koboId"
-  | "aladinId";
+  | "aladinId"
+  | "mangabakaId"
+  | "mangabakaSeriesId";
 
 export type MetadataScoreGroup = "core" | "publishing" | "classification" | "enrichment" | "providers";
 
-/**
- * How the scorer decides a field is present. The client shows this to explain a row; the server
- * keeps the matching behaviour in SCORE_RULES. The two must stay in step.
- */
-export type MetadataScoreRule = "text" | "positive" | "count" | "cover" | "providerId" | "seriesIndex";
+export type MetadataScoreRule = "text" | "positive" | "count" | "seriesIndex" | "cover" | "providerId";
 
 export interface MetadataScoreFieldMeta {
   group: MetadataScoreGroup;
@@ -63,6 +61,8 @@ export const METADATA_SCORE_FIELDS: Record<MetadataScoreField, MetadataScoreFiel
   itunesId: { group: "providers", rule: "providerId", defaultWeight: 1 },
   koboId: { group: "providers", rule: "providerId", defaultWeight: 1 },
   aladinId: { group: "providers", rule: "providerId", defaultWeight: 1 },
+  mangabakaId: { group: "providers", rule: "providerId", defaultWeight: 1 },
+  mangabakaSeriesId: { group: "providers", rule: "providerId", defaultWeight: 1 },
 };
 
 /** Display order for the groups. Not alphabetical: it runs from most to least weight by default. */

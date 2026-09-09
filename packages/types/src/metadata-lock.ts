@@ -32,6 +32,8 @@ export const BOOK_METADATA_LOCK_FIELDS = [
   "ranobedbId",
   "lubimyczytacId",
   "aladinId",
+  "mangabakaId",
+  "mangabakaSeriesId",
   "comicIssueNumber",
   "comicVolumeName",
   "comicStoryArcs",

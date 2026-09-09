@@ -1,10 +1,4 @@
-import {
-  METADATA_PROVIDER_STATUS_EVENT,
-  MetadataCandidate,
-  MetadataProviderKey,
-  ProviderConfigurations,
-  ProviderThrottleRuntimeSnapshot,
-} from '@bookorbit/types';
+import { MetadataProviderKey, ProviderConfigurations, ProviderThrottleRuntimeSnapshot } from '@bookorbit/types';
 import type { Mocked } from 'vitest';
 import { firstValueFrom, of, toArray } from 'rxjs';
 
@@ -13,16 +7,12 @@ import { LookupMetadataDto } from './dto/lookup-metadata.dto';
 import { MetadataSearchDto } from './dto/metadata-search.dto';
 import { MetadataFetchController } from './metadata-fetch.controller';
 import { MetadataFetchPipeline } from './metadata-fetch-pipeline';
-import { MetadataFetchService, MetadataSearchEvent } from './metadata-fetch.service';
+import { MetadataFetchService } from './metadata-fetch.service';
 import { ProviderRegistry } from './provider-registry';
 import { ProviderConfigService } from '../metadata-preferences/provider-config.service';
 import { MetadataPreferencesService } from '../metadata-preferences/metadata-preferences.service';
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
-
-function candidateEvent(candidate: MetadataCandidate): MetadataSearchEvent {
-  return { kind: 'candidate', candidate };
-}
 
 describe('MetadataFetchController', () => {
   let service: Mocked<MetadataFetchService>;
@@ -151,8 +141,8 @@ describe('MetadataFetchController', () => {
     pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY]);
     service.search.mockReturnValue(
       of(
-        candidateEvent({ provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First' }),
-        candidateEvent({ provider: MetadataProviderKey.OPEN_LIBRARY, providerId: 'ol-1', title: 'Second' }),
+        { provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First' },
+        { provider: MetadataProviderKey.OPEN_LIBRARY, providerId: 'ol-1', title: 'Second' },
       ),
     );
 
@@ -193,7 +183,7 @@ describe('MetadataFetchController', () => {
   it('allows explicit book searches to use enabled providers outside field rules', async () => {
     service.getStoredProviderContext.mockResolvedValue({ libraryId: 5, providerIds: {} });
     pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.GOOGLE]);
-    service.search.mockReturnValue(of(candidateEvent({ provider: MetadataProviderKey.KOBO, providerId: 'kobo-1', title: 'Kobo Result' })));
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.KOBO, providerId: 'kobo-1', title: 'Kobo Result' }));
 
     const stream = await controller.stream({ bookId: 12, title: 'Dune', providers: [MetadataProviderKey.KOBO] }, user);
     await firstValueFrom(stream.pipe(toArray()));
@@ -209,14 +199,12 @@ describe('MetadataFetchController', () => {
     preferences.options!.genres.maxCount = 2;
     metadataPreferences.getGlobal.mockResolvedValue(preferences);
     service.search.mockReturnValue(
-      of(
-        candidateEvent({
-          provider: MetadataProviderKey.GOOGLE,
-          providerId: 'vol-1',
-          title: 'First',
-          genres: ['Science Fiction', 'science fiction', 'audiobook', 'Space Opera', 'Fantasy'],
-        }),
-      ),
+      of({
+        provider: MetadataProviderKey.GOOGLE,
+        providerId: 'vol-1',
+        title: 'First',
+        genres: ['Science Fiction', 'science fiction', 'audiobook', 'Space Opera', 'Fantasy'],
+      }),
     );
 
     const stream = await controller.stream({ title: 'Dune' }, user);
@@ -228,7 +216,7 @@ describe('MetadataFetchController', () => {
   });
 
   it('skips stored provider lookup when bookId is not provided', async () => {
-    service.search.mockReturnValue(of(candidateEvent({ provider: MetadataProviderKey.GOOGLE, providerId: 'vol-2', title: 'Only' })));
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.GOOGLE, providerId: 'vol-2', title: 'Only' }));
 
     const dto: MetadataSearchDto = { title: 'Dune' };
     const stream = await controller.stream(dto, user);
@@ -258,22 +246,23 @@ describe('MetadataFetchController', () => {
     );
   });
 
-  it('sends a provider status as its own SSE event so a timeout is not read as an empty result', async () => {
+  it('does not emit provider status events, only candidate data', async () => {
     service.getStoredProviderContext.mockResolvedValue({ libraryId: 5, title: 'Dune', seriesName: null, seriesIndex: null, providerIds: {} });
     pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.COMICVINE]);
+    // Provider status events are no longer emitted, only candidate data is returned
     service.search.mockReturnValue(
-      of<MetadataSearchEvent>(candidateEvent({ provider: MetadataProviderKey.COMICVINE, providerId: 'cv-1', title: 'Found' }), {
-        kind: 'status',
-        status: { provider: MetadataProviderKey.COMICVINE, outcome: 'timeout' },
-      }),
+      of(
+        { provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First' },
+        { provider: MetadataProviderKey.OPEN_LIBRARY, providerId: 'ol-1', title: 'Second' },
+      ),
     );
 
     const stream = await controller.stream({ bookId: 12, title: 'Dune' }, user);
     const events = await firstValueFrom(stream.pipe(toArray()));
 
     expect(events).toEqual([
-      { data: { provider: MetadataProviderKey.COMICVINE, providerId: 'cv-1', title: 'Found' } },
-      { type: METADATA_PROVIDER_STATUS_EVENT, data: { provider: MetadataProviderKey.COMICVINE, outcome: 'timeout' } },
+      { data: { provider: MetadataProviderKey.GOOGLE, providerId: 'vol-1', title: 'First' } },
+      { data: { provider: MetadataProviderKey.OPEN_LIBRARY, providerId: 'ol-1', title: 'Second' } },
     ]);
   });
 
@@ -686,5 +675,6 @@ function makeProviderConfig(overrides: Partial<ProviderConfigurations> = {}): Pr
     kobo: { enabled: true, country: 'us', language: 'en', ...overrides.kobo },
     lubimyczytac: { enabled: false, ...overrides.lubimyczytac },
     aladin: { enabled: false, ttbKey: '', ...overrides.aladin },
+    mangabaka: { enabled: false, ...overrides.mangabaka },
   };
 }

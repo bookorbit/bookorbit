@@ -27,6 +27,7 @@ function makeConfig(overrides: Partial<ProviderConfigurations> = {}): ProviderCo
     kobo: { enabled: false, country: 'us', language: 'en' },
     lubimyczytac: { enabled: false },
     aladin: { enabled: false, ttbKey: '' },
+    mangabaka: { enabled: false },
     ...overrides,
   }
 }
@@ -50,6 +51,7 @@ function makeStatuses(): ProviderStatus[] {
     configured('kobo', false),
     configured('lubimyczytac', false),
     configured('aladin', false, false),
+    configured('mangabaka', false),
   ]
 }
 
@@ -133,7 +135,7 @@ describe('ProviderConfigPanel browsing', () => {
 
     const clear = wrapper.findAll('button').find((candidate) => candidate.text() === 'Clear filters')
     await clear?.trigger('click')
-    expect(wrapper.findAll('[role="switch"]')).toHaveLength(14)
+    expect(wrapper.findAll('[role="switch"]')).toHaveLength(15)
     wrapper.unmount()
   })
 })

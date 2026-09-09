@@ -758,6 +758,8 @@ export class MetadataService {
       comicvineId: boundProviderId('comicvineId', data.comicvineId),
       lubimyczytacId: boundProviderId('lubimyczytacId', data.lubimyczytacId),
       aladinId: boundProviderId('aladinId', data.aladinId),
+      mangabakaId: boundProviderId('mangabakaId', data.mangabakaId),
+      mangabakaSeriesId: boundProviderId('mangabakaSeriesId', data.mangabakaSeriesId),
       itunesId: boundProviderId('itunesId', data.itunesId),
       comicMetadata: data.comicMetadata ?? undefined,
       // A sidecar can name narrators (OPF role="nrt"); only sent when it did, so an extractor that
@@ -799,6 +801,8 @@ export class MetadataService {
     if (filtered.comicvineId !== undefined) scalarFields.comicvineId = filtered.comicvineId;
     if (filtered.lubimyczytacId !== undefined) scalarFields.lubimyczytacId = filtered.lubimyczytacId;
     if (filtered.aladinId !== undefined) scalarFields.aladinId = filtered.aladinId;
+    if (filtered.mangabakaId !== undefined) scalarFields.mangabakaId = filtered.mangabakaId;
+    if (filtered.mangabakaSeriesId !== undefined) scalarFields.mangabakaSeriesId = filtered.mangabakaSeriesId;
     if (filtered.itunesId !== undefined) scalarFields.itunesId = filtered.itunesId;
     if (Object.keys(scalarFields).length > 0) {
       const shouldSyncSeries =
