@@ -14,7 +14,9 @@
     "previous": "Precedente",
     "retry": "Riprova",
     "yes": "Sì",
-    "no": "No"
+    "no": "No",
+    "show": "Mostra",
+    "hide": "Nascondi"
   },
   "settings": {
     "privacySharing": {
@@ -1275,8 +1277,55 @@
           "title": "Come funziona.",
           "summary": "Ogni libro ottiene un punteggio su 100 in base a quanto sono completi i suoi metadati. Un peso è significativo solo accanto agli altri, quindi ogni campo sottostante mostra la parte di un punteggio finito di cui è responsabile. Raddoppiare ogni peso non cambia niente."
         },
+        "searchFields": "Filtro campi",
+        "clearSearch": "Cancella la ricerca",
+        "noMatches": "Nessun libro corrisponde a questa ricerca.",
+        "notScored": "Nessun punteggio",
+        "notScoredHeading": "Nessun punteggio ({count})",
+        "decreaseWeight": "Diminuisce il peso di {field}",
+        "increaseWeight": "Aumenta il peso di {field}",
+        "table": {
+          "field": "Campo",
+          "weight": "Peso"
+        },
+        "groups": {
+          "enrichment": "Arricchimento"
+        },
+        "rules": {
+          "text": "Conta quando non è vuoto",
+          "positive": "Conta quando è superiore a zero",
+          "count": "Conta quando almeno uno è impostato",
+          "cover": "Conta quando è memorizzata un'immagine di copertina",
+          "providerId": "Conta quando l'ID è memorizzato",
+          "seriesIndex": "Conta quando sopra lo zero, quindi il volume 0 non conta mai"
+        },
+        "rail": {
+          "title": "Dove si trovano i tuoi libri",
+          "bands": {
+            "poor": "SOTTO 50",
+            "fair": "50-69",
+            "good": "70-89",
+            "great": "90+"
+          },
+          "median": "Mediano",
+          "belowFifty": "Meno Di 50",
+          "ninetyPlus": "90 e oltre",
+          "noBooks": "Ancora nessun libro segnato. Esegui un aggiornamento del punteggio una volta che la tua libreria ha terminato l'importazione.",
+          "scopeNote": "Attraverso {count, plural, one {# libro} other {# libri}} nelle librerie che puoi accedere, segnati con i pesi attualmente salvati."
+        },
+        "progress": {
+          "running": "Aggiornando i punteggi della libreria",
+          "failed": "Aggiornamento non riuscito",
+          "count": "{processed} libri elaborati",
+          "countOf": "{processed} di libri {total}",
+          "failedCount": "({count} non riuscito)",
+          "safeToLeave": "Puoi lasciare questa pagina in modo sicuro.",
+          "dismiss": "Ignora"
+        },
         "save": {
-          "upToDate": "Tutte le modifiche salvate."
+          "upToDate": "Tutte le modifiche salvate.",
+          "unsaved": "{count, plural, one {# campo modificato} other {# campi modificati}}",
+          "totalShift": "{from} totali a {to} punti"
         }
       },
       "tabs": {
@@ -1582,7 +1631,11 @@
           "config": "Configurazione",
           "custom": "Personalizzato",
           "default": "Predefinito",
-          "resetToDefault": "Ripristina le impostazioni predefinite"
+          "resetToDefault": "Ripristina le impostazioni predefinite",
+          "unsaved": "Non salvato",
+          "override": "Sovrascrivi",
+          "inherited": "Ereditato",
+          "morePreview": "altri +{count}"
         },
         "reservoir": {
           "disabled": "{provider} - disabilitato",
@@ -1597,7 +1650,17 @@
           "statusNotConfigured": "non configurato",
           "done": "Fatto"
         },
+        "scope": {
+          "label": "Campo di applicazione della regola",
+          "global": "Impostazioni predefinite globali",
+          "unsavedMarker": "Modifiche non salvate"
+        },
         "toolbar": {
+          "searchFields": "Campi di ricerca",
+          "clearSearch": "Pulisci ricerca",
+          "provider": "Fornitore",
+          "anyProvider": "Qualunque",
+          "bulkLabel": "Applica a tutti i campi {count} che lo usano",
           "removeEverywhere": "Rimuovi da tutti i campi",
           "allFields": "Tutti i campi",
           "overridesOnly": "Solo sovrascrittura",
@@ -1617,6 +1680,7 @@
           "result": "Risultato",
           "resultHint": "Al prossimo aggiornamento questo campo si risolve in questo ordine:",
           "noUsableProviders": "Nessun provider utilizzabile - questo campo non sarà riempito.",
+          "appliesTo": "Si applica a {scope}.",
           "inheritGlobal": "Eredita regola globale",
           "inheritingGlobal": "Eredendo la regola globale.",
           "collapse": "Comprimi"
@@ -3445,7 +3509,7 @@
       "audiobook": "Audiolibro"
     },
     "actions": {
-      "read": "Segna come letto",
+      "read": "Leggi",
       "listen": "Ascolta",
       "peek": "Sbircia",
       "quickView": "Visualizzazione rapida",
@@ -3784,7 +3848,7 @@
         "ratingLocked": "La valutazione è bloccata",
         "rateStar": "Valuta {star}",
         "listen": "Ascolta",
-        "read": "Letto",
+        "read": "Leggi",
         "chooseFormat": "Scegli il formato",
         "audiobook": "Audiolibro",
         "primary": "Principale",
@@ -4024,7 +4088,7 @@
         "fieldsWritten": "{count, plural, =0 {nessun campo} one {un campo} other {# campi} many {# campi}}",
         "track": "Traccia {number}",
         "primary": "Principale",
-        "read": "Letto",
+        "read": "Leggi",
         "play": "Ascolta",
         "peek": "Sbircia",
         "download": "Scarica",
@@ -6312,6 +6376,15 @@
         "ascending": "Ascendente",
         "descending": "Discendente"
       }
+    },
+    "legend": {
+      "read": "Letto"
+    },
+    "status": {
+      "read": "Letta"
+    },
+    "index": {
+      "columnRead": "Letto"
     }
   },
   "smartScope": {
@@ -6958,7 +7031,7 @@
     "resetPassword": "Reimposta password",
     "completingSignIn": "Completamento dell'accesso",
     "magicLinkLogin": "Accesso al collegamento magico",
-    "readPrefix": "Leggi",
+    "readPrefix": "Letto",
     "emailSuffix": "E-mail",
     "library": "Biblioteca",
     "smartScope": "SmartScope",

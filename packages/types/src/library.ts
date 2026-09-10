@@ -91,11 +91,20 @@ export interface Library {
   updatedAt: string;
 }
 
-export interface RecomputeAddedAtResult {
+export type AddedAtRecomputeFailureCode = "file_unavailable" | "unsafe_path" | "database_error";
+
+export interface AddedAtRecomputeJob {
+  id: string;
+  libraryId: number;
   source: AddedAtSource;
+  status: "running" | "completed" | "failed";
   total: number;
+  processed: number;
   updated: number;
-  skipped?: string;
+  unchanged: number;
+  skipped: number;
+  failed: number;
+  failureSamples: { bookId: number; code: AddedAtRecomputeFailureCode }[];
 }
 
 export interface LibraryStats {

@@ -91,7 +91,7 @@ export class CreateLibraryDto {
   @IsIn(LIBRARY_ORGANIZATION_MODES)
   organizationMode?: OrganizationMode;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsIn(LIBRARY_ADDED_AT_SOURCES)
   addedAtSource?: AddedAtSource;
 

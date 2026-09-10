@@ -224,17 +224,22 @@ pnpm --filter @bookorbit/types dev
 
 These are the variables you are most likely to need during development. See `server/.env.example` for the full list with comments.
 
-| Variable              | Purpose                            | Default (dev)                                             |
-| --------------------- | ---------------------------------- | --------------------------------------------------------- |
-| `DATABASE_URL`        | PostgreSQL connection string       | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
-| `PORT`                | Server listen port                 | `3000`                                                    |
-| `NODE_ENV`            | Runtime mode                       | `development`                                             |
-| `JWT_SECRET`          | Signing key for auth tokens        | `change-me-in-production`                                 |
-| `APP_DATA_PATH`       | Storage for covers, avatars, cache | `../local/data`                                           |
-| `LIBRARY_BROWSE_ROOT` | Library folder picker root         | `/`                                                       |
-| `APP_URL`             | Base URL for email links           | `http://localhost:5173`                                   |
-| `SWAGGER_ENABLED`     | Serve Swagger UI and OpenAPI JSON  | `false`                                                   |
-| `DISABLE_LOCAL_AUTH`  | Disable password authentication    | `false`                                                   |
+| Variable              | Purpose                              | Default (dev)                                             |
+| --------------------- | ------------------------------------ | --------------------------------------------------------- |
+| `DATABASE_URL`        | PostgreSQL connection string         | `postgres://bookorbit:bookorbit@localhost:5432/bookorbit` |
+| `PORT`                | Server listen port                   | `3000`                                                    |
+| `HOST`                | Server listen address (IPv4 or IPv6) | `0.0.0.0`                                                 |
+| `NODE_ENV`            | Runtime mode                         | `development`                                             |
+| `JWT_SECRET`          | Signing key for auth tokens          | `change-me-in-production`                                 |
+| `APP_DATA_PATH`       | Storage for covers, avatars, cache   | `../local/data`                                           |
+| `LIBRARY_BROWSE_ROOT` | Library folder picker root           | `/`                                                       |
+| `APP_URL`             | Base URL for email links             | `http://localhost:5173`                                   |
+| `SWAGGER_ENABLED`     | Serve Swagger UI and OpenAPI JSON    | `false`                                                   |
+| `DISABLE_LOCAL_AUTH`  | Disable password authentication      | `false`                                                   |
+
+For a native server accessible only on this machine, set `HOST=127.0.0.1` in `server/.env`. `HOST` accepts an IPv4 or IPv6 address without a port or brackets, such as `::1` for IPv6 loopback. An unset or blank value keeps the existing `0.0.0.0` default. `PORT` continues to select the listen port.
+
+With Docker bridge networking, keep `HOST` unset and set `APP_PORT=127.0.0.1:3000` in the deployment `.env` to publish only on host loopback. `HOST` controls the container's listener, while `APP_PORT` controls host port publishing. Binding to loopback inside the container prevents normal port forwarding and access from other containers. A reverse proxy in another container can instead use the shared Docker network with the app's published port removed. With host networking, `HOST` controls the host's listener directly.
 
 ---
 

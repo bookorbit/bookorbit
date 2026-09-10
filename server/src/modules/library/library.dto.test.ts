@@ -77,9 +77,13 @@ describe('Library DTO validation', () => {
     expect(await hasErrors(plainToInstance(UpdateLibraryAccessDto, { accessLevel: 'owner' }))).toBe(false);
   });
 
-  it('PrescanLibraryDto requires at least one non-empty path', async () => {
+  it('PrescanLibraryDto requires at least one non-empty path and validates an optional library ID', async () => {
     expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: [''] }))).toBe(true);
     expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'] }))).toBe(false);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: 12 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: 0 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: 1.5 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: '12' }))).toBe(true);
   });
 
   it('ReorderLibrariesDto validates nested order items', async () => {
@@ -162,6 +166,14 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 1 }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 10000 }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 10001 }))).toBe(true);
+    });
+
+    it('rejects null and invalid date sources before they reach the database', async () => {
+      for (const addedAtSource of [null, 'unknown', 12]) {
+        expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource }))).toBe(true);
+        expect(await hasErrors(plainToInstance(UpdateLibraryDto, { addedAtSource }))).toBe(true);
+      }
+      expect(await hasErrors(plainToInstance(UpdateLibraryDto, {}))).toBe(false);
     });
 
     it('CreateLibraryDto accepts the Kindle enable flag', async () => {

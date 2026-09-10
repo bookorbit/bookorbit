@@ -14,7 +14,9 @@
     "previous": "이전",
     "retry": "재시도",
     "yes": "예",
-    "no": "아니오"
+    "no": "아니오",
+    "show": "표시",
+    "hide": "숨기기"
   },
   "settings": {
     "privacySharing": {
@@ -1366,6 +1368,7 @@
         "display": "디스플레이",
         "reader": "리더",
         "metadata": "메타데이터",
+        "usersAccess": "사용자 & 액세스",
         "email": "이메일",
         "opds": "OPDS",
         "kobo": "Kobo",
@@ -1628,6 +1631,10 @@
           "storeProviderIds": {
             "label": "도서별 제공자 ID 저장",
             "hint": "메타데이터를 가져올 때, 추후 더 정확한 조회를 위해 반환된 제공자 ID(ISBN, ASIN, Goodreads ID 등)를 도서 기록에 저장합니다."
+          },
+          "existingProviderIdsOnly": {
+            "label": "현재 제공자 ID만 사용",
+            "hint": "이미 라이브러리에 있는 도서는 저장된 ID가 있는 제공자만 조회하며, ID 검색이 실패해도 검색하지 않습니다. 수동 검색과 신간 도서 탐색은 영향을 받지 않습니다."
           }
         },
         "library": {
@@ -1916,6 +1923,18 @@
         "fontSizeHint": "기본 텍스트 크기 (픽셀)",
         "lineHeight": "행간",
         "lineHeightHint": "세로 줄 간격",
+        "paragraphSpacing": "문단 간격",
+        "paragraphSpacingHint": "문단 사이의 간격. 도서 기본값은 출판사 간격을 유지합니다.",
+        "paragraphSpacingDefault": "도서 기본값",
+        "paragraphSpacingValue": "{value}em",
+        "letterSpacing": "자간",
+        "letterSpacingHint": "글자 사이의 간격. 도서 기본값은 출판사 간격을 유지합니다.",
+        "wordSpacing": "단어 간격",
+        "wordSpacingHint": "단어 사이의 간격. 도서 기본값은 출판사 간격을 유지합니다.",
+        "textIndent": "첫줄 들여쓰기",
+        "textIndentHint": "문단 첫 번째 줄 시작 부분에 들여쓰기를 적용합니다. 도서 기본값은 출판사 설정을 유지합니다.",
+        "custom": "사용자 지정",
+        "emValue": "{value}em",
         "justify": "텍스트 양쪽 맞춤",
         "justifyHint": "양쪽 여백에 맞춰 텍스트 정렬",
         "hyphenation": "하이픈 처리",
@@ -2789,8 +2808,129 @@
       "tabs": {
         "file-naming": "파일 이름 명명",
         "book-dock": "책 창고",
+        "requests": "요청",
         "maintenance": "유지보수",
         "audit-log": "감사 로그"
+      },
+      "requests": {
+        "title": "요청",
+        "subtitle": "배포본을 어디서 찾을지, 무엇으로 다운로드할지, 완료 뒤 어떻게 처리할지 설정합니다.",
+        "tabs": {
+          "sources": "출처",
+          "clients": "다운로드 클라이언트",
+          "automation": "자동화"
+        },
+        "loading": "다운로드 클라이언트 불러오는 중...",
+        "clients": "다운로드 클라이언트",
+        "addClient": "클라이언트 추가",
+        "editClient": "클라이언트 수정",
+        "deleteClient": "{name} 삭제",
+        "clientsEmpty": {
+          "title": "아직 다운로드 클라이언트가 없습니다",
+          "body": "HTTP 직접 다운로드는 클라이언트가 필요 없습니다. 연결하면 BookOrbit에서 트래커가 제공하는 토렌트도 가져올 수 있습니다.",
+          "note": "qBittorrent, Transmission, Deluge가 지원됩니다."
+        },
+        "summary": "{type} - 카테고리 {category}, 우선도 {priority}",
+        "disabled": "비활성화됨",
+        "test": "연결 테스트",
+        "testSaveFirst": "테스트 전 변경사항을 저장하십시오",
+        "testOk": "{client} {version} 연결됨",
+        "testOkNoVersion": "{client} 연결됨",
+        "lastTestOk": "최근 테스트 {time}: 연결됨",
+        "lastTestFailed": "최근 테스트 {time}: {error}",
+        "saved": "다운로드 클라이언트 저장됨",
+        "deleted": "다운로드 클라이언트 제거됨",
+        "clientTypes": {
+          "qbittorrent": "qBittorrent",
+          "transmission": "Transmission",
+          "deluge": "Deluge"
+        },
+        "color": {
+          "label": "색상",
+          "hint": "이 클라이언트를 전송 세부 정보에 표시합니다. 전송 프로토콜은 고유 색상을 유지합니다.",
+          "none": "색상 없음"
+        },
+        "fields": {
+          "name": "이름",
+          "type": "클라이언트 유형",
+          "baseUrl": "기본 URL"
+        },
+        "errors": {
+          "nameAndUrlRequired": "이름 및 기본 URL을 입력하세요",
+          "nameTaken": "해당 이름의 다운로드 클라이언트가 이미 존재합니다",
+          "urlUnsafe": "기본 URL에 접속할 수 없습니다. 주소 및 http 또는 https를 사용하는지 확인하세요.",
+          "urlPrivate": "그 주소는 사설 또는 로컬 네트워크에 있습니다. 그러한 환경에서 실행하는 클라이언트일 경우 \"사설 주소 허용\"을 활성화하세요.",
+          "encryptionKeyMissing": "패스워드를 저장하기 전에 BOOK_REQUEST_ENCRYPTION_KEY를 설정하세요. 다음 명령어로 생성합니다: openssl rand -hex 32",
+          "encryptionKeyChanged": "저장된 패스워드를 읽을 수 없습니다. BOOK_REQUEST_ENCRYPTION_KEY 값이 저장된 이후 변경되었을 수 있습니다.",
+          "pathNotAbsolute": "경로 매핑은 양 쪽 모두 절대 경로를 사용해야 합니다",
+          "nameRequired": "이 클라이언트에 이름을 설정해 주세요.",
+          "urlRequired": "BookOrbit이 해당 클라이언트에 도달해야 하는 주소를 입력하세요.",
+          "mappingRequired": "BookOrbit가 가져올 디렉터리를 알 수 있도록 최소 하나의 경로 매핑을 추가하세요."
+        },
+        "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY가 설정되지 않아 클라이언트 패스워드를 저장할 수 없습니다. 다음 명령어로 생성하세요: openssl rand -hex 32",
+        "confirmDelete": {
+          "title": "이 다운로드 클라이언트를 삭제하시겠습니까?",
+          "description": "{name}의 주소 및 저장된 패스워드를 삭제하며, 여기서 다운로드중 요청은 업데이트를 중단합니다. 설정을 유지하려면 삭제하는 대신 비활성화할 수 있습니다.",
+          "confirm": "클라이언트 삭제"
+        },
+        "indexers": {
+          "title": "토렌트 인덱서",
+          "hint": "직접 운영하는 Prowlarr, Jackett, NZBHydra를 Torznab으로 연결합니다. 검색하려는 Torznab 피드마다 하나씩 추가하세요.",
+          "allDisabled": "아래의 모든 소스가 비활성화되어 있어 요청 검색에서 아무것도 찾을 수 없습니다. 최소 하나를 활성화해 두세요.",
+          "loading": "인덱서 불러오는 중...",
+          "empty": {
+            "title": "아직 소스가 없습니다",
+            "body": "BookOrbit은 자체 소스를 번들로 제공하지 않으므로 소스를 추가해야 요청 검색을 사용할 수 있습니다. 두 가지 방법이 있습니다.",
+            "bodyOneWay": "BookOrbit은 자체 소스를 번들로 제공하지 않으므로 소스를 추가해야 요청 검색을 사용할 수 있습니다.",
+            "responsibility": "직접 추가한 소스가 무엇을 색인하는지는 사용자의 책임입니다.",
+            "pluginTitle": "플러그인 설치",
+            "pluginBody": "BookOrbit이 검색할 사이트를 지정하는 파일입니다. 파일을 직접 준비한 후 설정을 채우세요.",
+            "torznabTitle": "Torznab 인덱서 추가",
+            "torznabBody": "운영 중인 Prowlarr, Jackett, NZBHydra 피드를 지정하세요. 피드마다 하나씩 지정해야 합니다."
+          },
+          "add": "인덱서 추가",
+          "edit": "인덱서 수정",
+          "delete": "{name} 삭제",
+          "none": "아직 인덱서가 없습니다.",
+          "disabled": "비활성화됨",
+          "test": "연결 테스트",
+          "testSaveFirst": "테스트 전 변경사항을 저장하십시오",
+          "testOk": "{name} 연결됨",
+          "toggleAria": "{name}로 검색",
+          "enabledNotice": "{name} 검색을 사용합니다",
+          "disabledNotice": "{name} 검색을 사용하지 않습니다",
+          "lastTestOk": "최근 테스트 {time}: 연결됨",
+          "lastTestFailed": "최근 테스트 {time}: {error}",
+          "saved": "인덱서 저장됨",
+          "deleted": "소스 삭제됨",
+          "unavailable": "이 서버에는 \"{type}\" 인덱서 유형이 없습니다. 유형을 변경하거나 해당 플러그인 및 저장된 설정을 삭제하세요.",
+          "pluginFailed": "\"{directory}\"에 있는 플러그인을 불러올 수 없습니다: {reason}",
+          "network": {
+            "title": "고급 네트워크",
+            "hint": "이 소스의 기본 경로가 작동하지 않을 때만 필요한 설정입니다. 허용 범위는 달라지지 않으며 어떤 주소로 연결되어도 동일한 검사를 거칩니다.",
+            "resolvers": "DNS 서버",
+            "proxyUrl": "프록시 URL",
+            "proxyHint": "이 소스의 요청을 전달할 HTTP 또는 HTTPS 프록시입니다. SOCKS는 지원되지 않습니다.",
+            "brief": "이 소스의 기본 경로가 작동하지 않을 때만 필요한 설정입니다.",
+            "resolversBrief": "쉼표로 항목을 구분합니다. 이 소스에서만 시스템 리졸버 대신 사용합니다. 빈 값일 경우 시스템 설정을 사용합니다."
+          },
+          "errors": {
+            "nameRequired": "이 인덱서에 이름을 설정해 주세요.",
+            "urlRequired": "BookOrbit이 검색할 주소를 입력하세요."
+          },
+          "editName": "{name} 편집",
+          "editorDescription": "이 인덱서에 대한 설정입니다.",
+          "chooseType": "인덱서 유형을 선택하세요",
+          "chooseTypeHint": "BookOrbit이 어디서 검색할지 선택하세요. 이후 제시되는 양식은 그 소스가 필요로 하는 것만 요청합니다.",
+          "builtIn": "내장",
+          "plugin": "플러그인",
+          "typeDescriptions": {
+            "torznab": "직접 운영하는 Jackett, Prowlarr, 또는 NZBHydra. 카테고리 및 시드 목표를 사용합니다."
+          },
+          "plugins": {
+            "title": "플러그인"
+          }
+        }
       }
     },
     "nav": {

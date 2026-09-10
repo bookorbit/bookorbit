@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Lock, Plus, RefreshCw, X } from '@lucide/vue'
-import type { AddedAtSource, OrganizationMode } from '@bookorbit/types'
+import type { AddedAtRecomputeJob, AddedAtSource, OrganizationMode } from '@bookorbit/types'
+import { formatNumber } from '@/i18n/formatters'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { FORMAT_LABELS } from '../composables/useLibraryCreator'
 
@@ -16,6 +17,8 @@ const props = defineProps<{
   canRecomputeAddedAt?: boolean
   storedAddedAtSource?: AddedAtSource | null
   recomputingAddedAt?: boolean
+  recomputeJob?: AddedAtRecomputeJob | null
+  recomputeErrorKey?: string | null
   excludePatterns: string[]
 }>()
 
@@ -26,6 +29,17 @@ const emit = defineEmits<{
   'update:excludePatterns': [value: string[]]
   recompute: []
 }>()
+
+const confirmingRecompute = ref(false)
+const confirmButton = ref<HTMLButtonElement | null>(null)
+const sourceGroup = ref<HTMLElement | null>(null)
+const recomputeButton = ref<HTMLButtonElement | null>(null)
+const progressText = computed(() => {
+  const job = props.recomputeJob
+  if (!job) return ''
+  const counters = ['processed', 'total', 'updated', 'unchanged', 'skipped', 'failed'] as const
+  return t('library.creator.scanner.addedAt.progressSummary', Object.fromEntries(counters.map((key) => [key, formatNumber(job[key])])))
+})
 
 const ADDED_AT_SOURCES: AddedAtSource[] = ['imported', 'file_modified', 'file_created']
 
@@ -42,8 +56,24 @@ function selectAddedAtSource(source: AddedAtSource) {
   emit('update:addedAtSource', source)
 }
 
-function requestRecompute() {
+async function requestRecompute() {
+  confirmingRecompute.value = true
+  await nextTick()
+  confirmButton.value?.focus()
+}
+
+async function cancelRecompute() {
+  confirmingRecompute.value = false
+  await nextTick()
+  recomputeButton.value?.focus()
+}
+
+async function confirmRecompute() {
+  if (recomputeDisabled.value) return
+  confirmingRecompute.value = false
   emit('recompute')
+  await nextTick()
+  sourceGroup.value?.querySelector<HTMLInputElement>('input:checked')?.focus()
 }
 
 // ── Scan mode ─────────────────────────────────────────────────────────────────
@@ -186,45 +216,93 @@ function onPatternKeydown(e: KeyboardEvent) {
         {{ t('library.creator.scanner.addedAt.title') }}
       </p>
       <p id="added-at-hint" class="text-xs text-muted-foreground mb-3">{{ t('library.creator.scanner.addedAt.hint') }}</p>
-      <div role="radiogroup" aria-labelledby="added-at-title" aria-describedby="added-at-hint" class="space-y-2">
-        <button
+      <div ref="sourceGroup" role="radiogroup" aria-labelledby="added-at-title" aria-describedby="added-at-hint" class="space-y-2">
+        <label
           v-for="source in ADDED_AT_SOURCES"
           :key="source"
-          type="button"
-          role="radio"
-          :aria-checked="addedAtSource === source"
-          class="w-full text-left rounded-lg border p-3 transition-colors"
+          class="block w-full cursor-pointer rounded-lg border p-3 text-start transition-colors focus-within:ring-2 focus-within:ring-ring"
           :class="addedAtSource === source ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card hover:border-primary/40'"
-          @click="selectAddedAtSource(source)"
         >
-          <div class="flex items-center gap-2 mb-1">
-            <span
-              class="w-3.5 h-3.5 rounded-full border-2 shrink-0 flex items-center justify-center"
-              :class="addedAtSource === source ? 'border-primary' : 'border-muted-foreground/40'"
-            >
-              <span v-if="addedAtSource === source" class="w-1.5 h-1.5 rounded-full bg-primary" />
-            </span>
+          <span class="mb-1 flex items-center gap-2">
+            <input
+              type="radio"
+              name="added-at-source"
+              :value="source"
+              :checked="addedAtSource === source"
+              class="accent-primary"
+              @change="selectAddedAtSource(source)"
+            />
             <span class="text-sm font-semibold text-foreground">{{ t(`library.creator.scanner.addedAt.options.${source}.title`) }}</span>
-          </div>
-          <p class="text-xs text-muted-foreground leading-relaxed pl-5.5">
-            {{ t(`library.creator.scanner.addedAt.options.${source}.hint`) }}
-          </p>
-        </button>
+          </span>
+          <span class="block ps-5.5 text-xs text-muted-foreground leading-relaxed">{{
+            t(`library.creator.scanner.addedAt.options.${source}.hint`)
+          }}</span>
+        </label>
       </div>
-      <div v-if="canRecomputeAddedAt" class="mt-3 flex items-center gap-3">
+      <div v-if="canRecomputeAddedAt" class="mt-3 flex flex-wrap items-center gap-3">
         <button
+          ref="recomputeButton"
           type="button"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="recomputeDisabled"
           @click="requestRecompute"
         >
-          <RefreshCw :size="13" :class="recomputingAddedAt ? 'animate-spin' : ''" />
+          <RefreshCw :size="13" :class="recomputingAddedAt ? 'motion-safe:animate-spin' : ''" />
           {{ recomputingAddedAt ? t('library.creator.scanner.addedAt.recomputing') : t('library.creator.scanner.addedAt.recompute') }}
         </button>
         <p class="text-xs text-muted-foreground">
           {{ showSaveFirstHint ? t('library.creator.scanner.addedAt.recomputeSaveFirst') : t('library.creator.scanner.addedAt.recomputeHint') }}
         </p>
       </div>
+      <div
+        v-if="confirmingRecompute"
+        role="group"
+        :aria-label="t('library.creator.scanner.addedAt.recompute')"
+        class="mt-3 rounded-md border border-border p-3"
+      >
+        <p class="text-sm text-muted-foreground">{{ t('library.creator.scanner.addedAt.backgroundConfirm') }}</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button
+            ref="confirmButton"
+            type="button"
+            :disabled="recomputeDisabled"
+            class="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            @click="confirmRecompute"
+          >
+            {{ t('library.creator.scanner.addedAt.recompute') }}
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            @click="cancelRecompute"
+          >
+            {{ t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+      <div v-if="recomputeJob" role="status" class="mt-3 space-y-2 text-sm text-muted-foreground">
+        <p>{{ t(`library.creator.scanner.addedAt.jobStatus.${recomputeJob.status}`) }}</p>
+        <progress
+          v-if="recomputeJob.status === 'running'"
+          :value="recomputeJob.total ? recomputeJob.processed : undefined"
+          :max="recomputeJob.total || 1"
+          :aria-label="t('library.creator.scanner.addedAt.recomputing')"
+          class="h-2 w-full accent-primary"
+        />
+        <p>{{ progressText }}</p>
+        <p v-if="recomputeJob.failed > 0">{{ t('library.creator.scanner.addedAt.failedBooksHint') }}</p>
+        <ul v-if="recomputeJob.failureSamples.length" class="space-y-1">
+          <li v-for="failure in recomputeJob.failureSamples" :key="failure.bookId">
+            {{
+              t('library.creator.scanner.addedAt.failureSample', {
+                bookId: formatNumber(failure.bookId),
+                reason: t(`library.creator.scanner.addedAt.failureReasons.${failure.code}`),
+              })
+            }}
+          </li>
+        </ul>
+      </div>
+      <p v-if="recomputeErrorKey" role="alert" class="mt-3 text-sm text-destructive">{{ t(recomputeErrorKey) }}</p>
     </div>
 
     <!-- Filtering group -->

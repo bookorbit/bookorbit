@@ -1,6 +1,6 @@
 import { Injectable, Logger, PayloadTooLargeException } from '@nestjs/common';
-import { copyFile, mkdir, rename, stat, unlink } from 'fs/promises';
-import { createWriteStream } from 'fs';
+import { mkdir, open, rename, stat, unlink } from 'fs/promises';
+import { createReadStream, createWriteStream } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { Readable } from 'stream';
@@ -46,7 +46,7 @@ export class UploadStorageService {
   /**
    * Moves the temp file to an already-resolved absolute destination path.
    * Creates parent directories as needed.
-   * Uses rename() and falls back to copy+unlink for cross-device moves.
+   * Uses rename() and stages cross-device copies on the destination filesystem.
    */
   async moveToPath(tempPath: string, absolutePath: string): Promise<void> {
     await mkdir(dirname(absolutePath), { recursive: true });
@@ -54,13 +54,27 @@ export class UploadStorageService {
     try {
       await rename(tempPath, absolutePath);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
-        await copyFile(tempPath, absolutePath);
-        await this.cleanup(tempPath);
-      } else {
-        throw err;
-      }
+      if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+      await this.copyAcrossDevices(tempPath, absolutePath);
     }
+  }
+
+  private async copyAcrossDevices(sourcePath: string, destinationPath: string): Promise<void> {
+    const stagingPath = join(dirname(destinationPath), `.bookorbit-upload-${randomUUID()}.tmp`);
+    const stagingFile = await open(stagingPath, 'wx');
+
+    try {
+      // copyFile also copies permissions, which ACL-backed shares may forbid despite allowing writes.
+      // Stage without a book extension so scanners cannot ingest a partially written file.
+      await pipeline(createReadStream(sourcePath), stagingFile.createWriteStream());
+      await rename(stagingPath, destinationPath);
+    } catch (err) {
+      await stagingFile.close().catch(() => {});
+      await this.cleanup(stagingPath);
+      throw err;
+    }
+
+    await this.cleanup(sourcePath);
   }
 
   async cleanup(tempPath: string): Promise<void> {

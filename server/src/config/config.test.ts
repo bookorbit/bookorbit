@@ -7,6 +7,7 @@ const ORIGINAL_ENV = process.env;
 function resetEnv(): void {
   process.env = { ...ORIGINAL_ENV };
   delete process.env.NODE_ENV;
+  delete process.env.HOST;
   delete process.env.APP_URL;
   delete process.env.APP_VERSION;
   delete process.env.OIDC_ALLOW_LOCAL_ISSUERS;
@@ -46,6 +47,7 @@ describe('config', () => {
   it('uses app defaults, including local-build fallback version', () => {
     expect(appConfig()).toEqual({
       nodeEnv: 'development',
+      host: '0.0.0.0',
       appUrl: 'http://localhost:5173',
       version: 'Local build',
       githubReleasesRepo: 'bookorbit/bookorbit',
@@ -59,6 +61,7 @@ describe('config', () => {
 
   it('reads app values from environment when provided', () => {
     process.env.NODE_ENV = 'production';
+    process.env.HOST = '127.0.0.1';
     process.env.APP_URL = 'https://bookorbit.local';
     process.env.APP_VERSION = 'v2.3.4';
     process.env.OIDC_ALLOW_LOCAL_ISSUERS = 'true';
@@ -70,6 +73,7 @@ describe('config', () => {
 
     expect(appConfig()).toEqual({
       nodeEnv: 'production',
+      host: '127.0.0.1',
       appUrl: 'https://bookorbit.local',
       version: 'v2.3.4',
       githubReleasesRepo: 'acme/app',
@@ -79,6 +83,16 @@ describe('config', () => {
       koboCloudscraperPython: '/opt/bookorbit-python/bin/python',
       koreaderPluginSourcePath: '/opt/koreader/bookorbit.koplugin',
     });
+  });
+
+  it.each(['', '   '])('preserves wildcard binding for blank HOST %j', (host) => {
+    process.env.HOST = host;
+    expect(appConfig().host).toBe('0.0.0.0');
+  });
+
+  it.each(['127.0.0.1', '192.0.2.10', '::1', '::'])('reads and trims bind address %s', (host) => {
+    process.env.HOST = ` ${host} `;
+    expect(appConfig().host).toBe(host);
   });
 
   it('falls back to false when OIDC_ALLOW_LOCAL_ISSUERS is invalid', () => {

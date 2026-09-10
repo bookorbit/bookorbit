@@ -1,5 +1,6 @@
 import { parseIntoClientConfig } from 'pg-connection-string';
 import { isAbsolute } from 'node:path';
+import { isIP } from 'node:net';
 import { z } from 'zod';
 
 const BOOLEAN_ENV_VALUES = ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'];
@@ -45,6 +46,11 @@ function trustProxyEnv() {
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  HOST: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || isIP(value) !== 0, 'HOST must be an IPv4 or IPv6 address without a port or brackets')
+    .optional(),
   DATABASE_URL: z.string().refine(isValidPostgresConnectionString, 'DATABASE_URL must be a valid PostgreSQL connection string').optional(),
   JWT_SECRET: z
     .string()

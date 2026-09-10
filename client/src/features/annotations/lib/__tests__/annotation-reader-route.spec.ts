@@ -18,6 +18,7 @@ function annotation(overrides: Partial<AnnotationHubItem> = {}): AnnotationHubIt
     origin: 'web',
     positionStatus: 'exact',
     chapterIndex: 0,
+    highlightedAt: '2026-07-12T00:00:00.000Z',
     createdAt: '2026-07-12T00:00:00.000Z',
     bookTitle: 'A Book',
     author: 'An Author',

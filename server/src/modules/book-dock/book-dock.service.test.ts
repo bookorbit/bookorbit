@@ -7,7 +7,7 @@ vi.mock('fs/promises', () => ({
   rmdir: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { unlink } from 'fs/promises';
+import { rmdir, unlink } from 'fs/promises';
 
 function row(overrides?: Record<string, unknown>) {
   return {
@@ -119,6 +119,32 @@ describe('BookDockService', () => {
         createdAt: '2026-01-01T00:00:00.000Z',
       }),
     );
+  });
+
+  it('lists and reads unit members even when books share a directory', async () => {
+    const { service, repo } = makeService();
+    const shared = row({ unitDirectory: null });
+    const member = { fileName: 'track-02.mp3', fileSize: 20, format: 'mp3', role: 'content', sortOrder: 1 };
+    repo.findAll.mockResolvedValue({ items: [shared], total: 1 });
+    repo.findUnitFilesByDockFileIds.mockResolvedValue(new Map([[shared.id, [member]]]));
+    repo.findById.mockResolvedValue(shared);
+    repo.findUnitFiles.mockResolvedValue([member]);
+
+    const page = await service.listFiles({ page: 1, limit: 20, sort: 'createdAt', order: 'desc', userId: 1, canManageAll: false });
+    const detail = await service.getFile(shared.id, 1, false);
+    expect(repo.findUnitFilesByDockFileIds).toHaveBeenCalledWith([shared.id]);
+    expect(page.items[0].unitFiles).toEqual([member]);
+    expect(detail.unitFiles).toEqual([member]);
+  });
+
+  it('discards a shared-folder book and its members without touching sibling books', async () => {
+    const { service, repo } = makeService();
+    repo.findById.mockResolvedValue(row({ unitDirectory: null }));
+    repo.findUnitFiles.mockResolvedValue([{ absolutePath: '/bucket/book.epub' }, { absolutePath: '/bucket/book.mobi' }]);
+    await service.discardFile(1, 1, false);
+    expect(new Set(vi.mocked(unlink).mock.calls.map(([path]) => path))).toEqual(new Set(['/bucket/book.epub', '/bucket/book.mobi']));
+    expect(rmdir).not.toHaveBeenCalled();
+    expect(repo.deleteById).toHaveBeenCalledWith(1);
   });
 
   it('normalizes legacy tainted metadata before returning it through the API', async () => {

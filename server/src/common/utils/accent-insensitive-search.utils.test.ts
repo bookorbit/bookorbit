@@ -1,6 +1,6 @@
 import { PgDialect, pgTable, text } from 'drizzle-orm/pg-core';
 
-import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from './accent-insensitive-search.utils';
+import { accentInsensitiveExactMatchRank, accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from './accent-insensitive-search.utils';
 
 const records = pgTable('records', {
   name: text('name'),
@@ -22,6 +22,17 @@ describe('accentInsensitiveIlike', () => {
     const query = dialect.sqlToQuery(accentInsensitiveIlike(records.name, '%100\\%\\_%'));
 
     expect(query.params).toEqual(['%100\\%\\_%']);
+  });
+});
+
+describe('accentInsensitiveExactMatchRank', () => {
+  it('ranks accent-insensitive, case-insensitive exact matches before partial matches', () => {
+    const dialect = new PgDialect();
+
+    const query = dialect.sqlToQuery(accentInsensitiveExactMatchRank(records.name, 'Garcia'));
+
+    expect(query.sql).toBe('case when lower(public.bookorbit_unaccent("records"."name")) = lower(public.bookorbit_unaccent($1)) then 0 else 1 end');
+    expect(query.params).toEqual(['Garcia']);
   });
 });
 

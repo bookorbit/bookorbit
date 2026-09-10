@@ -19,19 +19,45 @@ const query = ref('')
 const results = ref<Item[]>([])
 const showDropdown = ref(false)
 let debounceTimer: ReturnType<typeof setTimeout>
+let latestRequestId = 0
+
+function comparableName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Mark}/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLocaleLowerCase()
+}
+
+function findExactResult(items: readonly Item[], value: string): Item | undefined {
+  const comparableValue = comparableName(value)
+  return items.find((item) => comparableName(item.name) === comparableValue)
+}
+
+async function search(queryValue: string): Promise<Item[] | null> {
+  const requestId = ++latestRequestId
+  const selectedIds = new Set(props.modelValue.map((item) => item.id))
+  const response = await props.searchFn(queryValue)
+  if (requestId !== latestRequestId || query.value !== queryValue) return null
+
+  const available = response.filter((item) => !selectedIds.has(item.id))
+  results.value = available
+  showDropdown.value = available.length > 0
+  return available
+}
 
 async function onInput() {
   clearTimeout(debounceTimer)
   if (!query.value.trim()) {
+    latestRequestId++
     results.value = []
     showDropdown.value = false
     return
   }
-  debounceTimer = setTimeout(async () => {
-    const selectedIds = new Set(props.modelValue.map((i) => i.id))
-    const res = await props.searchFn(query.value)
-    results.value = res.filter((r) => !selectedIds.has(r.id))
-    showDropdown.value = results.value.length > 0
+  const queryValue = query.value
+  debounceTimer = setTimeout(() => {
+    void search(queryValue)
   }, 200)
 }
 
@@ -39,6 +65,8 @@ function addItem(item: Item) {
   if (!props.modelValue.some((v) => v.id === item.id)) {
     emit('update:modelValue', [...props.modelValue, item])
   }
+  latestRequestId++
+  clearTimeout(debounceTimer)
   query.value = ''
   results.value = []
   showDropdown.value = false
@@ -51,8 +79,21 @@ function removeItem(id: number) {
   )
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Backspace' && !query.value && props.modelValue.length > 0) {
+async function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && query.value.trim()) {
+    e.preventDefault()
+    const queryValue = query.value
+    const loadedExactMatch = findExactResult(results.value, queryValue)
+    if (loadedExactMatch) {
+      addItem(loadedExactMatch)
+      return
+    }
+
+    clearTimeout(debounceTimer)
+    const available = await search(queryValue)
+    const fetchedExactMatch = available ? findExactResult(available, queryValue) : undefined
+    if (fetchedExactMatch) addItem(fetchedExactMatch)
+  } else if (e.key === 'Backspace' && !query.value && props.modelValue.length > 0) {
     emit('update:modelValue', props.modelValue.slice(0, -1))
   }
 }
@@ -63,7 +104,10 @@ function onBlur() {
   }, 150)
 }
 
-onUnmounted(() => clearTimeout(debounceTimer))
+onUnmounted(() => {
+  latestRequestId++
+  clearTimeout(debounceTimer)
+})
 </script>
 
 <template>

@@ -483,6 +483,19 @@ describe('UserPreferencesService', () => {
     expect(repo.upsert).toHaveBeenCalledWith(11, 'display', preferences);
   });
 
+  it('upsertDisplayPreferences accepts the complete client payload for fill-crop covers', async () => {
+    const preferences = {
+      ...validDisplayPreferences,
+      authorRowDensity: 'comfortable',
+      authorCoverFallback: false,
+      bookCoverDisplayMode: 'fill-crop',
+    } satisfies DisplayPreferences;
+
+    await expect(service.upsertDisplayPreferences(11, preferences)).resolves.toBeUndefined();
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', preferences);
+  });
+
   it('upsertDisplayPreferences defaults author display preferences omitted by older clients', async () => {
     const { authorRowDensity, authorCoverFallback, ...olderPreferences } = validDisplayPreferences;
     void authorRowDensity;

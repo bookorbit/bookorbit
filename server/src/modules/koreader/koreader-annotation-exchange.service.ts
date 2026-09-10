@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { AnnotationPosition, AnnotationRow } from '../../db/schema';
 import { drawerFromStyle, koreaderColorFromHex } from '../annotation/annotation-style-map';
 import { AnnotationSyncService, formatDeviceDatetime, type IncomingDeviceAnnotation, type IngestResult } from '../annotation/annotation-sync.service';
@@ -15,8 +17,19 @@ const ACK_EVENT = 'koreader.annotation_exchange_ack';
 const MAX_CHANGES_PER_REQUEST = 50;
 const PUSH_DOWN_PAGE = 100;
 const CONVERSION_BUDGET_PER_REQUEST = 20;
+const DEVICE_DATETIME_FORMAT = 'yyyy-MM-dd HH:mm:ss';
 
 type DevicePositionsByFormat = { pdf?: AnnotationPosition; xpointer?: AnnotationPosition; cfi?: AnnotationPosition };
+
+export function parseKoreaderSourceCreatedAt(datetime: string, timeZone: string): Date | null {
+  try {
+    const parsed = fromZonedTime(datetime, timeZone);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return formatInTimeZone(parsed, timeZone, DEVICE_DATETIME_FORMAT) === datetime ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface ExchangeAddEntry {
   serverId: number;
@@ -102,6 +115,7 @@ export class KoreaderAnnotationExchangeService {
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
       const deviceClockOffsetMs = this.deviceClockOffsetMs(dto.deviceTime);
+      const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
 
       const results: ExchangeBookResult[] = [];
       const unmatched: string[] = [];
@@ -114,7 +128,7 @@ export class KoreaderAnnotationExchangeService {
           unmatched.push(hash);
           continue;
         }
-        const result = await this.exchangeBook(user.id, dto.deviceId, hash, match.bookId, match.bookFileId, book, deviceClockOffsetMs);
+        const result = await this.exchangeBook(user.id, dto.deviceId, hash, match.bookId, match.bookFileId, book, deviceClockOffsetMs, timeZone);
         pushedTotal += result.toApply.add.length + result.toApply.edit.length + result.toApply.delete.length;
         results.push(result);
       }
@@ -202,6 +216,7 @@ export class KoreaderAnnotationExchangeService {
     bookFileId: number,
     book: ExchangeBookDto,
     deviceClockOffsetMs: number,
+    timeZone: string,
   ): Promise<ExchangeBookResult> {
     const ingest = await this.annotationSync.ingestDeviceAnnotations({
       userId,
@@ -209,7 +224,7 @@ export class KoreaderAnnotationExchangeService {
       deviceId,
       bookId,
       bookFileId,
-      annotations: book.changes.map((change) => this.toIncoming(change)),
+      annotations: book.changes.map((change) => this.toIncoming(change, timeZone)),
     });
 
     let deviceDeleted = 0;
@@ -219,7 +234,10 @@ export class KoreaderAnnotationExchangeService {
         source: 'koreader',
         deviceId,
         bookId,
-        presentKeys: book.keys,
+        presentKeys: book.keys.map((entry) => ({
+          ...entry,
+          sourceCreatedAt: parseKoreaderSourceCreatedAt(entry.dt, timeZone),
+        })),
       });
     }
 
@@ -427,9 +445,10 @@ export class KoreaderAnnotationExchangeService {
     return candidate;
   }
 
-  private toIncoming(change: KoreaderAnnotationDto): IncomingDeviceAnnotation {
+  private toIncoming(change: KoreaderAnnotationDto, timeZone: string): IncomingDeviceAnnotation {
     return {
       datetime: change.datetime,
+      sourceCreatedAt: parseKoreaderSourceCreatedAt(change.datetime, timeZone),
       datetimeUpdated: change.datetimeUpdated ?? null,
       drawer: change.drawer,
       color: change.color ?? null,

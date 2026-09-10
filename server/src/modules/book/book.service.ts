@@ -30,7 +30,7 @@ import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../m
 import { parseFb2File } from '../metadata/lib/fb2-parser';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
-import { basename, dirname, extname, join } from 'path';
+import { basename, dirname, extname, join, relative } from 'path';
 
 import {
   BOOK_METADATA_LOCK_FIELDS,
@@ -1463,6 +1463,7 @@ export class BookService {
 
       await this.bookRepo.updateBookFile(fileId, {
         absolutePath: newAbsolutePath !== file.absolutePath ? newAbsolutePath : undefined,
+        relPath: newAbsolutePath !== file.absolutePath ? relative(file.libraryFolderPath, newAbsolutePath) : undefined,
       });
 
       this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} - rename file completed`);
@@ -1486,13 +1487,9 @@ export class BookService {
       try {
         await rm(file.absolutePath, { force: true });
       } catch {
-        this.logger.warn(`Failed to physically delete file at ${file.absolutePath}`);
+        throw new InternalServerErrorException('Failed to delete file from disk');
       }
 
-      // the file watcher will eventually catch the unlink and clean up the database.
-      // however, to be responsive, we can manually clean up the database here too,
-      // but if the file is the last file, the scanner logic is better suited to mark the book missing.
-      // So we leave the DB cleanup to the file watcher, which is more robust.
       const book = await this.bookRepo.findBookBase(file.bookId);
       const wasPrimary = book?.primaryFileId === fileId;
 

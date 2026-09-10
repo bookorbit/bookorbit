@@ -230,7 +230,7 @@ export function useReaderState() {
           }
       }
       html {
-          line-height: ${lh};
+          line-height: ${lh} !important;
           hanging-punctuation: allow-end last;
           orphans: 2;
           widows: 2;
@@ -276,7 +276,7 @@ export function useReaderState() {
           : ''
       }
       p, li, blockquote, dd {
-          line-height: ${lh};
+          line-height: ${lh} !important;
           text-align: ${j ? 'justify' : 'start'} !important;
           hyphens: ${h ? 'auto' : 'none'};
       }

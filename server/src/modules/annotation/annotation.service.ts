@@ -67,6 +67,7 @@ export class AnnotationService {
           origin: dto.origin as 'web' | 'koreader' | 'kobo',
           positionStatus: dto.positionStatus as AnnotationListResponse['items'][number]['positionStatus'],
           chapterIndex: dto.chapterIndex,
+          highlightedAt: dto.highlightedAt.toISOString(),
           createdAt: dto.createdAt instanceof Date ? dto.createdAt.toISOString() : String(dto.createdAt),
           pdf: dto.pdf,
         };

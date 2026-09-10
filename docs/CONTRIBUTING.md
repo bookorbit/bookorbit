@@ -281,4 +281,4 @@ See [AI_POLICY.md](AI_POLICY.md). The short version: disclose all AI usage in yo
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the same license as the project (AGPL-3.0).
+By contributing, you agree that your contributions are licensed under the same license as the project (AGPL-3.0), including the attribution term in the [BookOrbit Attribution Notice](../NOTICE).

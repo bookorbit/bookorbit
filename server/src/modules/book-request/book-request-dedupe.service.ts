@@ -107,7 +107,7 @@ export class BookRequestDedupeService {
       (value): value is string => value !== null && value.length === 13,
     );
     const titleKey = lowerTitleKey(work.title);
-    const owned = await this.repo.findOwnedMatches([...new Set(isbn13s)], titleKey ? [titleKey] : [], accessibleLibraryIds);
+    const owned = await this.repo.findOwnedMatches([...new Set(isbn13s)], titleKey ? [titleKey] : [], accessibleLibraryIds, work.mediaKind);
 
     for (const isbn13 of isbn13s) {
       const bookId = owned.byIsbn13.get(isbn13);
@@ -118,7 +118,7 @@ export class BookRequestDedupeService {
 
   /**
    * Annotates a batch of search candidates with "already in your library" and "already
-   * requested". Three queries total regardless of batch size.
+   * requested". Ownership lookups are bounded by the three media kinds regardless of batch size.
    */
   async checkAvailability(
     queries: BookRequestAvailabilityQuery[],
@@ -138,22 +138,37 @@ export class BookRequestDedupeService {
       }),
     );
 
-    const isbn13s = [...new Set(queries.map((q) => normalizeIsbn(q.isbn13)).filter((v): v is string => v !== null && v.length === 13))];
-    const lowerTitles = [...new Set(queries.map((q) => lowerTitleKey(q.title)).filter(Boolean))];
     const allKeys = [...new Set(perQueryKeys.flat())];
 
-    const [owned, activeRequests] = await Promise.all([
-      this.repo.findOwnedMatches(isbn13s, lowerTitles, accessibleLibraryIds),
+    const identitiesByMediaKind = new Map<BookRequestMediaKind, { isbn13s: Set<string>; lowerTitles: Set<string> }>();
+    for (const query of queries) {
+      const identities = identitiesByMediaKind.get(query.mediaKind) ?? { isbn13s: new Set<string>(), lowerTitles: new Set<string>() };
+      const isbn13 = normalizeIsbn(query.isbn13);
+      if (isbn13?.length === 13) identities.isbn13s.add(isbn13);
+      const title = lowerTitleKey(query.title);
+      if (title) identities.lowerTitles.add(title);
+      identitiesByMediaKind.set(query.mediaKind, identities);
+    }
+
+    const [ownedEntries, activeRequests] = await Promise.all([
+      Promise.all(
+        [...identitiesByMediaKind].map(async ([mediaKind, identities]) => {
+          const owned = await this.repo.findOwnedMatches([...identities.isbn13s], [...identities.lowerTitles], accessibleLibraryIds, mediaKind);
+          return [mediaKind, owned] as const;
+        }),
+      ),
       this.repo.findActiveByDedupeKeys(allKeys),
     ]);
+    const ownedByMediaKind = new Map(ownedEntries);
 
     const matchedRequestIds = [...new Set([...activeRequests.values()].map((row) => row.id))];
     const subscribedIds = await this.repo.findSubscribedRequestIds(userId, matchedRequestIds);
 
     return queries.map((query, index) => {
+      const owned = ownedByMediaKind.get(query.mediaKind);
       const isbn13 = normalizeIsbn(query.isbn13);
-      const ownedByIsbn = isbn13 !== null && isbn13.length === 13 ? owned.byIsbn13.get(isbn13) : undefined;
-      const ownedBookId = ownedByIsbn ?? matchOwnedByTitle(owned.byTitle.get(lowerTitleKey(query.title)), query.author);
+      const ownedByIsbn = isbn13 !== null && isbn13.length === 13 ? owned?.byIsbn13.get(isbn13) : undefined;
+      const ownedBookId = ownedByIsbn ?? matchOwnedByTitle(owned?.byTitle.get(lowerTitleKey(query.title)), query.author);
 
       const existing = perQueryKeys[index].map((key) => activeRequests.get(key)).find((row) => row !== undefined);
 

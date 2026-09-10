@@ -69,6 +69,24 @@ describe('useLibraryCreator', () => {
     expect(creator.prescanResult.value).toEqual(result)
   })
 
+  it('includes the current library ID when prescanning an edit', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    const result: PrescanResult = { paths: [{ path: '/books', accessible: true, fileCount: 2 }], totalFiles: 2 }
+    apiMock.mockResolvedValue(jsonResponse(result))
+    creator.initEdit(makeLibrary({ id: 12 }))
+
+    await creator.runPrescan()
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/libraries/prescan',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ paths: ['/books'], libraryId: 12 }),
+      }),
+    )
+  })
+
   it('surfaces prescan connection failures', async () => {
     const { useLibraryCreator } = await import('../useLibraryCreator')
     const creator = useLibraryCreator()

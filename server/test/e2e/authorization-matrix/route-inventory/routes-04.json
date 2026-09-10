@@ -590,6 +590,30 @@
   {
     "file": "server/src/modules/library/library.controller.ts",
     "className": "LibraryController",
+    "methodName": "getAddedAtRecompute",
+    "httpMethod": "GET",
+    "path": "/libraries/:id/recompute-added-at",
+    "permissions": ["Permission.ManageLibraries"],
+    "libraryAccess": ["'editor'"],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
+    "methodName": "recomputeAddedAt",
+    "httpMethod": "POST",
+    "path": "/libraries/:id/recompute-added-at",
+    "permissions": ["Permission.ManageLibraries"],
+    "libraryAccess": ["'editor'"],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/library/library.controller.ts",
+    "className": "LibraryController",
     "methodName": "writeMetadataToFiles",
     "httpMethod": "POST",
     "path": "/libraries/:id/write-metadata-to-files",

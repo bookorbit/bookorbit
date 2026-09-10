@@ -54,6 +54,7 @@ function makeAnnotationRow(overrides?: Record<string, unknown>) {
     deletedAt: null,
     deviceCreatedAt: null,
     deviceUpdatedAt: null,
+    sourceCreatedAt: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
@@ -559,7 +560,21 @@ describe('AnnotationService', () => {
       expect(dto.style).toBe('underline');
       expect(dto.note).toBe('a note');
       expect(dto.chapterTitle).toBe('Intro');
+      expect(dto.highlightedAt).toEqual(new Date('2026-03-01T00:00:00Z'));
       expect(dto.createdAt).toEqual(new Date('2026-03-01T00:00:00Z'));
+    });
+
+    it('maps source creation and ingestion timestamps independently', () => {
+      const row = makeAnnotationRow({
+        origin: 'koreader',
+        sourceCreatedAt: new Date('2026-01-15T16:30:00.000Z'),
+        createdAt: new Date('2026-09-06T17:10:19.332Z'),
+      });
+
+      const dto = AnnotationResponseDto.from(row as never);
+
+      expect(dto.highlightedAt).toEqual(new Date('2026-01-15T16:30:00.000Z'));
+      expect(dto.createdAt).toEqual(new Date('2026-09-06T17:10:19.332Z'));
     });
 
     it('parses pdf geometry and derives positionStatus for a pdf row', () => {

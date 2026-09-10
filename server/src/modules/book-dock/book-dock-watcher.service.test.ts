@@ -25,7 +25,7 @@ import { mkdir, readdir, realpath, stat, unlink } from 'fs/promises';
 import { watch } from 'chokidar';
 
 import { isPrimaryFormat } from '../scanner/lib/classify';
-import { waitForDirectoryStability, waitForStability } from '../scanner/lib/stability';
+import { waitForStability } from '../scanner/lib/stability';
 import { BookDockWatcherService } from './book-dock-watcher.service';
 
 function makeService(bookDockPath = '/data/book-dock') {
@@ -34,7 +34,7 @@ function makeService(bookDockPath = '/data/book-dock') {
   };
   const ingestService = {
     ingestFromWatchedFolder: vi.fn(),
-    ingestUnitDirectory: vi.fn().mockResolvedValue(0),
+    ingestUnitDirectory: vi.fn().mockResolvedValue({ created: 0, consumedDirectories: new Set() }),
   };
   const repo = {
     findByAbsolutePath: vi.fn(),
@@ -68,6 +68,7 @@ function makeReadyWatcher(overrides: { close?: ReturnType<typeof vi.fn> } = {}) 
 describe('BookDockWatcherService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(readdir).mockResolvedValue([]);
   });
 
   it('rescan walks files and emits summary', async () => {
@@ -100,7 +101,7 @@ describe('BookDockWatcherService', () => {
 
     expect(mkdir).toHaveBeenCalledWith('/data/book-dock', { recursive: true });
     expect(realpath).toHaveBeenCalledWith('/data/book-dock');
-    expect(watch).toHaveBeenCalledWith('/data/book-dock', { ignoreInitial: true });
+    expect(watch).toHaveBeenCalledWith('/data/book-dock', { ignoreInitial: true, followSymlinks: false });
   });
 
   it('startWatcher swallows watcher boot errors', async () => {
@@ -194,9 +195,9 @@ describe('BookDockWatcherService', () => {
 
   it('leaves a directory alone once a unit row has claimed it', async () => {
     const { service, ingestService, repo } = makeService();
-    repo.findByUnitDirectory.mockResolvedValue({ id: 4 });
+    repo.findByUnitDirectory.mockResolvedValue({ id: 4, autoFinalizeSuppressed: true });
 
-    await (service as any).ingestUnitDirectory('/data/book-dock/request-7-audiobook');
+    await (service as any).walkAndIngest('/data/book-dock/request-7-audiobook');
 
     expect(ingestService.ingestUnitDirectory).not.toHaveBeenCalled();
   });
@@ -209,28 +210,6 @@ describe('BookDockWatcherService', () => {
 
     expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
     expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
-  });
-
-  /**
-   * A folder still being copied is not yet a book: interpreting it now reads a partial snapshot,
-   * and the row it creates claims the directory so the tracks that follow are never looked at.
-   */
-  it('waits for a dropped folder to stop growing before interpreting it', async () => {
-    const { service, ingestService } = makeService();
-    const order: string[] = [];
-    vi.mocked(waitForDirectoryStability).mockImplementationOnce(() => {
-      order.push('wait');
-      return Promise.resolve();
-    });
-    ingestService.ingestUnitDirectory.mockImplementation(() => {
-      order.push('ingest');
-      return Promise.resolve(1);
-    });
-
-    await (service as any).ingestUnitDirectory('/data/book-dock/Neuromancer');
-
-    expect(waitForDirectoryStability).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
-    expect(order).toEqual(['wait', 'ingest']);
   });
 
   /**

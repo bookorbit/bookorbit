@@ -4,6 +4,8 @@
 
 A self-hosted library and reading platform for ebooks, PDFs, audiobooks, and comics.
 
+Copyright (C) 2025-2026 neon and BookOrbit contributors.
+
 [![Latest release](https://img.shields.io/github/v/release/bookorbit/bookorbit?label=latest&style=flat-square)](https://github.com/bookorbit/bookorbit/releases)
 [![Stars](https://img.shields.io/github/stars/bookorbit/bookorbit?style=flat-square&color=FFC72C)](https://github.com/bookorbit/bookorbit/stargazers)
 [![CI](https://img.shields.io/github/actions/workflow/status/bookorbit/bookorbit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/bookorbit/bookorbit/actions/workflows/ci.yml)
@@ -97,6 +99,8 @@ Open `http://your-server-ip:3000` and complete setup using your `SETUP_BOOTSTRAP
 
 After configuring OIDC and linking at least one active administrator, you can set `DISABLE_LOCAL_AUTH=true` and restart BookOrbit to remove and reject password sign-in. BookOrbit refuses to start if that would leave no usable OIDC administrator. Set it back to `false` and restart to recover access during an identity-provider outage.
 
+An OIDC provider signed by a private certificate authority requires its PEM CA bundle to be mounted read-only in the BookOrbit container. Set `NODE_EXTRA_CA_CERTS` to that in-container path and restart BookOrbit. This adds the private authority to Node's normal certificate verification; it does not disable TLS security. Private-network issuers also require `OIDC_ALLOW_LOCAL_ISSUERS=true`.
+
 For the full installation guide including reverse proxy setup, file permissions on NAS, external databases, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation)**.
 
 ## KOReader Plugin
@@ -119,9 +123,6 @@ Full documentation is at **[bookorbit.app](https://bookorbit.app/what-is-bookorb
 
 For setting up book requests, see the [book requests guide](docs/BOOK_REQUESTS.md): indexers,
 download clients, path mappings, automation, and the encryption key they all need.
-For a one-time import from Audiobookshelf, see the [Audiobookshelf migration guide](docs/AUDIOBOOKSHELF_MIGRATION.md).
-For a stopped-snapshot import from Calibre-Web Automated, see the
-[Calibre-Web Automated migration guide](docs/CALIBRE_WEB_AUTOMATED_MIGRATION.md).
 For local development, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). To contribute, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full workflow: branch naming, test expectations, PR checklist, and commit format.
 
 ## Repository Activity
@@ -147,6 +148,8 @@ When adding user-facing text in code, add the Vue I18n key only to `client/src/l
 - **Feature requests:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml)
 - **Security vulnerabilities:** Follow the private reporting process in the [Security Policy](.github/SECURITY.md).
 
-## License
+## License and Attribution
 
 BookOrbit is licensed under the **[GNU Affero General Public License v3.0](LICENSE)**.
+
+Forks and modified distributions must preserve BookOrbit's reasonable author attribution as described in the **[BookOrbit Attribution Notice](NOTICE)**, in accordance with section 7(b) of the GNU AGPL v3.

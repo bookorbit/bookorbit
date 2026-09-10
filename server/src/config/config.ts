@@ -3,6 +3,7 @@ import { join, resolve } from 'path';
 
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  host: process.env.HOST?.trim() || '0.0.0.0',
   appUrl: process.env.APP_URL ?? 'http://localhost:5173',
   version: process.env.APP_VERSION ?? 'Local build',
   githubReleasesRepo: process.env.GITHUB_RELEASES_REPO?.trim() || 'bookorbit/bookorbit',

@@ -6,6 +6,21 @@ const BASE_ENV = {
 };
 
 describe('validateEnv', () => {
+  it('allows HOST to remain unset', () => {
+    expect(validateEnv(BASE_ENV).HOST).toBeUndefined();
+  });
+
+  it.each(['', '   ', '0.0.0.0', '127.0.0.1', '192.0.2.10', '::', '::1', '2001:db8::1', ' 127.0.0.1 '])('accepts bind address %j', (HOST) => {
+    expect(validateEnv({ ...BASE_ENV, HOST }).HOST).toBe(HOST.trim());
+  });
+
+  it.each(['localhost', 'https://127.0.0.1', '127.0.0.1:3000', '[::1]', '256.0.0.1', '127.0.0.1/8', '127. 0.0.1'])(
+    'rejects invalid bind address %j',
+    (HOST) => {
+      expect(() => validateEnv({ ...BASE_ENV, HOST })).toThrow('HOST must be an IPv4 or IPv6 address without a port or brackets');
+    },
+  );
+
   it('accepts common postgres URL formats used by existing setups', () => {
     const urls = [
       'postgres://bookorbit:bookorbit@localhost:5432/bookorbit',

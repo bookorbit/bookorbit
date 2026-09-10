@@ -1,5 +1,5 @@
 {
-  "id": "32f2d33f-3c10-48ad-b008-cb7338422109",
+  "id": "1d34bd1a-5c8f-4a78-92a7-06a66281d909",
   "prevId": "43276ff2-894a-44fb-8b80-1f59a898540a",
   "version": "7",
   "dialect": "postgresql",
@@ -2699,13 +2699,6 @@
           "notNull": true,
           "default": "'book_per_folder'"
         },
-        "added_at_source": {
-          "name": "added_at_source",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'imported'"
-        },
         "exclude_patterns": {
           "name": "exclude_patterns",
           "type": "jsonb",
@@ -2920,10 +2913,6 @@
         "libraries_organization_mode_chk": {
           "name": "libraries_organization_mode_chk",
           "value": "\"libraries\".\"organization_mode\" in ('book_per_folder', 'book_per_file')"
-        },
-        "libraries_added_at_source_chk": {
-          "name": "libraries_added_at_source_chk",
-          "value": "\"libraries\".\"added_at_source\" in ('imported', 'file_modified', 'file_created')"
         },
         "libraries_reading_threshold_range_chk": {
           "name": "libraries_reading_threshold_range_chk",
@@ -7730,6 +7719,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "source_created_at": {
+          "name": "source_created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7850,9 +7845,43 @@
               "nulls": "last"
             },
             {
-              "expression": "created_at",
+              "expression": "coalesce(\"source_created_at\", \"created_at\") desc",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
               "isExpression": false,
               "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"annotations\".\"deleted_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "annotations_user_book_created_active_idx": {
+          "name": "annotations_user_book_created_active_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"source_created_at\", \"created_at\") desc",
+              "asc": true,
+              "isExpression": true,
               "nulls": "last"
             },
             {

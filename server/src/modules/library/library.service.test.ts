@@ -462,7 +462,7 @@ describe('LibraryService', () => {
   });
 
   it('prescan counts primary files recursively and flags overlapping paths', async () => {
-    libraryRepo.findAllFolderPaths.mockResolvedValue([{ path: '/books/existing', libraryName: 'Existing Library' }]);
+    libraryRepo.findAllFolderPaths.mockResolvedValue([{ libraryId: 1, path: '/books/existing', libraryName: 'Existing Library' }]);
 
     mockReaddir.mockImplementation((path: Parameters<typeof readdir>[0]) => {
       if (path === '/books/new') {
@@ -481,6 +481,34 @@ describe('LibraryService', () => {
     expect(result.totalFiles).toBe(2);
     expect(result.paths[0]).toEqual(expect.objectContaining({ path: '/books/new', accessible: true, fileCount: 2 }));
     expect(result.paths[1]).toEqual(expect.objectContaining({ overlapLibrary: 'Existing Library' }));
+  });
+
+  it('prescan ignores persisted folders from the library being edited', async () => {
+    libraryRepo.findAllFolderPaths.mockResolvedValue([
+      { libraryId: 10, path: '/books/audiobooks', libraryName: 'Audiobooks' },
+      { libraryId: 20, path: '/books/ebooks', libraryName: 'eBooks' },
+    ]);
+
+    const result = await service.prescan({ paths: ['/books/audiobooks'], libraryId: 10 });
+
+    expect(result.paths[0]).toEqual({
+      path: '/books/audiobooks',
+      accessible: true,
+      fileCount: 0,
+      overlapLibrary: undefined,
+      error: undefined,
+    });
+  });
+
+  it('prescan still reports a different overlapping library after ignoring the edited library', async () => {
+    libraryRepo.findAllFolderPaths.mockResolvedValue([
+      { libraryId: 10, path: '/books/audiobooks', libraryName: 'Audiobooks' },
+      { libraryId: 20, path: '/books', libraryName: 'All Books' },
+    ]);
+
+    const result = await service.prescan({ paths: ['/books/audiobooks'], libraryId: 10 });
+
+    expect(result.paths[0]).toEqual(expect.objectContaining({ overlapLibrary: 'All Books' }));
   });
 
   it('prescan reports paths outside the configured browse root without touching the filesystem', async () => {

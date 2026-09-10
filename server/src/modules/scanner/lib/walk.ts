@@ -1,3 +1,4 @@
+import { usableFileTime } from '../../../common/utils/file-time.utils';
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
@@ -27,18 +28,6 @@ export interface WalkResult {
   dirMtimes: Map<string, number>;
 }
 
-// Birthtimes at or below this epoch are treated as unavailable. Some filesystems
-// report birthtime as epoch 0 (or a tiny value) when they do not track creation
-// time, so anything in that range is not a real creation date.
-const MIN_VALID_TIME_MS = 1000;
-
-function usableTime(date: Date | undefined): Date | undefined {
-  if (!(date instanceof Date)) return undefined;
-  const ms = date.getTime();
-  if (Number.isNaN(ms) || ms <= MIN_VALID_TIME_MS) return undefined;
-  return date;
-}
-
 /**
  * Derive a book's "date added" from the earliest on-disk time of its content
  * files. This approximates when the book first landed on disk, rather than when
@@ -57,9 +46,9 @@ export function earliestContentTime(files: FileStat[], source: 'file_modified' |
     if (file.role !== 'content') continue;
     let candidate: Date | undefined;
     if (source === 'file_modified') {
-      candidate = usableTime(file.mtime);
+      candidate = usableFileTime(file.mtime);
     } else {
-      candidate = usableTime(file.birthtime) ?? usableTime(file.mtime);
+      candidate = usableFileTime(file.birthtime) ?? usableFileTime(file.mtime);
     }
     if (candidate === undefined) continue;
     if (earliest === undefined || candidate < earliest) earliest = candidate;

@@ -1704,13 +1704,13 @@ describe('BookDockFinalizeService', () => {
      * Every file into one folder, and one book out of it, in a single write: the primary goes first
      * because the book row that carries `primaryFileId` is the one created for it.
      */
-    it('places every file of a unit into one folder and builds a single book from them', async () => {
+    it.each([UNIT_DIR, null])('places every file into one book with directory ownership %s', async (unitDirectory) => {
       const harness = makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness);
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [77], createdBookIds: [77], attachedFileIds: [] });
 
-      const result = await finalize(harness, unitRow());
+      const result = await finalize(harness, unitRow({ unitDirectory }));
 
       expect(result).toMatchObject({ success: true, bookId: 77 });
       expect(harness.storage.moveToPath).toHaveBeenCalledTimes(3);
@@ -1765,7 +1765,7 @@ describe('BookDockFinalizeService', () => {
      * A disc-foldered unit holds two files called `track01.mp3`. Filing them both by basename put
      * the second on top of the first, and filed the book under `CD 1` rather than under the book.
      */
-    it('keeps the disc folders of a unit rather than flattening them onto each other', async () => {
+    it.each([UNIT_DIR, null])('preserves distinct disc paths with directory ownership %s', async (unitDirectory) => {
       const harness = makeService();
       harness.repo.findUnitFiles.mockResolvedValue([
         {
@@ -1792,7 +1792,7 @@ describe('BookDockFinalizeService', () => {
       arrange(harness);
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [80], createdBookIds: [80], attachedFileIds: [] });
 
-      const result = await finalize(harness, unitRow({ absolutePath: `${UNIT_DIR}/CD 1/track01.mp3` }));
+      const result = await finalize(harness, unitRow({ absolutePath: `${UNIT_DIR}/CD 1/track01.mp3`, unitDirectory }));
 
       expect(result.success).toBe(true);
       expect(harness.storage.moveToPath.mock.calls.map((call: string[]) => call[1])).toEqual([
@@ -1821,16 +1821,23 @@ describe('BookDockFinalizeService', () => {
     });
 
     /** A folder in a book_per_file library is split apart by the next scan: data loss, not taste. */
-    it('holds a multipart audiobook rather than placing a folder into a book_per_file library', async () => {
+    it.each([UNIT_DIR, null])('holds multipart audio for a book_per_file library with directory ownership %s', async (unitDirectory) => {
       const harness = makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness, { organizationMode: 'book_per_file' });
 
-      const result = await finalize(harness, unitRow());
+      const result = await finalize(harness, unitRow({ unitDirectory }));
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('one book per file');
       expect(harness.storage.moveToPath).not.toHaveBeenCalled();
+    });
+
+    it('discards every recorded file of a shared-folder unit without removing its directory', async () => {
+      const { service, repo } = makeService();
+      repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
+      await (service as any).cleanupDiscardedBookDockFile(unitRow({ unitDirectory: null }));
+      expect(new Set(mockUnlink.mock.calls.map(([path]) => path))).toEqual(new Set(AUDIO_UNIT_FILES.map((file) => file.absolutePath)));
     });
 
     const MULTI_FORMAT_FILES = [

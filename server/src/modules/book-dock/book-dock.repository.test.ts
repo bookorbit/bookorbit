@@ -21,6 +21,7 @@ vi.mock('drizzle-orm', () => ({
   sum: vi.fn((value: unknown) => ({ op: 'sum', value })),
 }));
 
+import { bookDockFiles, bookDockUnitFiles } from '../../db/schema';
 import { BookDockRepository } from './book-dock.repository';
 
 function makeDb() {
@@ -93,6 +94,31 @@ function hasReadyToFileCondition(value: unknown): boolean {
 }
 
 describe('BookDockRepository', () => {
+  it('looks up both anchors and secondary members in bounded batches', async () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new BookDockRepository(db as never);
+    const paths = Array.from({ length: 501 }, (_, index) => `/dock/book-${index}.epub`);
+    selectBuilder.where
+      .mockResolvedValueOnce([{ absolutePath: paths[0] }])
+      .mockResolvedValueOnce([{ absolutePath: paths[1] }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ absolutePath: paths[500] }]);
+    expect(await repo.findClaimedPaths(paths)).toEqual(new Set([paths[0], paths[1], paths[500]]));
+    expect(selectBuilder.where.mock.calls.map(([clause]) => clause.right)).toEqual([
+      paths.slice(0, 500),
+      paths.slice(0, 500),
+      paths.slice(500),
+      paths.slice(500),
+    ]);
+    expect(selectBuilder.from.mock.calls.map(([table]) => table)).toEqual([bookDockFiles, bookDockUnitFiles, bookDockFiles, bookDockUnitFiles]);
+  });
+
+  it('does not query file claims for empty input', async () => {
+    const { db } = makeDb();
+    expect(await new BookDockRepository(db as never).findClaimedPaths([])).toEqual(new Set());
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
   it('findExistingBooksByAbsolutePaths short-circuits an empty path list', async () => {
     const { db } = makeDb();
     const repo = new BookDockRepository(db as never);

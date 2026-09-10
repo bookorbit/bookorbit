@@ -64,7 +64,7 @@ const { t } = useI18n()
 
 const STYLE_ICONS = { highlight: Highlighter, underline: Underline, strikethrough: Strikethrough, squiggly: Waves, invert: Contrast }
 
-const created = computed(() => new Date(props.annotation.createdAt))
+const created = computed(() => new Date(props.annotation.highlightedAt))
 const dayLabel = computed(() => formatDate(created.value, { day: 'numeric', month: 'short' }))
 const yearLabel = computed(() => formatDate(created.value, { year: 'numeric' }))
 const hub = computed(() => ('bookTitle' in props.annotation ? props.annotation : null))

@@ -1459,16 +1459,19 @@ export class BookRepository {
       .select({
         id: bookFiles.id,
         absolutePath: bookFiles.absolutePath,
+        relPath: bookFiles.relPath,
         format: bookFiles.format,
         role: bookFiles.role,
         bookId: bookFiles.bookId,
         libraryId: books.libraryId,
+        libraryFolderPath: libraryFolders.path,
         fileHash: bookFiles.fileHash,
         sizeBytes: bookFiles.sizeBytes,
         durationSeconds: bookFiles.durationSeconds,
       })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
       .where(eq(bookFiles.id, fileId))
       .limit(1);
     return file ?? null;
@@ -1478,7 +1481,10 @@ export class BookRepository {
     await this.db.delete(bookFiles).where(eq(bookFiles.id, fileId));
   }
 
-  async updateBookFile(fileId: number, data: { format?: string | null; role?: string; absolutePath?: string; sizeBytes?: number }): Promise<void> {
+  async updateBookFile(
+    fileId: number,
+    data: { format?: string | null; role?: string; absolutePath?: string; relPath?: string | null; sizeBytes?: number },
+  ): Promise<void> {
     await this.db
       .update(bookFiles)
       .set({ ...data, updatedAt: new Date() })

@@ -3,7 +3,8 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
-import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
+import { accentInsensitiveExactMatchRank, accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
+import { normalizeMetadataText } from '../../common/utils/metadata-text-normalize.utils';
 import * as schema from '../../db/schema';
 import { authors, bookMetadata, bookSeries, collections, genres, narrators, tags } from '../../db/schema';
 
@@ -74,14 +75,14 @@ export class CatalogService {
   }
 
   private searchByNameWithId(q: string, table: NamedTableWithId): Promise<SearchResultWithId[]> {
-    const pattern = this.toContainsPattern(q);
-    if (!pattern) return Promise.resolve([]);
+    const term = normalizeMetadataText(q);
+    if (!term) return Promise.resolve([]);
 
     return this.db
       .select({ id: table.id, name: table.name })
       .from(table)
-      .where(accentInsensitiveIlike(table.name, pattern))
-      .orderBy(table.name)
+      .where(accentInsensitiveIlike(table.name, buildSearchPattern(term)))
+      .orderBy(accentInsensitiveExactMatchRank(table.name, term), table.name)
       .limit(DEFAULT_SEARCH_LIMIT);
   }
 

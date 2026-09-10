@@ -17,6 +17,7 @@ function item(overrides: Partial<AnnotationItem> = {}): AnnotationItem {
     origin: 'kobo',
     positionStatus: 'exact',
     chapterIndex: null,
+    highlightedAt: '2026-04-02T19:30:00.000Z',
     createdAt: '2026-04-02T19:30:00.000Z',
     ...overrides,
   }
@@ -157,21 +158,21 @@ describe('buildHighlightGroups by colour', () => {
 describe('buildHighlightGroups by day', () => {
   it('groups by the viewer time zone and puts the newest day first', () => {
     const groups = buildHighlightGroups(
-      [item({ id: 1, createdAt: '2026-04-02T12:00:00.000Z' }), item({ id: 2, createdAt: '2026-04-05T12:00:00.000Z' })],
+      [item({ id: 1, highlightedAt: '2026-04-02T12:00:00.000Z' }), item({ id: 2, highlightedAt: '2026-04-05T12:00:00.000Z' })],
       stats(),
       'day',
     )
 
     expect(groups.map((g) => g.label)).toEqual([
-      highlightDay(item({ createdAt: '2026-04-05T12:00:00.000Z' })),
-      highlightDay(item({ createdAt: '2026-04-02T12:00:00.000Z' })),
+      highlightDay(item({ highlightedAt: '2026-04-05T12:00:00.000Z' })),
+      highlightDay(item({ highlightedAt: '2026-04-02T12:00:00.000Z' })),
     ])
     expect(groups[0].total).toBe(1)
   })
 
   it('puts highlights made on the same day in one group', () => {
     const groups = buildHighlightGroups(
-      [item({ id: 1, createdAt: '2026-04-02T09:00:00.000Z' }), item({ id: 2, createdAt: '2026-04-02T11:00:00.000Z' })],
+      [item({ id: 1, highlightedAt: '2026-04-02T09:00:00.000Z' }), item({ id: 2, highlightedAt: '2026-04-02T11:00:00.000Z' })],
       stats(),
       'day',
     )
@@ -183,6 +184,6 @@ describe('buildHighlightGroups by day', () => {
 
 describe('highlightDay', () => {
   it('returns an empty key for an unparseable timestamp', () => {
-    expect(highlightDay(item({ createdAt: 'not a date' }))).toBe('')
+    expect(highlightDay(item({ highlightedAt: 'not a date' }))).toBe('')
   })
 })

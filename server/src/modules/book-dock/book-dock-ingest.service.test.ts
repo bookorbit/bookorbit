@@ -18,6 +18,8 @@ vi.mock('../scanner/lib/walk', async (importOriginal) => ({
   buildSingleBookCandidate: vi.fn(),
 }));
 
+vi.mock('../scanner/lib/stability', () => ({ waitForDirectoryStability: vi.fn().mockResolvedValue(undefined) }));
+
 const mockedStat = vi.mocked(stat);
 
 function makeService(bookDockPath = '/books/book-dock') {
@@ -30,6 +32,8 @@ function makeService(bookDockPath = '/books/book-dock') {
 
   const repo = {
     create: vi.fn(),
+    findByUnitDirectory: vi.fn().mockResolvedValue(undefined),
+    findClaimedPaths: vi.fn().mockResolvedValue(new Set()),
     createUnit: vi.fn().mockImplementation((data: Record<string, unknown>) => Promise.resolve({ id: 900, ...data })),
     findById: vi.fn(),
     findByAbsolutePath: vi.fn().mockResolvedValue(null),
@@ -317,7 +321,7 @@ describe('BookDockIngestService', () => {
         ],
       } as never);
 
-      await expect(service.ingestUnitDirectory('/books/book-dock/Neuromancer')).resolves.toBe(1);
+      await expect(service.ingestUnitDirectory('/books/book-dock/Neuromancer')).resolves.toMatchObject({ created: 1 });
 
       expect(repo.createUnit).toHaveBeenCalledTimes(1);
       const [anchor, files] = repo.createUnit.mock.calls[0];
@@ -340,7 +344,7 @@ describe('BookDockIngestService', () => {
         files: [candidateFile('/books/book-dock/Saga/Saga 001.cbz', 'cbz'), candidateFile('/books/book-dock/Saga/Saga 002.cbz', 'cbz')],
       } as never);
 
-      await expect(service.ingestUnitDirectory('/books/book-dock/Saga')).resolves.toBe(2);
+      await expect(service.ingestUnitDirectory('/books/book-dock/Saga')).resolves.toMatchObject({ created: 2 });
 
       // None of them owns the folder: claiming it would hide the others from the watcher, and
       // deleting one would take the whole folder with it.
@@ -351,19 +355,19 @@ describe('BookDockIngestService', () => {
       const { service, repo } = makeService();
       vi.mocked(buildSingleBookCandidate).mockResolvedValue(null as never);
 
-      await expect(service.ingestUnitDirectory('/books/book-dock/empty')).resolves.toBe(0);
+      await expect(service.ingestUnitDirectory('/books/book-dock/empty')).resolves.toMatchObject({ created: 0 });
       expect(repo.createUnit).not.toHaveBeenCalled();
     });
 
     it('skips a unit whose primary file already has a row', async () => {
       const { service, repo } = makeService();
-      repo.findByAbsolutePath.mockResolvedValue({ id: 3 });
+      repo.findClaimedPaths.mockResolvedValue(new Set(['/books/book-dock/Dune/Dune.epub']));
       vi.mocked(buildSingleBookCandidate).mockResolvedValue({
         folderPath: '/books/book-dock/Dune',
         files: [candidateFile('/books/book-dock/Dune/Dune.epub', 'epub')],
       } as never);
 
-      await expect(service.ingestUnitDirectory('/books/book-dock/Dune')).resolves.toBe(0);
+      await expect(service.ingestUnitDirectory('/books/book-dock/Dune')).resolves.toMatchObject({ created: 0 });
       expect(repo.createUnit).not.toHaveBeenCalled();
     });
   });

@@ -142,10 +142,31 @@ describe('useReaderState', () => {
     const css = state.generateCSS()
 
     expect(css).toContain('font-family: serif !important;')
-    expect(css).toContain('line-height: 1.8;')
+    expect(css).toContain('line-height: 1.8 !important;')
     expect(css).toContain('font-size: 20px;')
     expect(css).toContain('text-align: start !important;')
     expect(css).toContain('hyphens: none;')
+  })
+
+  it('overrides a more specific publisher line height on body text', () => {
+    const state = useReaderState()
+    state.setLineHeight(3)
+
+    const publisherStyle = document.createElement('style')
+    publisherStyle.textContent = '.TX { line-height: 1.31; }'
+    const readerStyle = document.createElement('style')
+    readerStyle.textContent = state.generateCSS()
+    const paragraph = document.createElement('p')
+    paragraph.className = 'TX'
+
+    document.head.append(publisherStyle, readerStyle)
+    document.body.append(paragraph)
+
+    expect(getComputedStyle(paragraph).lineHeight).toBe('3')
+
+    paragraph.remove()
+    publisherStyle.remove()
+    readerStyle.remove()
   })
 
   it('preserves publisher paragraph margins at the default spacing', () => {

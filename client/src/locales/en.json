@@ -734,6 +734,7 @@
         "connected": "Connected - {issuer}",
         "connectionFailed": "Connection failed",
         "privateIssuerAddress": "The issuer URL resolves to a private or local network address, so the server refused to connect. Set OIDC_ALLOW_LOCAL_ISSUERS=true on the BookOrbit server to allow it.",
+        "tlsCertificateUntrusted": "BookOrbit could not verify the OIDC provider's TLS certificate. If the provider uses a private certificate authority, mount its PEM CA bundle, set NODE_EXTRA_CA_CERTS to the bundle's in-container path, and restart BookOrbit.",
         "hide": "Hide",
         "details": "Details",
         "supported": "supported",
@@ -4126,7 +4127,7 @@
       "LibraryAccessRevoke": "Revoke library access",
       "LibraryWriteMetadataToFiles": "Write metadata to files",
       "LibraryBulkRename": "Rename library files",
-        "LibraryRecomputeAddedAt": "Recompute date added",
+      "LibraryRecomputeAddedAt": "Recompute date added",
       "BookUpload": "Upload book",
       "BookMetadataUpdate": "Update book metadata",
       "BookMetadataLocksUpdate": "Update metadata locks",
@@ -7996,10 +7997,27 @@
           "recomputing": "Recomputing...",
           "recomputeHint": "Update the date added for existing books using this setting.",
           "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
-          "recomputeConfirm": "Apply this setting to the existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeConfirmWithCount": "Apply this setting to the {count} existing books in this library now? This reads dates from disk and can take a while.",
-          "recomputeDone": "Updated {updated} of {total} books.",
-          "recomputeFailed": "Could not recompute date added."
+          "backgroundConfirm": "Recompute dates for existing books? This runs in the background, and you can close this editor. Books with unreadable files keep their current date.",
+          "progressSummary": "Processed {processed} of {total}: {updated} updated, {unchanged} unchanged, {skipped} skipped, {failed} failed.",
+          "failedBooksHint": "Failed books kept their dates. Check file access, then run recompute again to retry.",
+          "jobStatus": {
+            "running": "Recomputing dates in the background.",
+            "completed": "Date recompute finished.",
+            "failed": "Recompute stopped before finishing. Completed changes were kept; you can safely run it again."
+          },
+          "errors": {
+            "sourceImported": "Save a file timestamp source before recomputing dates.",
+            "alreadyRunning": "A recompute is already running for this library.",
+            "busy": "Other recomputes are running. Try again shortly.",
+            "requestFailed": "Could not reach the recompute service. Close and reopen this editor to check its status.",
+            "interrupted": "The job status is no longer available. It may have been interrupted by a server restart. You can safely run recompute again."
+          },
+          "failureSample": "Book {bookId}: {reason}",
+          "failureReasons": {
+            "file_unavailable": "A content file could not be read.",
+            "unsafe_path": "A content file is outside its permitted library folder.",
+            "database_error": "The database update failed."
+          }
         },
         "allowedFormats": {
           "title": "Allowed formats",

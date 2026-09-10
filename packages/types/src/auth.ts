@@ -16,6 +16,7 @@ export type AuthenticationMethod = (typeof AuthenticationMethod)[keyof typeof Au
 export enum OidcErrorCode {
   STATE_EXPIRED = "oidc_state_expired",
   PRIVATE_ISSUER_ADDRESS = "oidc_private_issuer_address",
+  TLS_CERTIFICATE_UNTRUSTED = "oidc_tls_certificate_untrusted",
   TOKEN_EXCHANGE_FAILED = "oidc_token_exchange_failed",
   USER_NOT_PROVISIONED = "oidc_user_not_provisioned",
   USER_INACTIVE = "oidc_user_inactive",

@@ -91,6 +91,7 @@ function exportJson() {
       color: h.color,
       style: h.style,
       chapter: h.chapterTitle,
+      highlightedAt: h.highlightedAt,
       createdAt: h.createdAt,
     })),
   }
