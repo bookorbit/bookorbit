@@ -1634,6 +1634,10 @@
           "storeProviderIds": {
             "label": "Armazenar IDs de provedores nos livros",
             "hint": "Ao buscar metadados, salvar os IDs de provedores retornados (ISBN, ASIN, ID do Goodreads, etc.) no registro do livro para futuras consultas mais precisas."
+          },
+          "existingProviderIdsOnly": {
+            "label": "Usar apenas IDs de provedores existentes",
+            "hint": "Para livros já na biblioteca, consulte somente provedores com um ID armazenado e nunca volte a uma pesquisa quando uma pesquisa de ID falhar. A busca manual e a descoberta de novos livros não são afetadas."
           }
         },
         "library": {
@@ -1922,6 +1926,18 @@
         "fontSizeHint": "Tamanho base do texto em pixels",
         "lineHeight": "Altura da linha",
         "lineHeightHint": "Espaçamento vertical entre as linhas",
+        "paragraphSpacing": "Espaçamento dos parágrafos",
+        "paragraphSpacingHint": "Espaço entre parágrafos. Por padrão, o livro preserva o espaçamento do editor.",
+        "paragraphSpacingDefault": "Padrão do livro",
+        "paragraphSpacingValue": "{value} em",
+        "letterSpacing": "Espaçamento entre letras",
+        "letterSpacingHint": "Espaço entre parágrafos. Por padrão, o livro preserva o espaçamento do editor.",
+        "wordSpacing": "Espaçamento entre Palavras",
+        "wordSpacingHint": "Espaço entre parágrafos. Por padrão, o livro preserva o espaçamento do editor.",
+        "textIndent": "Recuo da primeira linha",
+        "textIndentHint": "Indentação no início de parágrafos comuns. Por padrão, o livro preserva a indentação do editor.",
+        "custom": "Personalizado",
+        "emValue": "{value} em",
         "justify": "Justificar texto",
         "justifyHint": "Alinhar texto a ambas as margens",
         "hyphenation": "Hifenização",
@@ -2795,12 +2811,12 @@
       "tabs": {
         "file-naming": "Nomeação de Arquivos",
         "book-dock": "Doca de Livros",
-        "requests": "Pedidos",
+        "requests": "Solicitações",
         "maintenance": "Manutenção",
         "audit-log": "Registro de Auditoria"
       },
       "requests": {
-        "title": "Pedidos",
+        "title": "Solicitações",
         "subtitle": "Onde as versões são encontradas, o que os busca e o que acontece quando chegam.",
         "tabs": {
           "sources": "Fontes",
@@ -3123,7 +3139,7 @@
           "autoSearch": "Continue procurando por pedidos nada foi encontrado para",
           "autoSearchShort": "Uma solicitação aprovada que não corresponde é procurada novamente mais tarde.",
           "autoSearchHint": "Uma solicitação é pesquisada apenas uma vez ao ser aprovada. Se nenhum release adequado for encontrado ou o livro ainda não tiver sido lançado, a solicitação permanecerá como aprovada e não será buscada novamente. Ative esta opção para que o BookOrbit continue verificando periodicamente, encontrando inclusive lançamentos futuros. Esta função só é executada com os downloads automáticos ativos, evitando consultas desnecessárias que apenas consumiriam tráfego dos seus indexadores.",
-          "autoSearchEnabledToast": "Os pedidos serão buscados novamente",
+          "autoSearchEnabledToast": "As solicitações serão buscadas novamente",
           "autoSearchDisabledToast": "Os pedidos só serão pesquisados quando eles forem aprovados",
           "autoSearchInterval": "Buscar novamente após",
           "autoSearchIntervalShort": "Contado a partir da última busca e espaçado conforme a solicitação envelhece.",
@@ -3473,7 +3489,7 @@
         "notifications": "Notificações",
         "restrictions": "Restrições",
         "libraryBooks": "Biblioteca & Livros",
-        "bookRequests": "Pedidos de Livros",
+        "bookRequests": "Solicitações de livros",
         "bookDock": "Doca de Livros",
         "devices": "Dispositivos",
         "readingIntegrations": "Lendo integrações",
@@ -3624,6 +3640,7 @@
       "resetPasswordSharedHint": "Contas compartilhadas não possuem senha",
       "resetPasswordOidcHintFull": "Usuários OIDC redefinem suas senhas em seu provedor de identidade.",
       "resetPasswordSharedHintFull": "Contas compartilhadas não possuem senha.",
+      "resetPasswordDisabledHintFull": "A autenticação de senha está desativada em razão da configuração do servidor.",
       "deleteUserAction": "Excluir usuário",
       "deleteDialogTitle": "Excluir usuário?",
       "deleteDialogBody": "Excluir o usuário \"{username}\". Esta ação não pode ser desfeita.",
@@ -4229,6 +4246,8 @@
       "errors": {
         "invalidCredentials": "Nome de usuário ou senha inválidos",
         "tooManyAttempts": "Muitas tentativas de login. Por favor, aguarde um minuto e tente novamente.",
+        "passwordDisabled": "Login por senha está desativado. Use o single sign-on de login.",
+        "optionsUnavailable": "Não foi possível carregar as opções de login. Por favor, atualize a página ou entre em contato com seu administrador.",
         "accountLocked": "Sua senha está correta, mas esta conta está temporariamente bloqueada após muitas tentativas de login. Tente novamente em {minutes, plural, one {# minuto} other {# minutos}}ou redefina sua senha para desbloquear agora."
       }
     },
@@ -5082,6 +5101,7 @@
         "writeToFile": "Gravar no arquivo",
         "autoFill": "Preenchimento automático",
         "fetchingMetadata": "Buscando metadados...",
+        "noExistingProviderIds": "Nenhum metadados buscado: nenhum dos provedores da regra de campo ativo tem um ID armazenado neste livro.",
         "allFieldsLocked": "Todos os campos estão bloqueados",
         "autoFillTooltip": "Preencher campos automaticamente usando suas preferências de metadados",
         "lockAll": "Bloquear tudo",
@@ -6248,12 +6268,12 @@
     }
   },
   "bookRequests": {
-    "title": "Pedidos (Beta)",
-    "subtitle": "Perguntar por livros que a biblioteca ainda não tem. Este recurso é experimental, espere pequenos bugs.",
+    "title": "Solicitações (Beta)",
+    "subtitle": "Busca por livros que a biblioteca ainda não tem. Este recurso é experimental, espere pequenos bugs.",
     "tabs": {
-      "search": "Pedir um livro",
-      "mine": "Meus pedidos",
-      "all": "Todos os pedidos"
+      "search": "Solicitar um livro",
+      "mine": "Minhas solicitações",
+      "all": "Todos as solicitações"
     },
     "mediaKind": {
       "ebook": "E-book",
@@ -6288,7 +6308,7 @@
       "fulfillmentAutomatic": "Automático",
       "fulfillmentChooseRelease": "Escolha uma versão",
       "folderLabel": "Pasta",
-      "languageLabel": "Pedir idioma",
+      "languageLabel": "Solicitar idioma",
       "languageAny": "Qualquer idioma",
       "languageDefaultToggleLabel": "Usar este idioma para novas solicitações",
       "languageDefaultSetHint": "Pergunte por este idioma a cada novo pedido",
@@ -6399,7 +6419,7 @@
       "bookIdPlaceholder": "ex. 128",
       "dockFileIdLabel": "ID do arquivo",
       "dockFileIdPlaceholder": "ex. 42",
-      "backToList": "Todos os pedidos",
+      "backToList": "Todos as solicitações",
       "loading": "Carregando solicitação...",
       "transfer": "Transferência",
       "requestSection": "Pedido",
@@ -6448,7 +6468,7 @@
       "approvedOnly": "Através da aprovação"
     },
     "list": {
-      "loading": "Carregando pedidos...",
+      "loading": "Carregando solicitação...",
       "emptyMine": "Você ainda não pediu nenhum livro.",
       "emptyAll": "Nenhum pedido de livro ainda.",
       "pagination": "Solicitar páginas",
@@ -6478,7 +6498,7 @@
       "importDiscarded": "O arquivo importado foi descartado"
     },
     "errors": {
-      "loadFailed": "Não foi possível carregar os pedidos",
+      "loadFailed": "Não foi possível fechar esta solicitação",
       "approveFailed": "Não foi possível aprovar esta solicitação",
       "rejectFailed": "Não foi possível rejeitar esta solicitação",
       "cancelFailed": "Não foi possível cancelar esta solicitação",
@@ -6801,7 +6821,7 @@
       "release": "Versão",
       "decidedBy": "Decidido por",
       "decisionNote": "Nota de decisão",
-      "requestNote": "Pedir nota",
+      "requestNote": "Solicitar anotação",
       "openDetail": "Abrir todos os detalhes"
     },
     "confirm": {
@@ -6939,7 +6959,7 @@
       "allDisabled": "Todas as fontes de pesquisa estão desligadas.",
       "noneConfiguredHint": "Os pedidos podem ser arquivados, mas nada será pesquisado até que você adicione um indexador ou instale um plugin de origem.",
       "allDisabledHint": "Os pedidos podem ser arquivados, mas nada será pesquisado até que você ative um novamente.",
-      "askAdmin": "Os pedidos podem ser arquivados, mas nada será pesquisado até que um administrador configure um.",
+      "askAdmin": "Solicitações podem ser arquivadas, mas nada será pesquisado até que um administrador configure um.",
       "addSource": "Adicionar uma fonte",
       "reviewSources": "Revisar fontes"
     },
@@ -8581,7 +8601,7 @@
           "description": "Quando você desbloquear uma nova conquista de leitura."
         },
         "bookRequests": {
-          "label": "Pedidos de livros",
+          "label": "Solicitações de livros",
           "description": "Quando um pedido de livro for submetido, decidido ou o livro estiver disponível."
         }
       }
@@ -8592,7 +8612,69 @@
     "pdf": {
       "openError": "Não foi possível abrir este PDF",
       "preparing": "Preparando o leitor de PDF",
-      "opening": "Abrindo PDF"
+      "opening": "Abrindo PDF",
+      "loading": "Carregando PDF",
+      "loadFallback": "O documento não pôde ser carregado.",
+      "requestFailed": "A solicitação PDF falhou com o status {status}.",
+      "emptyDocument": "A solicitação de PDF retornou um documento vazio.",
+      "managerError": "Não foi possível inicializar o gerenciador de documentos PDF.",
+      "engineNoPages": "O mecanismo de PDF abriu este documento sem nenhuma página.",
+      "engineOpenError": "O PDF não pôde ser aberto pelo mecanismo do documento.",
+      "noPages": "Este PDF abriu sem nenhuma página",
+      "noPagesHint": "Recarregue o documento para recuperar da resposta incompleta do motor do PDF.",
+      "externalLinkTitle": "Abrir link externo?",
+      "externalLinkDescription": "Este PDF quer abrir o {host} em uma nova guia.",
+      "openLink": "Abrir o link",
+      "annotationsLoadError": "Não foi possível carregar os destaques deste PDF.",
+      "loadingAnnotations": "Carregando destaques PDF",
+      "loadMoreAnnotations": "Carregar mais destaques",
+      "loadingMoreAnnotations": "Carregando mais destaques…",
+      "sidebar": {
+        "pages": "Páginas",
+        "contents": "Conteúdo",
+        "search": "Buscar",
+        "tabsLabel": "Navegação no PDF",
+        "closeNavigation": "Fechar navegação",
+        "goToPage": "Ir para a página {page}",
+        "noOutline": "Este PDF não possui esboço de documento.",
+        "searchPlaceholder": "Pesquisar neste PDF",
+        "clearSearch": "Limpar busca",
+        "matchCase": "Diferenciar maiúsculas de minúsculas",
+        "wholeWord": "Palavra inteira",
+        "resultPosition": "{current} de {total}",
+        "previousResult": "Resultado anterior",
+        "nextResult": "Próximo resultado",
+        "searchingPage": "Procurando página {page} de {total}",
+        "searchPrompt": "Digite um termo para pesquisar este PDF.",
+        "searchTooShort": "Digite pelo menos {min} caracteres para pesquisar neste PDF.",
+        "noSearchResults": "Nenhum texto pesquisável corresponde à sua consulta.",
+        "page": "Página {page}",
+        "filterOutline": "Filtrar contorno",
+        "noOutlineMatch": "Nenhuma entrada de contorno corresponde ao seu filtro.",
+        "loadingOutline": "Carregando esboço",
+        "expandSection": "Expandir {title}",
+        "collapseSection": "Recolher {title}",
+        "jumpToPage": "Ir para página",
+        "resizePanel": "Redimensionar painel de navegação"
+      },
+      "toolbar": {
+        "navigation": "Navegação do documento",
+        "previousPage": "Página anterior",
+        "currentPage": "Página atual",
+        "nextPage": "Próxima página",
+        "zoomOut": "Diminuir Zoom",
+        "zoomIn": "Aumentar Zoom",
+        "panTool": "Ferramenta Panorâmica",
+        "pan": "Panorâmica",
+        "selectTool": "Selecionar ferramenta de texto",
+        "selectText": "Selecionar texto",
+        "pinHeader": "Fixar cabeçalho do leitor",
+        "unpinHeader": "Desafixar cabeçalho do leitor",
+        "pinHeaderShort": "Fixar cabeçalho",
+        "unpinHeaderShort": "Desafixar cabeçalho",
+        "moreTools": "Mais ferramentas para PDF",
+        "settings": "Configurações de arquivo PDF"
+      }
     },
     "loadingBook": "Carregando o livro…",
     "failedToLoadBook": "Falha ao carregar o livro",
@@ -8650,6 +8732,15 @@
       "fontStyle": "Estilo",
       "fontStyleItalicOf": "{style} Itálico",
       "lineSpacing": "Espaçamento entre linhas",
+      "paragraphSpacing": "Espaçamento dos parágrafos",
+      "paragraphSpacingDefault": "Padrão",
+      "paragraphSpacingValue": "{value} em",
+      "letterSpacing": "Espaçamento entre letras",
+      "wordSpacing": "Espaçamento entre Palavras",
+      "textIndent": "Recuo da primeira linha",
+      "bookDefault": "Livro",
+      "custom": "Personalizado",
+      "emValue": "{value} em",
       "pageWidth": "Largura da página",
       "pageWidthNarrow": "Estreito",
       "pageWidthMedium": "Médio",
@@ -8745,7 +8836,15 @@
       "translate": "Traduzir",
       "define": "Definir",
       "deleteAnnotation": "Excluir anotação",
-      "apply": "Aplicar"
+      "apply": "Aplicar",
+      "color": "Cor de destaque: {color}",
+      "style": "Estilo do destaque: {style}",
+      "styles": {
+        "highlight": "Destacar",
+        "underline": "Sublinhado",
+        "strikethrough": "Tachado",
+        "squiggly": "Sublinhado alegremente"
+      }
     },
     "note": {
       "title": "Adicionar nota",
@@ -8870,6 +8969,10 @@
       "playerSettings": "Configurações do player",
       "skipBack": "Pular para trás",
       "skipForward": "Pular para frente"
+    },
+    "sheet": {
+      "expand": "Expandir painel",
+      "collapse": "Colapsar painel"
     }
   },
   "scanner": {
@@ -9962,7 +10065,7 @@
     "system": {
       "file-naming": "Nomeação de Arquivos",
       "book-dock": "Doca de Livros",
-      "requests": "Pedidos",
+      "requests": "Solicitações",
       "maintenance": "Manutenção",
       "audit-log": "Registro de Auditoria"
     },
@@ -9975,7 +10078,7 @@
     "smartScopes": "Escopo inteligente",
     "collections": "Coleções",
     "missingResources": "Recursos faltando",
-    "bookRequests": "Pedidos",
+    "bookRequests": "Solicitações",
     "bookRequestDetail": "Pedido",
     "bookRequestReleases": "Escolha uma versão"
   }

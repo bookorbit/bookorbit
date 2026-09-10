@@ -1927,6 +1927,7 @@
         "lineHeightHint": "Vertikaler Abstand zwischen den Zeilen",
         "paragraphSpacing": "Absatzabstand",
         "paragraphSpacingHint": "Abstand zwischen den Absätzen. Standard Buch bewahrt den Abstand des Herausgebers.",
+        "textIndentHint": "Einzug am Anfang von normalen Absätzen. Buchstandard beibehaltet die vom Verlag vorgegebenen Einzug.",
         "justify": "Text ausrichten",
         "justifyHint": "Text an beiden Rändern ausrichten",
         "hyphenation": "Silbentrennung",
@@ -2075,7 +2076,7 @@
         "containerPath": "Container-Pfad",
         "containerPathHint": "Kopieren oder verschieben Sie Buchdateien in diesen Ordner, damit sie automatisch von der Bücherablage erkannt und verarbeitet werden. Unterverzeichnisse werden unterstützt.",
         "changePathPrefix": "Um diesen Pfad zu ändern, setzen Sie",
-        "changePathMiddle": "in Ihrer",
+        "changePathMiddle": "in deiner",
         "changePathSuffix": "Datei.",
         "metadata": "Metadaten",
         "autoFetch": "Metadaten automatisch von Anbietern abrufen",
@@ -2804,9 +2805,11 @@
         "audit-log": "Prüfprotokoll"
       },
       "requests": {
+        "lastTestOk": "Zuletzt getestet {time}: verbunden",
         "fields": {
           "name": "Name",
-          "passwordKeepAction": "Behalten"
+          "passwordKeepAction": "Behalten",
+          "enabled": "Aktiviert"
         },
         "indexers": {
           "fields": {
@@ -3065,7 +3068,8 @@
         "email": "E-Mail",
         "administration": "Verwaltung",
         "notifications": "Benachrichtigungen",
-        "restrictions": "Einschränkungen"
+        "restrictions": "Einschränkungen",
+        "bookDock": "Bücherablage"
       },
       "permissionLevels": {
         "use": "Verwenden"
@@ -3542,6 +3546,7 @@
       "BookUpload": "Buch hochladen",
       "BookDelete": "Buch löschen",
       "BookBulkDelete": "Bücher löschen",
+      "BookDockFinalize": "Bücherablage-Datei finalisieren",
       "EntityManagerSplit": "Entität aufteilen"
     }
   },
@@ -5255,15 +5260,28 @@
         "access_denied": "Kein Zugriff",
         "invalid_format": "Ungültiges Format",
         "error": "Würde scheitern"
+      },
+      "unit": {
+        "role": {
+          "content": "Buch",
+          "metadata": "Metadaten",
+          "supplement": "Extra"
+        }
       }
     }
   },
   "bookRequests": {
     "detail": {
-      "series": "Reihe"
+      "series": "Reihe",
+      "dockFileIdLabel": "Bücherablage Datei-ID",
+      "dockFileIdPlaceholder": "z.b. 42",
+      "fulfilFromDock": "Eine Bücherablage-Datei"
     },
     "table": {
       "age": "Alter"
+    },
+    "review": {
+      "openDock": "Bücherablage öffnen"
     }
   },
   "collection": {

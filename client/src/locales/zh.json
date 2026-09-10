@@ -14,7 +14,9 @@
     "previous": "上一个",
     "retry": "重试",
     "yes": "是",
-    "no": "否"
+    "no": "否",
+    "show": "显示",
+    "hide": "隐藏"
   },
   "settings": {
     "privacySharing": {
@@ -730,6 +732,7 @@
       "test": {
         "connected": "已连接 - {issuer}",
         "connectionFailed": "连接失败",
+        "privateIssuerAddress": "发行者的 URL 解析为私有或本地网络地址，因此服务器拒绝连接。 在 BookOrbit 服务器设置OIDC_ALLOCAL_ISSUERS=true 以允许它。",
         "hide": "隐藏",
         "details": "详细信息",
         "supported": "支持的",
@@ -1072,6 +1075,7 @@
         "syncMetadataToFiles": "同步元数据到文件",
         "deleteLibrary": "删除库",
         "bookCount": "{count, plural, =0 {没有书籍} one {# 书} other {# 书}}",
+        "booksUnit": "{count, plural, other {Move # books}}",
         "folderCount": "{count, plural, =0 {没有文件夹} one {# 文件夹} other {# 文件夹}}",
         "fileMode": "文件模式",
         "folderMode": "文件夹模式",
@@ -1099,7 +1103,90 @@
         "libraryDeleted": "“{name}” 已删除",
         "deleteFailed": "删除库失败",
         "refreshingCovers": "封面刷新中 {pct}%（{processed}/{total}）",
-        "coversRefreshed": "封面刷新完成，已处理 {count} 条"
+        "coversRefreshed": "封面刷新完成，已处理 {count} 条",
+        "onDiskUnit": "硬盘大小{size}",
+        "noFilesIndexed": "没有索引文件",
+        "formatEntry": "{format}{count}",
+        "formatOverflow": "{count, plural, other {+# 更多格式}}",
+        "extraFolders": "{count, plural, other {# folders}}",
+        "openLibrary": "打开 {name}",
+        "moreActions": "{name} 更多操作",
+        "statsFailed": "无法加载书库数。此页面上的其它内容仍然有效。",
+        "filterLabel": "筛选书库…",
+        "filterPlaceholder": "按名称或路径筛选",
+        "filterClear": "清除筛选器",
+        "sortLabel": "排序",
+        "noMatchesTitle": "没有匹配此过滤器的书库",
+        "noMatchesHint": "没有找到与“{query}”匹配的名称或文件夹路径。",
+        "neverScanned": "从未扫描",
+        "neverScannedHint": "运行扫描以索引文件夹",
+        "scanFailedAt": "执行失败：{time}\t",
+        "columns": {
+          "library": "书库",
+          "contents": "目录",
+          "onDisk": "磁盘",
+          "automation": "自动操作",
+          "lastScan": "最近扫描",
+          "actions": "操作"
+        },
+        "sort": {
+          "default": "默认排序",
+          "name": "名称",
+          "books": "书籍列表",
+          "size": "所占磁盘大小",
+          "lastScan": "最近扫描"
+        },
+        "trigger": {
+          "manual": "手动匹配",
+          "watcher": "Watcher",
+          "schedule": "日程"
+        },
+        "capability": {
+          "watch": "查看文件夹",
+          "schedule": "定时扫描",
+          "fileWrite": "写入至文件",
+          "fileRename": "重命名文件",
+          "on": "{name}: 打开",
+          "legendHint": "虚线表示关闭"
+        },
+        "stateOn": "打开",
+        "stateOff": "关闭",
+        "toggleDetail": "查看《{name}》详情",
+        "durationSeconds": "{seconds}秒",
+        "durationMinutes": "{minutes}分{seconds}秒",
+        "history": {
+          "when": "时间",
+          "trigger": "触发条件",
+          "duration": "阅读时长",
+          "result": "结果",
+          "status": "状态",
+          "statusValue": {
+            "running": "运行中",
+            "completed": "已完成",
+            "failed": "获取失败"
+          }
+        },
+        "detail": {
+          "foldersTitle": "文件夹和布局",
+          "metadataTitle": "元数据与读取",
+          "accessTitle": "访问权限",
+          "historyTitle": "扫描历史",
+          "organization": "发布机构",
+          "excludePatterns": "排除模式",
+          "precedence": "源优先级",
+          "allowedFormats": "允许格式",
+          "countsAsStarted": "已开始的计数",
+          "countsAsFinished": "计数已完成",
+          "peopleWithAccess": "具有访问权限的人员",
+          "added": "已添加",
+          "coverShape": "封面形状",
+          "coverShapeValue": {
+            "portrait": "2:3 竖屏模式",
+            "square": "1:1 正方形"
+          },
+          "none": "无",
+          "allSupported": "所有支持的格式"
+        }
       },
       "authorEnrichment": {
         "configuration": "配置",
@@ -1160,7 +1247,29 @@
         "saveFailed": "保存得分权重失败",
         "recalcStarted": "已在后台开始重新计算得分",
         "recalcFailed": "重新计算失败",
-        "resetToDefaults": "权重已重置为默认值。保存后生效。"
+        "resetToDefaults": "权重已重置为默认值。保存后生效。",
+        "rail": {
+          "bandsLabel": "徽章彩色波段",
+          "bands": {
+            "poor": "在 50 以内",
+            "fair": "50-69",
+            "good": "70-89",
+            "great": "90+"
+          },
+          "median": "中值",
+          "belowFifty": "50以内",
+          "ninetyPlus": "90及以上"
+        },
+        "progress": {
+          "running": "重置书库",
+          "failed": "重置失败"
+        },
+        "save": {
+          "rescoresUnknown": "在后台保存您的资料库。",
+          "action": "保存并重定向",
+          "discard": "放弃",
+          "leaveWarning": "您有未保存的权重修改。确定要离开并放弃更改吗？"
+        }
       },
       "tabs": {
         "users": "用户",
@@ -1183,6 +1292,7 @@
         "display": "显示",
         "reader": "阅读器",
         "metadata": "元数据",
+        "usersAccess": "用户与权限",
         "email": "电子邮件地址",
         "opds": "OPDS",
         "kobo": "Kobo",
@@ -1228,20 +1338,39 @@
         "genres": "体裁",
         "narrators": "叙述者",
         "duration": "阅读时长",
-        "abridged": "桥接的"
+        "abridged": "桥接的",
+        "tags": "标签",
+        "isbn13": "ISBN-13",
+        "isbn10": "ISBN-10",
+        "googleBooksId": "Google Books ID",
+        "goodreadsId": "Goodreads ID",
+        "amazonId": "Amazon ID",
+        "hardcoverId": "Hardcover ID",
+        "openLibraryId": "Open Library ID",
+        "itunesId": "iTunes ID",
+        "koboId": "Kobo ID",
+        "aladinId": "Aladin ID"
       },
       "mergeStrategy": {
         "fillMissing": {
           "label": "缺少填充",
-          "description": "仅在字段当前为空时写入"
+          "description": "仅在字段当前为空时写入",
+          "short": "仅补全缺失字段"
+        },
+        "mergeExisting": {
+          "label": "与现有项合并",
+          "description": "保留存储的体裁并追加新的提供者类型",
+          "short": "合并"
         },
         "overwriteIfProvided": {
           "label": "如果提供则覆盖",
-          "description": "如果提供者返回值则写入值"
+          "description": "如果提供者返回值则写入值",
+          "short": "如果已提供"
         },
         "overwrite": {
           "label": "总是覆盖",
-          "description": "总是替换现有值"
+          "description": "总是替换现有值",
+          "short": "总是"
         }
       },
       "autoFetch": {
@@ -1309,16 +1438,38 @@
       "providers": {
         "availableSources": "可用来源",
         "saveChanges": "保存更改",
+        "discard": "放弃",
+        "configure": "配置",
         "test": "测试",
         "testing": "测试中…",
+        "testHint": "根据在线服务检查这些凭据。没有保存任何凭据。",
         "enabled": "已启用",
         "retryIn": "{duration} 后重试",
         "runTestBeforeEnabling": "启用前运行测试",
         "hardcoverEnableHint": "使用当前令牌运行测试以解锁启用开关。",
+        "searchPlaceholder": "过滤源",
+        "sourcesEnabled": "已启用：{enabled}/{total}",
+        "groupEnabled": "已启用：{enabled}/{total}",
+        "unsavedChanges": "{count, plural, other {# 未保存的更改}}",
+        "noMatches": "没有源匹配此过滤器。",
+        "clearFilters": "清除筛选",
+        "filter": {
+          "label": "按状态筛选来源",
+          "all": "全部",
+          "enabled": "已启用",
+          "needsSetup": "需要设置"
+        },
+        "groups": {
+          "books": "一般书目目录",
+          "audiobooks": "有声读物",
+          "comics": "漫画和轻小说：",
+          "regional": "区域目录"
+        },
         "badge": {
           "setupRequired": "需要设置",
           "throttled": "已经平移",
-          "ready": "已配置"
+          "ready": "已配置",
+          "active": "启用"
         },
         "fields": {
           "apiKey": "API 密钥",
@@ -1402,6 +1553,9 @@
           "storeProviderIds": {
             "label": "在书籍上存储提供商ID",
             "hint": "当获取元数据时，在书卷记录上保存返回的提供商ID(ISBN、ASIN、Goodread ID等)以获取更准确的未来查询。"
+          },
+          "existingProviderIdsOnly": {
+            "hint": "对于已经在书库中的书籍，只查询拥有存储ID的供应商，并且在查找失败时永远不会返回搜索。 手工搜索和新书的发现不受影响。"
           }
         },
         "library": {
@@ -1433,7 +1587,8 @@
           "field": "字段",
           "activeProviders": "活动提供者(按优先级排序)",
           "mergeStrategy": "合并策略",
-          "status": "状态"
+          "status": "状态",
+          "noMatches": "没有字段匹配这些过滤器。"
         },
         "field": {
           "noProviders": "启用但没有提供商",
@@ -1441,7 +1596,10 @@
           "config": "配置",
           "custom": "自定义",
           "default": "默认设置",
-          "resetToDefault": "重置为默认值"
+          "resetToDefault": "重置为默认值",
+          "add": "添加",
+          "addHint": "添加在订单末尾。拖动芯片以便更早地移动。",
+          "noProvidersYet": "尚无提供商"
         },
         "reservoir": {
           "disabled": "{provider} - 已停用",
@@ -1455,6 +1613,19 @@
           "statusDisabled": "已禁用",
           "statusNotConfigured": "未配置",
           "done": "完成"
+        },
+        "scope": {
+          "unsavedMarker": "有未保存的更改"
+        },
+        "toolbar": {
+          "searchFields": "搜索区域",
+          "clearSearch": "清空搜索内容",
+          "provider": "提供商",
+          "anyProvider": "任何 ",
+          "removeEverywhere": "从所有字段删除",
+          "allFields": "所有区域",
+          "overridesOnly": "仅覆盖",
+          "clearFilters": "清除筛选"
         }
       },
       "genreBlocklist": {
@@ -1869,7 +2040,19 @@
         "tokenOriginalFilename": "原始文件名 (无扩展名)",
         "tokenExtension": "文件扩展名 (无点)",
         "patternHelpIntro": "命名模板可使用 {titleToken}、{authorsToken} 这类占位标识，同时支持修饰符与可选片段",
-        "browseTokensAndExamples": "浏览令牌和示例"
+        "browseTokensAndExamples": "浏览令牌和示例",
+        "recipe": {
+          "seriesShelf": "系列书架",
+          "calibre": "Calibre style",
+          "alphabetical": "按字母顺序",
+          "flat": "平整无文件夹",
+          "originalName": "原始文件名",
+          "authorTitle": "作者和标题",
+          "titleOnly": "仅限标题",
+          "seriesOrdered": "系列已排序"
+        },
+        "resultPanel": "已解决结果",
+        "copyResult": "复制已解决的结果"
       },
       "kobo": {
         "title": "Kobo Sync",
@@ -4751,7 +4934,7 @@
       "uploadPartialToast": "成功上传 {uploaded} 项，{failed} 项上传失败",
       "bookDock": "Book Dock",
       "statistics": "统计",
-      "achievements": "1. 成就",
+      "achievements": "成就",
       "annotations": "批注",
       "uploadBooks": "上传书",
       "appearance": "外观",
@@ -6268,7 +6451,7 @@
           "description": "当向电子邮件地址发送一本书时成功或失败。"
         },
         "achievements": {
-          "label": "1. 成就",
+          "label": "成就",
           "description": "当您解锁新的阅读成就时。"
         }
       }

@@ -924,6 +924,7 @@
         "reasonAmbiguousTitleAuthorMatch": "Wiele książek miało ten sam tytuł i autora",
         "reasonUnknown": "Nie udało się określić przyczyny",
         "strategyIsbn": "Dopasowane przez ISBN",
+        "strategyAsin": "Dopasowane do ASIN",
         "strategyFileHash": "Dopasowane według skrótu pliku",
         "strategyPathMapping": "Dopasowane według zmapowanej ścieżki pliku",
         "strategyTitleAuthor": "Dopasowane według tytułu i autora",
@@ -1093,7 +1094,10 @@
         "refreshingCovers": "Odświeżające okładki {pct}% ({processed}/{total})",
         "coversRefreshed": "Okładki odświeżone ({count} przetworzone)",
         "onDiskUnit": "{size} na dysku",
+        "noFilesIndexed": "Brak zindeksowanych plików",
+        "formatEntry": "{format} {count}",
         "openLibrary": "Otwórz {name}",
+        "moreActions": "Więcej działań dla {name}",
         "filterLabel": "Filtruj biblioteki",
         "filterClear": "Wyczyść filtry",
         "sortLabel": "Sortuj",
@@ -1113,14 +1117,32 @@
         },
         "sort": {
           "default": "Domyślna kolejność",
+          "name": "Nazwa",
           "books": "Książki",
           "size": "Rozmiar na dysku",
           "lastScan": "Ostatni skan"
         },
-        "capability": {
-          "fileWrite": "Zapisz do pliku"
+        "trigger": {
+          "watcher": "Obserwator",
+          "schedule": "Harmonogram"
         },
+        "capability": {
+          "watch": "Obserwuj foldery",
+          "fileWrite": "Zapisz do pliku",
+          "fileRename": "Zmień nazwę plików",
+          "on": "{name}: włączone",
+          "off": "{name}: wyłączone",
+          "legendHint": "Przerywane oznaczają wyłączenie"
+        },
+        "stateOn": "Włączone",
+        "stateOff": "Wyłączone",
+        "toggleDetail": "Pokaż szczegóły dla {name}",
+        "durationMs": "{ms} ms",
+        "durationSeconds": "{seconds}s",
+        "durationMinutes": "{minutes}m {seconds}s",
         "history": {
+          "when": "Kiedy",
+          "trigger": "Wyzwalacz",
           "result": "Wynik",
           "status": "Status",
           "statusValue": {
@@ -1202,11 +1224,27 @@
         "recalcFailed": "Ponowne obliczenie nie powiodło się",
         "resetToDefaults": "Wagi zresetowane do ustawień domyślnych. Zapisz, aby złożyć wniosek.",
         "howItWorks": {
-          "title": "Jak to działa."
+          "title": "Jak to działa.",
+          "summary": "Każda książka otrzymuje wynik ze 100 za to, jak kompletne są jej metadane. Waga ma znaczenie tylko obok innych, więc każde pole pokazuje swój udział w końcowym wyniku. Podwajanie wagi nic nie zmienia."
         },
+        "readOnly": "Możesz zobaczyć, jak wyniki są liczone, ale zmiana wagi wymaga uprawnień do ustawień aplikacji.",
+        "compositionTitle": "Skąd pochodzi wynik",
+        "compositionHint": "Procenty zawsze wynoszą 100.",
+        "searchFields": "Filtruj Pola",
+        "clearSearch": "Wyczyść wyszukiwanie",
+        "noMatches": "Żadne pola nie pasują do wyszukiwania.",
+        "totalSummary": "Wynik {scoring} z 24 pól, {total} razem",
+        "notScored": "Nie liczone",
+        "notScoredHeading": "Nie liczone ({count})",
+        "notScoredHint": "Pola z wartością zero nie zaliczają się do sumy, więc książka nie traci na wyniku.",
+        "decreaseWeight": "Zmniejsz wagę {field}",
+        "increaseWeight": "Zwiększ wagę {field}",
+        "revertField": "Przywróć {field} do zapisanej wagi",
         "table": {
+          "field": "Pole",
           "weight": "Waga",
-          "share": "Udział w wyniku"
+          "share": "Udział w wyniku",
+          "versusDefault": "Zmień"
         },
         "groups": {
           "classification": "Klasyfikacja",
@@ -1257,6 +1295,7 @@
         "display": "Wyświetlanie",
         "reader": "Czytelnik",
         "metadata": "Metadane",
+        "usersAccess": "Użytkownicy i Dostęp",
         "email": "E-mail",
         "opds": "OPDS",
         "kobo": "Kobo",
@@ -1269,10 +1308,22 @@
       }
     },
     "integrations": {
-      "title": "Integracje"
+      "title": "Integracje",
+      "subtitle": "Połącz zewnętrzne usługi, aby synchronizować dane o czytaniu i zaznaczenia.",
+      "noPermission": "Nie masz uprawnień, do korzystania z żadnych integracji.",
+      "tabs": {
+        "hardcover": "Hardcover",
+        "readwise": "Readwise",
+        "storygraph": "StoryGraph"
+      },
+      "providerSubtitles": {
+        "readwise": "Automatycznie wysyłaj zaznaczenia do Readwise.",
+        "storygraph": "Zsynchronizuj swój postęp w czytaniu i status do StoryGraph."
+      }
     },
     "metadata": {
       "title": "Metadane",
+      "subtitle": "Skonfiguruj dostawców metadanych, reguły, automatyzacje oraz wzbogacenie autora.",
       "noPermission": "Nie masz uprawnień do zarządzania ustawieniami metadanych.",
       "fields": {
         "title": "Tytuł",
@@ -1291,20 +1342,33 @@
         "narrators": "Narratorzy",
         "duration": "Czas trwania",
         "abridged": "Skrócone",
+        "tags": "Tagi",
         "isbn13": "ISBN-13",
-        "isbn10": "ISBN-10"
+        "isbn10": "ISBN-10",
+        "googleBooksId": "ID Książek Google",
+        "goodreadsId": "ID Goodreads",
+        "amazonId": "ID Amazon",
+        "hardcoverId": "ID Hardcover",
+        "openLibraryId": "ID Open Library",
+        "itunesId": "ID iTunes",
+        "koboId": "ID Kobo",
+        "aladinId": "ID Aladin"
       },
       "mergeStrategy": {
         "fillMissing": {
           "label": "Brak uzupełnienia",
-          "description": "Wpisz tylko jeśli pole jest aktualnie puste"
+          "description": "Wpisz tylko jeśli pole jest aktualnie puste",
+          "short": "Wypełnij luki"
         },
         "mergeExisting": {
+          "label": "Scal z istniejącym",
+          "description": "Zachowaj obecne gatunki i dodaj nowe od dostawcy",
           "short": "Połącz"
         },
         "overwriteIfProvided": {
           "label": "Zastąp, jeśli podano",
-          "description": "Napisz, czy dostawca zwrócił wartość"
+          "description": "Napisz, czy dostawca zwrócił wartość",
+          "short": "Gdy istnieje"
         },
         "overwrite": {
           "label": "Zawsze nadpisuj",
@@ -1506,9 +1570,16 @@
           "custom": "Niestandardowe",
           "default": "Domyślne",
           "resetToDefault": "Przywróć ustawienia domyślne",
+          "toggle": "Pobierz {field} podczas odświeżenia metadanych",
+          "configure": "Skonfiguruj {field}",
           "add": "Dodaj",
+          "addProviderTo": "Dodaj dostawcę do {field}",
+          "removeProvider": "Usuń {provider}",
+          "noProvidersYet": "Brak dostawców",
           "unsaved": "Niezapisane",
-          "override": "Nadpisz"
+          "override": "Nadpisz",
+          "inherited": "Odziedziczone",
+          "morePreview": "+{count} więcej"
         },
         "reservoir": {
           "disabled": "{provider} - wyłączone",
@@ -1523,8 +1594,22 @@
           "statusNotConfigured": "nie skonfigurowany",
           "done": "Gotowe"
         },
+        "scope": {
+          "label": "Zakres zasad",
+          "global": "Globalne ustawienia domyślne",
+          "unsavedMarker": "Niezapisane zmiany"
+        },
         "toolbar": {
-          "anyProvider": "Dowolne"
+          "searchFields": "Pola wyszukiwania",
+          "clearSearch": "Wyczyść wyszukiwanie",
+          "provider": "Dostawca",
+          "anyProvider": "Dowolne",
+          "providerMenuTitle": "Filtruj i edytuj masowo według dostawcy",
+          "allFields": "Wszystkie pola",
+          "clearFilters": "Wyczyść filtry"
+        },
+        "providerState": {
+          "disabled": "Wyłączony"
         },
         "save": {
           "discard": "Odrzuć",

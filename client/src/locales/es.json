@@ -1502,7 +1502,7 @@
             "summary": "Puntuación < {threshold}"
           },
           "missingFields": {
-            "label": "Campos faltantes",
+            "label": "Faltan campos",
             "hint": "Recuperar si alguno de los campos seleccionados está vacío.",
             "summary": "{count, plural, one {desaparecido # campo} other {desaparecido # campos} many {desaparecido # campos}}"
           }
@@ -4524,7 +4524,7 @@
       "readCount": "{count} leer"
     },
     "card": {
-      "missing": "desaparecido"
+      "missing": "Faltante"
     },
     "file": {
       "primary": "Principal",
@@ -8314,7 +8314,7 @@
       "targetUser": "Usuario objetivo",
       "doNotImport": "No importar este usuario",
       "noSourceUsersLoaded": "Aún no se han cargado usuarios de origen.",
-      "noActiveTargetUsers": "No se encontraron usuarios objetivo activos. Cree o vuelva a habilitar un usuario BookOrbit antes de realizar la asignación.",
+      "noActiveTargetUsers": "No se encontraron usuarios de destino activos. Crea o reactiva un usuario de BookOrbit antes de realizar la asignación.",
       "pathPrefixMappings": "Asignaciones de prefijos de ruta",
       "addMapping": "Agregar mapeo",
       "pathMappingsExplanation": "Las asignaciones de rutas traducen las rutas de los archivos de origen en rutas de destino para que los libros puedan coincidir según la ubicación del archivo. Los libros también coinciden con ISBN, hash de archivo y título/autor, independientemente de las asignaciones de rutas.",
@@ -9086,10 +9086,10 @@
       "reading": "Leyendo",
       "unread": "Sin leer",
       "complete": "Completado",
-      "gaps": "Saltos",
+      "gaps": "Faltantes",
       "read": "Leído",
       "inProgress": "En progreso",
-      "hasGaps": "Tiene saltos",
+      "hasGaps": "Tiene huecos",
       "notStarted": "No comenzado"
     },
     "index": {

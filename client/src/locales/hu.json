@@ -22,7 +22,7 @@
     "privacySharing": {
       "title": "Adatvédelem és megosztás",
       "subtitle": "Szabályozhatod, hogy az adminisztrátorok láthatják-e az olvasási tevékenységed azonosítható összegzését.",
-      "levelLegend": "Olvasási információk megosztási szintje",
+      "levelLegend": "Olvasási statisztikák megosztási szintje",
       "current": "Aktuális beállítás",
       "levels": {
         "private": {
@@ -52,7 +52,7 @@
       "confirm": {
         "shareTitle": "{level} engedélyezése?",
         "shareDescription": "Az engedéllyel rendelkező adminisztrátorok a következő információkat láthatják.",
-        "stopTitle": "Leállítod az olvasási információk megosztását?",
+        "stopTitle": "Leállítod az olvasási statisztikák megosztását?",
         "stopDescription": "A adminisztrátori hozzáférés azonnal blokkolásra kerül. A meglévő hozzáférési rekordok megmaradnak az előzményekben.",
         "recordedNotice": "Minden adminisztrátori profil megtekintés rögzítésre kerül, és megjelenik a hozzáférési előzményekben."
       },
@@ -545,7 +545,7 @@
         "removeConfirm": {
           "title": "Eltávolítod a profilképet?",
           "description": "Az avatárod eltávolításra kerül, és a helyére monogram kerül.",
-          "confirm": "Eltávolítás"
+          "confirm": "Eltávolít"
         }
       },
       "connectedAccounts": {
@@ -657,7 +657,7 @@
       },
       "errors": {
         "create": "Nem sikerült létrehozni",
-        "copy": "A magic link másolása nem sikerült",
+        "copy": "A magic link másolása sikertelen",
         "update": "A magic link frissítése nem sikerült",
         "revoke": "A magic link visszavonása nem sikerült"
       },
@@ -939,7 +939,7 @@
         "strategyPathMapping": "A leképezett fájlútvonal alapján egyeztetve",
         "strategyTitleAuthor": "Cím és szerző alapján egyeztetve",
         "strategyUnavailable": "Egyeztetési stratégia nem elérhető",
-        "userPreviewCounts": "{statuses} állapotok, {progress} előrehaladási bejegyzések, {bookmarks} könyvjelzők, {annotations} megjegyzések, {collections} gyűjtemény bejegyzések",
+        "userPreviewCounts": "{statuses} állapotok, {progress} előrehaladási bejegyzések, {bookmarks} könyvjelzők, {annotations} jegyzetek, {collections} gyűjtemény bejegyzések",
         "connErrorUnreachable": "Nem sikerült elérni az adatbázis-kiszolgálót. Ellenőrizze a kiszolgálót és a portot.",
         "connErrorAuth": "A hitelesítés sikertelen. Ellenőrizze a felhasználónevet és a jelszót.",
         "connErrorUnknownDatabase": "Az adatbázis nem található. Ellenőrizd az adatbázis nevét.",
@@ -981,7 +981,7 @@
         "noPrefixesFound": "Nem találhatók előtagok - először ellenőrizd a forrást",
         "selectSourcePrefix": "Forrás előtag kiválasztása...",
         "selectTargetFolder": "Célmappa kiválasztása...",
-        "remove": "Eltávolítás",
+        "remove": "Eltávolít",
         "pathValidation": "Útvonal-érvényesítés",
         "pathValidationMapped": "{total} forráskönyvből {mapped} rendelkezik leképezett útvonallal",
         "pathValidationUnmatched": "{count} leképezett elérési út nem található a lemezen - ezek a könyvek ISBN / cím egyeztetésre fognak visszaállni",
@@ -1198,7 +1198,7 @@
             "portrait": "2:3 portré",
             "square": "1:1 négyzet"
           },
-          "none": "Nincs",
+          "none": "Egyik sem",
           "allSupported": "Minden támogatott",
           "patternCount": "{count, plural,one {#minta} other {# minta}}",
           "peopleCount": "{count, plural, =0 {Nincsenek kifejezett jogosultságok} one {# személy} other {# személy}}",
@@ -1391,7 +1391,7 @@
       },
       "providerSubtitles": {
         "readwise": "Küldd el a kiemelt tartalmaidat automatikusan a Readwise-nak.",
-        "storygraph": "Szinkronizáld az olvasási folyamatodat és az állapotodat a StoryGraph-fal."
+        "storygraph": "Szinkronizáld az olvasási haladásodat és az állapotodat a StoryGraph-fal."
       }
     },
     "metadata": {
@@ -1508,7 +1508,7 @@
           "inheritingGlobal": "Globális alapértelmezések öröklése",
           "inheritFromGlobal": "Öröklés a globálistól",
           "usingGlobalDefaults": "Globális alapértelmezett értékek használata.",
-          "saveOverride": "Mentés felülbírálása"
+          "saveOverride": "Felülbírálás mentése"
         }
       },
       "providers": {
@@ -1723,7 +1723,7 @@
           "removeEverywhere": "Eltávolítás minden mezőből",
           "allFields": "Minden mező",
           "overridesOnly": "Csak felülbírálások",
-          "clearFilters": "Szűrés törlése"
+          "clearFilters": "Szűrők törlése"
         },
         "providerState": {
           "disabled": "Letiltva",
@@ -1743,7 +1743,7 @@
           "appliesTo": "A következőre vonatkozik: {scope}.",
           "inheritGlobal": "Globális szabály öröklése",
           "inheritingGlobal": "A globális szabály öröklése.",
-          "collapse": "Összecsukás"
+          "collapse": "Összecsuk"
         },
         "save": {
           "upToDate": "Nincsenek mentetlen változások",
@@ -1813,7 +1813,7 @@
         "archivedFields": "Archivált mezők",
         "archivedSummary": "{count, plural,one {# archivált mező - visszaállítás vagy végleges törlés.} other {# archivált mező - visszaállítás vagy végleges törlés.}}",
         "archivedAt": "Archiválva: {when}",
-        "restore": "Visszaállítás",
+        "restore": "Visszaállít",
         "deleteForever": "Végleges törlés",
         "deleteDialog": {
           "title": "Mező végleges törlése",
@@ -1955,7 +1955,7 @@
         "scrolled": "Görgetett",
         "pageSpread": "Oldalpárosítás",
         "pageSpreadHint": "Melyik oldalszám van jobb oldalon kétoldalas nézetben",
-        "spreadNone": "Nincs",
+        "spreadNone": "Egyik sem",
         "spreadOdd": "Páratlan",
         "spreadEven": "Páros",
         "zoom": "Nagyítás",
@@ -2173,11 +2173,11 @@
         "caseNoPublisher": "nincs kiadó",
         "caseAllSet": "minden beállítva",
         "copiedToClipboard": "{value} a vágólapra másolva",
-        "copyTokenFailed": "Nem sikerült a token másolása",
+        "copyTokenFailed": "Token másolása sikertelen",
         "patternCopied": "Minta másolva a vágólapra",
-        "copyPatternFailed": "Nem sikerült a minta másolása",
+        "copyPatternFailed": "Minta másolása sikertelen",
         "labelCopied": "{label} a vágólapra másolva",
-        "copyLabelFailed": "Nem sikerült a {label} másolása",
+        "copyLabelFailed": "{label} másolása sikertelen",
         "patternHelp": "Minta segítség",
         "patternHelpDescription": "Tokenek, módosítók és kész minták, amelyeket bármelyik mezőbe másolhatsz.",
         "copyPreview": "{label} másolása",
@@ -2267,7 +2267,7 @@
         "resultFor": "Eredmény: {rule}",
         "copyResult": "Másolja a generált eredményt",
         "resultCopied": "A generált eredmény a vágólapra másolva",
-        "resultCopyFailed": "Nem sikerült másolni a generált eredményt",
+        "resultCopyFailed": "A generált eredmény másolása sikertelen",
         "sampleBookNote": "Az összes előnézethez használt mintakönyv",
         "missingMetadata": "Ha hiányoznak a metaadatok",
         "caseNoSeriesLabel": "Nincs sorozat",
@@ -2341,9 +2341,1625 @@
         "accessRevoked": "Hozzáférés visszavonva a következőtől: \"{name}\"",
         "revokeFailed": "Nem sikerült visszavonni a hozzáférést",
         "syncUrlCopied": "Szinkronizálási URL a vágólapra másolva",
-        "syncUrlCopyFailed": "Nem sikerült másolni a szinkronizálási URL-t",
+        "syncUrlCopyFailed": "A szinkronizálási URL másolása sikertelen",
         "syncPreferences": "Szinkronizálási beállítások",
-        "twoWaySync": "Kétirányú folyamatszinkronizálás"
+        "twoWaySync": "Kétirányú haladásszinkronizálás",
+        "twoWaySyncHint": "Olvasási pozíció szinkronizálása a BookOrbit és a Kobo között. A pontos helymeghatározáshoz és a megbízható oldal-visszaállításhoz KEPUB kézbesítés szükséges.",
+        "syncHighlights": "Szinkronizálja a BookOrbit kiemeléseit a Kobo-val",
+        "syncHighlightsHint": "A BookOrbitban vagy KOReaderben készített kiemelések elküldése a Kobo-ra. A Kobo-kiemelések akkor is importálódnak a BookOrbitba, ha ez ki van kapcsolva. A csatolt jegyzetek mindkét irányban szinkronizálják a szerkesztéseket és a törléseket. KEPUB kézbesítést igényel; a Kobo-n lévő könyvnek a BookOrbitról letöltött KEPUB-nak kell lennie.",
+        "storeSync": "Kobo áruházi címek hozzáadása",
+        "storeSyncHint": "A BookOrbit könyvtárad mellett a Kobo-fiókodból származó könyveket is kézbesíthetsz, beleértve a Kobo Plus-t és a vásárlásokat is. Enélkül csak a BookOrbit könyvek jutnak el az eszközre. Az áruházi címek közvetlenül a Kobo-ból töltődnek le, és nem kerülnek be a BookOrbit könyvtáradba.",
+        "convertKepub": "Konvertálás KEPUB-ra",
+        "convertKepubHint": "A megfelelő EPUB-ok KEPUB formátumban történő küldése. Ez akkor is bekapcsolva marad, ha a haladásszinkronizálás vagy a BookOrbit-Kobo kiemelések engedélyezve vannak. A következő Kobo szinkronizáláskor az érintett könyvek ismét KEPUB letöltésként lesznek felajánlva; törölj minden régi EPUB példányt, ha a Kobo folyamatosan megnyitja azt.",
+        "forceHyphenation": "Szóelválasztás kényszerítése",
+        "forceHyphenationHint": "Biztosítja a szöveg egységes igazítását. Ez újragenerálja a gyorsítótárazott KEPUB-okat.",
+        "progressThresholds": "Haladási küszöbértékek",
+        "progressThresholdsHint": "Add meg, hogy a Kobo olvasási folyamata mikor frissíti a könyvtár állapotát.",
+        "markAsReading": "Megjelölés olvasmányként",
+        "markAsReadingHint": "Minimális százalék a könyv „Olvasás” kategóriába helyezéséhez.",
+        "markAsFinished": "Megjelölés befejezettként",
+        "markAsFinishedHint": "Százalékos küszöbérték, amely egy könyvet „Befejezettként” jelöl.",
+        "kepubLimit": "KEPUB átalakítási limit",
+        "kepubLimitHint": "Az ezen limit feletti könyveket normál EPUB-ként küldi el a rendszer, így a BookOrbit nem szinkronizálja az olvasó pozícióját a Kobo-val.",
+        "changesMustBeSaved": "A módosításokat menteni kell a hatálybalépéshez.",
+        "saving": "Mentés...",
+        "saveSyncSettings": "Szinkronizálási beállítások mentése",
+        "thresholdOrderError": "Az olvasási küszöbnek alacsonyabbnak kell lennie, mint a befejezési küszöbnek",
+        "saveSettingsFailed": "Nem sikerült menteni a beállításokat",
+        "settingsSaved": "Kobo szinkronizálási beállítások mentve",
+        "saveFailed": "Mentés sikertelen",
+        "activity": {
+          "waitingForActivity": "Várakozás a tevékenységre",
+          "needsAttention": "Figyelmet igényel",
+          "syncHealthy": "Szinkronizálás rendben",
+          "never": "Soha",
+          "none": "Egyik sem",
+          "unknown": "Ismeretlen",
+          "failureCount": "{count, plural, one {# hiba} other {# hiba}}",
+          "noActivityRecorded": "Nincs rögzített Kobo szinkronizálási tevékenység.",
+          "lastSuccess": "Utoljára sikerült {time}",
+          "lastFailure": "Utoljára sikertelen {time}",
+          "noFailedActivity": "A közelmúltban nem volt sikertelen Kobo-tevékenység.",
+          "noActivityYet": "Még nincs Kobo-tevékenység.",
+          "event": {
+            "librarySync": "A könyvtár frissítéseket keresett",
+            "bookDownload": "Könyv letöltve",
+            "progressUpdate": "Olvasási pozíció frissítve",
+            "annotationsPull": "Kiemelések elküldve a Kobo-nak",
+            "annotationsPush": "Kiemelések fogadva a Kobo-tól"
+          },
+          "outcome": {
+            "failed": "Sikertelen",
+            "noUpdates": "Nincsenek frissítések",
+            "noChanges": "Nincs változás",
+            "pending": "Függő",
+            "completed": "Kész",
+            "downloaded": "Letöltve",
+            "updated": "Frissítve",
+            "sent": "Elküldve",
+            "imported": "Importálva"
+          },
+          "failure": {
+            "librarySync": "A könyvtár ellenőrzés nem fejeződött be",
+            "bookDownload": "A letöltés nem fejeződött be",
+            "progressUpdate": "Az olvasási pozíció nem frissült",
+            "annotationsPull": "A kiemelések nem lettek elküldve",
+            "annotationsPush": "A kiemelések importálása nem történt meg"
+          },
+          "chip": {
+            "morePending": "További függőben lévő",
+            "noUpdatesPending": "Nincsenek függőben lévő frissítések",
+            "bookCount": "{count, plural, one {# könyv} other {# könyv}}",
+            "deletedAnnotations": "{count} törölt jegyzet",
+            "deviceAlreadyCurrent": "Az eszköz már naprakész",
+            "freshHighlightData": "Friss kiemelés adat",
+            "created": "{count} létrehozva",
+            "updated": "{count} frissítve",
+            "deleted": "{count} törölve",
+            "unchanged": "{count} változatlan"
+          },
+          "readingPositionSyncedTitle": "Olvasási pozíció szinkronizálva: {title}",
+          "readingPositionSynced": "Olvasási pozíció szinkronizálva",
+          "labelWithTitle": "{label}: {title}",
+          "updateCount": "{count, plural, one {# frissítés} other {# frissítés}}",
+          "directionToKobo": "BookOrbit -> Kobo",
+          "directionToBookOrbit": "Kobo -> BookOrbit",
+          "twoWaySyncEnabled": "Kétirányú szinkronizálás engedélyezve",
+          "deviceProgressSaved": "Eszköz állapota mentve",
+          "summary": {
+            "noLibraryUpdatesPending": "Nincsenek függőben lévő könyvtárfrissítések ehhez az eszközhöz",
+            "libraryUpdatesPrepared": "{count, plural, one {# könyvtárfrissítés előkészítve az eszközhöz} other {# könyvtárfrissítés előkészítve az eszközhöz}}",
+            "bookDownloadedBy": "{title} letöltve az alábbi eszköz által: {device}",
+            "booksDownloaded": "{count, plural, one {# könyv letöltve} other {# könyv letöltve}}",
+            "progressUpdatesSyncedFor": "{count, plural, one {# haladásfrissítés szinkronizálva ehhez: {title}} other {# haladásfrissítés szinkronizálva ehhez: {title}}}",
+            "progressUpdatesSynced": "{count, plural, one {# haladásfrissítés szinkronizálva} other {# haladásfrissítés szinkronizálva}}",
+            "newReadingPositionFor": "A Kobo új olvasási pozíciót jelentett ehhez: {title}",
+            "newReadingPosition": "A Kobo új olvasási pozíciót jelentett",
+            "noHighlightChangesNeededFor": "Nincs szükség kiemelés módosítására ennél: {title}",
+            "noHighlightChangesNeeded": "Nincs szükség kiemelés módosítására",
+            "highlightsSentToKoboFor": "{count, plural, one {# kiemelés elküldve a Kobo-nak ennél: {title}} other {# kiemelés elküldve a Kobo-nak ennél: {title}}}",
+            "highlightsSentToKobo": "{count, plural, one {# kiemelés elküldve a Kobo-nak} other {# kiemelés elküldve a Kobo-nak}}",
+            "noKoboHighlightChangesFor": "Nincsenek Kobo kiemelés változások ennél: {title}",
+            "noKoboHighlightChanges": "Nincsenek Kobo kiemelés változások",
+            "highlightsImportedFromKoboFor": "{count, plural, one {# kiemelés importálva a Kobo-ból ennél: {title}} other {# kiemelés importálva a Kobo-ból ennél: {title}}}",
+            "highlightsImportedFromKobo": "{count, plural, one {# kiemelés importálva a Kobo-ból} other {# kiemelés importálva a Kobo-ból}}"
+          },
+          "timeRange": "{from} - {to}",
+          "eventsGrouped": "{count, plural, one {# esemény csoportosítva} other {# esemény csoportosítva}}",
+          "removedDevice": "Eltávolított eszköz",
+          "loadMoreFailed": "Nem sikerült további előzményeket betölteni",
+          "historyRefreshed": "Kobo szinkronizálási előzmények frissítve",
+          "refreshFailed": "Nem sikerült frissíteni az előzményeket",
+          "recentActivity": "Legutóbbi Kobo-tevékenység",
+          "filterAll": "Összes",
+          "filterFailures": "Sikertelen",
+          "refresh": "Frissítés",
+          "loadingActivity": "Kobo tevékenység betöltése...",
+          "noActivityHint": "A legutóbbi szinkronizálási tevékenységek akkor jelennek meg, miután a párosított Kobo kapcsolatba lépett a BookOrbittal.",
+          "error": "Hiba",
+          "loading": "Betöltés...",
+          "loadMore": "További tevékenységek betöltése"
+        },
+        "howBooksSynced": {
+          "title": "Hogyan szinkronizálja a könyveket",
+          "body": "Könyvek Kobo eszközödre való küldéséhez engedélyezned kell a {syncToKobo} funkciót az adott könyveket tartalmazó gyűjteményeken. Nyiss meg egy tetszőleges gyűjteményt az oldalsávon, kattints a Szerkesztés ikonra, és kapcsold ki a {syncToKobo} funkciót. Azok a könyvek, amelyek nem részei egy engedélyezett gyűjteménynek, nem szinkronizálódnak."
+        },
+        "nextSteps": {
+          "title": "Következő lépések",
+          "step1": "1. Konfiguráld Kobo eszközödet a fenti szinkronizálási URL-címmel való szinkronizáláshoz.",
+          "step2": "2. A BookOrbitban lépj bármelyik gyűjteményre az oldalsávon, kattints a Szerkesztés ikonra, és engedélyezd a {syncToKobo} funkciót. Csak az engedélyezett szinkronizálással rendelkező gyűjteményekben található könyvek töltődnek le az eszközödre."
+        },
+        "syncToKobo": "Szinkronizálás Kobo-val",
+        "tabs": {
+          "syncSettings": "Szinkronizálási beállítások",
+          "activityLog": "Tevékenységnapló"
+        }
+      },
+      "koreader": {
+        "title": "KOReader szinkronizálás",
+        "subtitle": "Böngészd a BookOrbit katalógusodat a KOReaderben, és szinkronizáld az olvasási haladást, a kiemeléseket és a jegyzetek változásait.",
+        "tabs": {
+          "sync": "Szinkronizálási beállítások",
+          "fileNaming": "Fájlnevezés"
+        },
+        "fileNaming": {
+          "accountTitle": "Fiók alapértelmezett KOReader mintája",
+          "accountDescription": "Beállítja a BookOrbit bővítmény letöltései által a KOReader fiókodhoz használt alapértelmezett relatív mappát és fájlnevet. Az eszközspecifikus szabályok felülbírálhatják ezt az alábbiakban.",
+          "defaultPattern": "Alapértelmezett könyvútvonal-minta",
+          "accountHelp": "A fiókod alapértelmezettje a KOReader bővítmény letöltéseihez, kivéve, ha az eszközhöz egyéni szabály tartozik.",
+          "accountHint": "Az egyéni felülírással nem rendelkező KOReader eszközök használják.",
+          "preview": "Előnézet",
+          "saveAccount": "Mentés fiók alapértelmezettjeként",
+          "deviceTitle": "KOReader eszköz felülbírálások",
+          "deviceDescription": "Az alapértelmezett, sorozat- és önálló elérési utak bármilyen kombinációjának testreszabása. Az üres, eszközspecifikus sorok öröklik az eszköz alapértelmezéseit, amely maga is örökölheti a fiók alapértelmezett KOReader mintáját.",
+          "noDevices": "Az eszközök itt jelennek meg, miután szinkronizálódtak a BookOrbittal.",
+          "customOrganization": "Egyéni rendezés",
+          "usingAccountDefault": "A fiók alapértelmezéseinek használata",
+          "deviceDefaultHelp": "Tartalék beállítás ehhez az eszközhöz. Hagyd a fiók alapértelmezett értékével megegyezően, hogy a jövőbeni módosítások automatikusan öröklődjenek.",
+          "seriesBooks": "Könyvek egy sorozatban",
+          "seriesHelp": "Opcionális elérési út, csak sorozatmetaadatokkal rendelkező könyvekhez. Hagyd üresen, ha az eszköz alapértelmezett elérési út mintáját szeretnéd használni.",
+          "standaloneBooks": "Sorozat nélküli könyvek",
+          "standaloneHelp": "Opcionális elérési út, csak sorozatmetaadatok nélküli könyvekhez. Hagyd üresen, ha az eszköz alapértelmezett elérési út mintáját szeretnéd használni.",
+          "inheritPlaceholder": "Hagyd üresen az eszköz alapértelmezett mintájának használatához",
+          "useAccount": "Fiók alapértelmezés használata",
+          "saveOverride": "Felülbírálás mentése",
+          "loadFailed": "Nem sikerült betölteni a fájlrendszerezési beállításokat",
+          "accountRequired": "Mentés előtt adj meg egy alapértelmezett könyvútvonal-mintát.",
+          "accountSaved": "A fiók alapértelmezett KOReader mintája mentve",
+          "accountSaveFailed": "Nem sikerült menteni a fájlrendszerezési beállításokat",
+          "deviceUsesAccount": "Az eszköz mostantól a fiók alapértelmezett KOReader mintáját használja",
+          "deviceSaved": "Az eszköz rendezési felülbírálása mentve",
+          "deviceSaveFailed": "Nem sikerült menteni az eszköz felülbírálását",
+          "deviceResetFailed": "Nem sikerült visszaállítani az eszköz felülbírálását"
+        },
+        "loadingSettings": "KOReader beállítások betöltése...",
+        "loadFailed": "Nem sikerült betölteni a KOReader beállításait",
+        "never": "Soha",
+        "justNow": "Épp most",
+        "minutesAgo": "{count} perccel ezelőtt",
+        "hoursAgo": "{count} órával ezelőtt",
+        "daysAgo": "{count} nappal ezelőtt",
+        "unknown": "Ismeretlen",
+        "updateAvailable": "Frissítés érhető el",
+        "manualUpdateRequired": "Kézi frissítés szükséges",
+        "manualUpdateExplanation": "Ez a bővítmény verzió nem tudja telepíteni a saját frissítéseit. Töltsd le a bővítményt, és másold a bookorbit.koplugin fájlt a koreader/plugins/ mappába ezen az eszközön.",
+        "upToDate": "Naprakész",
+        "versionUnknown": "Ismeretlen verzió",
+        "latestPlugin": "Legújabb bővítmény: v{version}",
+        "latestPluginUnavailable": "Legújabb bővítmény nem érhető el",
+        "notConfigured": "A KOReader szinkronizálása nincs konfigurálva",
+        "notConfiguredHint": "Hozz létre egy szinkronizációs hitelesítő adatkészletet, majd használd azokat a BookOrbit KOReader bővítménnyel böngészéshez, letöltésekhez, haladáshoz, olvasási eseményekhez, kiemelésekhez és törlésekhez.",
+        "createCredentials": "Hitelesítő adatok létrehozása",
+        "createFormTitle": "KOReader szinkronizálási hitelesítő adatok létrehozása",
+        "createFormHint": "Ezek a hitelesítő adatok hitelesítik a KOReader eszközeidet a BookOrbittal.",
+        "username": "Felhasználónév",
+        "usernamePlaceholder": "pl.: myreader",
+        "password": "Jelszó",
+        "passwordPlaceholder": "Minimum 6 karakter",
+        "changeCredentials": {
+          "action": "Hitelesítő adatok módosítása",
+          "title": "KOReader hitelesítő adatok módosítása",
+          "description": "Minden BookOrbit fiókhoz egy KOReader hitelesítő adat tartozik. Módosítsd itt a szinkronizált adatok törlése nélkül.",
+          "newPassword": "Új jelszó",
+          "usernameInvalid": "A felhasználónévnek 3 és 100 karakter között kell lennie.",
+          "passwordPlaceholder": "Hagyd üresen a jelenlegi jelszó megtartásához",
+          "passwordHint": "Hagyd ezt üresen a jelenlegi jelszó megtartásához.",
+          "passwordInvalid": "A jelszónak 6 és 128 karakter közöttinek kell lennie.",
+          "deviceNotice": "Az előző bejelentkezést használó eszközöket újra kell csatlakoztatni, vagy frissíteni kell egy újonnan letöltött bővítménycsomaggal.",
+          "showPassword": "Új jelszó megjelenítése",
+          "hidePassword": "Új jelszó elrejtése",
+          "save": "Hitelesítő adatok mentése",
+          "saving": "Mentés...",
+          "updated": "KOReader hitelesítő adatok frissítve",
+          "updateFailed": "Nem sikerült frissíteni a KOReader hitelesítő adatait"
+        },
+        "creating": "Létrehozás...",
+        "create": "Létrehoz",
+        "credentialsCreated": "KOReader szinkronizálási hitelesítő adatok létrehozva",
+        "createCredentialsFailed": "Nem sikerült létrehozni a hitelesítő adatokat",
+        "status": "KOReader állapota",
+        "refresh": "Frissítés",
+        "progressSync": "Haladás szinkronizálás",
+        "progressSyncHint": "Engedélyezi a KOReader eszközök számára a haladás, az olvasási tevékenység, a kiemelések és a jegyzettörlések szinkronizálását a BookOrbittal.",
+        "lastSync": "Utolsó szinkronizálás",
+        "syncedBooks": "Szinkronizált könyv",
+        "bookCount": "{count, plural, =0 {nincs könyv} one {# könyv} other {# könyv}}",
+        "devices": "Eszközök",
+        "deviceCount": "{count, plural, =0 {nincs eszköz} one {# eszköz} other {# eszköz}}",
+        "credentialsCreatedLabel": "Hitelesítő adatok létrehozva",
+        "setup": "Beállítás",
+        "pluginServerUrl": "Bővítménykiszolgáló URL-címe",
+        "syncUrl": "KOReader szinkronizálási URL",
+        "syncUrlHint": "Működik a BookOrbit bővítménnyel és a KOReader beépített folyamatszinkronizációjával.",
+        "copied": "Másolva",
+        "copyUrl": "URL másolása",
+        "preconfiguredPlugin": "Előre konfigurált BookOrbit bővítmény",
+        "preconfiguredPluginHintPrefix": "Tölts le egy zip fájlt, amely tartalmazza a szerver URL-címét és a szinkronizálási bejelentkezési adatait. A bővítmény tartalmazza a katalógusböngészést és a szinkronizálást. Másold át a mappát ide:",
+        "preconfiguredPluginHintSuffix": "és indítsd újra a KOReader-t.",
+        "latestPluginNote": "{label}. Az eszközfrissítések a KOReader BookOrbit menüjéből futtathatók.",
+        "preparing": "Előkészítés...",
+        "downloadPlugin": "Bővítmény letöltése",
+        "noDevicesSynced": "Még nincsenek eszközök szinkronizálva",
+        "noDevicesSyncedHint": "Telepítsd a BookOrbit bővítményt a teljes szinkronizáláshoz, vagy konfiguráld a KOReader készletfolyamat-szinkronizálását csak a folyamatfrissítésekhez.",
+        "lastSyncLabel": "Utolsó szinkronizálás:",
+        "lastBookLabel": "Utolsó könyv:",
+        "noneYet": "Még nincs",
+        "pluginActivity": "Bővítményaktivitás",
+        "noPluginActivity": "Még nem érkezett jelentés bővítményaktivitásról.",
+        "lastFullSync": "Utolsó teljes szinkronizálás: {time}",
+        "latestPluginSuffix": "- legújabb bővítmény v{version}",
+        "matchedBooks": "Párosított könyvek",
+        "readingEvents": "Olvasási események",
+        "highlights": "Kiemelések",
+        "syncedTotals": "Összes szinkronizált",
+        "trashedHighlights": "Kukába tett kiemelések",
+        "pendingDeletes": "{count, plural, =0 {nincsenek törölt kiemelések, amelyek KOReader bővítmény visszaigazolására várnak.} one {# törölt kiemelés vár a KOReader bővítmény visszaigazolására.} other {# törölt kiemelés vár a KOReader bővítmény visszaigazolására.}}",
+        "failedPositions": "{count, plural, =0 {nincsenek figyelmet igénylő megjelölt helyek.} one {# figyelmet igénylő megjelölt hely.} other {# figyelmet igénylő megjelölt hely.}}",
+        "setupGuide": "Beállítási útmutató",
+        "setupSteps": "KOReader beállítási lépések",
+        "setupStepsHint": "Használd a BookOrbit bővítményt katalógusböngészéshez, letöltésekhez, haladáskövetéshez, olvasási eseményekhez és kiemelésekhez. Használd az alap bővítményt csak a haladáskövetéshez.",
+        "pluginGuideTitle": "BookOrbit bővítmény",
+        "pluginStep1": "Töltsd le a fenti előre konfigurált bővítményt.",
+        "pluginStep2Prefix": "Csomagold ki és másold",
+        "pluginStep2Middle": "ide:",
+        "pluginStep2Suffix": "az eszközödön.",
+        "pluginStep3": "KOReader újraindítása. A szerver és a bejelentkezés automatikusan konfigurálódik.",
+        "pluginStep4Prefix": "Megnyitás",
+        "pluginStep4Suffix": "könyvek kereséséhez, letöltéséhez és szinkronizáláshoz való csatolásához.",
+        "stockGuideTitle": "Készletfolyamat-szinkronizáló bővítmény",
+        "stockStep1Prefix": "A KOReader eszközödön menj ide:",
+        "stockStep1Suffix": ".",
+        "stockStep2": "Állítsd be az egyéni szinkronizálási szervert a fent látható URL-címre.",
+        "stockStep2InlineUrl": "Állítsd be az egyéni szinkronizálási szervert a következő URL-címre:",
+        "stockStep3": "Add meg a létrehozott felhasználónevet és jelszót, majd koppints a Bejelentkezés gombra.",
+        "locationNote": "A BookOrbit a webes olvasóból menti a KOReader-kompatibilis EPUB helyeket. A visszaállításnak nagyjából ugyanarra a pozícióra kell érkeznie, bár a pontos sorelhelyezés olvasónként és EPUB elrendezésenként változhat.",
+        "dangerZone": "Veszélyzóna",
+        "deleteCredentials": "KOReader hitelesítő adatok törlése",
+        "deleteCredentialsHint": "Eltávolítja a szinkronizálási hitelesítő adatokat, és leválasztja az összes eszközt. A haladási adatok megmaradnak.",
+        "credentialsDeleted": "KOReader hitelesítő adatok törölve",
+        "deleteCredentialsFailed": "Nem sikerült törölni a hitelesítő adatokat",
+        "deleteConfirmTitle": "Törlöd a KOReader hitelesítő adatait?",
+        "deleteConfirmBody": "Ez eltávolítja a szinkronizálási hitelesítő adatait, és leválasztja az összes KOReader eszközt. A meglévő haladási adatok megmaradnak.",
+        "syncEnabled": "KOReader szinkronizálás engedélyezve",
+        "syncDisabled": "KOReader szinkronizálás letiltva",
+        "toggleSyncFailed": "Nem sikerült be-/kikapcsolni a szinkronizálást",
+        "syncUrlCopied": "Szinkronizálási URL a vágólapra másolva",
+        "syncUrlCopyFailed": "A szinkronizálási URL másolása sikertelen",
+        "statusRefreshed": "Szinkronizálási állapot frissítve",
+        "refreshFailed": "Frissítés sikertelen",
+        "pluginDownloaded": "Bővítmény letöltve. Másold át a bookorbit.koplugin fájlt a zip fájlból a koreader/plugins/ mappába az eszközödön.",
+        "pluginDownloadFailed": "Nem sikerült letölteni a bővítményt",
+        "hashLinks": {
+          "unmatchedTitle": "Párosítatlan KOReader könyvek",
+          "unmatchedBooks": "Párosítatlan könyvek",
+          "manualTitle": "Kézi KOReader kapcsolatok",
+          "refresh": "Frissítés",
+          "link": "Összekapcsolás",
+          "change": "Módosítás",
+          "unlink": "Leválasztás",
+          "hash": "Hasítóérték:",
+          "lastOpened": "Utoljára megnyitva:",
+          "firstSeen": "Először látva:",
+          "lastSeen": "Utoljára látva:",
+          "linked": "Összekapcsolva:",
+          "updated": "Frissítve:",
+          "linkedTo": "Összekapcsolva ezzel: {title}",
+          "loadingUnmatched": "Párosítatlan könyvek betöltése...",
+          "loadingManual": "Manuális hash kapcsolatok betöltése...",
+          "noUnmatched": "Nincsenek párosítatlan KOReader könyvek.",
+          "noManual": "Nincsenek kézi KOReader kapcsolatok.",
+          "pageOf": "Oldal {page}/{total}",
+          "showingRange": "Mutatva {start}-{end} enyiből: {total}",
+          "unknownFile": "Ismeretlen KOReader fájl {hash}",
+          "unknownAuthor": "Ismeretlen szerző",
+          "noTitleOrAuthor": "Nincs jelentett cím vagy szerző",
+          "bookNumber": "BookOrbit könyv #{id}",
+          "toast": {
+            "unmatchedRefreshed": "Párosítatlan könyvek frissítve",
+            "unmatchedRefreshFailed": "Nem sikerült frissíteni a párosítatlan könyveket",
+            "manualRefreshed": "Manuális hash kapcsolatok frissítve",
+            "manualRefreshFailed": "Nem sikerült frissíteni a manuális hash kapcsolatokat",
+            "bookLinked": "Könyv összekapcsolva",
+            "linkUpdated": "Kapcsolat frissítve",
+            "linkFailed": "Nem sikerült a könyvet összekapcsolni",
+            "linkRemoved": "Kapcsolat törölve",
+            "unlinkFailed": "Nem sikerült leválasztani a könyvet",
+            "unmatchedDismissed": "Párosítatlan könyv elvetve",
+            "dismissFailed": "Nem sikerült elvetni a párosítatlan könyvet",
+            "allDismissed": "{count, plural, =0 {Nincs párosítatlan könyv elvetve} one {# párosítatlan könyv elvetve} other {# párosítatlan könyv elvetve}}",
+            "dismissAllFailed": "Nem sikerült elvetni az összes párosítatlan könyvet"
+          },
+          "modal": {
+            "linkTitle": "KOReader könyv összekapcsolása",
+            "changeTitle": "KOReader kapcsolat módosítása",
+            "bookOrbitBook": "BookOrbit könyv",
+            "searchPlaceholder": "Keresés a BookOrbit könyvtáradban",
+            "minChars": "Írj be legalább 2 karaktert.",
+            "searching": "Keresés...",
+            "noBooksFound": "Nem találhatók könyvek.",
+            "untitledBook": "Cím nélküli könyv",
+            "selected": "Kiválasztva",
+            "select": "Kiválaszt",
+            "loadMore": "Több betöltése",
+            "confirmTitle": "KOReader kapcsolat megerősítése",
+            "koreader": "KOReader",
+            "bookOrbit": "BookOrbit",
+            "bookId": "Könyvazonosító: {id}",
+            "syncedStatsNote": "A már szinkronizált statisztikák megmaradnak az aktuális BookOrbit könyvben.",
+            "chooseDifferent": "Válassz másikat",
+            "saving": "Mentés...",
+            "confirmLink": "Kapcsolat megerősítése",
+            "unlinkTitle": "Leválasztod a KOReader könyvet?",
+            "unlinkBody": "A hash jövőbeli szinkronizálásai a továbbiakban nem lesznek a(z) {title}-re feloldva, amíg újra nem csatolják. A már szinkronizált statisztikák az aktuális BookOrbit könyvben maradnak.",
+            "unlinking": "Leválasztás..."
+          },
+          "dismiss": "Elvetés",
+          "dismissAll": "Összes elvetése",
+          "dismissing": "Elvetés...",
+          "unlinking": "Leválasztás...",
+          "unlinkConfirmTitle": "Leválasztod a KOReader könyvet?",
+          "unlinkConfirmBody": "A hash jövőbeli szinkronizálásai a továbbiakban nem lesznek a(z) {title}-re feloldva, amíg újra nem csatolják. A már szinkronizált statisztikák az aktuális BookOrbit könyvben maradnak.",
+          "dismissConfirmTitle": "Elveted ezt: {title}?",
+          "dismissConfirmBody": "Ez eltávolítja a párosítatlan könyvek listájáról. Ha bármelyik eszköz ismét jelenti ezt a hash-t, akkor új bejegyzésként jelenik meg.",
+          "dismissAllConfirmTitle": "{count, plural, =0 {nincs párosítatlan könyv} one {# párosítatlan könyv elvetése?} other {# párosítatlan könyv elvetése?}}",
+          "dismissAllConfirmBody": "Ez törli az összes párosítatlan könyvek listát, nem csak az aktuális oldalt. Ha bármelyik eszköz ismét jelzi ezen hashek valamelyikét, az új bejegyzésként jelenik meg.",
+          "changeLinkTitle": "KOReader kapcsolat módosítása",
+          "linkBookTitle": "KOReader könyv kapcsolása",
+          "bookOrbitBook": "BookOrbit könyv",
+          "searchLibraryPlaceholder": "Keresés a BookOrbit könyvtáradban",
+          "enterMinChars": "Írj be legalább 2 karaktert.",
+          "searching": "Keresés...",
+          "noBooksFound": "Nem találhatók könyvek.",
+          "untitledBook": "Cím nélküli könyv",
+          "selected": "Kiválasztva",
+          "select": "Kiválaszt",
+          "loadMore": "Több betöltése",
+          "loadingMore": "Betöltés...",
+          "confirmLinkTitle": "KOReader kapcsolat megerősítése",
+          "bookId": "Könyvazonosító: {id}",
+          "syncedStatsNote": "A már szinkronizált statisztikák megmaradnak az aktuális BookOrbit könyvben.",
+          "chooseDifferent": "Válassz másikat",
+          "saving": "Mentés...",
+          "confirmLink": "Kapcsolat megerősítése"
+        },
+        "remove": "Eltávolít",
+        "removing": "Eltávolítás...",
+        "unmatchedBooks": "Párosítatlan könyvek",
+        "deviceRemoved": "Eszköz eltávolítva",
+        "removeDeviceFailed": "Nem sikerült eltávolítani az eszközt",
+        "removeDeviceConfirmTitle": "Eltávolítod ezt: {device}?",
+        "removeDeviceConfirmBody": "Ez véglegesen törli az eszköz szinkronizált haladását, olvasási tevékenységét és minden olyan nem egyező könyvbejegyzést, amelyet más eszköz már nem jelent. Ha az eszköz később újra szinkronizál, az új bejegyzésként jelenik meg.",
+        "deleteDeviceDataConfirmTitle": "Törlöd a szinkronizált adatokat erről: {device}?",
+        "deleteDeviceDataConfirmBody": "Ez véglegesen törli az eszköz szinkronizált haladását, az oldalankénti olvasási tevékenységet és az összes olyan nem egyező könyvbejegyzést, amelyet más eszköz már nem jelent. A statisztikákban már rögzített olvasási munkamenetek megmaradnak. Ha az eszköz később újra szinkronizál, új bejegyzésként jelenik meg.",
+        "devicesHint": "Egy eszköz kivonásával elrejti azt, de minden szinkronizált adat megmarad. A szinkronizált adatok törlése nem vonható vissza.",
+        "retire": "Kivon",
+        "retiring": "Kivonás...",
+        "restore": "Visszaállít",
+        "restoring": "Visszaállítás...",
+        "deleteSyncedData": "Adatok törlése",
+        "deletingSyncedData": "Törlés...",
+        "deviceRetired": "Eszköz visszavonva",
+        "deviceRestored": "Eszköz visszaállítva",
+        "retireDeviceFailed": "Nem sikerült az eszközt visszavonni",
+        "restoreDeviceFailed": "Nem sikerült az eszközt visszaállítani",
+        "retiredDevices": "{count, plural, one {# visszavont eszköz} other {# visszavont eszköz}}",
+        "retiredOnLabel": "Visszavonva"
+      },
+      "opds": {
+        "title": "OPDS",
+        "subtitle": "Csatlakoztass OPDS-kompatibilis olvasóalkalmazásokat, például a KOReader-t vagy a Thorium Reader-t a könyvtáradhoz.",
+        "copy": "Másolás",
+        "loadFailed": "Betöltés sikertelen",
+        "server": "Kiszolgáló",
+        "catalogServer": "OPDS katalóguskiszolgáló",
+        "catalogServerHint": "Engedélyezd az OPDS klienseknek a könyvek böngészését és letöltését",
+        "endpoint": "Végpont",
+        "accounts": "OPDS-fiókok",
+        "add": "Hozzáad",
+        "addAccount": "Fiók hozzáadása",
+        "username": "Felhasználónév",
+        "usernameLabel": "Felhasználónév",
+        "usernamePlaceholder": "pl.: koreader",
+        "password": "Jelszó",
+        "passwordPlaceholder": "Minimum 8 karakter",
+        "defaultSort": "Alapértelmezett rendezés",
+        "sortLabel": "Rendezés",
+        "creating": "Létrehozás...",
+        "create": "Létrehoz",
+        "noAccounts": "Még nincsenek OPDS-fiókok. Hozz létre egyet az OPDS kliensek használatának megkezdéséhez.",
+        "hideDetails": "Részletek elrejtése",
+        "showDetails": "Részletek megjelenítése",
+        "copyUsername": "Felhasználónév másolása",
+        "notes": "OPDS-jegyzetek",
+        "notesBody": "Használj OPDS-fiókokat az olvasóalkalmazásokban. Tartsd titokban a hitelesítő adatokat, és cseréld ki a jelszavakat, ha véletlenül megosztottad őket.",
+        "deleteConfirmTitle": "Törlöd az OPDS-fiókot?",
+        "deleteConfirmBody": "„{username}” törlése. Ez a művelet nem vonható vissza.",
+        "sortRecent": "Legutóbb hozzáadva",
+        "sortTitleAsc": "Cím (A-Z)",
+        "sortTitleDesc": "Cím (Z-A)",
+        "sortAuthorAsc": "Szerző (A-Z)",
+        "sortAuthorDesc": "Szerző (Z-A)",
+        "sortSeriesAsc": "Sorozat (A-Z)",
+        "sortSeriesDesc": "Sorozat (Z-A)",
+        "serverEnabled": "OPDS szerver engedélyezve",
+        "serverDisabled": "OPDS szerver letiltva",
+        "updateSettingsFailed": "Nem sikerült frissíteni az OPDS beállításait",
+        "urlCopied": "OPDS URL a vágólapra másolva",
+        "urlCopyFailed": "Az OPDS URL másolása sikertelen",
+        "createUserFailed": "Nem sikerült létrehozni az OPDS felhasználót",
+        "userCreated": "OPDS felhasználó létrehozva: \"{username}\"",
+        "sortOrderUpdated": "Rendezési sorrend frissítve a következő felhasználóhoz: „{username}”",
+        "updateSortFailed": "Nem sikerült frissíteni a rendezési sorrendet",
+        "userDeleted": "OPDS felhasználó törölve: \"{username}\"",
+        "deleteUserFailed": "Nem sikerült törölni az OPDS felhasználót",
+        "labelCopied": "{label} másolva",
+        "copyLabelFailed": "{label} másolása sikertelen"
+      },
+      "tabs": {
+        "general": "Általános",
+        "ebook": "e-Könyv",
+        "pdf": "PDF",
+        "comics": "Képregények",
+        "audio": "Hangoskönyv",
+        "fonts": "Betűtípusok"
+      }
+    },
+    "system": {
+      "tabs": {
+        "file-naming": "Fájlnevezés",
+        "book-dock": "Könyvdokk",
+        "requests": "Kérések",
+        "maintenance": "Karbantartás",
+        "audit-log": "Ellenőrzési napló"
+      },
+      "requests": {
+        "title": "Kérések",
+        "subtitle": "Hol találhatók a kibocsátott anyagok, mi hozza őket létre, és mi történik, miután beérkeznek.",
+        "tabs": {
+          "sources": "Források",
+          "clients": "Letöltő kliensek",
+          "automation": "Automatizálás"
+        },
+        "loading": "Letöltő kliensek betöltése...",
+        "clients": "Letöltő kliens",
+        "addClient": "Kliens hozzáadása",
+        "editClient": "Kliens szerkesztése",
+        "deleteClient": "{name} törlése",
+        "clientsEmpty": {
+          "title": "Még nincsenek letöltő kliensek",
+          "body": "A közvetlen HTTP letöltéshez nincs szükség kliensre. Csatlakoztass egyet, hogy a BookOrbit letölthesse a tracker által kínált torrenteket is.",
+          "note": "qBittorrent, Transmission és Deluge támogatott."
+        },
+        "summary": "{type} - kategória {category}, prioritás {priority}",
+        "disabled": "Letiltva",
+        "test": "Kapcsolat tesztelése",
+        "testSaveFirst": "Mentsd el a módosításokat tesztelés előtt",
+        "testOk": "Csatlakoztatva ehhez: {client} {version}",
+        "testOkNoVersion": "Csatlakozva ehhez: {client}",
+        "lastTestOk": "Utolsó tesztelés {time}: csatlakoztatva",
+        "lastTestFailed": "Utolsó tesztelés {time}: {error}",
+        "saved": "Letöltő kliens mentve",
+        "deleted": "Letöltő kliens törölve",
+        "clientTypes": {
+          "qbittorrent": "qBittorrent",
+          "transmission": "Transmission",
+          "deluge": "Deluge"
+        },
+        "color": {
+          "label": "Szín",
+          "hint": "Megjelöli ezt a klienst az átviteli részletekben. Az átviteli protokoll megtartja a saját színét.",
+          "none": "Nincs szín"
+        },
+        "fields": {
+          "name": "Név",
+          "type": "Kliens típusa",
+          "baseUrl": "Alap URL",
+          "username": "Felhasználónév",
+          "password": "Jelszó",
+          "passwordKeep": "Hagyd üresen a tárolt jelszó megtartásához",
+          "passwordClear": "Törlés",
+          "passwordKeepAction": "Megtartás",
+          "passwordWillClear": "A tárolt jelszó mentéskor törlődik",
+          "category": "Kategória",
+          "categoryHint": "Megcímkézi a BookOrbit által hozzáadott torrenteket, így csak önmagában működik.",
+          "priority": "Prioritás",
+          "enabled": "Engedélyezve",
+          "useHardlinks": "Hard linkek használata",
+          "allowPrivateAddress": "Privát címek engedélyezése",
+          "allowPrivateAddressHint": "Akkor szükséges, ha a kliens a helyi hálózaton vagy ugyanazon a gépen fut.",
+          "passwordBrief": "Titkosítva tárolva.",
+          "useHardlinksBrief": "Seedelés a lemez kétszeri használata nélkül. Visszalép egy fájlrendszereken átívelő másolási folyamatra."
+        },
+        "mappings": {
+          "title": "Útvonal-leképezések",
+          "hint": "Lefordítja a kliens által jelentett elérési utakat a BookOrbit által megnyitható elérési utakká. Akkor szükséges, ha a kettő külön konténerben fut.",
+          "add": "Leképzés hozzáadása",
+          "remove": "Leképzés eltávolítása",
+          "remotePath": "Kliens útvonal",
+          "localPath": "BookOrbit útvonal",
+          "brief": "Kötelező. Deklarálja azt a könyvtárat, ahonnan a BookOrbit importálhat; amikor az ügyfél ugyanazokat a fájlokat látja ugyanazon az elérési úton, a letöltési könyvtárat saját magára képezi le.",
+          "identityExample": "Ugyanaz a fájlrendszer? Használd ugyanazt az elérési utat mindkét oldalon, például /downloads a bal oldalon és /downloads a jobb oldalon."
+        },
+        "hardlink": {
+          "test": "Hardlink tesztelése",
+          "checking": "Ellenőrzés...",
+          "works": "A hardlinkek itt működnek: az importálás nem fogja kétszer használni a lemezt.",
+          "unavailable": "A hardlinkek itt nem érhetők el: az importálások másolásra kerülnek, a helyet kétszer használva.",
+          "link_refused": "Ez a fájlrendszer elutasította az összekapcsolást ({code}): az importált elemek másolásra kerülnek és dupla helyet foglalnak.",
+          "download_dir_unwritable": "A BookOrbit nem tud írni a letöltési könyvtárba ({code}), ezért a hardlinkelést nem lehetett tesztelni.",
+          "localMissing": "A BookOrbit nem látja az útvonalat.",
+          "dockMissing": "A Könyvdokk mappa nem olvasható."
+        },
+        "reconciliation": {
+          "action": "Egyeztetés",
+          "clean": "Minden saját klienselem megfelel egy megtartott BookOrbit letöltési kísérletnek.",
+          "unsupported": "Ez a kliens nem tudja felsorolni az elemeket a BookOrbit tulajdonjogi jelölője alapján. Deluge esetén engedélyezze a Label bővítményt; Transmission esetén konfiguráljon egy kategóriamappát.",
+          "truncated": "A kliens több mint 1000 tulajdonodban lévő tételt adott vissza. Oldd fel a látható bejegyzéseket, majd egyeztesd újra.",
+          "orphan": "Nincsenek megtartott BookOrbit kísérletek, amelyek ezt az ügyfélelemet birtokolnák.",
+          "failedAttempt": "Az ügyfél még mindig birtokolja ezt az elemet, de a(z) „{title}” típusú keresési kísérlete sikertelenként van megjelölve.",
+          "missing": "Ez a {status} kísérlet már nem szerepel a letöltő kliensben.",
+          "adopt": "Csatolás ehhez: {title}",
+          "adopted": "Ügyfél elem csatolva ehhez: {title}",
+          "remove": "Eltávolítás a kliensből",
+          "removed": "Gazdátlan ügyfélelem eltávolítva",
+          "removeTitle": "Eltávolítod a gazdátlan ügyfélelemet?",
+          "removeDescription": "{name} eltávolítva a letöltő kliensből. A letöltött fájlok megmaradtak.",
+          "notOrphan": "Az adott klienselem továbbra is egy BookOrbit letöltési kísérlethez van csatolva.",
+          "notAdoptable": "Az ügyfélelem vagy a sikertelen kísérlet megváltozott, és már nem csatolható. Egyeztesd újra."
+        },
+        "errors": {
+          "loadFailed": "Nem sikerült betölteni a letöltő klienseket",
+          "saveFailed": "Nem sikerült menteni a letöltő klienst",
+          "deleteFailed": "Nem sikerült eltávolítani a letöltő klienst",
+          "testFailed": "A letöltő kliens nem elérhető",
+          "nameAndUrlRequired": "Név és alap URL megadása kötelező",
+          "nameTaken": "Már létezik egy ilyen nevű letöltő kliens",
+          "urlUnsafe": "Az alap URL nem érhető el. Ellenőrizd a címet, és hogy http vagy https protokollt használ-e.",
+          "urlPrivate": "Ez a cím egy privát vagy helyi hálózaton található. Kapcsold be a „Privát címek engedélyezése” beállítást, ha a kliens ott fut.",
+          "encryptionKeyMissing": "Jelszó mentése előtt állítsd be a BOOK_REQUEST_ENCRYPTION_KEY értékét. Generálj egyet a következő paranccsal: openssl rand -hex 32",
+          "encryptionKeyChanged": "A tárolt jelszó nem olvasható. A BOOK_REQUEST_ENCRYPTION_KEY megváltozhatott a mentése óta.",
+          "pathNotAbsolute": "Az útvonal-leképezéseknek mindkét oldalon abszolút útvonalakat kell használniuk",
+          "nameRequired": "Adj nevet ennek a kliensnek.",
+          "urlRequired": "Add meg azt a címet, amelyen a BookOrbitnak el kell érnie ezt a klienst.",
+          "mappingRequired": "Adj hozzá legalább egy elérési út leképezést, hogy a BookOrbit tudja, melyik könyvtárból importálhat."
+        },
+        "encryptionKeyMissing": "A BOOK_REQUEST_ENCRYPTION_KEY nincs beállítva, ezért a kliensjelszó nem menthető. Hozzon létre egyet a következő paranccsal: openssl rand -hex 32",
+        "confirmDelete": {
+          "title": "Eltávolítod ezt a letöltő klienst?",
+          "description": "{name} címe és tárolt jelszava törlődik, és az oda letöltő kérelmek frissítése leáll. Kapcsold ki inkább az adatok megőrzéséhez.",
+          "confirm": "Kliens eltávolítása"
+        },
+        "indexers": {
+          "title": "Torrent indexelők",
+          "hint": "Saját Prowlarr, Jackett vagy NZBHydra a Torznab helyett. Adj hozzá egyet minden Torznab-hírfolyamhoz, amelyet keresni szeretnél.",
+          "allDisabled": "Az alábbi források mindegyike ki van kapcsolva, így a keresési kérések nem fognak találni semmit. Kapcsolj be legalább egyet újra.",
+          "loading": "Indexelők betöltése...",
+          "empty": {
+            "title": "Még nincsenek források",
+            "body": "A BookOrbit nem tartalmaz saját forrásokat, így a keresési kérések semmit sem találnak, amíg hozzá nem adsz egyet. Kétféleképpen lehetséges.",
+            "bodyOneWay": "A BookOrbit nem tartalmaz saját forrásokat, így a keresési kérések semmit sem találnak, amíg hozzá nem adsz egyet.",
+            "responsibility": "Az, hogy milyen forrásból adsz hozzá indexeket, a te felelősséged.",
+            "pluginTitle": "Bővítmény telepítése",
+            "pluginBody": "Egy fájl, ami megtanítja a BookOrbitnak, hogy egy adott oldalon keressen. Megadod, majd kitöltöd a beállításait.",
+            "torznabTitle": "Torznab indexelő hozzáadása",
+            "torznabBody": "Egy Prowlarr, Jackett vagy NZBHydra hírfolyamra mutat, amit már futtatsz. Hírfolyamonként egy."
+          },
+          "add": "Indexelő hozzáadása",
+          "edit": "Indexelő szerkesztése",
+          "delete": "Törlés: {name}",
+          "none": "Még nincsenek indexelők.",
+          "disabled": "Letiltva",
+          "test": "Kapcsolat tesztelése",
+          "testSaveFirst": "Mentsd el a módosításokat tesztelés előtt",
+          "testOk": "Csatlakozva ehhez: {name}",
+          "toggleAria": "Keresés ezzel: {name}",
+          "enabledNotice": "{name} lesz keresve",
+          "disabledNotice": "{name} nem lesz keresve",
+          "lastTestOk": "Utolsó tesztelés {time}: csatlakoztatva",
+          "lastTestFailed": "Utolsó tesztelés {time}: {error}",
+          "saved": "Indexelő mentve",
+          "deleted": "Forrás törölve",
+          "unavailable": "Ennek a telepítésnek nincs „{type}” indexelő típusa. Módosítsd a típust, vagy töröld a bővítményt és a mentett konfigurációt.",
+          "pluginFailed": "A(z) „{directory}” könyvtárban található bővítmény nem töltődött be: {reason}",
+          "network": {
+            "title": "Fejlett hálózat",
+            "hint": "Csak akkor szükséges, ha az alapértelmezett elérési út erre a forrásra nem működik. Az engedélyezett címek nem változnak: bármilyen címet is érünk el, az ellenőrzés továbbra is ugyanúgy történik.",
+            "resolvers": "DNS-szerverek",
+            "proxyUrl": "Proxy URL",
+            "proxyHint": "Egy http vagy https proxy, amelyen keresztül a forrás kérései elküldhetők. A SOCKS nem támogatott.",
+            "brief": "Csak akkor szükséges, ha az alapértelmezett elérési út erre a forrásra nem működik.",
+            "resolversBrief": "Vesszővel elválasztva. Csak ennél a forrásnál használatos a rendszerfeloldó helyett; az üres karakter a rendszerfeloldót használja.",
+            "proxyBrief": "Egy http vagy https proxy ehhez a forráshoz. A SOCKS nem támogatott."
+          },
+          "types": {
+            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)"
+          },
+          "fields": {
+            "name": "Név",
+            "type": "Indexelő típusa",
+            "baseUrl": "Alap URL",
+            "baseUrlHint": {
+              "torznab": "A torznab hírfolyam URL-címe, lekérdezési karakterlánc nélkül. A Jackett minden indexelőben \"Torznab hírcsatorna\" néven jeleníti meg."
+            },
+            "credential": {
+              "apiKey": "API-kulcs",
+              "sessionId": "Munkamenet azonosító"
+            },
+            "credentialKeep": "Hagyja üresen a tárolt hitelesítő adatok megtartásához",
+            "credentialClear": "Törlés",
+            "credentialKeepAction": "Megtartás",
+            "credentialWillClear": "A tárolt hitelesítő adatok mentéskor törlődnek",
+            "enabled": "Engedélyezve",
+            "allowPrivateAddress": "Privát címek engedélyezése",
+            "credentialBrief": "Titkosítva tárolva.",
+            "allowPrivateAddressBrief": "Alapértelmezés szerint kikapcsolva. Csak egy proxy, például a Jackett esetén szükséges a helyi hálózaton.",
+            "searchByIsbn": "Keresés ISBN alapján",
+            "searchByIsbnBrief": "Alapértelmezés szerint bekapcsolva. Kapcsold ki, ha ez a forrás rossz ISBN-számmal adja vissza a könyvet, ilyenkor cím és szerző alapján fog keresni."
+          },
+          "color": {
+            "label": "Szín",
+            "hint": "Minden visszaadott kiadásnál megjelöli ezt a forrást, így már a név elolvasása előtt meg lehet állapítani, hogy honnan származik az eredmény. A torrent és a közvetlen letöltés megtartja a saját két színét, ezért egyik sem szerepel itt.",
+            "none": "Nincs szín",
+            "options": {
+              "blue": "Kék",
+              "indigo": "Indigókék",
+              "purple": "Lila",
+              "pink": "Rózsaszín",
+              "red": "Piros",
+              "orange": "Narancssárga",
+              "yellow": "Sárga",
+              "lime": "Limezöld",
+              "green": "Zöld",
+              "teal": "Pávakék"
+            }
+          },
+          "mediaKinds": {
+            "label": "Keresés ebben a forrásban",
+            "hint": "Kapcsolj ki egy olyan médiumot, amitől nem érdemes kérdezni. Egy általános proxy mögött álló, csak hangoskönyveket tároló tracker továbbra is azt állítja, hogy mindent tartalmaz, és e-könyvek keresése minden kereséskor egy kérésbe kerül.",
+            "notCarried": "Ez a forrás nem tartalmazza."
+          },
+          "categories": {
+            "title": "Kategóriák",
+            "brief": "Az indexelő saját kategóriaszámai, vesszővel elválasztva."
+          },
+          "settings": {
+            "restoreDefault": "Alapértékek visszaállítása"
+          },
+          "confirmDelete": {
+            "title": "Törlöd ezt a forrást?",
+            "description": "{name} címe, beállításai és tárolt hitelesítő adatai törlődtek. Kapcsold ki inkább, hogy az elvesztésük nélkül le szeretnéd állítani a keresést.",
+            "confirm": "Forrás törlése"
+          },
+          "errors": {
+            "loadFailed": "Nem sikerült betölteni az indexelőket",
+            "saveFailed": "Nem sikerült menteni az indexelőt",
+            "deleteFailed": "Nem sikerült törölni a forrást",
+            "testFailed": "Nem sikerült elérni az indexelőt",
+            "nameAndUrlRequired": "Név és alap URL megadása kötelező",
+            "nameTaken": "Már létezik egy ilyen nevű indexelő",
+            "urlUnsafe": "Az alap URL nem érhető el. Ellenőrizd a címet, és hogy http vagy https protokollt használ-e.",
+            "urlPrivate": "Ez a cím egy privát vagy helyi hálózaton található. Kapcsold be a „Privát címek engedélyezése” beállítást, ha az indexelő ott fut.",
+            "credentialRequired": "Az indexelő használatához hitelesítő adatokra van szükség",
+            "invalidSettings": "Egy vagy több forrásbeállítás érvénytelen. Tekintsd át a rendelkezésre álló lehetőségeket.",
+            "nameRequired": "Adj nevet ennek az indexelőnek.",
+            "urlRequired": "Add meg azt a címet, ahol a BookOrbitnak keresnie kell."
+          },
+          "editName": "{name} szerkesztése",
+          "editorDescription": "Az indexelő beállításai.",
+          "chooseType": "Válassz egy indexelő típust",
+          "chooseTypeHint": "Válaszd ki, hogy a BookOrbit hol keressen. Az űrlap ezután csak azt kérdezi, amire az adott forrásnak szüksége van.",
+          "builtIn": "Beépített",
+          "plugin": "Bővítmény",
+          "typeDescriptions": {
+            "torznab": "Saját Jackett, Prowlarr vagy NZBHydra. Kategóriákat és seed célokat használ."
+          },
+          "plugins": {
+            "title": "Bővítmények",
+            "hint": "Egyetlen bővítményfájlként hozzáadott, a BookOrbit által kereshető webhely. Telepítsen egyet, majd adja meg a beállításait.",
+            "directoryLink": "Nyílt könyvtári bővítmények böngészése",
+            "none": "Nincs telepítve bővítmény. Telepíts egyet, hogy olyan webhelyen keress, amelyet a Torznab nem fed le.",
+            "install": "Bővítmény telepítése",
+            "installed": "Telepítve: {label}.",
+            "installFailed": "A bővítmény telepítése sikertelen volt.",
+            "inspectFailed": "A fájl nem olvasható be bővítményként.",
+            "removeAction": "Bővítmény törlése",
+            "removed": "{type} elem és forrásai törölve.",
+            "removeFailed": "A bővítményt nem lehetett törölni.",
+            "confirmRemove": "Törlöd ezt a bővítményt: {label}?",
+            "replaces": "Ez lecseréli a már telepített {type} bővítményt.",
+            "restartRequired": "Indítsd újra a BookOrbitot, hogy a bővítmény módosítása érvénybe lépjen.",
+            "confirmInstall": "Bővítmény telepítése",
+            "configure": "Beállítás",
+            "notSetUp": "Még nincs beállítva",
+            "brokenTitle": "Egy bővítmény nem töltődött be",
+            "managedHint": "Telepítve erre a szerverre. A frissítés felülírja a kódját. A törlés véglegesen eltávolítja a bővítményt és az összes ilyen típusú forrást.",
+            "missingHint": "A bővítményfájl már eltűnt. Töröld ezt a bővítménybejegyzést, hogy eltávolítsd az összes fennmaradó forrást, beállítást és a típusához tartozó tárolt hitelesítő adatot.",
+            "removeWarning": "{count, plural, one {# forrás, valamint mentett beállításai és hitelesítő adatai véglegesen törlődnek ezzel a bővítménnyel.} other {# forrás, valamint mentett beállításai és hitelesítő adatai véglegesen törlődnek ezzel a bővítménnyel.}}",
+            "configureAria": "{label} beállítása",
+            "usedBy": "{count, plural, one {# forrás használja} other {# forrás használja}}",
+            "unused": "még egyetlen forrás sem használja",
+            "update": "Plugin frissítése",
+            "wrongType": "Az a fájl a(z) {found} bővítmény, nem a(z) {expected}.",
+            "replaceTitle": "Lecseréled ezt a bővítményt?",
+            "replace": "Bővítmény lecserélése",
+            "reviewTitle": "Bővítmény telepítése?",
+            "reviewDescription": "Amit a fájl deklarál magáról, és a kód, amit futtatni fog.",
+            "declares": "Amit deklarál",
+            "source": "Amit futtatni fog",
+            "type": "Típus",
+            "version": "Verzió",
+            "versionLabel": "Bővítmény verzió {version}",
+            "versionUnknown": "Bővítmény verziója ismeretlen",
+            "versionUnknownValue": "Ismeretlen",
+            "media": "Média",
+            "credential": "Hitelesítés",
+            "credentialRequired": "Kötelező",
+            "credentialNone": "Egyik sem",
+            "trustWarning": "A bővítmény a BookOrbit rendszeren belül fut, hozzáféréssel az Ön adatbázisához, könyvtári fájljaihoz és titkosítási kulcsához. Csak olyan forrásból telepítsen egyet, amelyben megbízik, és először olvassa el.",
+            "sectionTitle": "Bővítmények",
+            "removeUnusedWarning": "A plugin véglegesen törlődik a szerverről."
+          },
+          "posture": "A BookOrbit nem biztosít vagy támogat indexelő forrásokat. Minden itt található forrást Ön állított be, és Ön felelős azért, hogy mit keres és tölt le rajta keresztül."
+        },
+        "automation": {
+          "title": "Automatizálás",
+          "pipeline": "Amikor a letöltés befejeződik, a fájl áthalad a Book Dockon, ahol beolvassa a címét és a szerzőt, hogy a fájl neve és a megfelelő iktatás megtörténhessen, majd magától átkerül a kérés célkönyvtárába. Csak akkor áll meg, ha az importellenőrzés be van kapcsolva, és a fájl nem felel meg a kértnek.",
+          "groupDownloads": "Automatikus letöltés",
+          "groupImports": "Importellenőrzések",
+          "stateOn": "Be",
+          "stateOff": "Ki",
+          "summaryOff": "Minden jóváhagyott kérés arra vár, hogy egy személy megnyissa a kiadásválasztót és válasszon.",
+          "summaryNoRetry": "Egy jóváhagyott kérelem önmagában letölti a legjobb kiadványt, amennyiben az a kiadás legalább {score} pontot ér el. Ha nem sikerül, a kérés vár egy személyre.",
+          "summaryRetry": "Egy jóváhagyott kérés magától letölti a legjobb kiadást, amennyiben az eléri a {score} pontot vagy annál többet. {count, plural, one {Ez az egyetlen kipróbált kiadás, mielőtt a kérés személyes beavatkozásra vár.} other {Legfeljebb # kiadást próbál ki a rendszer, mielőtt a kérés személyes beavatkozásra vár.}}",
+          "howDownloads": "Hogyan működik az automatikus letöltés",
+          "howImports": "Hogyan működnek az importellenőrzések",
+          "minScoreShort": "Ez alatt semmi sem töltődik le felügyelet nélkül.",
+          "autoRetryShort": "A sikertelen letöltés a második helyezettre esik.",
+          "maxAttemptsShort": "Az első próbálkozás és minden újrapróbálkozás beleszámít ebbe.",
+          "verificationShort": "Ez alatt a fájl a Könyvdokkban vár ellenőrzésre.",
+          "loading": "Az automatizálási beállítások betöltése...",
+          "loadFailed": "Nem sikerült betölteni az automatizálási beállításokat",
+          "saveFailed": "Nem sikerült menteni a beállítást",
+          "saved": "Automatizálási beállítások mentve",
+          "autoGrab": "Töltsd le automatikusan a legjobb kiadást",
+          "noSourcesConfigured": "Nincsenek beállítva keresési források, így semmi sem lesz keresve, és minden jóváhagyott kérés azonnal visszakerül. Adj hozzá egyet a Források alatt.",
+          "noSourcesEnabled": "Minden keresési forrás ki van kapcsolva, így semmi sem kerül keresésre, és minden jóváhagyott kérés azonnal visszakerül. Kapcsold be újra a Források alatt.",
+          "autoGrabHint": "Amikor egy kérést jóváhagynak, a legmagasabb pontszámú kiadás egyenesen a letöltőklienshez kerül, és senkinek sem kell megnyitnia a kiadásválasztót. Alapértelmezés szerint ki van kapcsolva, mert nehéz egy könyvet a megfelelő kiadáshoz párosítani, és általában egy személy jobban el tudja dönteni.",
+          "autoGrabEnabled": "Az automatikus letöltések be vannak kapcsolva",
+          "autoGrabDisabled": "Az automatikus letöltések ki vannak kapcsolva",
+          "minScore": "Minimális kiadási pontszám",
+          "minScoreHint": "Az ennél alacsonyabb pontszámú kiadások letöltése soha nem történik meg automatikusan. A pontszámok 100-ig futnak, és a cím és a szerző egyezésének mértéke nagyjából egyet tesz ki, a formátummal, a fájlmérettel, a seederekkel és a forrás prioritásával együtt. Ha semmi nem ér el elég magas pontszámot, a kérés megvárja, hogy valaki manuálisan válasszon ki egy kiadást, és közli, hogy miért állt le.",
+          "autoRetry": "Hiba után próbálja ki a következő kiadást",
+          "autoRetryHint": "Amikor egy automatikus letöltés sikertelen, a rendszer a feladás helyett a következő legjobb verziót próbálja ki. Ez vonatkozik arra az esetre, ha a forrás nem hajlandó átadni a fájlt, vagy ha a letöltés félbeszakad. Ez csak azokra a verziókra vonatkozik, amelyeket a BookOrbit maga választott ki: a jóváhagyó által kézzel kiválasztott verziók sikertelenek maradnak, és várnak rájuk.",
+          "maxAttempts": "Próbálkozások száma kérésenként",
+          "maxAttemptsHint": "Minden egyes letöltés, amit a BookOrbit küld a letöltő kliensnek ehhez a kéréshez, beleszámít ebbe a korlátba: az első automatikus kísérlet, minden, amire egy forrás elutasítása után került sor, és minden, amire egy sikertelen letöltés után került sor. Állítsd 1-re, ha az első kísérlet után le szeretnéd állítani.",
+          "autoSearch": "Keressen tovább olyan kéréseket, amire nincs találat",
+          "autoSearchShort": "Egy eredménytelen jóváhagyott keresés esetén a rendszer később újra keres.",
+          "autoSearchHint": "Egy kérést egyszer keres a rendszer jóváhagyást követően. Ha nincs elég jó találat, vagy a könyv még nem jelent meg, a kérés jóváhagyásra vár, és nincs újbóli keresés. Kapcsold be ezt, és a BookOrbit automatikusan ellenőrzi a könyvet, így a következő hónapban közzétett kiadás is megtalálható lesz. Csak akkor fut, ha az automatikus letöltések be vannak kapcsolva, mivel egy olyan keresés, amelynek semmi köze a találatokhoz, csak a források forgalmát csökkenti.",
+          "autoSearchEnabledToast": "A kérések újrakeresésre kerülnek",
+          "autoSearchDisabledToast": "A kérések csak jóváhagyás után kerülnek újrakeresésre",
+          "autoSearchInterval": "Újrakeresés ennyi idő után",
+          "autoSearchIntervalShort": "Az utolsó kereséstől számolva, és a kérések idővel párhuzamosan nyújtva.",
+          "autoSearchIntervalHint": "Mennyi ideig kell várni, mielőtt egy találat nélküli kérés újrakeresésre kerül. A várakozási idő minden héten megduplázódik, akár ennek a számnak a nyolcszorosát is elérheti, így a régi kérések hosszú sora nem válik napi forgalommá minden egyes forrással szemben.",
+          "autoSearchIntervalUnit": "óra",
+          "autoSearchMaxAge": "Keresés leállítása ennyi idő után",
+          "autoSearchMaxAgeShort": "A kérés benyújtásának időpontjától számolva.",
+          "autoSearchMaxAgeHint": "Az ennél régebbi kérést békén hagyjuk. Jóváhagyva marad, és bármikor manuálisan kiválasztható egy kiadás; semmi sem keresi már automatikusan.",
+          "autoSearchMaxAgeUnit": "nap",
+          "verify": "Importálás ellenőrzése a kérelem alapján",
+          "verifyOnHint": "Minden letöltött fájlt összehasonlításra kerül a kért könyvvel tárolás előtt. Bármi, ami nem elég pontosan egyezik, a Könyvdokkban várakozik, hogy valaki megnézze.",
+          "verifyOffHint": "Semmit sem tartunk vissza ellenőrzésre. Minden letöltést a cím és a szerző beolvasása után azonnal elmentünk, így egy rosszul címkézett kiadás figyelmeztetés nélkül kerül a könyvtáradba.",
+          "verificationEnabled": "Importellenőrzés be van kapcsolva",
+          "verificationDisabled": "Importellenőrzés ki van kapcsolva. A letöltéseket ellenőrzés nélkül tároljuk",
+          "verification": "Ellenőrzési küszöbértékb",
+          "verificationHint": "Mennyire kell egyeznie a letöltött fájlnak a kérésben szereplő adatokkal, mielőtt önállóan tárolásra kerülne. Az ezt el nem érők a Könyvdokkban várnak felülvizsgálatra. Ez minden kérésre vonatkozik, beleértve a kézzel kiválasztott kiadásokat is.",
+          "destinations": "Alapértelmezett célhelyek",
+          "destinationsHint": "Itt tárolódik az a könyv, aminek senki nem választ könyvtárat. Médiumonként egy alapértelmezett beállítás van, mivel az adathordozó a keresés megkezdése előtt kerül kiválasztásra, és ez az egyetlen dolog, amit ilyen korán tudni a fájlról. A kérelmező által meghatározott vagy a jóváhagyáskor kiválasztott célhely ezek előtt kerül felhasználásra.",
+          "destinationUnset": "Nincs alapértelmezett",
+          "destinationHiddenLibrary": "Egy könyvtár, amit nem láthatsz",
+          "destinationHiddenFolder": "Egy mappa, amit nem látsz",
+          "selectFolder": "Válassz mappát",
+          "destinationLibraryFor": "Alapértelmezett könyvtár {medium} kérésekhez",
+          "destinationFolderFor": "Alapértelmezett mappa {medium} kérésekhez",
+          "destinationClearFor": "Törölje az alapértelmezett célhelyet a {medium} kérésekhez",
+          "importFormats": "Importálási formátumok",
+          "importFormatsHint": "Ez lesz megtartva, ha egy kiadás ugyanazt a könyvet több formátumban tartalmazza, például EPUB-ként és PDF-ként egyszerre. Ez soha nem vonatkozik a többrészes hangoskönyvekre, mivel azok részei egyetlen könyvet alkotnak, nem pedig egymással versengő kiadásokat.",
+          "importFormatsOption": {
+            "all": "Minden elérhető",
+            "allHint": "Minden formátum megtartása, amit a kiadás tartalmaz.",
+            "preferred": "Csak előnyben részesített",
+            "preferredHint": "Csak azt a formátumot tartja meg, amelyik a célkönyvtár formátumprioritásában a legmagasabb helyen áll."
+          }
+        },
+        "profiles": {
+          "title": "Kiadási profilok",
+          "hint": "A kívánt kiadás, a legjobb az elején. A kiadást felülről lefelé párosítjuk ezekkel a szintekkel, és az első megfelelő szintet választjuk. A felügyelet nélküli letöltés a következő lehetőségek közül választhat: a szintnek nem megfelelő kiadások soha nem töltődnek le automatikusan, bár továbbra is megjelennek a választóban, hogy kézzel elküldhesd őket. Ha üresen hagysz egy médiumot, akkor semmi sem lesz szűrve vagy elutasítva, és a kiadások rangsorolása kizárólag pontszám alapján történik.",
+          "bitrateNote": "A bitráta alsó határa elutasítja azokat a kiadásokat, amelyek alacsonyabb besorolásúak. A legtöbb forrás nagyon kevés kiadást mér, és egy nem mért kiadást nem utasítanak el, így ez kevésbé szűkíti le a területet, mint amilyennek látszik.",
+          "empty": "Nincs profil. Az ehhez a médiumhoz tartozó kiadványok rangsorolása kizárólag a pontszám alapján történik.",
+          "addTier": "Szint hozzáadása",
+          "removeTier": "Távolítsa el ezt a szintet",
+          "moveUp": "Mozgassa feljebb ezt a szintet",
+          "moveDown": "Mozgassa lejjebb ezt a szintet",
+          "tierName": "Szint neve",
+          "newTier": "Szint {position}",
+          "formats": "Formátumok",
+          "files": "Fájlok",
+          "anyLayout": "Mind",
+          "minBitrate": "Minimum kbps",
+          "minSeeders": "Minimum seedelő",
+          "channels": "Csatornák",
+          "anyChannels": "Mind",
+          "mono": "Monó",
+          "stereo": "Sztereó",
+          "maxSize": "Maximum MB",
+          "languages": "Nyelvek",
+          "indexers": "Források",
+          "multiSelectHint": "Válassz egyet vagy többet, vagy hagyd üresen mindegyik engedélyezéséhez",
+          "multiSelectAny": "Mind"
+        },
+        "health": {
+          "ok": "Csatlakoztatva",
+          "failed": "Nem elérhető",
+          "untested": "Még nem volt tesztelve",
+          "disabled": "Letiltva",
+          "testedAt": "tesztelve {time}",
+          "failedAt": "sikertelen {time}"
+        },
+        "categoryLabel": "kategória {category}",
+        "priorityLabel": "prioritás {priority}",
+        "editClientName": "{name} szerkesztése",
+        "sections": {
+          "connection": "Kapcsolat",
+          "search": "Mit kell keresni",
+          "access": "Hozzáférés",
+          "availability": "Elérhetőség",
+          "behaviour": "Működés"
+        },
+        "continueWithType": "Folytatás",
+        "external": "Külső",
+        "editorDescription": "Beállítások ehhez a letöltő klienshez.",
+        "chooseClientType": "Válassz kliens típust",
+        "chooseClientTypeHint": "Válaszd ki, hogy a BookOrbit melyik programnak adja át a torrenteket.",
+        "clientTypeDescriptions": {
+          "qbittorrent": "A te qBittorrent-ed. Szükség van egy címre és egy fiókra.",
+          "transmission": "A te Transmission-öd. Nincsenek kategóriái, így a kategória a letöltési mappa egy almappájává válik.",
+          "deluge": "A te Deluge-od. Jelentkezz be a webes felhasználói felület jelszavával; a kategóriához be kell kapcsolni a Címke bővítményt."
+        },
+        "searchHealth": {
+          "failingOnce": "Utolsó keresés sikertelen",
+          "failingStreak": "{count} keresés sikertelen egymás után",
+          "lastSearchAt": "utolsó keresés {time}"
+        }
+      }
+    },
+    "nav": {
+      "title": "Beállítások",
+      "ariaLabel": "Beállítások szakaszai",
+      "searchPlaceholder": "Keresési beállítások",
+      "clearSearch": "Keresés törlése",
+      "noResults": "Nincsenek a következőnek megfelelő beállítások: {query}.",
+      "shortcutHint": "Nyomd meg a Cmd K billentyűkombinációt bármelyik beállításhoz ugráshoz",
+      "status": {
+        "scanning": "Beolvasás"
+      },
+      "groups": {
+        "you": "Te",
+        "library": "Könyvtár",
+        "devices": "Eszközök",
+        "accounts": "Fiókok",
+        "server": "Kiszolgáló"
+      },
+      "descriptions": {
+        "profile": "A neved, e-mail címed, jelszavad és aktív munkameneteid.",
+        "appearanceTheme": "Téma, kiemelő szín, háttér és sarokrádiusz.",
+        "appearanceBookCovers": "Borítóárnyékok, gerinceffektek és helyőrző grafikák.",
+        "appearanceIcons": "Válaszd ki az alkalmazásban használt ikonstílust.",
+        "appearanceLayout": "Alapértelmezett könyvtárnézet, sűrűség és térköz.",
+        "appearanceBehavior": "Hogyan reagál a könyvtár böngészésre és rendezésre.",
+        "appearanceLanguage": "Felület nyelve és regionális formátumok.",
+        "readerEbook": "Betűtípusok, térközök és oldalak viselkedése e-könyveknél.",
+        "readerPdf": "PDF-ek renderelése, nagyítása és oldalhoz igazítása.",
+        "readerComics": "Olvasási irány és oldalszámozás képregényekhez.",
+        "readerAudio": "Lejátszási sebesség, ugrási intervallumok és elalváskapcsoló.",
+        "readerFonts": "Olvasás közben elérhető betűtípusok.",
+        "readerGeneral": "Minden olvasási mód által megosztott alapértelmezett értékek.",
+        "notifications": "Mit és hol mond rólad a BookOrbit.",
+        "privacy": "Olvasási statisztikák, megosztott linkek és tevékenységek láthatósága.",
+        "restrictions": "Korbesorolás és rejtett tartalom ehhez a fiókhoz.",
+        "libraries": "Elérési utak, figyelt mappák és betöltési szabályok.",
+        "fileNaming": "Mappa- és fájlnév-minták a tárolt fájlokhoz.",
+        "maintenance": "Újraszkennelések, duplikációk, árvák és gyorsítótár-újraépítések.",
+        "kobo": "Szinkronizálási végpont, tárolási proxy és polcfeltérképezés.",
+        "koreader": "Folyamatszinkronizálás és dokumentumegyeztetés.",
+        "opds": "Katalógushírcsatornák harmadik féltől származó olvasási alkalmazásokhoz.",
+        "email": "SMTP kézbesítési és eszközre küldési címek.",
+        "hardcover": "Szinkronizálja az olvasási állapotot és az értékeléseket a Hardcover-rel.",
+        "users": "Fiókok, szerepkörök, engedélyek és meghívók.",
+        "accountActivity": "Felhasználónkénti olvasási és munkamenet-tevékenység.",
+        "magicLinks": "Jelszó nélküli megosztási és bejelentkezési linkek.",
+        "oidc": "Egyszeri bejelentkezési szolgáltató, igények és kiépítés.",
+        "serverFonts": "A szerveren található összes olvasóhoz telepített betűtípusok.",
+        "bookDock": "Könyv lapjain megjelenő gyorsműveletek.",
+        "auditLog": "Ki mit változtatott, és mikor.",
+        "requests": "Források, letöltő kliensek, és mi történik egy könyvvel a letöltés után."
+      },
+      "backToApp": "Vissza a könyvtárba"
+    },
+    "field": {
+      "required": "(kötelező)"
+    },
+    "editor": {
+      "discardTitle": "Elveted a változtatásokat?",
+      "discardDescription": "Ez a szerkesztő nem mentett módosításokat tartalmaz. A bezárása törli őket.",
+      "discardConfirm": "Változtatások elvetése",
+      "moreActions": "További műveletek",
+      "removeQuestion": "Eltávolítod?"
+    }
+  },
+  "achievements": {
+    "title": "Trófeák",
+    "tiersCount": "{earned} / {total} szint",
+    "loadFailed": "Nem sikerült betölteni a trófeákat",
+    "tryAgain": "Próbáld újra",
+    "noMatchFilter": "Egyetlen trófea sem felel meg a szűrőnek",
+    "secretAchievement": "Titkos trófea",
+    "earnedOn": "Megszerezve {date}",
+    "whileReading": "A következő olvasása közben: \"{title}\"",
+    "tierProgress": "Szint {earned} / {total}",
+    "progressToNext": "{current} / {threshold} ehhez: {name}",
+    "rarity": {
+      "common": "Általános",
+      "rare": "Ritka",
+      "epic": "Epikus",
+      "legendary": "Legendás"
+    },
+    "filter": {
+      "all": "Összes",
+      "earned": "Megszerezve ({count})",
+      "inProgress": "Folyamatban ({count})",
+      "locked": "Zárolt ({count})"
+    }
+  },
+  "adminFeature": {
+    "accountActivity": {
+      "title": "Fióktevékenység",
+      "subtitle": "Fiókhitelesítési tevékenységek áttekintése az olvasási előzmények felfedése nélkül.",
+      "privacyNotice": "Ez az oldal csak a bejelentkezéseket és a hitelesítés frissítéseit jelenti meg. Nem használja az olvasási előzményeket, a könyv haladását vagy a könyvtári tevékenységeket.",
+      "privacyLabel": "A fióktevékenységek adatvédelméről",
+      "never": "Soha",
+      "openInsightsFor": "A következő megosztott olvasási statisztikáinak megnyitása: {name}",
+      "permissionLabel": "Felhasználói aktivitás megtekintése",
+      "states": {
+        "recent": "Legutóbb aktív volt",
+        "dormant": "Alvó",
+        "never": "Nincs rögzített tevékenység",
+        "disabled": "Letiltva"
+      },
+      "filters": {
+        "search": "Fiókok keresése",
+        "searchPlaceholder": "Név vagy felhasználónév keresése",
+        "state": "Aktivitási állapot",
+        "allStates": "Minden aktivitási állapot",
+        "provisioning": "Hitelesítési módszer",
+        "allMethods": "Minden hitelesítési módszer",
+        "sort": "Fiókok rendezése",
+        "mostRecent": "Legutóbb aktív",
+        "leastRecent": "Legrégebben aktív",
+        "lastLogin": "Legutóbbi bejelentkezés",
+        "newest": "Legújabb fiókok",
+        "oldest": "Legrégebbi fiókok",
+        "name": "Név",
+        "apply": "Alkalmaz",
+        "clear": "Törlés"
+      },
+      "methods": {
+        "local": "Helyi",
+        "manual": "Adminisztrátor által létrehozva",
+        "oidc": "OIDC / SSO",
+        "shared": "Megosztott magic link"
+      },
+      "columns": {
+        "user": "Felhasználó",
+        "state": "Fiók állapota",
+        "lastLogin": "Utolsó bejelentkezés",
+        "lastAuthenticated": "Utolsó hitelesítés",
+        "created": "Létrehozva",
+        "readingInsights": "Olvasási statisztikák"
+      },
+      "sharing": {
+        "private": "Nincs megosztva",
+        "summary": "Megosztott összegző",
+        "detailed": "Megosztott részletes"
+      },
+      "empty": {
+        "title": "Nem találhatók fiókok",
+        "description": "Próbáld meg módosítani vagy törölni a jelenlegi szűrőket."
+      },
+      "pagination": {
+        "label": "Fióktevékenységi oldalak",
+        "page": "Oldal {page}/{totalPages}"
+      },
+      "errors": {
+        "load": "Nem sikerült betölteni a fióktevékenységet."
+      }
+    },
+    "sharedInsights": {
+      "title": "Megosztott olvasási statisztikák",
+      "subtitle": "Olyan olvasási információk, amelyeket ez a felhasználó önként osztott meg.",
+      "auditNotice": "A profilhoz való hozzáférés rögzítésre kerül, és látható a felhasználó számára.",
+      "period": "Jelentési időszak",
+      "periodDays": "Az utolsó {count} nap",
+      "durationMinutes": "{count, plural,one {# perc}other {# perc}}",
+      "durationHours": "{count, plural, one {# óra} other {# óra}}",
+      "metrics": {
+        "sessions": "Munkamenetek",
+        "readingTime": "Olvasási idő",
+        "activeDays": "Aktív napok",
+        "started": "Elkezdett könyvek",
+        "completed": "Befejezett könyvek"
+      },
+      "trend": "Napi olvasási trend",
+      "emptyTitle": "Nincs olvasási tevékenység ebben az időszakban",
+      "noData": "Nincs rögzített olvasási adat ebben az időszakban.",
+      "sourceNames": {
+        "web": "Webes olvasó",
+        "koreader": "KOReader",
+        "manual": "Kézi",
+        "kobo": "Kobo",
+        "unknown": "Ismeretlen"
+      },
+      "formats": "Formátumok",
+      "genres": "Műfajok",
+      "broadGenres": {
+        "science_fiction": "Tudományos-fantasztikus",
+        "fantasy": "Fantasy",
+        "mystery_thriller": "Krimi és thriller",
+        "romance": "Romantikus",
+        "horror": "Horror",
+        "history_biography": "Történelmi és életrajzi",
+        "science_technology": "Tudomány és technológia",
+        "business_economics": "Üzlet és gazdaság",
+        "self_development": "Önfejlesztés",
+        "society_culture": "Társadalom és kultúra",
+        "children_young_adult": "Ifjúsági irodalom",
+        "comics_graphic_novels": "Képregények és grafikus regények",
+        "poetry": "Versek",
+        "other": "Egyéb"
+      },
+      "sources": "Adatforrások",
+      "topBooks": "Legolvasottabb könyvek",
+      "recentBooks": "Nemrég olvasott",
+      "unknownTitle": "Cím nélküli könyv",
+      "top": {
+        "authors": "Legjobb szerzők",
+        "genres": "Legjobb műfajok",
+        "series": "Legjobb sorozatok",
+        "narrators": "Legjobb narrátorok"
+      },
+      "errors": {
+        "READING_INSIGHTS_PRIVATE": "Ez a felhasználó nem oszt meg olvasási statisztikákat.",
+        "READING_INSIGHTS_SUMMARY_ONLY": "Ez a felhasználó csak összegző statisztikákat oszt meg.",
+        "READING_INSIGHTS_VIEW_SESSION_REQUIRED": "Profilmegtekintési munkamenet szükséges.",
+        "READING_INSIGHTS_VIEW_SESSION_INVALID": "Ez a profilnézet lejárt vagy már nem érvényes.",
+        "LOAD_FAILED": "A megosztott olvasási statisztikák betöltése sikertelen.",
+        "cleared": "Nem jelennek meg korábban betöltött profilinformációk."
+      }
+    },
+    "resetLink": {
+      "title": "Jelszó-visszaállítási link",
+      "description": "Oszd meg ezt a linket a felhasználóval. 15 perc múlva lejár.",
+      "copy": "Másolás",
+      "copied": "Másolva!",
+      "copyFailed": "Másolás sikertelen",
+      "notShownAgain": "Ez a link nem fog újra megjelenni."
+    },
+    "userForm": {
+      "editUser": "Felhasználó szerkesztése",
+      "createUser": "Felhasználó létrehozása",
+      "createSharedAccount": "Megosztott fiók létrehozása",
+      "sharedBadge": "Megosztva",
+      "active": "Aktív",
+      "suspended": "Felfüggesztve",
+      "tabs": {
+        "general": "általános",
+        "access": "hozzáférés",
+        "restrictions": "korlátozások"
+      },
+      "sharedAccount": "Megosztott fiók",
+      "sharedAccountHint": "Nincs jelszó. A hozzáférés csak mágikus linkeken keresztül lehetséges.",
+      "sharedAccountManageHint": "A bejelentkezési linkeket a Beállítások - Magic Links menüpontban kezelheted.",
+      "username": "Felhasználónév",
+      "fullName": "Teljes név",
+      "email": "Email",
+      "optional": "(opcionális)",
+      "libraryAccess": "Könyvtár hozzáférés",
+      "noLibrariesSelected": "Nincsenek kiválasztott könyvtárak. A felhasználó nem tekinthet meg könyveket.",
+      "permissions": "Jogosultságok",
+      "presetStandard": "Általános",
+      "presetAdmin": "Adminisztrátor",
+      "presetClearAll": "Összes törlése",
+      "permissionGroups": {
+        "content": "Tartalom",
+        "devicesAccess": "Eszközök és hozzáférés",
+        "email": "Email",
+        "administration": "Adminisztráció",
+        "notifications": "Értesítések",
+        "restrictions": "Korlátozások",
+        "libraryBooks": "Könyvtár és könyvek",
+        "bookRequests": "Könyvkérések",
+        "bookDock": "Könyvdokk",
+        "devices": "Eszközök",
+        "readingIntegrations": "Olvasási integrációk",
+        "emailNotifications": "E-mail és értesítések",
+        "libraryConfiguration": "Könyvtár beállítások",
+        "usersSecurity": "Felhasználók és biztonság",
+        "system": "Rendszer"
+      },
+      "permissionLevels": {
+        "use": "Használ",
+        "manage": "Kezelés"
+      },
+      "accountRestrictions": "Fiók korlátozások",
+      "demoRestrictedHint": "Korlátozott demóélményre korlátozza ezt a fiókot.",
+      "superuserTarget": "Szuperfelhasználó cél",
+      "superuserTargetHint": "A tartalomkorlátozások nem alkalmazhatók szuperfelhasználókra.",
+      "superuserAccess": {
+        "title": "Szuperfelhasználó hozzáférés",
+        "enabled": "Engedélyezve",
+        "disabled": "Letiltva",
+        "enabledHint": "Ennek a fióknak korlátlan a szerverhozzáférése. A mentett engedélyek, könyvtárak és korlátozások a lefokozás után ismét érvényesek lesznek.",
+        "disabledHint": "Az előléptetés korlátlan szerverhozzáférést biztosít, és megkerüli az engedélyeket, a könyvtár-hozzárendeléseket és a tartalomkorlátozásokat.",
+        "selfHint": "A saját szuperfelhasználói hozzáférésedet nem módosíthatod.",
+        "sharedHint": "A megosztott fiókokat nem lehet szuperfelhasználóvá előléptetni.",
+        "promote": "Előléptetés szuperfelhasználóvá",
+        "demote": "Szuperfelhasználói hozzáférés törlése",
+        "promoteDialogTitle": "Előlépteted szuperfelhasználóvá?",
+        "promoteDialogBody": "Korlátlan szerverhozzáférést biztosít {name} felhasználónak. Az aktív munkamenetei véget érnek, és újra be kell jelentkezniük.",
+        "demoteDialogTitle": "Törlöd a szuperfelhasználói hozzáférést?",
+        "demoteDialogBody": "Korlátlan hozzáférés törlése {name} felhasználótól. A mentett engedélyei, könyvtárai és korlátozásai érvénybe lépnek, és újra be kell jelentkezniük.",
+        "changing": "Hozzáférés frissítése...",
+        "changeError": "Nem sikerült frissíteni a szuperfelhasználói hozzáférést. Töltsd be újra a fiókot, és próbáld újra."
+      },
+      "noRestrictions": "Nincsenek tartalomkorlátozások",
+      "noRestrictionsHint": "Ez a felhasználó teljes hozzáféréssel rendelkezik a hozzárendelt könyvtárakban található összes könyvhöz.",
+      "addRestrictions": "+ Tartalomkorlátozás hozzáadása",
+      "contentRestrictions": "Tartalomkorlátozások",
+      "remove": "Eltávolít",
+      "includeTags": "Címkék befoglalása",
+      "includeTagsHint": "(csak a következő címkékkel ellátott könyvek megjelenítése)",
+      "excludeTags": "Címkék kizárása",
+      "excludeTagsHint": "(a következő címkékkel ellátott könyvek elrejtése)",
+      "includeGenres": "Műfajok befoglalása",
+      "includeGenresHint": "(csak az következő műfajú könyvek megjelenítése)",
+      "excludeGenres": "Műfajok kizárása",
+      "excludeGenresHint": "(a következő műfajú könyvek elrejtése)",
+      "seeOwnRequestedBooks": "Engedélyezd ennek a felhasználónak a kért könyvek megtekintését",
+      "seeOwnRequestedBooksHint": "A saját könyvigénylésen keresztül érkezett könyvek figyelmen kívül hagyják a fenti szabályokat. Alapértelmezés szerint kikapcsolva.",
+      "searchTagsPlaceholder": "Címkék keresése...",
+      "searchGenresPlaceholder": "Műfajok keresése...",
+      "saving": "Mentés...",
+      "errors": {
+        "updateUser": "A felhasználó frissítése nem sikerült",
+        "updatePermissions": "Az engedélyek frissítése nem sikerült",
+        "updateLibraryAccess": "A könyvtár hozzáférés frissítése nem sikerült",
+        "updateContentFilters": "A tartalom szűrők frissítése nem sikerült",
+        "emailRequired": "Email cím megadása kötelező",
+        "createSharedAccount": "A megosztott fiók létrehozása nem sikerült",
+        "createUser": "A felhasználó létrehozása nem sikerült",
+        "nameRequired": "A teljes név megadása kötelező",
+        "usernameRequired": "A felhasználónév megadása kötelező"
+      },
+      "drawerDescription": "Szerkeszd a fiók profilját, a könyvtár hozzáférését, az engedélyeket és a korlátozásokat.",
+      "createHint": "Az új fiókok nem rendelkeznek jogosultságokkal, amíg nem adod meg azokat.",
+      "sectionsLabel": "Fiókbeállítások",
+      "sections": {
+        "profile": "Profil",
+        "libraries": "Könyvtárak",
+        "permissions": "Jogosultságok",
+        "restrictions": "Korlátozások"
+      },
+      "sectionSummary": {
+        "newAccount": "Még nincs létrehozva",
+        "libraries": "{selected} / {total}",
+        "permissions": "{count, plural, =0 {Nincsenek jogosultságok} one {1 megadva} other {# megadva}}",
+        "restrictionsNone": "Egyik sem",
+        "restrictionsContent": "Tartalomszűrők",
+        "restrictionsDemo": "Demó korlátozott",
+        "restrictionsBoth": "Szűrők és demó mód"
+      },
+      "account": "Fiók",
+      "status": "Állapot",
+      "statusHint": "A felfüggesztett felhasználók nem tudnak bejelentkezni vagy szinkronizálni az eszközeiket.",
+      "signInMethod": "Bejelentkezés",
+      "signInMethods": {
+        "password": "Jelszó",
+        "oidc": "Egyszeri bejelentkezés",
+        "shared": "Magic link"
+      },
+      "created": "Létrehozva",
+      "lockedUntil": "Zárolva eddig: {time}",
+      "lockedHint": "Túl sok sikertelen bejelentkezési kísérlet. Oldd fel a felhasználók listájából.",
+      "usernameFixedHint": "A felhasználó név nem változtatható meg.",
+      "emailHint": "Jelszó-visszaállításokhoz és értesítésekhez használatos.",
+      "libraryAccessHint": "Az ezeken a könyvtárakon kívüli könyvek láthatatlanok a felhasználó számára.",
+      "selectAll": "Összes kijelölése",
+      "clearAll": "Törlés",
+      "permissionsHint": "Amit ez a fiók tehet. {granted} / {total} engedélyezett.",
+      "groupLegend": "{group}: {granted} / {total} engedélyezett",
+      "presets": {
+        "label": "Engedély előbeállítás",
+        "none": "Egyik sem",
+        "standard": "Általános",
+        "custom": "Egyéni",
+        "admin": "Adminisztrátor",
+        "customHint": "Ez a kijelölés nem egyezik egyetlen előbeállítással sem."
+      },
+      "filterPermissions": "Jogosultságok szűrése",
+      "grantedOnly": "Csak engedélyezett",
+      "noPermissionMatches": "Egyetlen jogosultság sem felel meg a szűrőnek.",
+      "clearFilters": "Szűrők törlése",
+      "filteredNotice": "Szűrve. A rejtett jogosultságok megtartják aktuális beállításukat.",
+      "contentRestrictionsHint": "Korlátozd a felhasználó által megtekinthető könyveket címke vagy műfaj szerint.",
+      "contentRestrictionsAfterCreate": "A tartalomkorlátozások a fiók létrehozása után állíthatók be.",
+      "unsavedChanges": "{count, plural, one {1 nem mentett módosítás} other {# nem mentett módosítás}}",
+      "libraryBookCount": "{count, plural, =0 {Nincsenek könyvek} one {1 könyv} other {# könyv}}",
+      "dangerZone": "Veszélyzóna",
+      "deleteUserHint": "Véglegesen eltávolítja ezt a fiókot és a hozzá tartozó olvasási adatokat. A könyvtárban található könyveket ez nem érinti.",
+      "libraryReach": "Ez a fiók {total} könyvből {selected}-t láthat."
+    },
+    "usersPage": {
+      "usersTitle": "Felhasználók",
+      "usersSubtitle": "Felhasználói fiókok és jogosultságok kezelése.",
+      "createUser": "Felhasználó létrehozása",
+      "columns": {
+        "name": "Név",
+        "username": "Felhasználónév",
+        "email": "Email",
+        "access": "Hozzáférés",
+        "status": "Állapot",
+        "actions": "Műveletek",
+        "user": "Felhasználó",
+        "libraries": "Könyvtárak",
+        "lastActive": "Utoljára aktív"
+      },
+      "adminBadge": "Adminisztrátor",
+      "permissionCount": "{count, plural, =0 {nincsenek jogosultságok} one {egy jogosultság} other {# jogosultság}}",
+      "filteredBadge": "Szűrve",
+      "contentRestrictionsActive": "Tartalomkorlátozások aktívak",
+      "statusActive": "Aktív",
+      "statusInactive": "Inaktív",
+      "lockedBadge": "Zárolt",
+      "unlockAccount": "Fiók feloldása",
+      "unlockHint": "A bejelentkezési zárolás feloldása",
+      "unlockAria": "{name} feloldása",
+      "resetPassword": "Jelszó visszaállítása",
+      "resetPasswordOidcHint": "Az OIDC-felhasználók a jelszavaikat az identitásszolgáltatójukban állíthatják vissza",
+      "resetPasswordSharedHint": "A megosztott fiókoknak nincs jelszavuk",
+      "resetPasswordOidcHintFull": "Az OIDC-felhasználók a jelszavaikat az identitásszolgáltatójukban állíthatják vissza.",
+      "resetPasswordSharedHintFull": "A megosztott fiókoknak nincs jelszavuk.",
+      "resetPasswordDisabledHintFull": "A jelszavas hitelesítés le van tiltva a szerver konfigurációjában.",
+      "deleteUserAction": "Felhasználó törlése",
+      "deleteDialogTitle": "Törlöd a felhasználót?",
+      "deleteDialogBody": "Törlöd ezt a felhasználót: \"{username}\". Ez a művelet nem vonható vissza.",
+      "deleting": "Törlés...",
+      "errors": {
+        "load": "Betöltés sikertelen",
+        "deleteUser": "A felhasználó törlése sikertelen",
+        "resetPassword": "A jelszó-visszaállító link létrehozása sikertelen",
+        "unlock": "A fiók feloldása sikertelen"
+      },
+      "selfRegistration": {
+        "title": "Önregisztráció",
+        "subtitle": "Szabályozhatod, hogy a látogatók létrehozhatnak-e saját fiókokat.",
+        "label": "Önregisztráció engedélyezése",
+        "hint": "Ha engedélyezve van, a bejelentkezési oldalon megjelenik egy link a fiók létrehozásához.",
+        "enabledNotice": "Az új fiókok az alábbi alapértelmezett könyvtári hozzáféréssel indulnak, és semmilyen más jogosultsággal nem rendelkeznek. A védett funkciók használata előtt add meg az engedélyeket.",
+        "loadError": "Nem sikerült betölteni az önregisztrációs beállítást",
+        "saveError": "Nem sikerült frissíteni az önregisztrációs beállítást"
+      },
+      "defaultLibraryAccess": {
+        "title": "Alapértelmezett könyvtár hozzáférés",
+        "subtitle": "Megtekintői hozzáférés önregisztrált és OIDC által biztosított felhasználók számára.",
+        "description": "Válaszd ki az új felhasználókhoz automatikusan hozzárendelt könyvtárakat.",
+        "noLibraries": "Nincsenek elérhető könyvtárak.",
+        "save": "Alapértelmezések mentése",
+        "saving": "Mentés...",
+        "saveError": "Nem sikerült menteni az alapértelmezett könyvtár hozzáférést"
+      },
+      "filters": {
+        "search": "Felhasználók keresése",
+        "searchPlaceholder": "Keresés név, felhasználónév, vagy e-mail alapján",
+        "sort": "Felhasználók rendezése",
+        "clear": "Törlés",
+        "state": "Felhasználók szűrése",
+        "allUsers": "Minden felhasználó",
+        "admins": "Adminisztrátorok",
+        "active": "Aktív",
+        "inactive": "Inaktív"
+      },
+      "empty": {
+        "title": "Még nincsenek felhasználók",
+        "description": "Hozd létre az első fiókot a kezdéshez.",
+        "filtered": "Egyetlen felhasználó sem felel meg az aktuális keresésnek és szűrőknek."
+      },
+      "pagination": {
+        "label": "Felhasználók oldalszámozása",
+        "page": "Oldal {page} / {totalPages}",
+        "showing": "{shown} / {total} fiókból mutatva"
+      },
+      "editUserAria": "{name} szerkesztése",
+      "resetPasswordAria": "{name} jelszavának visszaállítása",
+      "deleteUserAria": "{name} törlése",
+      "moreActionsAria": "További műveletek ehhez: {name}",
+      "headerSummary": "{count, plural, =0 {Nincsenek fiókok} one {# fiók} other {# fiók}} · {admins} adminisztrátori hozzáféréssel",
+      "noEmail": "Nincs cím",
+      "editAccount": "Fiók szerkesztése",
+      "cardMeta": "{access} · {libraries} · {lastActive}",
+      "accessTier": {
+        "superuser": "Szuperfelhasználó",
+        "admin": "Adminisztrátor",
+        "standard": "Általános",
+        "custom": "Egyéni",
+        "none": "Nincs hozzáférés"
+      },
+      "libraries": {
+        "all": "Mind {total}",
+        "some": "{granted} / {total}"
+      },
+      "statusLocked": "Zárolt",
+      "status": {
+        "never": "Soha",
+        "neverSignedIn": "Soha nem volt bejelentkezve",
+        "defaultPassword": "Alapértelmezett jelszó",
+        "contentFiltered": "Szűrt tartalom",
+        "unlocksIn": "Feloldás ekkor: {when}"
+      },
+      "attention": {
+        "title": "Figyelmet igényel",
+        "count": "{count, plural,one {# fiók} other {# fiók}}",
+        "filter": "{count, plural, one {# figyelmet igényel} other {# figyelmet igényel}}",
+        "more": "{count} további nem látható itt",
+        "reason": {
+          "locked": "{name} fiók kizárva túl sok sikertelen bejelentkezést követően",
+          "neverSignedIn": "{name} még soha nem jelentkezett be",
+          "defaultPassword": "{name} még mindig azt a jelszót használja, amellyel a fiókot létrehozták"
+        },
+        "detail": {
+          "unlocksIn": "Automatikus feloldás ekkor: {when}",
+          "created": "Létrehozva {when}",
+          "linkExpired": "Létrehozva {when} · a bejelentkezési link lejárt",
+          "linkValid": "Létrehozva {when} · a bejelentkezési link érvényes: {expiry}"
+        },
+        "action": {
+          "unlock": "Feloldás most",
+          "sendResetLink": "Visszaállító link küldése",
+          "sendNewLink": "Új link küldése"
+        },
+        "collapse": "Elrejt",
+        "expand": "Mutat"
+      },
+      "defaults": {
+        "title": "Új fiókok alapértelmezett beállításai",
+        "appliesTo": "Önregisztrációra és OIDC-re vonatkozik",
+        "startingLibraries": "Kezdő könyvtárak",
+        "startingLibrariesHint": "A megtekintői hozzáférés automatikusan meg lesz adva minden új fióknak."
+      }
+    }
+  },
+  "annotations": {
+    "unknownBook": "Ismeretlen könyv",
+    "styles": {
+      "highlight": "Kiemelés",
+      "underline": "Aláhúzás",
+      "strike": "Áthúzás",
+      "squiggle": "Kanyargós vonal",
+      "invert": "Invertálás"
+    },
+    "combobox": {
+      "filterByBook": "Szűrés könyv szerint",
+      "allBooks": "Minden könyv",
+      "clearBookFilter": "Könyvszűrő törlése",
+      "searching": "Keresés...",
+      "noBooksFound": "Nem találhatók könyvek"
+    },
+    "bulk": {
+      "countSelected": "{count, plural, one {# kiválasztva} other {# kiválasztva}}",
+      "pageSelected": "Oldal kiválasztva",
+      "selectPage": "Oldal kiválasztása",
+      "clear": "Törlés",
+      "recolorTo": "Újraszínezés ilyenre: {color}",
+      "restyleTo": "Átalakítás ilyenre: {style}"
+    },
+    "chips": {
+      "active": "Aktív:",
+      "removeFilter": "Szűrő törlése: {label}",
+      "clearAll": "Összes törlése"
+    },
+    "filters": {
+      "colors": "Színek",
+      "dateRange": "Dátum intervallum",
+      "fromDate": "Dátumtól",
+      "toDate": "Dátumig",
+      "to": "-->",
+      "clearDateRange": "Dátum intervallum törlése",
+      "clearAll": "Összes törlése"
+    },
+    "pagination": {
+      "showing": "Mutatva {start}-{end} ennyiből: {total}",
+      "pageOf": "Oldal {page} / {totalPages}",
+      "firstPage": "Első oldal",
+      "previousPage": "Előző oldal",
+      "nextPage": "Következő oldal",
+      "lastPage": "Utolsó oldal"
+    },
+    "sync": {
+      "loading": "Szinkronizálási részletek betöltése",
+      "positions": "Pozíciók",
+      "devices": "Eszközök",
+      "retryConversion": "Átalakítás újrapróbálása",
+      "noStoredPositions": "Nincsenek tárolt pozíciók.",
+      "notSynced": "Még nincs szinkronizálva egyetlen eszközzel sem.",
+      "upToDate": "Naprakész",
+      "pendingVersion": "Függőben v{version}",
+      "syncedAt": "szinkronizálva {date}",
+      "format": {
+        "webReader": "Webes olvasó",
+        "koreader": "KOReader",
+        "pdf": "PDF",
+        "kobo": "Kobo"
+      },
+      "status": {
+        "exact": "Pontos",
+        "repaired": "Javítva",
+        "failed": "Sikertelen",
+        "pending": "Függő"
+      }
+    },
+    "toolbar": {
+      "searchPlaceholder": "Szöveg és jegyzetek keresése",
+      "filters": "Szűrők",
+      "sortOrder": "Rendezési sorrend",
+      "switchToCompact": "Váltás kompakt nézetre",
+      "switchToComfortable": "Váltás kényelmes nézetre",
+      "compactView": "Kompakt nézet",
+      "comfortableView": "Kényelmes nézet"
+    },
+    "listItem": {
+      "pageNumber": "o. {page}",
+      "chapterNumber": "fejezet {chapter}",
+      "selectAnnotation": "Jelölés kiválasztása",
+      "collapse": "Összecsuk",
+      "expand": "Kibont",
+      "hideSyncDetail": "Szinkronizálási részletek elrejtése",
+      "showSyncDetail": "Szinkronizálási részletek megjelenítése",
+      "exactPositionUnavailable": "A pontos olvasói pozíció nem elérhető",
+      "saving": "Mentés",
+      "bookDetails": "Könyv részletei",
+      "openInReader": "Megnyitás az olvasóban",
+      "restore": "Visszaállít",
+      "deleteForever": "Végleges törlés",
+      "editNote": "Megjegyzés szerkesztése",
+      "addNote": "Megjegyzés hozzáadása",
+      "colorAndStyle": "Szín és stílus",
+      "copied": "Másolva",
+      "copyText": "Szöveg másolása",
+      "trash": "Kuka",
+      "moveToTrash": "Áthelyezés a kukába"
+    },
+    "hub": {
+      "title": "Jegyzetek",
+      "totalCount": "{count} összesen",
+      "bookCount": "{count, plural, =0 {nincsenek könyvek} one {# könyv} other {# könyv}}",
+      "noteCount": "{count, plural,=0 {nincsenek jegyzetek} one {# jegyzet} other {# jegyzet}}",
+      "export": "Exportálás",
+      "exportMarkdown": "Markdown",
+      "exportCsv": "CSV",
+      "exportJson": "JSON",
+      "notesOnly": "Csak jegyzetek",
+      "style": "Stílus",
+      "source": "Forrás",
+      "bulkTrash": "Kuka",
+      "bulkRestore": "Visszaállít",
+      "tabs": {
+        "highlights": "Kiemelések",
+        "trash": "Kuka"
+      },
+      "empty": {
+        "noMatch": "Egyik kiemelés sem felel meg a szűrőknek.",
+        "resetFilters": "Szűrők visszaállítása",
+        "trashEmpty": "A kuka üres",
+        "noAnnotations": "Még nincsenek jegyzetek. Az interneten vagy az e-könyv olvasón létrehozott kiemelések jelennek meg itt.",
+        "noMatchHint": "Próbálj ki egy rövidebb kifejezést, vagy töröld a szín- és könyvszűrőket.",
+        "noAnnotationsBody": "Minden, amit megjelölsz, bármilyen könyvben és bármilyen eszközön, itt gyűlik össze.",
+        "readHere": "Olvasd el itt",
+        "readHereBody": "Jelöld ki a szöveget az olvasóban, és válassz egy színt.",
+        "syncKobo": "Egy Kobo szinkronizálása",
+        "syncKoboBody": "Az eszközön elhelyezett jelölések a következő szinkronizáláskor érkeznek meg.",
+        "syncKoreader": "KOReader szinkronizálása",
+        "syncKoreaderBody": "A bővítmény feltölti a pozíciókkal ellátott megjegyzéseket.",
+        "goToLibrary": "Ugrás a könyvtárba"
+      },
+      "toast": {
+        "movedToTrash": "Áthelyezve a kukába",
+        "annotationRestored": "Jegyzet visszaállítva",
+        "annotationDeletedForever": "Jegyzet véglegesen törölve",
+        "failedToDelete": "Törlés sikertelen"
+      }
+    }
+  },
+  "book": {
+    "detail": {
+      "details": {
+        "noCollections": "Egyik sem"
+      },
+      "readingLog": {
+        "ledger": {
+          "none": "egyik sem"
+        },
+        "attempts": {
+          "none": "egyik sem"
+        }
+      }
+    }
+  },
+  "bookRequests": {
+    "releases": {
+      "clearFilters": "Szűrők törlése"
+    }
+  },
+  "email": {
+    "recipients": {
+      "deviceNone": "Egyik sem"
+    },
+    "preferences": {
+      "none": "Egyik sem"
+    }
+  },
+  "hardcover": {
+    "import": {
+      "summary": {
+        "unmatched": "Párosítatlan"
+      }
+    },
+    "review": {
+      "tabs": {
+        "unmatched": "Párosítatlan"
+      },
+      "summary": {
+        "unmatched": "Párosítatlan"
+      },
+      "outcome": {
+        "unmatched": "Párosítatlan"
+      }
+    }
+  },
+  "reader": {
+    "settings": {
+      "pageWidthMedium": "Közepes"
+    }
+  },
+  "series": {
+    "filters": {
+      "clearAll": "Összes törlése"
+    }
+  },
+  "tools": {
+    "bookDuplicates": {
+      "none": "Egyik sem"
+    },
+    "entityManager": {
+      "browse": {
+        "clearFilters": "Szűrők törlése"
+      }
+    }
+  },
+  "views": {
+    "bookView": {
+      "clearAllFilters": "Összes szűrő törlése"
+    },
+    "library": {
+      "empty": {
+        "clearFilters": "Szűrők törlése"
       }
     }
   }
