@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import type { DownloadClientTestResult } from '@bookorbit/types';
 
 import { ensureSafeUrl } from '../../../../common/utils/ssrf.utils';
@@ -26,6 +26,9 @@ const STATUS_BATCH_SIZE = 100;
  */
 const TRACKER_PROBE_LIMIT = 20;
 const RECONCILIATION_LIMIT = 1000;
+const HASH_LOOKUP_PAGE_SIZE = 1000;
+const HASH_LOOKUP_MAX_PAGES = 100;
+const HASH_ALIAS_CACHE_LIMIT = 10_000;
 
 interface QbTracker {
   url?: string;
@@ -36,6 +39,8 @@ interface QbTracker {
 
 interface QbTorrentInfo {
   hash?: string;
+  infohash_v1?: string;
+  infohash_v2?: string;
   name?: string;
   state?: string;
   progress?: number;
@@ -76,6 +81,7 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
 
   private readonly logger = new Logger(QbittorrentAdapter.name);
   private readonly sessions = new Map<number, { cookie: string; expiresAt: number }>();
+  private readonly hashAliases = new Map<string, { primary: string; expiresAt: number }>();
 
   async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientHash: string }> {
     const form = new FormData();
@@ -97,7 +103,7 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
     // "Fails." with a 200 is the one 200 that is not success, and it covers two unrelated cases:
     // a torrent the client already holds, and one it could not read. Only the client can tell them
     // apart, so ask rather than hand the operator both guesses at once.
-    if (body.toLowerCase().startsWith('fail')) {
+    if (response.status === 409 || body.toLowerCase().startsWith('fail')) {
       if (await this.holds(release.infoHash, config)) {
         // An earlier attempt on this release leaves its torrent behind when the import fails, and
         // without this every retry of that release is rejected by the client forever. The torrent
@@ -107,6 +113,7 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
         );
         return { clientHash: release.infoHash.toLowerCase() };
       }
+      if (response.status === 409) throw new BadRequestException('qBittorrent answered 409 for /api/v2/torrents/add');
       throw new BadRequestException('qBittorrent could not read that torrent. The file may be corrupt, or the magnet link invalid.');
     }
 
@@ -120,51 +127,93 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
   private async holds(infoHash: string, config: ResolvedClientConfig): Promise<boolean> {
     const hash = infoHash.toLowerCase();
     try {
-      const response = await this.call(config, `/api/v2/torrents/info?hashes=${encodeURIComponent(hash)}`, { method: 'GET' });
-      const payload = await readClientJson<unknown>(response, LABEL);
-      return Array.isArray(payload) && (payload as QbTorrentInfo[]).some((entry) => entry.hash?.toLowerCase() === hash);
+      return (await this.findTorrents([hash], config)).has(hash);
     } catch {
       return false;
     }
   }
 
   async status(hashes: string[], config: ResolvedClientConfig): Promise<DownloadStatus[]> {
-    const wanted = new Set(hashes.map((hash) => hash.toLowerCase()));
+    const entries = await this.findTorrents(hashes, config);
     const results: DownloadStatus[] = [];
-    const stuck: DownloadStatus[] = [];
-
-    for (let index = 0; index < hashes.length; index += STATUS_BATCH_SIZE) {
-      const batch = hashes.slice(index, index + STATUS_BATCH_SIZE).map((hash) => hash.toLowerCase());
-      const response = await this.call(config, `/api/v2/torrents/info?hashes=${encodeURIComponent(batch.join('|'))}`, { method: 'GET' });
-      const payload = await readClientJson<unknown>(response, LABEL);
-      if (!Array.isArray(payload)) continue;
-
-      for (const entry of payload as QbTorrentInfo[]) {
-        const hash = entry.hash?.toLowerCase();
-        if (!hash || !wanted.has(hash)) continue;
-        const status = toDownloadStatus(hash, entry);
-        results.push(status);
-        // Collected here rather than derived from `status`: which qBittorrent states are worth
-        // asking about is this adapter's business, and does not belong in the shared shape.
-        if (entry.state !== undefined && STUCK_STATES.has(entry.state) && status.downloadedBytes === 0) stuck.push(status);
+    const stuck: Array<{ status: DownloadStatus; primary: string }> = [];
+    for (const [hash, entry] of entries) {
+      const status = toDownloadStatus(hash, entry);
+      results.push(status);
+      if (entry.state !== undefined && STUCK_STATES.has(entry.state) && status.downloadedBytes === 0) {
+        stuck.push({ status, primary: entry.hash!.toLowerCase() });
       }
     }
-
     await this.attachTrackerErrors(stuck.slice(0, TRACKER_PROBE_LIMIT), config);
     return results;
   }
 
-  async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
-    const response = await this.call(config, `/api/v2/torrents/info?category=${encodeURIComponent(config.category)}`, { method: 'GET' });
-    const payload = await readClientJson<unknown>(response, LABEL);
-    if (!Array.isArray(payload)) return { supported: true, truncated: false, items: [] };
+  /** Keep the caller's identity while resolving the primary hash required by qBittorrent's API. */
+  private async findTorrents(hashes: string[], config: ResolvedClientConfig): Promise<Map<string, QbTorrentInfo>> {
+    const wanted = new Set(hashes.map((hash) => hash.toLowerCase()));
+    const found = new Map<string, QbTorrentInfo>();
+    const collect = (entries: QbTorrentInfo[]) => {
+      for (const entry of entries) {
+        const primary = validHash(entry.hash, 40);
+        if (!primary) continue;
+        for (const alias of torrentHashes(entry)) {
+          if (!wanted.has(alias) || found.has(alias)) continue;
+          found.set(alias, entry);
+          this.rememberHash(config.id, alias, primary);
+        }
+      }
+    };
+    const requested = [...new Set([...wanted].map((hash) => this.primaryHash(config.id, hash)))];
+    for (let index = 0; index < requested.length; index += STATUS_BATCH_SIZE) {
+      const batch = requested.slice(index, index + STATUS_BATCH_SIZE);
+      collect(await this.readTorrents(config, `hashes=${encodeURIComponent(batch.join('|'))}`));
+    }
+    if (found.size === wanted.size) return found;
 
-    const entries = payload as QbTorrentInfo[];
+    // qBittorrent 5.2 filters only by primary hash, even when infohash_v1 is present. Search
+    // pages once for unresolved aliases, including torrents whose category an operator changed.
+    // A truncated or failed search must never become evidence that a download disappeared.
+    for (let page = 0; page < HASH_LOOKUP_MAX_PAGES; page++) {
+      const entries = await this.readTorrents(config, `sort=hash&limit=${HASH_LOOKUP_PAGE_SIZE}&offset=${page * HASH_LOOKUP_PAGE_SIZE}`);
+      collect(entries);
+      if (found.size === wanted.size || entries.length < HASH_LOOKUP_PAGE_SIZE) return found;
+    }
+    throw new ServiceUnavailableException('qBittorrent hash lookup exceeded its scan limit; download presence could not be determined');
+  }
+
+  private async readTorrents(config: ResolvedClientConfig, query: string): Promise<QbTorrentInfo[]> {
+    const response = await this.call(config, `/api/v2/torrents/info?${query}`, { method: 'GET' });
+    const payload = await readClientJson<unknown>(response, LABEL);
+    if (!Array.isArray(payload) || payload.some((entry) => entry === null || typeof entry !== 'object')) {
+      throw new BadRequestException('qBittorrent returned an invalid torrent listing');
+    }
+    return payload as QbTorrentInfo[];
+  }
+
+  private primaryHash(clientId: number, hash: string): string {
+    const key = `${clientId}:${hash}`;
+    const cached = this.hashAliases.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.primary;
+    this.hashAliases.delete(key);
+    return hash;
+  }
+
+  private rememberHash(clientId: number, hash: string, primary: string): void {
+    const key = `${clientId}:${hash}`;
+    this.hashAliases.delete(key);
+    if (hash === primary) return;
+    this.hashAliases.set(key, { primary, expiresAt: Date.now() + SESSION_TTL_MS });
+    if (this.hashAliases.size > HASH_ALIAS_CACHE_LIMIT) this.hashAliases.delete(this.hashAliases.keys().next().value!);
+  }
+
+  async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
+    const entries = await this.readTorrents(config, `category=${encodeURIComponent(config.category)}&limit=${RECONCILIATION_LIMIT + 1}`);
     return {
       supported: true,
       truncated: entries.length > RECONCILIATION_LIMIT,
       items: entries.slice(0, RECONCILIATION_LIMIT).flatMap((entry) => {
-        const hash = entry.hash?.toLowerCase();
+        // Grabs store v1, so reconciliation must use that same identity for hybrid torrents.
+        const hash = validHash(entry.infohash_v1, 40) ?? validHash(entry.hash, 40);
         if (!hash) return [];
         return [{ ...toDownloadStatus(hash, entry), name: entry.name?.trim() || hash }];
       }),
@@ -177,10 +226,10 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
    * tracker's own message is the only thing that distinguishes "no peers yet" from "this tracker
    * will never accept us".
    */
-  private async attachTrackerErrors(stuck: DownloadStatus[], config: ResolvedClientConfig): Promise<void> {
-    for (const status of stuck) {
+  private async attachTrackerErrors(stuck: Array<{ status: DownloadStatus; primary: string }>, config: ResolvedClientConfig): Promise<void> {
+    for (const { status, primary } of stuck) {
       try {
-        const response = await this.call(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(status.infoHash)}`, { method: 'GET' });
+        const response = await this.call(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(primary)}`, { method: 'GET' });
         const payload = await readClientJson<unknown>(response, LABEL);
         if (!Array.isArray(payload)) continue;
         const message = trackerFailure(payload as QbTracker[]);
@@ -197,7 +246,9 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
   }
 
   async remove(hash: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void> {
-    const body = new URLSearchParams({ hashes: hash.toLowerCase(), deleteFiles: String(opts.deleteFiles) });
+    const entry = (await this.findTorrents([hash], config)).get(hash.toLowerCase());
+    if (!entry) return;
+    const body = new URLSearchParams({ hashes: entry.hash!.toLowerCase(), deleteFiles: String(opts.deleteFiles) });
     await this.call(config, '/api/v2/torrents/delete', {
       method: 'POST',
       body,
@@ -218,9 +269,12 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
     }
   }
 
-  /** Drops the cached session so the next call re-authenticates against the current config. */
+  /** Neither credentials nor hash aliases may outlive the client configuration they came from. */
   forget(clientId: number): void {
     this.sessions.delete(clientId);
+    for (const key of this.hashAliases.keys()) {
+      if (key.startsWith(`${clientId}:`)) this.hashAliases.delete(key);
+    }
   }
 
   private async call(config: ResolvedClientConfig, path: string, init: RequestInit, retryOnAuthFailure = true): Promise<Response> {
@@ -237,7 +291,8 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
       this.sessions.delete(config.id);
       return this.call(config, path, init, false);
     }
-    if (!response.ok) {
+    // Newer clients report duplicate adds as 409; add() verifies presence before adopting.
+    if (!response.ok && !(response.status === 409 && path === '/api/v2/torrents/add')) {
       throwForClientServerError(response, LABEL, path.split('?')[0]!);
       throw new BadRequestException(`qBittorrent answered ${response.status} for ${path.split('?')[0]}`);
     }
@@ -273,6 +328,16 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
   private async resolveBaseUrl(config: ResolvedClientConfig): Promise<URL> {
     return ensureSafeUrl(config.baseUrl, { allowPrivate: config.allowPrivateAddress });
   }
+}
+
+function validHash(value: unknown, length: 40 | 64): string | undefined {
+  if (typeof value !== 'string' || value.length !== length || !/^[a-f0-9]+$/i.test(value) || /^0+$/.test(value)) return undefined;
+  return value.toLowerCase();
+}
+
+function torrentHashes(entry: QbTorrentInfo): string[] {
+  const v2 = validHash(entry.infohash_v2, 64);
+  return [validHash(entry.hash, 40), validHash(entry.infohash_v1, 40), v2, v2?.slice(0, 40)].filter((hash): hash is string => hash !== undefined);
 }
 
 function toDownloadStatus(hash: string, entry: QbTorrentInfo): DownloadStatus {

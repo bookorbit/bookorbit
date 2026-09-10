@@ -9,6 +9,7 @@ import { formatDate, formatNumber, formatRelativeFromNow } from '@/i18n/formatte
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { STATUS_COLORS, STATUS_ICONS, STATUS_OPTIONS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import { useReadingLogInsights } from '@/features/book/composables/useReadingLogInsights'
+import { readingDateToDateKey } from '@/features/book/lib/reading-date'
 import AchievementProgressRing from '@/features/achievements/components/AchievementProgressRing.vue'
 import ReadingLogSourceSplit from './ReadingLogSourceSplit.vue'
 
@@ -31,21 +32,11 @@ const { setStatus, updateStatus } = useBookStatus()
 const statsRef = computed(() => props.stats)
 const { activeDays, spanDays, pacePercentPerHour, momentum } = useReadingLogInsights(statsRef)
 
-const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/
-
 function dateToDateKey(value: Date): string {
   const year = value.getFullYear()
   const month = String(value.getMonth() + 1).padStart(2, '0')
   const day = String(value.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
-}
-
-function toDateInputValue(value: string | null | undefined): string {
-  if (!value) return ''
-  if (DATE_KEY_RE.test(value)) return value
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return ''
-  return dateToDateKey(parsed)
 }
 
 function formatDisplayDate(dateKey: string): string {
@@ -73,8 +64,8 @@ const datesError = ref<string | null>(null)
 
 function normalizeDates(readStatus: UserBookStatus | null | undefined) {
   return {
-    startedAt: toDateInputValue(readStatus?.startedAt),
-    finishedAt: toDateInputValue(readStatus?.finishedAt),
+    startedAt: readingDateToDateKey(readStatus?.startedAt),
+    finishedAt: readingDateToDateKey(readStatus?.finishedAt),
   }
 }
 

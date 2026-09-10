@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
-import { access, mkdir, readFile } from 'fs/promises';
+import { access, mkdir, readFile, stat, utimes, writeFile } from 'fs/promises';
 import { basename, join } from 'path';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
+import type { AddedAtRecomputeJob } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { waitForCondition, waitForScanCompletion } from './e2e/app-harness';
@@ -208,6 +209,152 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
     await closeAuthorizationMatrixE2EContext(ctx);
   });
 
+  describe('date added recompute', () => {
+    async function finishRecompute(libraryId: number): Promise<AddedAtRecomputeJob> {
+      let result: AddedAtRecomputeJob;
+      await waitForCondition(async () => {
+        const response = await ctx.app.inject({
+          method: 'GET',
+          url: `/api/v1/libraries/${libraryId}/recompute-added-at`,
+          headers: authHeader(manager.accessToken),
+        });
+        expect(response.statusCode).toBe(200);
+        result = response.json() as AddedAtRecomputeJob;
+        expect(result.status).not.toBe('running');
+      }, 15_000);
+      return result!;
+    }
+
+    it('enforces both permission and library access and updates multiple batches with precise database timestamps', async () => {
+      const library = await createLibraryWithFolder(ctx);
+      const url = `/api/v1/libraries/${library.libraryId}/recompute-added-at`;
+      for (const method of ['POST', 'GET'] as const) {
+        expect((await ctx.app.inject({ method, url, headers: authHeader(manager.accessToken) })).statusCode).toBe(403);
+      }
+      await grantLibraryAccess(ctx, manager.userId, library.libraryId, 'viewer');
+      expect((await ctx.app.inject({ method: 'POST', url, headers: authHeader(manager.accessToken) })).statusCode).toBe(403);
+      await grantLibraryAccess(ctx, manager.userId, library.libraryId, 'editor');
+      await grantLibraryAccess(ctx, scopedUser.userId, library.libraryId, 'editor');
+      for (const method of ['POST', 'GET'] as const) {
+        expect((await ctx.app.inject({ method, url, headers: authHeader(scopedUser.accessToken) })).statusCode).toBe(403);
+      }
+      const imported = await ctx.app.inject({ method: 'POST', url, headers: authHeader(manager.accessToken) });
+      expect(imported.statusCode).toBe(400);
+      expect(imported.json().errorCode).toBe('ADDED_AT_SOURCE_IMPORTED');
+      const update = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${library.libraryId}`,
+        headers: authHeader(manager.accessToken),
+        payload: { addedAtSource: 'file_modified', icon: 'BookOpen' },
+      });
+      expect(update.statusCode, update.body).toBe(200);
+      expect(update.json().addedAtSource).toBe('file_modified');
+      const inserted = await ctx.db
+        .insert(schema.books)
+        .values(
+          Array.from({ length: 105 }, (_, i) => ({
+            libraryId: library.libraryId,
+            libraryFolderId: library.libraryFolderId,
+            folderPath: join(library.folderPath, String(i)),
+            addedAt: sql`'2026-01-01 00:00:00.000123+00'::timestamptz`,
+          })),
+        )
+        .returning({ id: schema.books.id });
+      const expectedTime = new Date('2019-01-01T00:00:00Z');
+      await ctx.db.insert(schema.bookFiles).values(
+        inserted.slice(0, 104).flatMap(({ id }) => [
+          {
+            bookId: id,
+            libraryFolderId: library.libraryFolderId,
+            absolutePath: join(library.folderPath, `${id}.epub`),
+            ino: BigInt(id),
+            mtime: expectedTime,
+            role: 'content',
+          },
+          {
+            bookId: id,
+            libraryFolderId: library.libraryFolderId,
+            absolutePath: join(library.folderPath, `${id}.pdf`),
+            ino: BigInt(id + 100000),
+            mtime: new Date(0),
+            role: 'content',
+          },
+          {
+            bookId: id,
+            libraryFolderId: library.libraryFolderId,
+            absolutePath: join(library.folderPath, `${id}.jpg`),
+            ino: BigInt(id + 200000),
+            mtime: new Date('2010-01-01'),
+            role: 'cover',
+          },
+        ]),
+      );
+      const otherLibrary = await createLibraryWithFolder(ctx);
+      const [other] = await ctx.db
+        .insert(schema.books)
+        .values({ libraryId: otherLibrary.libraryId, libraryFolderId: otherLibrary.libraryFolderId, folderPath: otherLibrary.folderPath })
+        .returning();
+      const started = await ctx.app.inject({ method: 'POST', url, headers: authHeader(manager.accessToken) });
+      expect(started.statusCode).toBe(202);
+      expect(started.json().status).toBe('running');
+      expect(await finishRecompute(library.libraryId)).toMatchObject({ total: 105, processed: 105, updated: 104, skipped: 1, failed: 0 });
+      const [updated] = await ctx.db.select().from(schema.books).where(eq(schema.books.id, inserted[0].id));
+      expect(updated.addedAt).toEqual(expectedTime);
+      const [untouched] = await ctx.db.select().from(schema.books).where(eq(schema.books.id, other.id));
+      expect(untouched.addedAt).toEqual(other.addedAt);
+      expect((await ctx.app.inject({ method: 'POST', url, headers: authHeader(manager.accessToken) })).statusCode).toBe(202);
+      expect(await finishRecompute(library.libraryId)).toMatchObject({ updated: 0, unchanged: 104, skipped: 1 });
+    });
+
+    it('uses real birthtimes and preserves dates when any content file is missing', async () => {
+      const library = await createLibraryWithFolder(ctx);
+      await grantLibraryAccess(ctx, manager.userId, library.libraryId, 'editor');
+      await ctx.db.update(schema.libraries).set({ addedAtSource: 'file_created' }).where(eq(schema.libraries.id, library.libraryId));
+      const original = new Date('2020-01-01T00:00:00Z');
+      const inserted = await ctx.db
+        .insert(schema.books)
+        .values(
+          [0, 1].map((i) => ({
+            libraryId: library.libraryId,
+            libraryFolderId: library.libraryFolderId,
+            folderPath: join(library.folderPath, String(i)),
+            addedAt: original,
+          })),
+        )
+        .returning();
+      const present = join(library.folderPath, 'present.epub');
+      await writeFile(present, 'timestamp fixture');
+      const info = await stat(present);
+      await ctx.db.insert(schema.bookFiles).values([
+        { bookId: inserted[0].id, libraryFolderId: library.libraryFolderId, absolutePath: present, ino: 1n },
+        { bookId: inserted[1].id, libraryFolderId: library.libraryFolderId, absolutePath: join(library.folderPath, 'missing.epub'), ino: 2n },
+      ]);
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/libraries/${library.libraryId}/recompute-added-at`,
+        headers: authHeader(manager.accessToken),
+      });
+      expect(response.statusCode).toBe(202);
+      const result = await finishRecompute(library.libraryId);
+      expect(result).toMatchObject({ processed: 2, updated: 1, failed: 1, failureSamples: [{ bookId: inserted[1].id, code: 'file_unavailable' }] });
+      expect(JSON.stringify(result)).not.toContain(library.folderPath);
+      const rows = await ctx.db.select().from(schema.books).where(eq(schema.books.libraryId, library.libraryId)).orderBy(schema.books.id);
+      expect(rows[0].addedAt).toEqual(info.birthtime.getTime() > 1000 ? info.birthtime : info.mtime);
+      expect(rows[1].addedAt).toEqual(original);
+    });
+
+    it('applies a saved file source to new scanner imports', async () => {
+      const library = await createLibraryWithFolder(ctx);
+      await ctx.db.update(schema.libraries).set({ addedAtSource: 'file_modified' }).where(eq(schema.libraries.id, library.libraryId));
+      const path = await createEpubFixture(library.folderPath, 'dated.epub', { title: 'Dated Book' });
+      const timestamp = new Date('2018-06-01T00:00:00Z');
+      await utimes(path, timestamp, timestamp);
+      await startLibraryScanAs(ctx, ctx.adminToken, library.libraryId);
+      const [book] = await ctx.db.select().from(schema.books).where(eq(schema.books.libraryId, library.libraryId));
+      expect(book.addedAt).toEqual(timestamp);
+    });
+  });
+
   describe('path and prescan', () => {
     it('lists valid directories, hides blocked or hidden entries, and returns prescan details for valid, overlapping, and missing paths', async () => {
       const overlapLibraryName = `library-overlap-${randomUUID()}`;
@@ -307,6 +454,25 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
           error: 'Path does not exist',
         },
       ]);
+
+      const editPrescanResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/libraries/prescan',
+        headers: authHeader(manager.accessToken),
+        payload: { paths: [overlapLibrary.folderPath], libraryId: overlapLibrary.libraryId },
+      });
+
+      expect(editPrescanResponse.statusCode).toBe(201);
+      expect(editPrescanResponse.json()).toEqual({
+        totalFiles: 0,
+        paths: [
+          {
+            path: overlapLibrary.folderPath,
+            accessible: true,
+            fileCount: 0,
+          },
+        ],
+      });
 
       const forbiddenPrescanResponse = await ctx.app.inject({
         method: 'POST',

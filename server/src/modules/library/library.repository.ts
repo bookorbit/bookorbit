@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, eq, gt, lte, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { AccessLevel, ContentFilterRules, LibraryStats } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
+import { MIN_VALID_FILE_TIME_MS } from '../../common/utils/file-time.utils';
 import * as schema from '../../db/schema';
 import { bookFiles, books, libraryFolders, libraries } from '../../db/schema';
 import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
@@ -243,6 +244,74 @@ export class LibraryRepository {
         and(eq(schema.userLibraryAccess.userId, schema.users.id), eq(schema.userLibraryAccess.libraryId, libraryId)),
       )
       .where(and(inArray(schema.users.id, userIds), or(eq(schema.users.isSuperuser, true), isNotNull(schema.userLibraryAccess.userId))));
+  }
+
+  async getAddedAtRecomputeBounds(libraryId: number) {
+    const [row] = await this.db
+      .select({
+        total: sql<number>`count(*)::int`,
+        maxId: sql<number>`coalesce(max(${books.id}), 0)::int`,
+      })
+      .from(books)
+      .where(eq(books.libraryId, libraryId));
+    return row ?? { total: 0, maxId: 0 };
+  }
+
+  findAddedAtBookBatch(libraryId: number, afterId: number, maxId: number, limit: number) {
+    return this.db
+      .select({ id: books.id, addedAt: books.addedAt, previousAddedAt: sql<string>`${books.addedAt}::text` })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), gt(books.id, afterId), lte(books.id, maxId)))
+      .orderBy(books.id)
+      .limit(limit);
+  }
+
+  findAddedAtMtimes(libraryId: number, bookIds: number[]) {
+    return this.db
+      .select({ bookId: bookFiles.bookId, mtime: sql<Date>`min(${bookFiles.mtime})`.mapWith(bookFiles.mtime) })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(
+        and(
+          eq(books.libraryId, libraryId),
+          inArray(books.id, bookIds),
+          eq(bookFiles.role, 'content'),
+          gt(bookFiles.mtime, new Date(MIN_VALID_FILE_TIME_MS)),
+        ),
+      )
+      .groupBy(bookFiles.bookId);
+  }
+
+  findAddedAtFileBatch(libraryId: number, bookIds: number[], afterId: number, limit: number) {
+    return this.db
+      .select({
+        id: bookFiles.id,
+        bookId: bookFiles.bookId,
+        absolutePath: bookFiles.absolutePath,
+        mtime: bookFiles.mtime,
+        rootPath: libraryFolders.path,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, books.libraryFolderId))
+      .where(and(eq(books.libraryId, libraryId), inArray(books.id, bookIds), eq(bookFiles.role, 'content'), gt(bookFiles.id, afterId)))
+      .orderBy(bookFiles.id)
+      .limit(limit);
+  }
+
+  async updateAddedAtBatch(libraryId: number, values: { id: number; addedAt: Date; previousAddedAt: string }[]): Promise<number[]> {
+    if (values.length === 0) return [];
+    const rows = sql.join(
+      values.map(({ id, addedAt, previousAddedAt }) => sql`(${id}::int, ${addedAt.toISOString()}::timestamptz, ${previousAddedAt}::timestamptz)`),
+      sql`, `,
+    );
+    const result = await this.db
+      .update(books)
+      .set({ addedAt: sql`dates.added_at`, updatedAt: new Date() })
+      .from(sql`(values ${rows}) as dates(id, added_at, previous_added_at)`)
+      .where(and(eq(books.libraryId, libraryId), sql`${books.id} = dates.id`, sql`${books.addedAt} = dates.previous_added_at`))
+      .returning({ id: books.id });
+    return result.map(({ id }) => id);
   }
 
   async hasUserAccess(userId: number, libraryId: number): Promise<boolean> {

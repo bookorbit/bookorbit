@@ -1,3 +1,4 @@
+import { usableFileTime } from '../../../common/utils/file-time.utils';
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
@@ -10,6 +11,7 @@ export interface FileStat {
   ino: bigint;
   sizeBytes: number;
   mtime: Date;
+  birthtime: Date;
   format: string | null;
   role: FileRole;
 }
@@ -24,6 +26,34 @@ export interface WalkResult {
   skippedDirs: Set<string>;
   unchangedDirs: Set<string>;
   dirMtimes: Map<string, number>;
+}
+
+/**
+ * Derive a book's "date added" from the earliest on-disk time of its content
+ * files. This approximates when the book first landed on disk, rather than when
+ * BookOrbit happened to import it. Cover/metadata/supplement sidecars are
+ * excluded because they can be added later without meaning the book is "newer".
+ *
+ * For 'file_modified' the earliest valid mtime is used. For 'file_created' the
+ * earliest valid birthtime is used, falling back to that same file's mtime when
+ * its birthtime is missing or invalid (some filesystems do not track creation
+ * time). Returns undefined when no content file yields a usable time, so callers
+ * can fall back to the DB defaultNow() (import time).
+ */
+export function earliestContentTime(files: FileStat[], source: 'file_modified' | 'file_created'): Date | undefined {
+  let earliest: Date | undefined;
+  for (const file of files) {
+    if (file.role !== 'content') continue;
+    let candidate: Date | undefined;
+    if (source === 'file_modified') {
+      candidate = usableFileTime(file.mtime);
+    } else {
+      candidate = usableFileTime(file.birthtime) ?? usableFileTime(file.mtime);
+    }
+    if (candidate === undefined) continue;
+    if (earliest === undefined || candidate < earliest) earliest = candidate;
+  }
+  return earliest;
 }
 
 const MAX_PATH_LENGTH = 4096;
@@ -89,6 +119,7 @@ async function statFilesIntoAcc(
       ino,
       sizeBytes: Number(s.size),
       mtime: s.mtime,
+      birthtime: s.birthtime,
       format,
       role,
     });
@@ -426,6 +457,7 @@ export async function buildSingleBookCandidate(
         ino: s.ino,
         sizeBytes: Number(s.size),
         mtime: s.mtime,
+        birthtime: s.birthtime,
         format,
         role,
       } satisfies FileStat;

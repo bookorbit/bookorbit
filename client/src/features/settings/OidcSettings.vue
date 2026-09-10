@@ -19,6 +19,7 @@ const { t } = useI18n()
 
 const OIDC_TEST_ERROR_MESSAGE_KEYS: Record<string, string> = {
   [OidcErrorCode.PRIVATE_ISSUER_ADDRESS]: 'settings.oidc.test.privateIssuerAddress',
+  [OidcErrorCode.TLS_CERTIFICATE_UNTRUSTED]: 'settings.oidc.test.tlsCertificateUntrusted',
 }
 
 interface ProviderSummary {

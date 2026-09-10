@@ -111,6 +111,24 @@ function makeStats(items: BookReadingSession[]): BookReadingSessionStats {
   }
 }
 
+function makeAttempt(overrides: Partial<ReadingAttempt> = {}): ReadingAttempt {
+  return {
+    id: 1,
+    bookId: 10,
+    startedOn: '2026-09-07',
+    endedOn: null,
+    outcome: null,
+    origin: 'koreader',
+    externalProvider: null,
+    externalId: null,
+    totalSessions: 0,
+    totalSeconds: 0,
+    createdAt: '2026-09-07T00:00:00.000Z',
+    updatedAt: '2026-09-07T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
 function jsonResponse(body: unknown) {
   return { ok: true, status: 200, json: async () => body } as Response
 }
@@ -178,6 +196,33 @@ describe('ReadingLogTab', () => {
     expect(text).toContain('Last 30 days')
     expect(text).toContain('Last 90 days')
     expect(text).toContain('This year')
+  })
+
+  it('shows a projected UTC-midnight lifecycle date on its canonical day west of UTC', async () => {
+    const originalTimeZone = process.env.TZ
+    process.env.TZ = 'America/Sao_Paulo'
+    try {
+      mocks.api.mockImplementation(routeApi({ attempts: [makeAttempt()] }))
+      const wrapper = mountTab(
+        makeBook({
+          readStatus: {
+            status: 'reading',
+            source: 'auto',
+            startedAt: '2026-09-07T00:00:00.000Z',
+            finishedAt: null,
+            updatedAt: '2026-09-07T00:00:00.000Z',
+          },
+        }),
+      )
+      await flushPromises()
+
+      const startedDate = wrapper.get('button[aria-label="Edit the date you started this book"]')
+      expect(new Date('2026-09-07T00:00:00.000Z').getDate()).toBe(6)
+      expect(startedDate.text()).toContain('Sep 7, 2026')
+      expect(startedDate.text()).not.toContain('Sep 6, 2026')
+    } finally {
+      process.env.TZ = originalTimeZone
+    }
   })
 
   it('narrows the session request when a quick filter is chosen', async () => {

@@ -20,6 +20,7 @@ import { UpdateLibraryAccessDto } from './dto/update-library-access.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
 import { BulkRenameService } from './bulk-rename.service';
 import { LibraryService } from './library.service';
+import { LibraryAddedAtService } from './library-added-at.service';
 
 @Controller('libraries')
 export class LibraryController {
@@ -27,6 +28,7 @@ export class LibraryController {
     private readonly libraryService: LibraryService,
     private readonly bookService: BookService,
     private readonly bulkRenameService: BulkRenameService,
+    private readonly addedAtService: LibraryAddedAtService,
   ) {}
 
   @Get()
@@ -121,6 +123,27 @@ export class LibraryController {
   @RequireLibraryAccess('viewer')
   getStats(@Param('id', ParseIntPipe) id: number) {
     return this.libraryService.getStats(id);
+  }
+
+  @Get(':id/recompute-added-at')
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  getAddedAtRecompute(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.addedAtService.get(id, user);
+  }
+
+  @Post(':id/recompute-added-at')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RequireLibraryAccess('editor')
+  @RequirePermission(Permission.ManageLibraries)
+  @Auditable({
+    action: AuditAction.LibraryRecomputeAddedAt,
+    resource: AuditResource.Library,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Started added_at recompute for library #${req.params['id']}`,
+  })
+  recomputeAddedAt(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.addedAtService.start(id, user);
   }
 
   @Post(':id/write-metadata-to-files')

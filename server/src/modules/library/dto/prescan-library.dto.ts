@@ -1,6 +1,11 @@
-import { ArrayMinSize, IsArray, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ArrayMinSize, IsArray, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class PrescanLibraryDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  libraryId?: number;
+
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })

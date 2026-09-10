@@ -734,6 +734,7 @@
         "connected": "Connected - {issuer}",
         "connectionFailed": "Connection failed",
         "privateIssuerAddress": "The issuer URL resolves to a private or local network address, so the server refused to connect. Set OIDC_ALLOW_LOCAL_ISSUERS=true on the BookOrbit server to allow it.",
+        "tlsCertificateUntrusted": "BookOrbit could not verify the OIDC provider's TLS certificate. If the provider uses a private certificate authority, mount its PEM CA bundle, set NODE_EXTRA_CA_CERTS to the bundle's in-container path, and restart BookOrbit.",
         "hide": "Hide",
         "details": "Details",
         "supported": "supported",
@@ -4126,6 +4127,7 @@
       "LibraryAccessRevoke": "Revoke library access",
       "LibraryWriteMetadataToFiles": "Write metadata to files",
       "LibraryBulkRename": "Rename library files",
+      "LibraryRecomputeAddedAt": "Recompute date added",
       "BookUpload": "Upload book",
       "BookMetadataUpdate": "Update book metadata",
       "BookMetadataLocksUpdate": "Update metadata locks",
@@ -7264,6 +7266,20 @@
       "librariesEmptyHint": "Create a library to start adding books.",
       "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
       "collectionsEmptyHint": "Collections group books you pick by hand."
+    },
+    "legalNotices": {
+      "about": "About BookOrbit",
+      "trigger": "Legal notices",
+      "title": "About BookOrbit",
+      "description": "BookOrbit attribution, licensing, and source code.",
+      "poweredBy": "Powered by BookOrbit",
+      "originalDevelopment": "This software contains material originally developed as BookOrbit.",
+      "copyright": "Copyright (C) 2025-2026 neon.",
+      "contributors": "Additional copyright is held by the respective BookOrbit contributors.",
+      "licenseSummary": "Licensed under the GNU Affero General Public License, version 3 only, with additional terms. This software is provided without warranty. You may redistribute and modify it under those terms.",
+      "sourceCode": "Source code",
+      "license": "AGPLv3 license",
+      "additionalTerms": "Additional terms"
     }
   },
   "customIcons": {
@@ -7972,6 +7988,49 @@
           "fileAsBook": {
             "title": "File as Book",
             "hint": "Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple files."
+          }
+        },
+        "addedAt": {
+          "title": "Date added",
+          "hint": "Choose what a book's \"date added\" reflects. This applies to books imported from now on.",
+          "options": {
+            "imported": {
+              "title": "When imported",
+              "hint": "The date BookOrbit first imported the book. This is the default."
+            },
+            "file_modified": {
+              "title": "File modified time",
+              "hint": "The file's last-modified time (mtime), often preserved when files are copied."
+            },
+            "file_created": {
+              "title": "File creation time",
+              "hint": "When the file first landed on disk (birthtime). Falls back to modified time on filesystems that don't record creation time."
+            }
+          },
+          "recompute": "Recompute now",
+          "recomputing": "Recomputing...",
+          "recomputeHint": "Update the date added for existing books using this setting.",
+          "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
+          "backgroundConfirm": "Recompute dates for existing books? This runs in the background, and you can close this editor. Books with unreadable files keep their current date.",
+          "progressSummary": "Processed {processed} of {total}: {updated} updated, {unchanged} unchanged, {skipped} skipped, {failed} failed.",
+          "failedBooksHint": "Failed books kept their dates. Check file access, then run recompute again to retry.",
+          "jobStatus": {
+            "running": "Recomputing dates in the background.",
+            "completed": "Date recompute finished.",
+            "failed": "Recompute stopped before finishing. Completed changes were kept; you can safely run it again."
+          },
+          "errors": {
+            "sourceImported": "Save a file timestamp source before recomputing dates.",
+            "alreadyRunning": "A recompute is already running for this library.",
+            "busy": "Other recomputes are running. Try again shortly.",
+            "requestFailed": "Could not reach the recompute service. Close and reopen this editor to check its status.",
+            "interrupted": "The job status is no longer available. It may have been interrupted by a server restart. You can safely run recompute again."
+          },
+          "failureSample": "Book {bookId}: {reason}",
+          "failureReasons": {
+            "file_unavailable": "A content file could not be read.",
+            "unsafe_path": "A content file is outside its permitted library folder.",
+            "database_error": "The database update failed."
           }
         },
         "allowedFormats": {

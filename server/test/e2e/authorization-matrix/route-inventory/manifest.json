@@ -1,5 +1,5 @@
 {
-  "totalRoutes": 455,
+  "totalRoutes": 457,
   "byPermission": {
     "(none)": 168,
     "Permission.ManageMetadataConfig": 34,
@@ -7,7 +7,7 @@
     "Permission.LibraryEditMetadata": 35,
     "Permission.BookDockAccess": 17,
     "Permission.ManageAppSettings": 39,
-    "Permission.ManageLibraries": 17,
+    "Permission.ManageLibraries": 19,
     "Permission.ManageUsers": 13,
     "Permission.ManageEmail": 8,
     "Permission.KoboSync": 7,
@@ -31,7 +31,7 @@
   },
   "byLibraryAccess": {
     "'viewer'": 4,
-    "'editor'": 1
+    "'editor'": 3
   },
   "routeChunks": [
     "routes-01.json",

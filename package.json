@@ -2,7 +2,7 @@
   "name": "bookorbit",
   "description": "Self-hosted library management and reading platform for ebooks, PDFs, audiobooks, and comics",
   "author": "neonsolstice",
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "homepage": "https://bookorbit.app",
   "repository": {
     "type": "git",

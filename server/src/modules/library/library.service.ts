@@ -27,7 +27,12 @@ import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
 import { PrescanLibraryDto } from './dto/prescan-library.dto';
 import { ReorderLibrariesDto } from './dto/reorder-libraries.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
-import { DEFAULT_LIBRARY_COVER_ASPECT_RATIO, DEFAULT_LIBRARY_ORGANIZATION_MODE, LIBRARY_METADATA_PRECEDENCE_DEFAULT } from './library.constants';
+import {
+  DEFAULT_LIBRARY_ADDED_AT_SOURCE,
+  DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
+  DEFAULT_LIBRARY_ORGANIZATION_MODE,
+  LIBRARY_METADATA_PRECEDENCE_DEFAULT,
+} from './library.constants';
 import { LibraryRepository } from './library.repository';
 import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 
@@ -133,6 +138,7 @@ export class LibraryService {
       formatPriority: dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY],
       allowedFormats: dto.allowedFormats ?? [],
       organizationMode: dto.organizationMode ?? DEFAULT_LIBRARY_ORGANIZATION_MODE,
+      addedAtSource: dto.addedAtSource ?? DEFAULT_LIBRARY_ADDED_AT_SOURCE,
       excludePatterns: dto.excludePatterns ?? [],
       coverAspectRatio: dto.coverAspectRatio ?? DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
       readingThreshold: dto.readingThreshold ?? 0.25,
@@ -292,6 +298,7 @@ export class LibraryService {
         }
 
         for (const existing of allFolderPaths) {
+          if (dto.libraryId !== undefined && existing.libraryId === dto.libraryId) continue;
           if (pathsOverlap(resolvedInputPath, existing.path)) {
             overlapLibrary = existing.libraryName;
             break;

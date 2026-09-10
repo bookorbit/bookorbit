@@ -2,6 +2,7 @@ import type { LibraryLastScan } from "./scanner";
 
 export type OrganizationMode = "book_per_file" | "book_per_folder";
 export type CoverAspectRatio = "2/3" | "1/1";
+export type AddedAtSource = "imported" | "file_modified" | "file_created";
 
 export function normalizeCoverAspectRatio(value: unknown): CoverAspectRatio {
   return value === "1/1" ? "1/1" : "2/3";
@@ -64,6 +65,7 @@ export interface Library {
   formatPriority: string[];
   allowedFormats: string[];
   organizationMode: OrganizationMode;
+  addedAtSource: AddedAtSource;
   excludePatterns: string[];
   readingThreshold: number;
   markAsFinishedPercentComplete: number;
@@ -87,6 +89,22 @@ export interface Library {
   bookCount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export type AddedAtRecomputeFailureCode = "file_unavailable" | "unsafe_path" | "database_error";
+
+export interface AddedAtRecomputeJob {
+  id: string;
+  libraryId: number;
+  source: AddedAtSource;
+  status: "running" | "completed" | "failed";
+  total: number;
+  processed: number;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+  failed: number;
+  failureSamples: { bookId: number; code: AddedAtRecomputeFailureCode }[];
 }
 
 export interface LibraryStats {

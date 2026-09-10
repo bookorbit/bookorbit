@@ -570,7 +570,10 @@ describe('Authorization matrix (e2e)', () => {
       const live = liveRouteLabels(ctx.app);
       const liveLabels = new Set(live);
 
-      expect(live.filter((label) => !inventoryLabels.has(label) && !baseline.has(label))).toEqual([]);
+      // Fastify combines parameter aliases at shared trie nodes, such as :id|:libraryId.
+      const routeShape = (label: string) => label.replace(/:[\w]+(?:\|:[\w]+)*/g, ':param');
+      const inventoriedShapes = new Set([...inventoryLabels].map(routeShape));
+      expect(live.filter((label) => !inventoriedShapes.has(routeShape(label)) && !baseline.has(label))).toEqual([]);
       expect([...baseline].filter((label) => inventoryLabels.has(label))).toEqual([]);
       expect([...baseline].filter((label) => !liveLabels.has(label))).toEqual([]);
     });
@@ -850,6 +853,8 @@ describe('Authorization matrix (e2e)', () => {
           'GET /libraries/:id',
           'POST /libraries/:id/books',
           'GET /libraries/:id/stats',
+          'GET /libraries/:id/recompute-added-at',
+          'POST /libraries/:id/recompute-added-at',
           'POST /libraries/:id/write-metadata-to-files',
           'GET /scanner/libraries/:id/scan-history',
         ].sort(),

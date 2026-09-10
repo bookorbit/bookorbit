@@ -695,6 +695,25 @@ describe('DetailsTab cover surface', () => {
     expect((wrapper.get('input[aria-label="Added"]').element as HTMLInputElement).value).toBe('2022-07-13')
   })
 
+  it('keeps projected reading dates on their canonical day west of UTC', async () => {
+    mocks.user.value.settings.timezone = 'America/Sao_Paulo'
+    const wrapper = mountDetails(
+      makeBook({
+        readStatus: {
+          status: 'read',
+          source: 'auto',
+          startedAt: '2026-09-07T00:00:00.000Z',
+          finishedAt: '2026-09-07T00:00:00Z',
+          updatedAt: '2026-09-07T00:00:00.000Z',
+        },
+      }),
+    )
+    await flushPromises()
+
+    expect(wrapper.text().match(/Sep 7, 2026/g)).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('Sep 6, 2026')
+  })
+
   it('hides added date editing when the user cannot edit metadata', async () => {
     mocks.hasPermission.mockReturnValue(false)
     const wrapper = mountDetails(makeBook())

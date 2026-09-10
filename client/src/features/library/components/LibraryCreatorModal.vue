@@ -18,6 +18,7 @@ import {
   X,
 } from '@lucide/vue'
 import type { CoverAspectRatio, Library, OrganizationMode } from '@bookorbit/types'
+import { useLibraryAddedAt } from '../composables/useLibraryAddedAt'
 import { useModal } from '@/composables/useModal'
 import { api } from '@/lib/api'
 import { useLibraryCreator, type LibraryCreatorSectionId } from '../composables/useLibraryCreator'
@@ -120,6 +121,7 @@ const initializing = ref(true)
 const initializationWarning = ref<string | null>(null)
 const initialFormSnapshot = ref('')
 const nestedModalOpen = ref(false)
+const addedAtRecompute = useLibraryAddedAt(editingLibraryId)
 const attemptedSections = ref(new Set<LibraryCreatorSectionId>())
 
 const sections = computed(() => (mode.value === 'create' ? ALL_SECTIONS.filter((section) => section.id !== 'access') : ALL_SECTIONS))
@@ -149,6 +151,12 @@ const sectionProps = computed(() => ({
     organizationMode: form.organizationMode,
     organizationModeLocked: mode.value === 'edit',
     allowedFormats: form.allowedFormats,
+    addedAtSource: form.addedAtSource,
+    canRecomputeAddedAt: mode.value === 'edit',
+    storedAddedAtSource: creator.storedAddedAtSource.value,
+    recomputingAddedAt: addedAtRecompute.running.value,
+    recomputeJob: addedAtRecompute.job.value,
+    recomputeErrorKey: addedAtRecompute.errorKey.value,
     excludePatterns: form.excludePatterns,
   },
   metadata: { metadataPrecedence: form.metadataPrecedence, formatPriority: form.formatPriority },
@@ -256,6 +264,14 @@ function handleOrganizationModeUpdate(value: OrganizationMode) {
   form.organizationMode = value
 }
 
+function handleAddedAtSourceUpdate(value: Library['addedAtSource']) {
+  form.addedAtSource = value
+}
+
+function handleRecomputeAddedAt() {
+  if (!addedAtRecompute.running.value) void addedAtRecompute.start()
+}
+
 function handleNestedModalChange(value: boolean) {
   nestedModalOpen.value = value
 }
@@ -266,6 +282,8 @@ const sectionListeners = {
   'update:coverAspectRatio': handleCoverAspectRatioUpdate,
   'update:folders': handleFoldersUpdate,
   'update:organizationMode': handleOrganizationModeUpdate,
+  'update:addedAtSource': handleAddedAtSourceUpdate,
+  recompute: handleRecomputeAddedAt,
   'update:metadataPrecedence': (value: string[]) => (form.metadataPrecedence = value),
   'update:formatPriority': (value: string[]) => (form.formatPriority = value),
   'update:allowedFormats': (value: string[]) => (form.allowedFormats = value),

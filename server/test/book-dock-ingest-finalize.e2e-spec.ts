@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, realpath, utimes, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { afterEach } from 'vitest';
 
@@ -308,6 +308,69 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(await fileExists(removable.absolutePath)).toBe(false);
     expect(await fileExists(excluded.absolutePath)).toBe(true);
     expect(await fileExists(untouched.absolutePath)).toBe(true);
+  });
+
+  it.each(['finalize', 'discard'] as const)('rescans nested shared-folder books and %ss only the selected book', async (action) => {
+    const destination = await createLibraryWithFolder(context);
+    const dock = await realpath(context.fixture.bookDockPath);
+    const directory = join(dock, 'ebooks', 'Author', 'Title');
+    await mkdir(directory, { recursive: true });
+    const firstPath = join(directory, 'first.fb2');
+    const old = new Date(Date.now() - 120_000);
+    await writeFile(firstPath, buildFb2Fixture({ title: 'First Nested Book' }));
+    await utimes(firstPath, old, old);
+
+    const rescan = () => context.app.inject({ method: 'POST', url: '/api/v1/book-dock/rescan', headers: authHeader(context.adminToken) });
+    expect((await rescan()).statusCode).toBe(204);
+    const [first] = await context.db.select().from(schema.bookDockFiles).where(eq(schema.bookDockFiles.absolutePath, firstPath));
+    expect(first?.unitDirectory).toBe(directory);
+    await waitForBookDockStatus(context, first.id, ['ready']);
+
+    const secondPath = join(directory, 'second.fb2');
+    await writeFile(secondPath, buildFb2Fixture({ title: 'Second Nested Book' }));
+    const pdfPath = await createPdfFixture(directory, 'second.pdf', 'Second Nested Book');
+    await utimes(secondPath, old, old);
+    await utimes(pdfPath, old, old);
+    expect((await rescan()).statusCode).toBe(204);
+    expect((await rescan()).statusCode).toBe(204);
+    const dockRows = await context.db.select().from(schema.bookDockFiles);
+    expect(dockRows).toHaveLength(2);
+    const second = dockRows.find((row) => row.absolutePath === secondPath)!;
+    expect(second.unitDirectory).toBeNull();
+    await waitForBookDockStatus(context, second.id, ['ready']);
+
+    const detail = await context.app.inject({ method: 'GET', url: `/api/v1/book-dock/files/${second.id}`, headers: authHeader(context.adminToken) });
+    expect(detail.statusCode).toBe(200);
+    expect((detail.json() as BookDockFile).unitFiles.map((file) => file.fileName).sort()).toEqual(['second.fb2', 'second.pdf']);
+
+    if (action === 'finalize') {
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/book-dock/finalize',
+        headers: authHeader(context.adminToken),
+        payload: { fileIds: [second.id], defaultLibraryId: destination.libraryId, defaultFolderId: destination.libraryFolderId },
+      });
+      expect(response.statusCode).toBe(201);
+      const result = response.json() as BookDockFinalizeResult;
+      expect(result).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+      const files = await context.db.select().from(schema.bookFiles).where(eq(schema.bookFiles.bookId, result.results[0].bookId!));
+      expect(files.map((file) => file.format).sort()).toEqual(['fb2', 'pdf']);
+      expect(new Set(files.map((file) => dirname(file.absolutePath))).size).toBe(1);
+      for (const file of files) expect(await fileExists(file.absolutePath)).toBe(true);
+    } else {
+      const response = await context.app.inject({
+        method: 'DELETE',
+        url: `/api/v1/book-dock/files/${second.id}`,
+        headers: authHeader(context.adminToken),
+      });
+      expect(response.statusCode).toBe(204);
+    }
+
+    expect(await fileExists(firstPath)).toBe(true);
+    expect(await getBookDockRow(context, first.id)).toBeDefined();
+    expect(await fileExists(secondPath)).toBe(false);
+    expect(await fileExists(pdfPath)).toBe(false);
+    expect(await getBookDockRow(context, second.id)).toBeUndefined();
   });
 
   it('finalize moves files into destination and creates book records', async () => {

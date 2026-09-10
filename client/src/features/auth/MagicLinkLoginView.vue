@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Loader2, AlertCircle } from '@lucide/vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
+import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -41,7 +42,7 @@ function goToLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-background px-4">
+  <div class="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
     <div class="w-full max-w-sm text-center">
       <div v-if="status === 'loading'" class="space-y-4">
         <Loader2 :size="32" class="mx-auto text-primary animate-spin" />
@@ -64,5 +65,6 @@ function goToLogin() {
         </button>
       </div>
     </div>
+    <PublicLegalNotices />
   </div>
 </template>

@@ -578,7 +578,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       const format = row.format ?? extname(row.fileName).toLowerCase().slice(1);
       this.validator.validateFormat(row.fileName, library.allowedFormats);
 
-      const unitFiles = row.unitDirectory ? await this.repo.findUnitFiles(row.id) : [];
+      const unitFiles = await this.repo.findUnitFiles(row.id);
       const reduced = reduceUnitForLibrary(unitFiles, library, await this.appSettings.getBookRequestImportFormats());
       if (reduced.hold) {
         return { fileId: row.id, fileName: row.fileName, row, status: 'unsupported_layout', message: reduced.hold };
@@ -678,13 +678,20 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       };
     }
 
+    // Shared folders have no exclusive owner, but disc paths must still survive placement.
+    let root = row.unitDirectory ?? dirname(row.absolutePath);
+    if (!row.unitDirectory) {
+      for (const member of unitFiles) {
+        while (!member.absolutePath.startsWith(root + sep) && dirname(root) !== root) root = dirname(root);
+      }
+    }
     const destinationFolder = unitDestinationFolder(destPath, folderPath);
     return {
       files: ordered.map((file) => ({
         sourcePath: file.absolutePath,
         // The path *within* the unit, not the bare file name: a two-disc audiobook holds two files
         // called `track01.mp3`, and flattening them makes the second overwrite the first.
-        destPath: join(destinationFolder, this.unitRelativeName(row, file)),
+        destPath: join(destinationFolder, this.unitRelativeName(root, file)),
         format: file.format,
         role: (file.role as FileRole) ?? 'content',
         sortOrder: file.sortOrder,
@@ -694,9 +701,8 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
   }
 
   /** Each segment sanitized on its own, so the subdirectory survives rather than the separator. */
-  private unitRelativeName(row: BookDockFileRow, file: BookDockUnitFileRow): string {
-    if (!row.unitDirectory) return this.validator.sanitizeFilename(file.fileName);
-    const within = relative(row.unitDirectory, file.absolutePath);
+  private unitRelativeName(root: string, file: BookDockUnitFileRow): string {
+    const within = relative(root, file.absolutePath);
     if (!within || within.startsWith('..') || isAbsolute(within)) return this.validator.sanitizeFilename(file.fileName);
     return within
       .split(sep)
@@ -1196,8 +1202,8 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
   /** Discarding a unit throws away every file in it. Discarding track 1 of 31 is not a thing. */
   private async cleanupDiscardedBookDockFile(row: BookDockFileRow): Promise<void> {
+    for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
     if (row.unitDirectory) {
-      for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
       await removeEmptyDirectory(row.unitDirectory);
     }
     await safeUnlink(row.absolutePath);

@@ -27,6 +27,7 @@ import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot } f
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { providerIconPathSafe } from '@/features/book/lib/provider-icons'
 import { createBookProviderLinks } from '@/features/book/lib/provider-links'
+import { readingDateToDateKey } from '@/features/book/lib/reading-date'
 import { getProviderColor, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
@@ -512,8 +513,8 @@ const addedDateEditButton = ref<HTMLButtonElement | null>(null)
 
 const localReadStatus = ref<ReadStatus | null>(props.book.readStatus?.status ?? null)
 const savedReadingDates = ref<{ startedAt: string; finishedAt: string }>({
-  startedAt: toDateInputValue(props.book.readStatus?.startedAt),
-  finishedAt: toDateInputValue(props.book.readStatus?.finishedAt),
+  startedAt: readingDateToDateKey(props.book.readStatus?.startedAt, userTimeZone.value),
+  finishedAt: readingDateToDateKey(props.book.readStatus?.finishedAt, userTimeZone.value),
 })
 const draftReadingDates = ref<{ startedAt: string; finishedAt: string }>({
   startedAt: savedReadingDates.value.startedAt,
@@ -582,8 +583,8 @@ function clearAddedDateError() {
 
 function normalizeReadStatusDates(readStatus: UserBookStatus | null | undefined) {
   return {
-    startedAt: toDateInputValue(readStatus?.startedAt),
-    finishedAt: toDateInputValue(readStatus?.finishedAt),
+    startedAt: readingDateToDateKey(readStatus?.startedAt, userTimeZone.value),
+    finishedAt: readingDateToDateKey(readStatus?.finishedAt, userTimeZone.value),
   }
 }
 

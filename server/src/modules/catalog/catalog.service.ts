@@ -1,109 +1,57 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNotNull } from 'drizzle-orm';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Injectable } from '@nestjs/common';
 
-import { DB } from '../../db';
-import { accentInsensitiveExactMatchRank, accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
-import { normalizeMetadataText } from '../../common/utils/metadata-text-normalize.utils';
-import * as schema from '../../db/schema';
-import { authors, bookMetadata, bookSeries, collections, genres, narrators, tags } from '../../db/schema';
-
-type Db = NodePgDatabase<typeof schema>;
-type SearchResult = { name: string };
-type SearchResultWithId = { id: number; name: string };
-type NamedTable = typeof authors | typeof genres | typeof tags | typeof narrators | typeof bookSeries;
-type NamedTableWithId = typeof genres | typeof tags;
-type MetadataTextColumn = typeof bookMetadata.publisher | typeof bookMetadata.language;
-
-const DEFAULT_SEARCH_LIMIT = 15;
-const COLLECTION_SEARCH_LIMIT = 20;
+import type { RequestUser } from '../../common/types/request-user';
+import { LibraryService } from '../library/library.service';
+import { CatalogRepository, type CatalogSearchScope } from './catalog.repository';
 
 @Injectable()
 export class CatalogService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    private readonly catalogRepository: CatalogRepository,
+    private readonly libraryService: LibraryService,
+  ) {}
 
-  searchAuthors(q: string): Promise<SearchResult[]> {
-    return this.searchByName(q, authors);
+  searchAuthors(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchAuthors(q, scope));
   }
 
-  searchGenres(q: string): Promise<SearchResultWithId[]> {
-    return this.searchByNameWithId(q, genres);
+  searchGenres(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchGenres(q, scope));
   }
 
-  searchTags(q: string): Promise<SearchResultWithId[]> {
-    return this.searchByNameWithId(q, tags);
+  searchTags(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchTags(q, scope));
   }
 
-  searchNarrators(q: string): Promise<SearchResult[]> {
-    return this.searchByName(q, narrators);
+  searchNarrators(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchNarrators(q, scope));
   }
 
-  searchPublishers(q: string): Promise<SearchResult[]> {
-    return this.searchDistinctMetadataField(q, bookMetadata.publisher);
+  searchPublishers(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchPublishers(q, scope));
   }
 
-  searchSeries(q: string): Promise<SearchResult[]> {
-    return this.searchByName(q, bookSeries);
+  searchSeries(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchSeries(q, scope));
   }
 
-  searchLanguages(q: string): Promise<SearchResult[]> {
-    return this.searchDistinctMetadataField(q, bookMetadata.language);
+  searchLanguages(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchLanguages(q, scope));
   }
 
-  searchCollections(userId: number, q: string): Promise<SearchResult[]> {
-    const pattern = this.toContainsPattern(q);
-    if (!pattern) return Promise.resolve([]);
-
-    return this.db
-      .select({ name: collections.name })
-      .from(collections)
-      .where(and(eq(collections.userId, userId), accentInsensitiveIlike(collections.name, pattern)))
-      .orderBy(collections.name)
-      .limit(COLLECTION_SEARCH_LIMIT);
+  searchCollections(userId: number, q: string) {
+    return this.catalogRepository.searchCollections(userId, q);
   }
 
-  private searchByName(q: string, table: NamedTable): Promise<SearchResult[]> {
-    const pattern = this.toContainsPattern(q);
-    if (!pattern) return Promise.resolve([]);
+  private async searchVisible<T>(user: RequestUser, q: string, search: (scope: CatalogSearchScope) => Promise<T[]>): Promise<T[]> {
+    if (!q.trim()) return [];
 
-    return this.db
-      .select({ name: table.name })
-      .from(table)
-      .where(accentInsensitiveIlike(table.name, pattern))
-      .orderBy(table.name)
-      .limit(DEFAULT_SEARCH_LIMIT);
-  }
+    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    if (libraryIds.length === 0) return [];
 
-  private searchByNameWithId(q: string, table: NamedTableWithId): Promise<SearchResultWithId[]> {
-    const term = normalizeMetadataText(q);
-    if (!term) return Promise.resolve([]);
-
-    return this.db
-      .select({ id: table.id, name: table.name })
-      .from(table)
-      .where(accentInsensitiveIlike(table.name, buildSearchPattern(term)))
-      .orderBy(accentInsensitiveExactMatchRank(table.name, term), table.name)
-      .limit(DEFAULT_SEARCH_LIMIT);
-  }
-
-  private async searchDistinctMetadataField(q: string, column: MetadataTextColumn): Promise<SearchResult[]> {
-    const pattern = this.toContainsPattern(q);
-    if (!pattern) return [];
-
-    const rows = await this.db
-      .selectDistinct({ name: column })
-      .from(bookMetadata)
-      .where(and(isNotNull(column), accentInsensitiveIlike(column, pattern)))
-      .orderBy(column)
-      .limit(DEFAULT_SEARCH_LIMIT);
-
-    return rows.filter((row): row is SearchResult => row.name !== null);
-  }
-
-  private toContainsPattern(q: string): string | null {
-    const term = q.trim();
-    if (!term) return null;
-
-    return buildSearchPattern(term);
+    return search({
+      libraryIds,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
   }
 }

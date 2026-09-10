@@ -1,5 +1,8 @@
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Library } from '@bookorbit/types'
+import { useLibraryCreator } from '../../composables/useLibraryCreator'
+import LibraryCreatorScanner from '../LibraryCreatorScanner.vue'
 import LibraryCreatorDetails from '../LibraryCreatorDetails.vue'
 import LibraryCreatorModal from '../LibraryCreatorModal.vue'
 
@@ -12,6 +15,24 @@ describe('LibraryCreatorModal', () => {
     document.body.innerHTML = ''
     apiMock.mockReset()
     vi.restoreAllMocks()
+  })
+
+  it('uses fetched saved settings for delegated managers whose library list omits the source', async () => {
+    const full = { ...useLibraryCreator().form, id: 7, name: 'Library', icon: 'BookOpen', folders: [], addedAtSource: 'file_created' }
+    apiMock.mockImplementation(
+      async (url) => ({ ok: true, json: async () => (String(url).endsWith('recompute-added-at') ? null : full) }) as Response,
+    )
+    const listEntry = { id: 7, name: 'Library', folders: [], coverAspectRatio: '2/3' } as unknown as Library
+    const wrapper = shallowMount(LibraryCreatorModal, { props: { library: listEntry }, global: { stubs: { teleport: true } } })
+    await flushPromises()
+    await wrapper
+      .findAll('nav button')
+      .find((button) => button.text().includes('Scanning'))!
+      .trigger('click')
+    const scanner = wrapper.getComponent(LibraryCreatorScanner)
+    expect(scanner.props('addedAtSource')).toBe('file_created')
+    expect(scanner.props('storedAddedAtSource')).toBe('file_created')
+    wrapper.unmount()
   })
 
   it('renders an accessible responsive dialog with required setup identified', async () => {

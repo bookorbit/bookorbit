@@ -213,7 +213,23 @@ describe('tableColumnSchema', () => {
       readStatus: { status: 'read', source: 'manual', startedAt: null, finishedAt: '2025-06-01T00:00:00Z', updatedAt: '2025-06-01T00:00:00Z' },
     })
     const def = COLUMN_DEFS.find((c) => c.id === 'finishedAt')!
-    expect(def.accessor!(book)).toBe('2025-06-01T00:00:00Z')
+    expect(def.accessor!(book)).toBe('2025-06-01')
+  })
+
+  it('finishedAt accessor keeps a projected UTC-midnight date west of UTC', () => {
+    const originalTimeZone = process.env.TZ
+    process.env.TZ = 'America/Sao_Paulo'
+    try {
+      const book = makeBook({
+        readStatus: { status: 'read', source: 'auto', startedAt: null, finishedAt: '2025-06-01T00:00:00.000Z', updatedAt: '2025-06-01T00:00:00Z' },
+      })
+      const def = COLUMN_DEFS.find((c) => c.id === 'finishedAt')!
+
+      expect(new Date('2025-06-01T00:00:00.000Z').getDate()).toBe(31)
+      expect(def.accessor!(book)).toBe('2025-06-01')
+    } finally {
+      process.env.TZ = originalTimeZone
+    }
   })
 
   it('finishedAt accessor returns null when readStatus is null', () => {

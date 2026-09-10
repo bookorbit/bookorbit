@@ -180,13 +180,26 @@ export class BookDockRepository {
     return byDockFile;
   }
 
-  /**
-   * Whether a directory is already owned by a unit row. The watcher asks this of the first path
-   * segment below the dock root, which is why it can be an equality lookup on a unique column.
-   */
   async findByUnitDirectory(unitDirectory: string): Promise<BookDockFileRow | undefined> {
     const [row] = await this.db.select().from(bookDockFiles).where(eq(bookDockFiles.unitDirectory, unitDirectory)).limit(1);
     return row;
+  }
+
+  /** Indexed, bounded lookups include secondary tracks as well as primary files. */
+  async findClaimedPaths(paths: string[]): Promise<Set<string>> {
+    const claimed = new Set<string>();
+    for (let offset = 0; offset < paths.length; offset += 500) {
+      const batch = paths.slice(offset, offset + 500);
+      const [anchors, members] = await Promise.all([
+        this.db.select({ absolutePath: bookDockFiles.absolutePath }).from(bookDockFiles).where(inArray(bookDockFiles.absolutePath, batch)),
+        this.db
+          .select({ absolutePath: bookDockUnitFiles.absolutePath })
+          .from(bookDockUnitFiles)
+          .where(inArray(bookDockUnitFiles.absolutePath, batch)),
+      ]);
+      for (const row of [...anchors, ...members]) claimed.add(row.absolutePath);
+    }
+    return claimed;
   }
 
   async update(id: number, data: Partial<NewBookDockFileRow>): Promise<BookDockFileRow | undefined> {

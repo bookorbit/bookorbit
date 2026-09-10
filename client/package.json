@@ -4,7 +4,7 @@
   "description": "BookOrbit client - self-hosted library management and reading platform",
   "author": "neonsolstice",
   "private": true,
-  "license": "AGPL-3.0",
+  "license": "AGPL-3.0-only",
   "homepage": "https://bookorbit.app",
   "repository": {
     "type": "git",
