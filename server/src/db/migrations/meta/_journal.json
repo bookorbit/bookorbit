@@ -610,6 +610,20 @@
       "when": 1788884825211,
       "tag": "0086_add_annotation_source_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1788990414344,
+      "tag": "0087_physical_books_origin",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1788990536365,
+      "tag": "0088_validate_origin_constraints",
+      "breakpoints": true
     }
   ]
 }
