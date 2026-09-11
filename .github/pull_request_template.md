@@ -3,36 +3,59 @@
 > and wait for a maintainer to approve it and assign the issue to you. PRs opened without prior
 > approval and assignment will be closed without review. After approval, open a draft PR if the work
 > is not finished.
+>
+> Fill out every required section of this template. Do not remove or materially alter the template.
+> Blank or incomplete submissions will be closed immediately without review.
+>
+> Complete the PR description and all issue and review replies personally. AI tools and coding
+> agents may not draft, rewrite, populate, or submit them. Keep discussion brief, direct, and
+> specific. Do not post walls of text, generated summaries, generic explanations, or restatements
+> of the issue or diff. Maintainers will not respond to AI-written discussion or replies, and the PR
+> will be closed.
+>
+> Maintainers may ask you to explain the diff or personally demonstrate selected behavior.
 
 Closes #
 
 - **Maintainer approval:** (link to the approval comment)
 - **Assigned contributor:** @
 - **UI changed:** yes | no
-- **Evidence captured at commit:** (run `git rev-parse --short HEAD`)
+- **Evidence commit:** <!-- Full SHA. Evidence must match this commit. -->
 
 ## What changed
 
-<!-- What changed, why it is needed, and what a user sees differently. Two or three sentences. -->
+<!-- In your own words: the problem, your approach, and anything intentionally left out. -->
+
+## Impact
+
+<!-- List only the applicable areas and briefly explain each one:
+API/shared types, database/data, permissions/user isolation,
+filesystem/external input, UI/accessibility/localization, performance,
+configuration/deployment/dependencies. Write "None" if none apply. -->
 
 ## Verification
 
 **Commands run.** Paste the real output tail, including the summary lines. Do not reconstruct or
 summarize it.
 
+<!-- Remove any secrets or personal filesystem paths before posting. -->
+
 ```text
 
 ```
 
-**Manual testing.** Answer in your own words and be specific. "Tests pass" is not manual testing.
+**Personal verification**
 
-1. **First thing you did once it was running, and what you saw:**
+Answer in your own words and be specific. "Tests pass" is not manual testing. Keep each answer
+concise.
 
-2. **What went wrong or surprised you along the way:**
+1. **What did you personally test, and what did you observe?**
 
-3. **What this change is most likely to break, and how you checked that specifically:**
+2. **What is most likely to regress, and how did you check it?**
 
-**Anything you could not test:**
+**Anything you could not test or verify:**
+
+<!-- Write "None" only if nothing applicable remains unverified. -->
 
 ## Evidence
 
@@ -41,6 +64,9 @@ did, and what happened.
 
 Record it yourself. Videos made by a model, or by a coding agent driving the app, do not count, and
 the PR will be closed without review.
+
+Evidence must represent the commit listed above. If the implementation changes, rerun the affected
+checks and replace any stale evidence before requesting review.
 
 <!-- Video here. -->
 
@@ -52,21 +78,17 @@ AI assistance is welcome on this project; unreviewed AI output is not. See the
 - **AI tools used:**
 - **Extent (what they wrote, and what you wrote):**
 - **How you verified their output yourself:**
-- [ ] I can explain any line of this diff on request
 
 <!-- Write "None" for each field if no AI tool was involved. -->
 
 <details open>
 <summary><b>Contributor checklist</b></summary>
 
-- [ ] One focused change, linked above to an issue a maintainer approved
-- [ ] I discussed my approach and was assigned the issue before writing code or opening this PR
-- [ ] `pnpm verify` passes against the final diff
-- [ ] Tests added or updated per the [testing expectations](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md#phase-7-write-and-run-tests)
-- [ ] User-facing text uses Vue I18n keys added only to `client/src/locales/en.json`; non-English catalogs are unchanged, and accessibility was checked
-- [ ] Documentation updated, where applicable
-- [ ] No unintended files, secrets, build artifacts, or personal configuration included
-- [ ] No new dependencies, or the addition was discussed and approved in the linked issue
-- [ ] I followed the [contribution guidelines](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md) and [commit guidelines](https://github.com/bookorbit/bookorbit/blob/main/docs/COMMIT_GUIDELINES.md)
+- [ ] This is one focused change approved and assigned before implementation.
+- [ ] I personally authored this submission, reviewed the diff, and can explain every change.
+- [ ] I disclosed all AI assistance, limitations, and unverified behavior.
+- [ ] The required tests and `pnpm verify` pass against the evidence commit.
+- [ ] No unintended files, secrets, personal configuration, or unapproved dependencies are included.
+- [ ] I followed the [contribution guidelines](https://github.com/bookorbit/bookorbit/blob/main/docs/CONTRIBUTING.md) and [commit guidelines](https://github.com/bookorbit/bookorbit/blob/main/docs/COMMIT_GUIDELINES.md).
 
 </details>
