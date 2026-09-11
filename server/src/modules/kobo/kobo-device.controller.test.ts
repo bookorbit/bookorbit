@@ -138,12 +138,12 @@ describe('KoboDeviceController', () => {
   });
 
   it('streams downloads for valid numeric ids', async () => {
-    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/9/download' };
+    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/9/download', headers: {} };
     const reply = makeReply();
 
     await controller.download('9', { id: 11 } as never, { deviceId: 4, deviceToken: 'dev-token' } as never, req as never, reply as never);
 
-    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 9, reply);
+    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 9, reply, { rangeHeader: undefined, ifRangeHeader: undefined });
     expect(historyService.recordSuccess).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 11,
@@ -157,7 +157,7 @@ describe('KoboDeviceController', () => {
 
   it('records failed downloads before rethrowing', async () => {
     const error = new Error('file missing');
-    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/9/download' };
+    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/9/download', headers: {} };
     const reply = makeReply();
     downloadService.streamBook.mockRejectedValueOnce(error);
 
@@ -169,7 +169,7 @@ describe('KoboDeviceController', () => {
   });
 
   it('streams downloads and thumbnails for resolved Kobo UUID ids', async () => {
-    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/kobo-id/download' };
+    const req = { method: 'GET', url: '/api/v1/kobo/token/v1/books/kobo-id/download', headers: {} };
     const reply = makeReply();
     bookIdentityService.resolveBookIdByEntitlementId.mockResolvedValue(420);
     bookIdentityService.resolveBookIdByCoverImageId.mockResolvedValue(420);
@@ -177,8 +177,21 @@ describe('KoboDeviceController', () => {
     await controller.download('kobo-entitlement-id', { id: 11 } as never, { deviceToken: 'dev-token' } as never, req as never, reply as never);
     await controller.thumbnailSimple('kobo-cover-id', '355', '530', undefined, { id: 11 } as never, reply as never);
 
-    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 420, reply);
+    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 420, reply, { rangeHeader: undefined, ifRangeHeader: undefined });
     expect(thumbnailService.serveThumbnail).toHaveBeenCalledWith(11, 420, undefined, reply);
+  });
+
+  it('forwards Range and If-Range headers to the download service', async () => {
+    const req = {
+      method: 'GET',
+      url: '/api/v1/kobo/token/v1/books/9/download',
+      headers: { range: 'bytes=1024-', 'if-range': '"3e8-18b8"' },
+    };
+    const reply = makeReply();
+
+    await controller.download('9', { id: 11 } as never, { deviceId: 4, deviceToken: 'dev-token' } as never, req as never, reply as never);
+
+    expect(downloadService.streamBook).toHaveBeenCalledWith(11, 9, reply, { rangeHeader: 'bytes=1024-', ifRangeHeader: '"3e8-18b8"' });
   });
 
   it('returns static payload endpoints and ingests analytics events', async () => {
