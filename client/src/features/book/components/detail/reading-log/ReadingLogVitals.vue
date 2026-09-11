@@ -186,7 +186,7 @@ async function loadProgress() {
   try {
     const [progressRes, audioRes] = await Promise.all([
       api(`/api/v1/books/${bookId}/progress`).catch(() => null),
-      hasAudio ? api(`/api/v1/books/${bookId}/audio-progress`).catch(() => null) : Promise.resolve(null),
+      hasAudio ? api(`/api/v1/audiobooks/${bookId}/playback-state`).catch(() => null) : Promise.resolve(null),
     ])
     if (bookId !== props.book.id) return
 

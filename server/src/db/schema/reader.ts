@@ -1,5 +1,20 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  check,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import type { ReadStatus, ReadStatusSource, ReadingAttemptOrigin, ReadingAttemptOutcome, ReadingSessionSource } from '@bookorbit/types';
 
 import { bookFiles, books } from './books';
@@ -316,6 +331,10 @@ export const audiobookProgress = pgTable(
       .notNull()
       .references(() => bookFiles.id, { onDelete: 'cascade' }),
     positionSeconds: real('position_seconds').notNull().default(0),
+    revision: integer('revision').notNull().default(1),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+    operationId: uuid('operation_id'),
+    manifestRevision: varchar('manifest_revision', { length: 64 }),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -328,6 +347,7 @@ export const audiobookProgress = pgTable(
     index('audiobook_progress_current_file_id_idx').on(t.currentFileId),
     check('audiobook_progress_percentage_range_chk', sql`${t.percentage} >= 0 and ${t.percentage} <= 100`),
     check('audiobook_progress_position_seconds_nonnegative_chk', sql`${t.positionSeconds} >= 0`),
+    check('audiobook_progress_revision_positive_chk', sql`${t.revision} >= 1`),
   ],
 );
 
@@ -340,6 +360,7 @@ export const bookmarks = pgTable(
   'bookmarks',
   {
     id: serial('id').primaryKey(),
+    clientId: uuid('client_id').notNull().defaultRandom(),
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -349,6 +370,8 @@ export const bookmarks = pgTable(
     // EPUB: CFI string pinpoints exact location. Null for audio bookmarks.
     cfi: varchar('cfi', { length: 2000 }),
     title: varchar('title', { length: 500 }).notNull(),
+    note: text('note'),
+    chapterId: varchar('chapter_id', { length: 80 }),
     // Audio: absolute book position in seconds (sum of preceding file durations + offset).
     positionSeconds: real('position_seconds'),
     origin: varchar('origin', { length: 10 }).$type<BookmarkOrigin>().notNull().default('web'),
@@ -366,6 +389,7 @@ export const bookmarks = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
+    uniqueIndex('bookmarks_user_book_client_id_uidx').on(t.userId, t.bookId, t.clientId),
     index('bookmarks_user_book_idx').on(t.userId, t.bookId),
     index('bookmarks_book_id_idx').on(t.bookId),
     index('bookmarks_deleted_at_idx')

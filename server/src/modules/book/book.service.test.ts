@@ -2334,31 +2334,6 @@ describe('BookService', () => {
     });
   });
 
-  // ── AUDIO PROGRESS ─────────────────────────────────────────────────────────
-
-  describe('getAudioProgress', () => {
-    it('returns latest audio progress from repo', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const progressRow = { fileId: 5, positionSeconds: 1234, updatedAt: new Date().toISOString() };
-
-      bookRepo.findLibraryIdByBookId = vi.fn().mockResolvedValue(1);
-      bookRepo.findAudioProgress = vi.fn().mockResolvedValue(progressRow);
-
-      const result = await service.getAudioProgress(user.id, 10, user);
-      expect(result).toBe(progressRow);
-      expect(bookRepo.findAudioProgress).toHaveBeenCalledWith(user.id, 10);
-    });
-
-    it('throws NotFoundException when book does not exist', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      bookRepo.findLibraryIdByBookId = vi.fn().mockResolvedValue(null);
-
-      await expect(service.getAudioProgress(user.id, 99, user)).rejects.toThrow();
-    });
-  });
-
   describe('getBookProgress', () => {
     it('returns one row per file with defaults for missing progress', async () => {
       const { service, bookRepo } = makeService();
@@ -2550,102 +2525,6 @@ describe('BookService', () => {
 
       expect(service.verifyFileAccess).toHaveBeenCalledWith(88, user);
       expect(bookRepo.clearFileProgress).toHaveBeenCalledWith(user.id, 88);
-    });
-  });
-
-  describe('saveAudioProgress', () => {
-    it('writes audio progress when current file belongs to the target book', async () => {
-      const { service, bookRepo, libraryService, userBookStatusService } = makeService();
-      const user = makeUser({ id: 21 });
-
-      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
-      bookRepo.findFileById.mockResolvedValue({
-        id: 7,
-        absolutePath: '/books/audiobook-1.mp3',
-        format: 'mp3',
-        bookId: 10,
-        libraryId: 1,
-      });
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
-      libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
-
-      await service.saveAudioProgress(
-        user.id,
-        10,
-        {
-          percentage: 33,
-          currentFileId: 7,
-          positionSeconds: 120,
-        },
-        user,
-      );
-
-      expect(bookRepo.upsertAudioProgress).toHaveBeenCalledWith(user.id, 10, 7, 120, 33);
-      expect(libraryService.findOne).toHaveBeenCalledWith(1);
-      expect(userBookStatusService.autoUpdate).toHaveBeenCalledWith(user.id, 10, 33, 4, 90);
-    });
-
-    it('throws BadRequestException when current file belongs to a different book', async () => {
-      const { service, bookRepo, libraryService } = makeService();
-      const user = makeUser({ id: 21 });
-
-      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
-      bookRepo.findFileById.mockResolvedValue({
-        id: 8,
-        absolutePath: '/books/audiobook-2.mp3',
-        format: 'mp3',
-        bookId: 99,
-        libraryId: 1,
-      });
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
-
-      await expect(
-        service.saveAudioProgress(
-          user.id,
-          10,
-          {
-            percentage: 40,
-            currentFileId: 8,
-            positionSeconds: 90,
-          },
-          user,
-        ),
-      ).rejects.toThrow(BadRequestException);
-      expect(bookRepo.upsertAudioProgress).not.toHaveBeenCalled();
-    });
-
-    it('propagates ForbiddenException when current file is in an inaccessible library', async () => {
-      const { service, bookRepo, libraryService } = makeService();
-      const user = makeUser({ id: 21 });
-
-      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
-      bookRepo.findFileById.mockResolvedValue({
-        id: 9,
-        absolutePath: '/books/secret.mp3',
-        format: 'mp3',
-        bookId: 10,
-        libraryId: 2,
-      });
-      libraryService.verifyUserAccess.mockImplementation((_userId: number, libraryId: number) => {
-        if (libraryId === 2) {
-          return Promise.reject(new ForbiddenException());
-        }
-        return Promise.resolve();
-      });
-
-      await expect(
-        service.saveAudioProgress(
-          user.id,
-          10,
-          {
-            percentage: 20,
-            currentFileId: 9,
-            positionSeconds: 44,
-          },
-          user,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(bookRepo.upsertAudioProgress).not.toHaveBeenCalled();
     });
   });
 

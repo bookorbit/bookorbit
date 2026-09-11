@@ -2435,28 +2435,6 @@ export class BookRepository {
     `);
   }
 
-  async findAudioProgress(userId: number, bookId: number) {
-    const [row] = await this.db
-      .select()
-      .from(audiobookProgress)
-      .where(and(eq(audiobookProgress.userId, userId), eq(audiobookProgress.bookId, bookId)))
-      .limit(1);
-    return row ?? null;
-  }
-
-  async upsertAudioProgress(userId: number, bookId: number, currentFileId: number, positionSeconds: number, percentage: number) {
-    const now = new Date();
-    const [row] = await this.db
-      .insert(audiobookProgress)
-      .values({ userId, bookId, currentFileId, positionSeconds, percentage, updatedAt: now })
-      .onConflictDoUpdate({
-        target: [audiobookProgress.userId, audiobookProgress.bookId],
-        set: { currentFileId, positionSeconds, percentage, updatedAt: now },
-      })
-      .returning();
-    return row;
-  }
-
   private clampProgressPercentage(value: number): number {
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.min(100, value));

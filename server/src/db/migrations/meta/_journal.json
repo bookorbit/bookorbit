@@ -617,6 +617,13 @@
       "when": 1789055692244,
       "tag": "0087_add_library_added_at_source",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1789098337223,
+      "tag": "0088_audiobook_contract_v2",
+      "breakpoints": true
     }
   ]
 }

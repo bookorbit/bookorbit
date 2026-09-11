@@ -24,7 +24,7 @@ export class BookmarkRepository {
     return this.db
       .select()
       .from(bookmarks)
-      .where(and(eq(bookmarks.bookId, bookId), eq(bookmarks.userId, userId), isNull(bookmarks.deletedAt)))
+      .where(and(eq(bookmarks.bookId, bookId), eq(bookmarks.userId, userId), isNotNull(bookmarks.cfi), isNull(bookmarks.deletedAt)))
       .orderBy(asc(bookmarks.createdAt), asc(bookmarks.id));
   }
 
@@ -107,7 +107,15 @@ export class BookmarkRepository {
     const result = await this.db
       .update(bookmarks)
       .set({ deletedAt: new Date() })
-      .where(and(eq(bookmarks.id, bookmarkId), eq(bookmarks.bookId, bookId), eq(bookmarks.userId, userId), isNull(bookmarks.deletedAt)))
+      .where(
+        and(
+          eq(bookmarks.id, bookmarkId),
+          eq(bookmarks.bookId, bookId),
+          eq(bookmarks.userId, userId),
+          isNotNull(bookmarks.cfi),
+          isNull(bookmarks.deletedAt),
+        ),
+      )
       .returning({ id: bookmarks.id });
     return result.length > 0;
   }

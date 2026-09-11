@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 
 import { and, eq, inArray } from 'drizzle-orm';
-import { EPUB_READER_DEFAULTS } from '@bookorbit/types';
+import { EPUB_READER_DEFAULTS, type AudiobookManifest } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { createEpubFixture, writeFixtureFile } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
@@ -84,6 +84,11 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
     sharedAudioA = await locateBookByAbsolutePath(ctx, sharedAudioAPath);
     sharedAudioB = await locateBookByAbsolutePath(ctx, sharedAudioBPath);
     hiddenAudio = await locateBookByAbsolutePath(ctx, hiddenAudioPath);
+
+    await ctx.db
+      .update(schema.bookFiles)
+      .set({ durationSeconds: 1_000 })
+      .where(inArray(schema.bookFiles.id, [sharedAudioA.bookFileId, sharedAudioB.bookFileId, hiddenAudio.bookFileId]));
 
     userA = await createUserAndLogin(ctx);
     userB = await createUserAndLogin(ctx);
@@ -346,8 +351,8 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
     });
   });
 
-  describe('progress and audio-progress ownership', () => {
-    it('keeps file progress and audio progress isolated per user', async () => {
+  describe('progress and audiobook playback-state ownership', () => {
+    it('keeps file progress and audiobook playback state isolated per user', async () => {
       const userASaveFileProgress = await ctx.app.inject({
         method: 'POST',
         url: `/api/v1/books/files/${sharedEpub.bookFileId}/progress`,
@@ -392,83 +397,124 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
         percentage: 75.5,
       });
 
+      const manifestResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/manifest`,
+        headers: authHeader(userA.accessToken),
+      });
+      expect(manifestResponse.statusCode).toBe(200);
+      const manifest = manifestResponse.json<AudiobookManifest>();
+      const assetId = manifest.assets[0]!.assetId;
+
       const userASaveAudioProgress = await ctx.app.inject({
-        method: 'PATCH',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        method: 'PUT',
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(userA.accessToken),
         payload: {
-          percentage: 22.5,
-          currentFileId: sharedAudioA.bookFileId,
-          positionSeconds: 135,
+          assetId,
+          positionMs: 225_000,
+          capturedAt: '2026-01-10T10:00:00.000Z',
+          operationId: randomUUID(),
+          baseRevision: 0,
+          manifestRevision: manifest.revision,
         },
       });
-      expect(userASaveAudioProgress.statusCode).toBe(204);
+      expect(userASaveAudioProgress.statusCode).toBe(200);
 
       const userBSaveAudioProgress = await ctx.app.inject({
-        method: 'PATCH',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        method: 'PUT',
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(userB.accessToken),
         payload: {
-          percentage: 44.4,
-          currentFileId: sharedAudioA.bookFileId,
-          positionSeconds: 274,
+          assetId,
+          positionMs: 444_000,
+          capturedAt: '2026-01-10T10:01:00.000Z',
+          operationId: randomUUID(),
+          baseRevision: 0,
+          manifestRevision: manifest.revision,
         },
       });
-      expect(userBSaveAudioProgress.statusCode).toBe(204);
+      expect(userBSaveAudioProgress.statusCode).toBe(200);
 
       const userAGetAudioProgress = await ctx.app.inject({
         method: 'GET',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(userA.accessToken),
       });
       expect(userAGetAudioProgress.statusCode).toBe(200);
       expect(userAGetAudioProgress.json()).toMatchObject({
-        userId: userA.userId,
-        bookId: sharedAudioA.bookId,
-        currentFileId: sharedAudioA.bookFileId,
+        assetId,
         percentage: 22.5,
-        positionSeconds: 135,
+        positionMs: 225_000,
+        revision: 1,
+        manifestRevision: manifest.revision,
       });
 
       const userBGetAudioProgress = await ctx.app.inject({
         method: 'GET',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(userB.accessToken),
       });
       expect(userBGetAudioProgress.statusCode).toBe(200);
       expect(userBGetAudioProgress.json()).toMatchObject({
-        userId: userB.userId,
-        bookId: sharedAudioA.bookId,
-        currentFileId: sharedAudioA.bookFileId,
+        assetId,
         percentage: 44.4,
-        positionSeconds: 274,
+        positionMs: 444_000,
+        revision: 1,
+        manifestRevision: manifest.revision,
       });
     });
 
-    it('rejects invalid currentFileId bindings for audio progress', async () => {
+    it('rejects asset IDs that do not belong to the audiobook', async () => {
+      const [manifestAResponse, manifestBResponse] = await Promise.all([
+        ctx.app.inject({
+          method: 'GET',
+          url: `/api/v1/audiobooks/${sharedAudioA.bookId}/manifest`,
+          headers: authHeader(userA.accessToken),
+        }),
+        ctx.app.inject({
+          method: 'GET',
+          url: `/api/v1/audiobooks/${sharedAudioB.bookId}/manifest`,
+          headers: authHeader(userA.accessToken),
+        }),
+      ]);
+      expect(manifestAResponse.statusCode).toBe(200);
+      expect(manifestBResponse.statusCode).toBe(200);
+      const manifestA = manifestAResponse.json<AudiobookManifest>();
+      const manifestB = manifestBResponse.json<AudiobookManifest>();
+      const basePayload = {
+        positionMs: 33_000,
+        capturedAt: '2026-01-10T10:00:00.000Z',
+        operationId: randomUUID(),
+        baseRevision: 0,
+        manifestRevision: manifestA.revision,
+      };
       const crossBookResponse = await ctx.app.inject({
-        method: 'PATCH',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        method: 'PUT',
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(userA.accessToken),
         payload: {
-          percentage: 50,
-          currentFileId: sharedAudioB.bookFileId,
-          positionSeconds: 33,
+          ...basePayload,
+          assetId: manifestB.assets[0]!.assetId,
         },
       });
       expect(crossBookResponse.statusCode).toBe(400);
 
+      const [hiddenFile] = await ctx.db
+        .select({ publicId: schema.bookFiles.publicId })
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.id, hiddenAudio.bookFileId));
       const inaccessibleFileResponse = await ctx.app.inject({
-        method: 'PATCH',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        method: 'PUT',
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(userA.accessToken),
         payload: {
-          percentage: 50,
-          currentFileId: hiddenAudio.bookFileId,
-          positionSeconds: 33,
+          ...basePayload,
+          operationId: randomUUID(),
+          assetId: `aud_${hiddenFile!.publicId}`,
         },
       });
-      expect(inaccessibleFileResponse.statusCode).toBe(403);
+      expect(inaccessibleFileResponse.statusCode).toBe(400);
     });
   });
 
@@ -591,13 +637,16 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
       expect(sessionResponse.statusCode).toBe(403);
 
       const audioProgressResponse = await ctx.app.inject({
-        method: 'PATCH',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        method: 'PUT',
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(outsider.accessToken),
         payload: {
-          percentage: 55,
-          currentFileId: sharedAudioA.bookFileId,
-          positionSeconds: 50,
+          assetId: `aud_${randomUUID()}`,
+          positionMs: 50_000,
+          capturedAt: '2026-02-01T12:00:00.000Z',
+          operationId: randomUUID(),
+          baseRevision: 0,
+          manifestRevision: '0'.repeat(64),
         },
       });
       expect(audioProgressResponse.statusCode).toBe(403);
@@ -652,13 +701,16 @@ describe('Reader state isolation (e2e)', { timeout: 120_000 }, () => {
       expect(invalidProgress.statusCode).toBe(400);
 
       const invalidAudioProgress = await ctx.app.inject({
-        method: 'PATCH',
-        url: `/api/v1/books/${sharedAudioA.bookId}/audio-progress`,
+        method: 'PUT',
+        url: `/api/v1/audiobooks/${sharedAudioA.bookId}/playback-state`,
         headers: authHeader(userA.accessToken),
         payload: {
-          percentage: 15,
-          currentFileId: 0,
-          positionSeconds: 30,
+          assetId: 'invalid',
+          positionMs: -1,
+          capturedAt: 'not-a-date',
+          operationId: 'invalid',
+          baseRevision: -1,
+          manifestRevision: 'invalid',
         },
       });
       expect(invalidAudioProgress.statusCode).toBe(400);

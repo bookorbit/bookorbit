@@ -12,6 +12,7 @@ import {
   timestamp,
   unique,
   uniqueIndex,
+  uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
 
@@ -68,6 +69,7 @@ export const bookFiles = pgTable(
   'book_files',
   {
     id: serial('id').primaryKey(),
+    publicId: uuid('public_id').notNull().defaultRandom(),
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),
@@ -93,6 +95,7 @@ export const bookFiles = pgTable(
       .$onUpdateFn(() => new Date()),
   },
   (t) => [
+    uniqueIndex('book_files_public_id_uidx').on(t.publicId),
     uniqueIndex('book_files_absolute_path_uidx').on(t.absolutePath),
     index('book_files_book_id_idx').on(t.bookId),
     index('book_files_library_folder_id_idx').on(t.libraryFolderId),

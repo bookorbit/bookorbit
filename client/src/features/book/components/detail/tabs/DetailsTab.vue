@@ -708,7 +708,7 @@ function cancelReadingDateEdit(field: 'startedAt' | 'finishedAt') {
 }
 
 const fileProgressById = ref<Record<number, FileProgress>>({})
-const audiobookProgress = ref<{ percentage: number; currentFileId: number; positionSeconds: number; updatedAt: string | null } | null>(null)
+const audiobookProgress = ref<{ percentage: number; assetId: string; positionMs: number; capturedAt: string; revision: number } | null>(null)
 const collections = ref<CollectionMembership[]>([])
 const koboState = ref<BookKoboState | null>(null)
 const supplementalLoading = ref(false)
@@ -780,8 +780,7 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
   }
 
   if (audiobookProgress.value && audiobookProgress.value.percentage > 0) {
-    const audioFile = props.book.files.find((f) => f.id === audiobookProgress.value!.currentFileId)
-    const format = audioFile?.format ?? 'audio'
+    const format = 'audio'
     const color = getFormatColor(format)
     rows.push({
       label: format.toUpperCase(),
@@ -789,7 +788,7 @@ const leftColumnProgressRows = computed<ProgressRow[]>(() => {
       color,
       badgeStyle: { color, borderColor: `${color}66`, backgroundColor: `${color}1a` },
       finished: audiobookProgress.value.percentage >= 100,
-      resetFileId: audiobookProgress.value.currentFileId,
+      resetFileId: -props.book.id,
     })
   }
   const koboPercent = koboState.value?.readingState?.progressPercent
@@ -1074,7 +1073,10 @@ async function handleResetFileProgress(row: ProgressRow) {
 
   setFileResetting(fileId, true)
   try {
-    const res = await api(`/api/v1/books/files/${fileId}/progress`, { method: 'DELETE' })
+    const res =
+      fileId < 0
+        ? await api(`/api/v1/audiobooks/${props.book.id}/playback-state`, { method: 'DELETE' })
+        : await api(`/api/v1/books/files/${fileId}/progress`, { method: 'DELETE' })
     if (!res.ok) throw new Error('Failed to reset file progress')
     await loadSupplemental()
   } finally {
@@ -1090,7 +1092,7 @@ async function loadSupplemental() {
   const hasAudio = props.book.files.some((f) => f.format && FORMAT_TO_GROUP[f.format] === 'audio')
   try {
     const progressPromise = api(`/api/v1/books/${props.book.id}/progress`).catch(() => null)
-    const audioProgressPromise = hasAudio ? api(`/api/v1/books/${props.book.id}/audio-progress`).catch(() => null) : Promise.resolve(null)
+    const audioProgressPromise = hasAudio ? api(`/api/v1/audiobooks/${props.book.id}/playback-state`).catch(() => null) : Promise.resolve(null)
     const collectionsPromise = api('/api/v1/collections/membership', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1127,9 +1129,10 @@ async function loadSupplemental() {
       audiobookProgress.value = data
         ? {
             percentage: data.percentage,
-            currentFileId: data.currentFileId,
-            positionSeconds: data.positionSeconds,
-            updatedAt: data.updatedAt ?? null,
+            assetId: data.assetId,
+            positionMs: data.positionMs,
+            capturedAt: data.capturedAt,
+            revision: data.revision,
           }
         : null
     } else {

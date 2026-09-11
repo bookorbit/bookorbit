@@ -101,7 +101,6 @@ import type { BulkSelectionDto } from '../../common/dto/bulk-selection.dto';
 import type { MetadataExportDto, MetadataExportFormat, MetadataExportViewType } from './dto/metadata-export.dto';
 import type { MetadataExportColumnMode } from './dto/metadata-export-options.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
-import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
 import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
@@ -2034,30 +2033,6 @@ export class BookService {
       koreaderProgress: row.koreaderProgress ?? null,
       updatedAt: row.updatedAt ?? null,
     }));
-  }
-
-  async getAudioProgress(userId: number, bookId: number, user: RequestUser) {
-    await this.verifyBookAccess(bookId, user);
-    return this.bookRepo.findAudioProgress(userId, bookId);
-  }
-
-  async saveAudioProgress(userId: number, bookId: number, dto: UpsertAudioProgressDto, user: RequestUser) {
-    const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
-    if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(userId, libraryId, this.isSuperuser(user));
-    const currentFile = await this.verifyFileAccess(dto.currentFileId, user);
-    if (currentFile.bookId !== bookId) {
-      throw new BadRequestException(`currentFileId ${dto.currentFileId} does not belong to book ${bookId}`);
-    }
-    const previous = await this.bookRepo.findAudioProgress(userId, bookId);
-    await this.bookRepo.upsertAudioProgress(userId, bookId, dto.currentFileId, dto.positionSeconds, dto.percentage);
-    const strongRereadEvidence = previous != null && previous.percentage - dto.percentage >= 10;
-    await this.autoUpdateReadStatusForProgress(
-      userId,
-      { bookId, libraryId },
-      dto.percentage,
-      strongRereadEvidence ? { origin: 'bookorbit', strongRereadEvidence: true } : {},
-    );
   }
 
   async autoUpdateReadStatusForProgress(

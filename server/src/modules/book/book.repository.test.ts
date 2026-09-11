@@ -733,41 +733,25 @@ describe('BookRepository', () => {
     await expect(repo.findPrimaryFile(2)).resolves.toBeNull();
   });
 
-  it('writes deletion, metadata updates, and audio progress rows', async () => {
+  it('writes deletion and metadata updates', async () => {
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     const deleteBuilder = { where: deleteWhere };
     const updateWhere = vi.fn().mockResolvedValue(undefined);
     const updateBuilder = { set: vi.fn().mockReturnValue({ where: updateWhere }) };
-    const audioInsert = {
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ bookId: 10, percentage: 33 }]),
-        }),
-      }),
-    };
-    const audioProgressSelect = makeSelectChain('limit', [{ percentage: 22 }]);
-    const missingAudioProgressSelect = makeSelectChain('limit', []);
     const db = {
       delete: vi.fn().mockReturnValue(deleteBuilder),
       update: vi.fn().mockReturnValue(updateBuilder),
-      insert: vi.fn().mockReturnValue(audioInsert),
-      select: vi.fn().mockReturnValueOnce(audioProgressSelect).mockReturnValueOnce(missingAudioProgressSelect),
     };
     const repo = new BookRepository(db as never);
 
     await repo.deleteByIds([10, 11]);
     await repo.updateMetadataFields(10, { title: 'Updated' });
-    await expect(repo.findAudioProgress(1, 10)).resolves.toEqual({ percentage: 22 });
-    await expect(repo.findAudioProgress(1, 11)).resolves.toBeNull();
-    await expect(repo.upsertAudioProgress(1, 10, 4, 120, 33)).resolves.toEqual({ bookId: 10, percentage: 33 });
-
     expect(db.delete).toHaveBeenCalledTimes(1);
     expect(deleteWhere).toHaveBeenCalledTimes(1);
     expect(db.update).toHaveBeenCalledTimes(2);
     expect(updateBuilder.set).toHaveBeenNthCalledWith(1, { title: 'Updated' });
     expect(updateBuilder.set).toHaveBeenNthCalledWith(2, expect.objectContaining({ updatedAt: expect.any(Date) }));
     expect(updateWhere).toHaveBeenCalledTimes(2);
-    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
   it('replaces all community rating rows: deletes old then inserts new', async () => {

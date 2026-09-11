@@ -87,6 +87,7 @@ import { SharedReadingInsightsModule } from './modules/shared-reading-insights/s
 import { BookDuplicatesModule } from './modules/book-duplicates/book-duplicates.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
 import { BookMoveModule } from './modules/book-move/book-move.module';
+import { AudiobookModule } from './modules/audiobook/audiobook.module';
 
 @Module({
   imports: [
@@ -119,6 +120,7 @@ import { BookMoveModule } from './modules/book-move/book-move.module';
     LibraryModule,
     PathModule,
     BookModule,
+    AudiobookModule,
     CatalogModule,
     CoverModule,
     CollectionModule,

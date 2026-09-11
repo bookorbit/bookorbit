@@ -98,43 +98,30 @@ describe('BookmarkService', () => {
       expect(result.id).toBe(existing.id);
     });
 
-    it('returns an existing bookmark for duplicate audio position requests', async () => {
-      const { service, bookmarkRepo } = makeService();
-      const existing = makeBookmarkRow({ id: 11, cfi: null, positionSeconds: 93.5, title: '00:01:33' });
-      bookmarkRepo.findLiveByLocation.mockResolvedValue(existing);
-
-      const result = await service.createBookmark(5, makeUser(), { title: '00:01:33', positionSeconds: 93.5 });
-
-      expect(bookmarkRepo.findLiveByLocation).toHaveBeenCalledWith(1, 5, { cfi: null, positionSeconds: 93.5 });
-      expect(bookmarkRepo.create).not.toHaveBeenCalled();
-      expect(result.id).toBe(11);
-      expect(result.positionSeconds).toBe(93.5);
-    });
-
     it('creates and maps a bookmark when no duplicate exists', async () => {
       const { service, bookmarkRepo } = makeService();
-      const createdRow = makeBookmarkRow({ id: 12, cfi: null, positionSeconds: 42, title: '00:00:42' });
+      const createdRow = makeBookmarkRow({ id: 12, title: 'Chapter 2' });
       bookmarkRepo.findLiveByLocation.mockResolvedValue(null);
       bookmarkRepo.create.mockResolvedValue(createdRow);
 
-      const result = await service.createBookmark(5, makeUser(), { title: '00:00:42', positionSeconds: 42 });
+      const result = await service.createBookmark(5, makeUser(), { title: 'Chapter 2', cfi: 'epubcfi(/6/8)' });
 
-      expect(bookmarkRepo.create).toHaveBeenCalledWith(1, 5, { cfi: null, title: '00:00:42', positionSeconds: 42 });
+      expect(bookmarkRepo.create).toHaveBeenCalledWith(1, 5, { cfi: 'epubcfi(/6/8)', title: 'Chapter 2', positionSeconds: null });
       expect(result).toBeInstanceOf(BookmarkResponseDto);
       expect(result.id).toBe(12);
-      expect(result.cfi).toBeNull();
-      expect(result.positionSeconds).toBe(42);
+      expect(result.cfi).toBe('epubcfi(/6/4!/4/2/1:0)');
+      expect(result.positionSeconds).toBeNull();
     });
 
     it('re-reads and returns the existing bookmark when a concurrent duplicate insert is ignored', async () => {
       const { service, bookmarkRepo } = makeService();
-      const existing = makeBookmarkRow({ id: 13, cfi: null, positionSeconds: 42, title: '00:00:42' });
+      const existing = makeBookmarkRow({ id: 13, title: 'Chapter 2' });
       bookmarkRepo.findLiveByLocation.mockResolvedValueOnce(null).mockResolvedValueOnce(existing);
       bookmarkRepo.create.mockResolvedValue(null);
 
-      const result = await service.createBookmark(5, makeUser(), { title: '00:00:42', positionSeconds: 42 });
+      const result = await service.createBookmark(5, makeUser(), { title: 'Chapter 2', cfi: 'epubcfi(/6/8)' });
 
-      expect(bookmarkRepo.findLiveByLocation).toHaveBeenNthCalledWith(2, 1, 5, { cfi: null, positionSeconds: 42 });
+      expect(bookmarkRepo.findLiveByLocation).toHaveBeenNthCalledWith(2, 1, 5, { cfi: 'epubcfi(/6/8)', positionSeconds: null });
       expect(result.id).toBe(13);
     });
 

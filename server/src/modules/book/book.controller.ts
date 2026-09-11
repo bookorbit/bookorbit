@@ -42,7 +42,6 @@ import { DeleteBooksDto } from './dto/delete-books.dto';
 import { ExportBooksDto } from './dto/export-books.dto';
 import { MetadataExportDto } from './dto/metadata-export.dto';
 import { SaveProgressDto } from './dto/save-progress.dto';
-import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
@@ -396,6 +395,7 @@ export class BookController {
     @Res() reply: FastifyReply,
   ) {
     const { path, size, format, originalFilename } = await this.bookService.getFileInfo(fileId, user);
+    if (resolveAudioMimeType(format)) throw new NotFoundException('File route not found');
     const mimeType = resolveBookMimeType(format);
     const filename = originalFilename;
 
@@ -494,17 +494,6 @@ export class BookController {
   @RequirePermission(Permission.LibraryDeleteBooks)
   async deleteFile(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
     await this.bookService.deleteFile(fileId, user);
-  }
-
-  @Get(':id/audio-progress')
-  async getAudioProgress(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    return (await this.bookService.getAudioProgress(user.id, id, user)) ?? null;
-  }
-
-  @Patch(':id/audio-progress')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async saveAudioProgress(@Param('id', ParseIntPipe) id: number, @Body() dto: UpsertAudioProgressDto, @CurrentUser() user: RequestUser) {
-    await this.bookService.saveAudioProgress(user.id, id, dto, user);
   }
 
   @Patch(':id/personal-note')
