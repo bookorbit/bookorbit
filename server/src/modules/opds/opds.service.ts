@@ -37,7 +37,7 @@ export class OpdsService {
       'Libraries',
       'urn:bookorbit:libraries',
       now,
-      [xmlLink('self', `${BASE}/libraries`, OPDS_MIME_NAV), ...this.searchLinks()],
+      [xmlLink('self', `${BASE}/libraries`, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), ...this.searchLinks()],
       entries,
     );
   }
@@ -51,7 +51,7 @@ export class OpdsService {
       'Collections',
       'urn:bookorbit:collections',
       now,
-      [xmlLink('self', `${BASE}/collections`, OPDS_MIME_NAV), ...this.searchLinks()],
+      [xmlLink('self', `${BASE}/collections`, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), ...this.searchLinks()],
       entries,
     );
   }
@@ -71,7 +71,7 @@ export class OpdsService {
       'SmartScopes',
       'urn:bookorbit:smartScopes',
       now,
-      [xmlLink('self', `${BASE}/smart-scopes`, OPDS_MIME_NAV), ...this.searchLinks()],
+      [xmlLink('self', `${BASE}/smart-scopes`, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), ...this.searchLinks()],
       entries,
     );
   }
@@ -91,7 +91,7 @@ export class OpdsService {
       'Authors',
       'urn:bookorbit:authors',
       now,
-      [xmlLink('self', `${BASE}/authors`, OPDS_MIME_NAV), ...this.searchLinks()],
+      [xmlLink('self', `${BASE}/authors`, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), ...this.searchLinks()],
       entries,
     );
   }
@@ -107,7 +107,13 @@ export class OpdsService {
         now,
       ),
     );
-    return this.wrapFeed('Series', 'urn:bookorbit:series', now, [xmlLink('self', `${BASE}/series`, OPDS_MIME_NAV), ...this.searchLinks()], entries);
+    return this.wrapFeed(
+      'Series',
+      'urn:bookorbit:series',
+      now,
+      [xmlLink('self', `${BASE}/series`, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), ...this.searchLinks()],
+      entries,
+    );
   }
 
   generateAcquisitionFeed(
@@ -239,6 +245,10 @@ export class OpdsService {
       `  ${xmlEl('title', title)}`,
       `  ${xmlEl('id', id)}`,
       `  ${xmlEl('updated', updated)}`,
+      '  <author>',
+      `    ${xmlEl('name', 'bookorbit')}`,
+      `    ${xmlEl('uri', 'https://github.com/bookorbit/bookorbit')}`,
+      '  </author>',
     ];
 
     if (totalResults !== undefined) {
