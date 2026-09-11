@@ -20,11 +20,14 @@ local T = require("ffi/util").template
 local _ = require("gettext")
 
 local BookOrbitStateManager = require("bookorbit_state_manager")
+local Capabilities = require("bookorbit_capabilities")
 local CatalogUtil = require("bookorbit_catalog_util")
 local Transfer = require("bookorbit_download_transfer")
 
 local formatBytes = CatalogUtil.formatBytes
 local safeFilenameBase = CatalogUtil.safeFilenameBase
+
+local RESUME_FEATURE = "resumableDownload"
 
 local CatalogDownload = {}
 
@@ -298,6 +301,18 @@ function CatalogDownload.install(Catalog)
         return self.download_generation
     end
 
+    -- Names the temporary file after the remote file so an interrupted transfer
+    -- can be continued. Only safe against a server that answers Range requests:
+    -- an older one would restart the body at byte zero and append it to bytes we
+    -- already hold. Must be called off the UI thread, since an unknown
+    -- capability is resolved with a request.
+    function Catalog:downloadResumeKey(file)
+        local file_id = file and file.id
+        if not file_id then return nil end
+        if Capabilities.supports(self.client, RESUME_FEATURE) ~= true then return nil end
+        return "f" .. tostring(file_id)
+    end
+
     function Catalog:downloadProgressText(filename, received, total)
         if total and total > 0 then
             local pct = math.min(100, math.floor(received / total * 100))
@@ -362,6 +377,7 @@ function CatalogDownload.install(Catalog)
                 destination = local_path,
                 generation = generation,
                 expected_bytes = total,
+                resume_key = self:downloadResumeKey(file),
                 on_progress = onProgress,
                 is_current = function()
                     return self.download_generation == generation

@@ -399,7 +399,7 @@ export interface KoreaderCatalogManifestPage {
   restartRequired: boolean;
 }
 
-export type KoreaderPluginCapability = "catalogBulkManifest" | "catalogDashboardSections" | "bookmarkSync";
+export type KoreaderPluginCapability = "catalogBulkManifest" | "catalogDashboardSections" | "bookmarkSync" | "resumableDownload";
 
 export interface KoreaderPluginVersionInfo {
   pluginVersion: string;

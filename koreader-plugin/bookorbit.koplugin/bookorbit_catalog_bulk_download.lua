@@ -1182,6 +1182,7 @@ function CatalogBulkDownload.install(Catalog)
             generation = generation,
             expected_bytes = total,
             hash = "partial_md5",
+            resume_key = self:downloadResumeKey(file),
             on_progress = onProgress,
             is_current = function()
                 return ctx == self.bulk_ctx and not ctx.cancel_requested

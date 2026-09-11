@@ -3,20 +3,34 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('fs/promises', () => ({
+  open: vi.fn(),
   readdir: vi.fn(),
   stat: vi.fn(),
 }));
 
 import { createReadStream } from 'fs';
-import { readdir, stat } from 'fs/promises';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { open, readdir, stat } from 'fs/promises';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 
 import { OpdsController } from './opds.controller';
 
 const mockCreateReadStream = createReadStream as MockedFunction<typeof createReadStream>;
+const mockOpen = open as MockedFunction<typeof open>;
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockStat = stat as MockedFunction<typeof stat>;
+
+// The download route hands the path to the stream helper, which opens it once and
+// takes both the identity and the bytes from that descriptor.
+function stubOpen(size: number, stream: unknown = { kind: 'download-stream' }) {
+  const handle = {
+    stat: vi.fn(() => Promise.resolve({ size: BigInt(size), mtimeNs: 5_000_000_000n, ino: 42n })),
+    createReadStream: vi.fn(() => stream),
+    close: vi.fn(() => Promise.resolve(undefined)),
+  };
+  mockOpen.mockResolvedValueOnce(handle as never);
+  return { handle, stream };
+}
 
 function makeController() {
   const opdsService = {
@@ -47,6 +61,13 @@ function makeController() {
       format: 'epub',
       title: 'Book Title',
       authorName: 'Author Name',
+    }),
+    getDownloadTarget: vi.fn().mockResolvedValue({
+      absolutePath: '/books/library/book.epub',
+      format: 'epub',
+      size: 12345,
+      mtimeNs: 5_000_000_000n,
+      ino: 42n,
     }),
   } as never;
   const config = {
@@ -329,16 +350,12 @@ describe('OpdsController', () => {
   it('downloads file with sanitized attachment name', async () => {
     const { controller, opdsBookService } = makeController();
     const reply = makeReply();
-    const stream = { kind: 'download-stream' };
 
-    opdsBookService.getBookFiles.mockResolvedValue({
+    opdsBookService.getDownloadTarget.mockResolvedValue({
       absolutePath: '/books/library/book.epub',
       format: 'epub',
-      title: 'Bad:/Title*',
-      authorName: 'Au<th>or',
     });
-    mockStat.mockResolvedValue({ size: 12345 } as never);
-    mockCreateReadStream.mockReturnValue(stream as never);
+    const { stream } = stubOpen(12345);
 
     await controller.download(99, 0, { userId: 2, isSuperuser: false } as never, reply);
 
@@ -347,14 +364,73 @@ describe('OpdsController', () => {
       'attachment; filename="BadTitle - Author.epub"; filename*=UTF-8\'\'BadTitle%20-%20Author.epub',
     );
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 12345);
+    expect(reply.header).toHaveBeenCalledWith('Accept-Ranges', 'bytes');
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
     expect(reply.send).toHaveBeenCalledWith(stream);
   });
 
-  it('throws NotFoundException when requested download file is unavailable', async () => {
+  it('serves a partial download when the reader resumes with a range', async () => {
     const { controller, opdsBookService } = makeController();
-    opdsBookService.getBookFiles.mockResolvedValue(null);
+    const reply = makeReply();
+
+    opdsBookService.getDownloadTarget.mockResolvedValue({
+      absolutePath: '/books/library/book.epub',
+      format: 'epub',
+    });
+    const { handle } = stubOpen(12345);
+
+    await controller.download(99, 0, { userId: 2, isSuperuser: false } as never, reply, 'bytes=12000-', '"3039-12a05f200-2a"');
+
+    expect(reply.status).toHaveBeenCalledWith(206);
+    expect(reply.header).toHaveBeenCalledWith('Content-Range', 'bytes 12000-12344/12345');
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 345);
+    expect(mockOpen).toHaveBeenCalledWith('/books/library/book.epub', 'r');
+    expect(handle.createReadStream).toHaveBeenCalledWith({ start: 12000, end: 12344 });
+  });
+
+  it('reports a download whose file vanished from disk as not found', async () => {
+    const { controller, opdsBookService } = makeController();
+    opdsBookService.getDownloadTarget.mockResolvedValue({
+      absolutePath: '/books/library/book.epub',
+      format: 'epub',
+    });
+    mockOpen.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+
+    await expect(controller.download(99, 0, { userId: 2, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
+  });
+
+  it('propagates a download failure that is not a missing file', async () => {
+    const { controller, opdsBookService } = makeController();
+    opdsBookService.getDownloadTarget.mockResolvedValue({
+      absolutePath: '/books/library/book.epub',
+      format: 'epub',
+    });
+    mockOpen.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'EACCES' }));
+
+    await expect(controller.download(99, 0, { userId: 2, isSuperuser: false } as never, makeReply())).rejects.toThrow('denied');
+  });
+
+  it('logs a download failure that rejected with something other than an Error', async () => {
+    const { controller, opdsBookService } = makeController();
+    const errorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    opdsBookService.getDownloadTarget.mockResolvedValue({
+      absolutePath: '/books/library/book.epub',
+      format: 'epub',
+    });
+    mockOpen.mockRejectedValueOnce('socket hang up');
+
+    await expect(controller.download(99, 0, { userId: 2, isSuperuser: false } as never, makeReply())).rejects.toBe('socket hang up');
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('errorClass=Error error="socket hang up"'));
+
+    errorSpy.mockRestore();
+  });
+
+  it('propagates the not-found the download target lookup raises', async () => {
+    const { controller, opdsBookService } = makeController();
+    opdsBookService.getDownloadTarget.mockRejectedValue(new NotFoundException('File not found'));
 
     await expect(controller.download(88, 77, { userId: 2, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
+    expect(opdsBookService.getDownloadTarget).toHaveBeenCalledWith(88, 77);
   });
 });

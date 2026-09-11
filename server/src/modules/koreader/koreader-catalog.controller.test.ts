@@ -47,7 +47,7 @@ describe('KoreaderCatalogController', () => {
     await expect(controller.setReadStatus(user, 10, { status: 'reading' } as never)).resolves.toEqual({ readStatus: 'reading' });
     await expect(controller.setRating(user, 10, { rating: 4 } as never)).resolves.toEqual({ rating: 4 });
     await controller.thumbnail(user, 10, reply, '"etag"');
-    await controller.download(user, 100, reply);
+    await controller.download(user, 100, reply, 'bytes=2048-', '"3e8-18b8"');
 
     expect(catalogService.getDashboard).toHaveBeenCalledWith(user, undefined);
     expect(catalogService.getSectionEntries).toHaveBeenCalledWith(user, 'libraries', sectionQuery);
@@ -57,7 +57,17 @@ describe('KoreaderCatalogController', () => {
     expect(catalogService.setReadStatus).toHaveBeenCalledWith(user, 10, 'reading');
     expect(catalogService.setRating).toHaveBeenCalledWith(user, 10, 4);
     expect(catalogService.streamThumbnail).toHaveBeenCalledWith(user, 10, reply, '"etag"');
-    expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply);
+    expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply, { rangeHeader: 'bytes=2048-', ifRangeHeader: '"3e8-18b8"' });
+  });
+
+  it('omits range options when the client sends no range headers', async () => {
+    const { controller, catalogService } = makeController();
+    const user = { id: 7 } as never;
+    const reply = { send: vi.fn() } as never;
+
+    await controller.download(user, 100, reply);
+
+    expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply, { rangeHeader: undefined, ifRangeHeader: undefined });
   });
 
   it('forwards an unread reset rather than treating it as a missing status', async () => {

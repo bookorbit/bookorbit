@@ -47,8 +47,9 @@ end
 local function defaultWrite(content, path)
     local handle, err = io.open(path, "w")
     if not handle then return nil, tostring(err or "open_failed") end
-    handle:write(content)
+    local written, write_err = handle:write(content)
     handle:close()
+    if not written then return nil, tostring(write_err or "write_failed") end
     return true
 end
 
@@ -92,10 +93,19 @@ function TransferProgress.writer(path, opts)
             done = done,
         })
         remove(temporary)
-        if not write(content, temporary) then return false end
-        if not rename(temporary, path) then
+        if not write(content, temporary) then
             remove(temporary)
             return false
+        end
+        if not rename(temporary, path) then
+            -- POSIX replaces the destination in one step. Windows' rename
+            -- refuses an existing file, so it takes the two step path, where it
+            -- had no atomicity to lose anyway.
+            remove(path)
+            if not rename(temporary, path) then
+                remove(temporary)
+                return false
+            end
         end
         return true
     end

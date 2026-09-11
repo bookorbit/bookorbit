@@ -3,13 +3,14 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('fs/promises', () => ({
+  open: vi.fn(),
   stat: vi.fn(),
 }));
 
 import { createReadStream } from 'fs';
 import { join } from 'path';
-import { stat } from 'fs/promises';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { open, stat } from 'fs/promises';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { DEFAULT_KOREADER_DEVICE_PATTERN } from '@bookorbit/types';
 import type { MockedFunction } from 'vitest';
 
@@ -19,7 +20,23 @@ import { KoreaderCatalogBooksQueryDto, KoreaderCatalogManifestQueryDto } from '.
 import { KoreaderCatalogService } from './koreader-catalog.service';
 
 const mockCreateReadStream = createReadStream as MockedFunction<typeof createReadStream>;
+const mockOpen = open as MockedFunction<typeof open>;
 const mockStat = stat as MockedFunction<typeof stat>;
+
+// Content downloads go through the stream helper, which opens the path once and
+// takes the identity and the bytes off that descriptor. Thumbnails still use the
+// path-based stat and createReadStream.
+let downloadHandle: { stat: MockedFunction<never>; createReadStream: MockedFunction<never>; close: MockedFunction<never> };
+
+function stubOpen(size: number) {
+  downloadHandle = {
+    stat: vi.fn(() => Promise.resolve({ size: BigInt(size), mtimeNs: 5_000_000_000n, ino: 42n })) as never,
+    createReadStream: vi.fn(() => 'stream') as never,
+    close: vi.fn(() => Promise.resolve(undefined)) as never,
+  };
+  mockOpen.mockResolvedValue(downloadHandle as never);
+  return downloadHandle;
+}
 
 function makeReply() {
   const reply = {
@@ -291,7 +308,8 @@ function makeService(
 describe('KoreaderCatalogService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStat.mockResolvedValue({ size: 1234, mtimeMs: 5000 } as never);
+    mockStat.mockResolvedValue({ mtimeMs: 5000 } as never);
+    stubOpen(1234);
   });
 
   it('returns root catalog sections', () => {
@@ -870,8 +888,84 @@ describe('KoreaderCatalogService', () => {
       `attachment; filename="Dune - Frank Herbert.epub"; filename*=UTF-8''Dune%20-%20Frank%20Herbert.epub`,
     );
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
+    expect(reply.header).toHaveBeenCalledWith('Accept-Ranges', 'bytes');
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
-    expect(mockCreateReadStream).toHaveBeenCalledWith('/books/dune.epub');
+    expect(mockOpen).toHaveBeenCalledWith('/books/dune.epub', 'r');
+    expect(downloadHandle.createReadStream).toHaveBeenCalledWith({ start: 0 });
+  });
+
+  it('serves a partial response when the plugin resumes a download', async () => {
+    const { service } = makeService();
+    const reply = makeReply();
+
+    await service.streamFile(makeUser(), 100, reply as never, { rangeHeader: 'bytes=1000-' });
+
+    expect(reply.status).toHaveBeenCalledWith(206);
+    expect(reply.header).toHaveBeenCalledWith('Content-Range', 'bytes 1000-1233/1234');
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 234);
+    expect(reply.header).toHaveBeenCalledWith('ETag', '"4d2-12a05f200-2a"');
+    expect(downloadHandle.createReadStream).toHaveBeenCalledWith({ start: 1000, end: 1233 });
+  });
+
+  it('restarts a resumed download from the beginning when the file changed underneath', async () => {
+    const { service } = makeService();
+    const reply = makeReply();
+
+    await service.streamFile(makeUser(), 100, reply as never, { rangeHeader: 'bytes=1000-', ifRangeHeader: '"stale"' });
+
+    expect(reply.status).not.toHaveBeenCalledWith(206);
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
+    expect(downloadHandle.createReadStream).toHaveBeenCalledWith({ start: 0 });
+  });
+
+  it('answers 416 when the resume offset is past the end of the file', async () => {
+    const { service } = makeService();
+    const reply = makeReply();
+
+    await service.streamFile(makeUser(), 100, reply as never, { rangeHeader: 'bytes=5000-' });
+
+    expect(reply.status).toHaveBeenCalledWith(416);
+    expect(reply.header).toHaveBeenCalledWith('Content-Range', 'bytes */1234');
+    expect(downloadHandle.createReadStream).not.toHaveBeenCalled();
+    expect(downloadHandle.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a missing content file as not found and propagates every other open failure', async () => {
+    const { service } = makeService();
+
+    mockOpen.mockRejectedValueOnce(Object.assign(new Error('gone'), { code: 'ENOENT' }));
+    await expect(service.streamFile(makeUser(), 100, makeReply() as never)).rejects.toThrow(NotFoundException);
+
+    mockOpen.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'EACCES' }));
+    await expect(service.streamFile(makeUser(), 100, makeReply() as never)).rejects.toThrow('denied');
+  });
+
+  it('logs the download start before any check that can fail, and a matching failure', async () => {
+    const { service, bookService } = makeService();
+    const logSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    bookService.verifyFileAccess.mockRejectedValueOnce(new NotFoundException('File not found'));
+
+    await expect(service.streamFile(makeUser(), 100, makeReply() as never, { rangeHeader: 'bytes=10-' })).rejects.toThrow(NotFoundException);
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[koreader.catalog_download] [start] fileId=100 userId=1 range="bytes=10-"'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[koreader.catalog_download] [fail] fileId=100 userId=1 durationMs='));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('errorClass=NotFoundException error="File not found"'));
+
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('logs a download failure that rejected with something other than an Error', async () => {
+    const { service, bookService } = makeService();
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    bookService.verifyFileAccess.mockRejectedValueOnce('socket hang up');
+
+    await expect(service.streamFile(makeUser(), 100, makeReply() as never)).rejects.toBe('socket hang up');
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('errorClass=Error error="socket hang up"'));
+
+    warnSpy.mockRestore();
   });
 
   it('encodes non-ASCII content file download filenames for Content-Disposition', async () => {
@@ -887,7 +981,7 @@ describe('KoreaderCatalogService', () => {
     );
     expect(reply.header).toHaveBeenCalledWith('Content-Length', 1234);
     expect(reply.type).toHaveBeenCalledWith('application/epub+zip');
-    expect(mockCreateReadStream).toHaveBeenCalledWith('/books/dune.epub');
+    expect(downloadHandle.createReadStream).toHaveBeenCalledWith({ start: 0 });
   });
 
   it('rejects non-content file downloads and missing thumbnails', async () => {

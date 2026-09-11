@@ -96,6 +96,25 @@ os.rename = function(from, to)
     return true
 end
 
+-- The origin record is dropped through os.remove rather than util.removeFile,
+-- because it belongs to the module that writes it. Counting those separately is
+-- what proves a record never outlives the partial it vouches for.
+local unlinked = {}
+local real_os_remove = os.remove
+os.remove = function(path)
+    table.insert(unlinked, path)
+    files[path] = nil
+    return true
+end
+
+local function originsDropped()
+    local count = 0
+    for _, path in ipairs(unlinked) do
+        if path:find("%.origin$") then count = count + 1 end
+    end
+    return count
+end
+
 local function runScheduled()
     local pending = scheduled
     scheduled = {}
@@ -133,6 +152,8 @@ local completed = Transfer.run{
         assertEqual(download_opts.total_timeout > 60, true, "the total budget scales past the inherited file timeout")
         assertEqual(download_opts.temp_path:find("/downloads/.bookorbit%-tmp/") == 1, true,
             "the child writes inside the authorized temporary directory")
+        assertEqual(download_opts.resume, false, "without a resume key nothing is continued")
+        assertEqual(download_opts.keep_partial, false, "without a resume key a dropped link keeps nothing")
         snapshots[download_opts.progress_path] =
             TransferProgress.encode({ generation = 4, received = 450, total = 900 })
         files[download_opts.temp_path] = { size = 900, modified = now }
@@ -203,6 +224,151 @@ assertEqual(failed, nil, "a failed transfer reports failure")
 assertEqual(failure, "network_error", "the transport error reaches the caller")
 assertEqual(#renames, 0, "a failed transfer publishes nothing")
 
+-- A resume key names the temporary file after the remote file instead of the
+-- attempt, which is the whole reason a second attempt can find the bytes the
+-- first one left behind.
+renames = {}
+removed = {}
+local resume_opts
+local resumable = Transfer.run{
+    root = "/downloads",
+    destination = "/downloads/Books/d.epub",
+    generation = 8,
+    resume_key = "../../f42",
+    is_current = function() return true end,
+    perform = function(download_opts)
+        resume_opts = download_opts
+        files[download_opts.temp_path] = { size = 5, modified = now }
+        return { temp_path = download_opts.temp_path, bytes = 5, resumed = 2 }
+    end,
+}
+assertEqual(resumable, true, "a resumable transfer completes")
+assertEqual(resume_opts.temp_path, "/downloads/.bookorbit-tmp/bo_rf42.part",
+    "the temporary file is named after the remote file, with traversal stripped from the key")
+assertEqual(resume_opts.resume, true, "the child continues the bytes already on disk")
+assertEqual(resume_opts.keep_partial, true, "the child leaves them behind when the link drops")
+
+-- A dropped link is retried once with the bytes already on disk, and what
+-- reached the disk survives for the caller's own retry after that.
+renames = {}
+removed = {}
+unlinked = {}
+local attempts = 0
+local dropped, dropped_err = Transfer.run{
+    root = "/downloads",
+    destination = "/downloads/Books/e.epub",
+    generation = 9,
+    resume_key = "f43",
+    perform = function()
+        attempts = attempts + 1
+        return nil, "closed"
+    end,
+}
+assertEqual(attempts, Transfer.MAX_ATTEMPTS, "a dropped link is retried inside the transfer")
+assertEqual(dropped, nil, "an exhausted retry still reports failure")
+assertEqual(dropped_err, "closed", "the last transport error reaches the caller")
+assertEqual(#removed, 0, "the partial file stays for the next attempt at this file")
+assertEqual(originsDropped(), 0, "the record that proves those bytes stays with them")
+
+-- A server verdict will not change on a second try, and neither will a response
+-- the client itself refused, so both stop after one attempt and take the
+-- worthless bytes with them.
+attempts = 0
+removed = {}
+unlinked = {}
+local refused, refused_err = Transfer.run{
+    root = "/downloads",
+    destination = "/downloads/Books/f.epub",
+    generation = 10,
+    resume_key = "f44",
+    perform = function()
+        attempts = attempts + 1
+        return nil, 404
+    end,
+}
+assertEqual(attempts, 1, "an http status is not retried")
+assertEqual(refused, nil, "an http status reports failure")
+assertEqual(refused_err, 404, "the status code reaches the caller")
+assertEqual(#removed, 1, "a refused transfer removes its temporary file")
+assertEqual(originsDropped() > 0, true, "a record never outlives the partial it describes")
+
+attempts = 0
+removed = {}
+Transfer.run{
+    root = "/downloads",
+    destination = "/downloads/Books/g.epub",
+    generation = 11,
+    resume_key = "f45",
+    perform = function()
+        attempts = attempts + 1
+        return nil, "empty_response"
+    end,
+}
+assertEqual(attempts, 1, "a response the client refused is not retried")
+assertEqual(#removed, 1, "a refused response removes its temporary file")
+
+-- Cancelling during the first attempt stops the retry instead of spending the
+-- link on a file the user no longer wants.
+attempts = 0
+Transfer.run{
+    root = "/downloads",
+    destination = "/downloads/Books/h.epub",
+    generation = 12,
+    resume_key = "f46",
+    is_current = function() return attempts == 0 end,
+    perform = function()
+        attempts = attempts + 1
+        return nil, "closed"
+    end,
+}
+assertEqual(attempts, 1, "a cancelled transfer is not retried")
+
+-- Two transfers sharing one resume key would interleave their writes, so the
+-- second one gives up resuming rather than the first one's bytes.
+local nested_path
+Transfer.run{
+    root = "/downloads",
+    destination = "/downloads/Books/i.epub",
+    generation = 13,
+    resume_key = "f47",
+    is_current = function() return true end,
+    perform = function(outer_opts)
+        Transfer.run{
+            root = "/downloads",
+            destination = "/downloads/Books/j.epub",
+            generation = 14,
+            resume_key = "f47",
+            is_current = function() return true end,
+            perform = function(inner_opts)
+                nested_path = inner_opts.temp_path
+                files[inner_opts.temp_path] = { size = 1, modified = now }
+                return { temp_path = inner_opts.temp_path, bytes = 1 }
+            end,
+        }
+        files[outer_opts.temp_path] = { size = 1, modified = now }
+        return { temp_path = outer_opts.temp_path, bytes = 1 }
+    end,
+}
+assertEqual(nested_path ~= nil and nested_path ~= "/downloads/.bookorbit-tmp/bo_rf47.part", true,
+    "a transfer never writes into a temporary file another one already owns")
+
+-- The key is released when the run ends, so the next attempt at the same file
+-- gets the resumable name back.
+resume_opts = nil
+Transfer.run{
+    root = "/downloads",
+    destination = "/downloads/Books/i.epub",
+    generation = 15,
+    resume_key = "f47",
+    is_current = function() return true end,
+    perform = function(download_opts)
+        resume_opts = download_opts
+        files[download_opts.temp_path] = { size = 1, modified = now }
+        return { temp_path = download_opts.temp_path, bytes = 1 }
+    end,
+}
+assertEqual(resume_opts.temp_path, "/downloads/.bookorbit-tmp/bo_rf47.part", "a finished run releases its resume key")
+
 -- A destination outside the authorized root is refused before any request.
 local requested = false
 local unsafe, unsafe_err = Transfer.run{
@@ -219,5 +385,6 @@ assertEqual(unsafe_err, "unsafe_destination", "an unauthorized destination says 
 assertEqual(requested, false, "an unauthorized destination never starts a transfer")
 
 os.rename = real_rename
+os.remove = real_os_remove
 
 print("bookorbit_download_transfer_test.lua: ok")

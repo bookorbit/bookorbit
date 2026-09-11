@@ -1,7 +1,12 @@
-import { ForbiddenException } from '@nestjs/common';
+vi.mock('fs/promises', () => ({ stat: vi.fn() }));
+
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { stat } from 'fs/promises';
 
 import { bookSeries, bookSeriesMemberships } from '../../../db/schema';
 import { OpdsBookService } from '../opds-book.service';
+
+const statMock = vi.mocked(stat);
 
 type BookPageResult = { entries: unknown[]; total: number };
 
@@ -262,6 +267,35 @@ describe('OpdsBookService', () => {
       title: 'book-7',
       authorName: '',
     });
+  });
+
+  // The identity used to come from a stat here, which left a window for the file
+  // to be replaced before the stream opened it. The stream helper now opens the
+  // path itself, so this resolves to the target only and never touches the disk.
+  it('resolves getDownloadTarget to the path and format without touching the filesystem', async () => {
+    const { service } = makeService();
+    vi.spyOn(service, 'getBookFiles').mockResolvedValue({
+      absolutePath: '/books/a.epub',
+      format: 'epub',
+      title: 'A',
+      authorName: 'B',
+    });
+    statMock.mockClear();
+
+    await expect(service.getDownloadTarget(7, 42)).resolves.toEqual({
+      absolutePath: '/books/a.epub',
+      format: 'epub',
+    });
+    expect(statMock).not.toHaveBeenCalled();
+  });
+
+  it('reports an unknown download file as not found without touching the filesystem', async () => {
+    const { service } = makeService();
+    vi.spyOn(service, 'getBookFiles').mockResolvedValue(null);
+    statMock.mockClear();
+
+    await expect(service.getDownloadTarget(7, 42)).rejects.toThrow(NotFoundException);
+    expect(statMock).not.toHaveBeenCalled();
   });
 
   it('applies text search inside smartScope when q is provided', async () => {
