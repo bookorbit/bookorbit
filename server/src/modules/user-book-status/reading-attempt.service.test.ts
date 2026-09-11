@@ -111,6 +111,8 @@ function makeFakeRepo() {
       return Promise.resolve();
     }),
     findStatus: vi.fn(() => Promise.resolve(null)),
+    findUserSettings: vi.fn(() => Promise.resolve({ timezone: 'Europe/Paris' })),
+    attachBackfilledSessions: vi.fn(() => Promise.resolve()),
     findByExternal: vi.fn((_tx: object, userId: number, provider: string, externalId: string) =>
       Promise.resolve(rows.find((row) => row.userId === userId && row.externalProvider === provider && row.externalId === externalId)),
     ),
@@ -511,6 +513,143 @@ describe('ReadingAttemptService', () => {
     });
 
     expect(row.endedOn).toBe('2025-01-10');
+  });
+
+  describe('sessions delivered after the device already closed the attempt', () => {
+    async function completeAttempt() {
+      return fake.repo.create(
+        {},
+        {
+          userId: 1,
+          bookId: 10,
+          startedOn: '2026-08-27',
+          endedOn: '2026-08-31',
+          outcome: 'completed',
+          origin: 'kobo',
+        },
+      );
+    }
+
+    it('adopts a late meaningful session into the completed attempt instead of opening a duplicate', async () => {
+      const attempt = await completeAttempt();
+
+      const result = await service.recordActivity({
+        userId: 1,
+        bookId: 10,
+        occurredOn: '2026-08-30',
+        origin: 'bookorbit',
+        progress: 94,
+        finishThreshold: 98,
+        strongRereadEvidence: false,
+        meaningfulActivity: true,
+      });
+
+      expect(result).toBeNull();
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.repo.attachBackfilledSessions).toHaveBeenCalledWith(
+        fake.transactionContext,
+        1,
+        10,
+        attempt.id,
+        'Europe/Paris',
+        '2026-08-27',
+        '2026-08-31',
+      );
+    });
+
+    it('adopts the finishing session that trails the reading-state close', async () => {
+      const attempt = await completeAttempt();
+
+      const result = await service.recordActivity({
+        userId: 1,
+        bookId: 10,
+        occurredOn: '2026-08-31',
+        origin: 'bookorbit',
+        progress: 100,
+        finishThreshold: 98,
+        strongRereadEvidence: false,
+        meaningfulActivity: true,
+      });
+
+      expect(result).toBeNull();
+      expect(fake.rows).toHaveLength(1);
+      expect(fake.repo.attachBackfilledSessions).toHaveBeenCalledWith(
+        fake.transactionContext,
+        1,
+        10,
+        attempt.id,
+        'Europe/Paris',
+        '2026-08-27',
+        '2026-08-31',
+      );
+    });
+
+    it('still opens a same-day reread when the strong signal says so', async () => {
+      await completeAttempt();
+
+      const result = await service.recordActivity({
+        userId: 1,
+        bookId: 10,
+        occurredOn: '2026-08-31',
+        origin: 'kobo',
+        progress: 5,
+        finishThreshold: 98,
+        strongRereadEvidence: true,
+        meaningfulActivity: false,
+      });
+
+      expect(result?.status).toBe('rereading');
+      expect(fake.rows).toHaveLength(2);
+      expect(fake.repo.attachBackfilledSessions).not.toHaveBeenCalled();
+    });
+
+    it('still opens a reread from meaningful activity after the attempt ended', async () => {
+      await completeAttempt();
+
+      const result = await service.recordActivity({
+        userId: 1,
+        bookId: 10,
+        occurredOn: '2026-09-05',
+        origin: 'bookorbit',
+        progress: 12,
+        finishThreshold: 98,
+        strongRereadEvidence: false,
+        meaningfulActivity: true,
+      });
+
+      expect(result?.status).toBe('rereading');
+      expect(fake.rows).toHaveLength(2);
+      expect(fake.repo.attachBackfilledSessions).not.toHaveBeenCalled();
+    });
+
+    it('leaves a completion without an end date out of the retroactivity guard', async () => {
+      await fake.repo.create(
+        {},
+        {
+          userId: 1,
+          bookId: 10,
+          startedOn: null,
+          endedOn: null,
+          outcome: 'completed',
+          origin: 'migration',
+        },
+      );
+
+      const result = await service.recordActivity({
+        userId: 1,
+        bookId: 10,
+        occurredOn: '2026-08-30',
+        origin: 'bookorbit',
+        progress: 94,
+        finishThreshold: 98,
+        strongRereadEvidence: false,
+        meaningfulActivity: true,
+      });
+
+      expect(result?.status).toBe('rereading');
+      expect(fake.rows).toHaveLength(2);
+      expect(fake.repo.attachBackfilledSessions).not.toHaveBeenCalled();
+    });
   });
 
   describe('closing an attempt that a skewed device clock started in the future', () => {

@@ -9,6 +9,7 @@ import type {
   UserBookStatus,
 } from '@bookorbit/types';
 
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { ReadingAttemptRepository } from './reading-attempt.repository';
 import { READING_DATE_ERROR_CODES } from './user-book-status.constants';
 
@@ -261,6 +262,23 @@ export class ReadingAttemptService {
       const hasCompleted = await this.repo.hasCompleted(tx, input.userId, input.bookId);
       const isFinished = input.progress >= input.finishThreshold;
 
+      // A device that skips a sync delivers the closing sessions of a read only after the
+      // finished state itself has already closed the attempt (the analytics batch trails the
+      // reading-state PUT). Activity dated on or before that attempt's end is late-arriving
+      // backlog of it, not evidence of a new read: adopt whatever sessions the close left
+      // unassigned into the attempt they belong to instead of fabricating a duplicate.
+      if (
+        !active &&
+        !input.strongRereadEvidence &&
+        latest?.outcome === 'completed' &&
+        latest.endedOn !== null &&
+        input.occurredOn <= latest.endedOn
+      ) {
+        const settings = await this.repo.findUserSettings(tx, input.userId);
+        const timezone = resolveTimeZone((settings as { timezone?: unknown } | null)?.timezone, 'UTC');
+        await this.repo.attachBackfilledSessions(tx, input.userId, input.bookId, latest.id, timezone, latest.startedOn, latest.endedOn);
+        return null;
+      }
       if (!active && hasCompleted && !input.strongRereadEvidence && !input.meaningfulActivity) return null;
       if (!active && isFinished && !hasCompleted) {
         latest = await this.repo.create(tx, {

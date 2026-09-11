@@ -82,6 +82,11 @@ export class ReadingAttemptRepository {
       .where(and(...boundaries));
   }
 
+  async findUserSettings(tx: Tx, userId: number): Promise<unknown> {
+    const [row] = await tx.select({ settings: users.settings }).from(users).where(eq(users.id, userId)).limit(1);
+    return row?.settings ?? null;
+  }
+
   async findActive(tx: Tx, userId: number, bookId: number) {
     const [row] = await tx
       .select()
