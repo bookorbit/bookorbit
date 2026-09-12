@@ -589,8 +589,13 @@ function handleRowClick(book: BookCard, e: MouseEvent) {
     return
   }
   if (book.collapsedSeries) {
-    if (book.seriesId != null) router.push({ name: 'series-detail', params: { seriesId: book.seriesId } })
+    handleOpenSeries(book)
   }
+}
+
+function handleOpenSeries(book: BookCard) {
+  if (book.seriesId == null) return
+  void router.push({ name: 'series-detail', params: { seriesId: book.seriesId } })
 }
 
 function emitLockStateUpdate(book: BookCard, nextFields: BookCard['lockedFields']) {
@@ -873,7 +878,7 @@ defineExpose({
                 @click="focusTableCell(vItem.index, colIdx, $event, rowBook(vItem.index).id, col.id)"
               >
                 <template v-if="rowBook(vItem.index).collapsedSeries">
-                  <BookTableCollapsedSeriesCell :book="rowBook(vItem.index)" :col-id="col.id" />
+                  <BookTableCollapsedSeriesCell :book="rowBook(vItem.index)" :col-id="col.id" @open-series="handleOpenSeries(rowBook(vItem.index))" />
                 </template>
                 <template v-else>
                   <BookTableCellDispatcher

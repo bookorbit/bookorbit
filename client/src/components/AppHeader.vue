@@ -607,7 +607,13 @@ function formatBadgeStyle(fmt: string) {
         <!-- Mobile: search icon -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :class="['md:hidden', controlClass]" @click="mobileSearchOpen = true">
+            <Button
+              variant="ghost"
+              size="icon"
+              :class="['md:hidden', controlClass]"
+              :aria-label="t('common.search')"
+              @click="mobileSearchOpen = true"
+            >
               <Search :size="15" />
             </Button>
           </TooltipTrigger>
@@ -692,6 +698,7 @@ function formatBadgeStyle(fmt: string) {
                 variant="ghost"
                 size="icon"
                 :class="destinationClass(isStatisticsActive)"
+                :aria-label="t('components.appHeader.statistics')"
                 @click="navigateToStatistics"
               >
                 <BarChart3 :size="15" />
@@ -702,7 +709,13 @@ function formatBadgeStyle(fmt: string) {
 
           <Tooltip v-if="achievementsEnabled">
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" :class="destinationClass(isAchievementsActive)" @click="navigateToAchievements">
+              <Button
+                variant="ghost"
+                size="icon"
+                :class="destinationClass(isAchievementsActive)"
+                :aria-label="t('components.appHeader.achievements')"
+                @click="navigateToAchievements"
+              >
                 <Trophy :size="15" />
               </Button>
             </TooltipTrigger>
@@ -711,7 +724,14 @@ function formatBadgeStyle(fmt: string) {
 
           <Tooltip v-if="hasPermission('library_upload')">
             <TooltipTrigger as-child>
-              <Button data-tour="upload-button" variant="ghost" size="icon" :class="controlClass" @click="uploadOpen = true">
+              <Button
+                data-tour="upload-button"
+                variant="ghost"
+                size="icon"
+                :class="controlClass"
+                :aria-label="t('components.appHeader.uploadBooks')"
+                @click="uploadOpen = true"
+              >
                 <Upload :size="15" />
               </Button>
             </TooltipTrigger>
@@ -726,7 +746,13 @@ function formatBadgeStyle(fmt: string) {
             <DropdownMenu>
               <TooltipTrigger as-child>
                 <DropdownMenuTrigger as-child>
-                  <Button data-tour="documentation-link" variant="ghost" size="icon" :class="['relative', controlClass]">
+                  <Button
+                    data-tour="documentation-link"
+                    variant="ghost"
+                    size="icon"
+                    :class="['relative', controlClass]"
+                    :aria-label="t('components.appHeader.help')"
+                  >
                     <BadgeQuestionMark :size="15" />
                     <span
                       v-if="hasUnseenWhatsNew"
@@ -762,7 +788,13 @@ function formatBadgeStyle(fmt: string) {
             <Popover>
               <TooltipTrigger as-child>
                 <PopoverTrigger as-child>
-                  <Button data-tour="appearance-picker" variant="ghost" size="icon" :class="controlClass">
+                  <Button
+                    data-tour="appearance-picker"
+                    variant="ghost"
+                    size="icon"
+                    :class="controlClass"
+                    :aria-label="t('components.appHeader.appearance')"
+                  >
                     <Palette :size="15" />
                   </Button>
                 </PopoverTrigger>
@@ -824,7 +856,14 @@ function formatBadgeStyle(fmt: string) {
 
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button data-tour="settings-nav" variant="ghost" size="icon" :class="controlClass" @click="navigateToSettings">
+              <Button
+                data-tour="settings-nav"
+                variant="ghost"
+                size="icon"
+                :class="controlClass"
+                :aria-label="t('components.appHeader.settings')"
+                @click="navigateToSettings"
+              >
                 <Settings :size="15" />
               </Button>
             </TooltipTrigger>

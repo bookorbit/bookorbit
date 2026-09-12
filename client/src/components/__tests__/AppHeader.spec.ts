@@ -328,6 +328,15 @@ describe('AppHeader global search', () => {
     expect(settingsControlIndex).toBe(languageControlIndex + 1)
   })
 
+  it('labels the icon-only desktop destinations and preference controls', () => {
+    const wrapper = mountHeader()
+
+    expect(wrapper.get('[data-tour="statistics-btn"]').attributes('aria-label')).toBe('Statistics')
+    expect(wrapper.get('[data-tour="documentation-link"]').attributes('aria-label')).toBe('Help')
+    expect(wrapper.get('[data-tour="appearance-picker"]').attributes('aria-label')).toBe('Appearance')
+    expect(wrapper.get('[data-tour="settings-nav"]').attributes('aria-label')).toBe('Settings')
+  })
+
   it('opens settings from the mobile overflow menu', async () => {
     const wrapper = mountHeader()
     const settingsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Settings')

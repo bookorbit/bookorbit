@@ -226,6 +226,30 @@ describe('BookCoverCard — present state', () => {
     expect(routerPushMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
   })
 
+  it('labels and describes the quick-view and start-reading actions', () => {
+    const wrapper = mountCard(presentBook)
+
+    expect(wrapper.get('button[aria-label="Quick View"]')).toBeTruthy()
+    expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Start reading')
+    expect(wrapper.findAll('[data-testid="tooltip-content"]').map((content) => content.text())).toEqual(
+      expect.arrayContaining(['Quick View', 'Start reading']),
+    )
+  })
+
+  it('uses a continue-reading label when the book has progress', () => {
+    const wrapper = mountCard({ ...presentBook, readingProgress: 20 })
+
+    expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Continue reading')
+  })
+
+  it('labels the explicit reading action when thumbnail clicks prefer details', () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mountCard(presentBook)
+
+    expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Book Details')
+    expect(wrapper.get('button[aria-label="Start reading"]')).toBeTruthy()
+  })
+
   it('opens book details for missing books when thumbnail clicks prefer details', async () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mountCard(missingBook)

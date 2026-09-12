@@ -6,6 +6,7 @@ import { CheckSquare, LayoutGrid, List, SlidersHorizontal, Square, Table2 } from
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TableDensity } from '@bookorbit/types'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
 import ViewHeaderDesktopSearch from '@/components/view-header/ViewHeaderDesktopSearch.vue'
@@ -85,6 +86,62 @@ const mobileSearchOpen = ref(false)
 function handleShowJumpRailsUpdate(value: boolean) {
   emit('update:showJumpRails', value)
 }
+
+function handleCoverSizeUpdate(value: number) {
+  emit('update:coverSize', value)
+}
+
+function handleGridGapUpdate(value: number) {
+  emit('update:gridGap', value)
+}
+
+function handleRowDensityUpdate(value: TableDensity) {
+  emit('update:rowDensity', value)
+}
+
+function handleCoverFallbackUpdate(value: boolean) {
+  emit('update:coverFallback', value)
+}
+
+function handleCoverShapeUpdate(value: 'square' | 'circle') {
+  emit('update:coverShape', value)
+}
+
+function handleViewModeUpdate(value: BookViewMode) {
+  emit('update:viewMode', value)
+}
+
+function handleSearchQueryUpdate(value: string) {
+  emit('update:searchQuery', value)
+}
+
+function handleToggleSelection() {
+  emit('toggle-selection')
+}
+
+function handleGridView() {
+  handleViewModeUpdate('grid')
+}
+
+function handleListView() {
+  handleViewModeUpdate('list')
+}
+
+function handleTableView() {
+  handleViewModeUpdate('table')
+}
+
+function handleOpenDisplay() {
+  mobileDisplayOpen.value = true
+}
+
+function handleOpenMobileSearch() {
+  mobileSearchOpen.value = true
+}
+
+function handleMobileSearchOpenUpdate(value: boolean) {
+  mobileSearchOpen.value = value
+}
 </script>
 
 <template>
@@ -100,7 +157,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
         v-if="searchable"
         :search-query="searchQuery"
         :placeholder="searchPlaceholder"
-        @update:search-query="emit('update:searchQuery', $event)"
+        @update:search-query="handleSearchQueryUpdate"
       />
 
       <slot name="toolbar" />
@@ -116,7 +173,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
             ? 'text-primary bg-primary/10 hover:bg-primary/20 ring-1 ring-primary/20'
             : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'
         "
-        @click="emit('toggle-selection')"
+        @click="handleToggleSelection"
       >
         <CheckSquare v-if="selectionMode" :size="13" />
         <Square v-else :size="13" />
@@ -126,88 +183,105 @@ function handleShowJumpRailsUpdate(value: boolean) {
       <div v-if="showSelection" class="mx-1.5 hidden h-3.5 w-px bg-border/40 md:block" />
 
       <div v-if="showViewModeToggle && allowedViewModes.length > 0" class="hidden items-center gap-0.5 md:flex">
-        <Button
-          v-if="allowedViewModes.includes('grid')"
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
-          :aria-label="t('components.viewHeader.viewModes.grid')"
-          :aria-pressed="viewMode === 'grid'"
-          @click="emit('update:viewMode', 'grid')"
-        >
-          <LayoutGrid :size="14" />
-        </Button>
-        <Button
-          v-if="allowedViewModes.includes('list')"
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
-          :aria-label="t('components.viewHeader.viewModes.list')"
-          :aria-pressed="viewMode === 'list'"
-          @click="emit('update:viewMode', 'list')"
-        >
-          <List :size="14" />
-        </Button>
-        <Button
-          v-if="allowedViewModes.includes('table')"
-          variant="ghost"
-          size="icon"
-          class="h-8 w-8 rounded-lg"
-          :class="viewMode === 'table' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
-          :aria-label="t('components.viewHeader.viewModes.table')"
-          :aria-pressed="viewMode === 'table'"
-          @click="emit('update:viewMode', 'table')"
-        >
-          <Table2 :size="14" />
-        </Button>
+        <Tooltip v-if="allowedViewModes.includes('grid')">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 rounded-lg"
+              :class="viewMode === 'grid' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
+              :aria-label="t('components.viewHeader.viewModes.grid')"
+              :aria-pressed="viewMode === 'grid'"
+              @click="handleGridView"
+            >
+              <LayoutGrid :size="14" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t('components.viewHeader.viewModes.grid') }}</TooltipContent>
+        </Tooltip>
+        <Tooltip v-if="allowedViewModes.includes('list')">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 rounded-lg"
+              :class="viewMode === 'list' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
+              :aria-label="t('components.viewHeader.viewModes.list')"
+              :aria-pressed="viewMode === 'list'"
+              @click="handleListView"
+            >
+              <List :size="14" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t('components.viewHeader.viewModes.list') }}</TooltipContent>
+        </Tooltip>
+        <Tooltip v-if="allowedViewModes.includes('table')">
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 rounded-lg"
+              :class="viewMode === 'table' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'"
+              :aria-label="t('components.viewHeader.viewModes.table')"
+              :aria-pressed="viewMode === 'table'"
+              @click="handleTableView"
+            >
+              <Table2 :size="14" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t('components.viewHeader.viewModes.table') }}</TooltipContent>
+        </Tooltip>
       </div>
 
-      <Popover v-if="showDisplayControls">
-        <PopoverTrigger as-child>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="hidden h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/5 hover:text-foreground md:flex"
-            :aria-label="t('components.viewHeader.display')"
-          >
-            <SlidersHorizontal :size="14" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent :class="viewMode === 'table' ? 'w-80 max-w-[90vw] max-h-[80vh] overflow-y-auto p-4' : 'w-56 p-4'" align="end">
-          <ViewHeaderDisplayControls
-            :view-mode="viewMode"
-            :cover-size="coverSize"
-            :grid-gap="gridGap"
-            :show-jump-rail-toggle="showJumpRailToggle"
-            :show-jump-rails="showJumpRails"
-            :jump-rail-modes="jumpRailModes"
-            :row-density="rowDensity"
-            :show-cover-fallback-toggle="showCoverFallbackToggle"
-            :cover-fallback="coverFallback"
-            :cover-shape="coverShape"
-            :cover-size-min="coverSizeMin"
-            :cover-size-max="coverSizeMax"
-            :cover-size-step="coverSizeStep"
-            :grid-gap-min="gridGapMin"
-            :grid-gap-max="gridGapMax"
-            :grid-gap-step="gridGapStep"
-            @update:cover-size="emit('update:coverSize', $event)"
-            @update:grid-gap="emit('update:gridGap', $event)"
-            @update:show-jump-rails="handleShowJumpRailsUpdate"
-            @update:row-density="emit('update:rowDensity', $event)"
-            @update:cover-fallback="emit('update:coverFallback', $event)"
-            @update:cover-shape="emit('update:coverShape', $event)"
-          >
-            <template #columns>
-              <slot name="columns">
-                <p class="text-xs text-muted-foreground">{{ t('components.viewHeader.columnVisibilityHint') }}</p>
-              </slot>
-            </template>
-          </ViewHeaderDisplayControls>
-        </PopoverContent>
-      </Popover>
+      <Tooltip v-if="showDisplayControls">
+        <Popover>
+          <TooltipTrigger as-child>
+            <PopoverTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="hidden h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/5 hover:text-foreground md:flex"
+                :aria-label="t('components.viewHeader.display')"
+              >
+                <SlidersHorizontal :size="14" aria-hidden="true" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <PopoverContent :class="viewMode === 'table' ? 'w-80 max-w-[90vw] max-h-[80vh] overflow-y-auto p-4' : 'w-56 p-4'" align="end">
+            <ViewHeaderDisplayControls
+              :view-mode="viewMode"
+              :cover-size="coverSize"
+              :grid-gap="gridGap"
+              :show-jump-rail-toggle="showJumpRailToggle"
+              :show-jump-rails="showJumpRails"
+              :jump-rail-modes="jumpRailModes"
+              :row-density="rowDensity"
+              :show-cover-fallback-toggle="showCoverFallbackToggle"
+              :cover-fallback="coverFallback"
+              :cover-shape="coverShape"
+              :cover-size-min="coverSizeMin"
+              :cover-size-max="coverSizeMax"
+              :cover-size-step="coverSizeStep"
+              :grid-gap-min="gridGapMin"
+              :grid-gap-max="gridGapMax"
+              :grid-gap-step="gridGapStep"
+              @update:cover-size="handleCoverSizeUpdate"
+              @update:grid-gap="handleGridGapUpdate"
+              @update:show-jump-rails="handleShowJumpRailsUpdate"
+              @update:row-density="handleRowDensityUpdate"
+              @update:cover-fallback="handleCoverFallbackUpdate"
+              @update:cover-shape="handleCoverShapeUpdate"
+            >
+              <template #columns>
+                <slot name="columns">
+                  <p class="text-xs text-muted-foreground">{{ t('components.viewHeader.columnVisibilityHint') }}</p>
+                </slot>
+              </template>
+            </ViewHeaderDisplayControls>
+          </PopoverContent>
+        </Popover>
+        <TooltipContent>{{ t('components.viewHeader.display') }}</TooltipContent>
+      </Tooltip>
 
       <ViewHeaderMobileMenu
         :view-mode="viewMode"
@@ -218,10 +292,10 @@ function handleShowJumpRailsUpdate(value: boolean) {
         :mobile-search-in-menu="mobileSearchInMenu"
         :show-display-action="mobileDisplayInMenu && showDisplayControls"
         :allowed-view-modes="allowedViewModes"
-        @update:view-mode="emit('update:viewMode', $event)"
-        @open-display="mobileDisplayOpen = true"
-        @open-mobile-search="mobileSearchOpen = true"
-        @toggle-selection="emit('toggle-selection')"
+        @update:view-mode="handleViewModeUpdate"
+        @open-display="handleOpenDisplay"
+        @open-mobile-search="handleOpenMobileSearch"
+        @toggle-selection="handleToggleSelection"
       >
         <template v-if="$slots['mobile-menu']" #mobile-menu>
           <slot name="mobile-menu" />
@@ -254,12 +328,12 @@ function handleShowJumpRailsUpdate(value: boolean) {
           :grid-gap-min="gridGapMin"
           :grid-gap-max="gridGapMax"
           :grid-gap-step="gridGapStep"
-          @update:cover-size="emit('update:coverSize', $event)"
-          @update:grid-gap="emit('update:gridGap', $event)"
+          @update:cover-size="handleCoverSizeUpdate"
+          @update:grid-gap="handleGridGapUpdate"
           @update:show-jump-rails="handleShowJumpRailsUpdate"
-          @update:row-density="emit('update:rowDensity', $event)"
-          @update:cover-fallback="emit('update:coverFallback', $event)"
-          @update:cover-shape="emit('update:coverShape', $event)"
+          @update:row-density="handleRowDensityUpdate"
+          @update:cover-fallback="handleCoverFallbackUpdate"
+          @update:cover-shape="handleCoverShapeUpdate"
         >
           <template #columns>
             <slot name="columns">
@@ -276,7 +350,7 @@ function handleShowJumpRailsUpdate(value: boolean) {
     :open="mobileSearchOpen"
     :search-query="searchQuery"
     :placeholder="searchPlaceholder"
-    @update:open="mobileSearchOpen = $event"
-    @update:search-query="emit('update:searchQuery', $event)"
+    @update:open="handleMobileSearchOpenUpdate"
+    @update:search-query="handleSearchQueryUpdate"
   />
 </template>

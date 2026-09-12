@@ -17,6 +17,7 @@ import BookTableProgressCell from './BookTableProgressCell.vue'
 import BookTableMetadataScoreCell from './BookTableMetadataScoreCell.vue'
 import BookTableLockableCell from './BookTableLockableCell.vue'
 import BookTableBooleanCell from './BookTableBooleanCell.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { CellType } from '@/features/book/composables/tableColumnSchema'
 
 type NavigationDirection = 'next' | 'prev' | 'rowUp' | 'rowDown'
@@ -84,6 +85,14 @@ const lockStateClass = computed(() => {
   return 'text-muted-foreground hover:text-foreground'
 })
 
+function handleToggleAllLocks() {
+  if (props.isFullyLocked) {
+    emit('unlockAll')
+    return
+  }
+  emit('lockAll')
+}
+
 const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
 const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
@@ -91,15 +100,21 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
 
 <template>
   <template v-if="cellType === 'lockRow'">
-    <button
-      class="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-muted"
-      :class="lockStateClass"
-      :aria-label="isFullyLocked ? t('book.table.locks.unlockAll') : t('book.table.locks.lockAll')"
-      @click.stop="isFullyLocked ? emit('unlockAll') : emit('lockAll')"
-    >
-      <Lock v-if="lockedFieldCount > 0" :size="13" />
-      <LockOpen v-else :size="13" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button
+          type="button"
+          class="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-muted"
+          :class="lockStateClass"
+          :aria-label="isFullyLocked ? t('book.table.locks.unlockAll') : t('book.table.locks.lockAll')"
+          @click.stop="handleToggleAllLocks"
+        >
+          <Lock v-if="lockedFieldCount > 0" :size="13" aria-hidden="true" />
+          <LockOpen v-else :size="13" aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{{ isFullyLocked ? t('book.table.locks.unlockAll') : t('book.table.locks.lockAll') }}</TooltipContent>
+    </Tooltip>
   </template>
 
   <BookTableCoverCell

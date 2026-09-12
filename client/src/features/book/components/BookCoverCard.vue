@@ -271,6 +271,13 @@ const primaryOverlayActionIcon = computed(() => {
 })
 const primaryOverlayActionIconClass = computed(() => (thumbnailClickAction.value !== 'details' && isAudiobook.value ? 'ml-[2cqi]' : ''))
 const showExplicitReadButton = computed(() => thumbnailClickAction.value === 'details' && primaryFile.value != null && !isMissing.value)
+const readActionLabel = computed(() => {
+  if (isAudiobook.value) {
+    return hasProgress.value ? t('book.actions.continueListening') : t('book.actions.startListening')
+  }
+  return hasProgress.value ? t('book.actions.continueReading') : t('book.actions.startReading')
+})
+const primaryOverlayActionLabel = computed(() => (thumbnailClickAction.value === 'details' ? t('book.actions.bookDetails') : readActionLabel.value))
 
 function handlePrimaryOverlayAction() {
   if (thumbnailClickAction.value === 'details') {
@@ -543,29 +550,48 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           >
             <!-- Top row: Quick View + explicit Read (when thumbnail click prefers details) -->
             <div class="shrink-0 flex items-center justify-end gap-1">
-              <button class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white" @click="openQuickView">
-                <PanelRight class="size-[12cqi]" />
-              </button>
-              <button
-                v-if="showExplicitReadButton"
-                class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white"
-                @click.stop="openPrimaryFileExplicit"
-              >
-                <BookOpen class="size-[12cqi]" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white"
+                    :aria-label="t('book.actions.quickView')"
+                    @click.stop="openQuickView"
+                  >
+                    <PanelRight class="size-[12cqi]" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ t('book.actions.quickView') }}</TooltipContent>
+              </Tooltip>
+              <Tooltip v-if="showExplicitReadButton">
+                <TooltipTrigger as-child>
+                  <button
+                    class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white"
+                    :aria-label="readActionLabel"
+                    @click.stop="openPrimaryFileExplicit"
+                  >
+                    <BookOpen class="size-[12cqi]" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ readActionLabel }}</TooltipContent>
+              </Tooltip>
             </div>
 
             <!-- Center: primary thumbnail action -->
             <div class="flex-1 flex items-center justify-center">
-              <button
-                v-if="showPrimaryOverlayAction"
-                data-testid="grid-card-primary-action"
-                class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90"
-                :class="[showMobileOverlay || 'group-hover:scale-100', showMobileOverlay ? 'scale-100' : '']"
-                @click.stop="handlePrimaryOverlayAction"
-              >
-                <component :is="primaryOverlayActionIcon" class="size-[16cqi]" :class="primaryOverlayActionIconClass" />
-              </button>
+              <Tooltip v-if="showPrimaryOverlayAction">
+                <TooltipTrigger as-child>
+                  <button
+                    data-testid="grid-card-primary-action"
+                    class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90"
+                    :class="[showMobileOverlay || 'group-hover:scale-100', showMobileOverlay ? 'scale-100' : '']"
+                    :aria-label="primaryOverlayActionLabel"
+                    @click.stop="handlePrimaryOverlayAction"
+                  >
+                    <component :is="primaryOverlayActionIcon" class="size-[16cqi]" :class="primaryOverlayActionIconClass" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{{ primaryOverlayActionLabel }}</TooltipContent>
+              </Tooltip>
             </div>
 
             <!-- Bottom: title/author (hover-overlay mode only) + kebab (when not in below-cover label row) -->

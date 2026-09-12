@@ -4535,6 +4535,10 @@
     "actions": {
       "read": "Read",
       "listen": "Listen",
+      "startReading": "Start reading",
+      "continueReading": "Continue reading",
+      "startListening": "Start listening",
+      "continueListening": "Continue listening",
       "peek": "Peek",
       "quickView": "Quick View",
       "details": "Details",
@@ -5922,6 +5926,7 @@
         "unread": "Unread"
       },
       "series": {
+        "seriesRow": "Series row",
         "bookCount": "{count, plural, =0 {(no books)} one {(# book)} other {(# books)}}",
         "readOfCount": "{read} of {total} read"
       },
@@ -7236,7 +7241,11 @@
       "sidebar": {
         "title": "Sidebar",
         "mobileDescription": "Displays the mobile sidebar.",
-        "toggle": "Toggle Sidebar"
+        "toggle": "Toggle Sidebar",
+        "collapse": "Collapse sidebar",
+        "expand": "Expand sidebar",
+        "open": "Open sidebar",
+        "close": "Close sidebar"
       },
       "chipInput": {
         "typeAndEnter": "Type and press Enter to add",
