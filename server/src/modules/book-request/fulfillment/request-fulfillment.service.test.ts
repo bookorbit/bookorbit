@@ -554,6 +554,34 @@ describe('RequestFulfillmentService.grab from a picked release', () => {
   });
 
   /**
+   * The fetch happens later and elsewhere, so the row that resolved the release is the only thing
+   * that ever knows whether this source is allowed to live on a private address. Dropping it here
+   * is what made a self-hosted source pass Test and search, and then fail every grab.
+   */
+  it('carries the source private-address opt-in to the downloader', async () => {
+    const directRelease = { ...RELEASE, downloadUrl: 'https://curator.example/proxy/t', format: 'epub' };
+    const { service, direct } = makeService({
+      indexers: {
+        resolveConfig: vi.fn().mockResolvedValue({
+          id: 9,
+          name: 'Curator',
+          adapterType: 'curator',
+          allowPrivateAddress: true,
+          seedRatioGoal: null,
+        }),
+      },
+      releases: { find: vi.fn().mockReturnValue(directRelease) },
+      indexerAdapter: {
+        resolveFile: vi.fn().mockResolvedValue({ url: directRelease.downloadUrl, fileName: 'book.epub', sizeBytes: 1234, format: 'epub' }),
+      },
+    });
+
+    await service.grab(7, { indexerId: 9, releaseGuid: 'r-1' }, user());
+
+    expect(direct.add).toHaveBeenCalledWith(expect.objectContaining({ allowPrivate: true }));
+  });
+
+  /**
    * A direct source states its format out of band, and its URL often ends in something that is not
    * a filename at all. Staging that answer unchanged is how a release was reported ready, fetched
    * in full, and only then refused by an importer that classifies by extension alone.

@@ -67,7 +67,8 @@ when the request has one, and a colour that marks its releases in the release pi
 
 Private network addresses are refused unless you opt the row in with **Allow private address**. A
 self-hosted Prowlarr on the LAN is the common reason to; a public tracker resolving to a private
-address is not.
+address is not. The opt-in covers the whole of that row's work: searching it, and fetching a file
+from it when the source serves its own files rather than handing over a torrent.
 
 Two health facts are shown per row, and they answer different questions:
 

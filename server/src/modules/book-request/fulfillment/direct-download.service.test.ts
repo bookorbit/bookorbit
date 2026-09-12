@@ -27,11 +27,13 @@ describe('DirectDownloadService', () => {
   let service: DirectDownloadService;
   let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
   let downloads: { update: ReturnType<typeof vi.fn> };
+  let indexers: { findById: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     appDataPath = await mkdtemp(join(tmpdir(), 'bookorbit-http-'));
     downloads = { update: vi.fn().mockResolvedValue(undefined) };
-    service = new DirectDownloadService({ appDataPath } as never, downloads as never);
+    indexers = { findById: vi.fn().mockResolvedValue({ allowPrivateAddress: false }) };
+    service = new DirectDownloadService({ appDataPath } as never, downloads as never, indexers as never);
     fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -57,7 +59,7 @@ describe('DirectDownloadService', () => {
   it('writes the file into its staging directory and reports where it landed', async () => {
     fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
     const status = await settle();
 
     expect(status.state).toBe('completed');
@@ -200,7 +202,7 @@ describe('DirectDownloadService', () => {
   it('stages a nameless file under the format the source declared', async () => {
     fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/get', fileName: 'download', format: 'epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/get', fileName: 'download', format: 'epub', infoHash: HASH });
 
     expect((await settle()).contentPath).toBe(join(appDataPath, 'request-downloads', HASH, 'download.epub'));
   });
@@ -213,7 +215,7 @@ describe('DirectDownloadService', () => {
   it('accepts a content-length that does not divide evenly', async () => {
     fetchMock.mockResolvedValue(fileResponse('x'.repeat(187712), { 'content-length': '187712' }));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
 
     expect((await settle()).state).toBe('completed');
   });
@@ -306,7 +308,7 @@ describe('DirectDownloadService', () => {
         return Promise.resolve(fileResponse('a real epub would go here'));
       });
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       await until(() => handed !== undefined);
       // Well past the connect deadline, which by then has nothing left to say about the transfer.
       vi.advanceTimersByTime(90_000);
@@ -327,7 +329,7 @@ describe('DirectDownloadService', () => {
         });
       });
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       await until(() => asked);
       vi.advanceTimersByTime(31_000);
 
@@ -346,7 +348,7 @@ describe('DirectDownloadService', () => {
       const trickle = trickleResponse();
       fetchMock.mockResolvedValue(trickle.response);
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       // Ten minutes of transfer, for a file the old size-scaled budget allowed two.
       const chunk = 'another chunk of the audiobook';
       for (let minute = 0; minute < 10; minute++) {
@@ -366,7 +368,7 @@ describe('DirectDownloadService', () => {
       const trickle = trickleResponse();
       fetchMock.mockResolvedValue(trickle.response);
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       const chunk = 'the only chunk that ever arrives';
       trickle.push(chunk);
       await untilDownloaded(chunk.length);
@@ -380,7 +382,7 @@ describe('DirectDownloadService', () => {
   it('fails a response that is a web page rather than a file', async () => {
     fetchMock.mockResolvedValue(new Response('<html>not found</html>', { headers: { 'content-type': 'text/html; charset=utf-8' } }));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
     const status = await settle();
 
     expect(status.state).toBe('failed');
@@ -394,7 +396,7 @@ describe('DirectDownloadService', () => {
   it('names itself rather than letting Node announce the request as node', async () => {
     fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
     await settle();
 
     const [, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
@@ -404,7 +406,7 @@ describe('DirectDownloadService', () => {
   it('fails a file that declares itself past the size cap', async () => {
     fetchMock.mockResolvedValue(fileResponse('x', { 'content-length': String(64 * 1024 * 1024 * 1024) }));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/huge.m4b', fileName: 'huge.m4b', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/huge.m4b', fileName: 'huge.m4b', infoHash: HASH });
 
     expect((await settle()).state).toBe('failed');
   });
@@ -412,7 +414,7 @@ describe('DirectDownloadService', () => {
   it('fails an empty file rather than importing nothing', async () => {
     fetchMock.mockResolvedValue(fileResponse(''));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
 
     expect((await settle()).state).toBe('failed');
   });
@@ -424,7 +426,7 @@ describe('DirectDownloadService', () => {
   it('refuses a redirect to a private address', async () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 302, headers: { location: 'http://127.0.0.1:8080/secret' } }));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
 
     expect((await settle()).state).toBe('failed');
   });
@@ -432,7 +434,7 @@ describe('DirectDownloadService', () => {
   it('gives up rather than following redirects forever', async () => {
     fetchMock.mockResolvedValue(new Response('', { status: 302, headers: { location: 'https://archive.org/again' } }));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
     const status = await settle();
 
     expect(status.state).toBe('failed');
@@ -443,7 +445,7 @@ describe('DirectDownloadService', () => {
   it('keeps a traversing filename inside the download directory', async () => {
     fetchMock.mockResolvedValue(fileResponse('payload'));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/b', fileName: '../../escaped.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/b', fileName: '../../escaped.epub', infoHash: HASH });
     const status = await settle();
 
     expect(status.state).toBe('completed');
@@ -458,7 +460,7 @@ describe('DirectDownloadService', () => {
   it('connects only to the address that passed policy', async () => {
     fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
 
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
     await settle();
 
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ dispatcher: expect.any(Agent) });
@@ -475,7 +477,7 @@ describe('DirectDownloadService', () => {
 
   it('deletes only the staged copy, the library hardlink being a separate one', async () => {
     fetchMock.mockResolvedValue(fileResponse('payload'));
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
     await settle();
 
     await service.remove(HASH, { deleteFiles: true });
@@ -502,7 +504,7 @@ describe('DirectDownloadService', () => {
     it('leaves nothing behind when the server answers with a page rather than a file', async () => {
       fetchMock.mockResolvedValue(new Response('<html>not found</html>', { headers: { 'content-type': 'text/html' } }));
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       await settle();
 
       expect(await stagingExists()).toBe(false);
@@ -511,7 +513,7 @@ describe('DirectDownloadService', () => {
     it('leaves nothing behind when the file declares itself past the size cap', async () => {
       fetchMock.mockResolvedValue(fileResponse('x', { 'content-length': String(64 * 1024 * 1024 * 1024) }));
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/huge.m4b', fileName: 'huge.m4b', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/huge.m4b', fileName: 'huge.m4b', infoHash: HASH });
       await settle();
 
       expect(await stagingExists()).toBe(false);
@@ -520,7 +522,7 @@ describe('DirectDownloadService', () => {
     it('leaves nothing behind when the connection fails outright', async () => {
       fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       await settle();
 
       expect(await stagingExists()).toBe(false);
@@ -535,7 +537,7 @@ describe('DirectDownloadService', () => {
       });
       fetchMock.mockResolvedValue(new Response(body, { headers: { 'content-type': 'application/epub+zip' } }));
 
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       await settle();
 
       expect(await stagingExists()).toBe(false);
@@ -544,7 +546,7 @@ describe('DirectDownloadService', () => {
     /** Read once by the poll loop and then never again, so the entry must not outlive the process. */
     it('drops a terminal entry once nothing could still be reading it', async () => {
       fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       expect((await settle()).state).toBe('failed');
 
       const reported = await atLaterTime(11 * 60 * 1000, () => service.status([HASH]));
@@ -555,7 +557,7 @@ describe('DirectDownloadService', () => {
     /** Dropping it too early would replace the reason it failed with "the client has never heard of it". */
     it('keeps a terminal entry readable while the poll loop could still want it', async () => {
       fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       await settle();
 
       const state = await atLaterTime(60 * 1000, async () => (await service.status([HASH]))[0].state);
@@ -587,7 +589,7 @@ describe('DirectDownloadService', () => {
     it('never reaps a directory this process is downloading into', async () => {
       const trickle = trickleResponse();
       fetchMock.mockResolvedValue(trickle.response);
-      await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+      await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
       expect(await service.reapStaging(new Set())).toBe(0);
@@ -610,7 +612,7 @@ describe('DirectDownloadService', () => {
       },
     });
     fetchMock.mockResolvedValue(new Response(body, { headers: { 'content-type': 'application/epub+zip', 'content-length': '1000' } }));
-    await service.add({ fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
+    await service.add({ allowPrivate: false, fileUrl: 'https://archive.org/download/x/book.epub', fileName: 'book.epub', infoHash: HASH });
     await vi.waitFor(async () => {
       expect((await service.status([HASH]))[0].downloadedBytes).toBeGreaterThan(0);
     });
@@ -619,6 +621,76 @@ describe('DirectDownloadService', () => {
 
     await expect(service.status([HASH])).resolves.toEqual([]);
     await expect(stat(join(appDataPath, 'request-downloads', HASH))).rejects.toThrow();
+  });
+
+  /**
+   * The row's opt-in, not this service's opinion. A source an operator has already marked as
+   * living on their own network is reachable here for the same reason a torrent client on the LAN
+   * is: they said so about the row, and which of the row's two grab paths is taken is not a second
+   * question they were asked.
+   */
+  describe('private addresses', () => {
+    const PRIVATE_URL = 'http://192.168.1.10:8080/book.epub';
+
+    it('refuses a private address when the source has no opt-in', async () => {
+      await expect(service.add({ allowPrivate: false, fileUrl: PRIVATE_URL, fileName: 'book.epub', infoHash: HASH })).rejects.toThrow(
+        /private or local address/i,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('fetches a private address when the source has one', async () => {
+      fetchMock.mockResolvedValue(fileResponse('a real epub would go here'));
+
+      await service.add({ allowPrivate: true, fileUrl: PRIVATE_URL, fileName: 'book.epub', infoHash: HASH });
+
+      expect((await settle()).state).toBe('completed');
+      expect(fetchMock.mock.calls[0][0]).toBe(PRIVATE_URL);
+    });
+
+    /**
+     * Read off the source rather than remembered on the attempt: a row that has since been told to
+     * stop reaching private addresses must not go on doing it because a transfer outlived the
+     * change.
+     */
+    it('reads the policy off the source when resuming, and refuses a row that has lost it', async () => {
+      indexers.findById.mockResolvedValue({ allowPrivateAddress: false });
+
+      await expect(
+        service.resume({
+          id: 46,
+          indexerId: 7,
+          source: 'direct_url',
+          clientHash: HASH,
+          directUrl: PRIVATE_URL,
+          directFileName: 'book.epub',
+          directEtag: null,
+          directLastModified: null,
+          totalBytes: null,
+          status: 'downloading',
+        } as BookRequestDownloadRow),
+      ).rejects.toThrow(/private or local address/i);
+      expect(indexers.findById).toHaveBeenCalledWith(7);
+    });
+
+    /** A deleted source leaves `indexerId` null, and null is not permission. */
+    it('refuses a private address for an attempt whose source is gone', async () => {
+      await expect(
+        service.resume({
+          id: 47,
+          indexerId: null,
+          source: 'direct_url',
+          clientHash: HASH,
+          directUrl: PRIVATE_URL,
+          directFileName: 'book.epub',
+          directEtag: null,
+          directLastModified: null,
+          totalBytes: null,
+          status: 'downloading',
+        } as BookRequestDownloadRow),
+      ).rejects.toThrow(/private or local address/i);
+      expect(indexers.findById).not.toHaveBeenCalled();
+    });
   });
 });
 

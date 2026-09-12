@@ -285,6 +285,9 @@ export class RequestFulfillmentService {
           fileUrl: directUrl as string,
           fileName: directFileName as string,
           infoHash: grab.infoHash,
+          // The source's own opt-in. A hand-pasted link has no indexer behind it and so no row
+          // that could have said yes, which is the same answer as a row that never did.
+          allowPrivate: grab.allowPrivate === true,
         });
       } else {
         const config = await this.clients.resolveConfig(client.id);
@@ -622,6 +625,9 @@ export class RequestFulfillmentService {
         source: 'direct_url',
         fileUrl: file.url,
         fileName,
+        // Carried from the row that resolved it, because the fetch happens later and elsewhere:
+        // by then the only thing that knows where this source lives is this field.
+        allowPrivate: indexer.allowPrivateAddress,
         // A digest of the URL, because there is no infohash and the poll loop still needs a key.
         infoHash: createHash('sha1').update(file.url).digest('hex'),
         releaseFormat: file.format.slice(0, 20),
@@ -846,6 +852,8 @@ interface ParsedGrab {
   torrentFileName?: string;
   fileUrl?: string;
   fileName?: string;
+  /** The resolving indexer's `allowPrivateAddress`, for the fetch this grab turns into. */
+  allowPrivate?: boolean;
   releaseTitle: string;
   /** The size of what the release carries, which a magnet does not state. */
   releaseSizeBytes: number | null;
