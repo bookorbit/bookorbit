@@ -10,6 +10,7 @@ vi.mock('fs/promises', () => ({
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { access, lstat, readdir, readFile, stat, unlink } from 'fs/promises';
+import { DatabaseError } from 'pg';
 
 import {
   DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE,
@@ -1953,10 +1954,12 @@ describe('BookDockFinalizeService', () => {
   it('does not put a database error into the message a requester reads', async () => {
     const harness = makeService();
     const row = makeRow({ targetLibraryId: 5, targetFolderId: 9, unitDirectory: '/dock/request-7-Dune' });
+    const databaseError = Object.assign(new DatabaseError('syntax error at or near "asc"', 0, 'error'), { code: '42601' });
     const failure = Object.assign(new Error('Failed query: select "id" from "book_dock_unit_files" where ...'), {
-      cause: Object.assign(new Error('syntax error at or near "asc"'), { code: '42601' }),
+      cause: databaseError,
     });
     harness.repo.findUnitFiles.mockRejectedValue(failure);
+    const warn = vi.spyOn((harness.service as any).logger, 'warn').mockImplementation(() => {});
     vi.spyOn(harness.service as never, 'findLibraryOrFail').mockResolvedValue({
       id: 5,
       name: 'Books',
@@ -1973,6 +1976,51 @@ describe('BookDockFinalizeService', () => {
     expect(result.message).toBe('Filing this book failed inside BookOrbit. Check the server log for the cause.');
     expect(result.message).not.toContain('select');
     expect(result.message).not.toContain('book_dock_unit_files');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('errorClass=DatabaseError errorCode=42601'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('error="syntax error at or near \\"asc\\""'));
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('book_dock_unit_files'));
+  });
+
+  it.each(['EXDEV', 'EPERM', 'EACCES', 'ENOENT'])('logs %s from a failed file move without exposing paths to the requester', async (code) => {
+    const harness = makeService();
+    const row = makeRow({ absolutePath: '/dock/book.epub' });
+    const prepared = {
+      fileId: row.id,
+      fileName: row.fileName,
+      row,
+      status: 'ready',
+      destPath: '/library/book.epub',
+      library: { id: 5 },
+      folder: { id: 9, path: '/library' },
+      format: 'epub',
+      placement: [
+        {
+          sourcePath: '/dock/book.epub',
+          destPath: '/library/book.epub',
+          format: 'epub',
+          role: 'content',
+          sortOrder: 0,
+        },
+      ],
+    };
+    const failure = Object.assign(new Error(`${code}: move '/dock/book.epub' -> '/library/book.epub'`), { code });
+    harness.storage.moveToPath.mockRejectedValueOnce(failure);
+    vi.spyOn(harness.service as never, 'classifyDestination').mockResolvedValue(prepared as never);
+    const warn = vi.spyOn((harness.service as any).logger, 'warn').mockImplementation(() => {});
+
+    const result = await (harness.service as any).finalizePreparedCandidate(prepared, new Map());
+
+    expect(result).toEqual({
+      fileId: 1,
+      fileName: 'book.epub',
+      success: false,
+      message: 'Filing this book failed inside BookOrbit. Check the server log for the cause.',
+    });
+    expect(result.message).not.toContain('/dock');
+    expect(result.message).not.toContain('/library');
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      `[book_dock.finalize] [fail] fileId=1 stage=filing errorClass=Error errorCode=${code} error="${code}" - Book Dock file finalization failed`,
+    );
   });
 
   it('cleanupBookDockRecord deletes cover files and bucket row id', async () => {
@@ -2047,6 +2095,7 @@ describe('BookDockFinalizeService', () => {
 
   it('reports non-ENOENT destination access failures without moving the file', async () => {
     const { service, storage } = makeService();
+    const warn = vi.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
     const analysis = {
       fileId: 1,
       fileName: 'book.epub',
@@ -2061,7 +2110,13 @@ describe('BookDockFinalizeService', () => {
 
     const classified = await (service as any).classifyDestination(analysis, new Map());
 
-    expect(classified).toMatchObject({ status: 'error', message: 'permission denied' });
+    expect(classified).toMatchObject({
+      status: 'error',
+      message: 'Filing this book failed inside BookOrbit. Check the server log for the cause.',
+    });
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      '[book_dock.finalize] [fail] fileId=1 stage=destination_check errorClass=Error errorCode=EACCES error="EACCES" - Book Dock file finalization failed',
+    );
     expect(storage.moveToPath).not.toHaveBeenCalled();
   });
 

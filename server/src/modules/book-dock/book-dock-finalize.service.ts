@@ -14,6 +14,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } 
 import { access as fsAccess, readFile, rmdir, stat, unlink } from 'fs/promises';
 import { eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { DatabaseError } from 'pg';
 
 import type {
   AudiobookChapter,
@@ -424,7 +425,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       return { fileId: row.id, fileName: row.fileName, newName, success: true, bookId };
     } catch (err) {
       const message = resolveFinalizeErrorMessage(err);
-      this.logger.warn(`Finalize failed for Book Dock file ${row.id}: ${message}`);
+      this.logFinalizeFailure(row.id, 'filing', err);
       return { fileId: row.id, fileName: row.fileName, success: false, message };
     }
   }
@@ -605,11 +606,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       return { fileId: row.id, fileName: row.fileName, row, status: 'ready', newName, library, folder, format, destPath, placement, bookFolderPath };
     } catch (error) {
+      const status = classifyFinalizePreviewError(error);
+      if (status === 'error') this.logFinalizeFailure(row.id, 'target_resolution', error);
       return {
         fileId: row.id,
         fileName: row.fileName,
         row,
-        status: classifyFinalizePreviewError(error),
+        status,
         message: resolveFinalizeErrorMessage(error),
       };
     }
@@ -795,6 +798,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       await fsAccess(analysis.destPath);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return analysis;
+      this.logFinalizeFailure(analysis.fileId, 'destination_check', error);
       return {
         ...analysis,
         status: 'error',
@@ -817,6 +821,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       status: 'destination_conflict',
       message: 'A file with this name already exists at the target location',
     };
+  }
+
+  private logFinalizeFailure(fileId: number, stage: string, error: unknown): void {
+    const details = finalizeErrorLogDetails(error);
+    this.logger.warn(
+      `[book_dock.finalize] [fail] fileId=${fileId} stage=${stage} errorClass=${details.errorClass} errorCode=${details.errorCode} error="${sanitizeLogValue(details.message)}" - Book Dock file finalization failed`,
+    );
   }
 
   private destinationKey(libraryId: number, absolutePath: string): string {
@@ -1508,10 +1519,9 @@ function resolveFinalizeErrorMessage(error: unknown): string {
   if (isBookMetadataConstraintViolation(error)) {
     return INVALID_METADATA_MESSAGE;
   }
-  // A database error is not a sentence for a requester to read. One shipped verbatim - a whole
-  // failed SELECT, table and column names included - into the request drawer of the person who
-  // asked for the book. The detail belongs in the log, which already has the original error.
-  if (isDatabaseError(error)) {
+  // Infrastructure errors can contain SQL and absolute filesystem paths. They belong in the
+  // sanitized server log, not in the request drawer of the person who asked for the book.
+  if (isDatabaseError(error) || hasNodeStyleErrorCode(error)) {
     return INTERNAL_FAILURE_MESSAGE;
   }
   if (error instanceof Error && error.message) {
@@ -1521,14 +1531,34 @@ function resolveFinalizeErrorMessage(error: unknown): string {
 }
 
 /**
- * A `pg` error carries a five-character SQLSTATE. Drizzle wraps it in a `DrizzleQueryError` whose
- * own message is the failed query, so the chain is walked rather than the outermost error read.
+ * Drizzle wraps the driver's `DatabaseError` in a `DrizzleQueryError`, so the chain is walked
+ * rather than relying on the outermost error. Checking the concrete error type avoids mistaking
+ * five-character Node codes such as `EPERM` and `EXDEV` for SQLSTATE values.
  */
 function isDatabaseError(error: unknown): boolean {
   for (const entry of iterateErrorChain(error)) {
-    if (/^[0-9A-Z]{5}$/.test(asString(entry.code))) return true;
+    if (entry instanceof DatabaseError) return true;
   }
   return false;
+}
+
+function hasNodeStyleErrorCode(error: unknown): boolean {
+  for (const entry of iterateErrorChain(error)) {
+    if (/^E[A-Z0-9_]+$/.test(asString(entry.code))) return true;
+  }
+  return false;
+}
+
+function finalizeErrorLogDetails(error: unknown): { errorClass: string; errorCode: string; message: string } {
+  let selected: Record<string, unknown> | undefined;
+  for (const entry of iterateErrorChain(error)) selected = entry;
+
+  const errorCode = asString(selected?.code) || 'none';
+  const errorClass =
+    selected instanceof Error ? selected.constructor.name : asString(selected?.name) || (error instanceof Error ? error.constructor.name : 'Error');
+  const message = hasNodeStyleErrorCode(error) ? errorCode : asString(selected?.message) || (error instanceof Error ? error.message : String(error));
+
+  return { errorClass, errorCode, message };
 }
 
 function isPublishedYearConstraintViolation(error: unknown): boolean {
