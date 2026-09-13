@@ -16,14 +16,14 @@ export class OpdsService {
       now,
       [xmlLink('self', BASE, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), ...this.searchLinks()],
       [
-        this.navEntry('urn:bookorbit:all', 'All Books', 'Browse the full catalog', `${BASE}/catalog`, now),
-        this.navEntry('urn:bookorbit:recent', 'Recent Books', 'Recently added books', `${BASE}/recent`, now),
-        this.navEntry('urn:bookorbit:surprise', 'Random Books', '25 random picks', `${BASE}/surprise`, now),
-        this.navEntry('urn:bookorbit:libraries', 'Libraries', 'Browse by library', `${BASE}/libraries`, now),
-        this.navEntry('urn:bookorbit:collections', 'Collections', 'Browse your collections', `${BASE}/collections`, now),
-        this.navEntry('urn:bookorbit:smartScopes', 'SmartScopes', 'Browse your smartScopes', `${BASE}/smart-scopes`, now),
-        this.navEntry('urn:bookorbit:authors', 'Authors', 'Browse by author', `${BASE}/authors`, now),
-        this.navEntry('urn:bookorbit:series', 'Series', 'Browse by series', `${BASE}/series`, now),
+        this.navEntry('urn:bookorbit:all', 'All Books', 'Browse the full catalog', `${BASE}/catalog`, now, OPDS_MIME_ACQ),
+        this.navEntry('urn:bookorbit:recent', 'Recent Books', 'Recently added books', `${BASE}/recent`, now, OPDS_MIME_ACQ),
+        this.navEntry('urn:bookorbit:surprise', 'Random Books', '25 random picks', `${BASE}/surprise`, now, OPDS_MIME_ACQ),
+        this.navEntry('urn:bookorbit:libraries', 'Libraries', 'Browse by library', `${BASE}/libraries`, now, OPDS_MIME_NAV),
+        this.navEntry('urn:bookorbit:collections', 'Collections', 'Browse your collections', `${BASE}/collections`, now, OPDS_MIME_NAV),
+        this.navEntry('urn:bookorbit:smartScopes', 'SmartScopes', 'Browse your smartScopes', `${BASE}/smart-scopes`, now, OPDS_MIME_NAV),
+        this.navEntry('urn:bookorbit:authors', 'Authors', 'Browse by author', `${BASE}/authors`, now, OPDS_MIME_NAV),
+        this.navEntry('urn:bookorbit:series', 'Series', 'Browse by series', `${BASE}/series`, now, OPDS_MIME_NAV),
       ],
     );
   }
@@ -31,7 +31,7 @@ export class OpdsService {
   generateLibrariesNavigation(libs: { id: number; name: string; bookCount: number }[]): string {
     const now = new Date().toISOString();
     const entries = libs.map((lib) =>
-      this.navEntry(`urn:bookorbit:library:${lib.id}`, lib.name, `${lib.bookCount} books`, `${BASE}/catalog?libraryId=${lib.id}`, now),
+      this.navEntry(`urn:bookorbit:library:${lib.id}`, lib.name, `${lib.bookCount} books`, `${BASE}/catalog?libraryId=${lib.id}`, now, OPDS_MIME_ACQ),
     );
     return this.wrapFeed(
       'Libraries',
@@ -45,7 +45,14 @@ export class OpdsService {
   generateCollectionsNavigation(cols: { id: number; name: string; bookCount: number }[]): string {
     const now = new Date().toISOString();
     const entries = cols.map((col) =>
-      this.navEntry(`urn:bookorbit:collection:${col.id}`, col.name, `${col.bookCount} books`, `${BASE}/catalog?collectionId=${col.id}`, now),
+      this.navEntry(
+        `urn:bookorbit:collection:${col.id}`,
+        col.name,
+        `${col.bookCount} books`,
+        `${BASE}/catalog?collectionId=${col.id}`,
+        now,
+        OPDS_MIME_ACQ,
+      ),
     );
     return this.wrapFeed(
       'Collections',
@@ -65,6 +72,7 @@ export class OpdsService {
         'Dynamic smartScope',
         `${BASE}/catalog?smartScopeId=${smartScope.id}`,
         now,
+        OPDS_MIME_ACQ,
       ),
     );
     return this.wrapFeed(
@@ -85,6 +93,7 @@ export class OpdsService {
         `${a.bookCount} books`,
         `${BASE}/catalog?author=${encodeURIComponent(a.name)}`,
         now,
+        OPDS_MIME_ACQ,
       ),
     );
     return this.wrapFeed(
@@ -105,6 +114,7 @@ export class OpdsService {
         `${s.bookCount} books`,
         s.id != null ? `${BASE}/catalog?seriesId=${s.id}` : `${BASE}/catalog?series=${encodeURIComponent(s.name)}`,
         now,
+        OPDS_MIME_ACQ,
       ),
     );
     return this.wrapFeed(
@@ -223,14 +233,14 @@ export class OpdsService {
     return [xmlLink('search', `${BASE}/search.opds`, OPDS_MIME_SEARCH), xmlLink('search', SEARCH_TEMPLATE, OPDS_MIME_ATOM, 'Search')];
   }
 
-  private navEntry(id: string, title: string, content: string, href: string, updated: string): string {
+  private navEntry(id: string, title: string, content: string, href: string, updated: string, type: string): string {
     return [
       '<entry>',
       `  ${xmlEl('title', title)}`,
       `  ${xmlEl('id', id)}`,
       `  ${xmlEl('updated', updated)}`,
       `  <content type="text">${esc(content)}</content>`,
-      `  ${xmlLink('subsection', href, OPDS_MIME_NAV)}`,
+      `  ${xmlLink('subsection', href, type)}`,
       '</entry>',
     ].join('\n');
   }
