@@ -74,7 +74,10 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
       @click="handleToggle"
     >
       <span class="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{{ label }}</span>
-      <span v-if="showCount" class="shrink-0 rounded-md bg-(--shell-accent-tint) px-1.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+      <span
+        v-if="showCount"
+        class="shrink-0 rounded-md bg-(--shell-accent-tint) px-1.5 text-[11px] font-semibold tabular-nums text-sidebar-count-foreground"
+      >
         {{ formatCompactNumber(count ?? 0) }}
       </span>
       <ChevronDown

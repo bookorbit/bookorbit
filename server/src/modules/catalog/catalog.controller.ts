@@ -10,38 +10,38 @@ export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
   @Get('authors')
-  searchAuthors(@Query() query: SearchCatalogQueryDto) {
-    return this.catalogService.searchAuthors(query.q);
+  searchAuthors(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchAuthors(user, query.q);
   }
 
   @Get('genres')
-  searchGenres(@Query() query: SearchCatalogQueryDto) {
-    return this.catalogService.searchGenres(query.q);
+  searchGenres(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchGenres(user, query.q);
   }
 
   @Get('tags')
-  searchTags(@Query() query: SearchCatalogQueryDto) {
-    return this.catalogService.searchTags(query.q);
+  searchTags(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchTags(user, query.q);
   }
 
   @Get('narrators')
-  searchNarrators(@Query() query: SearchCatalogQueryDto) {
-    return this.catalogService.searchNarrators(query.q);
+  searchNarrators(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchNarrators(user, query.q);
   }
 
   @Get('publishers')
-  searchPublishers(@Query() query: SearchCatalogQueryDto) {
-    return this.catalogService.searchPublishers(query.q);
+  searchPublishers(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchPublishers(user, query.q);
   }
 
   @Get('series')
-  searchSeries(@Query() query: SearchCatalogQueryDto) {
-    return this.catalogService.searchSeries(query.q);
+  searchSeries(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchSeries(user, query.q);
   }
 
   @Get('languages')
-  searchLanguages(@Query() query: SearchCatalogQueryDto) {
-    return this.catalogService.searchLanguages(query.q);
+  searchLanguages(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchLanguages(user, query.q);
   }
 
   @Get('collections')

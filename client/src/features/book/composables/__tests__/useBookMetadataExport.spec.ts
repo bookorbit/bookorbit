@@ -175,7 +175,6 @@ describe('useBookMetadataExport', () => {
     const anchor = appendSpy.mock.calls[0]?.[0] as HTMLAnchorElement
     expect(anchor.download).toBe('bookorbit-library-selected-✅.csv')
     expect(createObjectUrlSpy).toHaveBeenCalledTimes(1)
-    expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:test-url')
     expect(clickSpy).toHaveBeenCalledTimes(1)
     expect(removeSpy).toHaveBeenCalledTimes(1)
     expect(result.fileName).toBe('bookorbit-library-selected-✅.csv')

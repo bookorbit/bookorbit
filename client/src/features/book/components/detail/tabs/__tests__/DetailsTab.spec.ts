@@ -3,6 +3,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import type { BookDetail } from '@bookorbit/types'
 import DetailsTab from '../DetailsTab.vue'
+import BookReadingActivityCard from '../../details/BookReadingActivityCard.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
 const mocks = vi.hoisted(() => ({
@@ -109,6 +110,7 @@ const RouterLinkStub = defineComponent({
 })
 
 let mountedWrappers: Array<{ unmount: () => void }> = []
+let resizeObserverCallbacks: ResizeObserverCallback[] = []
 
 function mountDetails(book: BookDetail) {
   const wrapper = shallowMount(DetailsTab, {
@@ -117,6 +119,7 @@ function mountDetails(book: BookDetail) {
       stubs: {
         BookCoverArtwork: false,
         BookCoverSurface: false,
+        BookReadingActivityCard: false,
         RouterLink: RouterLinkStub,
         Popover: { template: '<div><slot /><slot name="content" /></div>' },
         PopoverTrigger: { template: '<div><slot /></div>' },
@@ -133,7 +136,7 @@ function mountDetails(book: BookDetail) {
 
 async function loadCoverImages(wrapper: ReturnType<typeof mountDetails>, naturalWidth = 1000, naturalHeight = 1000) {
   const imgs = wrapper.findAll(`img[alt="${wrapper.props('book').title}"]`)
-  expect(imgs.length).toBe(2)
+  expect(imgs.length).toBe(1)
 
   for (const img of imgs) {
     Object.defineProperty(img.element, 'naturalWidth', { configurable: true, value: naturalWidth })
@@ -146,6 +149,7 @@ describe('DetailsTab cover surface', () => {
   const { bookSpineOverlay, bookCoverDisplayMode } = useDisplaySettings()
 
   beforeEach(() => {
+    resizeObserverCallbacks = []
     mocks.api.mockReset()
     mocks.push.mockReset()
     mocks.hasPermission.mockReset()
@@ -155,7 +159,7 @@ describe('DetailsTab cover surface', () => {
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)
       if (url.includes('/metadata-score/weights')) return response({})
-      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/playback-state')) return response(null)
       if (url.includes('/collections/membership')) return response([])
       if (url.includes('/kobo-state')) {
         return response({
@@ -173,6 +177,10 @@ describe('DetailsTab cover surface', () => {
     vi.stubGlobal(
       'ResizeObserver',
       class {
+        constructor(callback: ResizeObserverCallback) {
+          resizeObserverCallbacks.push(callback)
+        }
+
         observe() {}
         unobserve() {}
         disconnect() {}
@@ -200,14 +208,14 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const surfaces = wrapper.findAll('.book-cover-surface')
-    expect(surfaces.length).toBe(2)
+    expect(surfaces.length).toBe(1)
     expect(surfaces.every((surface) => surface.attributes('data-cover-spine') === 'strong')).toBe(true)
     expect(wrapper.findAll('.book-cover-spine-layer').length).toBe(0)
 
     await loadCoverImages(wrapper)
 
     const spineLayers = wrapper.findAll('.book-cover-spine-layer')
-    expect(spineLayers.length).toBe(2)
+    expect(spineLayers.length).toBe(1)
     expect(spineLayers[0]!.attributes('style')).toContain('translateY(-50%)')
   })
 
@@ -219,8 +227,77 @@ describe('DetailsTab cover surface', () => {
     await loadCoverImages(wrapper, 1200, 600)
 
     const surfaces = wrapper.findAll('.book-cover-surface')
-    expect(surfaces.length).toBe(2)
+    expect(surfaces.length).toBe(1)
     expect(surfaces.every((surface) => surface.attributes('style')?.includes('aspect-ratio: 2 / 1'))).toBe(true)
+  })
+
+  it('constrains cover width to the column height remaining above its actions', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const surface = wrapper.get('.book-cover-surface')
+    const frame = surface.element.parentElement as HTMLElement
+    const column = wrapper.get<HTMLElement>('[data-test="cover-column"]')
+    const actions = wrapper.get<HTMLElement>('[data-test="cover-actions"]')
+
+    Object.defineProperty(column.element, 'clientHeight', { configurable: true, value: 320 })
+    vi.spyOn(actions.element, 'getBoundingClientRect').mockReturnValue({ height: 84 } as DOMRect)
+
+    resizeObserverCallbacks.at(-1)?.([], {} as ResizeObserver)
+    await flushPromises()
+
+    expect(frame.style.maxWidth).toBe('')
+    expect(frame.style.getPropertyValue('--detail-cover-max-width')).toBe('146px')
+    expect(frame.classList).toContain('@min-[46rem]/book-detail:max-w-[var(--detail-cover-max-width)]')
+  })
+
+  it('anchors wide-layout covers beside the top of the metadata column', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const surface = wrapper.get('.book-cover-surface')
+    const slot = surface.element.parentElement?.parentElement as HTMLElement
+
+    expect(slot.classList).toContain('@min-[46rem]/book-detail:items-start')
+    expect(slot.classList).toContain('@min-[46rem]/book-detail:justify-end')
+    expect(slot.classList).not.toContain('@min-[46rem]/book-detail:items-center')
+  })
+
+  it('keeps wide-layout actions immediately after the cover instead of at the bottom of the column', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const column = wrapper.get<HTMLElement>('[data-test="cover-column"]')
+    const actions = wrapper.get<HTMLElement>('[data-test="cover-actions"]')
+    const coverRow = column.element.firstElementChild as HTMLElement
+
+    expect(actions.element.parentElement).toBe(column.element)
+    expect(coverRow.nextElementSibling).toBe(actions.element)
+    expect(coverRow.classList).not.toContain('@min-[46rem]/book-detail:flex-1')
+  })
+
+  it('lets the discovery shelf follow the natural height of the detail content', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const layout = wrapper.get<HTMLElement>('[data-test="details-layout"]')
+    const shelf = wrapper.get<HTMLElement>('[data-test="discovery-shelf"]')
+
+    expect(shelf.element.parentElement).toBe(layout.element)
+    expect(layout.element.classList).toContain('@min-[46rem]/book-detail:content-start')
+    expect(layout.element.classList).not.toContain('@min-[46rem]/book-detail:h-full')
+    expect(layout.element.classList).not.toContain('@min-[46rem]/book-detail:grid-rows-[minmax(0,1fr)_clamp(11.25rem,29%,17.5rem)]')
+  })
+
+  it('uses the responsive synopsis clamp until the full description is opened', async () => {
+    const wrapper = mountDetails(makeBook({ description: '<p>A synopsis</p>' }))
+    await flushPromises()
+
+    const synopsis = wrapper.get<HTMLElement>('[data-test="synopsis-copy"]')
+
+    expect(synopsis.element.classList).toContain('synopsis-copy--clamped')
+    await wrapper.get(`[aria-controls="book-${wrapper.props('book').id}-synopsis"]`).trigger('click')
+    expect(synopsis.element.classList).not.toContain('synopsis-copy--clamped')
   })
 
   it('forces spine overlay off for audiobook details covers', async () => {
@@ -245,7 +322,7 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const surfaces = wrapper.findAll('.book-cover-surface')
-    expect(surfaces.length).toBe(2)
+    expect(surfaces.length).toBe(1)
     expect(surfaces.every((surface) => surface.attributes('data-cover-spine') === 'off')).toBe(true)
 
     await loadCoverImages(wrapper)
@@ -305,11 +382,51 @@ describe('DetailsTab cover surface', () => {
     expect(wrapper.get('[data-test="hidden-genres"]').text()).toContain('Mystery')
   })
 
+  it('fully expands the synopsis without creating a nested scroll area', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        description: '<p>First paragraph.</p><p>Second paragraph with enough content to continue beyond the collapsed preview.</p>',
+      }),
+    )
+    await flushPromises()
+
+    const synopsis = wrapper.get('[data-test="synopsis-copy"]')
+    expect(synopsis.html()).toContain('Second paragraph')
+
+    const toggle = wrapper.findAll('button').find((button) => button.text() === 'Show more')
+    expect(toggle).toBeDefined()
+    expect(toggle!.attributes('aria-controls')).toBe('book-12-synopsis')
+    expect(toggle!.attributes('aria-expanded')).toBe('false')
+    expect(synopsis.attributes('id')).toBe('book-12-synopsis')
+    await toggle!.trigger('click')
+
+    expect(synopsis.classes()).not.toContain('synopsis-copy--clamped')
+    expect(synopsis.classes()).not.toContain('max-h-44')
+    expect(synopsis.classes()).not.toContain('overflow-y-auto')
+    expect(toggle!.text()).toBe('Show less')
+    expect(toggle!.attributes('aria-expanded')).toBe('true')
+
+    await toggle!.trigger('click')
+
+    expect(synopsis.classes()).toContain('synopsis-copy--clamped')
+    expect(toggle!.text()).toBe('Show more')
+    expect(toggle!.attributes('aria-expanded')).toBe('false')
+  })
+
+  it('keeps the reading activity card tall enough for its content', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const activityCard = wrapper.getComponent(BookReadingActivityCard)
+    expect(activityCard.classes()).toContain('@min-[46rem]/book-detail:flex-1')
+    expect(activityCard.classes().some((className) => className.includes('min-h-0'))).toBe(false)
+  })
+
   it('summarizes pending Kobo sync state for each affected device', async () => {
     mocks.api.mockImplementation(async (input) => {
       const url = String(input)
       if (url.includes('/metadata-score/weights')) return response({})
-      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/playback-state')) return response(null)
       if (url.includes('/collections/membership')) return response([])
       if (url.includes('/kobo-state')) {
         return response({
@@ -363,11 +480,11 @@ describe('DetailsTab cover surface', () => {
       makeBook({
         seriesId: 20,
         seriesName: 'Mistborn Era 2',
-        seriesIndex: 4,
+        seriesIndex: '4',
         seriesMemberships: [
           { seriesId: 22, seriesName: 'Cosmere', seriesIndex: null, displayOrder: 2, expectedBookCount: null },
-          { seriesId: 20, seriesName: 'Mistborn Era 2', seriesIndex: 4, displayOrder: 0, expectedBookCount: null },
-          { seriesId: 21, seriesName: 'Mistborn Saga', seriesIndex: 7.5, displayOrder: 1, expectedBookCount: null },
+          { seriesId: 20, seriesName: 'Mistborn Era 2', seriesIndex: '4', displayOrder: 0, expectedBookCount: null },
+          { seriesId: 21, seriesName: 'Mistborn Saga', seriesIndex: '7.5', displayOrder: 1, expectedBookCount: null },
         ],
       }),
     )
@@ -389,7 +506,7 @@ describe('DetailsTab cover surface', () => {
       makeBook({
         seriesId: 20,
         seriesName: 'Mistborn Era 2',
-        seriesIndex: 4,
+        seriesIndex: '4',
       }),
     )
     await flushPromises()
@@ -444,7 +561,7 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const sendButtons = wrapper.findAll('button[aria-label="Send via Email"]')
-    expect(sendButtons).toHaveLength(2)
+    expect(sendButtons).toHaveLength(1)
 
     // Find the stubbed SendBookDialog
     const sendDialog = wrapper.findComponent({ name: 'SendBookDialog' })
@@ -464,7 +581,7 @@ describe('DetailsTab cover surface', () => {
     expect(sendButtons.length).toBe(0)
   })
 
-  it('offers reset in both overflow menus and refreshes supplemental reading state after confirmation', async () => {
+  it('offers reset in the overflow menu and refreshes supplemental reading state after confirmation', async () => {
     mocks.hasPermission.mockImplementation(
       (permission) => permission === 'library_edit_metadata' || permission === 'kobo_sync' || permission === 'koreader_sync',
     )
@@ -472,7 +589,7 @@ describe('DetailsTab cover surface', () => {
     await flushPromises()
 
     const resetButtons = wrapper.findAll('button').filter((button) => button.text().includes('Reset reading state'))
-    expect(resetButtons).toHaveLength(2)
+    expect(resetButtons).toHaveLength(1)
 
     const resetDialog = wrapper.findComponent({ name: 'ResetReadingStateDialog' })
     expect(resetDialog.exists()).toBe(true)
@@ -540,7 +657,7 @@ describe('DetailsTab cover surface', () => {
       const url = String(input)
       if (url.endsWith('/added-at')) return response(updated)
       if (url.includes('/metadata-score/weights')) return response({})
-      if (url.includes('/audio-progress')) return response(null)
+      if (url.includes('/playback-state')) return response(null)
       if (url.includes('/collections/membership')) return response([])
       if (url.includes('/kobo-state')) return response({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] })
       if (url.includes('/koreader/books/')) return response(null)
@@ -577,6 +694,25 @@ describe('DetailsTab cover surface', () => {
     await wrapper.get('button[aria-label="Edit date added"]').trigger('click')
 
     expect((wrapper.get('input[aria-label="Added"]').element as HTMLInputElement).value).toBe('2022-07-13')
+  })
+
+  it('keeps projected reading dates on their canonical day west of UTC', async () => {
+    mocks.user.value.settings.timezone = 'America/Sao_Paulo'
+    const wrapper = mountDetails(
+      makeBook({
+        readStatus: {
+          status: 'read',
+          source: 'auto',
+          startedAt: '2026-09-07T00:00:00.000Z',
+          finishedAt: '2026-09-07T00:00:00Z',
+          updatedAt: '2026-09-07T00:00:00.000Z',
+        },
+      }),
+    )
+    await flushPromises()
+
+    expect(wrapper.text().match(/Sep 7, 2026/g)).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('Sep 6, 2026')
   })
 
   it('hides added date editing when the user cannot edit metadata', async () => {

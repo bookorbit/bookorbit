@@ -1,0 +1,2 @@
+ALTER TABLE "libraries" ADD COLUMN "added_at_source" varchar(20) DEFAULT 'imported' NOT NULL;--> statement-breakpoint
+ALTER TABLE "libraries" ADD CONSTRAINT "libraries_added_at_source_chk" CHECK ("libraries"."added_at_source" in ('imported', 'file_modified', 'file_created'));

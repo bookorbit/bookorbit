@@ -9,6 +9,7 @@ export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   title: "Neuromancer",
   subtitle: "20th Anniversary Edition",
   authors: "William Gibson",
+  narrators: "Robertson Dean",
   year: "1984",
   series: "Sprawl",
   seriesIndex: "01",
@@ -24,6 +25,7 @@ export const PATTERN_TOKENS = [
   { token: "title", description: "Book title" },
   { token: "subtitle", description: "Book subtitle" },
   { token: "authors", description: "Author(s), comma-separated" },
+  { token: "narrators", description: "Narrator(s), comma-separated" },
   { token: "year", description: "Publication year" },
   { token: "series", description: "Series name" },
   { token: "seriesIndex", description: "Series index (zero-padded)" },
@@ -90,13 +92,21 @@ export function applyModifier(value: string, modifier: string, fieldName: string
       }
       return target.charAt(0).toUpperCase();
     }
+    case "max3": {
+      const parts = value
+        .split(", ")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      return parts.length > 3 ? "" : parts.join(", ");
+    }
     case "upper":
       return value.toUpperCase();
     case "lower":
       return value.toLowerCase();
     case "fixed2": {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric.toFixed(2) : value;
+      if (!/^\d+(?:\.\d+)?$/.test(value)) return value;
+      const [whole, fraction] = value.split(".");
+      return `${whole}.${(fraction ?? "").padEnd(2, "0")}`;
     }
     default:
       return value;
@@ -112,7 +122,11 @@ function resolveModifierPlaceholders(block: string, values: Record<string, strin
 
 function checkAllPlaceholdersPresent(block: string, values: Record<string, string>): boolean {
   const matches = [...block.matchAll(MODIFIER_PLACEHOLDER_REGEX)];
-  return matches.every((m) => values[m[1]]?.trim());
+  return matches.every(([, fieldName, modifier]) => {
+    const raw = values[fieldName] ?? "";
+    if (!raw.trim()) return false;
+    return (modifier ? applyModifier(raw, modifier, fieldName) : raw).trim().length > 0;
+  });
 }
 
 export function replacePlaceholders(pattern: string, values: Record<string, string>): string {
@@ -161,6 +175,22 @@ function stripTrailingDotsAndSpaces(value: string): string {
   let end = value.length;
   while (end > 0 && (value[end - 1] === "." || value[end - 1] === " ")) end -= 1;
   return end === value.length ? value : value.slice(0, end);
+}
+
+/**
+ * Token values are sanitized before modifiers and literal pattern text run, so an assembled
+ * segment can still end in a dot or space: `{authors:sort}` rewrites "J.K. Rowling" to
+ * "Rowling, J.K.". Windows and SMB reject those names and serve a mangled 8.3 alias instead.
+ * Only the trailing run is trimmed here; re-running sanitizePathSegment would append a second
+ * reserved-name guard ("NUL.txt_" -> "NUL.txt__").
+ */
+function normalizeResolvedSegments(path: string, options: Required<PathResolverOptions>): string {
+  if (!options.sanitizeForCrossPlatform || !path) return path;
+
+  return path
+    .split("/")
+    .map((segment) => (segment ? stripTrailingDotsAndSpaces(segment) || options.replacementCharacter : segment))
+    .join("/");
 }
 
 function sanitizeResolutionValues(values: Record<string, string>, options: Required<PathResolverOptions>): Record<string, string> {
@@ -263,7 +293,7 @@ function limitPathSegmentBytes(path: string, dotExt: string): string {
 export function resolveUploadPath(pattern: string, values: Record<string, string>, ext: string, options?: PathResolverOptions): string | null {
   const normalizedOptions = normalizeResolverOptions(options);
   const resolvedValues = sanitizeResolutionValues(values, normalizedOptions);
-  const resolved = replacePlaceholders(pattern, resolvedValues);
+  const resolved = normalizeResolvedSegments(replacePlaceholders(pattern, resolvedValues), normalizedOptions);
   if (!resolved) return null;
 
   const dotExt = normalizeDotExt(ext);
@@ -287,7 +317,7 @@ export function resolveUploadPath(pattern: string, values: Record<string, string
 export function resolveDownloadFilename(pattern: string, values: Record<string, string>, ext: string, options?: PathResolverOptions): string | null {
   const normalizedOptions = normalizeResolverOptions(options);
   const resolvedValues = sanitizeResolutionValues(values, normalizedOptions);
-  const resolved = replacePlaceholders(pattern, resolvedValues);
+  const resolved = normalizeResolvedSegments(replacePlaceholders(pattern, resolvedValues), normalizedOptions);
   if (!resolved) return null;
 
   const dotExt = normalizeDotExt(ext);

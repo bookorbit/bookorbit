@@ -28,6 +28,7 @@ describe('published-date utils', () => {
     expect(parsePublishedDateKey('1965/8/1')).toBe('1965-08-01');
     expect(parsePublishedDateKey('1965-08-01T12:30:00Z')).toBe('1965-08-01');
     expect(parsePublishedDateKey('August 1, 1965')).toBe('1965-08-01');
+    expect(parsePublishedDateKey('January 1, 2020')).toBe('2020-01-01');
     expect(parsePublishedDateKey('1965')).toBeUndefined();
   });
 

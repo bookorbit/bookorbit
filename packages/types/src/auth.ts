@@ -1,10 +1,22 @@
 export enum LoginErrorCode {
   ACCOUNT_LOCKED = "account_locked",
+  PASSWORD_AUTH_DISABLED = "password_auth_disabled",
 }
+
+export const AuthenticationMethod = {
+  Password: "password",
+  Oidc: "oidc",
+  MagicLink: "magic_link",
+  Setup: "setup",
+  Legacy: "legacy",
+} as const;
+
+export type AuthenticationMethod = (typeof AuthenticationMethod)[keyof typeof AuthenticationMethod];
 
 export enum OidcErrorCode {
   STATE_EXPIRED = "oidc_state_expired",
   PRIVATE_ISSUER_ADDRESS = "oidc_private_issuer_address",
+  TLS_CERTIFICATE_UNTRUSTED = "oidc_tls_certificate_untrusted",
   TOKEN_EXCHANGE_FAILED = "oidc_token_exchange_failed",
   USER_NOT_PROVISIONED = "oidc_user_not_provisioned",
   USER_INACTIVE = "oidc_user_inactive",
@@ -48,6 +60,7 @@ export interface AuthUser {
   settings: UserSettings;
   avatarUrl?: string | null;
   provisioningMethod: ProvisioningMethod;
+  authenticationMethod?: AuthenticationMethod;
   permissions: string[];
 }
 
@@ -67,6 +80,12 @@ export interface OidcProviderPublic {
   iconUrl?: string | null;
   clientId: string;
   scopes: string;
+}
+
+export interface LoginOptionsResponse {
+  passwordLoginEnabled: boolean;
+  allowRegistration: boolean;
+  oidcProviders: OidcProviderPublic[];
 }
 
 export interface OidcProviderConfig {

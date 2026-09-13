@@ -10,17 +10,33 @@ import { useSeriesList } from './useSeriesList'
 
 const mockFetchSeries = vi.mocked(fetchSeries)
 
+const EMPTY_FACETS: SeriesPage['facets'] = { all: 0, notStarted: 0, inProgress: 0, complete: 0, hasGaps: 0 }
+
 function makeSeries(overrides: Partial<SeriesPage['items'][number]> = {}): SeriesPage['items'][number] {
   return {
     id: 42,
     name: 'Series',
     bookCount: 1,
     readCount: 0,
+    readingCount: 0,
     authors: [],
     coverBookIds: [],
     lastAddedAt: null,
+    libraryNames: [],
+    expectedBookCount: null,
+    volumes: [],
+    volumesTruncated: false,
+    gaps: [],
+    gapCount: 0,
+    nextBookId: null,
+    nextIndex: null,
+    nextTitle: null,
     ...overrides,
   }
+}
+
+function makePage(overrides: Partial<SeriesPage> = {}): SeriesPage {
+  return { items: [], total: 0, page: 0, size: 50, facets: { ...EMPTY_FACETS }, ...overrides }
 }
 
 describe('useSeriesList', () => {
@@ -42,12 +58,14 @@ describe('useSeriesList', () => {
   })
 
   it('loads first page and populates items', async () => {
-    mockFetchSeries.mockResolvedValue({
-      items: [makeSeries({ name: 'Harry Potter', bookCount: 7, readCount: 3, authors: ['J.K. Rowling'], coverBookIds: [1] })],
-      total: 1,
-      page: 0,
-      size: 50,
-    })
+    mockFetchSeries.mockResolvedValue(
+      makePage({
+        items: [makeSeries({ name: 'Harry Potter', bookCount: 7, readCount: 3, authors: ['J.K. Rowling'], coverBookIds: [1] })],
+        total: 1,
+        page: 0,
+        size: 50,
+      }),
+    )
 
     const { items, total, loading, load } = useSeriesList()
     await load(true)
@@ -61,18 +79,8 @@ describe('useSeriesList', () => {
 
   it('appends items on subsequent loads', async () => {
     mockFetchSeries
-      .mockResolvedValueOnce({
-        items: [makeSeries({ id: 1, name: 'Series A', bookCount: 3 })],
-        total: 2,
-        page: 0,
-        size: 50,
-      })
-      .mockResolvedValueOnce({
-        items: [makeSeries({ id: 2, name: 'Series B', bookCount: 5, readCount: 1 })],
-        total: 2,
-        page: 1,
-        size: 50,
-      })
+      .mockResolvedValueOnce(makePage({ items: [makeSeries({ id: 1, name: 'Series A', bookCount: 3 })], total: 2, page: 0 }))
+      .mockResolvedValueOnce(makePage({ items: [makeSeries({ id: 2, name: 'Series B', bookCount: 5, readCount: 1 })], total: 2, page: 1 }))
 
     const { items, load } = useSeriesList()
     await load(true)
@@ -84,23 +92,13 @@ describe('useSeriesList', () => {
   })
 
   it('resets state on load(true)', async () => {
-    mockFetchSeries.mockResolvedValue({
-      items: [makeSeries({ name: 'Series A' })],
-      total: 1,
-      page: 0,
-      size: 50,
-    })
+    mockFetchSeries.mockResolvedValue(makePage(makePage({ items: [makeSeries({ name: 'Series A' })], total: 1, page: 0 })))
 
     const { items, load } = useSeriesList()
     await load(true)
     expect(items.value).toHaveLength(1)
 
-    mockFetchSeries.mockResolvedValue({
-      items: [makeSeries({ id: 2, name: 'Series B', bookCount: 2 })],
-      total: 1,
-      page: 0,
-      size: 50,
-    })
+    mockFetchSeries.mockResolvedValue(makePage(makePage({ items: [makeSeries({ id: 2, name: 'Series B', bookCount: 2 })], total: 1, page: 0 })))
 
     await load(true)
     expect(items.value).toHaveLength(1)
@@ -127,12 +125,7 @@ describe('useSeriesList', () => {
 
   it('does not load when already loading (non-reset)', async () => {
     // First load some data so hasMore becomes true
-    mockFetchSeries.mockResolvedValueOnce({
-      items: [makeSeries({ name: 'Series A' })],
-      total: 3,
-      page: 0,
-      size: 50,
-    })
+    mockFetchSeries.mockResolvedValueOnce(makePage(makePage({ items: [makeSeries({ name: 'Series A' })], total: 3, page: 0 })))
 
     const { loading, load } = useSeriesList()
     await load(true)
@@ -150,7 +143,7 @@ describe('useSeriesList', () => {
 
     const secondLoad = load()
 
-    resolveFn!({ items: [], total: 3, page: 1, size: 50 })
+    resolveFn!(makePage({ total: 3, page: 1 }))
     await firstLoad
     await secondLoad
 
@@ -181,21 +174,11 @@ describe('useSeriesList', () => {
     const resetLoad = load(true)
 
     // Resolve second (reset) first
-    resolveSecond!({
-      items: [makeSeries({ name: 'Fresh' })],
-      total: 1,
-      page: 0,
-      size: 50,
-    })
+    resolveSecond!(makePage({ items: [makeSeries({ name: 'Fresh' })], total: 1, page: 0 }))
     await resetLoad
 
     // Resolve first (stale)
-    resolveFirst!({
-      items: [makeSeries({ id: 2, name: 'Stale' })],
-      total: 1,
-      page: 0,
-      size: 50,
-    })
+    resolveFirst!(makePage({ items: [makeSeries({ id: 2, name: 'Stale' })], total: 1, page: 0 }))
     await firstLoad
 
     // Stale response should be discarded
@@ -224,12 +207,7 @@ describe('useSeriesList', () => {
     const firstLoad = load(true)
     const resetLoad = load(true)
 
-    resolveSecond!({
-      items: [makeSeries({ name: 'OK' })],
-      total: 1,
-      page: 0,
-      size: 50,
-    })
+    resolveSecond!(makePage({ items: [makeSeries({ name: 'OK' })], total: 1, page: 0 }))
     await resetLoad
     await firstLoad
 
@@ -238,12 +216,7 @@ describe('useSeriesList', () => {
   })
 
   it('does not load more when no more items', async () => {
-    mockFetchSeries.mockResolvedValue({
-      items: [makeSeries({ name: 'Only One' })],
-      total: 1,
-      page: 0,
-      size: 50,
-    })
+    mockFetchSeries.mockResolvedValue(makePage(makePage({ items: [makeSeries({ name: 'Only One' })], total: 1, page: 0 })))
 
     const { load, hasMore } = useSeriesList()
     await load(true)
@@ -254,7 +227,7 @@ describe('useSeriesList', () => {
   })
 
   it('passes query params to fetchSeries', async () => {
-    mockFetchSeries.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 })
+    mockFetchSeries.mockResolvedValue(makePage({ total: 0, page: 0 }))
 
     const { q, sort, order, libraryId, completionStatus, author, load } = useSeriesList()
     q.value = 'harry'
@@ -279,7 +252,7 @@ describe('useSeriesList', () => {
   })
 
   it('trims whitespace-only query to undefined', async () => {
-    mockFetchSeries.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 })
+    mockFetchSeries.mockResolvedValue(makePage({ total: 0, page: 0 }))
 
     const { q, load } = useSeriesList()
     q.value = '   '

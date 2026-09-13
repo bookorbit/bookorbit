@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { MetadataScoreWeights } from '@bookorbit/types';
+import type { MetadataScoreRecalculationState, MetadataScoreWeights } from '@bookorbit/types';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { MetadataScoreRepository } from './metadata-score.repository';
 import { MetadataScoreScorer, type ScoreData } from './metadata-score.scorer';
@@ -16,7 +16,7 @@ export enum MetadataRecalculationTrigger {
   WEIGHTS_UPDATE = 'weights_update',
 }
 
-export type MetadataRecalculationState = 'idle' | 'running' | 'completed' | 'failed';
+export type MetadataRecalculationState = MetadataScoreRecalculationState;
 
 export type MetadataRecalculationStatus = {
   state: MetadataRecalculationState;

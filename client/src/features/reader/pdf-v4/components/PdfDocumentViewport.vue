@@ -19,7 +19,7 @@ defineProps<{ documentId: string }>()
       <ZoomGestureWrapper :document-id="documentId">
         <Scroller :document-id="documentId">
           <template #default="{ page }">
-            <Rotate :document-id="documentId" :page-index="page.pageIndex" class="bg-background shadow-md">
+            <Rotate :document-id="documentId" :page-index="page.pageIndex" :data-page-index="page.pageIndex" class="bg-background shadow-md">
               <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
                 <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="0.5" class="pointer-events-none" />
                 <TilingLayer :document-id="documentId" :page-index="page.pageIndex" class="pointer-events-none" />

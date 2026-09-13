@@ -70,6 +70,7 @@ export class LibraryScanSchedulerService implements OnApplicationBootstrap, OnMo
 
       const job = CronJob.from({
         cronTime: expression,
+        timeZone: this.timeZone,
         onTick: () => this.runScheduledScan(libraryId),
         start: false,
       });

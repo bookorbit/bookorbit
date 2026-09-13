@@ -56,7 +56,13 @@ describe('DedicationEvaluator', () => {
     it('awards streak_1 at 7-day streak', async () => {
       repo.getCurrentStreak.mockResolvedValue(7);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'streak_1' }));
@@ -65,7 +71,13 @@ describe('DedicationEvaluator', () => {
     it('awards multiple streak tiers at once', async () => {
       repo.getCurrentStreak.mockResolvedValue(35);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       const keys = awards.map((a) => a.key);
@@ -79,7 +91,13 @@ describe('DedicationEvaluator', () => {
     it('awards year_round_reader at 12 months', async () => {
       repo.countDistinctMonthsWithReading.mockResolvedValue(12);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'year_round_reader' }));
@@ -93,6 +111,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
           payload: { userId: 1, bookId: 5, newStatus: 'read', oldStatus: 'abandoned' } as never,
         },
@@ -107,7 +126,13 @@ describe('DedicationEvaluator', () => {
       const thirtyOneDaysAgo = new Date('2026-02-12T10:00:00Z');
       repo.getPreviousSessionEndedAt.mockResolvedValue(thirtyOneDaysAgo);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'comeback_kid' }));
@@ -117,7 +142,13 @@ describe('DedicationEvaluator', () => {
       const fiveDaysAgo = new Date('2026-03-10T10:00:00Z');
       repo.getPreviousSessionEndedAt.mockResolvedValue(fiveDaysAgo);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'comeback_kid')).toBeUndefined();
@@ -128,7 +159,13 @@ describe('DedicationEvaluator', () => {
     it('awards seasonal_reader when 4 distinct seasons have reading activity', async () => {
       repo.countDistinctSeasonsWithReading.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'seasonal_reader' }));
@@ -137,7 +174,13 @@ describe('DedicationEvaluator', () => {
     it('does not award seasonal_reader below 4 seasons', async () => {
       repo.countDistinctSeasonsWithReading.mockResolvedValue(3);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'seasonal_reader')).toBeUndefined();
@@ -146,7 +189,13 @@ describe('DedicationEvaluator', () => {
     it('does not award seasonal_reader when already earned', async () => {
       repo.countDistinctSeasonsWithReading.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(['seasonal_reader']),
       );
       expect(awards.find((a) => a.key === 'seasonal_reader')).toBeUndefined();
@@ -155,7 +204,7 @@ describe('DedicationEvaluator', () => {
     it('awards seasonal_reader via backfill', async () => {
       repo.countDistinctSeasonsWithReading.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'seasonal_reader' }));
@@ -166,7 +215,13 @@ describe('DedicationEvaluator', () => {
     it('awards perfect_month when user read every day in any calendar month', async () => {
       repo.hasReadEveryDayInAnyMonth.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'perfect_month' }));
@@ -175,7 +230,13 @@ describe('DedicationEvaluator', () => {
     it('does not award perfect_month when no qualifying month', async () => {
       repo.hasReadEveryDayInAnyMonth.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'perfect_month')).toBeUndefined();
@@ -184,7 +245,13 @@ describe('DedicationEvaluator', () => {
     it('does not award perfect_month when already earned', async () => {
       repo.hasReadEveryDayInAnyMonth.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(['perfect_month']),
       );
       expect(awards.find((a) => a.key === 'perfect_month')).toBeUndefined();
@@ -193,7 +260,7 @@ describe('DedicationEvaluator', () => {
     it('awards perfect_month via backfill', async () => {
       repo.hasReadEveryDayInAnyMonth.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'perfect_month' }));
@@ -204,7 +271,13 @@ describe('DedicationEvaluator', () => {
     it('awards consistent_reader when 30+ consecutive days with min 5 minutes each', async () => {
       repo.hasConsecutiveDaysWithMinReading.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'consistent_reader' }));
@@ -213,7 +286,13 @@ describe('DedicationEvaluator', () => {
     it('does not award consistent_reader when condition not met', async () => {
       repo.hasConsecutiveDaysWithMinReading.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'consistent_reader')).toBeUndefined();
@@ -222,7 +301,13 @@ describe('DedicationEvaluator', () => {
     it('does not award consistent_reader when already earned', async () => {
       repo.hasConsecutiveDaysWithMinReading.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(['consistent_reader']),
       );
       expect(awards.find((a) => a.key === 'consistent_reader')).toBeUndefined();
@@ -231,7 +316,7 @@ describe('DedicationEvaluator', () => {
     it('awards consistent_reader via backfill', async () => {
       repo.hasConsecutiveDaysWithMinReading.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'consistent_reader' }));
@@ -242,7 +327,13 @@ describe('DedicationEvaluator', () => {
     it('awards weekend_rhythm when 4+ consecutive weekends have reading', async () => {
       repo.hasConsecutiveWeekendsWithReading.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'weekend_rhythm' }));
@@ -251,7 +342,13 @@ describe('DedicationEvaluator', () => {
     it('does not award weekend_rhythm when condition not met', async () => {
       repo.hasConsecutiveWeekendsWithReading.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'weekend_rhythm')).toBeUndefined();
@@ -260,7 +357,13 @@ describe('DedicationEvaluator', () => {
     it('does not award weekend_rhythm when already earned', async () => {
       repo.hasConsecutiveWeekendsWithReading.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: makeSessionPayload() as never },
+        {
+          userId: 1,
+          isSuperuser: false,
+          timeZone: 'UTC',
+          eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+          payload: makeSessionPayload() as never,
+        },
         new Set(['weekend_rhythm']),
       );
       expect(awards.find((a) => a.key === 'weekend_rhythm')).toBeUndefined();
@@ -269,7 +372,7 @@ describe('DedicationEvaluator', () => {
     it('awards weekend_rhythm via backfill', async () => {
       repo.hasConsecutiveWeekendsWithReading.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'weekend_rhythm' }));
@@ -283,6 +386,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
           payload: {
             userId: 1,
@@ -304,6 +408,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
           payload: {
             userId: 1,
@@ -324,6 +429,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
           payload: {
             userId: 1,
@@ -345,6 +451,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
           payload: {
             userId: 1,
@@ -364,7 +471,7 @@ describe('DedicationEvaluator', () => {
     it('awards weekend_warrior via backfill when user has a weekend marathon', async () => {
       repo.hasWeekendMarathon.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'weekend_warrior' }));
@@ -378,6 +485,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
           payload: { userId: 1, bookId: 5, newStatus: 'read', oldStatus: 'reading' } as never,
         },
@@ -392,6 +500,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
           payload: { userId: 1, bookId: 5, newStatus: 'read', oldStatus: 'reading' } as never,
         },
@@ -406,6 +515,7 @@ describe('DedicationEvaluator', () => {
         {
           userId: 1,
           isSuperuser: false,
+          timeZone: 'UTC',
           eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
           payload: { userId: 1, bookId: 5, newStatus: 'read', oldStatus: 'reading' } as never,
         },
@@ -417,7 +527,7 @@ describe('DedicationEvaluator', () => {
     it('awards yearly_finisher_12 via backfill', async () => {
       repo.countBooksFinishedInYear.mockResolvedValue(12);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'yearly_finisher_12' }));
@@ -428,7 +538,7 @@ describe('DedicationEvaluator', () => {
     it('awards comeback_kid via backfill when large session gap exists', async () => {
       repo.hasLargeGapBetweenAnySessions.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'comeback_kid' }));
@@ -437,7 +547,7 @@ describe('DedicationEvaluator', () => {
     it('does not award comeback_kid via backfill when no large gap', async () => {
       repo.hasLargeGapBetweenAnySessions.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'comeback_kid')).toBeUndefined();
@@ -446,7 +556,7 @@ describe('DedicationEvaluator', () => {
     it('awards reborn via backfill when a previously abandoned book was finished', async () => {
       repo.hasAnyBookRebornFromAbandoned.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'reborn' }));
@@ -455,7 +565,7 @@ describe('DedicationEvaluator', () => {
     it('does not award reborn via backfill when no abandoned book was finished', async () => {
       repo.hasAnyBookRebornFromAbandoned.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'reborn')).toBeUndefined();

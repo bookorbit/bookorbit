@@ -1,5 +1,6 @@
 import type { AudiobookChapter } from "./audiobook";
 import type { ComicMetadataFields, MetadataProviderKey, MetadataSeriesMembership } from "./metadata-fetch";
+import type { SeriesIndex } from "./series-index";
 
 export type BookDockFileStatus = "pending" | "extracting" | "fetching" | "ready" | "error";
 export type BookDockAutoFinalizeMetadataMode = "safe_merge" | "fetched_only" | "embedded_only";
@@ -43,7 +44,7 @@ export interface BookDockMetadata {
   isbn10?: string | null;
   isbn13?: string | null;
   seriesName?: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: SeriesIndex | null;
   seriesMemberships?: MetadataSeriesMembership[] | null;
   genres?: string[];
   coverUrl?: string | null;
@@ -68,6 +69,15 @@ export interface BookDockMetadata {
   comicMetadata?: ComicMetadataFields | null;
 }
 
+/** One file of a multi-file dock unit. Read-only in the UI: a unit is finalized whole. */
+export interface BookDockUnitFile {
+  fileName: string;
+  fileSize: number | null;
+  format: string | null;
+  role: "content" | "cover" | "metadata" | "supplement";
+  sortOrder: number | null;
+}
+
 export interface BookDockFile {
   id: number;
   fileName: string;
@@ -85,6 +95,11 @@ export interface BookDockFile {
   metadataEditedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The files this entry is made of, in playback or format order. Empty for the ordinary loose
+   * single file, which is what `fileName` and `fileSize` already describe.
+   */
+  unitFiles: BookDockUnitFile[];
 }
 
 export interface BookDockFilesPage {
@@ -146,7 +161,16 @@ export interface BookDockFinalizeResult {
 }
 
 export type BookDockFinalizePreviewStatus =
-  "ready" | "duplicate" | "destination_conflict" | "missing_destination" | "invalid_target" | "access_denied" | "invalid_format" | "error";
+  | "ready"
+  | "duplicate"
+  | "destination_conflict"
+  | "missing_destination"
+  | "invalid_target"
+  | "access_denied"
+  | "invalid_format"
+  /** A multi-file unit the target library's organization mode cannot represent. */
+  | "unsupported_layout"
+  | "error";
 
 export interface BookDockFinalizePreviewItem {
   fileId: number;

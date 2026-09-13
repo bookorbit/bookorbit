@@ -12,7 +12,7 @@ import { emailPreferences } from './email-preferences';
 import { smartScopes } from './smart-scopes';
 import { koboSyncSettings, koboLibrarySnapshots, koboReadingStates } from './kobo';
 import { emailRecipients, emailRecipientGroups } from './email-recipients';
-import { readerDefaultPreferences, readerPreferences, readingProgress, annotations, userReadingDailyStats } from './reader';
+import { readerDefaultPreferences, readerPreferences, readingProgress, annotations, userBookStatus, userReadingDailyStats } from './reader';
 import { migrationSources, migrationProfiles, migrationPlanArtifacts, migrationRuns, migrationRunMetrics } from './migration';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import { FILE_ROLES } from '../../modules/scanner/lib/classify';
@@ -60,6 +60,33 @@ describe('Database Schema Logic', () => {
       expect(embeddingColumn.mapFromDriverValue(123)).toEqual([]);
       // @ts-expect-error: testing invalid object input
       expect(embeddingColumn.mapFromDriverValue({})).toEqual([]);
+    });
+  });
+
+  describe('user-supplied date columns', () => {
+    // Issue #1143: these three hold dates the user types, so they can legitimately land in
+    // the year range drizzle's own timestamp decoder gets wrong. Reverting any of them to
+    // `timestamp(name, { withTimezone: true })` brings back a 500 on every book listing.
+    const columns = [
+      ['books.addedAt', books.addedAt],
+      ['userBookStatus.startedAt', userBookStatus.startedAt],
+      ['userBookStatus.finishedAt', userBookStatus.finishedAt],
+    ] as const;
+
+    it.each(columns)('%s is still a timestamp with time zone on the wire', (_name, column) => {
+      expect(column.getSQLType()).toBe('timestamp with time zone');
+    });
+
+    it.each(columns)('%s decodes a year below 100 as itself', (_name, column) => {
+      expect(column.mapFromDriverValue('0050-06-15 00:00:00+00').toISOString()).toBe('0050-06-15T00:00:00.000Z');
+    });
+
+    it.each(columns)('%s decodes the year band that used to throw', (_name, column) => {
+      expect(column.mapFromDriverValue('0025-08-25 00:00:00+00').toISOString()).toBe('0025-08-25T00:00:00.000Z');
+    });
+
+    it.each(columns)('%s still encodes a Date as an ISO string', (_name, column) => {
+      expect(column.mapToDriverValue(new Date('2026-08-25T07:42:00.000Z'))).toBe('2026-08-25T07:42:00.000Z');
     });
   });
 

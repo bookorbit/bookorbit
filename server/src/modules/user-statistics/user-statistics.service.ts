@@ -618,4 +618,18 @@ export class UserStatisticsService {
     this.cache.clear();
     return result;
   }
+
+  listUserIdsWithReadingHistory() {
+    return this.repo.listUserIdsWithReadingHistory();
+  }
+
+  getUserTimeZone(userId: number) {
+    return this.repo.getUserTimeZone(userId);
+  }
+
+  async rebuildDailyStatsForUser(userId: number, timeZone: string) {
+    const result = await this.repo.rebuildDailyStatsForUser(userId, timeZone);
+    this.cache.clearForScope(String(userId));
+    return result;
+  }
 }

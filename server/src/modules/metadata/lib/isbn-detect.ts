@@ -1,3 +1,5 @@
+import { normalizeIsbn } from '../../../common/text-match/isbn-normalize';
+
 export interface IsbnHit {
   value: string;
   kind: 10 | 13;
@@ -6,9 +8,7 @@ export interface IsbnHit {
 
 const LABEL_LOOKBACK = 25;
 
-export function normalizeIsbn(raw: string): string {
-  return raw.replace(/[^0-9Xx]/g, '').toUpperCase();
-}
+export { normalizeIsbn };
 
 export function isValidIsbn10(n: string): boolean {
   if (!/^[0-9]{9}[0-9X]$/.test(n)) return false;

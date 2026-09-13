@@ -1,8 +1,10 @@
 import { parseIntoClientConfig } from 'pg-connection-string';
 import { isAbsolute } from 'node:path';
+import { isIP } from 'node:net';
 import { z } from 'zod';
 
 const BOOLEAN_ENV_VALUES = ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'];
+const TRUST_PROXY_BOOLEAN_VALUES = ['true', 'false', 'yes', 'no', 'on', 'off'];
 
 function isValidPostgresConnectionString(value: string): boolean {
   if (!value.trim()) {
@@ -32,8 +34,23 @@ function booleanEnvFlag(name: string) {
     .optional();
 }
 
+function trustProxyEnv() {
+  return z
+    .string()
+    .trim()
+    .refine((value) => value === '' || TRUST_PROXY_BOOLEAN_VALUES.includes(value.toLowerCase()) || Number.isNaN(Number(value)), {
+      message: 'TRUST_PROXY must be a boolean value or trusted proxy IP/CIDR; numeric hop counts are not supported',
+    })
+    .optional();
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  HOST: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || isIP(value) !== 0, 'HOST must be an IPv4 or IPv6 address without a port or brackets')
+    .optional(),
   DATABASE_URL: z.string().refine(isValidPostgresConnectionString, 'DATABASE_URL must be a valid PostgreSQL connection string').optional(),
   JWT_SECRET: z
     .string()
@@ -45,6 +62,7 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   SETUP_BOOTSTRAP_TOKEN: z.string().optional(),
+  DISABLE_LOCAL_AUTH: booleanEnvFlag('DISABLE_LOCAL_AUTH'),
   APP_DATA_PATH: z.string().default('/data'),
   BOOK_DOCK_PATH: z
     .string()
@@ -58,9 +76,10 @@ const envSchema = z.object({
   FILE_WRITE_MAX_CONCURRENT_WRITES: z.coerce.number().int().positive().optional(),
   CLIENT_URL: z.string().url().optional(),
   APP_URL: z.string().url().default('http://localhost:5173'),
-  TRUST_PROXY: z.string().optional(),
+  TRUST_PROXY: trustProxyEnv(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   MIGRATION_ENCRYPTION_KEY: z.string().optional(),
+  BOOK_REQUEST_ENCRYPTION_KEY: z.string().optional(),
   MIGRATION_IMPORT_ROOT: z
     .string()
     .transform((val) => val.trim())

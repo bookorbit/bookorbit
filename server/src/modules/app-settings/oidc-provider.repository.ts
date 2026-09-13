@@ -1,15 +1,19 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db/db.module';
 import * as schema from '../../db/schema';
+import { AuthenticationPolicyService } from '../../common/services/authentication-policy.service';
 
 type Db = NodePgDatabase<typeof schema>;
 
 @Injectable()
 export class OidcProviderRepository {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly authenticationPolicy: AuthenticationPolicyService,
+  ) {}
 
   findAll() {
     return this.db.query.oidcProviders.findMany({
@@ -48,13 +52,33 @@ export class OidcProviderRepository {
   }
 
   async update(id: number, data: Partial<Omit<typeof schema.oidcProviders.$inferInsert, 'id'>>) {
-    const [row] = await this.db.update(schema.oidcProviders).set(data).where(eq(schema.oidcProviders.id, id)).returning();
-    return row ?? null;
+    return this.db.transaction(async (tx) => {
+      await this.authenticationPolicy.lockAdministratorAvailability(tx);
+      const current = await tx.query.oidcProviders.findFirst({ where: eq(schema.oidcProviders.id, id) });
+      if (!current) return null;
+      if (this.changesAuthenticationConfiguration(current, data)) {
+        await this.authenticationPolicy.assertProviderAuthenticationCanChange(tx, id);
+      }
+      const [row] = await tx.update(schema.oidcProviders).set(data).where(eq(schema.oidcProviders.id, id)).returning();
+      await this.authenticationPolicy.assertUsableOidcSuperuser(tx);
+      return row ?? null;
+    });
   }
 
   async remove(id: number) {
-    const [row] = await this.db.delete(schema.oidcProviders).where(eq(schema.oidcProviders.id, id)).returning();
-    return row ?? null;
+    return this.db.transaction(async (tx) => {
+      await this.authenticationPolicy.lockAdministratorAvailability(tx);
+      const [{ count }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.oidcIdentities)
+        .where(eq(schema.oidcIdentities.providerId, id));
+      if ((count ?? 0) > 0) {
+        throw new BadRequestException(`Cannot delete provider: ${count} user(s) have linked identities. Unlink all users first.`);
+      }
+      const [row] = await tx.delete(schema.oidcProviders).where(eq(schema.oidcProviders.id, id)).returning();
+      await this.authenticationPolicy.assertUsableOidcSuperuser(tx);
+      return row ?? null;
+    });
   }
 
   async reorder(orderedIds: number[]) {
@@ -100,5 +124,14 @@ export class OidcProviderRepository {
       .where(and(eq(schema.oidcGroupMappings.id, id), eq(schema.oidcGroupMappings.providerId, providerId)))
       .returning();
     return row ?? null;
+  }
+
+  private changesAuthenticationConfiguration(
+    current: typeof schema.oidcProviders.$inferSelect,
+    data: Partial<Omit<typeof schema.oidcProviders.$inferInsert, 'id'>>,
+  ): boolean {
+    return (['enabled', 'issuerUri', 'clientId', 'clientSecret', 'scopes'] as const).some(
+      (key) => Object.prototype.hasOwnProperty.call(data, key) && data[key] !== current[key],
+    );
   }
 }

@@ -6,6 +6,7 @@ import { X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import type { Collection } from '@bookorbit/types'
 
 const props = defineProps<{ open: boolean; collection: Collection }>()
@@ -18,6 +19,7 @@ const { t } = useI18n()
 const name = ref('')
 const icon = ref('')
 const syncToKobo = ref(false)
+const isPublic = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const confirmingDelete = ref(false)
@@ -32,6 +34,7 @@ watch(
       name.value = props.collection.name
       icon.value = props.collection.icon ?? ''
       syncToKobo.value = props.collection.syncToKobo
+      isPublic.value = props.collection.isPublic
       error.value = null
       confirmingDelete.value = false
     }
@@ -50,7 +53,7 @@ async function submit() {
   saving.value = true
   error.value = null
   try {
-    await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value)
+    await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value, isPublic.value)
     emit('close')
   } catch {
     error.value = t('collection.editDialog.updateFailed')
@@ -128,20 +131,18 @@ async function confirmDelete() {
 
           <div class="flex items-center justify-between py-1">
             <div>
+              <p class="text-sm font-medium text-foreground">{{ t('collection.visibleToAll') }}</p>
+              <p class="text-xs text-muted-foreground mt-0.5">{{ t('collection.visibleToAllHint') }}</p>
+            </div>
+            <ToggleSwitch v-model="isPublic" :aria-label="t('collection.visibleToAll')" />
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <div>
               <p class="text-sm font-medium text-foreground">{{ t('collection.editDialog.syncToKobo') }}</p>
               <p class="text-xs text-muted-foreground mt-0.5">{{ t('collection.editDialog.syncToKoboHint') }}</p>
             </div>
-            <button
-              type="button"
-              class="w-11 h-6 rounded-full transition-colors relative shrink-0"
-              :class="syncToKobo ? 'bg-primary' : 'bg-muted'"
-              @click="syncToKobo = !syncToKobo"
-            >
-              <div
-                class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm"
-                :class="syncToKobo ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
+            <ToggleSwitch v-model="syncToKobo" :aria-label="t('collection.editDialog.syncToKobo')" />
           </div>
 
           <p v-if="error" class="text-sm text-destructive">{{ error }}</p>

@@ -41,6 +41,21 @@ describe('AmazonScraper', () => {
       const result = extractAsins(html, 5);
       expect(result).toEqual(['GOOD123456']);
     });
+
+    it('should skip sponsored cards before following unrelated format links', () => {
+      const html = `
+        <div data-component-type="s-search-result" data-asin="SPONSOR001">
+          <div data-cy="title-recipe">Sponsored Sponsored result</div>
+          <a href="/dp/SERIES0001">Book 1 of 3: A Series</a>
+        </div>
+        <div data-component-type="s-search-result" data-asin="B123456789">
+          <div data-cy="title-recipe">Wanted Book</div>
+          <a href="/dp/B123456789">Kindle</a>
+        </div>
+      `;
+
+      expect(extractAsins(html, 5)).toEqual(['B123456789']);
+    });
   });
 
   describe('parseBookPage', () => {
@@ -118,22 +133,26 @@ describe('AmazonScraper', () => {
         const result = parseBookPage(seriesHtml('Book 3 of 7'));
 
         expect(result.seriesName).toBe('The Expanse');
-        expect(result.seriesIndex).toBe(3);
+        expect(result.seriesIndex).toBe('3');
         expect(result.seriesTotalBooks).toBe(7);
       });
 
       it('keeps a fractional position while still reading the length', () => {
         const result = parseBookPage(seriesHtml('Book 2.5 of 9'));
 
-        expect(result.seriesIndex).toBe(2.5);
+        expect(result.seriesIndex).toBe('2.5');
         expect(result.seriesTotalBooks).toBe(9);
       });
 
       it('still yields the position when the label states no length', () => {
         const result = parseBookPage(seriesHtml('Book 3 of'));
 
-        expect(result.seriesIndex).toBe(3);
+        expect(result.seriesIndex).toBe('3');
         expect(result.seriesTotalBooks).toBeUndefined();
+      });
+
+      it('preserves trailing zeros in a fractional position', () => {
+        expect(parseBookPage(seriesHtml('Book 5.10 of 12')).seriesIndex).toBe('5.10');
       });
 
       it('yields nothing when the page has no series block', () => {

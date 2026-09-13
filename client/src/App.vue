@@ -11,6 +11,8 @@ import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { resolveRouteViewKey } from '@/router/view-key'
+import LegalNotices from '@/components/legal/LegalNotices.vue'
 
 const { isOpen } = useChangePasswordDialog()
 const themeStore = useThemeStore()
@@ -47,11 +49,12 @@ provide(
   <TooltipProvider :delay-duration="0">
     <router-view v-slot="{ Component, route }">
       <Transition name="page" mode="out-in">
-        <component :is="Component" :key="route.matched[0]?.path ?? route.path" />
+        <component :is="Component" :key="resolveRouteViewKey(route)" />
       </Transition>
     </router-view>
     <ChangePasswordDialog v-if="isOpen" />
     <WhatsNewDialog v-if="popupOpen" />
+    <LegalNotices />
     <Toaster rich-colors position="bottom-right" :visible-toasts="5" :gap="8" />
   </TooltipProvider>
 </template>

@@ -24,7 +24,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     title: 'Test Book',
     authors: ['Author One'],
     seriesName: 'My Series',
-    seriesIndex: 1,
+    seriesIndex: '1',
     files: [],
     publishedDate: null,
     publishedYear: 2020,

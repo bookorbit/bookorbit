@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
+import type { AuthorSummary } from '@bookorbit/types'
 import type { AuthorListSort, SortDirection } from '../types/author'
 import AuthorsView from './AuthorsView.vue'
-import AuthorFilters from '../components/AuthorFilters.vue'
+import AuthorFilterChips from '../components/AuthorFilterChips.vue'
 
 class MockIntersectionObserver {
   observe = vi.fn<(target: Element) => void>()
@@ -12,18 +13,27 @@ class MockIntersectionObserver {
   takeRecords = vi.fn<() => IntersectionObserverEntry[]>(() => [])
 }
 
+function author(id: number, name: string, extra: Partial<AuthorSummary> = {}): AuthorSummary {
+  return { id, name, sortName: null, bookCount: 1, lastAddedAt: null, coverBookId: null, ...extra }
+}
+
 const mocks = vi.hoisted(() => ({
   route: { params: {} as Record<string, string>, query: {} as Record<string, unknown>, fullPath: '/authors' },
   routerPush: vi.fn<(to: unknown) => Promise<void>>(),
   routerReplace: vi.fn<(to: unknown) => Promise<void>>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
   load: vi.fn<(reset?: boolean) => Promise<void>>(),
+  loadThrough: vi.fn<(index: number) => Promise<boolean>>(),
+  items: null as unknown as { value: AuthorSummary[] },
   q: null as unknown as { value: string },
   sort: null as unknown as { value: AuthorListSort },
   order: null as unknown as { value: SortDirection },
   libraryId: null as unknown as { value: number | null },
   hasPhoto: null as unknown as { value: boolean | null },
+  hasSortName: null as unknown as { value: boolean | null },
+  addedWithinDays: null as unknown as { value: number | null },
   minBookCount: null as unknown as { value: number | null },
+  viewMode: null as unknown as { value: string },
 }))
 
 vi.mock('vue-router', () => ({
@@ -38,9 +48,12 @@ vi.mock('vue-sonner', () => ({
 vi.mock('@/composables/useDisplaySettings', () => ({
   useDisplaySettings: () => ({
     gridGap: ref(16),
-    viewMode: ref('grid'),
-    authorCoverSize: ref(160),
+    viewMode: mocks.viewMode,
+    authorCoverSize: ref(120),
     authorCoverShape: ref('circle'),
+    authorRowDensity: ref('comfortable'),
+    authorCoverFallback: ref(false),
+    showJumpRails: ref(true),
   }),
 }))
 
@@ -52,9 +65,22 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: () => true, isDemoRestrictedAccount: ref(false), isSuperuser: ref(false) }),
 }))
 
+vi.mock('../composables/useAuthorJumpRail', () => ({
+  useAuthorJumpRail: () => ({
+    buckets: ref([]),
+    visible: ref(false),
+    template: ref([]),
+    activeKey: ref(null),
+    gutterReserved: ref(false),
+    releaseGutter: vi.fn<() => void>(),
+    syncActiveKey: vi.fn<() => void>(),
+    handleJump: vi.fn<() => Promise<void>>(),
+  }),
+}))
+
 vi.mock('../composables/useAuthorsList', () => ({
   useAuthorsList: () => ({
-    items: ref([]),
+    items: mocks.items,
     total: ref(0),
     loading: ref(false),
     error: ref(null),
@@ -64,8 +90,12 @@ vi.mock('../composables/useAuthorsList', () => ({
     order: mocks.order,
     libraryId: mocks.libraryId,
     hasPhoto: mocks.hasPhoto,
+    hasSortName: mocks.hasSortName,
+    addedWithinDays: mocks.addedWithinDays,
     minBookCount: mocks.minBookCount,
+    filterParams: () => ({}),
     load: mocks.load,
+    loadThrough: mocks.loadThrough,
   }),
 }))
 
@@ -97,7 +127,7 @@ async function mountView() {
   return wrapper
 }
 
-describe('AuthorsView filters panel placement', () => {
+describe('AuthorsView', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
     mocks.route.query = {}
@@ -105,12 +135,17 @@ describe('AuthorsView filters panel placement', () => {
     mocks.routerReplace.mockResolvedValue()
     mocks.fetchLibraries.mockResolvedValue()
     mocks.load.mockResolvedValue()
+    mocks.loadThrough.mockResolvedValue(true)
+    mocks.items = ref([])
     mocks.q = ref('')
     mocks.sort = ref('name')
     mocks.order = ref('asc')
     mocks.libraryId = ref(null)
     mocks.hasPhoto = ref(null)
+    mocks.hasSortName = ref(null)
+    mocks.addedWithinDays = ref(null)
     mocks.minBookCount = ref(null)
+    mocks.viewMode = ref('list')
   })
 
   afterEach(() => {
@@ -118,23 +153,53 @@ describe('AuthorsView filters panel placement', () => {
     vi.clearAllMocks()
   })
 
-  it('renders the desktop filters panel outside the scrolling <main> so it stays anchored when scrolled', async () => {
-    mocks.route.query = { libraryId: '5' }
+  it('keeps the filter chips outside the scrolling <main> so they stay anchored', async () => {
     const wrapper = await mountView()
 
-    const main = wrapper.find('main')
-    expect(main.exists()).toBe(true)
-
-    const filters = wrapper.findComponent(AuthorFilters)
-    expect(filters.exists()).toBe(true)
-    // Regression guard for #326: the panel must NOT live inside the scroll container.
-    expect(filters.element.closest('main')).toBeNull()
+    expect(wrapper.find('main').exists()).toBe(true)
+    const chips = wrapper.findComponent(AuthorFilterChips)
+    expect(chips.exists()).toBe(true)
+    // Regression guard for #326: filters must NOT live inside the scroll container.
+    expect(chips.element.closest('main')).toBeNull()
   })
 
-  it('does not render the desktop filters panel when no filter is active', async () => {
-    mocks.route.query = {}
+  it('hydrates a quick filter from the route into the matching list filters', async () => {
+    mocks.route.query = { filter: 'noPortrait' }
+    await mountView()
+
+    expect(mocks.hasPhoto.value).toBe(false)
+    expect(mocks.minBookCount.value).toBeNull()
+    expect(mocks.addedWithinDays.value).toBeNull()
+    expect(mocks.hasSortName.value).toBeNull()
+  })
+
+  it('treats the quick filters as mutually exclusive', async () => {
+    mocks.route.query = { filter: 'multipleBooks' }
     const wrapper = await mountView()
 
-    expect(wrapper.findComponent(AuthorFilters).exists()).toBe(false)
+    expect(mocks.minBookCount.value).toBe(2)
+
+    wrapper.findComponent(AuthorFilterChips).vm.$emit('update:quickFilter', 'recentlyAdded')
+    await flushPromises()
+
+    expect(mocks.minBookCount.value).toBeNull()
+    expect(mocks.addedWithinDays.value).toBe(7)
+  })
+
+  it('groups authors into one section per letter when sorted alphabetically', async () => {
+    mocks.items = ref([author(1, 'Alan Glynn'), author(2, 'Amy Tan'), author(3, 'Blake Crouch')])
+    const wrapper = await mountView()
+
+    const headings = wrapper.findAll('[data-letter]')
+    expect(headings.map((heading) => heading.attributes('data-letter'))).toEqual(['A', 'B'])
+  })
+
+  it('drops the letter sections when the sort is not alphabetical', async () => {
+    mocks.items = ref([author(1, 'Alan Glynn'), author(2, 'Blake Crouch')])
+    // The view hydrates sort from the route on mount, so drive it from there.
+    mocks.route.query = { sort: 'bookCount' }
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('[data-letter]')).toHaveLength(0)
   })
 })

@@ -196,8 +196,8 @@ describe('mapAudibleProduct — series', () => {
       }),
     );
     expect(result.seriesName).toBe('Kingkiller Chronicle');
-    expect(result.seriesIndex).toBe(1);
-    expect(result.seriesMemberships).toEqual([{ seriesName: 'Kingkiller Chronicle', seriesIndex: 1 }]);
+    expect(result.seriesIndex).toBe('1');
+    expect(result.seriesMemberships).toEqual([{ seriesName: 'Kingkiller Chronicle', seriesIndex: '1' }]);
   });
 
   it('handles decimal series index', () => {
@@ -206,8 +206,8 @@ describe('mapAudibleProduct — series', () => {
         series: [{ title: 'Wheel of Time', sequence: '2.5' }],
       }),
     );
-    expect(result.seriesIndex).toBe(2.5);
-    expect(result.seriesMemberships).toEqual([{ seriesName: 'Wheel of Time', seriesIndex: 2.5 }]);
+    expect(result.seriesIndex).toBe('2.5');
+    expect(result.seriesMemberships).toEqual([{ seriesName: 'Wheel of Time', seriesIndex: '2.5' }]);
   });
 
   it('leaves seriesIndex undefined when sequence is absent', () => {
@@ -241,10 +241,10 @@ describe('mapAudibleProduct — series', () => {
     );
 
     expect(result.seriesName).toBe('Sword of Truth');
-    expect(result.seriesIndex).toBe(11);
+    expect(result.seriesIndex).toBe('11');
     expect(result.seriesMemberships).toEqual([
-      { seriesName: 'Sword of Truth', seriesIndex: 11 },
-      { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+      { seriesName: 'Sword of Truth', seriesIndex: '11' },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
     ]);
   });
 

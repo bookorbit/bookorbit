@@ -17,7 +17,7 @@ describe('useMetadataDiff', () => {
     language: 'en',
     pageCount: 300,
     seriesName: 'Original Series',
-    seriesIndex: 1,
+    seriesIndex: '1',
     isbn10: '1234567890',
     isbn13: '1234567890123',
     narrators: [],
@@ -113,6 +113,40 @@ describe('useMetadataDiff', () => {
     // Should auto-include provider IDs
     expect(formPatch.googleBooksId).toBe('g1')
     expect(formPatch.goodreadsId).toBe('gr1')
+  })
+
+  it('merges provider genres into the current list by default', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'goodreads',
+      providerId: 'gr1',
+      title: 'Goodreads Title',
+      genres: [' genre 1 ', 'Genre 2', 'GENRE 2', ''],
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('goodreads')
+    const { fields, toggleField, buildPatch } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+
+    toggleField('genres')
+
+    expect(fields.value.find((field) => field.key === 'genres')?.currentDisplay).toBe('Genre 1, Genre 2')
+    expect(buildPatch().formPatch.genres).toEqual(['Genre 1', 'Genre 2'])
+  })
+
+  it('can replace current genres explicitly', () => {
+    const candidate: MetadataCandidate = {
+      provider: 'goodreads',
+      providerId: 'gr1',
+      title: 'Goodreads Title',
+      genres: ['Genre 2', 'genre 2', 'Genre 3'],
+    }
+    const candidates = ref([candidate])
+    const activeProvider = ref<MetadataProviderKey>('goodreads')
+    const { toggleField, buildPatch, setGenreWriteMode } = useMetadataDiff(mockCurrent, candidates, activeProvider, providers)
+
+    toggleField('genres')
+    setGenreWriteMode('replace')
+
+    expect(buildPatch().formPatch.genres).toEqual(['Genre 2', 'Genre 3'])
   })
 
   it('shows and applies the Libro.fm ISBN as a provider ID', () => {
@@ -340,10 +374,10 @@ describe('useMetadataDiff', () => {
       providerId: 'B002V1NSN2',
       title: 'Confessor',
       seriesName: 'Sword of Truth',
-      seriesIndex: 11,
+      seriesIndex: '11',
       seriesMemberships: [
-        { seriesName: 'Sword of Truth', seriesIndex: 11 },
-        { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+        { seriesName: 'Sword of Truth', seriesIndex: '11' },
+        { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
       ],
     }
     const candidates = ref([audibleCandidate])
@@ -356,8 +390,8 @@ describe('useMetadataDiff', () => {
     toggleField('seriesIndex')
 
     expect(buildPatch().formPatch.seriesMemberships).toEqual([
-      { seriesName: 'Sword of Truth', seriesIndex: 11 },
-      { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+      { seriesName: 'Sword of Truth', seriesIndex: '11' },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
     ])
   })
 
@@ -367,10 +401,10 @@ describe('useMetadataDiff', () => {
       providerId: 'B002V1NSN2',
       title: 'Confessor',
       seriesName: 'Sword of Truth',
-      seriesIndex: 11,
+      seriesIndex: '11',
       seriesMemberships: [
-        { seriesName: 'Sword of Truth', seriesIndex: 11 },
-        { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+        { seriesName: 'Sword of Truth', seriesIndex: '11' },
+        { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
       ],
     }
     const candidates = ref([audibleCandidate])

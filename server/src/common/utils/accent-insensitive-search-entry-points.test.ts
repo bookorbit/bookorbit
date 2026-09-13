@@ -7,7 +7,7 @@ const SEARCH_ENTRY_POINTS = [
   'modules/book-dock/book-dock.repository.ts',
   'modules/book/book-query-builder.service.ts',
   'modules/book/book.repository.ts',
-  'modules/catalog/catalog.service.ts',
+  'modules/catalog/catalog.repository.ts',
   'modules/custom-icon/custom-icon.repository.ts',
   'modules/entity-manager/strategies/author.strategy.ts',
   'modules/entity-manager/strategies/inline-entity.strategy.ts',
@@ -24,7 +24,7 @@ const SEARCH_ENTRY_POINTS = [
 const FREE_TEXT_SEARCH_ENTRY_POINTS = [
   'modules/authors/authors.repository.ts',
   'modules/book/book-query-builder.service.ts',
-  'modules/catalog/catalog.service.ts',
+  'modules/catalog/catalog.repository.ts',
   'modules/opds/opds-book.service.ts',
   'modules/series/series.repository.ts',
 ] as const;

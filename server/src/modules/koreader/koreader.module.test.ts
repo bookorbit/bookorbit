@@ -19,6 +19,7 @@ import { KoreaderPluginService } from './koreader-plugin.service';
 import { KoreaderRepository } from './koreader.repository';
 import { KoreaderService } from './koreader.service';
 import { KoreaderStatsService } from './koreader-stats.service';
+import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cleanup.service';
 
 describe('KoreaderModule', () => {
   it('registers expected controllers, providers, and exports', () => {
@@ -39,6 +40,7 @@ describe('KoreaderModule', () => {
       KoreaderBookmarkExchangeService,
       KoreaderBookmarkRepository,
       KoreaderStatsService,
+      KoreaderSyncEstimateCleanupService,
     ]);
     expect(Reflect.getMetadata('exports', KoreaderModule)).toEqual([KoreaderService, KoreaderRepository]);
   });

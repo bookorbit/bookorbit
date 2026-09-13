@@ -21,6 +21,11 @@ export class AnnotationHubController {
     return this.hubService.list(user.id, query);
   }
 
+  @Get('overview')
+  overview(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubQueryDto) {
+    return this.hubService.overview(user.id, query);
+  }
+
   @Get('books')
   listBooks(@CurrentUser() user: RequestUser, @Query() query: AnnotationHubBooksQueryDto) {
     return this.hubService.listBooks(user.id, {

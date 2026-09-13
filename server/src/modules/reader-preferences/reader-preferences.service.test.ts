@@ -77,7 +77,9 @@ describe('ReaderPreferencesService', () => {
 
   it('verifies file access before loading a per-book preference', async () => {
     const user = makeUser({ id: 12 });
-    mockRepo.findPreference.mockResolvedValueOnce({ settings: { zoomMode: 'fit-width' } });
+    mockRepo.findPreference.mockResolvedValueOnce({
+      settings: { zoomMode: 'fit-width' },
+    });
 
     const result = await service.getPreference(user, 42);
 
@@ -98,15 +100,25 @@ describe('ReaderPreferencesService', () => {
     const user = makeUser({ id: 4 });
     mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'pdf' });
 
-    await service.upsertPreference(user, 10, { zoomMode: 'custom', customScale: 1.4 });
+    await service.upsertPreference(user, 10, {
+      zoomMode: 'custom',
+      customScale: 1.4,
+    });
 
-    expect(mockRepo.upsertPreference).toHaveBeenCalledWith(4, 10, { zoomMode: 'custom', customScale: 1.4 });
+    expect(mockRepo.upsertPreference).toHaveBeenCalledWith(4, 10, {
+      zoomMode: 'custom',
+      customScale: 1.4,
+    });
   });
 
   it('accepts new PDF layout choices and normalizes legacy wrapped mode', async () => {
     const user = makeUser({ id: 4 });
 
-    await service.upsertPreference(user, 10, { scrollMode: 'wrapped', spread: 'auto', zoomMode: 'automatic' });
+    await service.upsertPreference(user, 10, {
+      scrollMode: 'wrapped',
+      spread: 'auto',
+      zoomMode: 'automatic',
+    });
 
     expect(mockRepo.upsertPreference).toHaveBeenCalledWith(4, 10, {
       scrollMode: 'vertical',
@@ -119,9 +131,17 @@ describe('ReaderPreferencesService', () => {
     const user = makeUser();
     mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'cbz' });
 
-    await service.upsertPreference(user, 11, { fitMode: 'fit-page', direction: 'rtl', spreadGap: 24 });
+    await service.upsertPreference(user, 11, {
+      fitMode: 'fit-page',
+      direction: 'rtl',
+      spreadGap: 24,
+    });
 
-    expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 11, { fitMode: 'fit-page', direction: 'rtl', spreadGap: 24 });
+    expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 11, {
+      fitMode: 'fit-page',
+      direction: 'rtl',
+      spreadGap: 24,
+    });
   });
 
   it('rejects comic spread gaps outside the supported range', async () => {
@@ -177,7 +197,9 @@ describe('ReaderPreferencesService', () => {
   });
 
   it('fills the gapless default for cbx payloads saved before spread gaps were supported', async () => {
-    const legacyCbxDefaults: Partial<typeof validCbxDefaults> = { ...validCbxDefaults };
+    const legacyCbxDefaults: Partial<typeof validCbxDefaults> = {
+      ...validCbxDefaults,
+    };
     delete legacyCbxDefaults.spreadGap;
 
     await service.upsertDefault(3, 'cbx', legacyCbxDefaults);
@@ -223,6 +245,10 @@ describe('ReaderPreferencesService', () => {
       fontStyle: 'normal' as const,
       fontSize: 16,
       lineHeight: 1.5,
+      paragraphSpacing: 0,
+      letterSpacing: null,
+      wordSpacing: null,
+      textIndent: null,
       maxColumnCount: 2,
       gap: 0.05,
       maxInlineSize: 720,
@@ -239,14 +265,27 @@ describe('ReaderPreferencesService', () => {
       for (const mode of [0, 1, 2] as const) {
         vi.clearAllMocks();
         mockRepo.upsertDefault.mockResolvedValue(undefined);
-        await service.upsertDefault(1, 'epub', { ...validEpubDefaults, footerDisplayMode: mode });
+        await service.upsertDefault(1, 'epub', {
+          ...validEpubDefaults,
+          footerDisplayMode: mode,
+        });
         expect(mockRepo.upsertDefault).toHaveBeenCalledWith(1, 'epub', expect.objectContaining({ footerDisplayMode: mode }));
       }
     });
 
     it('rejects invalid footerDisplayMode values in epub defaults', async () => {
-      await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, footerDisplayMode: 3 })).rejects.toThrow(BadRequestException);
-      await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, footerDisplayMode: -1 })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.upsertDefault(1, 'epub', {
+          ...validEpubDefaults,
+          footerDisplayMode: 3,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.upsertDefault(1, 'epub', {
+          ...validEpubDefaults,
+          footerDisplayMode: -1,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('rejects a full epub default that omits the font style keys', async () => {
@@ -255,65 +294,187 @@ describe('ReaderPreferencesService', () => {
       await expect(service.upsertDefault(1, 'epub', missingFontStyle)).rejects.toThrow(BadRequestException);
     });
 
+    it('rejects a full epub default that omits paragraph spacing', async () => {
+      const missingParagraphSpacing = Object.fromEntries(Object.entries(validEpubDefaults).filter(([key]) => key !== 'paragraphSpacing'));
+
+      await expect(service.upsertDefault(1, 'epub', missingParagraphSpacing)).rejects.toThrow(BadRequestException);
+    });
+
+    it('accepts publisher typography defaults represented by null', async () => {
+      await service.upsertDefault(1, 'epub', validEpubDefaults);
+
+      expect(mockRepo.upsertDefault).toHaveBeenCalledWith(
+        1,
+        'epub',
+        expect.objectContaining({
+          letterSpacing: null,
+          wordSpacing: null,
+          textIndent: null,
+        }),
+      );
+    });
+
+    it.each(['letterSpacing', 'wordSpacing', 'textIndent'] as const)('rejects a full epub default that omits %s', async (field) => {
+      const missingField = Object.fromEntries(Object.entries(validEpubDefaults).filter(([key]) => key !== field));
+
+      await expect(service.upsertDefault(1, 'epub', missingField)).rejects.toThrow(BadRequestException);
+    });
+
     it('accepts a full epub default carrying a font weight and style', async () => {
-      await service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontWeight: 700, fontStyle: 'italic' });
+      await service.upsertDefault(1, 'epub', {
+        ...validEpubDefaults,
+        fontWeight: 700,
+        fontStyle: 'italic',
+      });
 
       expect(mockRepo.upsertDefault).toHaveBeenCalledWith(1, 'epub', expect.objectContaining({ fontWeight: 700, fontStyle: 'italic' }));
     });
 
     it.each([[1], [350], [1000]])('accepts the CSS font weight %s', async (weight) => {
-      await service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontWeight: weight });
+      await service.upsertDefault(1, 'epub', {
+        ...validEpubDefaults,
+        fontWeight: weight,
+      });
 
       expect(mockRepo.upsertDefault).toHaveBeenCalledWith(1, 'epub', expect.objectContaining({ fontWeight: weight }));
     });
 
     it.each([[0], [1001], [400.5]])('rejects the unsupported font weight %s', async (weight) => {
-      await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontWeight: weight })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.upsertDefault(1, 'epub', {
+          ...validEpubDefaults,
+          fontWeight: weight,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('rejects an unsupported font style', async () => {
-      await expect(service.upsertDefault(1, 'epub', { ...validEpubDefaults, fontStyle: 'oblique' })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.upsertDefault(1, 'epub', {
+          ...validEpubDefaults,
+          fontStyle: 'oblique',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('accepts partial epub per-book settings with a font weight and style', async () => {
       const user = makeUser();
-      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
 
-      await service.upsertPreference(user, 26, { fontWeight: 300, fontStyle: 'italic' });
+      await service.upsertPreference(user, 26, {
+        fontWeight: 300,
+        fontStyle: 'italic',
+      });
 
-      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 26, { fontWeight: 300, fontStyle: 'italic' });
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 26, {
+        fontWeight: 300,
+        fontStyle: 'italic',
+      });
+    });
+
+    it.each([[0], [0.8], [2]])('accepts paragraph spacing %s em', async (paragraphSpacing) => {
+      const user = makeUser();
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
+
+      await service.upsertPreference(user, 27, { paragraphSpacing });
+
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 27, {
+        paragraphSpacing,
+      });
+    });
+
+    it.each([[-0.1], [2.1]])('rejects paragraph spacing %s em', async (paragraphSpacing) => {
+      const user = makeUser();
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
+
+      await expect(service.upsertPreference(user, 27, { paragraphSpacing })).rejects.toThrow(BadRequestException);
+    });
+
+    it('accepts explicit zero and null typography overrides in partial epub settings', async () => {
+      const user = makeUser();
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
+
+      await service.upsertPreference(user, 28, {
+        letterSpacing: 0,
+        wordSpacing: null,
+        textIndent: 0,
+      });
+
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 28, {
+        letterSpacing: 0,
+        wordSpacing: null,
+        textIndent: 0,
+      });
+    });
+
+    it.each([
+      ['letterSpacing', -0.01],
+      ['letterSpacing', 0.21],
+      ['wordSpacing', -0.01],
+      ['wordSpacing', 0.51],
+      ['textIndent', -0.01],
+      ['textIndent', 4.01],
+    ])('rejects out-of-range typography setting %s=%s', async (field, value) => {
+      const user = makeUser();
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
+
+      await expect(service.upsertPreference(user, 29, { [field]: value })).rejects.toThrow(BadRequestException);
     });
 
     it('accepts partial epub per-book settings with footerDisplayMode', async () => {
       const user = makeUser();
-      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
 
       await service.upsertPreference(user, 20, { footerDisplayMode: 1 });
 
-      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 20, { footerDisplayMode: 1 });
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 20, {
+        footerDisplayMode: 1,
+      });
     });
 
     it('accepts partial epub per-book settings with fixedLayoutSpread', async () => {
       const user = makeUser();
-      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
 
       await service.upsertPreference(user, 22, { fixedLayoutSpread: 'none' });
 
-      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 22, { fixedLayoutSpread: 'none' });
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 22, {
+        fixedLayoutSpread: 'none',
+      });
     });
 
     it('accepts the minimum epub font size', async () => {
       const user = makeUser();
-      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
 
       await service.upsertPreference(user, 24, { fontSize: 6 });
 
-      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 24, { fontSize: 6 });
+      expect(mockRepo.upsertPreference).toHaveBeenCalledWith(7, 24, {
+        fontSize: 6,
+      });
     });
 
     it('rejects epub font sizes below the minimum', async () => {
       const user = makeUser();
-      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
 
       await expect(service.upsertPreference(user, 25, { fontSize: 5 })).rejects.toThrow(BadRequestException);
       expect(mockRepo.upsertPreference).not.toHaveBeenCalled();
@@ -321,7 +482,9 @@ describe('ReaderPreferencesService', () => {
 
     it('rejects partial epub per-book settings with invalid footerDisplayMode', async () => {
       const user = makeUser();
-      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
 
       await expect(service.upsertPreference(user, 21, { footerDisplayMode: 5 })).rejects.toThrow(BadRequestException);
       expect(mockRepo.upsertPreference).not.toHaveBeenCalled();
@@ -329,7 +492,9 @@ describe('ReaderPreferencesService', () => {
 
     it('rejects partial epub per-book settings with invalid fixedLayoutSpread', async () => {
       const user = makeUser();
-      mockBookService.verifyFileAccess.mockResolvedValueOnce({ format: 'epub' });
+      mockBookService.verifyFileAccess.mockResolvedValueOnce({
+        format: 'epub',
+      });
 
       await expect(service.upsertPreference(user, 23, { fixedLayoutSpread: 'two-page' })).rejects.toThrow(BadRequestException);
       expect(mockRepo.upsertPreference).not.toHaveBeenCalled();

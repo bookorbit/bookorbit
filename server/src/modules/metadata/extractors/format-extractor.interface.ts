@@ -11,7 +11,7 @@ export interface ParsedBookData {
   publishedYear?: number | null;
   language?: string | null;
   seriesName?: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: string | null;
   /** Series length declared by the file itself; annotates the series, never the book row. */
   seriesTotalBooks?: number | null;
   authors: { name: string; sortName: string | null }[];
@@ -39,6 +39,11 @@ export interface ParsedBookData {
   chapters?: { title: string; startMs: number }[];
   // ebook-specific extras
   pageCount?: number | null;
+  /**
+   * Fixed-layout (`rendition:layout: pre-paginated`) declaration. Only EPUB extraction sets it,
+   * because it describes the book file itself, not the bibliographic metadata a sidecar can carry.
+   */
+  isFixedLayout?: boolean | null;
   comicMetadata?: ParsedCbzComicMetadata | null;
 }
 

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Columns2, GripVertical, Plus, RotateCcw, Rows3, Trash2 } from '@lucide/vue'
 
 import type { ScrollerConfig, ScrollerType, WidgetConfig } from '@bookorbit/types'
+import { formatList } from '@/i18n/formatters'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
+import { useLibraries } from '@/features/library/composables/useLibraries'
 import { DEFAULT_SCROLLERS, SCROLLER_LABELS, SHELF_LAYOUT, useDashboardConfig, type DashboardShelfLayout } from '../composables/useDashboardConfig'
 import { SHELF_ROW_OPTIONS } from '../lib/shelf-rows'
 import { useDashboardLabels } from '../composables/useDashboardLabels'
@@ -13,20 +15,39 @@ import { useDashboardWidgets } from '../composables/useDashboardWidgets'
 import { useDraggableList } from '../composables/useDraggableList'
 
 const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ 'update:open': [value: boolean] }>()
+const emit = defineEmits<{ 'update:open': [value: boolean]; saved: [] }>()
 
 const { t } = useI18n()
 
 const { scrollers, shelfLayout, saveShelfSettings, MAX_SCROLLERS } = useDashboardConfig()
-const { widgets, saveWidgets, DEFAULT_WIDGETS } = useDashboardWidgets()
+const { widgets, libraryIds, saveWidgets, saveLibraryScope, DEFAULT_WIDGETS } = useDashboardWidgets()
 const { smartScopes, fetchSmartScopes } = useSmartScopes()
+const { libraries, fetchLibraries } = useLibraries()
 const { widgetName, shelfTypeName } = useDashboardLabels()
 
 const activeTab = ref<'widgets' | 'shelves'>('shelves')
 const draft = ref<ScrollerConfig[]>([])
 const shelfLayoutDraft = ref<DashboardShelfLayout>(SHELF_LAYOUT.WIDE)
 const widgetDraft = ref<WidgetConfig[]>([])
-const widgetSaving = ref(false)
+const libraryIdsDraft = ref<number[] | null>(null)
+const libraryScopeOpen = ref(false)
+const saving = ref(false)
+const bookLibraries = computed(() => libraries.value)
+const accessibleLibraryIds = computed(() => new Set(bookLibraries.value.map((library) => library.id)))
+const selectedAccessibleLibraryIds = computed<number[] | null>(() =>
+  libraryIdsDraft.value === null ? null : libraryIdsDraft.value.filter((libraryId) => accessibleLibraryIds.value.has(libraryId)),
+)
+const hasValidLibrarySelection = computed(() => selectedAccessibleLibraryIds.value === null || selectedAccessibleLibraryIds.value.length > 0)
+
+const MAX_SUMMARY_NAMES = 3
+const librarySelectionSummary = computed(() => {
+  const selected = selectedAccessibleLibraryIds.value
+  if (selected === null) return t('dashboard.settings.libraryScope.allLibraries')
+  if (selected.length === 0) return t('dashboard.settings.libraryScope.summaryNone')
+  if (selected.length > MAX_SUMMARY_NAMES) return t('dashboard.settings.libraryScope.summaryCount', { count: selected.length }, selected.length)
+  const selectedIds = new Set(selected)
+  return formatList(bookLibraries.value.filter((library) => selectedIds.has(library.id)).map((library) => library.name))
+})
 
 watch(
   () => props.open,
@@ -35,7 +56,10 @@ watch(
       draft.value = (Array.isArray(scrollers.value) ? scrollers.value : DEFAULT_SCROLLERS).map((s) => ({ ...s }))
       shelfLayoutDraft.value = shelfLayout.value
       widgetDraft.value = widgets.value.map((w) => ({ ...w }))
+      libraryIdsDraft.value = libraryIds.value ? [...libraryIds.value] : null
+      libraryScopeOpen.value = false
       fetchSmartScopes()
+      fetchLibraries()
     }
   },
 )
@@ -103,10 +127,27 @@ function onSmartScopeChange(scroller: ScrollerConfig) {
   if (smartScope) scroller.label = smartScope.name
 }
 
+function toggleLibraryScope() {
+  libraryScopeOpen.value = !libraryScopeOpen.value
+}
+
+function handleAllLibrariesChange(event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  libraryIdsDraft.value = checked ? null : bookLibraries.value.map((library) => library.id)
+}
+
+function handleLibraryChange(libraryId: number, event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  const selected = new Set(libraryIdsDraft.value ?? bookLibraries.value.map((library) => library.id))
+  if (checked) selected.add(libraryId)
+  else selected.delete(libraryId)
+  libraryIdsDraft.value = [...selected]
+}
+
 // ── Save / Reset / Close ─────────────────────────────────────
-function saveShelves() {
+async function saveShelves() {
   saveShelfSettings(draft.value, shelfLayoutDraft.value)
-  emit('update:open', false)
+  await saveLibraryScope(selectedAccessibleLibraryIds.value)
 }
 
 function selectWideShelfLayout() {
@@ -118,20 +159,22 @@ function selectTwoColumnShelfLayout() {
 }
 
 async function saveWidgetSettings() {
-  widgetSaving.value = true
-  try {
-    await saveWidgets(widgetDraft.value)
-    emit('update:open', false)
-  } finally {
-    widgetSaving.value = false
-  }
+  await saveWidgets(widgetDraft.value, selectedAccessibleLibraryIds.value)
 }
 
 async function handleSave() {
-  if (activeTab.value === 'widgets') {
-    await saveWidgetSettings()
-  } else {
-    saveShelves()
+  if (!hasValidLibrarySelection.value) {
+    libraryScopeOpen.value = true
+    return
+  }
+  saving.value = true
+  try {
+    if (activeTab.value === 'widgets') await saveWidgetSettings()
+    else await saveShelves()
+    emit('saved')
+    emit('update:open', false)
+  } finally {
+    saving.value = false
   }
 }
 
@@ -180,6 +223,60 @@ function resetToDefault() {
 
       <!-- Body -->
       <div class="flex-1 overflow-y-auto px-5 py-4">
+        <div class="mb-4 rounded-lg border border-border bg-card">
+          <button
+            type="button"
+            class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :aria-expanded="libraryScopeOpen"
+            aria-controls="dashboard-library-scope"
+            @click="toggleLibraryScope"
+          >
+            <span class="min-w-0 grow">
+              <span class="block text-sm font-medium text-foreground">{{ t('dashboard.settings.libraryScope.title') }}</span>
+              <span class="mt-0.5 block truncate text-xs text-muted-foreground">{{ librarySelectionSummary }}</span>
+            </span>
+            <ChevronDown
+              :size="16"
+              class="shrink-0 text-muted-foreground transition-transform duration-150"
+              :class="{ 'rotate-180': libraryScopeOpen }"
+              aria-hidden="true"
+            />
+          </button>
+          <fieldset v-show="libraryScopeOpen" id="dashboard-library-scope" class="border-t border-border px-3 pb-3 pt-2">
+            <legend class="sr-only">{{ t('dashboard.settings.libraryScope.title') }}</legend>
+            <p class="mb-2 text-xs text-muted-foreground">{{ t('dashboard.settings.libraryScope.description') }}</p>
+            <div class="space-y-1">
+              <label class="flex min-h-9 cursor-pointer items-center gap-3 rounded-md px-2 text-sm hover:bg-muted/60">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :checked="libraryIdsDraft === null"
+                  @change="handleAllLibrariesChange"
+                />
+                <span class="font-medium text-foreground">{{ t('dashboard.settings.libraryScope.allLibraries') }}</span>
+              </label>
+              <div v-if="libraryIdsDraft !== null" class="space-y-0.5 border-s border-border ps-3">
+                <label
+                  v-for="library in bookLibraries"
+                  :key="library.id"
+                  class="flex min-h-9 cursor-pointer items-center gap-3 rounded-md px-2 text-sm hover:bg-muted/60"
+                >
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    :checked="libraryIdsDraft.includes(library.id)"
+                    @change="handleLibraryChange(library.id, $event)"
+                  />
+                  <span class="text-foreground">{{ library.name }}</span>
+                </label>
+              </div>
+            </div>
+          </fieldset>
+          <p v-if="!hasValidLibrarySelection" role="alert" class="border-t border-border px-3 py-2 text-xs text-destructive">
+            {{ t('dashboard.settings.libraryScope.required') }}
+          </p>
+        </div>
+
         <!-- SHELVES TAB -->
         <div v-show="activeTab === 'shelves'">
           <fieldset class="mb-5">
@@ -423,7 +520,7 @@ function resetToDefault() {
           </button>
           <button
             class="h-8 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            :disabled="widgetSaving"
+            :disabled="saving || !hasValidLibrarySelection"
             @click="handleSave"
           >
             {{ t('common.save') }}

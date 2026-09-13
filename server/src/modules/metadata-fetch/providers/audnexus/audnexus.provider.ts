@@ -27,6 +27,7 @@ export class AudnexusProvider implements MetadataProvider {
   readonly key = MetadataProviderKey.AUDNEXUS;
   readonly label = 'AudNexus';
   readonly identifiable = false as const;
+  readonly mediaKinds = ['audiobook'] as const;
 
   private readonly logger = new Logger(AudnexusProvider.name);
 

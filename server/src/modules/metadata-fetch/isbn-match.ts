@@ -1,10 +1,8 @@
 import { MetadataCandidate } from '@bookorbit/types';
 
-import { normalizeIsbn } from '../metadata/lib/isbn-detect';
+import { normalizeMetadataIsbn } from '../../common/text-match/isbn-normalize';
 
-export function normalizeMetadataIsbn(value: string | null | undefined): string {
-  return value ? normalizeIsbn(value) : '';
-}
+export { normalizeMetadataIsbn };
 
 export function candidateHasNormalizedIsbn(candidate: MetadataCandidate, normalizedIsbn: string): boolean {
   return (

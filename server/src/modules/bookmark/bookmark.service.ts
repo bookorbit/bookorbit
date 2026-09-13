@@ -56,9 +56,9 @@ export class BookmarkService {
 
   private buildCreateData(dto: CreateBookmarkDto): Pick<NewBookmark, 'cfi' | 'title' | 'positionSeconds'> {
     return {
-      cfi: dto.cfi ?? null,
+      cfi: dto.cfi,
       title: dto.title,
-      positionSeconds: dto.positionSeconds ?? null,
+      positionSeconds: null,
     };
   }
 

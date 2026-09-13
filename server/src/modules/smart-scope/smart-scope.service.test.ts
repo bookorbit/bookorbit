@@ -127,7 +127,12 @@ describe('SmartScopeService', () => {
     const result = await service.findAll(user);
 
     expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(1);
-    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(secondSmartScope.filter, { accessibleLibraryIds: [2, 3], userId: 8, timeZone: 'UTC' });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(secondSmartScope.filter, {
+      accessibleLibraryIds: [2, 3],
+      userId: 8,
+      timeZone: 'UTC',
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
     expect(result).toEqual([
       { ...firstSmartScope, isOwner: false, koboSyncEnabled: false, bookCount: 0 },
       { ...secondSmartScope, isOwner: false, koboSyncEnabled: false, bookCount: 7 },
@@ -162,7 +167,12 @@ describe('SmartScopeService', () => {
       { ...healthyScope, isOwner: false, koboSyncEnabled: false, bookCount: 7 },
     ]);
     expect(queryBuilder.buildWhere).toHaveBeenCalledTimes(1);
-    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(healthyScope.filter, { accessibleLibraryIds: [2, 3], userId: 8, timeZone: 'UTC' });
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(healthyScope.filter, {
+      accessibleLibraryIds: [2, 3],
+      userId: 8,
+      timeZone: 'UTC',
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[smart_scope.count] [fail] scopeId=1 userId=8'));
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('durationMs='));
@@ -599,6 +609,29 @@ describe('SmartScopeService', () => {
       pagination: { page: 0, size: 20 },
     });
     expect(bookService.executeBooksQuery).not.toHaveBeenCalled();
+  });
+
+  it('executeSmartScopeBookIds intersects a caller-provided restriction with accessible libraries', async () => {
+    const { service, smartScopeRepo, libraryService, queryBuilder, bookService } = makeService();
+    const smartScope = makeSmartScope({
+      id: 5,
+      userId: 12,
+      filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'test' }] },
+    });
+    smartScopeRepo.findById.mockResolvedValue([smartScope]);
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([4, 6]);
+    queryBuilder.buildWhere.mockReturnValue('where');
+    bookService.executeBookIdsQuery.mockResolvedValue([]);
+
+    await service.executeSmartScopeBookIds(5, makeUser({ id: 12 }), 20, [4, 99]);
+
+    expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledOnce();
+    expect(queryBuilder.buildWhere).toHaveBeenCalledWith(smartScope.filter, {
+      accessibleLibraryIds: [4],
+      userId: 12,
+      timeZone: 'UTC',
+      contentFilters: EMPTY_CONTENT_FILTER_RULES,
+    });
   });
 
   it('executeSmartScope seeds sort from the smartScope when the request does not override it', async () => {

@@ -92,6 +92,14 @@ describe('candidate-relevance', () => {
       expect(result[0].authors).toContain('Andy Weir');
     });
 
+    it('keeps only matching authors for an author-only search', () => {
+      const candidates = [candidate('Dune', 'Frank Herbert'), candidate('The Hobbit', 'J.R.R. Tolkien')];
+
+      const result = filterAndRank(candidates, { author: 'Frank Herbert' });
+
+      expect(result.map((entry) => entry.title)).toEqual(['Dune']);
+    });
+
     it('drops candidates with zero score', () => {
       const candidates = [candidate('Unrelated Book')];
       const params: MetadataSearchParams = { title: 'Different Title' };

@@ -12,7 +12,7 @@ export interface FileMetadata {
   language?: string | null
   pageCount?: number | null
   seriesName?: string | null
-  seriesIndex?: number | null
+  seriesIndex?: string | null
   isbn10?: string | null
   isbn13?: string | null
   googleBooksId?: string | null

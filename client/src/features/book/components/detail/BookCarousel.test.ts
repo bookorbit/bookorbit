@@ -265,13 +265,13 @@ describe('BookCarousel', () => {
   })
 
   it('shows series index badge when showSeriesIndex is true and seriesIndex is set', () => {
-    const book = makeBook({ seriesIndex: 3 })
+    const book = makeBook({ seriesIndex: '3' })
     const wrapper = mountCarousel([book], { showSeriesIndex: true })
     expect(wrapper.text()).toContain('#3')
   })
 
   it('does not show series index badge when showSeriesIndex is false', () => {
-    const book = makeBook({ seriesIndex: 3 })
+    const book = makeBook({ seriesIndex: '3' })
     const wrapper = mountCarousel([book], { showSeriesIndex: false })
     expect(wrapper.text()).not.toContain('#3')
   })

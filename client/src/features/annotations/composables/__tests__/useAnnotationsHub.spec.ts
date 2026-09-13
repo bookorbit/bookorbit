@@ -131,24 +131,22 @@ describe('useAnnotationsHub', () => {
       expect(hub.selectedIds.value.size).toBe(0)
     })
 
-    it('computes pagination ranges', async () => {
+    it('reports more to load until the loaded window covers the total', async () => {
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
-      hub.total.value = 0
-      expect(hub.rangeStart.value).toBe(0)
+      expect(hub.hasMore.value).toBe(false)
 
       hub.total.value = 60
-      hub.pageSize.value = 25
-      hub.page.value = 2
-      expect(hub.totalPages.value).toBe(3)
-      expect(hub.rangeStart.value).toBe(26)
-      expect(hub.rangeEnd.value).toBe(50)
+      expect(hub.hasMore.value).toBe(true)
+
+      hub.items.value = Array.from({ length: 60 }, (_, index) => ({ id: index }) as never)
+      expect(hub.hasMore.value).toBe(false)
     })
   })
 
   describe('requests', () => {
-    it('load fetches the hub list and populates items, total and stats', async () => {
+    it('load fetches the hub list and populates items and total', async () => {
       const body = {
         items: [{ id: 1, bookId: 5, note: 'n' }],
         total: 1,
@@ -167,7 +165,48 @@ describe('useAnnotationsHub', () => {
       expect(url.startsWith('/api/v1/annotations?')).toBe(true)
       expect(hub.items.value).toEqual(body.items)
       expect(hub.total.value).toBe(1)
-      expect(hub.stats.value).toEqual(body.stats)
+    })
+
+    it('loadMore appends the next page instead of replacing the window', async () => {
+      const first = { items: [{ id: 1 }], total: 2, page: 1, pageSize: 50, stats: emptyHub.stats }
+      const second = { items: [{ id: 2 }], total: 2, page: 2, pageSize: 50, stats: emptyHub.stats }
+      apiMock.mockResolvedValueOnce(makeResponse(first)).mockResolvedValueOnce(makeResponse(second))
+
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      await hub.load()
+      await hub.loadMore()
+
+      expect(hub.items.value.map((item) => item.id)).toEqual([1, 2])
+      expect(String(apiMock.mock.calls[1][0])).toContain('page=2')
+      expect(hub.hasMore.value).toBe(false)
+    })
+
+    it('loadOverview populates the side rail facets', async () => {
+      const overview = {
+        total: 3,
+        books: 2,
+        withNotes: 1,
+        needsReview: 0,
+        trashed: 0,
+        originBreakdown: [],
+        colorBreakdown: [],
+        shelf: [],
+        weeks: [],
+        busiestWeek: null,
+        longestQuietWeeks: 0,
+        devices: [],
+      }
+      apiMock.mockResolvedValueOnce(makeResponse(overview))
+
+      const { useAnnotationsHub } = await import('../useAnnotationsHub')
+      const hub = useAnnotationsHub()
+
+      await hub.loadOverview()
+
+      expect(String(apiMock.mock.calls[0][0])).toContain('/api/v1/annotations/overview?')
+      expect(hub.overview.value).toEqual(overview)
     })
 
     it('load surfaces an error message when the request fails', async () => {
@@ -178,7 +217,7 @@ describe('useAnnotationsHub', () => {
 
       await hub.load()
 
-      expect(hub.error.value).toBe('Failed to load annotations')
+      expect(hub.error.value).toBe('failed')
     })
 
     it('searchBooks queries the books facet endpoint with the trimmed term', async () => {
@@ -288,7 +327,7 @@ describe('useAnnotationsHub', () => {
 
       const result = await hub.purge(7)
 
-      expect(result).toEqual({ ok: false, message: 'Failed to delete' })
+      expect(result).toEqual({ ok: false })
     })
   })
 
@@ -304,30 +343,31 @@ describe('useAnnotationsHub', () => {
       expect(hub.bookFilter.value).toBe('all')
 
       apiMock.mockClear()
-      hub.page.value = 2
+      hub.view.value = 'book'
       await nextTick()
       expect(apiMock).toHaveBeenCalled()
     })
   })
 
-  describe('sort key', () => {
-    it('maps the merged sort key to sortBy/sortDir and back', async () => {
+  describe('view', () => {
+    it('drives the grouping and the server sort from one key', async () => {
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
-      expect(hub.sortKey.value).toBe('newest')
+      expect(hub.view.value).toBe('newest')
+      expect(hub.groupMode.value).toBe('month')
 
-      hub.sortKey.value = 'oldest'
-      expect(hub.sortBy.value).toBe('createdAt')
-      expect(hub.sortDir.value).toBe('asc')
+      hub.view.value = 'oldest'
+      expect(hub.groupMode.value).toBe('month')
+      expect(hub.exportUrl('md')).toContain('sortDir=asc')
 
-      hub.sortKey.value = 'book-asc'
-      expect(hub.sortBy.value).toBe('book')
-      expect(hub.sortDir.value).toBe('asc')
+      hub.view.value = 'book'
+      expect(hub.groupMode.value).toBe('book')
+      expect(hub.exportUrl('md')).toContain('sortBy=book')
 
-      hub.sortBy.value = 'book'
-      hub.sortDir.value = 'desc'
-      expect(hub.sortKey.value).toBe('book-desc')
+      hub.view.value = 'source'
+      expect(hub.groupMode.value).toBe('source')
+      expect(hub.exportUrl('md')).toContain('sortBy=origin')
     })
   })
 
@@ -337,7 +377,6 @@ describe('useAnnotationsHub', () => {
       const hub = useAnnotationsHub()
 
       expect(hub.popoverFilterCount.value).toBe(0)
-      expect(hub.activeFilterChips.value).toEqual([])
 
       hub.colors.value = ['#FACC15']
       hub.styleFilter.value = 'underline'
@@ -345,9 +384,6 @@ describe('useAnnotationsHub', () => {
       hub.dateFrom.value = '2026-01-10'
 
       expect(hub.popoverFilterCount.value).toBe(4)
-      expect(hub.activeFilterChips.value.map((chip) => chip.id)).toEqual(['color:#FACC15', 'style', 'origin', 'date'])
-      expect(hub.activeFilterChips.value[0].label).toBe('Color: Yellow')
-      expect(hub.activeFilterChips.value[3].label).toBe('Date: From 2026-01-10')
 
       hub.removeFilterChip('color:#FACC15')
       expect(hub.colors.value).toEqual([])
@@ -360,34 +396,34 @@ describe('useAnnotationsHub', () => {
       expect(hub.dateFrom.value).toBe('')
     })
 
-    it('does not chip the book or notes-only filters', async () => {
+    it('does not count the book or notes-only filters as popover filters', async () => {
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
       hub.bookFilter.value = 5
       hub.notesOnly.value = true
 
-      expect(hub.activeFilterChips.value).toEqual([])
       expect(hub.popoverFilterCount.value).toBe(0)
+      expect(hub.hasActiveFilters.value).toBe(true)
     })
   })
 
   describe('hydrate', () => {
-    it('restores state and keeps the hydrated page despite the filter watcher', async () => {
+    it('restores state without letting the filter watcher reload mid-hydration', async () => {
       const { nextTick } = await import('vue')
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
-      hub.hydrate({ colors: ['#FACC15'], notesOnly: true, sortKey: 'oldest', page: 3 })
+      apiMock.mockClear()
+      hub.hydrate({ colors: ['#FACC15'], notesOnly: true, needsReviewOnly: true, view: 'oldest' })
 
       expect(hub.colors.value).toEqual(['#FACC15'])
       expect(hub.notesOnly.value).toBe(true)
-      expect(hub.sortBy.value).toBe('createdAt')
-      expect(hub.sortDir.value).toBe('asc')
-      expect(hub.page.value).toBe(3)
+      expect(hub.needsReviewOnly.value).toBe(true)
+      expect(hub.view.value).toBe('oldest')
+      expect(apiMock).not.toHaveBeenCalled()
 
       await nextTick()
-      expect(hub.page.value).toBe(3)
       expect(hub.hydrating.value).toBe(false)
     })
   })
@@ -406,7 +442,7 @@ describe('useAnnotationsHub', () => {
         expect(apiMock).not.toHaveBeenCalled()
 
         vi.advanceTimersByTime(300)
-        expect(apiMock).toHaveBeenCalledTimes(1)
+        expect(apiMock).toHaveBeenCalledTimes(2)
         expect(String(apiMock.mock.calls[0][0])).toContain('search=dune')
       } finally {
         vi.useRealTimers()
@@ -471,20 +507,19 @@ describe('useAnnotationsHub', () => {
   })
 
   describe('load sequencing', () => {
-    it('reloads exactly once when a filter changes while on a later page', async () => {
+    it('reloads the list and the overview exactly once when a filter changes', async () => {
       const { nextTick } = await import('vue')
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
       const hub = useAnnotationsHub()
 
-      hub.page.value = 3
-      await nextTick()
       apiMock.mockClear()
-
       hub.colors.value = ['#FACC15']
       await nextTick()
 
-      expect(hub.page.value).toBe(1)
-      expect(apiMock).toHaveBeenCalledTimes(1)
+      expect(apiMock).toHaveBeenCalledTimes(2)
+      const urls = apiMock.mock.calls.map((call) => String(call[0]))
+      expect(urls.filter((url) => url.startsWith('/api/v1/annotations?'))).toHaveLength(1)
+      expect(urls.filter((url) => url.startsWith('/api/v1/annotations/overview?'))).toHaveLength(1)
     })
 
     it('discards a stale load when a newer load has superseded it', async () => {
@@ -493,7 +528,7 @@ describe('useAnnotationsHub', () => {
       const stalePending = new Promise<Response>((resolve) => {
         resolveStale = resolve
       })
-      const freshBody = { items: [{ id: 2 }], total: 2, page: 1, pageSize: 25, stats: emptyHub.stats }
+      const freshBody = { items: [{ id: 2 }], total: 2, page: 1, pageSize: 50, stats: emptyHub.stats }
       apiMock.mockReturnValueOnce(stalePending).mockResolvedValueOnce(makeResponse(freshBody))
 
       const { useAnnotationsHub } = await import('../useAnnotationsHub')
@@ -506,7 +541,7 @@ describe('useAnnotationsHub', () => {
       expect(hub.total.value).toBe(2)
       expect(hub.loading.value).toBe(false)
 
-      resolveStale(makeResponse({ items: [{ id: 1 }], total: 1, page: 1, pageSize: 25, stats: emptyHub.stats }))
+      resolveStale(makeResponse({ items: [{ id: 1 }], total: 1, page: 1, pageSize: 50, stats: emptyHub.stats }))
       await stale
 
       expect(hub.total.value).toBe(2)

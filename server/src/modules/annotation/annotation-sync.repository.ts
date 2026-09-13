@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, getTableColumns, inArray, isNotNull, isNull, notExists, sql } from 'drizzle-orm';
+import { and, asc, eq, exists, getTableColumns, inArray, isNotNull, isNull, notExists, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -226,7 +226,14 @@ export class AnnotationSyncRepository {
   }
 
   /** Active annotations of the book with no sync state for this device (push-down adds). */
-  async findAddCandidates(userId: number, source: AnnotationSyncSource, deviceId: string, bookId: number, limit: number): Promise<AnnotationRow[]> {
+  async findAddCandidates(
+    userId: number,
+    source: AnnotationSyncSource,
+    deviceId: string,
+    bookId: number,
+    limit: number,
+    requiredPositionFormats?: AnnotationPositionFormat[],
+  ): Promise<AnnotationRow[]> {
     return this.db
       .select(getTableColumns(annotations))
       .from(annotations)
@@ -247,6 +254,14 @@ export class AnnotationSyncRepository {
                 ),
               ),
           ),
+          requiredPositionFormats?.length
+            ? exists(
+                this.db
+                  .select({ one: sql`1` })
+                  .from(annotationPositions)
+                  .where(and(eq(annotationPositions.annotationId, annotations.id), inArray(annotationPositions.format, requiredPositionFormats))),
+              )
+            : undefined,
         ),
       )
       .orderBy(asc(annotations.id))
@@ -333,6 +348,27 @@ export class AnnotationSyncRepository {
 
   async setDeviceUpdatedAtSilent(annotationId: number, deviceUpdatedAt: string | null, ex: Executor = this.db): Promise<void> {
     await ex.update(annotations).set({ deviceUpdatedAt }).where(eq(annotations.id, annotationId));
+  }
+
+  async setSourceCreatedAtSilent(annotationId: number, sourceCreatedAt: Date, ex: Executor = this.db): Promise<void> {
+    await ex
+      .update(annotations)
+      .set({ sourceCreatedAt })
+      .where(and(eq(annotations.id, annotationId), isNull(annotations.sourceCreatedAt)));
+  }
+
+  async setSourceCreatedAtsSilent(entries: { annotationId: number; sourceCreatedAt: Date }[], ex: Executor = this.db): Promise<void> {
+    if (entries.length === 0) return;
+    const values = sql.join(
+      entries.map((entry) => sql`(${entry.annotationId}::int, ${entry.sourceCreatedAt}::timestamptz)`),
+      sql`, `,
+    );
+    await ex.execute(sql`
+      update ${annotations} set source_created_at = v.source_created_at
+      from (values ${values}) as v(annotation_id, source_created_at)
+      where ${annotations.id} = v.annotation_id
+        and ${annotations.sourceCreatedAt} is null
+    `);
   }
 
   async bumpVersion(annotationId: number, ex: Executor = this.db): Promise<number> {

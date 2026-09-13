@@ -38,7 +38,9 @@ function onFileRenamed() {
 
 <template>
   <BookDetailLayout :book-id="bookId">
-    <EditMetadataTab v-if="detail" :book="detail" @saved="onMetadataSaved" @cover-changed="onCoverChanged" @file-renamed="onFileRenamed" />
+    <div v-if="detail" class="h-full">
+      <EditMetadataTab :book="detail" @saved="onMetadataSaved" @cover-changed="onCoverChanged" @file-renamed="onFileRenamed" />
+    </div>
     <div v-else-if="loading" class="max-w-2xl space-y-4">
       <div class="h-9 rounded-md bg-muted animate-pulse" />
       <div class="h-9 rounded-md bg-muted animate-pulse" />

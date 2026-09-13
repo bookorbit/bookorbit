@@ -228,6 +228,25 @@ describe('BookQuickView', () => {
     expect(ranobedbLink.find('img[alt="RanobeDB"][src="/assets/provider-icons/ranobedb.svg"]').exists()).toBe(true)
   })
 
+  it('renders a direct ComicVine issue link with the monogram fallback', () => {
+    detailRef.value = makeDetail({ providerIds: { comicvine: '1126983' } })
+
+    const wrapper = mount(BookQuickView, {
+      props: { open: true, bookId: 42 },
+      global: globalStubs,
+    })
+
+    const comicVineLink = wrapper.find('a[title="Open in ComicVine"]')
+    expect(comicVineLink.exists()).toBe(true)
+    expect(comicVineLink.attributes()).toMatchObject({
+      href: 'https://comicvine.gamespot.com/issue/4000-1126983/',
+      target: '_blank',
+      rel: 'noopener noreferrer',
+    })
+    expect(comicVineLink.find('img').exists()).toBe(false)
+    expect(comicVineLink.text()).toBe('CV')
+  })
+
   it('renders Libro.fm provider icon link', () => {
     detailRef.value = makeDetail({ providerIds: { librofm: '9781234567890' } })
 

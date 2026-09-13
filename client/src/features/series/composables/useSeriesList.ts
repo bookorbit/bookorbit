@@ -1,14 +1,17 @@
 import { computed, ref } from 'vue'
 
-import type { SeriesSummary } from '@bookorbit/types'
+import type { SeriesFacets, SeriesSummary } from '@bookorbit/types'
 import { fetchSeries } from '../api/series'
 import type { CompletionStatus, SeriesListSort, SortDirection } from '../types/series'
 
 const PAGE_SIZE = 50
 
+const EMPTY_FACETS: SeriesFacets = { all: 0, notStarted: 0, inProgress: 0, complete: 0, hasGaps: 0 }
+
 export function useSeriesList() {
   const items = ref<SeriesSummary[]>([])
   const total = ref(0)
+  const facets = ref<SeriesFacets>({ ...EMPTY_FACETS })
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -54,6 +57,7 @@ export function useSeriesList() {
 
       items.value = reset ? data.items : [...items.value, ...data.items]
       total.value = data.total
+      facets.value = data.facets ?? { ...EMPTY_FACETS }
       page.value = requestPage + 1
     } catch (err) {
       if (token !== requestToken) return
@@ -66,6 +70,7 @@ export function useSeriesList() {
   return {
     items,
     total,
+    facets,
     loading,
     error,
     hasMore,

@@ -1,11 +1,14 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 
 import { createPostgresClientConfig } from '../db/postgres-connection-config';
+import { reconcileMigrationLedgerTimestamps } from './migration-ledger-compatibility';
 import { installPostgresExtensions } from './postgres-extensions';
+import { prepareLegacySeriesIndexColumns } from './series-index-migration-compatibility';
 
 function resolveMigrationsFolder(): string {
   const candidates = [
@@ -38,8 +41,10 @@ async function runMigrations() {
 
   try {
     await installPostgresExtensions(pool);
-
     const migrationsFolder = resolveMigrationsFolder();
+    await reconcileMigrationLedgerTimestamps(pool, readMigrationFiles({ migrationsFolder }));
+    await prepareLegacySeriesIndexColumns(pool);
+
     await migrate(drizzle(pool), { migrationsFolder });
 
     console.log(`Migrations applied successfully from ${migrationsFolder}`);

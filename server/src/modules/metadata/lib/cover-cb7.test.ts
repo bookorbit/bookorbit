@@ -1,5 +1,5 @@
 vi.mock('fs/promises', () => ({ readFile: vi.fn() }));
-vi.mock('../../../common/sevenzip', () => ({ getSevenZip: vi.fn() }));
+vi.mock('../../../common/sevenzip', () => ({ getSevenZip: vi.fn(), createSevenZipTempId: (prefix: string) => `${prefix}_test` }));
 
 import { readFile } from 'fs/promises';
 

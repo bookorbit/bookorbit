@@ -32,7 +32,7 @@ describe('FileRenameRepository', () => {
       isbn13: '9780441172719',
       publishedYear: 1965,
       seriesName: 'Dune',
-      seriesIndex: 1,
+      seriesIndex: '1',
     };
 
     const db = {
@@ -48,6 +48,12 @@ describe('FileRenameRepository', () => {
           innerJoin: vi.fn().mockReturnThis(),
           where: vi.fn().mockReturnThis(),
           orderBy: vi.fn().mockResolvedValue([{ name: 'Frank Herbert' }, { name: 'Brian Herbert' }]),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnThis(),
+          innerJoin: vi.fn().mockReturnThis(),
+          where: vi.fn().mockReturnThis(),
+          orderBy: vi.fn().mockResolvedValue([{ name: 'Simon Vance' }]),
         }),
     };
 
@@ -76,9 +82,10 @@ describe('FileRenameRepository', () => {
         isbn13: '9780441172719',
         publishedYear: 1965,
         seriesName: 'Dune',
-        seriesIndex: 1,
+        seriesIndex: '1',
       },
       authors: ['Frank Herbert', 'Brian Herbert'],
+      narrators: ['Simon Vance'],
     });
   });
 

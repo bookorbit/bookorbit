@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
+import { ReadingSessionService } from '../src/modules/reading-session/reading-session.service';
 import { createCbzFixture, createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -18,6 +19,7 @@ import {
 const KOREADER_USERNAME = `progress-position-device-${randomUUID().slice(0, 8)}`;
 const KOREADER_PASSWORD = 'ProgressPositionPass123';
 const XPOINTER = '/body/DocFragment[8]/body/p[12]/text().0';
+const DEVICE_ID = 'progress-regression-device';
 
 /**
  * KOReader reports a paged document's position as a page number and a reflowable one's as an
@@ -47,7 +49,13 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
       method: 'PUT',
       url: '/api/v1/koreader/syncs/progress',
       headers: deviceHeaders(),
-      payload: { document: hash, percentage, ...(progress === undefined ? {} : { progress }) },
+      payload: {
+        document: hash,
+        percentage,
+        device: 'Regression device',
+        device_id: DEVICE_ID,
+        ...(progress === undefined ? {} : { progress }),
+      },
     });
     expect(response.statusCode).toBe(200);
   }
@@ -159,6 +167,8 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
         document: epubHash,
         percentage: 0.35,
         progress: XPOINTER,
+        device: 'Regression device',
+        device_id: DEVICE_ID,
         metadata: { filename: 'progress-position-book.epub', title: 'Progress Position Book', authors: 'Test Author' },
       },
     });
@@ -192,5 +202,82 @@ describe('KOReader progress position routing (e2e)', { timeout: 180_000 }, () =>
     const stored = await storedProgress(comic.bookFileId);
     expect(stored?.pageNumber).toBeNull();
     expect(stored?.percentage).toBeCloseTo(80, 5);
+  });
+
+  it('never turns KOSync progress pushes into reading sessions', async () => {
+    await syncFromDevice(epubHash, 0.4, XPOINTER);
+    await ctx.db
+      .update(schema.koreaderDeviceProgress)
+      .set({ updatedAt: new Date(Date.now() - 12 * 60 * 1000) })
+      .where(and(eq(schema.koreaderDeviceProgress.bookFileId, epub.bookFileId), eq(schema.koreaderDeviceProgress.deviceId, DEVICE_ID)));
+
+    await syncFromDevice(epubHash, 0.5, XPOINTER);
+
+    const sessions = await ctx.db
+      .select({ id: schema.readingSessions.id })
+      .from(schema.readingSessions)
+      .where(and(eq(schema.readingSessions.bookFileId, epub.bookFileId), eq(schema.readingSessions.source, 'koreader')));
+    expect(sessions).toEqual([]);
+  });
+
+  it('removes only historical KOSync estimates during repair', async () => {
+    const [koreaderUser] = await ctx.db
+      .select({ userId: schema.koreaderUsers.userId })
+      .from(schema.koreaderUsers)
+      .where(eq(schema.koreaderUsers.username, KOREADER_USERNAME));
+    expect(koreaderUser).toBeDefined();
+
+    const legacySessionId = `ks-${'a'.repeat(12)}-${'b'.repeat(32)}`;
+    const measuredSessionId = 'kor:cleanup-supported';
+    const webSessionId = 'web-cleanup-supported';
+    const startedAt = new Date('2026-08-31T10:00:00.000Z');
+    const endedAt = new Date('2026-08-31T10:10:00.000Z');
+    await ctx.db.insert(schema.readingSessions).values(
+      [
+        { sessionId: legacySessionId, source: 'koreader' as const },
+        { sessionId: measuredSessionId, source: 'koreader' as const },
+        { sessionId: webSessionId, source: 'web' as const },
+      ].map((session) => ({
+        ...session,
+        userId: koreaderUser!.userId,
+        bookId: epub.bookId,
+        bookFileId: epub.bookFileId,
+        startedAt,
+        endedAt,
+        durationSeconds: 600,
+        progressDelta: 2,
+        endProgress: 50,
+      })),
+    );
+
+    await expect(ctx.app.get(ReadingSessionService).deleteLegacyKoreaderSyncEstimatesBatch(500)).resolves.toEqual({ deleted: 1 });
+
+    const remaining = await ctx.db
+      .select({ sessionId: schema.readingSessions.sessionId })
+      .from(schema.readingSessions)
+      .where(and(eq(schema.readingSessions.userId, koreaderUser!.userId), eq(schema.readingSessions.bookFileId, epub.bookFileId)));
+    expect(remaining.map((row) => row.sessionId).sort()).toEqual([measuredSessionId, webSessionId].sort());
+  });
+
+  it('does not route progress when the document hash matches different books', async () => {
+    const comicProgressBefore = await storedProgress(comic.bookFileId);
+    const epubProgressBefore = await storedProgress(epub.bookFileId);
+
+    await ctx.db.update(schema.bookFiles).set({ fileHash: comicHash }).where(eq(schema.bookFiles.id, epub.bookFileId));
+
+    try {
+      const response = await ctx.app.inject({
+        method: 'PUT',
+        url: '/api/v1/koreader/syncs/progress',
+        headers: deviceHeaders(),
+        payload: { document: comicHash, percentage: 0.99, progress: '999' },
+      });
+
+      expect(response.statusCode).toBe(404);
+      await expect(storedProgress(comic.bookFileId)).resolves.toEqual(comicProgressBefore);
+      await expect(storedProgress(epub.bookFileId)).resolves.toEqual(epubProgressBefore);
+    } finally {
+      await ctx.db.update(schema.bookFiles).set({ fileHash: epubHash }).where(eq(schema.bookFiles.id, epub.bookFileId));
+    }
   });
 });

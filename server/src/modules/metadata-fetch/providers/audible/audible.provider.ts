@@ -19,6 +19,7 @@ export class AudibleProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.AUDIBLE;
   readonly label = 'Audible';
   readonly identifiable = true as const;
+  readonly mediaKinds = ['audiobook'] as const;
 
   private readonly logger = new Logger(AudibleProvider.name);
 

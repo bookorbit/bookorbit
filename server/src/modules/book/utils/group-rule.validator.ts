@@ -93,8 +93,12 @@ const ruleSchema: z.ZodType<Rule> = z
     if (!allowedOperators?.includes(rule.operator as RuleOperator)) {
       ctx.addIssue({ code: 'custom', message: 'Operator is not valid for this field', path: ['operator'] });
     }
-    if (rule.provider !== undefined && rule.field !== 'communityRating') {
-      ctx.addIssue({ code: 'custom', message: 'Provider is only valid for community rating rules', path: ['provider'] });
+    if (rule.provider !== undefined && rule.field !== 'communityRating' && rule.field !== 'communityRatingCount') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Provider is only valid for community rating rules and community rating count rules',
+        path: ['provider'],
+      });
     }
     if (custom) {
       checkCustomFieldValue(rule, ctx);

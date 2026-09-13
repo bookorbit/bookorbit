@@ -11,7 +11,12 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_READING_SESSION_SAVED } fro
 import type { CreateManualReadingSessionDto } from './dto/create-manual-reading-session.dto';
 import type { ListBookReadingSessionsDto } from './dto/list-book-reading-sessions.dto';
 import type { SaveReadingSessionDto } from './dto/save-reading-session.dto';
-import { ReadingSessionRepository } from './reading-session.repository';
+import {
+  ReadingSessionRepository,
+  type ReadingSessionSyncOptions,
+  type RecordCumulativeReadingSessionParams,
+  type RecordCumulativeReadingSessionResult,
+} from './reading-session.repository';
 
 @Injectable()
 export class ReadingSessionService {
@@ -27,7 +32,13 @@ export class ReadingSessionService {
     return resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
   }
 
-  async save(fileId: number, dto: SaveReadingSessionDto, user: RequestUser, source: ReadingSessionSource = 'web'): Promise<void> {
+  async save(
+    fileId: number,
+    dto: SaveReadingSessionDto,
+    user: RequestUser,
+    source: ReadingSessionSource = 'web',
+    sync?: ReadingSessionSyncOptions,
+  ): Promise<void> {
     const event = 'reading_session.save';
     const startedAtMs = Date.now();
     this.logger.log(
@@ -52,7 +63,7 @@ export class ReadingSessionService {
       // span to prevent the client from reporting more time than physically elapsed.
       const durationSeconds = Math.min(dto.durationSeconds, wallClockSeconds);
 
-      const result = await this.repo.saveSession(
+      const saveArgs = [
         user.id,
         fileId,
         dto.sessionId,
@@ -63,7 +74,8 @@ export class ReadingSessionService {
         dto.endProgress ?? null,
         source,
         this.resolveUserTimeZone(user),
-      );
+      ] as const;
+      const result = sync ? await this.repo.saveSession(...saveArgs, sync) : await this.repo.saveSession(...saveArgs);
 
       this.logger.log(
         `[${event}] [end] fileId=${fileId} userId=${user.id} sessionId=${dto.sessionId} durationMs=${Date.now() - startedAtMs} outcome=${result.kind}${result.kind === 'skipped' ? ` reason=${result.reason}` : ''} - reading session save completed`,
@@ -86,7 +98,7 @@ export class ReadingSessionService {
           endedAt,
           progressDelta: dto.progressDelta ?? null,
           endProgress: dto.endProgress ?? null,
-          timezone: (user.settings as unknown as UserSettings)?.timezone ?? 'UTC',
+          timezone: resolveTimeZone((user.settings as unknown as UserSettings)?.timezone, 'UTC'),
         });
       }
     } catch (error) {
@@ -97,6 +109,30 @@ export class ReadingSessionService {
       );
       throw error;
     }
+  }
+
+  async recordCumulativeSyncedSession(params: RecordCumulativeReadingSessionParams): Promise<RecordCumulativeReadingSessionResult> {
+    const result = await this.repo.recordCumulativeSyncedSession(params);
+
+    if (result.kind === 'saved' && params.bookFileId !== null) {
+      const startedAt = new Date(params.endedAt.getTime() - result.durationSeconds * 1000);
+      this.achievementEvents.emit(ACHIEVEMENT_EVENT_READING_SESSION_SAVED, {
+        userId: params.userId,
+        bookFileId: params.bookFileId,
+        durationSeconds: result.durationSeconds,
+        startedAt,
+        endedAt: params.endedAt,
+        progressDelta: params.progressDelta,
+        endProgress: params.endProgress,
+        timezone: params.timeZone,
+      });
+    }
+
+    return result;
+  }
+
+  async deleteLegacyKoreaderSyncEstimatesBatch(limit: number): Promise<{ deleted: number }> {
+    return this.repo.deleteLegacyKoreaderSyncEstimatesBatch(limit);
   }
 
   async createManualSession(bookId: number, dto: CreateManualReadingSessionDto, user: RequestUser): Promise<BookReadingSession> {
@@ -168,6 +204,7 @@ export class ReadingSessionService {
 
       return {
         id: created.id,
+        bookFileId,
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
         durationSeconds,
@@ -175,6 +212,7 @@ export class ReadingSessionService {
         endProgress,
         format,
         source: 'manual',
+        attemptId: created.attemptId,
       };
     } catch (error) {
       const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';

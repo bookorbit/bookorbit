@@ -41,6 +41,7 @@ const contentRef = ref<HTMLElement | null>(null)
 const isScrolled = ref(false)
 
 const forceTwoPageLabelId = `cbz-force-two-page-${useId()}`
+const autoAdvanceLabelId = `cbz-auto-advance-${useId()}`
 
 function onContentScroll() {
   isScrolled.value = (contentRef.value?.scrollTop ?? 0) > 0
@@ -86,6 +87,9 @@ const bgSwatches = computed<{ value: BgColor; label: string; color: string }[]>(
 ])
 
 const isTwoPagePreferred = computed(() => props.settings.viewMode === 'two-page' && props.settings.scrollMode === 'paginated')
+const autoAdvanceHint = computed(() =>
+  props.settings.autoAdvance && props.settings.scrollMode !== 'paginated' ? t('reader.cbz.autoAdvancePagedOnly') : t('reader.cbz.autoAdvanceHint'),
+)
 const showPagedOnlyHint = computed(() => props.settings.viewMode === 'two-page' && props.settings.scrollMode !== 'paginated')
 
 function selectFit(value: FitMode) {
@@ -118,6 +122,10 @@ function setSpreadGap(value: number) {
 
 function setForceTwoPage(value: boolean) {
   emit('update', { forceTwoPage: value })
+}
+
+function setAutoAdvance(value: boolean) {
+  emit('update', { autoAdvance: value })
 }
 
 function selectBackground(value: BgColor) {
@@ -242,6 +250,16 @@ const groupLabelClass = 'mb-2 block text-[11px] font-semibold uppercase tracking
           :aria-label="t('reader.cbz.readingDirection')"
           @update:model-value="setDirection"
         />
+      </div>
+
+      <div class="border-b border-border px-4 py-3.5">
+        <div class="flex items-center justify-between gap-3">
+          <span :id="autoAdvanceLabelId" class="text-[13px] font-medium text-foreground">{{ t('reader.cbz.autoAdvance') }}</span>
+          <ToggleSwitch :model-value="settings.autoAdvance" :aria-labelledby="autoAdvanceLabelId" @update:model-value="setAutoAdvance" />
+        </div>
+        <p class="mt-2 text-xs leading-snug text-muted-foreground">
+          {{ autoAdvanceHint }}
+        </p>
       </div>
 
       <div class="px-4 py-3.5">

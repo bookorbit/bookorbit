@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import type { BookMetadataFetchReason } from '@bookorbit/types';
-import { MetadataProviderKey, NotificationType } from '@bookorbit/types';
+import { MetadataProviderKey, NotificationType, Permission, parseSeriesIndex } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
 import { resolveIsAudiobook } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -328,7 +328,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (pageCount !== undefined) scalarFields.pageCount = pageCount;
     const seriesName = this.asNullableString(filteredResolved.seriesName);
     if (seriesName !== undefined) scalarFields.seriesName = seriesName;
-    const seriesIndex = this.asNullableNumber(filteredResolved.seriesIndex);
+    const seriesIndex = filteredResolved.seriesIndex === null ? null : (parseSeriesIndex(filteredResolved.seriesIndex) ?? undefined);
     if (seriesIndex !== undefined) scalarFields.seriesIndex = seriesIndex;
 
     if (filteredProviderIds[MetadataProviderKey.GOOGLE]) scalarFields.googleBooksId = filteredProviderIds[MetadataProviderKey.GOOGLE];
@@ -493,7 +493,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
             type: hasFailed ? NotificationType.MetadataFetchFailed : NotificationType.MetadataFetchCompleted,
             title: hasFailed ? 'Metadata fetch completed with errors' : 'Metadata fetch completed',
             message: `Processed ${snapshot.sessionDone} of ${snapshot.sessionTotal} books` + (hasFailed ? `, ${summary.failed} failed` : ''),
-            scope: { kind: 'all' },
+            scope: { kind: 'permission', permission: Permission.ManageMetadataConfig },
             meta: { sessionTotal: snapshot.sessionTotal, sessionDone: snapshot.sessionDone, failed: summary.failed },
           })
           .catch(() => {});

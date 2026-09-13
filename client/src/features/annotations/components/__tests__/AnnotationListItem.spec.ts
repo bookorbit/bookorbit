@@ -31,6 +31,7 @@ function makeAnnotation(overrides: Partial<AnnotationItem> = {}): AnnotationItem
     origin: 'web',
     positionStatus: 'exact',
     chapterIndex: 0,
+    highlightedAt: '2026-01-01T00:00:00.000Z',
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }

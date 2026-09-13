@@ -18,7 +18,6 @@ vi.mock('../../composables/useBookDockDetail', () => ({
     saveError: ref(null),
     saveMetadata: mocks.saveMetadata,
     setTarget: vi.fn<(...args: unknown[]) => Promise<null>>().mockResolvedValue(null),
-    discardFile: vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined),
     coverUrl: (id: number) => `/api/v1/book-dock/files/${id}/cover`,
   }),
 }))
@@ -81,6 +80,7 @@ function makeFile(overrides: Partial<BookDockFile> = {}): BookDockFile {
     metadataEditedAt: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
+    unitFiles: [],
     ...overrides,
   }
 }
@@ -161,6 +161,44 @@ describe('BookDockFileSheet metadata search defaults', () => {
     })
   })
 
+  it('autosaves an exact series index label including its trailing zero', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountSheet(makeFile({ embeddedMetadata: { seriesName: 'Dune' } }))
+      const label = wrapper.findAll('label').find((item) => item.text().includes('Series #'))
+      expect(label).toBeDefined()
+      const input = label!.get<HTMLInputElement>('input')
+
+      for (const character of '5.10') {
+        input.element.value += character
+        await input.trigger('input')
+      }
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(input.element.value).toBe('5.10')
+      expect(mocks.saveMetadata).toHaveBeenLastCalledWith(1, expect.objectContaining({ seriesIndex: '5.10' }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows an error and does not autosave a malformed series index', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountSheet(makeFile())
+      const label = wrapper.findAll('label').find((item) => item.text().includes('Series #'))
+      const input = label!.get<HTMLInputElement>('input')
+
+      await input.setValue('1.2.3')
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(label!.get('[role="alert"]').text()).toContain('at most one decimal point')
+      expect(mocks.saveMetadata).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('persists every metadata field emitted by the search diff', async () => {
     const candidate: MetadataCandidate = {
       provider: 'hardcover',
@@ -181,7 +219,7 @@ describe('BookDockFileSheet metadata search defaults', () => {
         narrators: ['Simon Vance'],
         durationSeconds: 1200,
         abridged: false,
-        seriesMemberships: [{ seriesName: 'Dune', seriesIndex: 1 }],
+        seriesMemberships: [{ seriesName: 'Dune', seriesIndex: '1' }],
         communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
         hardcoverId: 'hardcover-book',
         hardcoverEditionId: 'hardcover-edition',
@@ -200,7 +238,7 @@ describe('BookDockFileSheet metadata search defaults', () => {
         narrators: ['Simon Vance'],
         durationSeconds: 1200,
         abridged: false,
-        seriesMemberships: [{ seriesName: 'Dune', seriesIndex: 1 }],
+        seriesMemberships: [{ seriesName: 'Dune', seriesIndex: '1' }],
         communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
         hardcoverId: 'hardcover-book',
         hardcoverEditionId: 'hardcover-edition',
@@ -209,5 +247,17 @@ describe('BookDockFileSheet metadata search defaults', () => {
         coverUrl: 'https://covers.example/dune.jpg',
       }),
     )
+  })
+
+  it('requests confirmation before discarding the file', async () => {
+    const dockFile = makeFile()
+    const wrapper = mountSheet(dockFile)
+    const discardButton = wrapper.findAll('button').find((button) => button.text().trim() === 'Discard')
+
+    expect(discardButton).toBeDefined()
+    await discardButton!.trigger('click')
+
+    expect(wrapper.emitted('discard')).toEqual([[dockFile]])
+    expect(wrapper.emitted('close')).toBeUndefined()
   })
 })

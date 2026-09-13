@@ -87,7 +87,7 @@ jobs:
             echo >> "$PR_BODY"
             cat "$REJECTION_REPORT" >> "$PR_BODY"
             cat "$REJECTION_REPORT" >> "$GITHUB_STEP_SUMMARY"
-            echo "::warning::Crowdin returned translations that failed catalog validation; they were omitted and are listed in the pull request body."
+            echo "::warning::Some messages fall back to English in this export; they are listed in the pull request body."
           fi
 
       - name: Create translation pull request

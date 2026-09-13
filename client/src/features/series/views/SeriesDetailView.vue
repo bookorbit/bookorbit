@@ -93,7 +93,7 @@ const leadCoverRatios = ref(new Map<number, number>())
 const leadBook = ref<{
   id: number
   title: string | null
-  seriesIndex: number | null
+  seriesIndex: string | null
   publishedYear: number | null
   language: string | null
   rating: number | null

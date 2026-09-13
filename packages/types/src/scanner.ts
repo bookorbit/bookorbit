@@ -1,7 +1,27 @@
+export type ScanJobStatus = "running" | "completed" | "failed";
+export type ScanTriggeredBy = "manual" | "watcher" | "schedule";
+
+/** The last recorded scan_jobs row for a library, or null when it has never been scanned. */
+export interface LibraryLastScan {
+  status: ScanJobStatus;
+  triggeredBy: ScanTriggeredBy;
+  startedAt: string;
+  completedAt: string | null;
+  addedCount: number;
+  updatedCount: number;
+  missingCount: number;
+  errorMessage: string | null;
+}
+
+/** One row of a library's scan_jobs history, newest first. */
+export interface LibraryScanHistoryEntry extends LibraryLastScan {
+  id: number;
+}
+
 export interface ScanProgressEvent {
   jobId: number;
   libraryId: number;
-  status: "running" | "completed" | "failed";
+  status: ScanJobStatus;
   processed: number;
   total: number;
   added: number;

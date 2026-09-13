@@ -21,6 +21,7 @@ vi.mock('drizzle-orm', () => ({
   sum: vi.fn((value: unknown) => ({ op: 'sum', value })),
 }));
 
+import { bookDockFiles, bookDockUnitFiles } from '../../db/schema';
 import { BookDockRepository } from './book-dock.repository';
 
 function makeDb() {
@@ -78,7 +79,46 @@ function makeDb() {
   };
 }
 
+function hasReadyToFileCondition(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const node = value as { op?: string; clauses?: unknown[]; right?: unknown };
+  const clauses = node.clauses ?? [];
+  if (
+    node.op === 'and' &&
+    clauses.some((clause) => (clause as { op?: string; right?: unknown }).op === 'eq' && (clause as { right?: unknown }).right === 'ready') &&
+    clauses.filter((clause) => (clause as { op?: string }).op === 'isNotNull').length === 2
+  ) {
+    return true;
+  }
+  return clauses.some(hasReadyToFileCondition);
+}
+
 describe('BookDockRepository', () => {
+  it('looks up both anchors and secondary members in bounded batches', async () => {
+    const { db, selectBuilder } = makeDb();
+    const repo = new BookDockRepository(db as never);
+    const paths = Array.from({ length: 501 }, (_, index) => `/dock/book-${index}.epub`);
+    selectBuilder.where
+      .mockResolvedValueOnce([{ absolutePath: paths[0] }])
+      .mockResolvedValueOnce([{ absolutePath: paths[1] }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ absolutePath: paths[500] }]);
+    expect(await repo.findClaimedPaths(paths)).toEqual(new Set([paths[0], paths[1], paths[500]]));
+    expect(selectBuilder.where.mock.calls.map(([clause]) => clause.right)).toEqual([
+      paths.slice(0, 500),
+      paths.slice(0, 500),
+      paths.slice(500),
+      paths.slice(500),
+    ]);
+    expect(selectBuilder.from.mock.calls.map(([table]) => table)).toEqual([bookDockFiles, bookDockUnitFiles, bookDockFiles, bookDockUnitFiles]);
+  });
+
+  it('does not query file claims for empty input', async () => {
+    const { db } = makeDb();
+    expect(await new BookDockRepository(db as never).findClaimedPaths([])).toEqual(new Set());
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
   it('findExistingBooksByAbsolutePaths short-circuits an empty path list', async () => {
     const { db } = makeDb();
     const repo = new BookDockRepository(db as never);
@@ -171,6 +211,36 @@ describe('BookDockRepository', () => {
     ).resolves.toEqual([{ id: 11 }, { id: 12 }]);
     expect(selectBuilder.orderBy).toHaveBeenCalled();
     expect(selectBuilder.limit).toHaveBeenCalledWith(2);
+  });
+
+  it('uses the same ready-to-file predicate for paged results and select-all batches', async () => {
+    const paged = makeDb();
+    paged.selectBuilder.where.mockReturnValueOnce(paged.selectBuilder).mockResolvedValueOnce([{ total: 1 }]);
+    paged.selectBuilder.offset.mockResolvedValueOnce([{ id: 1 }]);
+    const pagedRepo = new BookDockRepository(paged.db as never);
+
+    await pagedRepo.findAll({
+      readyToFile: true,
+      page: 1,
+      limit: 20,
+      sort: 'createdAt',
+      order: 'desc',
+      userId: 1,
+      canManageAll: true,
+    });
+
+    expect(paged.selectBuilder.where.mock.calls).toHaveLength(2);
+    for (const [where] of paged.selectBuilder.where.mock.calls) {
+      expect(hasReadyToFileCondition(where)).toBe(true);
+    }
+
+    const batched = makeDb();
+    batched.selectBuilder.limit.mockResolvedValueOnce([{ id: 1 }]);
+    const batchedRepo = new BookDockRepository(batched.db as never);
+
+    await batchedRepo.findSelectionBatch({ limit: 20, readyToFile: true, userId: 1, canManageAll: true });
+
+    expect(hasReadyToFileCondition(batched.selectBuilder.where.mock.calls[0]?.[0])).toBe(true);
   });
 
   it('findAll returns paged rows and scalar total using status/search filters', async () => {

@@ -38,7 +38,7 @@ describe('AuditInterceptor', () => {
       get: vi.fn().mockImplementation((key: string) => {
         if (key !== AUDITABLE_KEY) return undefined;
         return {
-          action: 'smart_scope.create',
+          action: (_req: unknown, body: { source: string }) => (body.source === 'test' ? 'smart_scope.create' : 'smart_scope.update'),
           resource: 'smart_scope',
           getResourceId: (_req: unknown, body: { id: number }) => body.id,
           getMeta: (_req: unknown, body: { source: string }) => ({ source: body.source }),

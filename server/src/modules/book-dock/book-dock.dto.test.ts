@@ -21,10 +21,12 @@ describe('BookDock DTO validation', () => {
       sort: 'fileName',
       order: 'asc',
       search: 'dune',
+      readyToFile: '1',
     });
 
     expect(dto.page).toBe(2);
     expect(dto.limit).toBe(30);
+    expect(dto.readyToFile).toBe(true);
     expect((await validate(dto)).length).toBe(0);
     expect((await errorsFor(ListBookDockFilesDto, { status: 'unknown' })).length).toBeGreaterThan(0);
     expect((await errorsFor(ListBookDockFilesDto, { limit: 200 })).length).toBeGreaterThan(0);
@@ -44,6 +46,9 @@ describe('BookDock DTO validation', () => {
     expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { publishedYear: 101 } })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { publishedYear: 2201 } })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { publishedYear: 1984.5 } })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { seriesIndex: '5.10' } })).length).toBe(0);
+    expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { seriesIndex: 5.1 } })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { seriesIndex: '5.1.0' } })).length).toBeGreaterThan(0);
   });
 
   it('UpdateBookDockFileDto accepts every metadata field emitted by metadata search through the production validation path', async () => {
@@ -55,7 +60,7 @@ describe('BookDock DTO validation', () => {
       durationSeconds: 1200,
       abridged: false,
       chapters: [{ title: 'Chapter 1', startMs: 0 }],
-      seriesMemberships: [{ seriesName: 'Dune', seriesIndex: 1 }],
+      seriesMemberships: [{ seriesName: 'Dune', seriesIndex: '5.10' }],
       communityRatings: [{ provider: 'hardcover', rating: 4.5, ratingCount: 1000 }],
       googleBooksId: 'google-id',
       goodreadsId: 'goodreads-id',
@@ -112,6 +117,7 @@ describe('BookDock DTO validation', () => {
           selectAll: true,
           status: 'error',
           search: 'abc',
+          readyToFile: true,
           targetLibraryId: null,
           targetFolderId: null,
         })
@@ -141,5 +147,11 @@ describe('BookDock DTO validation', () => {
     expect(
       (await errorsFor(BulkEditBookDockDto, { fields: { publishedYear: 1984 }, enabledFields: ['publishedYear'], mergeArrays: false })).length,
     ).toBe(0);
+    expect(
+      (await errorsFor(BulkEditBookDockDto, { fields: { seriesIndex: '5.10' }, enabledFields: ['seriesIndex'], mergeArrays: false })).length,
+    ).toBe(0);
+    expect(
+      (await errorsFor(BulkEditBookDockDto, { fields: { seriesIndex: 5.1 }, enabledFields: ['seriesIndex'], mergeArrays: false })).length,
+    ).toBeGreaterThan(0);
   });
 });

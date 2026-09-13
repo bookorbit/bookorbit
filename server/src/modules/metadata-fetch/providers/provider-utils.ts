@@ -1,4 +1,7 @@
+import { MetadataCandidate } from '@bookorbit/types';
+
 import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
+import { ProviderThrottleError } from '../provider-throttle.error';
 import { MetadataSearchParams } from './metadata-search-params';
 
 export function allowsAudiobookProviders(params: MetadataSearchParams): boolean {
@@ -66,6 +69,18 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+/**
+ * Rethrows a throttle raised part-way through a per-result loop with the candidates gathered so far
+ * attached, so recording the cooldown does not also discard finished work. Anything else, and a
+ * throttle that already carries candidates from an inner loop, is rethrown untouched.
+ */
+export function rethrowWithPartialCandidates(error: unknown, candidates: readonly MetadataCandidate[]): never {
+  if (error instanceof ProviderThrottleError && candidates.length > 0 && error.partialCandidates.length === 0) {
+    throw new ProviderThrottleError(error.retryAfterSeconds, error.reason, [...candidates]);
+  }
+  throw error;
 }
 
 export function stripHtml(html: string): string {

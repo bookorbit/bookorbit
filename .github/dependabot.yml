@@ -18,6 +18,9 @@ updates:
       # archiver v8 is ESM-only with a completely different API; pin to v7 until we migrate
       - dependency-name: "archiver"
         update-types: ["version-update:semver-major"]
+      # @nestjs/testing must stay on the same major as @nestjs/common and @nestjs/core
+      - dependency-name: "@nestjs/testing"
+        update-types: ["version-update:semver-major"]
     groups:
       production-dependencies:
         dependency-type: "production"

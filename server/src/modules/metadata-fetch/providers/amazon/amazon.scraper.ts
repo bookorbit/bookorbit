@@ -17,7 +17,7 @@ export interface AmazonBookData {
   language?: string;
   pageCount?: number;
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: string;
   seriesTotalBooks?: number;
   coverUrl?: string;
   tags?: string[];
@@ -64,7 +64,8 @@ export function extractAsins(html: string, limit: number): string[] {
   $('div[data-component-type="s-search-result"]').each((_, el) => {
     if (results.length >= limit) return false;
 
-    const titleText = $(el).find('[data-cy=title-recipe]').text().toLowerCase();
+    const titleText = $(el).find('[data-cy=title-recipe]').text().trim().toLowerCase();
+    if (titleText.startsWith('sponsored')) return;
     if (SKIP_TITLE_PATTERNS.test(titleText)) return;
 
     // Collect all /dp/ASIN links with their visible label within this result block.
@@ -226,11 +227,9 @@ function seriesLabel($: CheerioAPI): string {
   return $('#rpi-attribute-book_details-series .rpi-attribute-label span').first().text();
 }
 
-function extractSeriesIndex($: CheerioAPI): number | undefined {
+function extractSeriesIndex($: CheerioAPI): string | undefined {
   const match = seriesLabel($).match(/book\s+(\d+(?:\.\d+)?)\s+of/i);
-  if (!match) return undefined;
-  const n = parseFloat(match[1]);
-  return Number.isNaN(n) ? undefined : n;
+  return match?.[1];
 }
 
 /**

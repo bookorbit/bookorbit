@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import type { OidcCallbackResponse } from '@bookorbit/types'
 import { OidcErrorCode } from '@bookorbit/types'
 import { setAccessToken } from '@/lib/api'
+import PublicLegalNotices from '@/components/legal/PublicLegalNotices.vue'
 import { useAuth } from './composables/useAuth'
 import { useOidc, OidcLoginError } from './composables/useOidc'
 
@@ -82,7 +83,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-background px-4">
+  <div class="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-4">
     <div class="w-full max-w-sm text-center">
       <h1 class="text-2xl font-serif font-semibold text-foreground mb-6">Book<span class="text-primary"> Orbit</span></h1>
 
@@ -98,5 +99,6 @@ onMounted(async () => {
         <RouterLink to="/login" class="text-sm text-primary hover:underline">{{ t('auth.oidc.tryAgain') }}</RouterLink>
       </div>
     </div>
+    <PublicLegalNotices />
   </div>
 </template>

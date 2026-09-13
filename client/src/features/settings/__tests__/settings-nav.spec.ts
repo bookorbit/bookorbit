@@ -54,7 +54,7 @@ describe('visibleSettingsNav', () => {
   })
 
   it('keeps every group for a superuser', () => {
-    expect(visibleSettingsNav(SUPERUSER).map((group) => group.id)).toEqual(['you', 'library', 'devices', 'server'])
+    expect(visibleSettingsNav(SUPERUSER).map((group) => group.id)).toEqual(['you', 'library', 'devices', 'accounts', 'server'])
   })
 
   it('hides notifications without notification access', () => {
@@ -85,9 +85,25 @@ describe('visibleSettingsNav', () => {
   it('only exposes the metadata pages the permission allows', () => {
     const library = visibleSettingsNav({ ...NOBODY, permissions: ['manage_libraries'] }).find((group) => group.id === 'library')
     const ids = library?.items.map((item) => item.id) ?? []
+    const metadataChildren = library?.items.find((item) => item.id === 'metadata')?.children?.map((child) => child.id) ?? []
+
     expect(ids).toContain('libraries')
-    expect(ids).toContain('metadata-custom-fields')
-    expect(ids).not.toContain('metadata-providers')
+    expect(metadataChildren).toContain('metadata-custom-fields')
+    expect(metadataChildren).not.toContain('metadata-providers')
+  })
+
+  it('drops a grouping row once every child behind it is hidden', () => {
+    const library = visibleSettingsNav({ ...NOBODY, permissions: ['manage_app_settings'] }).find((group) => group.id === 'library')
+    expect(library?.items.map((item) => item.id)).not.toContain('metadata')
+
+    const server = visibleSettingsNav({ ...NOBODY, permissions: [Permission.ManageBookDock] }).find((group) => group.id === 'server')
+    expect(server?.items.map((item) => item.id)).not.toContain('users-access')
+  })
+
+  it('keeps a grouping row when a single child survives', () => {
+    const server = visibleSettingsNav({ ...NOBODY, permissions: ['manage_users'] }).find((group) => group.id === 'server')
+    const access = server?.items.find((item) => item.id === 'users-access')
+    expect(access?.children?.map((child) => child.id)).toEqual(['users'])
   })
 })
 

@@ -42,6 +42,7 @@ export enum AuditAction {
   LibraryAccessRevoke = "library.access.revoke",
   LibraryWriteMetadataToFiles = "library.write_metadata_to_files",
   LibraryBulkRename = "library.bulk_rename",
+  LibraryRecomputeAddedAt = "library.recompute_added_at",
 
   BookUpload = "book.upload",
   BookMetadataUpdate = "book.metadata.update",
@@ -72,6 +73,27 @@ export enum AuditAction {
   SmartScopeDelete = "smart_scope.delete",
 
   BookDockFinalize = "book_dock.finalize",
+
+  BookRequestCreate = "book_request.create",
+  BookRequestApprove = "book_request.approve",
+  BookRequestReject = "book_request.reject",
+  BookRequestCancel = "book_request.cancel",
+  BookRequestFulfill = "book_request.fulfill",
+  BookRequestGrab = "book_request.grab",
+  BookRequestImport = "book_request.import",
+  BookRequestRemoveDownload = "book_request.remove_download",
+  BookRequestDelete = "book_request.delete",
+
+  DownloadClientCreate = "download_client.create",
+  DownloadClientUpdate = "download_client.update",
+  DownloadClientDelete = "download_client.delete",
+
+  RequestIndexerCreate = "request_indexer.create",
+  RequestIndexerUpdate = "request_indexer.update",
+  RequestIndexerDelete = "request_indexer.delete",
+  RequestIndexerPluginInspect = "request_indexer.plugin.inspect",
+  RequestIndexerPluginInstall = "request_indexer.plugin.install",
+  RequestIndexerPluginRemove = "request_indexer.plugin.remove",
 
   AuthorUpdate = "author.update",
   AuthorDelete = "author.delete",
@@ -115,6 +137,10 @@ export enum AuditAction {
   EmailRecipientGroupDelete = "email.recipient_group.delete",
   EmailRecipientGroupMemberAdd = "email.recipient_group.member_add",
   EmailRecipientGroupMemberRemove = "email.recipient_group.member_remove",
+
+  MaintenanceMissingBooksClean = "maintenance.missing_books.clean",
+  MaintenanceBrokenCoversClean = "maintenance.broken_covers.clean",
+  MaintenanceOrphanedCoversClean = "maintenance.orphaned_covers.clean",
 }
 
 export enum AuditResource {
@@ -124,6 +150,9 @@ export enum AuditResource {
   Collection = "collection",
   SmartScope = "smart_scope",
   BookDockFile = "book_dock_file",
+  BookRequest = "book_request",
+  DownloadClient = "download_client",
+  RequestIndexer = "request_indexer",
   Author = "author",
   AppSettings = "app_settings",
   Genre = "genre",

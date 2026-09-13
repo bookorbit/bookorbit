@@ -102,10 +102,11 @@ export class FileEventProcessorService {
 
     const existing = await this.scannerRepo.findBookFileByAbsolutePath(absolutePath, scopeLibraryId);
     if (existing) {
+      const currentRelPath = relative(existing.libraryFolderPath, absolutePath);
       // Check the file's own book first before searching for any missing book
       const ownBook = await this.scannerRepo.findBookById(existing.file.bookId);
       if (ownBook?.status === 'missing') {
-        await this.scannerRepo.updateBookFile(existing.file.id, this.statToFileInfo(fileStat));
+        await this.scannerRepo.updateBookFile(existing.file.id, { ...this.statToFileInfo(fileStat), relPath: currentRelPath });
         await this.refreshPrimaryFile(ownBook.id, existing.libraryId);
         await this.scannerRepo.markBooksAsPresent([ownBook.id]);
         this.logger.log(
@@ -119,10 +120,14 @@ export class FileEventProcessorService {
         (await this.scannerRepo.findMissingBookByFolderPath(dirname(absolutePath), scopeLibraryId)) ??
         (await this.scannerRepo.findMissingBookByFolderPath(absolutePath, scopeLibraryId));
       if (!book) {
-        return this.fileStateMatches(existing.file, fileStat) ? { type: 'noop' } : { type: 'scan-required', scope: 'file' };
+        if (!this.fileStateMatches(existing.file, fileStat)) return { type: 'scan-required', scope: 'file' };
+        if (existing.file.relPath !== currentRelPath) {
+          await this.scannerRepo.updateBookFile(existing.file.id, { relPath: currentRelPath });
+        }
+        return { type: 'noop' };
       }
 
-      await this.scannerRepo.updateBookFile(existing.file.id, this.statToFileInfo(fileStat));
+      await this.scannerRepo.updateBookFile(existing.file.id, { ...this.statToFileInfo(fileStat), relPath: currentRelPath });
       await this.refreshPrimaryFile(book.id, book.libraryId);
       await this.scannerRepo.markBooksAsPresent([book.id]);
       this.logger.log(

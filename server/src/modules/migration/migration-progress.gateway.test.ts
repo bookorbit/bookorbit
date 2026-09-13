@@ -83,7 +83,7 @@ describe('MigrationProgressGateway', () => {
     await gateway.handleConnection(client as never);
 
     expect(jwtService.verify).toHaveBeenCalledWith('token-1', { algorithms: ['HS256'] });
-    expect(authService.validateUser).toHaveBeenCalledWith(7, 1);
+    expect(authService.validateUser).toHaveBeenCalledWith(7, 1, 'legacy');
     expect(client.disconnect).not.toHaveBeenCalled();
     expect((client.data as { user?: RequestUser }).user?.id).toBe(7);
   });

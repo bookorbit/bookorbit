@@ -7,29 +7,32 @@ const props = defineProps<{ status: BulkRenameStatus }>()
 
 const { t } = useI18n()
 
-const config = computed(() => {
-  switch (props.status) {
-    case 'will_rename':
-      return { label: t('tools.bulkRename.status.willRename'), classes: 'border-primary/40 bg-primary/15 text-primary' }
-    case 'unchanged':
-      return { label: t('tools.bulkRename.status.unchanged'), classes: 'border-border/70 bg-muted text-muted-foreground' }
-    case 'collision':
-      return { label: t('tools.bulkRename.status.collision'), classes: 'border-amber-500/40 bg-amber-500/15 text-amber-500' }
-    case 'no_pattern':
-      return { label: t('tools.bulkRename.status.noPattern'), classes: 'border-border/70 bg-muted text-muted-foreground' }
-    case 'error':
-      return { label: t('tools.bulkRename.status.error'), classes: 'border-destructive/40 bg-destructive/15 text-destructive' }
-    default:
-      return { label: props.status, classes: 'border-border/70 bg-muted text-muted-foreground' }
-  }
-})
+const STATUS_CLASSES: Record<BulkRenameStatus, string> = {
+  will_rename: 'border-primary/35 bg-primary/12 text-primary',
+  unchanged: 'border-border bg-muted text-muted-foreground',
+  collision: 'border-warning/35 bg-warning/14 text-warning',
+  no_pattern: 'border-border bg-muted text-muted-foreground',
+  error: 'border-destructive/35 bg-destructive/13 text-destructive',
+}
+
+const STATUS_LABELS: Record<BulkRenameStatus, string> = {
+  will_rename: 'tools.bulkRename.status.willRename',
+  unchanged: 'tools.bulkRename.status.unchanged',
+  collision: 'tools.bulkRename.status.collision',
+  no_pattern: 'tools.bulkRename.status.noPattern',
+  error: 'tools.bulkRename.status.error',
+}
+
+const label = computed(() => t(STATUS_LABELS[props.status]))
+const classes = computed(() => STATUS_CLASSES[props.status])
 </script>
 
 <template>
   <span
-    class="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 text-xs font-medium leading-none"
-    :class="config.classes"
+    class="inline-flex shrink-0 items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-1.5 text-[0.6875rem] font-semibold whitespace-nowrap"
+    :class="classes"
   >
-    {{ config.label }}
+    <span class="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
+    {{ label }}
   </span>
 </template>

@@ -15,8 +15,7 @@ function makeImporter() {
       .mockResolvedValue(
         new Map([[200, [{ id: 500, hash: null, absolutePath: '/target/book.epub', format: 'epub', sortOrder: 0, durationSeconds: null }]]]),
       ),
-    clearUserBookStatuses: vi.fn().mockResolvedValue(undefined),
-    batchUpsertUserBookStatuses: vi.fn().mockResolvedValue(undefined),
+    batchMergeUserBookStatuses: vi.fn().mockResolvedValue(undefined),
     clearUserBookRatings: vi.fn().mockResolvedValue(undefined),
     batchUpsertUserBookRatings: vi.fn().mockResolvedValue(undefined),
     clearReadingProgress: vi.fn().mockResolvedValue(undefined),
@@ -141,12 +140,13 @@ describe('UserStateImporter', () => {
     const ensureRunning = vi.fn().mockResolvedValue(undefined);
     await importer.import(300, planned as never, ensureRunning);
 
-    expect(importRepo.batchUpsertUserBookStatuses).toHaveBeenCalledWith([
+    expect(importRepo.batchMergeUserBookStatuses).toHaveBeenCalledWith([
       expect.objectContaining({
         userId: 10,
         bookId: 200,
         status: 'read',
         source: 'manual',
+        sourceUpdatedAt: new Date('2026-01-02T00:00:00.000Z'),
       }),
     ]);
     expect(importRepo.batchUpsertUserBookRatings).toHaveBeenCalledWith([
@@ -477,7 +477,7 @@ describe('UserStateImporter', () => {
 
     await importer.import(302, planned as never, vi.fn().mockResolvedValue(undefined));
 
-    expect(importRepo.batchUpsertUserBookStatuses).not.toHaveBeenCalled();
+    expect(importRepo.batchMergeUserBookStatuses).not.toHaveBeenCalled();
     expect(importRepo.batchUpsertUserBookRatings).not.toHaveBeenCalled();
     expect(importRepo.batchUpsertReadingProgress).not.toHaveBeenCalled();
     expect(importRepo.batchUpsertAudiobookProgress).not.toHaveBeenCalled();
@@ -975,18 +975,18 @@ describe('UserStateImporter', () => {
 
     await importer.import(306, planned as never, vi.fn().mockResolvedValue(undefined));
 
-    const statusBatch = importRepo.batchUpsertUserBookStatuses.mock.calls[0]?.[0] as Array<{
+    const statusBatch = importRepo.batchMergeUserBookStatuses.mock.calls[0]?.[0] as Array<{
       userId: number;
       bookId: number;
       status: string;
-      updatedAt: Date;
+      sourceUpdatedAt: Date;
     }>;
     expect(statusBatch).toHaveLength(1);
     expect(statusBatch[0]).toMatchObject({
       userId: 10,
       bookId: 200,
       status: 'read',
-      updatedAt: new Date(newerStatusUpdatedAt),
+      sourceUpdatedAt: new Date(newerStatusUpdatedAt),
     });
 
     const ratingBatch = importRepo.batchUpsertUserBookRatings.mock.calls[0]?.[0] as Array<{

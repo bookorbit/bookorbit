@@ -31,12 +31,20 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
   --color-star-highlight: var(--star-highlight);
+  --color-volume-read: var(--volume-read);
+  --color-volume-reading: var(--volume-reading);
+  --color-volume-unread: var(--volume-unread);
+  --color-volume-missing: var(--volume-missing);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-count-foreground: var(--sidebar-count-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -47,6 +55,16 @@
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
   --color-surface-4: var(--surface-4);
+
+  --color-pattern-token: var(--pattern-token);
+  --color-pattern-modifier: var(--pattern-modifier);
+  --color-pattern-optional: var(--pattern-optional);
+  --color-pattern-fallback: var(--pattern-fallback);
+
+  --color-diff-del: var(--diff-del);
+  --color-diff-ins: var(--diff-ins);
+  --color-path-dim: var(--path-dim);
+  --color-path-fold: var(--path-fold);
 
   --shadow-xs: var(--elevation-xs);
   --shadow-sm: var(--elevation-sm);

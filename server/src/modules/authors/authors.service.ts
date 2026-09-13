@@ -2,15 +2,16 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { Observable } from 'rxjs';
 
 import type {
+  AuthorBooksPage,
   AuthorDetail,
   AuthorMetadataCandidate,
   AuthorMetadataProviderInfo,
   AuthorSummary,
   AuthorsPage,
-  BooksPage,
+  JumpBucketsResponse,
   MergeAuthorsResult,
 } from '@bookorbit/types';
-import { assembleBookCards } from '../book/utils/assemble-book-cards';
+import { assembleBookCards, assembleCollapsedBookCards } from '../book/utils/assemble-book-cards';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText } from '../../common/utils/metadata-text-normalize.utils';
@@ -27,7 +28,7 @@ import { AuthorDetailRow, AuthorsRepository } from './authors.repository';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
-import { ListAuthorsDto } from './dto/list-authors.dto';
+import { ListAuthorLettersDto, ListAuthorsDto } from './dto/list-authors.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
@@ -73,6 +74,8 @@ export class AuthorsService {
       order: dto.order ?? 'asc',
       libraryIds,
       hasPhoto: dto.hasPhoto,
+      hasSortName: dto.hasSortName,
+      addedWithinDays: dto.addedWithinDays,
       minBookCount: dto.minBookCount,
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     });
@@ -82,6 +85,39 @@ export class AuthorsService {
       ...page,
       items: await this.withAuthorImageUrls(mapped),
     };
+  }
+
+  /**
+   * A-Z jump buckets under the current filters, in the same shape the book views use so
+   * the existing rail renders them unchanged. `index` is the offset of the bucket's first
+   * author in the sorted list, which is what the rail jumps to. One grouped query, so the
+   * rail is correct for the whole filtered set and not only the pages already loaded.
+   */
+  async findJumpBuckets(user: RequestUser, dto: ListAuthorLettersDto): Promise<JumpBucketsResponse> {
+    const empty: JumpBucketsResponse = { buckets: [], total: 0, kind: 'letter', granularity: null };
+    const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
+    if (libraryIds.length === 0) return empty;
+
+    const counts = await this.authorsRepo.findLetterCounts({
+      q: dto.q,
+      sort: dto.sort === 'sortName' ? 'sortName' : 'name',
+      order: dto.order ?? 'asc',
+      libraryIds,
+      hasPhoto: dto.hasPhoto,
+      hasSortName: dto.hasSortName,
+      addedWithinDays: dto.addedWithinDays,
+      minBookCount: dto.minBookCount,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
+
+    let offset = 0;
+    const buckets = counts.map((row) => {
+      const bucket = { key: row.letter, label: row.letter, index: offset, isUnknown: row.letter === '#' };
+      offset += row.count;
+      return bucket;
+    });
+
+    return { buckets, total: offset, kind: 'letter', granularity: null };
   }
 
   /** Total authors the user can browse; matches the unfiltered total of {@link findAll}. */
@@ -98,15 +134,19 @@ export class AuthorsService {
     return this.withAuthorImageUrl(this.mapAuthorDetail(row), 'full');
   }
 
-  async findBooks(user: RequestUser, authorId: number, dto: ListAuthorBooksDto): Promise<BooksPage> {
+  async findBooks(user: RequestUser, authorId: number, dto: ListAuthorBooksDto): Promise<AuthorBooksPage> {
     this.assertPaginationWindow(dto.page ?? 0, dto.size ?? 50);
     const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
     if (libraryIds.length === 0) {
-      return { items: [], total: 0, page: dto.page ?? 0, size: dto.size ?? 50 };
+      return { items: [], total: 0, bookTotal: 0, page: dto.page ?? 0, size: dto.size ?? 50 };
     }
 
     const author = await this.authorsRepo.findById(authorId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
     if (!author) throw new NotFoundException('Author not found');
+
+    if (dto.collapseSeries === true) {
+      return this.findBooksCollapsed(user, authorId, dto, libraryIds);
+    }
 
     const page = await this.authorsRepo.findBookIdsPage({
       authorId,
@@ -119,7 +159,7 @@ export class AuthorsService {
     });
 
     if (page.bookIds.length === 0) {
-      return { items: [], total: page.total, page: page.page, size: page.size };
+      return { items: [], total: page.total, bookTotal: page.total, page: page.page, size: page.size };
     }
 
     const orderMap = new Map(page.bookIds.map((id, index) => [id, index]));
@@ -136,7 +176,49 @@ export class AuthorsService {
       cardData.seriesMembershipRows,
     ).sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
-    return { items, total: page.total, page: page.page, size: page.size };
+    return { items, total: page.total, bookTotal: page.total, page: page.page, size: page.size };
+  }
+
+  /**
+   * The collapsed half of {@link findBooks}: the same author scope, run through the book module's
+   * collapsed query so a series arrives as one card carrying its `collapsedSeries` payload. The
+   * per-series counts come out of that query scoped to the rows it saw, so they say "books by this
+   * author in the series" - which is the number an author page should show.
+   *
+   * `total` is the row count the collapsed query reports, so paging still walks the list it is
+   * actually rendering; `bookTotal` counts the books behind those rows for the callers that speak
+   * in books. Counting both under one visibility rule keeps them from disagreeing.
+   */
+  private async findBooksCollapsed(user: RequestUser, authorId: number, dto: ListAuthorBooksDto, libraryIds: number[]): Promise<AuthorBooksPage> {
+    const page = dto.page ?? 0;
+    const size = dto.size ?? 50;
+    const where = this.authorsRepo.buildBooksWhere({
+      authorId,
+      libraryIds,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
+
+    const collapsed = await this.bookReadService.findCardsCollapsed({
+      where,
+      sort: [{ field: dto.sort ?? 'addedAt', dir: dto.order ?? 'desc' }],
+      limit: size,
+      offset: page * size,
+      userId: user.id,
+    });
+
+    const items = assembleCollapsedBookCards(
+      collapsed.rows,
+      collapsed.authorRows,
+      collapsed.fileRows,
+      collapsed.genreRows,
+      collapsed.progressRows,
+      collapsed.statusRows,
+      collapsed.narratorRows,
+      collapsed.tagRows,
+      collapsed.seriesMembershipRows,
+    );
+
+    return { items, total: collapsed.total, bookTotal: collapsed.bookTotal, page, size };
   }
 
   listMetadataProviders(): AuthorMetadataProviderInfo[] {
@@ -573,6 +655,7 @@ export class AuthorsService {
     description: string | null;
     bookCount: number;
     lastAddedAt: Date | null;
+    coverBookId?: number | null;
   }): AuthorSummary {
     return {
       id: row.id,
@@ -581,6 +664,7 @@ export class AuthorsService {
       description: row.description,
       bookCount: row.bookCount,
       lastAddedAt: row.lastAddedAt ? row.lastAddedAt.toISOString() : null,
+      coverBookId: row.coverBookId ?? null,
     };
   }
 

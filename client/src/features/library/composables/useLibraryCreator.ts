@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
 import { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS, isFiveFieldCronExpression } from '@bookorbit/types'
-import type { CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@bookorbit/types'
+import type { AddedAtSource, CoverAspectRatio, Library, OrganizationMode, PrescanResult } from '@bookorbit/types'
 
 export { DEFAULT_FORMAT_PRIORITY, FORMAT_LABELS }
 
@@ -30,6 +30,7 @@ function blankForm() {
     formatPriority: [...DEFAULT_FORMAT_PRIORITY] as string[],
     allowedFormats: [] as string[],
     organizationMode: 'book_per_folder' as OrganizationMode,
+    addedAtSource: 'imported' as AddedAtSource,
     excludePatterns: [] as string[],
     readingThreshold: 0.25,
     markAsFinishedPercentComplete: 98,
@@ -59,6 +60,7 @@ export function useLibraryCreator() {
   const prescanLoading = ref(false)
   const prescanResult = ref<PrescanResult | null>(null)
   const error = ref<string | null>(null)
+  const storedAddedAtSource = ref<AddedAtSource | null>(null)
 
   const validationErrors = computed<Partial<Record<LibraryCreatorSectionId, string>>>(() => {
     const errors: Partial<Record<LibraryCreatorSectionId, string>> = {}
@@ -91,6 +93,7 @@ export function useLibraryCreator() {
   })
 
   function initCreate() {
+    storedAddedAtSource.value = null
     Object.assign(form, blankForm())
     mode.value = 'create'
     editingLibraryId.value = null
@@ -111,6 +114,8 @@ export function useLibraryCreator() {
     form.formatPriority = [...library.formatPriority, ...missing]
     form.allowedFormats = [...library.allowedFormats]
     form.organizationMode = library.organizationMode
+    form.addedAtSource = library.addedAtSource
+    storedAddedAtSource.value = library.addedAtSource
     form.excludePatterns = [...library.excludePatterns]
     form.readingThreshold = library.readingThreshold
     form.markAsFinishedPercentComplete = library.markAsFinishedPercentComplete
@@ -141,10 +146,14 @@ export function useLibraryCreator() {
     prescanResult.value = null
     error.value = null
     try {
+      const payload = {
+        paths: form.folders,
+        ...(editingLibraryId.value === null ? {} : { libraryId: editingLibraryId.value }),
+      }
       const res = await api('/api/v1/libraries/prescan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paths: form.folders }),
+        body: JSON.stringify(payload),
       })
       if (res.ok) {
         prescanResult.value = await res.json()
@@ -202,6 +211,7 @@ export function useLibraryCreator() {
 
   return {
     form,
+    storedAddedAtSource,
     mode,
     editingLibraryId,
     loading,

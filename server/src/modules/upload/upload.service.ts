@@ -6,7 +6,7 @@ import { Readable } from 'stream';
 import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { formatSeriesIndex } from '../../common/utils/series-index-format.utils';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -18,12 +18,13 @@ import { UploadValidatorService } from './upload-validator.service';
 import { UploadStorageService } from './upload-storage.service';
 import { UploadProcessorService } from './upload-processor.service';
 import { FileRenameService } from '../file-write/file-rename.service';
-import { resolveDownloadFilename, resolveUploadPath } from '@bookorbit/types';
+import { isAudioFormat, resolveUploadPath } from '@bookorbit/types';
 import type { AddBookFileResult, UploadResult } from '@bookorbit/types';
 import { extractEpubMetadata } from '../metadata/lib/epub';
 import { extractCbzMetadata, extractCbrMetadata, extractCb7Metadata } from '../metadata/lib/cbz-metadata';
 import { parseMobiFile } from '../metadata/lib/mobi-parser';
 import { parsePdfFile, type PdfParseWarning } from '../metadata/lib/pdf-parser';
+import { extractAudioMetadata } from '../metadata/extractors/audio.extractor';
 import { computeFileHash } from '../scanner/lib/hash';
 import { resolveExistingPathSpelling } from '../../common/utils/path-identity.utils';
 
@@ -330,64 +331,54 @@ export class UploadService {
     this.logger.log(`[${event}] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAt} - rename book files completed`);
   }
 
+  /**
+   * Both organization modes keep the pattern's folder segments, so an upload lands where the
+   * rename and move services would put the same book. The modes differ only in what counts as
+   * the book: in `book_per_file` the file itself is the book key, not the folder holding it.
+   */
   private async resolveDestination(
     library: { name?: string | null; fileNamingPattern?: string | null; organizationMode?: string | null },
     libraryFolderPath: string,
     tempPath: string,
     filename: string,
     format: string,
-  ): Promise<{ absolutePath: string; bookFolderPath: string; relPath: string }> {
+  ): Promise<{ absolutePath: string; bookFolderPath: string }> {
     const pattern =
       library.fileNamingPattern ??
       (library.organizationMode === 'book_per_folder'
         ? await this.appSettings.getUploadPatternBookPerFolder()
         : await this.appSettings.getUploadPattern());
     const sanitizeForCrossPlatform = await this.appSettings.isCrossPlatformPathSanitizationEnabled();
+    const isBookPerFile = library.organizationMode === 'book_per_file';
 
     if (pattern) {
       const stem = basename(filename, extname(filename));
-      const tokens = await this.buildPatternTokens(tempPath, format, stem, library.name);
-      if (library.organizationMode === 'book_per_file') {
-        const resolvedFilename = resolveDownloadFilename(pattern, tokens, format, { sanitizeForCrossPlatform });
-        if (resolvedFilename) {
-          const absolutePath = join(libraryFolderPath, resolvedFilename);
-          return {
-            absolutePath,
-            bookFolderPath: absolutePath,
-            relPath: resolvedFilename,
-          };
-        }
-      } else {
-        const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
+      const tokens = await this.buildUploadPatternTokens(tempPath, format, stem, library.name);
+      const resolved = resolveUploadPath(pattern, tokens, format, { sanitizeForCrossPlatform });
 
-        if (resolved) {
-          const absolutePath = join(libraryFolderPath, resolved);
-          const relPath = resolved;
-          const bookFolderPath = dirname(absolutePath);
-          return { absolutePath, bookFolderPath, relPath };
-        }
+      if (resolved) {
+        const absolutePath = join(libraryFolderPath, resolved);
+        return { absolutePath, bookFolderPath: isBookPerFile ? absolutePath : dirname(absolutePath) };
       }
     }
 
-    if (library.organizationMode === 'book_per_file') {
+    if (isBookPerFile) {
       const absolutePath = join(libraryFolderPath, filename);
-      return {
-        absolutePath,
-        bookFolderPath: absolutePath,
-        relPath: filename,
-      };
+      return { absolutePath, bookFolderPath: absolutePath };
     }
 
     const stem = basename(filename, extname(filename));
     const bookFolderPath = join(libraryFolderPath, stem);
-    const absolutePath = join(bookFolderPath, filename);
-    const relPath = join(stem, filename);
-    return { absolutePath, bookFolderPath, relPath };
+    return { absolutePath: join(bookFolderPath, filename), bookFolderPath };
   }
 
-  private async buildPatternTokens(tempPath: string, format: string, stem: string, libraryName?: string | null): Promise<Record<string, string>> {
-    const base: Record<string, string> = { originalFilename: stem, extension: format };
-    if (libraryName) base['library'] = libraryName;
+  private async buildUploadPatternTokens(
+    tempPath: string,
+    format: string,
+    stem: string,
+    libraryName?: string | null,
+  ): Promise<Record<string, string>> {
+    const fallback = buildPatternTokens({ metadata: {}, originalStem: stem, format, libraryName });
     const event = 'upload.pattern_tokens';
     const startedAt = Date.now();
 
@@ -399,9 +390,10 @@ export class UploadService {
         publishedYear?: number | null;
         language?: string | null;
         seriesName?: string | null;
-        seriesIndex?: number | null;
+        seriesIndex?: string | null;
         isbn13?: string | null;
         authors: { name: string }[];
+        narrators?: string[];
       } | null = null;
 
       if (format === 'epub') {
@@ -435,22 +427,20 @@ export class UploadService {
         if (pdf) {
           parsed = { title: pdf.title, publisher: pdf.publisher, authors: pdf.authors, seriesName: null, seriesIndex: null };
         }
+      } else if (isAudioFormat(format)) {
+        parsed = await extractAudioMetadata(tempPath);
       }
 
-      if (!parsed) return base;
+      if (!parsed) return fallback;
 
-      if (parsed.title) base['title'] = parsed.title;
-      if (parsed.subtitle) base['subtitle'] = parsed.subtitle;
-      if (parsed.publisher) base['publisher'] = parsed.publisher;
-      if (parsed.language) base['language'] = parsed.language;
-      if (parsed.isbn13) base['isbn'] = parsed.isbn13;
-      if (parsed.publishedYear) base['year'] = String(parsed.publishedYear);
-      if (parsed.seriesName) base['series'] = parsed.seriesName;
-      const seriesIndex = formatSeriesIndex(parsed.seriesIndex ?? null);
-      if (seriesIndex) base['seriesIndex'] = seriesIndex;
-      if (parsed.authors.length > 0) {
-        base['authors'] = parsed.authors.map((a) => a.name).join(', ');
-      }
+      return buildPatternTokens({
+        metadata: parsed,
+        authors: parsed.authors.map((author) => author.name),
+        narrators: parsed.narrators,
+        originalStem: stem,
+        format,
+        libraryName,
+      });
     } catch (err) {
       const { errorClass, errorMessage } = this.parseError(err);
       this.logger.warn(
@@ -458,7 +448,7 @@ export class UploadService {
       );
     }
 
-    return base;
+    return fallback;
   }
 
   private parseError(err: unknown): { errorClass: string; errorMessage: string } {

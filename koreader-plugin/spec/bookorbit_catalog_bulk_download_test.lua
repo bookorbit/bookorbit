@@ -92,7 +92,7 @@ package.loaded["util"] = {
         table.insert(made_paths, path)
     end,
     getSafeFilename = function(filename)
-        return filename
+        return filename:gsub("[\\/:*?\"<>|]", "_")
     end,
     removeFile = function(path)
         files[path] = nil
@@ -188,9 +188,14 @@ G_reader_settings = {
 assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "Series/Book.epub"), "/downloads/Series/Book.epub", "valid device path")
 assertEqual(made_paths[1], "/downloads/Series", "valid device parent created")
 assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "./Series//Book.epub"), "/downloads/Series/Book.epub", "dot segments normalized")
+assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "Standalone/Book: One.epub"), "/downloads/Standalone/Book_ One.epub", "device filename is filesystem safe")
+assertEqual(made_paths[3], "/downloads/Standalone", "sanitized device filename keeps its parent")
+assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "Series: One/Book? One.epub"), "/downloads/Series_ One/Book_ One.epub", "every device path segment is filesystem safe")
+assertEqual(made_paths[4], "/downloads/Series_ One", "sanitized device parent is created")
+made_paths = {}
 assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "../outside.epub"), "/downloads/fallback.epub", "parent traversal falls back")
 assertEqual(Catalog:getLocalDownloadPath("fallback", "epub", "Series\\..\\..\\outside.epub"), "/downloads/fallback.epub", "mixed separator traversal falls back")
-assertEqual(#made_paths, 2, "traversal paths do not create directories")
+assertEqual(#made_paths, 0, "traversal paths do not create directories")
 
 Catalog.settings = {}
 Catalog:initBulkDownloadState()
@@ -608,12 +613,12 @@ local collision_ctx = {
     pending_matches = {},
     completed = {},
 }
-local function collisionBook(id, title)
+local function collisionBook(id, title, device_path)
     return {
         id = id,
         title = title,
         formats = { "epub" },
-        files = { { id = 100 + id, format = "epub", devicePath = "Shared/Book.epub" } },
+        files = { { id = 100 + id, format = "epub", devicePath = device_path } },
     }
 end
 Catalog.bulkShowStatus = function() end
@@ -621,21 +626,21 @@ Catalog.bulkDownloadFile = function(_, _, _, _, local_path)
     table.insert(transfers, local_path)
     return true
 end
-Catalog:bulkProcessBook(collision_ctx, collisionBook(1, "First"))
+Catalog:bulkProcessBook(collision_ctx, collisionBook(1, "First", "Shared/Book: One.epub"))
 collision_ctx.index = 2
-Catalog:bulkProcessBook(collision_ctx, collisionBook(2, "Second"))
+Catalog:bulkProcessBook(collision_ctx, collisionBook(2, "Second", "Shared/Book? One.epub"))
 collision_ctx.index = 3
-Catalog:bulkProcessBook(collision_ctx, collisionBook(3, "Third"))
+Catalog:bulkProcessBook(collision_ctx, collisionBook(3, "Third", "Shared/Book* One.epub"))
 
-assertEqual(transfers[1], "/downloads/Shared/Book.epub", "first collision path remains unchanged")
-assertEqual(transfers[2], "/downloads/Shared/Book [2].epub", "second collision path gains book identity")
-assertEqual(transfers[3], "/downloads/Shared/Book [3].epub", "third collision path gains book identity")
+assertEqual(transfers[1], "/downloads/Shared/Book_ One.epub", "first sanitized collision path remains unchanged")
+assertEqual(transfers[2], "/downloads/Shared/Book_ One [2].epub", "second sanitized collision path gains book identity")
+assertEqual(transfers[3], "/downloads/Shared/Book_ One [3].epub", "third sanitized collision path gains book identity")
 assertEqual(collision_ctx.counts.downloaded, 3, "all colliding books download")
 assertEqual(collision_ctx.counts.path_conflicts, 2, "collision count recorded")
 assertEqual(collision_ctx.path_conflicts[1].conflicting_book_id, 1, "collision owner recorded")
-assertEqual(collision_ctx.path_conflicts[1].resolved_path, "/downloads/Shared/Book [2].epub", "resolved collision path recorded")
-assertEqual(collision_ctx.destination_paths["/downloads/shared/book.epub"].book_id, 1, "original path ownership retained")
-assertEqual(collision_ctx.completed["2"], "/downloads/Shared/Book [2].epub", "checkpoint records the renamed destination")
+assertEqual(collision_ctx.path_conflicts[1].resolved_path, "/downloads/Shared/Book_ One [2].epub", "resolved collision path recorded")
+assertEqual(collision_ctx.destination_paths["/downloads/shared/book_ one.epub"].book_id, 1, "original path ownership retained")
+assertEqual(collision_ctx.completed["2"], "/downloads/Shared/Book_ One [2].epub", "checkpoint records the renamed destination")
 
 Catalog.bulkReleaseStandby = function() end
 Catalog:bulkFinish(collision_ctx)

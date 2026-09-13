@@ -58,6 +58,7 @@ describe('MetadataFetchController', () => {
 
     registry = {
       all: vi.fn(),
+      keysForMediaKind: vi.fn(),
     } as unknown as Mocked<ProviderRegistry>;
 
     providerConfig = {
@@ -66,8 +67,10 @@ describe('MetadataFetchController', () => {
     } as unknown as Mocked<ProviderConfigService>;
 
     const resolver = new MetadataPreferenceResolver();
+    const defaultPreferences = resolver.getDefaultPreferences();
     metadataPreferences = {
-      getGlobal: vi.fn().mockResolvedValue(resolver.getDefaultPreferences()),
+      getGlobal: vi.fn().mockResolvedValue(defaultPreferences),
+      getForLibrary: vi.fn().mockResolvedValue({ libraryId: 9, overrides: null, effective: defaultPreferences }),
     } as unknown as Mocked<MetadataPreferencesService>;
 
     throttleTracker = {
@@ -99,8 +102,8 @@ describe('MetadataFetchController', () => {
     ] as never);
 
     await expect(controller.listProviders({}, user)).resolves.toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
-      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false },
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 4 },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, coverPriority: 5 },
     ]);
   });
 
@@ -117,10 +120,29 @@ describe('MetadataFetchController', () => {
 
     expect(service.getAccessibleBookLibraryId).toHaveBeenCalledWith(12, user);
     expect(pipeline.getEffectiveProviderKeys).toHaveBeenCalledWith(9);
+    expect(metadataPreferences.getForLibrary).toHaveBeenCalledWith(9);
     expect(result).toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, selectedByFieldRules: true },
-      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, selectedByFieldRules: false },
-      { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true, selectedByFieldRules: true },
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, selectedByFieldRules: true, coverPriority: 4 },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, selectedByFieldRules: false, coverPriority: 5 },
+      { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true, selectedByFieldRules: true, coverPriority: 2 },
+    ]);
+  });
+
+  it('exposes the configured Cover field order independently of registry order', async () => {
+    const resolver = new MetadataPreferenceResolver();
+    const preferences = resolver.getDefaultPreferences();
+    preferences.fields.cover.providers = [MetadataProviderKey.OPEN_LIBRARY, MetadataProviderKey.GOOGLE];
+    metadataPreferences.getGlobal.mockResolvedValue(preferences);
+    registry.all.mockReturnValue([
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false },
+    ] as never);
+
+    const result = await controller.listProviders({}, user);
+
+    expect(result).toEqual([
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 1 },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, coverPriority: 0 },
     ]);
   });
 
@@ -152,10 +174,13 @@ describe('MetadataFetchController', () => {
         title: 'Dune',
         author: 'Frank Herbert',
         isbn: '9780441172719',
+        seriesName: undefined,
+        seriesIndex: undefined,
         existingProviderIds: { [MetadataProviderKey.GOOGLE]: 'vol-1' },
         titleIsExplicitQuery: true,
         isAudiobook: false,
         includeAudiobookProviders: false,
+        validateCoverPlaceholders: true,
       },
       [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
     );
@@ -215,10 +240,13 @@ describe('MetadataFetchController', () => {
         title: 'Dune',
         author: undefined,
         isbn: undefined,
+        seriesName: undefined,
+        seriesIndex: undefined,
         existingProviderIds: {},
         titleIsExplicitQuery: true,
         isAudiobook: false,
         includeAudiobookProviders: true,
+        validateCoverPlaceholders: true,
       },
       [
         MetadataProviderKey.GOOGLE,
@@ -419,6 +447,52 @@ describe('MetadataFetchController', () => {
       MetadataProviderKey.ITUNES,
       MetadataProviderKey.AUDIBLE,
     ]);
+  });
+
+  it('narrows the provider set to the ones serving the requested medium', async () => {
+    registry.keysForMediaKind.mockReturnValue([MetadataProviderKey.COMICVINE]);
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.COMICVINE, providerId: '4000-1', title: 'Saga #1' }));
+
+    const stream = await controller.stream({ title: 'Saga', mediaKind: 'comic' }, user);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(registry.keysForMediaKind).toHaveBeenCalledWith(expect.arrayContaining([MetadataProviderKey.GOOGLE]), 'comic');
+    expect(service.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Saga', isAudiobook: false }), [MetadataProviderKey.COMICVINE]);
+  });
+
+  it('reads the medium as the audiobook signal, so an audiobook provider in the list cannot flip an ebook search', async () => {
+    registry.keysForMediaKind.mockReturnValue([MetadataProviderKey.GOOGLE]);
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.GOOGLE, providerId: 'g1', title: 'Dune' }));
+
+    const stream = await controller.stream(
+      { title: 'Dune', mediaKind: 'ebook', providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.AUDIBLE] },
+      user,
+    );
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(service.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune', isAudiobook: false, includeAudiobookProviders: false }), [
+      MetadataProviderKey.GOOGLE,
+    ]);
+  });
+
+  it('keeps an explicit isAudiobook flag ahead of the medium it was sent with', async () => {
+    registry.keysForMediaKind.mockReturnValue([MetadataProviderKey.GOOGLE]);
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.GOOGLE, providerId: 'g2', title: 'Dune' }));
+
+    const stream = await controller.stream({ title: 'Dune', mediaKind: 'ebook', isAudiobook: true }, user);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(service.search).toHaveBeenCalledWith(expect.objectContaining({ isAudiobook: true }), [MetadataProviderKey.GOOGLE]);
+  });
+
+  it('leaves the provider set untouched when no medium is stated', async () => {
+    service.search.mockReturnValue(of({ provider: MetadataProviderKey.GOOGLE, providerId: 'g3', title: 'Dune' }));
+
+    const stream = await controller.stream({ title: 'Dune', providers: [MetadataProviderKey.GOOGLE] }, user);
+    await firstValueFrom(stream.pipe(toArray()));
+
+    expect(registry.keysForMediaKind).not.toHaveBeenCalled();
+    expect(service.search).toHaveBeenCalledWith(expect.anything(), [MetadataProviderKey.GOOGLE]);
   });
 
   it('infers audiobook search when audiobook providers are requested', async () => {

@@ -488,6 +488,27 @@ describe('ProviderConfigService', () => {
     expect(result.message).toContain('bot-check');
   });
 
+  it('returns warning for Amazon interstitial challenge responses', async () => {
+    db.query.appSettings.findFirst.mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue(
+      new Response(
+        '<script>function triggerInterstitialChallenge() { xhr.open("POST", "/_sec/verify?provider=interstitial"); xhr.send(JSON.stringify({"bm-verify":"token"})); }</script>',
+        { status: 200 },
+      ),
+    );
+
+    const result = await service.testProvider(MetadataProviderKey.AMAZON, {
+      amazon: { cookie: 'session-cookie' },
+    });
+
+    expect(result).toEqual({
+      key: MetadataProviderKey.AMAZON,
+      ok: false,
+      status: 'warning',
+      message: 'Amazon responded with a bot-check page. Use a fresh browser session cookie.',
+    });
+  });
+
   it('falls back to the allowlisted Amazon origin for an untrusted domain', async () => {
     db.query.appSettings.findFirst.mockResolvedValue(undefined);
     fetchMock.mockResolvedValue(new Response('<html>Amazon results</html>', { status: 200 }));

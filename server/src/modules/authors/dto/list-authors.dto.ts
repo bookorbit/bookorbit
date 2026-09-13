@@ -46,6 +46,66 @@ export class ListAuthorsDto {
   hasPhoto?: boolean;
 
   @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  hasSortName?: boolean;
+
+  /** "Added recently" filter, expressed in days so the client picks the window. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  addedWithinDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  minBookCount?: number;
+}
+
+/** Query for the A-Z rail. Same filters as the list, minus paging and sorting. */
+export class ListAuthorLettersDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  q?: string;
+
+  /** Only the two alphabetical sorts have letter buckets; anything else is rejected. */
+  @IsOptional()
+  @IsIn(['name', 'sortName'])
+  sort?: 'name' | 'sortName' = 'name';
+
+  /** Bucket order has to match the list, or every jump index is off. */
+  @IsOptional()
+  @IsIn(SORT_DIRECTIONS)
+  order?: SortDirection = 'asc';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  libraryId?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  hasPhoto?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  hasSortName?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  addedWithinDays?: number;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

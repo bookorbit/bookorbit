@@ -342,8 +342,11 @@ describe('KOReader plugin update source wiring', () => {
     const sweep = await readPluginFile('bookorbit_sweep.lua');
     const statsReader = await readPluginFile('bookorbit_stats_reader.lua');
 
-    expect(api).toContain('source = cand.source');
-    expect(api).toContain('metadataAmbiguous = cand.metadata_ambiguous');
+    expect(api).toContain('title = boundedUtf8(cand.title, MATCH_TITLE_MAX_BYTES)');
+    expect(api).toContain('authors = boundedUtf8(cand.authors, MATCH_AUTHORS_MAX_BYTES)');
+    expect(api).toContain('lastOpen = nonNegativeInteger(cand.last_open)');
+    expect(api).toContain('source = validMatchSource(cand.source)');
+    expect(api).toContain('metadataAmbiguous = optionalBoolean(cand.metadata_ambiguous)');
     expect(statsReader).toContain('entry.metadata_ambiguous = (entry._variant_count or 0) > 1');
     expect(sweep).toContain('source = "statistics"');
     expect(sweep).toContain('metadata_ambiguous = entry.metadata_ambiguous');

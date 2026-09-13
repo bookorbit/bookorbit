@@ -59,15 +59,16 @@ export class MetadataFetchController {
   async listProviders(@Query() dto: ListMetadataProvidersDto, @CurrentUser() user: RequestUser): Promise<MetadataProviderInfo[]> {
     if (dto.bookId) {
       const libraryId = await this.metadataFetchService.getAccessibleBookLibraryId(dto.bookId, user);
-      const [enabledProviderKeys, fieldRuleProviderKeys] = await Promise.all([
+      const [enabledProviderKeys, fieldRuleProviderKeys, libraryPreferences] = await Promise.all([
         this.resolveEnabledProviderKeys(),
         this.resolveFieldRuleProviderKeys(undefined, libraryId),
+        this.metadataPreferences.getForLibrary(libraryId),
       ]);
-      return this.providerInfosForKeys(enabledProviderKeys, new Set(fieldRuleProviderKeys));
+      return this.providerInfosForKeys(enabledProviderKeys, new Set(fieldRuleProviderKeys), libraryPreferences.effective.fields.cover.providers);
     }
 
-    const providerKeys = await this.resolveEnabledProviderKeys();
-    return this.providerInfosForKeys(providerKeys);
+    const [providerKeys, preferences] = await Promise.all([this.resolveEnabledProviderKeys(), this.metadataPreferences.getGlobal()]);
+    return this.providerInfosForKeys(providerKeys, undefined, preferences.fields.cover.providers);
   }
 
   @Get('providers/runtime')
@@ -84,17 +85,20 @@ export class MetadataFetchController {
   async stream(@Query() dto: MetadataSearchDto, @CurrentUser() user: RequestUser): Promise<Observable<MessageEvent>> {
     const storedContext = dto.bookId ? await this.metadataFetchService.getStoredProviderContext(dto.bookId, user) : null;
     const existingProviderIds = storedContext?.providerIds ?? {};
-    const [preferences, providerKeys] = await Promise.all([
+    const [preferences, enabledProviderKeys] = await Promise.all([
       this.metadataPreferences.getGlobal(),
       this.resolveSearchProviderKeys(dto.providers, storedContext?.libraryId),
     ]);
+    // A stated medium describes the book, so it settles which providers can answer at all. It
+    // narrows the caller's provider list rather than widening it, and never adds a disabled one.
+    const providerKeys = dto.mediaKind ? this.registry.keysForMediaKind(enabledProviderKeys, dto.mediaKind) : enabledProviderKeys;
     const requestedAudiobookProvider = (dto.providers ?? []).some(isAudiobookProvider);
     const onlyAudiobookProviders = providerKeys.length > 0 && providerKeys.every(isAudiobookProvider);
     const inferredIsAudiobook =
       requestedAudiobookProvider ||
       onlyAudiobookProviders ||
       Boolean(existingProviderIds[MetadataProviderKey.AUDIBLE] || existingProviderIds[MetadataProviderKey.LIBROFM]);
-    const isAudiobook = dto.isAudiobook ?? inferredIsAudiobook;
+    const isAudiobook = dto.isAudiobook ?? (dto.mediaKind ? dto.mediaKind === 'audiobook' : inferredIsAudiobook);
 
     const searchTitle = normalizeSearchTitle(dto.title);
     const params: MetadataSearchParams = {
@@ -107,6 +111,7 @@ export class MetadataFetchController {
       existingProviderIds,
       isAudiobook,
       includeAudiobookProviders: isAudiobook || providerKeys.some(isAudiobookProvider),
+      validateCoverPlaceholders: true,
     };
 
     const genreOptions = preferences.options?.genres;
@@ -166,16 +171,25 @@ export class MetadataFetchController {
     return this.resolveFieldRuleProviderKeys(undefined, libraryId);
   }
 
-  private providerInfosForKeys(providerKeys: MetadataProviderKey[], fieldRuleProviderKeys?: Set<MetadataProviderKey>): MetadataProviderInfo[] {
+  private providerInfosForKeys(
+    providerKeys: MetadataProviderKey[],
+    fieldRuleProviderKeys?: Set<MetadataProviderKey>,
+    coverProviderKeys: MetadataProviderKey[] = [],
+  ): MetadataProviderInfo[] {
     const keySet = new Set(providerKeys);
+    const coverPriorities = new Map(coverProviderKeys.map((key, index) => [key, index]));
     return this.registry
       .all()
       .filter((p) => keySet.has(p.key))
-      .map((p) => ({
-        key: p.key,
-        label: p.label,
-        identifiable: p.identifiable,
-        ...(fieldRuleProviderKeys ? { selectedByFieldRules: fieldRuleProviderKeys.has(p.key) } : {}),
-      }));
+      .map((p) => {
+        const coverPriority = coverPriorities.get(p.key);
+        return {
+          key: p.key,
+          label: p.label,
+          identifiable: p.identifiable,
+          ...(fieldRuleProviderKeys ? { selectedByFieldRules: fieldRuleProviderKeys.has(p.key) } : {}),
+          ...(coverPriority !== undefined ? { coverPriority } : {}),
+        };
+      });
   }
 }

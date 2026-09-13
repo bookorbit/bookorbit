@@ -50,6 +50,47 @@ describe('GlobalExceptionFilter', () => {
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ errorCode: 'READING_INSIGHTS_PRIVATE' }));
   });
 
+  /**
+   * A code without its parameters is a sentence a client cannot finish. "You can have {limit} in
+   * flight at once" translated with no `limit` renders the placeholder empty, which is how the
+   * one refusal that carries a number told nobody what the number was.
+   */
+  it('carries the code’s translation parameters alongside it', () => {
+    const filter = new GlobalExceptionFilter();
+    const { host, send } = makeHost();
+
+    filter.catch(
+      new HttpException({ message: 'too many in flight', errorCode: 'SUBMIT_SELF_SERVE_LIMIT', errorMeta: { limit: 10 } }, HttpStatus.FORBIDDEN),
+      host,
+    );
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ errorCode: 'SUBMIT_SELF_SERVE_LIMIT', errorMeta: { limit: 10 } }));
+  });
+
+  it('keeps only the scalars a translation could use, so an error body cannot carry internals', () => {
+    const filter = new GlobalExceptionFilter();
+    const { host, send } = makeHost();
+
+    filter.catch(
+      new HttpException(
+        { message: 'nope', errorCode: 'SOME_CODE', errorMeta: { limit: 10, source: 'tracker', internals: { stack: 'secret' }, ids: [1, 2] } },
+        HttpStatus.BAD_REQUEST,
+      ),
+      host,
+    );
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ errorMeta: { limit: 10, source: 'tracker' } }));
+  });
+
+  it('omits meta entirely when nothing coded it, so an uncoded refusal keeps its old shape', () => {
+    const filter = new GlobalExceptionFilter();
+    const { host, send } = makeHost();
+
+    filter.catch(new HttpException({ message: 'nope', errorMeta: { limit: 10 } }, HttpStatus.BAD_REQUEST), host);
+
+    expect(send).toHaveBeenCalledWith(expect.not.objectContaining({ errorMeta: expect.anything() }));
+  });
+
   it('falls back to statusCode/message fields on non-HttpException values', () => {
     const filter = new GlobalExceptionFilter();
     const { host, status, send } = makeHost();

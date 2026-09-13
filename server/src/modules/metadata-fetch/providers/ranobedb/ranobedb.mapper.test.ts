@@ -137,7 +137,7 @@ describe('mapRanobeDbBook', () => {
       pageCount: 240,
       isbn13: '9780316371247',
       seriesName: 'Sword Art Online',
-      seriesIndex: 1,
+      seriesIndex: '1',
       communityRating: 4.25,
       communityRatingCount: 1200,
       coverUrl: 'https://images.ranobedb.org/covers/sao.jpg',
@@ -255,7 +255,7 @@ describe('mapRanobeDbBook', () => {
 
   it('computes seriesIndex as 1-based position', () => {
     const result = mapRanobeDbBook(baseBook);
-    expect(result?.seriesIndex).toBe(1);
+    expect(result?.seriesIndex).toBe('1');
   });
 
   it('returns undefined seriesIndex when book is not in series.books', () => {

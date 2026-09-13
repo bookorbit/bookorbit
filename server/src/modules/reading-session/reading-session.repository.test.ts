@@ -210,7 +210,7 @@ describe('ReadingSessionRepository - insertManualSession', () => {
       timeZone: 'UTC',
     });
 
-    expect(result).toEqual({ id: 321 });
+    expect(result).toEqual({ id: 321, attemptId: null });
     expect(sessionValues).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 5,
@@ -326,7 +326,19 @@ describe('ReadingSessionRepository - listByBook', () => {
     const later = new Date('2026-04-15T10:30:00.000Z');
 
     const { db } = makeListDb({
-      rows: [{ id: 1, startedAt: now, endedAt: later, durationSeconds: 1800, progressDelta: 5, endProgress: 50, format: 'epub', source: 'web' }],
+      rows: [
+        {
+          id: 1,
+          bookFileId: 42,
+          startedAt: now,
+          endedAt: later,
+          durationSeconds: 1800,
+          progressDelta: 5,
+          endProgress: 50,
+          format: 'epub',
+          source: 'web',
+        },
+      ],
       count: [{ total: 1 }],
       stats: [
         {
@@ -352,6 +364,7 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.stats.paceDurationSeconds).toBe(1800);
     expect(result.stats.progressSummary).toEqual([{ day: '2026-04-15', endProgress: 50 }]);
     expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.bookFileId).toBe(42);
     expect(result.items[0]?.startedAt).toBe(now.toISOString());
     expect(result.items[0]?.source).toBe('web');
   });
@@ -427,7 +440,19 @@ describe('ReadingSessionRepository - listByBook', () => {
   it('maps null format and null source to null in items', async () => {
     const now = new Date('2026-04-15T10:00:00.000Z');
     const { db } = makeListDb({
-      rows: [{ id: 1, startedAt: now, endedAt: now, durationSeconds: 60, progressDelta: null, endProgress: null, format: null, source: null }],
+      rows: [
+        {
+          id: 1,
+          bookFileId: null,
+          startedAt: now,
+          endedAt: now,
+          durationSeconds: 60,
+          progressDelta: null,
+          endProgress: null,
+          format: null,
+          source: null,
+        },
+      ],
       count: [{ total: 1 }],
       stats: [{ totalSessions: 1, totalSeconds: 60, avgDurationSeconds: 60, firstSessionAt: null, lastSessionAt: null }],
     });
@@ -435,6 +460,7 @@ describe('ReadingSessionRepository - listByBook', () => {
 
     const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
 
+    expect(result.items[0]?.bookFileId).toBeNull();
     expect(result.items[0]?.format).toBeNull();
     expect(result.items[0]?.source).toBeNull();
   });
@@ -668,5 +694,114 @@ describe('ReadingSessionRepository - deleteSessionByBook', () => {
     await repo.deleteSessionByBook(1, 2, 99);
 
     expect(transaction).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ReadingSessionRepository - deleteLegacyKoreaderSyncEstimatesBatch', () => {
+  function makeCleanupHarness(
+    rows: Array<{
+      id: number;
+      userId: number;
+      libraryId: number;
+      startedAt: Date;
+      endedAt: Date;
+      durationSeconds: number;
+      progressDelta: number | null;
+      userSettings: Record<string, unknown>;
+    }>,
+  ) {
+    const initialLimit = vi.fn().mockResolvedValue(rows);
+    const initialSelect = {
+      from: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({ orderBy: vi.fn().mockReturnValue({ limit: initialLimit }) }),
+          }),
+        }),
+      }),
+    };
+    const survivingSessions = [
+      {
+        startedAt: new Date('2026-07-01T10:00:00.000Z'),
+        endedAt: new Date('2026-07-01T10:05:00.000Z'),
+        durationSeconds: 300,
+        progressDelta: 1,
+      },
+    ];
+    const recomputeWhere = vi.fn().mockResolvedValue(survivingSessions);
+    const recomputeSelect = {
+      from: vi.fn().mockReturnValue({ innerJoin: vi.fn().mockReturnValue({ where: recomputeWhere }) }),
+    };
+    const select = vi.fn().mockReturnValue(recomputeSelect).mockReturnValueOnce(initialSelect);
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
+    const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
+    const insert = vi.fn((table: unknown) => {
+      if (table === userReadingDailyStats) return { values: dailyValues };
+      throw new Error('Unexpected table in insert');
+    });
+    const tx = { select, delete: deleteFn, insert, execute: vi.fn().mockResolvedValue(undefined) };
+    const transaction = vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx));
+
+    return {
+      repo: new ReadingSessionRepository({ transaction } as never),
+      deleteFn,
+      dailyValues,
+      initialLimit,
+      recomputeWhere,
+      transaction,
+    };
+  }
+
+  it('deletes one bounded batch and rebuilds the affected daily totals', async () => {
+    const { repo, deleteFn, dailyValues, initialLimit } = makeCleanupHarness([
+      {
+        id: 9,
+        userId: 7,
+        libraryId: 3,
+        startedAt: new Date('2026-07-01T09:45:00.000Z'),
+        endedAt: new Date('2026-07-01T10:00:00.000Z'),
+        durationSeconds: 900,
+        progressDelta: 4,
+        userSettings: { timezone: 'UTC' },
+      },
+    ]);
+
+    await expect(repo.deleteLegacyKoreaderSyncEstimatesBatch(500)).resolves.toEqual({ deleted: 1 });
+
+    expect(initialLimit).toHaveBeenCalledWith(500);
+    expect(deleteFn).toHaveBeenCalledWith(readingSessions);
+    expect(deleteFn).toHaveBeenCalledWith(userReadingDailyStats);
+    expect(dailyValues).toHaveBeenCalledWith([
+      expect.objectContaining({ userId: 7, libraryId: 3, day: '2026-07-01', readingSeconds: 300, sessionsCount: 1 }),
+    ]);
+  });
+
+  it('does not rewrite daily totals when no legacy estimates remain', async () => {
+    const { repo, deleteFn, dailyValues, transaction } = makeCleanupHarness([]);
+
+    await expect(repo.deleteLegacyKoreaderSyncEstimatesBatch(500)).resolves.toEqual({ deleted: 0 });
+
+    expect(deleteFn).not.toHaveBeenCalled();
+    expect(dailyValues).not.toHaveBeenCalled();
+    expect(transaction).toHaveBeenCalledOnce();
+  });
+
+  it('recomputes sparse history in bounded date ranges', async () => {
+    const row = (id: number, day: string) => ({
+      id,
+      userId: 7,
+      libraryId: 3,
+      startedAt: new Date(`${day}T09:45:00.000Z`),
+      endedAt: new Date(`${day}T10:00:00.000Z`),
+      durationSeconds: 900,
+      progressDelta: 4,
+      userSettings: { timezone: 'UTC' },
+    });
+    const { repo, recomputeWhere } = makeCleanupHarness([row(9, '2024-01-01'), row(10, '2026-07-01')]);
+
+    await repo.deleteLegacyKoreaderSyncEstimatesBatch(500);
+
+    expect(recomputeWhere).toHaveBeenCalledTimes(2);
   });
 });

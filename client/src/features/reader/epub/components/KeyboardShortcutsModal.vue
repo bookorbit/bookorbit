@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Keyboard, X } from '@lucide/vue'
+import { Info, Keyboard, X } from '@lucide/vue'
+import { useLegalNotices } from '@/components/legal/useLegalNotices'
 
 const { t } = useI18n()
+const { openLegalNotices } = useLegalNotices()
 
 const emit = defineEmits<{
   close: []
@@ -51,6 +53,11 @@ function handleBackdropClick(e: MouseEvent) {
   }
 }
 
+function openAboutBookOrbit() {
+  emit('close')
+  openLegalNotices()
+}
+
 onMounted(() => document.addEventListener('keydown', onKeyDown, true))
 onUnmounted(() => document.removeEventListener('keydown', onKeyDown, true))
 </script>
@@ -86,6 +93,17 @@ onUnmounted(() => document.removeEventListener('keydown', onKeyDown, true))
             </div>
           </div>
         </section>
+      </div>
+
+      <div class="flex justify-end border-t border-border/80 px-4 py-2.5">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-foreground outline-hidden hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          @click="openAboutBookOrbit"
+        >
+          <Info :size="13" aria-hidden="true" />
+          {{ t('components.legalNotices.about') }}
+        </button>
       </div>
     </div>
   </div>

@@ -298,8 +298,8 @@ export class CoverService {
     const now = new Date();
     await this.db
       .insert(bookMetadata)
-      .values({ bookId, coverSource: source, updatedAt: now })
-      .onConflictDoUpdate({ target: bookMetadata.bookId, set: { coverSource: source, updatedAt: now } });
+      .values({ bookId, coverSource: source, coverUpdatedAt: now, updatedAt: now })
+      .onConflictDoUpdate({ target: bookMetadata.bookId, set: { coverSource: source, coverUpdatedAt: now, updatedAt: now } });
     await this.db.update(books).set({ updatedAt: now }).where(eq(books.id, bookId));
     await this.metadataScoreService.calculateAndSave(bookId);
   }

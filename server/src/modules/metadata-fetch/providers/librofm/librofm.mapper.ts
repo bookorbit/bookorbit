@@ -1,4 +1,9 @@
-import { MetadataProviderKey, type MetadataCandidate, type MetadataSeriesMembership } from '@bookorbit/types';
+import {
+  MetadataProviderKey,
+  parseSeriesIndex as parseSeriesIndexLabel,
+  type MetadataCandidate,
+  type MetadataSeriesMembership,
+} from '@bookorbit/types';
 
 import { parsePublishedDateKey, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { stripHtml } from '../provider-utils';
@@ -18,10 +23,8 @@ function normalizeCoverUrl(value: string | null | undefined): string | undefined
   return coverUrl;
 }
 
-function parseSeriesIndex(value: string | number | null | undefined): number | undefined {
-  if (value == null || String(value).trim() === '') return undefined;
-  const parsed = Number.parseFloat(String(value));
-  return Number.isFinite(parsed) ? parsed : undefined;
+function parseSeriesIndex(value: string | number | null | undefined): string | undefined {
+  return parseSeriesIndexLabel(value) ?? undefined;
 }
 
 function normalizeGenres(values: LibroFmAudiobook['genres']): string[] | undefined {

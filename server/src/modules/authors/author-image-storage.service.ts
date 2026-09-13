@@ -159,6 +159,25 @@ export class AuthorImageStorageService {
     return true;
   }
 
+  /**
+   * Every author id that has a stored thumbnail, read in one directory listing.
+   * The stored image is the truth the list already renders from, so this is what
+   * `authors.has_photo` gets reconciled against.
+   */
+  async listAuthorIdsWithStoredImage(): Promise<number[]> {
+    const root = join(this.appDataPath, 'authors');
+    const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+    const ids: number[] = [];
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const id = Number(entry.name);
+      if (!Number.isInteger(id) || id <= 0) continue;
+      if (await this.isReadable(join(root, entry.name, 'thumbnail.jpg'))) ids.push(id);
+    }
+    return ids;
+  }
+
   private authorDir(authorId: number): string {
     return join(this.appDataPath, 'authors', String(authorId));
   }

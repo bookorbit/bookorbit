@@ -133,7 +133,7 @@ describe('AuthorEnrichmentGateway', () => {
 
     await gateway.handleConnection(client);
 
-    expect(authService.validateUser).toHaveBeenCalledWith(11, 2);
+    expect(authService.validateUser).toHaveBeenCalledWith(11, 2, 'legacy');
     expect(client.emit).toHaveBeenCalledWith(AUTHOR_ENRICHMENT_STATUS_EVENT, {
       queued: 3,
       processing: 1,

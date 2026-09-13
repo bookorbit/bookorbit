@@ -25,6 +25,7 @@ describe('BulkRenameRepository', () => {
       const bookRows = [
         {
           bookId: 1,
+          primaryFileId: 11,
           absolutePath: '/lib/old/a.epub',
           relPath: 'old/a.epub',
           format: 'epub',
@@ -43,6 +44,7 @@ describe('BulkRenameRepository', () => {
         },
         {
           bookId: 2,
+          primaryFileId: 21,
           absolutePath: '/lib/old/b.epub',
           relPath: 'old/b.epub',
           format: 'epub',
@@ -65,9 +67,27 @@ describe('BulkRenameRepository', () => {
         { bookId: 1, name: 'Author Two' },
         { bookId: 2, name: 'Author Three' },
       ];
+      const narratorRows = [
+        { bookId: 1, name: 'Narrator One' },
+        { bookId: 2, name: 'Narrator Two' },
+        { bookId: 2, name: 'Narrator Three' },
+      ];
+
+      const fileRows = [
+        { bookId: 1, id: 11, absolutePath: '/lib/old/a.epub', format: 'epub', role: 'content', sortOrder: null },
+        { bookId: 1, id: 12, absolutePath: '/lib/old/a.jpg', format: 'jpg', role: 'cover', sortOrder: null },
+        { bookId: 2, id: 21, absolutePath: '/lib/old/b.epub', format: 'epub', role: 'content', sortOrder: null },
+      ];
 
       const db = {
-        select: vi.fn().mockReturnValueOnce(queryChain(bookRows)).mockReturnValueOnce(queryChain(authorRows)).mockReturnValue(subqueryChain()),
+        select: vi
+          .fn()
+          .mockReturnValueOnce(queryChain(bookRows))
+          .mockReturnValueOnce(subqueryChain())
+          .mockReturnValueOnce(queryChain(authorRows))
+          .mockReturnValueOnce(queryChain(narratorRows))
+          .mockReturnValueOnce(queryChain(fileRows))
+          .mockReturnValue(subqueryChain()),
       };
 
       const repo = new BulkRenameRepository(db as never);
@@ -79,15 +99,22 @@ describe('BulkRenameRepository', () => {
         title: 'A',
         absolutePath: '/lib/old/a.epub',
         authors: ['Author One', 'Author Two'],
+        narrators: ['Narrator One'],
         metadata: { language: 'en', publishedYear: 2001 },
       });
-      expect(result[1]).toMatchObject({ bookId: 2, authors: ['Author Three'] });
+      expect(result[1]).toMatchObject({ bookId: 2, authors: ['Author Three'], narrators: ['Narrator Two', 'Narrator Three'] });
+
+      // Sibling files travel with the book so the preview can see a multi-file layout.
+      expect(result[0]?.primaryFileId).toBe(11);
+      expect(result[0]?.files.map((file) => file.id)).toEqual([11, 12]);
+      expect(result[1]?.files.map((file) => file.id)).toEqual([21]);
     });
 
-    it('returns books with empty author lists when none are linked', async () => {
+    it('returns books with empty author and narrator lists when none are linked', async () => {
       const bookRows = [
         {
           bookId: 1,
+          primaryFileId: 11,
           absolutePath: '/lib/old/a.epub',
           relPath: 'old/a.epub',
           format: 'epub',
@@ -107,7 +134,14 @@ describe('BulkRenameRepository', () => {
       ];
 
       const db = {
-        select: vi.fn().mockReturnValueOnce(queryChain(bookRows)).mockReturnValueOnce(queryChain([])).mockReturnValue(subqueryChain()),
+        select: vi
+          .fn()
+          .mockReturnValueOnce(queryChain(bookRows))
+          .mockReturnValueOnce(subqueryChain())
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValue(subqueryChain()),
       };
 
       const repo = new BulkRenameRepository(db as never);
@@ -115,9 +149,11 @@ describe('BulkRenameRepository', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].authors).toEqual([]);
+      expect(result[0].narrators).toEqual([]);
+      expect(result[0].files).toEqual([]);
     });
 
-    it('returns an empty array and skips the author query when the library has no books', async () => {
+    it('returns an empty array and skips the contributor queries when the library has no books', async () => {
       const db = { select: vi.fn().mockReturnValueOnce(queryChain([])) };
 
       const repo = new BulkRenameRepository(db as never);
@@ -127,7 +163,7 @@ describe('BulkRenameRepository', () => {
       expect(db.select).toHaveBeenCalledTimes(1);
     });
 
-    it('fetches authors via a library subquery, never a per-book parameter list (issue #361)', async () => {
+    it('fetches contributors via a library subquery, never a per-book parameter list (issue #361)', async () => {
       const calls: Array<{ text: string; params: unknown[] }> = [];
       const fakeClient = {
         query: vi.fn().mockImplementation((cfg: { text: string }, params: unknown[]) => {
@@ -142,16 +178,18 @@ describe('BulkRenameRepository', () => {
 
       await repo.findAllBooksForLibrary(42);
 
-      expect(calls).toHaveLength(2);
+      // Books, authors, narrators, files.
+      expect(calls).toHaveLength(4);
 
-      const authorQuery = calls[1];
-      // The ONLY bind parameter is the libraryId - not one entry per book - so the statement can
-      // never exceed PostgreSQL's 65535-parameter wire-protocol limit, regardless of library size.
-      expect(authorQuery.params).toEqual([42]);
+      // The ONLY bind parameter is the libraryId - not one entry per book - so no statement
+      // can exceed PostgreSQL's 65535-parameter wire-protocol limit, regardless of library size.
+      for (const contributorQuery of calls.slice(1)) {
+        expect(contributorQuery.params).toEqual([42]);
 
-      const sqlText = authorQuery.text.toLowerCase();
-      expect(sqlText).toContain('in (select');
-      expect(sqlText).toContain('"library_id"');
+        const sqlText = contributorQuery.text.toLowerCase();
+        expect(sqlText).toContain('in (select');
+        expect(sqlText).toContain('"library_id"');
+      }
     });
   });
 

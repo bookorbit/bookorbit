@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { createHash } from 'crypto';
 import type { FastifyReply } from 'fastify';
 
-import { AuditAction, AuditResource } from '@bookorbit/types';
+import { AuditAction, AuditResource, AuthenticationMethod } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { AUDIT_EVENT, AuditEventsService } from '../audit/audit-events.service';
@@ -115,7 +115,7 @@ export class MagicLinkService {
     }
 
     await this.magicLinkRepo.updateUsage(row.id);
-    const result = await this.authService.issueTokensForUser(row.userId, reply);
+    const result = await this.authService.issueTokensForUser(row.userId, reply, AuthenticationMethod.MagicLink);
 
     this.logger.log(`[magic_link.login] [end] tokenId=${row.id} userId=${row.userId} ip=${ip ?? 'unknown'} - magic link login completed`);
 

@@ -4,7 +4,7 @@ import { basename, dirname, extname, join, relative } from 'path';
 import type { BookMoveCollisionKind, BookMoveCollisionPolicy, BookMoveIneligibleReason, BookMoveLayoutChange } from '@bookorbit/types';
 import { resolveUploadPath } from '@bookorbit/types';
 
-import { buildTokens } from '../file-write/file-rename.utils';
+import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import type { MoveBookData, MoveBookFile, MoveTargetLibrary } from './book-move.repository';
 import { MAX_PATH_LENGTH, isInsideRoot, withCollisionSuffix } from './book-move.utils';
 
@@ -213,7 +213,14 @@ export class BookMovePlannerService {
 
   private resolvePathForFile(file: MoveBookFile, book: MoveBookData, input: PlanInput, format: string): string | null {
     const originalStem = basename(file.absolutePath, extname(file.absolutePath));
-    const tokens = buildTokens(book.metadata, book.authors, originalStem, format, input.target.libraryName);
+    const tokens = buildPatternTokens({
+      metadata: book.metadata,
+      authors: book.authors,
+      narrators: book.narrators,
+      originalStem,
+      format,
+      libraryName: input.target.libraryName,
+    });
     return resolveUploadPath(input.pattern!, tokens, format, { sanitizeForCrossPlatform: input.sanitizeForCrossPlatform });
   }
 

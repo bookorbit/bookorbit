@@ -2,6 +2,42 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 import { SeriesService } from './series.service';
+import type { SeriesMemberRow } from './series.repository';
+
+const EMPTY_FACETS = { all: 0, notStarted: 0, inProgress: 0, complete: 0, hasGaps: 0 };
+
+function summaryRow(
+  overrides: Partial<{
+    id: number;
+    name: string;
+    bookCount: number;
+    readCount: number;
+    readingCount: number;
+    expectedBookCount: number | null;
+    authors: string[];
+    coverBookIds: number[];
+    lastAddedAt: string | null;
+    members: SeriesMemberRow[];
+    membersTruncated: boolean;
+    libraryNames: string[];
+  }>,
+) {
+  return {
+    id: 1,
+    name: 'Series',
+    bookCount: 1,
+    readCount: 0,
+    readingCount: 0,
+    expectedBookCount: null,
+    authors: [],
+    coverBookIds: [],
+    lastAddedAt: null,
+    members: [],
+    membersTruncated: false,
+    libraryNames: [],
+    ...overrides,
+  };
+}
 
 function reqUser(id = 7, superuser = false) {
   return { id, isSuperuser: superuser, permissions: [], contentFilters: undefined } as any;
@@ -12,6 +48,7 @@ describe('SeriesService', () => {
     findPage: vi.fn(),
     findDetail: vi.fn(),
     findBookIds: vi.fn(),
+    findNextReadableBook: vi.fn(),
     countSeries: vi.fn(),
   };
 
@@ -53,24 +90,32 @@ describe('SeriesService', () => {
     it('returns empty page when user has no library access', async () => {
       libraryService.findAll.mockResolvedValue([]);
       const result = await service.findAll(reqUser(), { page: 0, size: 50 });
-      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50 });
+      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50, facets: EMPTY_FACETS });
       expect(seriesRepo.findPage).not.toHaveBeenCalled();
     });
 
     it('delegates to repository with correct params', async () => {
       seriesRepo.findPage.mockResolvedValue({
         items: [
-          {
+          summaryRow({
             id: 42,
             name: 'Harry Potter',
             bookCount: 7,
             readCount: 3,
+            readingCount: 1,
             authors: ['J.K. Rowling'],
             coverBookIds: [1, 2, 3, 4],
             lastAddedAt: '2024-01-01 00:00:00',
-          },
+            members: [
+              { bookId: 1, seriesIndex: '1', title: 'Stone', status: 'read' },
+              { bookId: 2, seriesIndex: '2', title: 'Chamber', status: 'read' },
+              { bookId: 3, seriesIndex: '3', title: 'Azkaban', status: 'read' },
+              { bookId: 4, seriesIndex: '5', title: 'Phoenix', status: 'reading' },
+            ],
+          }),
         ],
         total: 1,
+        facets: { ...EMPTY_FACETS, all: 1, inProgress: 1 },
         page: 0,
         size: 50,
       });
@@ -89,17 +134,103 @@ describe('SeriesService', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0]!.name).toBe('Harry Potter');
       expect(result.items[0]!.lastAddedAt).toBe('2024-01-01 00:00:00');
+      expect(result.facets).toEqual({ ...EMPTY_FACETS, all: 1, inProgress: 1 });
+    });
+
+    it('builds a volume ladder that names the holes between the numbers it holds', async () => {
+      seriesRepo.findPage.mockResolvedValue({
+        items: [
+          summaryRow({
+            id: 7,
+            name: 'Absolute Batman',
+            bookCount: 3,
+            readCount: 2,
+            members: [
+              { bookId: 11, seriesIndex: '1', title: 'One', status: 'read' },
+              { bookId: 12, seriesIndex: '2', title: 'Two', status: 'read' },
+              { bookId: 13, seriesIndex: '5', title: 'Five', status: null },
+            ],
+          }),
+        ],
+        total: 1,
+        facets: { ...EMPTY_FACETS, all: 1, hasGaps: 1 },
+        page: 0,
+        size: 50,
+      });
+
+      const item = (await service.findAll(reqUser(), {})).items[0]!;
+
+      expect(item.volumes.map((v) => v.status)).toEqual(['read', 'read', 'missing', 'missing', 'unread']);
+      expect(item.gaps).toEqual([3, 4]);
+      expect(item.gapCount).toBe(2);
+      expect(item.nextBookId).toBe(13);
+      expect(item.nextIndex).toBe('5');
+    });
+
+    it('collapses two copies of one volume onto a single rung, keeping the furthest read', async () => {
+      seriesRepo.findPage.mockResolvedValue({
+        items: [
+          summaryRow({
+            id: 8,
+            name: 'Two editions',
+            bookCount: 4,
+            readCount: 1,
+            members: [
+              { bookId: 21, seriesIndex: '1', title: 'One ebook', status: null },
+              { bookId: 22, seriesIndex: '1', title: 'One audio', status: 'read' },
+              { bookId: 23, seriesIndex: '2', title: 'Two ebook', status: 'reading' },
+              { bookId: 24, seriesIndex: '2', title: 'Two audio', status: null },
+            ],
+          }),
+        ],
+        total: 1,
+        facets: { ...EMPTY_FACETS, all: 1 },
+        page: 0,
+        size: 50,
+      });
+
+      const item = (await service.findAll(reqUser(), {})).items[0]!;
+
+      expect(item.volumes).toHaveLength(2);
+      expect(item.volumes.map((v) => v.status)).toEqual(['read', 'reading']);
+      expect(item.gapCount).toBe(0);
+    });
+
+    it('draws no ladder for a series too long to read in full, rather than a wrong one', async () => {
+      seriesRepo.findPage.mockResolvedValue({
+        items: [
+          summaryRow({
+            id: 9,
+            name: 'Enormous',
+            bookCount: 900,
+            readCount: 0,
+            membersTruncated: true,
+            members: [{ bookId: 31, seriesIndex: '1', title: 'One', status: null }],
+          }),
+        ],
+        total: 1,
+        facets: { ...EMPTY_FACETS, all: 1 },
+        page: 0,
+        size: 50,
+      });
+
+      const item = (await service.findAll(reqUser(), {})).items[0]!;
+
+      expect(item.volumes).toEqual([]);
+      expect(item.volumesTruncated).toBe(true);
+      expect(item.gapCount).toBe(0);
+      expect(item.nextBookId).toBe(31);
     });
 
     it('scopes to specific library when libraryId provided', async () => {
-      seriesRepo.findPage.mockResolvedValue({ items: [], total: 0, page: 0, size: 50 });
+      seriesRepo.findPage.mockResolvedValue({ items: [], total: 0, facets: EMPTY_FACETS, page: 0, size: 50 });
       await service.findAll(reqUser(), { libraryId: 2 });
       expect(seriesRepo.findPage).toHaveBeenCalledWith(expect.objectContaining({ libraryIds: [2], contentFilters: undefined }));
     });
 
     it('returns empty when scoped library is inaccessible', async () => {
       const result = await service.findAll(reqUser(), { libraryId: 99 });
-      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50 });
+      expect(result).toEqual({ items: [], total: 0, page: 0, size: 50, facets: EMPTY_FACETS });
     });
 
     it('rejects deep pagination', async () => {
@@ -108,8 +239,9 @@ describe('SeriesService', () => {
 
     it('converts null lastAddedAt to null', async () => {
       seriesRepo.findPage.mockResolvedValue({
-        items: [{ id: 42, name: 'Test', bookCount: 1, readCount: 0, authors: [], coverBookIds: [], lastAddedAt: null }],
+        items: [summaryRow({ id: 42, name: 'Test', bookCount: 1, readCount: 0, lastAddedAt: null })],
         total: 1,
+        facets: { ...EMPTY_FACETS, all: 1 },
         page: 0,
         size: 50,
       });
@@ -138,7 +270,7 @@ describe('SeriesService', () => {
         bookCount: 3,
         readCount: 1,
         authors: ['Frank Herbert'],
-        indices: [1, 2, 4],
+        indices: ['1', '2', '4'],
       });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [10, 11, 12], total: 3 });
       bookReadService.findCardsByBookIds.mockResolvedValue({
@@ -203,7 +335,7 @@ describe('SeriesService', () => {
     });
 
     it('preserves book order from repository', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: [1, 2] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: ['1', '2'] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [20, 10], total: 2 });
       bookReadService.findCardsByBookIds.mockResolvedValue({
         rows: [
@@ -305,7 +437,7 @@ describe('SeriesService', () => {
     it('returns empty state when series exists in another library', async () => {
       seriesRepo.findDetail
         .mockResolvedValueOnce(null) // first call with scoped library [2]
-        .mockResolvedValueOnce({ id: 42, name: 'Dune', bookCount: 5, readCount: 2, authors: ['Frank Herbert'], indices: [1, 2, 3, 4, 5] }); // second call with all libraries [1, 2]
+        .mockResolvedValueOnce({ id: 42, name: 'Dune', bookCount: 5, readCount: 2, authors: ['Frank Herbert'], indices: ['1', '2', '3', '4', '5'] }); // second call with all libraries [1, 2]
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
 
       const result = await service.findBooks(reqUser(), 42, { libraryId: 2 });
@@ -339,25 +471,25 @@ describe('SeriesService', () => {
     });
 
     it('returns empty gaps when all indices are non-integer', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [0.5, 1.5, 2.5] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: ['0.5', '1.5', '2.5'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('returns empty gaps when min index < 1', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [0, 5] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: ['0', '5'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('returns empty gaps when max index > 10000', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: [1, 10001] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 2, readCount: 0, authors: [], indices: ['1', '10001'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([]);
     });
 
     it('handles duplicate indices', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: [1, 1, 3] });
+      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 3, readCount: 0, authors: [], indices: ['1', '1', '3'] });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.possibleGaps).toEqual([2]);
     });
@@ -374,27 +506,27 @@ describe('SeriesService', () => {
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 0 });
     });
 
-    async function gapsFor(indices: number[], bookCount: number, expectedBookCount: number | null) {
+    async function gapsFor(indices: string[], bookCount: number, expectedBookCount: number | null) {
       seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount, readCount: 0, authors: [], indices, expectedBookCount });
       const result = await service.findBooks(reqUser(), 42, {});
       return result.seriesInfo.possibleGaps;
     }
 
     it('reports books past the highest owned index, which is the whole point of the total', async () => {
-      expect(await gapsFor([1, 2, 4], 3, 7)).toEqual([3, 5, 6, 7]);
+      expect(await gapsFor(['1', '2', '4'], 3, 7)).toEqual([3, 5, 6, 7]);
     });
 
     it('reports the books below the lowest owned index', async () => {
-      expect(await gapsFor([4], 1, 5)).toEqual([1, 2, 3, 5]);
+      expect(await gapsFor(['4'], 1, 5)).toEqual([1, 2, 3, 5]);
     });
 
     it('reports no gaps for a complete series', async () => {
-      expect(await gapsFor([1, 2, 3], 3, 3)).toEqual([]);
+      expect(await gapsFor(['1', '2', '3'], 3, 3)).toEqual([]);
     });
 
     it('still reports gaps for a single owned book, which the interior-only rule cannot', async () => {
-      expect(await gapsFor([2], 1, 3)).toEqual([1, 3]);
-      expect(await gapsFor([2], 1, null)).toEqual([]);
+      expect(await gapsFor(['2'], 1, 3)).toEqual([1, 3]);
+      expect(await gapsFor(['2'], 1, null)).toEqual([]);
     });
 
     it('exposes the expected count on the series payload', async () => {
@@ -404,7 +536,7 @@ describe('SeriesService', () => {
         bookCount: 1,
         readCount: 0,
         authors: [],
-        indices: [1],
+        indices: ['1'],
         expectedBookCount: 7,
       });
       const result = await service.findBooks(reqUser(), 42, {});
@@ -412,7 +544,15 @@ describe('SeriesService', () => {
     });
 
     it('reports null when no provider has supplied a total', async () => {
-      seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'S', bookCount: 1, readCount: 0, authors: [], indices: [1], expectedBookCount: null });
+      seriesRepo.findDetail.mockResolvedValue({
+        id: 42,
+        name: 'S',
+        bookCount: 1,
+        readCount: 0,
+        authors: [],
+        indices: ['1'],
+        expectedBookCount: null,
+      });
       const result = await service.findBooks(reqUser(), 42, {});
       expect(result.seriesInfo.expectedBookCount).toBeNull();
     });
@@ -420,34 +560,88 @@ describe('SeriesService', () => {
     describe('distrusting the total rather than naming a book missing wrongly', () => {
       it('falls back to interior gaps when a book has no series index', async () => {
         // Four books but only three numbered: the unnumbered one could be any of #4 to #7.
-        expect(await gapsFor([1, 2, 5], 4, 7)).toEqual([3, 4]);
+        expect(await gapsFor(['1', '2', '5'], 4, 7)).toEqual([3, 4]);
       });
 
       it('falls back to interior gaps when a book has a fractional index', async () => {
-        expect(await gapsFor([1, 2.5, 4], 3, 7)).toEqual([2, 3]);
+        expect(await gapsFor(['1', '2.5', '4'], 3, 7)).toEqual([2, 3]);
       });
 
       it('falls back when an owned book is numbered past the provider total', async () => {
-        expect(await gapsFor([1, 2, 9], 3, 7)).toEqual([3, 4, 5, 6, 7, 8]);
+        expect(await gapsFor(['1', '2', '9'], 3, 7)).toEqual([3, 4, 5, 6, 7, 8]);
       });
 
       it('ignores a total of zero or below', async () => {
-        expect(await gapsFor([1, 3], 2, 0)).toEqual([2]);
-        expect(await gapsFor([1, 3], 2, -5)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, 0)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, -5)).toEqual([2]);
       });
 
       it('ignores a total beyond the ceiling so gap enumeration stays bounded', async () => {
-        expect(await gapsFor([1, 3], 2, 10_001)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, 10_001)).toEqual([2]);
       });
 
       it('ignores a fractional total', async () => {
-        expect(await gapsFor([1, 3], 2, 4.5)).toEqual([2]);
+        expect(await gapsFor(['1', '3'], 2, 4.5)).toEqual([2]);
       });
     });
 
     it('counts duplicate editions of one entry as a single owned position', async () => {
       // Two files for #1 plus #3: bookCount 3 matches the three index rows, so the total is trusted.
-      expect(await gapsFor([1, 1, 3], 3, 4)).toEqual([2, 4]);
+      expect(await gapsFor(['1', '1', '3'], 3, 4)).toEqual([2, 4]);
+    });
+  });
+  describe('findNextBook', () => {
+    const row = { bookId: 91, title: 'Issue 10', seriesIndex: '10', fileId: 501, format: 'cbr' };
+
+    it('resolves the next book down to the file the reader should open', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(row);
+
+      await expect(service.findNextBook(reqUser(), 42, 90, { formatGroup: 'cbx' })).resolves.toEqual({
+        next: { bookId: 91, fileId: 501, format: 'cbr', title: 'Issue 10', seriesIndex: '10' },
+      });
+    });
+
+    it('limits candidates to the formats the requesting reader can open', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(null);
+
+      await service.findNextBook(reqUser(), 42, 90, { formatGroup: 'cbx' });
+
+      const params = seriesRepo.findNextReadableBook.mock.calls[0]![0];
+      expect(params).toMatchObject({ seriesId: 42, bookId: 90, libraryIds: [1, 2] });
+      expect([...params.formats].sort()).toEqual(['cb7', 'cbr', 'cbz']);
+    });
+
+    it('allows every readable format when no group is requested', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(null);
+
+      await service.findNextBook(reqUser(), 42, 90, {});
+
+      const params = seriesRepo.findNextReadableBook.mock.calls[0]![0];
+      expect(params.formats).toEqual(expect.arrayContaining(['epub', 'pdf', 'cbz', 'm4b']));
+    });
+
+    it('applies the user content filters and exempts superusers', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue(null);
+      const filtered = { ...reqUser(), contentFilters: EMPTY_CONTENT_FILTER_RULES };
+
+      await service.findNextBook(filtered as any, 42, 90, { formatGroup: 'cbx' });
+      expect(seriesRepo.findNextReadableBook.mock.calls[0]![0].contentFilters).toBe(EMPTY_CONTENT_FILTER_RULES);
+
+      await service.findNextBook(reqUser(7, true), 42, 90, { formatGroup: 'cbx' });
+      expect(seriesRepo.findNextReadableBook.mock.calls[1]![0].contentFilters).toBeUndefined();
+    });
+
+    it('returns no next book without querying when the user has no library access', async () => {
+      libraryService.findAll.mockResolvedValue([]);
+
+      await expect(service.findNextBook(reqUser(), 42, 90, {})).resolves.toEqual({ next: null });
+      expect(seriesRepo.findNextReadableBook).not.toHaveBeenCalled();
+    });
+
+    it('returns no next book when the candidate file has no format', async () => {
+      seriesRepo.findNextReadableBook.mockResolvedValue({ ...row, format: null });
+
+      await expect(service.findNextBook(reqUser(), 42, 90, {})).resolves.toEqual({ next: null });
     });
   });
 });

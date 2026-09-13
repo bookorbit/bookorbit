@@ -1,7 +1,7 @@
 import { basename } from 'path';
 
 import type { BookCard, BookMetadataLockField, CollapsedSeriesInfo, CustomMetadataBookValue, UserBookStatus } from '@bookorbit/types';
-import { BOOK_METADATA_LOCK_FIELDS, normalizeCoverAspectRatio } from '@bookorbit/types';
+import { BOOK_METADATA_LOCK_FIELDS, compareSeriesIndices, normalizeCoverAspectRatio } from '@bookorbit/types';
 
 const LOCK_FIELD_SET = new Set<string>(BOOK_METADATA_LOCK_FIELDS);
 
@@ -21,7 +21,7 @@ type BookRow = {
   title: string | null;
   seriesId?: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
@@ -55,7 +55,7 @@ type SeriesMembershipRow = {
   bookId: number;
   seriesId: number;
   seriesName: string;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   displayOrder: number;
   expectedBookCount?: number | null;
 };
@@ -303,7 +303,7 @@ export function collapseBookCards(cards: BookCard[]): BookCard[] {
 
   for (const [, { firstIndex, books: group }] of seriesGroups) {
     const sorted = [...group].sort((a, b) => {
-      if (a.seriesIndex !== null && b.seriesIndex !== null) return a.seriesIndex - b.seriesIndex;
+      if (a.seriesIndex !== null && b.seriesIndex !== null) return compareSeriesIndices(a.seriesIndex, b.seriesIndex);
       if (a.seriesIndex !== null) return -1;
       if (b.seriesIndex !== null) return 1;
       return new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime();

@@ -91,15 +91,28 @@ describe('DashboardService', () => {
   });
 
   it('executes smartScope scroller with max limit clamp and returns smartScope items', async () => {
-    const { service, smartScopeService } = makeService();
-    const user = makeUser({ id: 7 });
+    const { service, smartScopeService, libraryService } = makeService();
+    const user = makeUser({ id: 7, settings: { dashboardConfig: { libraryIds: [12] } } });
     const items = [{ id: 11 }, { id: 12 }];
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([10, 12]);
     smartScopeService.executeSmartScope.mockResolvedValue({ items, total: 2, page: 0, size: 50 });
 
     const result = await service.getScroller(ScrollerType.SMART_SCOPE, user, 999, 88);
 
-    expect(smartScopeService.executeSmartScope).toHaveBeenCalledWith(88, user, 0, 50);
+    expect(smartScopeService.executeSmartScope).toHaveBeenCalledWith(88, user, 0, 50, undefined, [12]);
     expect(result).toEqual(items);
+  });
+
+  it('intersects standard shelves with the saved dashboard library selection', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService } = makeService();
+    const user = makeUser({ id: 5, settings: { dashboardConfig: { libraryIds: [200, 999] } } });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([100, 200]);
+    dashboardRepo.findRecentlyAddedBookIds.mockResolvedValue([9]);
+    bookReadService.findCardsByBookIds.mockResolvedValue(makeFindCardsResult([9]));
+
+    await service.getScroller(ScrollerType.RECENTLY_ADDED, user, 20);
+
+    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([200], 20, EMPTY_CONTENT_FILTER_RULES);
   });
 
   it('returns empty list when user has no accessible libraries', async () => {
@@ -253,6 +266,29 @@ describe('DashboardService', () => {
       { id: 'recent', ids: [9, 3], failed: false },
       { id: 'wanted', ids: [3, 7], failed: false },
     ]);
+  });
+
+  it('uses one intersected library scope for every shelf in a batch, including smart scopes', async () => {
+    const { service, dashboardRepo, bookReadService, libraryService, smartScopeService } = makeService();
+    const user = makeUser({ id: 8, settings: { dashboardConfig: { libraryIds: [11] } } });
+    libraryService.findAccessibleLibraryIds.mockResolvedValue([10, 11]);
+    dashboardRepo.findRecentlyAddedBookIds.mockResolvedValue([]);
+    smartScopeService.executeSmartScopeBookIds.mockResolvedValue([]);
+
+    await service.getScrollers(
+      {
+        items: [
+          { id: 'recent', type: 'recently-added', limit: 20 },
+          { id: 'scope', type: 'smart-scope', limit: 20, smartScopeId: 7 },
+        ],
+      },
+      user,
+    );
+
+    expect(libraryService.findAccessibleLibraryIds).toHaveBeenCalledOnce();
+    expect(dashboardRepo.findRecentlyAddedBookIds).toHaveBeenCalledWith([11], 20, EMPTY_CONTENT_FILTER_RULES);
+    expect(smartScopeService.executeSmartScopeBookIds).toHaveBeenCalledWith(7, user, 20, [11]);
+    expect(bookReadService.findCardsByBookIds).not.toHaveBeenCalled();
   });
 
   it('keeps successful shelves when one batched selection fails', async () => {

@@ -109,7 +109,7 @@ describe('handleConnection', () => {
     await gateway.handleConnection(client);
 
     expect(jwtService.verify).toHaveBeenCalledWith('valid', { algorithms: ['HS256'] });
-    expect(authService.validateUser).toHaveBeenCalledWith(42, 3);
+    expect(authService.validateUser).toHaveBeenCalledWith(42, 3, 'legacy');
     expect(client.data.user).toEqual({ id: 42, username: 'reader' });
     expect(join).toHaveBeenCalledWith('user:42');
     expect(disconnect).not.toHaveBeenCalled();

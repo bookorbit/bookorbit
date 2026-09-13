@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { parseSeriesIndex } from '@bookorbit/types';
 
 import type {
   SourceBook,
@@ -549,11 +550,7 @@ function normalizePublishedYear(value: string | number | null | undefined): numb
   return normalized;
 }
 
-function normalizeSeriesIndex(value: string | number | null | undefined): number | null {
-  if (value == null || value === '') return null;
-  const normalized = typeof value === 'number' ? value : Number(value.trim());
-  return Number.isFinite(normalized) ? normalized : null;
-}
+const normalizeSeriesIndex = parseSeriesIndex;
 
 function normalizeTimestamp(value: AudiobookshelfTimestamp | undefined): string | null {
   if (value == null || value === '') return null;

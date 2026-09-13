@@ -8,11 +8,16 @@ export interface MetadataSearchParams {
   // (e.g. ComicVine volume plus issue number). A comic title holds only the issue name, so the
   // pairing cannot be recovered from it.
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: string;
   // True when `title` is a query the caller typed rather than the book's own stored title. Stored
   // series context may then fill in what the query omits, but must not override what it states.
   titleIsExplicitQuery?: boolean;
+  // Presence, including an empty map, identifies a refresh of an established book. Discovery
+  // flows omit this property because they have no stored provider identity to preserve.
   existingProviderIds?: Partial<Record<MetadataProviderKey, string>>;
+  // Restricts refreshes to exact stored identities. Providers must not fall back to search when an
+  // ID lookup returns no usable candidate.
+  existingProviderIdsOnly?: boolean;
   // Pins a Hardcover refresh to a previously chosen edition instead of re-deriving one by ISBN.
   hardcoverEditionId?: string;
   // Media type of the edition being searched. Providers that carry both editions of a title use it to
@@ -24,6 +29,9 @@ export interface MetadataSearchParams {
   // Hint for providers to cap deep candidate exploration in non-interactive flows
   // (e.g. auto-fill/background refresh where there is no manual candidate picking).
   maxCandidatesPerProvider?: number;
+  // Interactive result lists can afford bounded cover checks. Bulk metadata pipelines must not
+  // multiply one provider lookup into many thumbnail requests.
+  validateCoverPlaceholders?: boolean;
   // Internal-only signal used by orchestration timeout/cancellation.
   signal?: AbortSignal;
 }

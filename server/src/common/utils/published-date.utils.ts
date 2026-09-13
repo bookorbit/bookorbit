@@ -60,7 +60,8 @@ export function parsePublishedDateKey(value: unknown): string | undefined {
 
   if (MONTH_NAME_RE.test(trimmed) && /\b\d{1,2}\b/.test(trimmed) && /\b\d{4}\b/.test(trimmed)) {
     const parsed = new Date(trimmed);
-    return dateToPublishedDateKey(parsed);
+    if (Number.isNaN(parsed.getTime())) return undefined;
+    return buildDateKey(String(parsed.getFullYear()), String(parsed.getMonth() + 1), String(parsed.getDate()));
   }
 
   return undefined;

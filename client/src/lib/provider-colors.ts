@@ -60,9 +60,12 @@ export function providerActivePillStyle(provider: string): Record<string, string
   return makeProviderPillStyle(getProviderColor(provider), 22, 45)
 }
 
-export function providerChipStyle(provider: MetadataProviderKey | string, disabled = false): Record<string, string> {
-  const color = getProviderColor(provider)
-  const style = makeProviderPillStyle(color, disabled ? 6 : 14, disabled ? 15 : 35)
-  if (disabled) style.opacity = '0.75'
-  return style
+/**
+ * Chips resolve their fill, ink and ring from the theme rather than from the raw brand
+ * hex, because the hex alone fails contrast on a light surface. Pair with the
+ * `provider-chip` class; a chip for an unusable provider pairs with
+ * `provider-chip-skipped` instead and ignores the custom property.
+ */
+export function providerChipStyle(provider: MetadataProviderKey | string): Record<string, string> {
+  return { '--provider-color': getProviderColor(provider) }
 }

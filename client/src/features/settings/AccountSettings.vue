@@ -16,6 +16,7 @@ import SettingsPageHeader from './SettingsPageHeader.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { useOnboardingTour } from '@/features/onboarding/composables/useOnboardingTour'
+import { useLoginOptions } from '@/features/auth/composables/useLoginOptions'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
@@ -25,6 +26,7 @@ const { isDemoRestrictedAccount } = usePermissions()
 const { open: openChangePassword } = useChangePasswordDialog()
 const { uploading, removing, uploadAvatar, removeAvatar } = useProfileAvatar()
 const { resetTour } = useOnboardingTour()
+const { loginOptions, fetchLoginOptions } = useLoginOptions()
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const savingProfile = ref(false)
@@ -65,8 +67,13 @@ const nameChanged = computed(() => {
 const profileChanged = computed(() => nameChanged.value || timezoneChanged.value)
 const accountEditBlocked = computed(() => isDemoRestrictedAccount.value)
 const canChangePassword = computed(
-  () => !accountEditBlocked.value && user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared',
+  () =>
+    loginOptions.value?.passwordLoginEnabled === true &&
+    !accountEditBlocked.value &&
+    user.value?.provisioningMethod !== 'oidc' &&
+    user.value?.provisioningMethod !== 'shared',
 )
+const needsUnlinkPassword = computed(() => loginOptions.value?.passwordLoginEnabled === true && user.value?.authenticationMethod !== 'oidc')
 
 const accountTypeLabel = computed(() => {
   if (user.value?.provisioningMethod === 'oidc') return t('settings.account.profile.accountTypeOidc')
@@ -249,12 +256,9 @@ const linkingSlug = ref<string | null>(null)
 onMounted(async () => {
   oidcIdentityLoading.value = true
   try {
-    const [identitiesRes, providersRes] = await Promise.all([
-      api('/api/v1/auth/oidc/identities'),
-      fetch('/api/v1/app-settings/oidc/providers/public'),
-    ])
+    const [identitiesRes, options] = await Promise.all([api('/api/v1/auth/oidc/identities'), fetchLoginOptions()])
     if (identitiesRes.ok) linkedIdentities.value = await identitiesRes.json()
-    if (providersRes.ok) oidcProviders.value = await providersRes.json()
+    oidcProviders.value = options.oidcProviders
   } finally {
     oidcIdentityLoading.value = false
   }
@@ -298,13 +302,13 @@ async function initiateOidcLink(provider: OidcProviderPublic) {
 
 async function confirmUnlink() {
   if (shouldBlockAccountEdit()) return
-  if (!unlinkPassword.value || !unlinkTarget.value) return
+  if (!unlinkTarget.value || (needsUnlinkPassword.value && !unlinkPassword.value)) return
   unlinking.value = true
   try {
     const res = await api(`/api/v1/auth/oidc/identities/${unlinkTarget.value.providerId}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: unlinkPassword.value }),
+      body: JSON.stringify(needsUnlinkPassword.value ? { password: unlinkPassword.value } : {}),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -453,7 +457,10 @@ function closeUnlinkDialog() {
       <h2 id="account-preferences-heading" class="settings-group-label">{{ t('settings.account.groups.preferences') }}</h2>
 
       <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-xs">
-        <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5 md:py-5">
+        <div
+          v-if="loginOptions?.passwordLoginEnabled"
+          class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5 md:py-5"
+        >
           <div class="flex min-w-0 max-w-2xl items-start gap-2.5">
             <Clock :size="16" class="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div class="min-w-0">
@@ -618,11 +625,11 @@ function closeUnlinkDialog() {
     :description="t('settings.account.connectedAccounts.unlinkDialog.description')"
     :confirm-label="unlinking ? t('settings.account.connectedAccounts.unlinking') : t('settings.account.connectedAccounts.unlink')"
     :busy="unlinking"
-    :confirm-disabled="!unlinkPassword || accountEditBlocked"
+    :confirm-disabled="(needsUnlinkPassword && !unlinkPassword) || accountEditBlocked"
     @confirm="confirmUnlink"
     @cancel="closeUnlinkDialog"
   >
-    <div class="mt-3 space-y-1.5">
+    <div v-if="needsUnlinkPassword" class="mt-3 space-y-1.5">
       <label for="account-unlink-password" class="settings-label">
         {{ t('settings.account.connectedAccounts.unlinkDialog.currentPassword') }}
       </label>

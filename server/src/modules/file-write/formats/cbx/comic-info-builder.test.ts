@@ -18,7 +18,7 @@ describe('buildComicInfoXml', () => {
         description: '<p>Epic &amp; vast</p>',
         publisher: 'Ace',
         seriesName: 'Dune Saga',
-        seriesIndex: 1,
+        seriesIndex: '5.10',
         publishedYear: 1965,
         pageCount: 412,
         language: 'en',
@@ -61,7 +61,7 @@ describe('buildComicInfoXml', () => {
 
     expect(parsed.ComicInfo.Title).toBe('Dune');
     expect(parsed.ComicInfo.Summary).toBe('Epic & vast');
-    expect(parsed.ComicInfo.Number).toBe('1');
+    expect(parsed.ComicInfo.Number).toBe('5.10');
     expect(parsed.ComicInfo.CommunityRating).toBe('4.0');
     expect(parsed.ComicInfo.Web).toBe('https://www.goodreads.com/book/show/44767458-dune');
     expect(parsed.ComicInfo.Notes).toContain('[bookorbit:subtitle] Anniversary Edition');
@@ -76,9 +76,9 @@ describe('buildComicInfoXml', () => {
     const xml = buildComicInfoXml(
       null,
       {
-        seriesIndex: 1,
+        seriesIndex: '1',
         comicIssueNumber: '12A',
-        comicVolumeName: 'Year One',
+        comicVolumeName: '2',
         comicPencillers: ['Penciller A', 'Penciller B'],
         comicInkers: ['Inker A'],
         comicColorists: ['Colorist A'],
@@ -108,7 +108,7 @@ describe('buildComicInfoXml', () => {
     const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
 
     expect(parsed.ComicInfo.Number).toBe('12A');
-    expect(parsed.ComicInfo.Volume).toBe('Year One');
+    expect(parsed.ComicInfo.Volume).toBe('2');
     expect(parsed.ComicInfo.Penciller).toBe('Penciller A, Penciller B');
     expect(parsed.ComicInfo.Inker).toBe('Inker A');
     expect(parsed.ComicInfo.Colorist).toBe('Colorist A');
@@ -118,6 +118,110 @@ describe('buildComicInfoXml', () => {
     expect(parsed.ComicInfo.Teams).toBe('Team A');
     expect(parsed.ComicInfo.Locations).toBe('Location A');
     expect(parsed.ComicInfo.StoryArc).toBe('Arc A');
+  });
+
+  describe('Volume', () => {
+    function volumeOf(comicVolumeName: string, existing: string | null = null): string | undefined {
+      const xml = buildComicInfoXml(existing, { comicVolumeName }, new Set(['comicVolumeName']));
+      const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
+      return parsed.ComicInfo.Volume;
+    }
+
+    it('omits Volume when the ComicVine volume name is not an integer', () => {
+      expect(volumeOf('Bone')).toBeUndefined();
+      expect(volumeOf('Star Wars: Doctor Aphra')).toBeUndefined();
+      expect(volumeOf('1.5')).toBeUndefined();
+      expect(volumeOf('2019-2020')).toBeUndefined();
+    });
+
+    it('writes Volume when the volume name is an integer', () => {
+      expect(volumeOf('2019')).toBe('2019');
+      expect(volumeOf('  3  ')).toBe('3');
+    });
+
+    it('drops a non-integer Volume left behind by an earlier write', () => {
+      const existing = `<?xml version="1.0"?><ComicInfo><Series>Bone</Series><Volume>Bone</Volume></ComicInfo>`;
+
+      expect(volumeOf('Bone', existing)).toBeUndefined();
+    });
+  });
+
+  it('emits elements in ComicInfo schema sequence order', () => {
+    const existing = `<?xml version="1.0"?><ComicInfo><Summary>Old</Summary><Volume>9</Volume><Title>Old</Title><CustomThing>keep</CustomThing></ComicInfo>`;
+
+    const xml = buildComicInfoXml(
+      existing,
+      {
+        title: 'The Promise',
+        seriesName: 'Bone',
+        seriesIndex: '39',
+        comicVolumeName: '3',
+        description: 'The Bones make their way home',
+        subtitle: 'Anniversary Edition',
+        publisher: 'Cartoon Books',
+        publishedDate: '2000-06-15',
+        authors: [{ name: 'Jeff Smith', sortName: null }],
+        genres: ['Fantasy'],
+        tags: ['Classic'],
+        goodreadsId: '111',
+        pageCount: 24,
+        language: 'en',
+        rating: 8,
+        isbn13: '9781888963144',
+      },
+      new Set([
+        'title',
+        'seriesName',
+        'seriesIndex',
+        'comicVolumeName',
+        'description',
+        'subtitle',
+        'publisher',
+        'publishedDate',
+        'authors',
+        'genres',
+        'tags',
+        'goodreadsId',
+        'pageCount',
+        'language',
+        'rating',
+        'isbn13',
+      ]),
+    );
+
+    const elements = [...xml.matchAll(/^\s*<(\w+)>/gm)].map((match) => match[1]);
+
+    expect(elements).toEqual([
+      'Title',
+      'Series',
+      'Number',
+      'Volume',
+      'Summary',
+      'Notes',
+      'Year',
+      'Month',
+      'Day',
+      'Writer',
+      'Publisher',
+      'Genre',
+      'Tags',
+      'Web',
+      'PageCount',
+      'LanguageISO',
+      'CommunityRating',
+      'GTIN',
+      'CustomThing',
+    ]);
+  });
+
+  it('omits Month and Day when the published date carries no month or day', () => {
+    const xml = buildComicInfoXml(null, { publishedDate: '1991' }, new Set(['publishedDate']));
+
+    const parsed = parser.parse(xml) as { ComicInfo: Record<string, string> };
+
+    expect(parsed.ComicInfo.Year).toBe('1991');
+    expect(parsed.ComicInfo.Month).toBeUndefined();
+    expect(parsed.ComicInfo.Day).toBeUndefined();
   });
 
   it('clears selected comic-specific fields when payload values are empty', () => {

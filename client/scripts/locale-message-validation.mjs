@@ -164,6 +164,57 @@ function pluralOptionPounds(elements) {
   return totals
 }
 
+// A translator types the whole ICU message by hand, so a locale with more plural categories than
+// English loses every plural to a missing branch: Romanian arrived with `one` and `other` for all 156
+// of its plurals and rendered English for every one of them. The branch a translator writes as
+// `other` is the one a reader sees for small counts, so copying it into the missing categories keeps
+// the message in its own language, and the copy disappears as soon as Crowdin carries a real branch.
+function pluralElements(elements, found = []) {
+  for (const element of elements) {
+    if (element.type === TYPE.plural) found.push(element)
+    if (element.type === TYPE.select || element.type === TYPE.plural) {
+      for (const option of Object.values(element.options)) pluralElements(option.value, found)
+    }
+    if (element.type === TYPE.tag) pluralElements(element.children, found)
+  }
+  return found
+}
+
+export function completePluralCategories({ locale, message }) {
+  if (!isIcuPluralMessage(message)) return null
+
+  let elements
+  try {
+    elements = parse(message, { captureLocation: true })
+  } catch {
+    return null
+  }
+
+  const insertions = []
+  for (const element of pluralElements(elements)) {
+    const other = element.options.other
+    if (!other) continue
+
+    const missing = pluralCategories(locale, element.pluralType).filter((category) => !(category in element.options))
+    if (missing.length === 0) continue
+
+    const text = message.slice(other.location.start.offset + 1, other.location.end.offset - 1)
+    insertions.push({
+      offset: other.location.end.offset,
+      text: missing.map((category) => ` ${category} {${text}}`).join(''),
+    })
+  }
+
+  if (insertions.length === 0) return null
+
+  let completed = message
+  for (const { offset, text } of insertions.sort((first, second) => second.offset - first.offset)) {
+    completed = `${completed.slice(0, offset)}${text}${completed.slice(offset)}`
+  }
+
+  return completed
+}
+
 export function validateSlotCountMessage({ key, locale, message }) {
   if (!isIcuPluralMessage(message)) return [`${locale}: ICU plural syntax required for slot count message ${key}`]
 

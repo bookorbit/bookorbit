@@ -21,7 +21,7 @@ export interface LubimyczytacBookData {
   isbn10?: string;
   isbn13?: string;
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: string;
   genres?: string[];
   coverUrl?: string;
   sourceUrl?: string;
@@ -168,7 +168,7 @@ function extractIsbn($: CheerioAPI): { isbn10?: string; isbn13?: string } {
   return {};
 }
 
-function extractSeries($: CheerioAPI): { name?: string; index?: number } {
+function extractSeries($: CheerioAPI): { name?: string; index?: string } {
   let raw = '';
   $('span.d-none.d-sm-block.mt-1').each((_, el) => {
     if (raw) return;
@@ -182,15 +182,13 @@ function extractSeries($: CheerioAPI): { name?: string; index?: number } {
   // Preferred format: "Series Name (tom 4)"
   const tomMatch = SERIES_INDEX_PATTERN.exec(text);
   if (tomMatch) {
-    const index = parseFloat(tomMatch[1].replace(',', '.'));
-    return { name: text.replace(SERIES_INDEX_PATTERN, '').trim() || undefined, index: Number.isNaN(index) ? undefined : index };
+    return { name: text.replace(SERIES_INDEX_PATTERN, '').trim() || undefined, index: tomMatch[1].replace(',', '.') };
   }
 
   // Fallback: "Series Name 4" (trailing standalone volume number)
   const trailing = /\s(\d+(?:[.,]\d+)?)$/.exec(text);
   if (trailing) {
-    const index = parseFloat(trailing[1].replace(',', '.'));
-    return { name: text.slice(0, trailing.index).trim() || undefined, index: Number.isNaN(index) ? undefined : index };
+    return { name: text.slice(0, trailing.index).trim() || undefined, index: trailing[1].replace(',', '.') };
   }
 
   return { name: text || undefined };

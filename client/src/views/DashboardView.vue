@@ -26,6 +26,7 @@ const { maybeStartTour } = useOnboardingTour()
 const { smartScopes, loaded: smartScopesLoaded, fetchSmartScopes } = useSmartScopes()
 
 const settingsOpen = ref(false)
+const dashboardRevision = ref(0)
 const now = ref(new Date())
 let greetingTimer: number | null = null
 
@@ -64,6 +65,10 @@ function handleRetryLibraries() {
 
 function handleOpenSettings() {
   settingsOpen.value = true
+}
+
+function handleDashboardSettingsSaved() {
+  dashboardRevision.value += 1
 }
 
 onMounted(() => {
@@ -134,11 +139,11 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <DashboardWidgetRow class="animate-fade-up" />
+          <DashboardWidgetRow :key="`widgets-${dashboardRevision}`" class="animate-fade-up" />
           <div v-if="enabledScrollers.length > 0" :class="shelfLayoutClass">
             <DashboardScroller
               v-for="(scroller, index) in enabledScrollers"
-              :key="`${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}-${scroller.rows}`"
+              :key="`${dashboardRevision}-${scroller.id}-${scroller.type}-${scroller.smartScopeId ?? 0}-${scroller.rows}`"
               :type="scroller.type"
               :title="shelfTitle(scroller)"
               :limit="scroller.limit"
@@ -156,6 +161,6 @@ onUnmounted(() => {
       </div>
     </main>
 
-    <DashboardSettingsSheet v-model:open="settingsOpen" />
+    <DashboardSettingsSheet v-model:open="settingsOpen" @saved="handleDashboardSettingsSaved" />
   </div>
 </template>

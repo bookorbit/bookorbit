@@ -83,6 +83,34 @@ describe('BookFilterBuilder', () => {
     expect(optionText).toContain('Date Finished')
   })
 
+  it('serializes primary file size input from megabytes to bytes', async () => {
+    const wrapper = mount(BookFilterBuilder, {
+      props: {
+        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
+      },
+    })
+
+    await wrapper.findAll('select')[0]!.setValue('fileSize')
+    await wrapper.findAll('select')[1]!.setValue('gte')
+    await wrapper.get('input[aria-label="Primary file size in megabytes"]').setValue('10.5')
+
+    expect(lastUpdate(wrapper)).toEqual({
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'fileSize', operator: 'gte', value: 11_010_048, valueTo: undefined }],
+    })
+  })
+
+  it('hydrates saved primary file size bytes as megabytes', () => {
+    const wrapper = mount(BookFilterBuilder, {
+      props: {
+        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'fileSize', operator: 'lte', value: 26_214_400 }] },
+      },
+    })
+
+    expect((wrapper.get('input[aria-label="Primary file size in megabytes"]').element as HTMLInputElement).value).toBe('25')
+  })
+
   it('offers date and empty/not-empty operators for Date Started', async () => {
     const wrapper = mount(BookFilterBuilder, {
       props: {
@@ -205,6 +233,46 @@ describe('BookFilterBuilder', () => {
     })
 
     expect((wrapper.get('select[aria-label="Community rating provider"]').element as HTMLSelectElement).value).toBe('any')
+  })
+
+  it('serializes a provider-aware community review count rule', async () => {
+    const wrapper = mount(BookFilterBuilder, {
+      props: {
+        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
+      },
+    })
+
+    const [fieldSelect] = wrapper.findAll('select')
+    await fieldSelect!.setValue('communityRatingCount')
+    await wrapper.findAll('select')[1]!.setValue('gte')
+    await wrapper.get('select[aria-label="Community rating provider"]').setValue('hardcover')
+
+    const input = wrapper.get('input[type="number"]')
+    expect(input.attributes('min')).toBe('0')
+    expect(input.attributes('max')).toBeUndefined()
+    expect(input.attributes('step')).toBe('1')
+    await input.setValue('1000')
+
+    expect(lastUpdate(wrapper)).toEqual({
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 1000, valueTo: undefined, provider: 'hardcover' }],
+    })
+  })
+
+  it('hydrates a saved community review count provider', () => {
+    const wrapper = mount(BookFilterBuilder, {
+      props: {
+        modelValue: {
+          type: 'group',
+          join: 'AND',
+          rules: [{ type: 'rule', field: 'communityRatingCount', operator: 'lt', value: 25, provider: 'goodreads' }],
+        },
+      },
+    })
+
+    expect((wrapper.get('select[aria-label="Community rating provider"]').element as HTMLSelectElement).value).toBe('goodreads')
+    expect((wrapper.get('input[type="number"]').element as HTMLInputElement).value).toBe('25')
   })
 })
 

@@ -12,7 +12,7 @@ import { readdir, rm, stat } from 'fs/promises';
 import { join } from 'path';
 
 import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
-import type { AccessLevel, LibraryFileSyncProgressEvent, OrganizationMode, WriteResult } from '@bookorbit/types';
+import type { AccessLevel, LibraryFileSyncProgressEvent, LibraryOverviewEntry, OrganizationMode, WriteResult } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeIconValue } from '../../common/utils/icon-value.utils';
 import type { RequestUser } from '../../common/types/request-user';
@@ -27,7 +27,12 @@ import { GrantLibraryAccessDto } from './dto/grant-library-access.dto';
 import { PrescanLibraryDto } from './dto/prescan-library.dto';
 import { ReorderLibrariesDto } from './dto/reorder-libraries.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
-import { DEFAULT_LIBRARY_COVER_ASPECT_RATIO, DEFAULT_LIBRARY_ORGANIZATION_MODE, LIBRARY_METADATA_PRECEDENCE_DEFAULT } from './library.constants';
+import {
+  DEFAULT_LIBRARY_ADDED_AT_SOURCE,
+  DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
+  DEFAULT_LIBRARY_ORGANIZATION_MODE,
+  LIBRARY_METADATA_PRECEDENCE_DEFAULT,
+} from './library.constants';
 import { LibraryRepository } from './library.repository';
 import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 
@@ -92,6 +97,17 @@ export class LibraryService {
     }));
   }
 
+  /**
+   * Which of these users can open this library. Callers that hold user ids rather than whole
+   * users - a notifier resolving one link per recipient, for instance - cannot ask
+   * `verifyUserAccess`, which needs the superuser flag handed to it.
+   */
+  async findUserIdsWithAccess(libraryId: number, userIds: number[]): Promise<Set<number>> {
+    if (userIds.length === 0) return new Set();
+    const rows = await this.libraryRepo.findUserIdsWithAccess(libraryId, userIds);
+    return new Set(rows.map(({ id }) => id));
+  }
+
   async findAccessibleLibraryIds(user: RequestUser): Promise<number[]> {
     const ids = user.isSuperuser ? await this.libraryRepo.findAllIds() : await this.libraryRepo.findAccessibleIdsForUser(user.id);
     return ids.map(({ id }) => id);
@@ -122,6 +138,7 @@ export class LibraryService {
       formatPriority: dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY],
       allowedFormats: dto.allowedFormats ?? [],
       organizationMode: dto.organizationMode ?? DEFAULT_LIBRARY_ORGANIZATION_MODE,
+      addedAtSource: dto.addedAtSource ?? DEFAULT_LIBRARY_ADDED_AT_SOURCE,
       excludePatterns: dto.excludePatterns ?? [],
       coverAspectRatio: dto.coverAspectRatio ?? DEFAULT_LIBRARY_COVER_ASPECT_RATIO,
       readingThreshold: dto.readingThreshold ?? 0.25,
@@ -281,6 +298,7 @@ export class LibraryService {
         }
 
         for (const existing of allFolderPaths) {
+          if (dto.libraryId !== undefined && existing.libraryId === dto.libraryId) continue;
           if (pathsOverlap(resolvedInputPath, existing.path)) {
             overlapLibrary = existing.libraryName;
             break;
@@ -293,6 +311,35 @@ export class LibraryService {
 
     const totalFiles = results.reduce((sum, r) => sum + r.fileCount, 0);
     return { paths: results, totalFiles };
+  }
+
+  /**
+   * Everything the libraries settings page needs about every library the caller can reach, in one
+   * request: the stats that used to cost a fan-out of one call per library, plus each library's
+   * most recent scan.
+   */
+  async getOverview(user: RequestUser): Promise<LibraryOverviewEntry[]> {
+    const libraryIds = await this.findAccessibleLibraryIds(user);
+    if (libraryIds.length === 0) return [];
+
+    let stats: Awaited<ReturnType<LibraryRepository['getStatsForLibraries']>>;
+    try {
+      stats = await this.libraryRepo.getStatsForLibraries(libraryIds);
+    } catch (err) {
+      if (err instanceof RangeError) {
+        throw new InternalServerErrorException('Library stats exceed supported size range');
+      }
+      throw err;
+    }
+    const lastScans = await this.scannerService.getLatestScans(libraryIds);
+
+    return libraryIds.map((libraryId) => ({
+      libraryId,
+      totalBooks: stats.get(libraryId)?.totalBooks ?? 0,
+      totalSizeBytes: stats.get(libraryId)?.totalSizeBytes ?? 0,
+      formatCounts: stats.get(libraryId)?.formatCounts ?? {},
+      lastScan: lastScans.get(libraryId) ?? null,
+    }));
   }
 
   async getStats(libraryId: number) {

@@ -43,7 +43,6 @@ describe('Architecture boundaries', () => {
       'src/modules/authors/author-metadata-preferences.service.ts',
       'src/modules/book/book-query-builder.service.ts',
       'src/modules/book-metadata-fetch/book-metadata-fetch-config.service.ts',
-      'src/modules/catalog/catalog.service.ts',
       'src/modules/cover/cover.service.ts',
       'src/modules/entity-manager/duplicate-compute.service.ts',
       'src/modules/kobo/services/kobo-analytics-resolver.service.ts',

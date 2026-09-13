@@ -1,8 +1,24 @@
 import { sql } from 'drizzle-orm';
-import { check, date, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  check,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import type { ReadStatus, ReadStatusSource, ReadingAttemptOrigin, ReadingAttemptOutcome, ReadingSessionSource } from '@bookorbit/types';
 
 import { bookFiles, books } from './books';
+import { timestamptz } from './columns';
 import { libraries } from './libraries';
 import { users } from './auth';
 
@@ -19,8 +35,8 @@ export const userBookStatus = pgTable(
     status: varchar('status', { length: 20 }).$type<ReadStatus>().notNull().default('unread'),
     // 'auto' (derived from progress) | 'manual' (user-set/imported; protected from progress updates except want_to_read)
     source: varchar('source', { length: 10 }).$type<ReadStatusSource>().notNull().default('auto'),
-    startedAt: timestamp('started_at', { withTimezone: true }),
-    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    startedAt: timestamptz('started_at'),
+    finishedAt: timestamptz('finished_at'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -214,6 +230,7 @@ export const readingSessions = pgTable(
     sessionId: varchar('session_id', { length: 64 }).notNull(),
     // 'web' (browser reader) | 'koreader' (page-stats derivation) | 'manual' (user-entered) | 'kobo' (future)
     source: varchar('source', { length: 10 }).$type<ReadingSessionSource>(),
+    sourceDeviceKey: varchar('source_device_key', { length: 128 }),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
     // Server-computed from endedAt - startedAt; client-provided timestamps are untrusted for duration.
@@ -228,6 +245,7 @@ export const readingSessions = pgTable(
     index('rs_book_file_started_at_idx').on(t.bookFileId, t.startedAt),
     index('rs_user_book_file_idx').on(t.userId, t.bookFileId),
     index('rs_user_book_started_at_idx').on(t.userId, t.bookId, t.startedAt),
+    index('rs_user_book_source_device_started_idx').on(t.userId, t.bookId, t.source, t.sourceDeviceKey, t.startedAt),
     index('reading_sessions_book_id_idx').on(t.bookId),
     index('rs_attempt_started_at_idx').on(t.attemptId, t.startedAt),
     check('reading_sessions_source_chk', sql`${t.source} in ('web', 'koreader', 'manual', 'kobo')`),
@@ -239,6 +257,35 @@ export const readingSessions = pgTable(
 
 export type ReadingSession = typeof readingSessions.$inferSelect;
 export type NewReadingSession = typeof readingSessions.$inferInsert;
+
+export const readingSessionSyncCursors = pgTable(
+  'reading_session_sync_cursors',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookId: integer('book_id')
+      .notNull()
+      .references(() => books.id, { onDelete: 'cascade' }),
+    source: varchar('source', { length: 32 }).notNull(),
+    sourceDeviceKey: varchar('source_device_key', { length: 128 }).notNull(),
+    counter: integer('counter').notNull(),
+    generation: integer('generation').notNull().default(0),
+    lastModified: timestamp('last_modified', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.bookId, t.source, t.sourceDeviceKey] }),
+    index('rssc_book_id_idx').on(t.bookId),
+    check('rssc_counter_nonnegative_chk', sql`${t.counter} >= 0`),
+    check('rssc_generation_nonnegative_chk', sql`${t.generation} >= 0`),
+  ],
+);
+
+export type ReadingSessionSyncCursor = typeof readingSessionSyncCursors.$inferSelect;
 
 export const userReadingDailyStats = pgTable(
   'user_reading_daily_stats',
@@ -284,6 +331,10 @@ export const audiobookProgress = pgTable(
       .notNull()
       .references(() => bookFiles.id, { onDelete: 'cascade' }),
     positionSeconds: real('position_seconds').notNull().default(0),
+    revision: integer('revision').notNull().default(1),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+    operationId: uuid('operation_id'),
+    manifestRevision: varchar('manifest_revision', { length: 64 }),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -296,6 +347,7 @@ export const audiobookProgress = pgTable(
     index('audiobook_progress_current_file_id_idx').on(t.currentFileId),
     check('audiobook_progress_percentage_range_chk', sql`${t.percentage} >= 0 and ${t.percentage} <= 100`),
     check('audiobook_progress_position_seconds_nonnegative_chk', sql`${t.positionSeconds} >= 0`),
+    check('audiobook_progress_revision_positive_chk', sql`${t.revision} >= 1`),
   ],
 );
 
@@ -308,6 +360,7 @@ export const bookmarks = pgTable(
   'bookmarks',
   {
     id: serial('id').primaryKey(),
+    clientId: uuid('client_id').notNull().defaultRandom(),
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -317,6 +370,8 @@ export const bookmarks = pgTable(
     // EPUB: CFI string pinpoints exact location. Null for audio bookmarks.
     cfi: varchar('cfi', { length: 2000 }),
     title: varchar('title', { length: 500 }).notNull(),
+    note: text('note'),
+    chapterId: varchar('chapter_id', { length: 80 }),
     // Audio: absolute book position in seconds (sum of preceding file durations + offset).
     positionSeconds: real('position_seconds'),
     origin: varchar('origin', { length: 10 }).$type<BookmarkOrigin>().notNull().default('web'),
@@ -334,6 +389,7 @@ export const bookmarks = pgTable(
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
+    uniqueIndex('bookmarks_user_book_client_id_uidx').on(t.userId, t.bookId, t.clientId),
     index('bookmarks_user_book_idx').on(t.userId, t.bookId),
     index('bookmarks_book_id_idx').on(t.bookId),
     index('bookmarks_deleted_at_idx')
@@ -376,6 +432,7 @@ export const annotations = pgTable(
     // deviceCreatedAt doubles as the KOReader-side identity datetime for synced annotations.
     deviceCreatedAt: varchar('device_created_at', { length: 19 }),
     deviceUpdatedAt: varchar('device_updated_at', { length: 19 }),
+    sourceCreatedAt: timestamp('source_created_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -389,6 +446,14 @@ export const annotations = pgTable(
     index('annotations_book_id_idx').on(t.bookId),
     index('annotations_user_book_active_idx')
       .on(t.userId, t.bookId)
+      .where(sql`${t.deletedAt} is null`),
+    // The annotations hub is an infinite stream ordered newest-first over everything a
+    // user owns, so its default query sorts the whole set without this.
+    index('annotations_user_created_active_idx')
+      .on(t.userId, sql`coalesce(${t.sourceCreatedAt}, ${t.createdAt}) desc`, t.id.desc())
+      .where(sql`${t.deletedAt} is null`),
+    index('annotations_user_book_created_active_idx')
+      .on(t.userId, t.bookId, sql`coalesce(${t.sourceCreatedAt}, ${t.createdAt}) desc`, t.id.desc())
       .where(sql`${t.deletedAt} is null`),
     check('annotations_style_chk', sql`${t.style} in ('highlight', 'underline', 'strikethrough', 'squiggly', 'invert')`),
     check('annotations_origin_chk', sql`${t.origin} in ('web', 'koreader', 'kobo')`),

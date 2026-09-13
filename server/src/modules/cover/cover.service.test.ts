@@ -132,7 +132,7 @@ function createMutationService(options?: { assertFieldsUnlocked?: ReturnType<typ
     scoreService as never,
   );
 
-  return { service, mockDb, updateSet, scoreService };
+  return { service, mockDb, updateSet, scoreService, values, onConflictDoUpdate };
 }
 
 describe('CoverService', () => {
@@ -609,6 +609,61 @@ describe('CoverService', () => {
       const result = await service.deleteCover(12, makeUser());
 
       expect(result).toBeNull();
+    });
+  });
+
+  // A Kobo device keys its locally stored cover by CoverImageId, which is versioned from
+  // coverUpdatedAt. Leaving the stamp behind here strands the device on a stale picture.
+  describe('coverUpdatedAt stamping (issue #943)', () => {
+    it('stamps coverUpdatedAt when a custom cover is uploaded', async () => {
+      const { service, values, onConflictDoUpdate } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(imageExt).mockReturnValue('jpg');
+      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
+      vi.mocked(readdir).mockResolvedValue([] as never);
+      vi.mocked(mkdir).mockResolvedValue(undefined as never);
+      vi.mocked(writeFile).mockResolvedValue(undefined);
+      vi.mocked(rename).mockResolvedValue(undefined);
+
+      await service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser());
+
+      expect(values).toHaveBeenCalledWith({ bookId: 12, coverSource: 'custom', coverUpdatedAt: expect.any(Date), updatedAt: expect.any(Date) });
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ set: { coverSource: 'custom', coverUpdatedAt: expect.any(Date), updatedAt: expect.any(Date) } }),
+      );
+    });
+
+    it('stamps coverUpdatedAt when deleting the last cover leaves the book without one', async () => {
+      const { service, values } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg'] as never);
+      vi.mocked(unlink).mockResolvedValue(undefined);
+
+      await service.deleteCover(12, makeUser());
+
+      expect(values).toHaveBeenCalledWith({ bookId: 12, coverSource: null, coverUpdatedAt: expect.any(Date), updatedAt: expect.any(Date) });
+    });
+
+    it('stamps coverUpdatedAt when deleting a custom cover falls back to the extracted one', async () => {
+      const { service, values } = createMutationService();
+
+      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
+      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg', 'cover_extracted.png'] as never);
+      vi.mocked(readFile).mockResolvedValue(Buffer.from('extracted-img'));
+      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
+      vi.mocked(unlink).mockResolvedValue(undefined);
+      vi.mocked(writeFile).mockResolvedValue(undefined);
+
+      await service.deleteCover(12, makeUser());
+
+      expect(values).toHaveBeenCalledWith({
+        bookId: 12,
+        coverSource: 'extracted',
+        coverUpdatedAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+      });
     });
   });
 });

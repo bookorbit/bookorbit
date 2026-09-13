@@ -93,7 +93,8 @@ vi.mock('@embedpdf/core', async (importOriginal) => {
 
 vi.mock('@embedpdf/core/vue', () => ({
   EmbedPDF: defineComponent({
-    props: ['engine', 'plugins', 'onInitialized'],
+    name: 'EmbedPDF',
+    props: ['engine', 'plugins', 'config', 'onInitialized'],
     setup(props, { slots }) {
       void props.onInitialized?.(mockRegistry)
       return () =>
@@ -180,6 +181,17 @@ describe('PdfV4ReaderView', () => {
       rotation: 0,
     })
     expect(mockApi).toHaveBeenCalledWith('/api/v1/books/files/101/serve', { signal: expect.any(AbortSignal) })
+  })
+
+  it('allows the in-app annotation overlay while preserving other PDF permissions', async () => {
+    const wrapper = await mountReader()
+
+    expect(wrapper.getComponent({ name: 'EmbedPDF' }).props('config')).toEqual({
+      permissions: {
+        enforceDocumentPermissions: true,
+        overrides: { modifyAnnotations: true },
+      },
+    })
   })
 
   it('retries a zero-page engine result once before showing an error', async () => {

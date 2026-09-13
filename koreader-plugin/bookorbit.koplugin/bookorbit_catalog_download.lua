@@ -28,12 +28,16 @@ local safeFilenameBase = CatalogUtil.safeFilenameBase
 
 local CatalogDownload = {}
 
-local function sanitizeDevicePath(device_path)
+local function sanitizeDevicePath(device_path, download_dir)
     local normalized = tostring(device_path or ""):gsub("\\", "/"):gsub("^/+", "")
     local segments = {}
     for segment in normalized:gmatch("[^/]+") do
         if segment == ".." then return nil end
-        if segment ~= "." then table.insert(segments, segment) end
+        if segment ~= "." then
+            local safe_segment = util.getSafeFilename(segment, download_dir)
+            if not safe_segment or safe_segment == "" or safe_segment == "." or safe_segment == ".." then return nil end
+            table.insert(segments, safe_segment)
+        end
     end
     if #segments == 0 then return nil end
     return table.concat(segments, "/")
@@ -44,7 +48,7 @@ local function joinDownloadPath(download_dir, relative_path)
 end
 
 local function resolveRelativeDownloadPath(download_dir, filename, filetype, device_path, filename_override)
-    local relative = sanitizeDevicePath(device_path)
+    local relative = sanitizeDevicePath(device_path, download_dir)
     if relative and not filename_override then return relative end
 
     local parent = relative and relative:match("^(.*)/[^/]+$")

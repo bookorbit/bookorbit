@@ -56,7 +56,7 @@ function makeBook(overrides?: Partial<BookCard>): BookCard {
     authors: ['Author A'],
     seriesId: 42,
     seriesName: 'The Arc',
-    seriesIndex: 1,
+    seriesIndex: '1',
     files: [],
     publishedDate: null,
     publishedYear: null,

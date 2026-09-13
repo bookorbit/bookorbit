@@ -117,7 +117,7 @@ describe('ITunesProvider', () => {
         collectionId: 456,
         collectionName: 'Audiobook Title',
         artistName: 'Author',
-        kind: 'audiobook',
+        wrapperType: 'audiobook',
       };
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -130,6 +130,38 @@ describe('ITunesProvider', () => {
       expect(result).toHaveLength(1);
       expect(result[0].providerId).toBe('456');
       expect(result[0].title).toBe('Audiobook Title');
+    });
+
+    it('should discard results whose media type does not match the requested entity', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          results: [
+            {
+              trackId: 123,
+              trackName: 'Ebook Result',
+              artistName: 'Author',
+              kind: 'ebook',
+            },
+            {
+              collectionId: 456,
+              collectionName: 'Audiobook Result',
+              artistName: 'Author',
+              wrapperType: 'audiobook',
+            },
+            {
+              trackId: 789,
+              trackName: 'Unclassified Result',
+              artistName: 'Author',
+            },
+          ],
+        }),
+      });
+
+      const result = await provider.search({ title: 'Test', isAudiobook: true });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].providerId).toBe('456');
     });
 
     it('should skip invalid results', async () => {
@@ -196,6 +228,66 @@ describe('ITunesProvider', () => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('id=123'), expect.any(Object));
       expect(result).not.toBeNull();
       expect(result?.title).toBe('Test Book');
+    });
+
+    it('should accept a stored audiobook id when the lookup confirms the requested media type', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          results: [
+            {
+              collectionId: 456,
+              collectionName: 'Audiobook Title',
+              artistName: 'Author',
+              wrapperType: 'audiobook',
+            },
+          ],
+        }),
+      });
+
+      const result = await provider.lookupById('456', undefined, { title: 'Audiobook Title', isAudiobook: true });
+
+      expect(result?.providerId).toBe('456');
+    });
+
+    it.each([
+      {
+        label: 'ebook lookup for an audiobook',
+        expectedAudiobook: true,
+        result: { trackId: 123, trackName: 'Book', kind: 'ebook' },
+      },
+      {
+        label: 'audiobook lookup for an ebook',
+        expectedAudiobook: false,
+        result: { collectionId: 456, collectionName: 'Book', wrapperType: 'audiobook' },
+      },
+      {
+        label: 'unclassified lookup for a known media type',
+        expectedAudiobook: true,
+        result: { trackId: 789, trackName: 'Book' },
+      },
+    ])('should reject a stored $label', async ({ expectedAudiobook, result: lookupResult }) => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ results: [lookupResult] }),
+      });
+
+      const result = await provider.lookupById('stored-id', undefined, { title: 'Book', isAudiobook: expectedAudiobook });
+
+      expect(result).toBeNull();
+    });
+
+    it('should preserve unconstrained direct lookups', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          results: [{ trackId: 123, trackName: 'Test Book' }],
+        }),
+      });
+
+      const result = await provider.lookupById('123');
+
+      expect(result?.providerId).toBe('123');
     });
 
     it('should return null if no results', async () => {

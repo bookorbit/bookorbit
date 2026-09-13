@@ -1,0 +1,1 @@
+ALTER TABLE "book_files" ADD COLUMN "is_fixed_layout" boolean;

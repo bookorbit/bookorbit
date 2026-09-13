@@ -1,0 +1,1 @@
+CREATE INDEX "annotations_user_created_active_idx" ON "annotations" USING btree ("user_id","created_at" DESC NULLS LAST,"id" DESC NULLS LAST) WHERE "annotations"."deleted_at" is null;

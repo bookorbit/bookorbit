@@ -104,3 +104,7 @@ export function toTimeZoneStartOfDay(dateKey: string, timeZone: string): Date {
 
   throw new RangeError(`Invalid timezone conversion for date key: ${dateKey}`);
 }
+
+export function getYearInTimeZone(date: Date, timeZone: string): number {
+  return Number(toDateKeyInTimeZone(date, timeZone).slice(0, 4));
+}

@@ -106,7 +106,7 @@ const plainButtonClass = computed(() => buttonClass(false))
 watch(
   () => props.disabled,
   (disabled) => {
-    editor.value?.setEditable(!disabled)
+    editor.value?.setEditable(!disabled, false)
     if (disabled) closeLinkPanel()
   },
 )

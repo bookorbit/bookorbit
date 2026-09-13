@@ -1,4 +1,5 @@
 import type { AudiobookChapter, NarratorRef } from "./audiobook";
+import type { SeriesIndex } from "./series-index";
 
 export const MetadataProviderKey = {
   GOOGLE: "google",
@@ -48,7 +49,7 @@ export type MetadataProviderKey = (typeof MetadataProviderKey)[keyof typeof Meta
 
 export interface MetadataSeriesMembership {
   seriesName: string;
-  seriesIndex?: number | null;
+  seriesIndex?: SeriesIndex | null;
 }
 
 export interface BookCommunityRating {
@@ -77,7 +78,7 @@ export interface MetadataCandidate {
   isbn10?: string;
   isbn13?: string;
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: SeriesIndex;
   /** Books the provider believes the series contains in total, not a field of this book. */
   seriesTotalBooks?: number;
   seriesMemberships?: MetadataSeriesMembership[];
@@ -99,6 +100,8 @@ export interface MetadataProviderInfo {
   label: string;
   identifiable: boolean;
   selectedByFieldRules?: boolean;
+  /** Zero-based priority for the effective Cover field rule. Absent when the provider is not used for covers. */
+  coverPriority?: number;
 }
 
 /**
@@ -115,7 +118,8 @@ export interface MetadataProviderSearchStatus {
   outcome: MetadataProviderSearchOutcome;
 }
 
-export type MetadataFetchEmptyReason = "no_active_providers" | "providers_throttled" | "no_candidates" | "no_resolved_fields";
+export type MetadataFetchEmptyReason =
+  "no_active_providers" | "no_existing_provider_ids" | "providers_throttled" | "no_candidates" | "no_resolved_fields";
 
 export interface MetadataFetchDiagnostics {
   reason: MetadataFetchEmptyReason | null;
@@ -153,7 +157,7 @@ export interface MetadataSource {
   language: string | null;
   pageCount: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   isbn10: string | null;
   isbn13: string | null;
   authors: string[];

@@ -36,4 +36,9 @@ export class UpdateSeriesCollapsePreferencesDto {
   @IsOptional()
   @IsBooleanOrNullRecord()
   smartScopes?: Record<string, boolean | null>;
+
+  /** One flag for every author page; there is no per-author bucket to override it. */
+  @IsOptional()
+  @IsBoolean()
+  authorPages?: boolean;
 }

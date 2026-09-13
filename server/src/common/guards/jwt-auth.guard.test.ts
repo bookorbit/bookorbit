@@ -19,6 +19,7 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     settings: {},
     avatarUrl: null,
     provisioningMethod: 'local',
+    authenticationMethod: 'password',
     permissions: [],
     ...overrides,
 
@@ -87,5 +88,14 @@ describe('JwtAuthGuard', () => {
 
     const result = guard.handleRequest(undefined, user, undefined, makeContext());
     expect(result).toBe(user);
+  });
+
+  it('does not force a password change for an OIDC-authenticated session', () => {
+    const reflector = { getAllAndOverride: vi.fn() };
+    const guard = new JwtAuthGuard(reflector as never);
+
+    expect(() =>
+      guard.handleRequest(undefined, makeUser({ isDefaultPassword: true, authenticationMethod: 'oidc' }), undefined, makeContext()),
+    ).not.toThrow();
   });
 });

@@ -1,11 +1,13 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Permission } from '@bookorbit/types';
-import type { UserSettings } from '@bookorbit/types';
+import type { ProvisioningMethod, UserAttentionResponse, UserListSummary, UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { ContentFilterRepository } from './content-filter.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateSharedUserDto } from './dto/create-shared-user.dto';
@@ -15,11 +17,18 @@ import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
+import { USER_DELETING, UserEventsService, type UserDeletingEvent } from './user-events.service';
 import { UserRepository, type UserListQuery } from './user.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { UserStatisticsService } from '../user-statistics/user-statistics.service';
+import { AuthenticationPolicyService } from '../../common/services/authentication-policy.service';
+
+/** The band is a to-do list, not a second roster. */
+const ATTENTION_BAND_LIMIT = 8;
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
   private readonly achievementEnabledCache = new Map<number, { enabled: boolean; expiresAt: number }>();
 
   constructor(
@@ -27,6 +36,9 @@ export class UserService {
     private readonly config: ConfigService,
     private readonly contentFilterRepo: ContentFilterRepository,
     private readonly appSettingsService: AppSettingsService,
+    private readonly userStatistics: UserStatisticsService,
+    private readonly events: UserEventsService,
+    private readonly authenticationPolicy: AuthenticationPolicyService,
   ) {}
 
   findByUsername(username: string) {
@@ -87,6 +99,32 @@ export class UserService {
     return this.userRepo.findAssignable();
   }
 
+  summary(): Promise<UserListSummary> {
+    return this.userRepo.summary();
+  }
+
+  /**
+   * The roster's attention band. Capped because the band is a to-do list, not a second
+   * roster; `total` tells the UI when there is more behind the `attention` filter.
+   */
+  async findNeedingAttention(): Promise<UserAttentionResponse> {
+    const [rows, summary] = await Promise.all([this.userRepo.findNeedingAttention(ATTENTION_BAND_LIMIT), this.userRepo.summary()]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        username: row.username,
+        name: row.name,
+        avatarUrl: row.avatarUrl,
+        provisioningMethod: row.provisioningMethod as ProvisioningMethod,
+        reason: row.reason,
+        lockedUntil: row.lockedUntil?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        resetLinkExpiresAt: row.resetLinkExpiresAt?.toISOString() ?? null,
+      })),
+      total: summary.attention,
+    };
+  }
+
   async findById(id: number) {
     const user = await this.userRepo.findByIdWithPermissions(id);
     if (!user) throw new NotFoundException('User not found');
@@ -94,6 +132,7 @@ export class UserService {
   }
 
   async createUser(dto: CreateUserDto) {
+    this.authenticationPolicy.assertPasswordLoginEnabled();
     const existing = await this.userRepo.findByUsername(dto.username);
     if (existing) throw new ConflictException('Username already taken');
     const existingEmail = await this.userRepo.findByEmail(dto.email);
@@ -174,16 +213,12 @@ export class UserService {
       await this.assertEmailAvailable(dto.email, id);
     }
 
-    if (dto.active === false && target.isSuperuser) {
-      const otherSuperusers = await this.userRepo.countOtherSuperusers(id);
-      if (otherSuperusers === 0) {
-        throw new ConflictException('Cannot deactivate the last administrator');
-      }
-    }
-
-    const user = await this.userRepo.update(id, dto);
-    if (!user) throw new NotFoundException('User not found');
-    return user;
+    const result = await this.userRepo.updateManagedUser(requestingUser.id, id, dto);
+    if (result.status === 'target_not_found') throw new NotFoundException('User not found');
+    if (result.status === 'requester_not_superuser') throw new ForbiddenException('Only administrators can edit administrator accounts');
+    if (result.status === 'last_superuser') throw new ConflictException('Cannot deactivate the last administrator');
+    if (!result.user) throw new NotFoundException('User not found');
+    return result.user;
   }
 
   async updateMe(userId: number, dto: UpdateMeDto) {
@@ -193,10 +228,65 @@ export class UserService {
   }
 
   async updateMySettings(userId: number, dto: UpdateMeSettingsDto) {
+    // Settings are merged server-side, so the stored row is the only place the outgoing
+    // timezone still exists. Read only when this write is the one that can replace it.
+    const touchesTimeZone = Object.prototype.hasOwnProperty.call(dto.settings, 'timezone');
+    const previousSettings = touchesTimeZone ? await this.userRepo.findSettingsById(userId) : null;
+
     const user = await this.userRepo.update(userId, { settings: dto.settings });
     if (!user) throw new NotFoundException('User not found');
     this.updateAchievementEnabledCache(userId, dto.settings);
+
+    if (touchesTimeZone) {
+      void this.rebuildReadingStatsForSubmittedTimeZone(userId, previousSettings, user.settings as Record<string, unknown> | null);
+    }
     return user;
+  }
+
+  /**
+   * Daily reading stats are stored per local day, so the timezone that produced a row is baked
+   * into it. The hourly aggregation only revisits the last couple of days, which leaves every
+   * older row attributed to the zone the user has just corrected, and a streak broken at the
+   * old day boundary stays broken. The rebuild is what makes the new setting retroactive.
+   *
+   * Submitting a timezone rebuilds even when it matches the stored one. The rebuild is
+   * idempotent, and skipping the unchanged case would make a failure permanent: the setting is
+   * saved either way, so saving it again is the only retry a user has, and that retry is
+   * exactly the case where nothing appears to have changed.
+   *
+   * A failure does not fail the save. The setting itself is already stored, and refusing the
+   * write would leave the user with neither the setting nor a way to ask for it again.
+   *
+   * Detached for the same reason the bootstrap backfill is: this walks the reader's whole
+   * history, and the response neither returns its result nor depends on it, so awaiting it
+   * would hold the request open for a long library and nothing else.
+   */
+  private async rebuildReadingStatsForSubmittedTimeZone(
+    userId: number,
+    previousSettings: Record<string, unknown> | null,
+    nextSettings: Record<string, unknown> | null,
+  ): Promise<void> {
+    const previousTimeZone = resolveTimeZone(previousSettings?.['timezone'], 'UTC');
+    const nextTimeZone = resolveTimeZone(nextSettings?.['timezone'], 'UTC');
+
+    const event = 'user.reading_stats_rebuild';
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${event}] [start] userId=${userId} previousTimeZone="${sanitizeLogValue(previousTimeZone)}" timeZone="${sanitizeLogValue(nextTimeZone)}" - rebuilding daily reading stats after a timezone change`,
+    );
+
+    try {
+      const result = await this.userStatistics.rebuildDailyStatsForUser(userId, nextTimeZone);
+      this.logger.log(
+        `[${event}] [end] userId=${userId} timeZone="${sanitizeLogValue(nextTimeZone)}" durationMs=${Date.now() - startedAt} libraries=${result.libraries} deleted=${result.deleted} inserted=${result.inserted} - daily reading stats rebuilt`,
+      );
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const message = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+      this.logger.warn(
+        `[${event}] [fail] userId=${userId} timeZone="${sanitizeLogValue(nextTimeZone)}" durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${message}" - daily reading stats rebuild failed`,
+      );
+    }
   }
 
   async isAchievementEnabled(userId: number): Promise<boolean> {
@@ -245,13 +335,40 @@ export class UserService {
     if (id === requestingUser.id) {
       throw new ConflictException('You cannot delete your own account');
     }
-    const [target, otherSuperusers] = await Promise.all([this.userRepo.findByIdWithPermissions(id), this.userRepo.countOtherSuperusers(id)]);
-    if (!target) throw new NotFoundException('User not found');
-    if (target?.isSuperuser) {
-      if (!requestingUser.isSuperuser) throw new ForbiddenException('Only administrators can delete administrator accounts');
-      if (otherSuperusers === 0) throw new ConflictException('Cannot delete the last administrator');
+    const result = await this.userRepo.deleteManagedUser(requestingUser.id, id, () => this.announceDeletion(id));
+    if (result === 'target_not_found') throw new NotFoundException('User not found');
+    if (result === 'requester_not_superuser') throw new ForbiddenException('Only administrators can delete administrator accounts');
+    if (result === 'last_superuser') throw new ConflictException('Cannot delete the last administrator');
+  }
+
+  /**
+   * Gives everything holding work on this account's behalf the chance to stop it, before the
+   * cascade removes the only rows that say the work exists.
+   *
+   * Awaited, because running afterwards would be pointless: a torrent whose attempt row is gone
+   * cannot be found again. Failures are logged and the deletion proceeds - an account the operator
+   * asked to remove must go, and the alternative to a leaked torrent is an account that cannot be
+   * deleted at all.
+   */
+  private async announceDeletion(userId: number): Promise<void> {
+    const pending: Promise<void>[] = [];
+    const event: UserDeletingEvent = { userId, waitFor: (work) => pending.push(work) };
+    try {
+      this.events.emit(USER_DELETING, event);
+    } catch (error: unknown) {
+      // A listener that threw before it could register anything, which is still not a reason to
+      // refuse the deletion; whatever it holds is reported here and left running.
+      pending.push(Promise.reject(error instanceof Error ? error : new Error(String(error))));
     }
-    await this.userRepo.delete(id);
+    if (pending.length === 0) return;
+
+    for (const outcome of await Promise.allSettled(pending)) {
+      if (outcome.status !== 'rejected') continue;
+      const message = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      this.logger.warn(
+        `[user.delete] [fail] userId=${userId} error="${sanitizeLogValue(message)}" - work belonging to this account could not be stopped before deletion`,
+      );
+    }
   }
 
   setPermissionsDirectly(userId: number, permissionNames: Permission[]) {
@@ -280,18 +397,15 @@ export class UserService {
     if (targetUserId === requestingUser.id) {
       throw new ConflictException('You cannot change your own superuser status');
     }
-    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
-    if (!target) throw new NotFoundException('User not found');
-    if (target.provisioningMethod === 'shared') {
-      throw new BadRequestException('Shared accounts cannot be made superuser');
+    const result = await this.userRepo.setSuperuser(requestingUser.id, targetUserId, isSuperuser);
+    if (result === 'self_target') throw new ConflictException('You cannot change your own superuser status');
+    if (result === 'requester_not_superuser') throw new ForbiddenException('Only administrators can change superuser status');
+    if (result === 'target_not_found') throw new NotFoundException('User not found');
+    if (result === 'shared_target') throw new BadRequestException('Shared accounts cannot be made superuser');
+    if (result === 'target_no_oidc') {
+      throw new ConflictException('An administrator must link an enabled OIDC provider while password authentication is disabled');
     }
-    if (!isSuperuser && target.isSuperuser) {
-      const otherSuperusers = await this.userRepo.countOtherSuperusers(targetUserId);
-      if (otherSuperusers === 0) {
-        throw new ConflictException('Cannot remove the last administrator');
-      }
-    }
-    await this.userRepo.setSuperuser(targetUserId, isSuperuser);
+    if (result === 'last_superuser') throw new ConflictException('Cannot remove the last administrator');
   }
 
   async getLibraryIds(userId: number): Promise<number[]> {
@@ -313,6 +427,7 @@ export class UserService {
   }
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {
+    this.authenticationPolicy.assertPasswordLoginEnabled();
     const target = await this.userRepo.findByIdWithPermissions(targetUserId);
     if (!target) throw new NotFoundException('User not found');
     if (target.isSuperuser && !requestingUser.isSuperuser) {
@@ -389,6 +504,7 @@ export class UserService {
       libraries: { ...currentPrefs.libraries, ...(dto.libraries ?? {}) },
       collections: { ...currentPrefs.collections, ...(dto.collections ?? {}) },
       smartScopes: { ...(currentPrefs.smartScopes ?? {}), ...(dto.smartScopes ?? {}) },
+      authorPages: dto.authorPages !== undefined ? dto.authorPages : (currentPrefs.authorPages ?? false),
     };
 
     // Remove entries set to null (deletion of overrides)
@@ -430,5 +546,9 @@ export class UserService {
       excludeGenreIds: dto.excludeGenreIds ?? [],
     };
     await this.contentFilterRepo.replaceFilters(targetUserId, filters);
+
+    if (dto.seeOwnRequestedBooks !== undefined) {
+      await this.userRepo.update(targetUserId, { seeOwnRequestedBooks: dto.seeOwnRequestedBooks });
+    }
   }
 }

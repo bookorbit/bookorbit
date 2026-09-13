@@ -28,6 +28,7 @@ function makeController() {
   const seriesService = {
     findAll: vi.fn(),
     findBooks: vi.fn(),
+    findNextBook: vi.fn(),
   };
 
   const controller = new SeriesController(seriesService as any);
@@ -64,6 +65,18 @@ describe('SeriesController', () => {
     const result = await controller.findBooks(user, 42, dto as any);
 
     expect(seriesService.findBooks).toHaveBeenCalledWith(user, 42, dto);
+    expect(result).toBe(expected);
+  });
+  it('findNextBook delegates to service with numeric series and book ids', async () => {
+    const { controller, seriesService } = makeController();
+    const user = makeUser();
+    const dto = { formatGroup: 'cbx' as const };
+    const expected = { next: { bookId: 91, fileId: 501, format: 'cbz', title: 'Issue 10', seriesIndex: '10' } };
+    seriesService.findNextBook.mockResolvedValue(expected);
+
+    const result = await controller.findNextBook(user, 42, 90, dto);
+
+    expect(seriesService.findNextBook).toHaveBeenCalledWith(user, 42, 90, dto);
     expect(result).toBe(expected);
   });
 });

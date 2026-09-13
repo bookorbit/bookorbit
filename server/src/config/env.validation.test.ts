@@ -6,6 +6,21 @@ const BASE_ENV = {
 };
 
 describe('validateEnv', () => {
+  it('allows HOST to remain unset', () => {
+    expect(validateEnv(BASE_ENV).HOST).toBeUndefined();
+  });
+
+  it.each(['', '   ', '0.0.0.0', '127.0.0.1', '192.0.2.10', '::', '::1', '2001:db8::1', ' 127.0.0.1 '])('accepts bind address %j', (HOST) => {
+    expect(validateEnv({ ...BASE_ENV, HOST }).HOST).toBe(HOST.trim());
+  });
+
+  it.each(['localhost', 'https://127.0.0.1', '127.0.0.1:3000', '[::1]', '256.0.0.1', '127.0.0.1/8', '127. 0.0.1'])(
+    'rejects invalid bind address %j',
+    (HOST) => {
+      expect(() => validateEnv({ ...BASE_ENV, HOST })).toThrow('HOST must be an IPv4 or IPv6 address without a port or brackets');
+    },
+  );
+
   it('accepts common postgres URL formats used by existing setups', () => {
     const urls = [
       'postgres://bookorbit:bookorbit@localhost:5432/bookorbit',
@@ -79,6 +94,16 @@ describe('validateEnv', () => {
     ).toThrow('OIDC_ALLOW_LOCAL_ISSUERS must be one of true/false/1/0/yes/no/on/off');
   });
 
+  it('accepts boolean-like values for DISABLE_LOCAL_AUTH', () => {
+    for (const DISABLE_LOCAL_AUTH of ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']) {
+      expect(() => validateEnv({ ...BASE_ENV, DISABLE_LOCAL_AUTH })).not.toThrow();
+    }
+  });
+
+  it('rejects invalid DISABLE_LOCAL_AUTH values', () => {
+    expect(() => validateEnv({ ...BASE_ENV, DISABLE_LOCAL_AUTH: 'maybe' })).toThrow('DISABLE_LOCAL_AUTH must be one of true/false/1/0/yes/no/on/off');
+  });
+
   it('accepts boolean-like values for SWAGGER_ENABLED', () => {
     for (const SWAGGER_ENABLED of ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']) {
       expect(() =>
@@ -97,6 +122,18 @@ describe('validateEnv', () => {
         SWAGGER_ENABLED: 'maybe',
       }),
     ).toThrow('SWAGGER_ENABLED must be one of true/false/1/0/yes/no/on/off');
+  });
+
+  it('accepts explicit trusted proxy addresses and boolean values', () => {
+    for (const TRUST_PROXY of ['', 'true', 'false', 'yes', 'no', 'on', 'off', 'loopback,linklocal,uniquelocal', '127.0.0.1', '10.0.0.0/8']) {
+      expect(() => validateEnv({ ...BASE_ENV, TRUST_PROXY })).not.toThrow();
+    }
+  });
+
+  it.each(['0', '1', '2', '10', '1.5', '-1', '1e2'])('rejects numeric TRUST_PROXY hop count %s', (TRUST_PROXY) => {
+    expect(() => validateEnv({ ...BASE_ENV, TRUST_PROXY })).toThrow(
+      'TRUST_PROXY must be a boolean value or trusted proxy IP/CIDR; numeric hop counts are not supported',
+    );
   });
 
   it('accepts a custom Book Dock container path', () => {

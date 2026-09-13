@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { BookloreSourceAdapter } from './booklore-source.adapter';
+import { BookloreSourceAdapter, parseBookloreSeriesIndex } from './booklore-source.adapter';
 import { BOOKLORE_TABLES } from './booklore-tables';
 
 describe('BookloreSourceAdapter shelf export', () => {
@@ -1132,6 +1132,28 @@ describe('BookloreSourceAdapter exportData - minimal and edge cases', () => {
     expect(result.books[0]!.filePath).toBe('/books/late.epub');
     expect(result.books[0]!.fileHash).toBe('late-hash');
     expect(result.books[0]!.durationSeconds).toBe(42);
+  });
+});
+
+describe('parseBookloreSeriesIndex', () => {
+  it.each([
+    ['2.50', '2.5'],
+    ['2.00', '2'],
+    ['0.50', '0.5'],
+    ['2.100', '2.1'],
+    ['1.25', '1.25'],
+    ['2.105', '2.105'],
+    ['3', '3'],
+    // A trailing zero outside a decimal is a real digit, not scale padding.
+    ['10', '10'],
+    ['100', '100'],
+    [' 2.50 ', '2.5'],
+    [2.5, '2.5'],
+    [null, null],
+    ['', null],
+    ['not-a-number', null],
+  ])('normalizes %o to %o', (input, expected) => {
+    expect(parseBookloreSeriesIndex(input)).toBe(expected);
   });
 });
 

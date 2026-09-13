@@ -13,6 +13,7 @@ describe('LibraryController', () => {
     prescan: vi.fn(),
     reorder: vi.fn(),
     getStats: vi.fn(),
+    getOverview: vi.fn(),
     getAccess: vi.fn(),
     grantAccess: vi.fn(),
     updateAccess: vi.fn(),
@@ -28,10 +29,20 @@ describe('LibraryController', () => {
     execute: vi.fn(),
   };
 
-  const controller = new LibraryController(libraryService as any, bookService as any, bulkRenameService as any);
+  const addedAtService = { start: vi.fn(), get: vi.fn() };
+  const controller = new LibraryController(libraryService as any, bookService as any, bulkRenameService as any, addedAtService as any);
 
   beforeEach(() => {
     vi.resetAllMocks();
+  });
+
+  it('getOverview passes the caller through so the service can scope the result', async () => {
+    const user = { id: 7, isSuperuser: false } as any;
+    libraryService.getOverview.mockResolvedValue([]);
+
+    await controller.getOverview(user);
+
+    expect(libraryService.getOverview).toHaveBeenCalledWith(user);
   });
 
   it('writeMetadataToFiles blocks non-dry-run when file write is disabled', async () => {

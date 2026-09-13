@@ -13,14 +13,35 @@ type Db = NodePgDatabase<typeof schema>;
 export class NotificationRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async insertMany(rows: NewNotification[]): Promise<Notification[]> {
+  async insertOrCollapse(rows: NewNotification[]): Promise<Notification[]> {
     if (rows.length === 0) return [];
-    return this.db.insert(notifications).values(rows).returning();
+    return this.db
+      .insert(notifications)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [notifications.userId, notifications.groupKey],
+        targetWhere: sql`${notifications.read} = false and ${notifications.groupKey} is not null`,
+        set: {
+          title: sql`excluded.title`,
+          message: sql`excluded.message`,
+          actionUrl: sql`excluded.action_url`,
+          meta: sql`excluded.meta`,
+          count: sql`${notifications.count} + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
   }
 
   async findByUser(userId: number, limit: number, offset: number): Promise<{ items: Notification[]; total: number }> {
     const [items, [{ value: total }]] = await Promise.all([
-      this.db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit).offset(offset),
+      this.db
+        .select()
+        .from(notifications)
+        .where(eq(notifications.userId, userId))
+        .orderBy(desc(notifications.updatedAt), desc(notifications.id))
+        .limit(limit)
+        .offset(offset),
       this.db.select({ value: count() }).from(notifications).where(eq(notifications.userId, userId)),
     ]);
     return { items, total };
@@ -37,7 +58,7 @@ export class NotificationRepository {
   async setRead(id: number, userId: number): Promise<boolean> {
     const result = await this.db
       .update(notifications)
-      .set({ read: true })
+      .set({ read: true, updatedAt: sql`${notifications.updatedAt}` })
       .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
     return (result.rowCount ?? 0) > 0;
   }
@@ -45,7 +66,7 @@ export class NotificationRepository {
   async setAllRead(userId: number): Promise<number> {
     const result = await this.db
       .update(notifications)
-      .set({ read: true })
+      .set({ read: true, updatedAt: sql`${notifications.updatedAt}` })
       .where(and(eq(notifications.userId, userId), eq(notifications.read, false)));
     return result.rowCount ?? 0;
   }
@@ -60,9 +81,36 @@ export class NotificationRepository {
     return result.rowCount ?? 0;
   }
 
-  async deleteOlderThan(date: Date): Promise<number> {
-    const result = await this.db.delete(notifications).where(lt(notifications.createdAt, date));
-    return result.rowCount ?? 0;
+  async deleteOlderThan(date: Date, batchSize = 1_000): Promise<{ deleted: number; userIds: number[] }> {
+    let deleted = 0;
+    const userIds = new Set<number>();
+
+    while (true) {
+      const candidates = await this.db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(lt(notifications.updatedAt, date))
+        .orderBy(notifications.updatedAt, notifications.id)
+        .limit(batchSize);
+      if (candidates.length === 0) break;
+
+      const rows = await this.db
+        .delete(notifications)
+        .where(
+          and(
+            inArray(
+              notifications.id,
+              candidates.map((row) => row.id),
+            ),
+            lt(notifications.updatedAt, date),
+          ),
+        )
+        .returning({ userId: notifications.userId });
+      deleted += rows.length;
+      for (const row of rows) userIds.add(row.userId);
+    }
+
+    return { deleted, userIds: [...userIds] };
   }
 
   async findUserIdsWithLibraryAccess(libraryId: number): Promise<number[]> {

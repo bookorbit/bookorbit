@@ -6,19 +6,26 @@ import type { BookFileWriteField, WriteResult } from "./file-write";
 import type { CustomMetadataBookValue } from "./custom-metadata";
 import type { CoverAspectRatio } from "./library";
 import { DEFAULT_FORMAT_PRIORITY } from "./library";
+import type { SeriesIndex } from "./series-index";
 
 export const BOOK_FORMATS = DEFAULT_FORMAT_PRIORITY;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
-const AUDIO_FORMATS = new Set<string>(["m4b", "mp3", "m4a", "opus", "ogg", "flac"]);
+/** Exported as an ordered list too, so a form offering these cannot drift from what matches them. */
+export const AUDIO_FORMAT_LIST = ["m4b", "mp3", "m4a", "opus", "ogg", "flac"] as const;
+const AUDIO_FORMATS = new Set<string>(AUDIO_FORMAT_LIST);
 export function isAudioFormat(format: string): boolean {
   return AUDIO_FORMATS.has(format.toLowerCase());
 }
 
-const COMIC_FORMATS = new Set<string>(["cbz", "cbr", "cb7", "cbx"]);
+export const COMIC_FORMAT_LIST = ["cbz", "cbr", "cb7", "cbx"] as const;
+const COMIC_FORMATS = new Set<string>(COMIC_FORMAT_LIST);
 export function isComicFormat(format: string): boolean {
   return COMIC_FORMATS.has(format.toLowerCase());
 }
+
+/** What BookOrbit accepts as an ebook, and what an ebook tier may therefore ask for. */
+export const EBOOK_FORMAT_LIST = ["epub", "kepub", "mobi", "azw3", "azw", "fb2", "pdf", "djvu"] as const;
 
 export const READ_STATUSES = ["unread", "want_to_read", "reading", "on_hold", "rereading", "read", "skimmed", "abandoned"] as const;
 export type ReadStatus = (typeof READ_STATUSES)[number];
@@ -77,7 +84,11 @@ export type BookFileRef = {
   sizeBytes: number | null;
 };
 
-export type BookMediaKind = "ebook" | "audiobook" | "comic" | "unknown";
+/** The kinds a real file can be. `BookMediaKind` adds the case where no format identifies one. */
+export const CONCRETE_BOOK_MEDIA_KINDS = ["ebook", "audiobook", "comic"] as const;
+export type ConcreteBookMediaKind = (typeof CONCRETE_BOOK_MEDIA_KINDS)[number];
+
+export type BookMediaKind = ConcreteBookMediaKind | "unknown";
 
 export type BookMediaProfile = {
   primaryMediaKind: BookMediaKind;
@@ -113,7 +124,7 @@ export function getBookMediaProfile(files: readonly BookMediaFile[]): BookMediaP
 export type BookSeriesMembership = {
   seriesId: number;
   seriesName: string;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   displayOrder: number;
   expectedBookCount: number | null;
 };
@@ -126,7 +137,7 @@ export type BookCard = {
   authors: string[];
   seriesId?: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
   publishedDate: string | null;
@@ -205,7 +216,7 @@ export type BookDetail = {
   pageCount: number | null;
   seriesId?: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   seriesMemberships?: BookSeriesMembership[];
   rating: number | null;
   personalNote: string | null;
@@ -249,7 +260,7 @@ export type BookMetadataRefreshPreviewFields = {
   language?: string | null;
   pageCount?: number | null;
   seriesName?: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: SeriesIndex | null;
   seriesMemberships?: MetadataSeriesMembership[] | null;
   communityRatings?: BookCommunityRating[];
   coverUrl?: string;
@@ -325,18 +336,23 @@ export type BookRecommendation = {
   updatedAt: string | null;
   hasCover: boolean;
   authors: string[];
+  readStatus: UserBookStatus | null;
   isAudiobook?: boolean;
   isComic?: boolean;
 };
+
+/** A recommendation row before a user's read status is attached, for lookups that have no user in scope. */
+export type UnscopedBookRecommendation = Omit<BookRecommendation, "readStatus">;
 
 export type SeriesBookRecommendation = {
   id: number;
   title: string | null;
   coverAspectRatio: CoverAspectRatio;
   updatedAt: string | null;
-  seriesIndex: number | null;
+  seriesIndex: SeriesIndex | null;
   hasCover: boolean;
   authors: string[];
+  readStatus: UserBookStatus | null;
   isAudiobook?: boolean;
   isComic?: boolean;
 };

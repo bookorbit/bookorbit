@@ -9,6 +9,7 @@ import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { SmartScopeService } from '../smart-scope/smart-scope.service';
 import { LibraryService } from '../library/library.service';
 import { DashboardRepository } from './dashboard.repository';
+import { resolveDashboardLibraryIds } from './dashboard-library-scope';
 import { DASHBOARD_SCROLLER_MAX_LIMIT, type DashboardScrollerBatchDto, type DashboardScrollerBatchItemDto } from './dto/dashboard-scroller-batch.dto';
 import { ScrollerType } from './dto/scroller-type.enum';
 
@@ -45,7 +46,7 @@ export class DashboardService {
       `[dashboard.scroller_batch] [start] userId=${user.id} shelfCount=${dto.items.length} concurrency=${SCROLLER_QUERY_CONCURRENCY} - scroller batch started`,
     );
 
-    const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
     const selections = await mapWithConcurrency(dto.items, SCROLLER_QUERY_CONCURRENCY, async (item) => {
       const selectionStartedAt = Date.now();
       try {
@@ -100,7 +101,7 @@ export class DashboardService {
     let bookIds: number[];
     if (item.type === ScrollerType.SMART_SCOPE) {
       const smartScopeId = this.assertSmartScopeId(item.smartScopeId);
-      bookIds = await this.smartScopeService.executeSmartScopeBookIds(smartScopeId, user, item.limit);
+      bookIds = await this.smartScopeService.executeSmartScopeBookIds(smartScopeId, user, item.limit, accessibleLibraryIds);
     } else {
       bookIds = await this.findScrollerBookIdsForLibraries(item.type, user, item.limit, accessibleLibraryIds);
     }
@@ -115,7 +116,9 @@ export class DashboardService {
     const clampedLimit = Math.min(Math.max(1, limit), DASHBOARD_SCROLLER_MAX_LIMIT);
 
     if (type === ScrollerType.SMART_SCOPE) {
-      const result = await this.smartScopeService.executeSmartScope(this.assertSmartScopeId(smartScopeId), user, 0, clampedLimit);
+      const resolvedSmartScopeId = this.assertSmartScopeId(smartScopeId);
+      const accessibleLibraryIds = resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
+      const result = await this.smartScopeService.executeSmartScope(resolvedSmartScopeId, user, 0, clampedLimit, undefined, accessibleLibraryIds);
       return result.items;
     }
 
@@ -129,11 +132,14 @@ export class DashboardService {
   }
 
   async getSmartScopeBookIds(smartScopeId: number | undefined, user: RequestUser, limit: number): Promise<number[]> {
+    const accessibleLibraryIds = resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
     const result = await this.smartScopeService.executeSmartScope(
       this.assertSmartScopeId(smartScopeId),
       user,
       0,
       Math.min(Math.max(1, limit), DASHBOARD_SCROLLER_MAX_LIMIT),
+      undefined,
+      accessibleLibraryIds,
     );
     return result.items.map((item) => item.id);
   }
@@ -146,7 +152,7 @@ export class DashboardService {
   }
 
   private async findScrollerBookIds(type: Exclude<ScrollerType, 'smart-scope'>, user: RequestUser, clampedLimit: number): Promise<number[]> {
-    const accessibleLibraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const accessibleLibraryIds = resolveDashboardLibraryIds(await this.libraryService.findAccessibleLibraryIds(user), user);
     return this.findScrollerBookIdsForLibraries(type, user, clampedLimit, accessibleLibraryIds);
   }
 

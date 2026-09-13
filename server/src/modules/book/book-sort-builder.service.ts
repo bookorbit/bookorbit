@@ -1,13 +1,26 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, sql } from 'drizzle-orm';
 
-import { parseCustomSortFieldId } from '@bookorbit/types';
+import { MAX_RANDOM_SORT_SEED, parseCustomSortFieldId } from '@bookorbit/types';
 import type { CustomMetadataFieldType, CustomMetadataFieldTypeMap, SortField, SortSpec } from '@bookorbit/types';
 import { bookMetadata, books, collectionBooks } from '../../db/schema';
+import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 
 export type BookSortContext = {
   defaultCollectionId?: number;
+  /** Seed for the `random` sort field. See `resolveRandomSortSeed`. */
+  randomSeed?: number;
 };
+
+/**
+ * Browsing clients send a seed so every page uses the same shuffle and a fresh visit reshuffles.
+ * Other callers fall back to a per-user daily seed to keep pagination coherent within a day.
+ */
+export function resolveRandomSortSeed(context: BookSortContext | undefined, userId: number | undefined): number {
+  const seed = context?.randomSeed;
+  if (seed !== undefined && Number.isSafeInteger(seed) && seed >= 0 && seed <= MAX_RANDOM_SORT_SEED) return seed;
+  return Math.floor(Date.now() / 86_400_000) + (userId ?? 0);
+}
 
 const CUSTOM_VALUE_COLUMNS: Record<CustomMetadataFieldType, string> = {
   text: 'value_text',
@@ -124,9 +137,8 @@ export class BookSortBuilder {
         break;
       }
       case 'random': {
-        const daySeed = Math.floor(Date.now() / 86_400_000);
-        const scopedSeed = daySeed + (userId ?? 0);
-        result.push(sql`md5(${books.id}::text || ':' || ${scopedSeed}::text) ${sql.raw(D)}`);
+        const seed = resolveRandomSortSeed(context, userId);
+        result.push(sql`md5(${books.id}::text || ':' || ${seed}::text) ${sql.raw(D)}`);
         result.push(sql`${books.id} ${sql.raw(D)}`);
         break;
       }
@@ -142,6 +154,12 @@ export class BookSortBuilder {
       case 'publishedYear':
         result.push(sql`${bookMetadata.publishedYear} ${sql.raw(D)} NULLS LAST`);
         break;
+      case 'seriesIndex':
+        result.push(...seriesIndexOrderBy(bookMetadata.seriesIndex, D));
+        if (!allSorts.some((s) => s.field === 'series')) {
+          result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
+        }
+        break;
       case 'format':
         result.push(sql.raw(`(SELECT bf.format FROM book_files bf WHERE bf.id = books.primary_file_id) ${D} NULLS LAST`));
         break;
@@ -149,9 +167,6 @@ export class BookSortBuilder {
         const col = SORT_FIELD_MAP[field];
         if (!col) return;
         result.push(sql`${col} ${sql.raw(D)} NULLS LAST`);
-        if (field === 'seriesIndex' && !allSorts.some((s) => s.field === 'series')) {
-          result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
-        }
       }
     }
   }

@@ -25,11 +25,11 @@ describe('extractPdfCover', () => {
     mockMkdtemp.mockResolvedValue('/tmp/pdf-cover-abc');
   });
 
-  it('extracts first-page jpeg bytes and always cleans up temp directory', async () => {
+  it('extracts the first-page crop box as jpeg bytes and always cleans up the temp directory', async () => {
     const coverBytes = Buffer.from('cover-bytes');
     mockExecFile.mockImplementation((file, args, callback) => {
       expect(file).toBe('pdftoppm');
-      expect(args).toEqual(['-jpeg', '-singlefile', '-r', '150', '-f', '1', '-l', '1', '/books/test.pdf', '/tmp/pdf-cover-abc/cover']);
+      expect(args).toEqual(['-jpeg', '-singlefile', '-cropbox', '-r', '150', '-f', '1', '-l', '1', '/books/test.pdf', '/tmp/pdf-cover-abc/cover']);
       callback?.(null, '', '');
       return {} as never;
     });

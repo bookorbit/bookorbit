@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { MetadataScoreField, MetadataScoreWeights } from '@bookorbit/types';
+import { isPositiveSeriesIndex, type MetadataScoreField, type MetadataScoreWeights } from '@bookorbit/types';
 
 export type ScoreData = {
   title: string | null;
@@ -12,7 +12,7 @@ export type ScoreData = {
   language: string | null;
   pageCount: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   rating: number | null;
   coverSource: string | null;
   googleBooksId: string | null;
@@ -28,7 +28,7 @@ export type ScoreData = {
   tagCount: number;
 };
 
-type ScoreRuleKind = 'string' | 'positive-number' | 'count';
+type ScoreRuleKind = 'string' | 'positive-number' | 'count' | 'series-index';
 type ScoreRule = { kind: ScoreRuleKind; value: (data: ScoreData) => string | number | null };
 
 const SCORE_RULES: Record<MetadataScoreField, ScoreRule> = {
@@ -45,7 +45,7 @@ const SCORE_RULES: Record<MetadataScoreField, ScoreRule> = {
   pageCount: { kind: 'positive-number', value: (data) => data.pageCount },
   rating: { kind: 'positive-number', value: (data) => data.rating },
   seriesName: { kind: 'string', value: (data) => data.seriesName },
-  seriesIndex: { kind: 'positive-number', value: (data) => data.seriesIndex },
+  seriesIndex: { kind: 'series-index', value: (data) => data.seriesIndex },
   tags: { kind: 'count', value: (data) => data.tagCount },
   authors: { kind: 'count', value: (data) => data.authorCount },
   googleBooksId: { kind: 'string', value: (data) => data.googleBooksId },
@@ -87,6 +87,8 @@ export class MetadataScoreScorer {
       case 'count':
       case 'positive-number':
         return typeof raw === 'number' && raw > 0;
+      case 'series-index':
+        return typeof raw === 'string' && isPositiveSeriesIndex(raw);
     }
   }
 }

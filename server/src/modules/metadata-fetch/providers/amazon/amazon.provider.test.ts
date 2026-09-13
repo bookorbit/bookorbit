@@ -76,7 +76,7 @@ describe('AmazonProvider', () => {
       const result = await provider.search({ title: 'Test Book' });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('https://www.amazon.com/s?k=Test%20Book'),
+        expect.stringContaining('https://www.amazon.com/gp/aw/s?k=Test%20Book'),
         expect.objectContaining({
           headers: expect.objectContaining({ cookie: 'test-cookie' }),
         }),
@@ -106,7 +106,7 @@ describe('AmazonProvider', () => {
 
       expect(global.fetch).toHaveBeenNthCalledWith(
         1,
-        expect.stringContaining('https://www.amazon.com/s?k=9781250165343'),
+        expect.stringContaining('https://www.amazon.com/gp/aw/s?k=9781250165343'),
         expect.objectContaining({
           headers: expect.objectContaining({ cookie: 'test-cookie' }),
         }),
@@ -182,6 +182,23 @@ describe('AmazonProvider', () => {
       });
 
       await expect(provider.search({ title: 'Test' })).rejects.toBeInstanceOf(ProviderThrottleError);
+    });
+
+    it('should treat Amazon interstitial responses as throttling', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            '<script>function triggerInterstitialChallenge() { xhr.open("POST", "/_sec/verify?provider=interstitial"); xhr.send(JSON.stringify({"bm-verify":"token"})); }</script>',
+          ),
+      });
+
+      await expect(provider.search({ title: 'Test' })).rejects.toMatchObject({
+        name: 'ProviderThrottleError',
+        reason: 'bot challenge',
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
     it('should return empty if no title in parsed page', async () => {

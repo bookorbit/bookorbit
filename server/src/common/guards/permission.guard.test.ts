@@ -2,6 +2,7 @@ import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Permission } from '@bookorbit/types';
 
 import { FORBIDDEN_PERMISSION_KEY } from '../decorators/forbid-permission.decorator';
+import { ANY_PERMISSION_KEY } from '../decorators/require-any-permission.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { PERMISSION_KEY } from '../decorators/require-permission.decorator';
 import type { RequestUser } from '../types/request-user';
@@ -153,6 +154,59 @@ describe('PermissionGuard', () => {
     const guard = new PermissionGuard(reflector as never, permissionService as never);
 
     expect(guard.canActivate(makeContext(makeUser()))).toBe(true);
+  });
+
+  it('accepts any one of an any-of set', () => {
+    const reflector = {
+      getAllAndOverride: vi.fn((key: string) => {
+        if (key === IS_PUBLIC_KEY) return false;
+        if (key === ANY_PERMISSION_KEY) return [Permission.BookRequestAccess, Permission.ManageAppSettings];
+        return undefined;
+      }),
+    };
+    const permissionService = {
+      userHas: vi.fn((_user: RequestUser, permission: Permission) => permission === Permission.ManageAppSettings),
+      userHasExplicit: vi.fn().mockReturnValue(false),
+    };
+    const guard = new PermissionGuard(reflector as never, permissionService as never);
+
+    expect(guard.canActivate(makeContext(makeUser()))).toBe(true);
+  });
+
+  it('refuses an any-of set the user holds none of, and names them all', () => {
+    const reflector = {
+      getAllAndOverride: vi.fn((key: string) => {
+        if (key === IS_PUBLIC_KEY) return false;
+        if (key === ANY_PERMISSION_KEY) return [Permission.BookRequestAccess, Permission.ManageAppSettings];
+        return undefined;
+      }),
+    };
+    const permissionService = { userHas: vi.fn().mockReturnValue(false), userHasExplicit: vi.fn().mockReturnValue(false) };
+    const guard = new PermissionGuard(reflector as never, permissionService as never);
+
+    expect(() => guard.canActivate(makeContext(makeUser()))).toThrow(
+      `Missing permission: ${Permission.BookRequestAccess} or ${Permission.ManageAppSettings}`,
+    );
+  });
+
+  /** A handler naming an any-of set answers for it instead of its controller's class-level rule. */
+  it('lets an any-of set stand in for the class-level requirement', () => {
+    const reflector = {
+      getAllAndOverride: vi.fn((key: string) => {
+        if (key === IS_PUBLIC_KEY) return false;
+        if (key === ANY_PERMISSION_KEY) return [Permission.BookRequestAccess, Permission.ManageAppSettings];
+        if (key === PERMISSION_KEY) return Permission.ManageUsers;
+        return undefined;
+      }),
+    };
+    const permissionService = {
+      userHas: vi.fn((_user: RequestUser, permission: Permission) => permission === Permission.ManageAppSettings),
+      userHasExplicit: vi.fn().mockReturnValue(false),
+    };
+    const guard = new PermissionGuard(reflector as never, permissionService as never);
+
+    expect(guard.canActivate(makeContext(makeUser()))).toBe(true);
+    expect(permissionService.userHas).not.toHaveBeenCalledWith(expect.any(Object), Permission.ManageUsers);
   });
 
   it('requires every permission attached to a route', () => {

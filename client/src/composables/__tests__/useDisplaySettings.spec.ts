@@ -16,13 +16,15 @@ function resetDisplaySettings() {
   settings.smartScopeFilterExpanded.value = true
   settings.authorCoverSize.value = 120
   settings.authorCoverShape.value = 'circle'
+  settings.authorRowDensity.value = 'comfortable'
+  settings.authorCoverFallback.value = false
   settings.tableZebraStriping.value = false
   settings.tableDensity.value = 'comfortable'
   settings.bookSpineOverlay.value = 'off'
   settings.showSpineOnComics.value = false
   settings.bookShadowStrength.value = 'default'
   settings.bookCoverDisplayMode.value = 'blurred-fit'
-  settings.bookDetailCoverTint.value = 'single'
+  settings.bookDetailCoverTint.value = 'off'
   settings.seriesCardCoverMode.value = 'stack'
   settings.gridCardPrimaryLabel.value = 'hidden'
   settings.gridCardSecondaryLabel.value = 'hidden'
@@ -207,9 +209,9 @@ describe('useDisplaySettings preferences helpers', () => {
     expect(getDisplayPreferencesSnapshot().bookDetailCoverTint).toBe('duotone')
   })
 
-  it('defaults bookDetailCoverTint to single', () => {
+  it('defaults bookDetailCoverTint to off', () => {
     resetDisplaySettings()
-    expect(settings.bookDetailCoverTint.value).toBe('single')
+    expect(settings.bookDetailCoverTint.value).toBe('off')
   })
 
   it('sanitizes bookDetailCoverTint and drops unknown values', () => {

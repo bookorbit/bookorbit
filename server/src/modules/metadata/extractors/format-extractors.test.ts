@@ -4,7 +4,8 @@ vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
 }));
 
-vi.mock('../lib/epub', () => ({
+vi.mock('../lib/epub', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/epub')>()),
   extractEpubMetadata: vi.fn(),
 }));
 
@@ -120,8 +121,9 @@ describe('metadata format extractors', () => {
       publishedYear: 1965,
       language: 'en',
       seriesName: 'Dune Chronicles',
-      seriesIndex: 1,
+      seriesIndex: '1',
       authors: [{ name: 'Frank Herbert', sortName: null }],
+      narrators: [],
       genres: ['Science Fiction'],
       tags: ['SF', 'Classic'],
       rating: 9,
@@ -168,6 +170,7 @@ describe('metadata format extractors', () => {
       seriesName: null,
       seriesIndex: null,
       authors: [{ name: 'Frank Herbert', sortName: null }],
+      narrators: [],
       genres: [],
       tags: ['Science Fiction'],
       rating: null,
@@ -228,6 +231,51 @@ describe('metadata format extractors', () => {
       }),
     );
     expect(mockReadFile).toHaveBeenCalledWith('/books/metadata.opf', 'utf8');
+  });
+
+  it('opf extractor carries narrators declared by role nrt', async () => {
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:title>Audiobook Title</dc:title>
+          <dc:creator opf:role="aut">Sidecar Author</dc:creator>
+          <dc:creator opf:role="nrt">Sidecar Narrator</dc:creator>
+        </metadata>
+      </package>
+    `);
+
+    await expect(new OpfFormatExtractor().extract('/books/book.opf')).resolves.toEqual(
+      expect.objectContaining({
+        authors: [{ name: 'Sidecar Author', sortName: null }],
+        narrators: ['Sidecar Narrator'],
+      }),
+    );
+  });
+
+  it('opf extractor treats a narrator-only sidecar as usable metadata', async () => {
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:contributor opf:role="nrt">Sidecar Narrator</dc:contributor>
+        </metadata>
+      </package>
+    `);
+
+    await expect(new OpfFormatExtractor().extract('/books/book.opf')).resolves.toEqual(expect.objectContaining({ narrators: ['Sidecar Narrator'] }));
+  });
+
+  it('opf extractor leaves narrators undefined when the sidecar names none, so nothing is wiped', async () => {
+    mockReadFile.mockResolvedValue(`
+      <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+          <dc:title>Sidecar Title</dc:title>
+          <dc:creator opf:role="aut">Sidecar Author</dc:creator>
+        </metadata>
+      </package>
+    `);
+
+    const parsed = await new OpfFormatExtractor().extract('/books/book.opf');
+    expect(parsed?.narrators).toBeUndefined();
   });
 
   it('opf extractor returns null for sidecars without usable metadata', async () => {
@@ -317,7 +365,7 @@ describe('metadata format extractors', () => {
       publishedYear: 2018,
       language: 'en',
       seriesName: 'Pathway',
-      seriesIndex: 2,
+      seriesIndex: '2',
       authors: [],
       genres: [],
       tags: ['favourite'],
@@ -392,7 +440,7 @@ describe('metadata format extractors', () => {
       publishedYear: 2020,
       language: 'en',
       seriesName: 'Batman',
-      seriesIndex: 55,
+      seriesIndex: '55',
       authors: [{ name: 'Writer', sortName: null }],
       genres: ['Comics'],
       tags: ['Superhero'],
@@ -478,6 +526,7 @@ describe('metadata format extractors', () => {
       seriesName: null,
       seriesIndex: null,
       authors: [],
+      narrators: [],
       genres: [],
       tags: [],
       rating: null,
@@ -521,7 +570,7 @@ describe('metadata format extractors', () => {
       publishedYear: 2021,
       language: 'en',
       seriesName: 'Project Hail Mary',
-      seriesIndex: 1,
+      seriesIndex: '1',
       authors: [{ name: 'Andy Weir', sortName: null }],
       genres: ['Science Fiction'],
       audibleId: 'B08G9PRS1K',
@@ -537,7 +586,7 @@ describe('metadata format extractors', () => {
         title: 'Project Hail Mary',
         subtitle: 'A Novel',
         seriesName: 'Project Hail Mary',
-        seriesIndex: 1,
+        seriesIndex: '1',
         genres: ['Science Fiction'],
         audibleId: 'B08G9PRS1K',
         librofmId: '9781234567890',
@@ -547,5 +596,12 @@ describe('metadata format extractors', () => {
         cover: Buffer.from('cover'),
       }),
     );
+  });
+
+  // Persisting an unreadable file as empty metadata would wipe whatever the book already had.
+  it('AudioFormatExtractor returns null when the file cannot be read', async () => {
+    mockExtractAudioMetadata.mockResolvedValue(null);
+
+    await expect(new AudioFormatExtractor().extract('/books/hail-mary.m4b')).resolves.toBeNull();
   });
 });

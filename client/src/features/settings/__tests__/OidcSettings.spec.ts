@@ -65,6 +65,23 @@ describe('OidcSettings', () => {
     expect(wrapper.text()).not.toContain('Server copy must not be rendered')
   })
 
+  it('localizes an untrusted TLS certificate error without rendering server copy', async () => {
+    apiMock.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/v1/app-settings/oidc/providers') return response(true, [])
+      return response(false, {
+        errorCode: OidcErrorCode.TLS_CERTIFICATE_UNTRUSTED,
+        message: 'Server copy must not be rendered',
+      })
+    })
+    const wrapper = await mountCreateForm()
+
+    await testConnection(wrapper)
+
+    expect(wrapper.text()).toContain('private certificate authority')
+    expect(wrapper.text()).toContain('NODE_EXTRA_CA_CERTS')
+    expect(wrapper.text()).not.toContain('Server copy must not be rendered')
+  })
+
   it('uses localized generic copy for an unknown server error code', async () => {
     apiMock.mockImplementation(async (input: RequestInfo | URL) => {
       if (String(input) === '/api/v1/app-settings/oidc/providers') return response(true, [])

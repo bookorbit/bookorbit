@@ -80,6 +80,7 @@ local function installClient(handle)
         isConfigured = function() return true end,
         matchCheck = function(_, hashes)
             table.insert(handle.calls.match, hashes)
+            if responses.match_error then return nil, responses.match_error end
             local matches = {}
             for _, hash in ipairs(hashes) do
                 if responses.unmatched[hash] then
@@ -129,6 +130,7 @@ opts:
 - library_version: token every server response carries
 - unmatched: set of hashes match-check refuses to match
 - matches: map of hashes to custom { bookId, bookFileId } match results
+- match_error: HTTP or transport error returned by match-check
 - page_stats_response: function returning the server response for an upload
 - sidecar: overrides for the BookOrbitSidecar stub
 ]]
@@ -151,6 +153,7 @@ function SweepHarness.install(opts)
             library_version = opts.library_version,
             unmatched = opts.unmatched or {},
             matches = opts.matches or {},
+            match_error = opts.match_error,
             page_stats = opts.page_stats_response,
         },
         calls = {
@@ -229,7 +232,7 @@ function SweepHarness.install(opts)
             handle.calls.scheduled = handle.calls.scheduled + 1
             handle.scheduler:scheduleIn(delay, callback)
         end,
-        show = function() end,
+        show = function(_, widget) handle.shown = widget end,
         close = function() end,
         setDirty = function() end,
     }

@@ -4,7 +4,10 @@ import {
   aggregateReadingSessionDailyStats,
   getDayRangeForDateKeys,
   getReadingSessionDayKeys,
+  mergeReadingDailyStatsSegments,
+  sortReadingDailyStatsSegments,
   splitReadingSessionByDay,
+  type ReadingDailyStatsSegment,
 } from './reading-daily-stats.utils';
 
 describe('reading daily stats utils', () => {
@@ -143,6 +146,46 @@ describe('reading daily stats utils', () => {
     );
 
     expect(result).toEqual([{ day: '2026-04-16', readingSeconds: 5400, progressDelta: 2, sessionsCount: 2 }]);
+  });
+
+  it('accumulates batched segments into the same totals as one pass over every session', () => {
+    const sessions = [
+      { startedAt: new Date('2026-04-15T08:00:00.000Z'), endedAt: new Date('2026-04-15T09:00:00.000Z'), durationSeconds: 3600, progressDelta: 3 },
+      { startedAt: new Date('2026-04-15T20:00:00.000Z'), endedAt: new Date('2026-04-15T20:30:00.000Z'), durationSeconds: 1800, progressDelta: 1 },
+      { startedAt: new Date('2026-04-16T07:00:00.000Z'), endedAt: new Date('2026-04-16T07:15:00.000Z'), durationSeconds: 900, progressDelta: null },
+    ];
+
+    const byDay = new Map<string, ReadingDailyStatsSegment>();
+    for (const session of sessions) {
+      mergeReadingDailyStatsSegments(byDay, aggregateReadingSessionDailyStats([session], 'UTC'));
+    }
+
+    expect(sortReadingDailyStatsSegments(byDay)).toEqual(aggregateReadingSessionDailyStats(sessions, 'UTC'));
+  });
+
+  it('merges without mutating the segments it was handed', () => {
+    const incoming: ReadingDailyStatsSegment[] = [{ day: '2026-04-15', readingSeconds: 60, progressDelta: 1, sessionsCount: 1 }];
+    const byDay = new Map<string, ReadingDailyStatsSegment>();
+
+    mergeReadingDailyStatsSegments(byDay, incoming);
+    mergeReadingDailyStatsSegments(byDay, [{ day: '2026-04-15', readingSeconds: 40, progressDelta: 2, sessionsCount: 1 }]);
+
+    expect(byDay.get('2026-04-15')).toEqual({ day: '2026-04-15', readingSeconds: 100, progressDelta: 3, sessionsCount: 2 });
+    expect(incoming[0]).toEqual({ day: '2026-04-15', readingSeconds: 60, progressDelta: 1, sessionsCount: 1 });
+  });
+
+  it('drops merged days outside the requested set and sorts what is left by day', () => {
+    const byDay = mergeReadingDailyStatsSegments(
+      new Map<string, ReadingDailyStatsSegment>(),
+      [
+        { day: '2026-04-16', readingSeconds: 30, progressDelta: 0, sessionsCount: 1 },
+        { day: '2026-04-15', readingSeconds: 60, progressDelta: 0, sessionsCount: 1 },
+        { day: '2026-04-14', readingSeconds: 90, progressDelta: 0, sessionsCount: 1 },
+      ],
+      new Set(['2026-04-15', '2026-04-16']),
+    );
+
+    expect(sortReadingDailyStatsSegments(byDay).map((segment) => segment.day)).toEqual(['2026-04-15', '2026-04-16']);
   });
 
   it('builds an exclusive UTC range for timezone-local affected days', () => {

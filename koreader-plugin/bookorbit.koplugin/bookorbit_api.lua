@@ -18,12 +18,50 @@ local TransferPolicy = require("bookorbit_transfer_policy")
 local TransferProgress = require("bookorbit_transfer_progress")
 
 local MAX_BODY_BYTES = 900 * 1024 -- stays under the server's 1 MiB body limit
+local MATCH_HASH_LENGTH = 32
+local MATCH_TITLE_MAX_BYTES = 500
+local MATCH_AUTHORS_MAX_BYTES = 1000
+local MAX_SAFE_INTEGER = 9007199254740991
 
 local MAX_DOWNLOAD_REDIRECTS = 5
 
 -- Plain empty Lua tables would encode as {} and fail the server's array
 -- validation; every empty table in our payloads is semantically an array.
 local ENCODE_OPTIONS = { empty_table_as_array = true }
+
+local function validMatchHash(value)
+    return type(value) == "string"
+        and #value == MATCH_HASH_LENGTH
+        and value:match("^[0-9a-fA-F]+$") ~= nil
+end
+
+-- Byte limits are conservative against the server's character limits and
+-- keep a worst-case 500-book payload below the HTTP body cap.
+local function boundedUtf8(value, max_bytes)
+    if type(value) ~= "string" then return nil end
+    value = util.fixUtf8(value, "?")
+    if #value <= max_bytes then return value end
+    return util.fixUtf8(value:sub(1, max_bytes), "")
+end
+
+local function nonNegativeInteger(value)
+    value = tonumber(value)
+    if not value or value ~= value or value == math.huge
+            or value < 0 or value > MAX_SAFE_INTEGER or value ~= math.floor(value) then
+        return nil
+    end
+    return value
+end
+
+local function validMatchSource(value)
+    if value == "current_file" or value == "file" or value == "statistics" then
+        return value
+    end
+end
+
+local function optionalBoolean(value)
+    if type(value) == "boolean" then return value end
+end
 
 -- JSON null decodes to the rapidjson.null lightuserdata, which is truthy in
 -- Lua and would leak into sidecars and truthiness checks; treat it as absent.
@@ -482,20 +520,37 @@ end
 -- BookOrbit plugin endpoints (camelCase wire format)
 
 function BookOrbitApi:matchCheck(hashes, candidates)
-    local payload = { hashes = hashes }
+    local payload = { hashes = {} }
     if candidates then
         payload.books = {}
-        for _, hash in ipairs(hashes) do
+    end
+
+    local skipped = 0
+    for _, hash in ipairs(hashes or {}) do
+        local valid_hash = validMatchHash(hash)
+        if valid_hash then
+            table.insert(payload.hashes, hash)
+        else
+            skipped = skipped + 1
+        end
+        if candidates and valid_hash then
             local cand = candidates[hash] or {}
             table.insert(payload.books, {
                 hash = hash,
-                title = cand.title,
-                authors = cand.authors,
-                lastOpen = cand.last_open,
-                source = cand.source,
-                metadataAmbiguous = cand.metadata_ambiguous,
+                title = boundedUtf8(cand.title, MATCH_TITLE_MAX_BYTES),
+                authors = boundedUtf8(cand.authors, MATCH_AUTHORS_MAX_BYTES),
+                lastOpen = nonNegativeInteger(cand.last_open),
+                source = validMatchSource(cand.source),
+                metadataAmbiguous = optionalBoolean(cand.metadata_ambiguous),
             })
         end
+    end
+
+    if skipped > 0 then
+        logger.warn("BookOrbit: match-check skipped invalid hashes:", skipped)
+    end
+    if #payload.hashes == 0 then
+        return { matches = {} }
     end
     return self:request("POST", "/koreader/plugin/match-check", self:withDevice(payload))
 end

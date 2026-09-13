@@ -8,6 +8,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookFiles, bookGenres, bookMetadata, bookTags, books, genres, libraries, tags } from '../../db/schema';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 const ANN_CANDIDATE_FETCH_LIMIT = 100;
@@ -19,7 +20,7 @@ export interface SeriesBookRow {
   title: string | null;
   coverAspectRatio: string;
   updatedAt: Date | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   coverSource: string | null;
   authorNames: string[];
   isAudiobook: boolean;
@@ -183,7 +184,7 @@ export class RecommendationRepository {
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(and(inArray(books.libraryId, libraryIds), eq(bookMetadata.seriesId, seriesId), ...filterClauses))
-      .orderBy(sql`${bookMetadata.seriesIndex} ASC NULLS LAST`, asc(bookMetadata.title), asc(books.id))
+      .orderBy(...seriesIndexOrderBy(bookMetadata.seriesIndex, 'ASC'), asc(bookMetadata.title), asc(books.id))
       .limit(SERIES_BOOKS_LIMIT);
 
     const bookIds = rows.map((r) => r.bookId);

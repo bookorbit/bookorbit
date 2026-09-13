@@ -12,14 +12,14 @@ function handleToggle() {
     type="button"
     role="switch"
     :aria-checked="modelValue"
-    class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+    class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 border-transparent p-0 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
     :class="modelValue ? 'bg-primary' : 'bg-muted'"
     :disabled="disabled"
     @click="handleToggle"
   >
     <span
-      class="pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform"
-      :class="modelValue ? 'translate-x-4' : 'translate-x-0'"
+      class="pointer-events-none absolute top-0 inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-[inset-inline-start]"
+      :class="modelValue ? 'start-4' : 'start-0'"
       style="transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1)"
     />
   </button>

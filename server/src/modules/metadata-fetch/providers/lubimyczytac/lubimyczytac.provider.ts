@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../../../common/utils/log-sanitize.utils';
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
@@ -8,7 +8,7 @@ import { ProviderThrottleError } from '../../provider-throttle.error';
 import { IdentifiableProvider } from '../metadata-provider';
 import { PROVIDER_DELAYS_MS, PROVIDER_LIMITS, PROVIDER_TIMEOUT_MS } from '../provider-constants';
 import { MetadataSearchParams } from '../metadata-search-params';
-import { buildRequestSignal, normalizeMaxCandidates, sleep } from '../provider-utils';
+import { buildRequestSignal, normalizeMaxCandidates, rethrowWithPartialCandidates, sleep } from '../provider-utils';
 import {
   buildLubimyczytacBookUrl,
   buildLubimyczytacSearchUrl,
@@ -49,13 +49,17 @@ export class LubimyczytacProvider implements IdentifiableProvider {
     const links = await this.searchBookLinks(params, maxCandidates, params.signal);
 
     const results: MetadataCandidate[] = [];
-    for (const link of links.slice(0, maxCandidates)) {
-      if (params.signal?.aborted) break;
-      if (results.length > 0) {
-        await sleep(PROVIDER_DELAYS_MS.LUBIMYCZYTAC_BETWEEN_REQUESTS, params.signal);
+    try {
+      for (const link of links.slice(0, maxCandidates)) {
+        if (params.signal?.aborted) break;
+        if (results.length > 0) {
+          await sleep(PROVIDER_DELAYS_MS.LUBIMYCZYTAC_BETWEEN_REQUESTS, params.signal);
+        }
+        const candidate = await this.fetchByUrl(link.url, link.providerId, params.signal);
+        if (candidate) results.push(candidate);
       }
-      const candidate = await this.fetchByUrl(link.url, link.providerId, params.signal);
-      if (candidate) results.push(candidate);
+    } catch (err) {
+      rethrowWithPartialCandidates(err, results);
     }
 
     return results;
@@ -100,7 +104,7 @@ export class LubimyczytacProvider implements IdentifiableProvider {
       isbn10: data.isbn10,
       isbn13: data.isbn13,
       seriesName: data.seriesName,
-      seriesIndex: data.seriesIndex,
+      seriesIndex: parseSeriesIndex(data.seriesIndex) ?? undefined,
       genres: data.genres?.length ? data.genres : undefined,
       coverUrl: data.coverUrl,
       sourceUrl: url,

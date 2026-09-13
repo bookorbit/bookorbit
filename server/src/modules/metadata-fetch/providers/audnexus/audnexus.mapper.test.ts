@@ -141,8 +141,8 @@ describe('mapAudNexusBook — series', () => {
       }),
     );
     expect(result.seriesName).toBe('The Expanse');
-    expect(result.seriesIndex).toBe(3);
-    expect(result.seriesMemberships).toEqual([{ seriesName: 'The Expanse', seriesIndex: 3 }]);
+    expect(result.seriesIndex).toBe('3');
+    expect(result.seriesMemberships).toEqual([{ seriesName: 'The Expanse', seriesIndex: '3' }]);
   });
 
   it('maps all series memberships from the AudNexus Confessor payload', () => {
@@ -165,23 +165,23 @@ describe('mapAudNexusBook — series', () => {
     );
 
     expect(result.seriesName).toBe('Sword of Truth');
-    expect(result.seriesIndex).toBe(11);
+    expect(result.seriesIndex).toBe('11');
     expect(result.seriesMemberships).toEqual([
-      { seriesName: 'Sword of Truth', seriesIndex: 11 },
-      { seriesName: 'Chainfire Trilogy', seriesIndex: 3 },
+      { seriesName: 'Sword of Truth', seriesIndex: '11' },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
     ]);
   });
 
   it('maps seriesName and numeric seriesPart', () => {
     const result = mapAudNexusBook(makeBook({ seriesName: 'The Expanse', seriesPart: '3' }));
     expect(result.seriesName).toBe('The Expanse');
-    expect(result.seriesIndex).toBe(3);
-    expect(result.seriesMemberships).toEqual([{ seriesName: 'The Expanse', seriesIndex: 3 }]);
+    expect(result.seriesIndex).toBe('3');
+    expect(result.seriesMemberships).toEqual([{ seriesName: 'The Expanse', seriesIndex: '3' }]);
   });
 
   it('handles decimal seriesPart', () => {
     const result = mapAudNexusBook(makeBook({ seriesPart: '1.5' }));
-    expect(result.seriesIndex).toBe(1.5);
+    expect(result.seriesIndex).toBe('1.5');
   });
 
   it('leaves seriesIndex undefined when seriesPart is absent', () => {

@@ -21,7 +21,7 @@ import {
   ValidatorConstraint,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MetadataProviderKey } from '@bookorbit/types';
+import { MetadataProviderKey, SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type SeriesIndex } from '@bookorbit/types';
 
 @ValidatorConstraint({ name: 'hasCompleteDefaultDestination', async: false })
 class HasCompleteDefaultDestinationConstraint implements ValidatorConstraintInterface {
@@ -57,7 +57,7 @@ class BookDockAudiobookChapterDto {
 
 class BookDockSeriesMembershipDto {
   @IsString() @MaxLength(500) seriesName!: string;
-  @IsOptional() @IsNumber() seriesIndex?: number | null;
+  @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
 }
 
 class BookDockCommunityRatingDto {
@@ -93,7 +93,7 @@ export class BookDockMetadataFieldsDto {
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) publishedDate?: string | null;
   @IsOptional() @IsInt() @Min(1000) @Max(2200) publishedYear?: number | null;
   @IsOptional() @IsInt() @Min(0) pageCount?: number | null;
-  @IsOptional() @IsNumber() seriesIndex?: number | null;
+  @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) narrators?: string[];
@@ -192,6 +192,10 @@ export class FinalizeBookDockDto {
   needsReview?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
+
+  @IsOptional()
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
   defaultLibraryId?: number;
@@ -234,6 +238,10 @@ export class BulkDiscardDto {
   @IsOptional()
   @IsBoolean()
   needsReview?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
 }
 
 export class PreviewNamesDto {
@@ -262,6 +270,10 @@ export class PreviewNamesDto {
   @IsOptional()
   @IsBoolean()
   needsReview?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== undefined)
@@ -295,6 +307,10 @@ export class BulkRetryFetchDto {
   @IsOptional()
   @IsBoolean()
   needsReview?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
 }
 
 export class BulkApplyFetchedDto {
@@ -323,6 +339,10 @@ export class BulkApplyFetchedDto {
   @IsOptional()
   @IsBoolean()
   needsReview?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
 }
 
 export class BulkSetTargetDto {
@@ -351,6 +371,10 @@ export class BulkSetTargetDto {
   @IsOptional()
   @IsBoolean()
   needsReview?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
@@ -389,6 +413,10 @@ export class SelectionSummaryDto {
   @IsOptional()
   @IsBoolean()
   needsReview?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
 }
 
 export class BulkEditBookDockDto {
@@ -417,6 +445,10 @@ export class BulkEditBookDockDto {
   @IsOptional()
   @IsBoolean()
   needsReview?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  readyToFile?: boolean;
 
   @ValidateNested()
   @IsObject()

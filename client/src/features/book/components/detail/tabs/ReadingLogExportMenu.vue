@@ -93,11 +93,11 @@ async function exportJson() {
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
       <button
-        class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        class="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="total === 0 || exporting"
       >
-        <Loader2 v-if="exporting" :size="14" class="animate-spin" />
-        <Download v-else :size="14" />
+        <Loader2 v-if="exporting" :size="12" class="animate-spin" />
+        <Download v-else :size="12" />
         {{ t('book.detail.readingLog.export.button') }}
       </button>
     </PopoverTrigger>

@@ -14,7 +14,7 @@ const baseBook = (): BookEligibilityData => ({
   pageCount: 320,
   communityRating: [{ provider: 'hardcover', rating: 4.25 }],
   seriesName: 'Series',
-  seriesIndex: 1,
+  seriesIndex: '1',
   coverSource: 'cover.jpg',
   hasAuthors: true,
   hasGenres: true,

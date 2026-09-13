@@ -88,7 +88,7 @@ const authorQuery = computed(() => props.book.authors[0] ?? null)
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
   const idx = props.book.seriesIndex
-  return idx != null ? `${props.book.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : props.book.seriesName
+  return idx != null ? `${props.book.seriesName} #${idx}` : props.book.seriesName
 })
 
 const isMissing = computed(() => props.book.status === 'missing')

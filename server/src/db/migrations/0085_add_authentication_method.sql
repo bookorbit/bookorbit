@@ -1,0 +1,2 @@
+ALTER TABLE "refresh_tokens" ADD COLUMN "authentication_method" varchar(20) DEFAULT 'legacy' NOT NULL;--> statement-breakpoint
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_authentication_method_chk" CHECK ("refresh_tokens"."authentication_method" in ('password', 'oidc', 'magic_link', 'setup', 'legacy'));

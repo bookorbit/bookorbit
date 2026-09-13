@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
+import { parseSeriesIndex } from '@bookorbit/types';
 
 import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
 import { parsePublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
@@ -18,7 +19,7 @@ export interface XmpParsed {
   isbn10: string | null;
   isbn13: string | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   rating: number | null;
   pageCount: number | null;
   googleBooksId: string | null;
@@ -163,7 +164,7 @@ export function parseXmp(xmpXml: string): XmpParsed | null {
     isbn10: str(merged[`${px}:isbn10`]),
     isbn13: str(merged[`${px}:isbn13`]),
     seriesName: str(merged[`${px}:seriesName`]),
-    seriesIndex: num(merged[`${px}:seriesIndex`]),
+    seriesIndex: parseSeriesIndex(str(merged[`${px}:seriesIndex`])),
     rating: num(merged[`${px}:rating`]),
     pageCount: num(merged[`${px}:pageCount`]),
     googleBooksId: str(merged[`${px}:googleBooksId`]),

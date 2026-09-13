@@ -213,6 +213,16 @@ describe('validateGroupRule', () => {
     expect(validateGroupRule(rule)).toEqual(rule);
   });
 
+  it('accepts a community rating count rule with an explicit provider', () => {
+    const rule = {
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 1000, provider: COMMUNITY_RATING_PROVIDER_KEYS[0] }],
+    };
+
+    expect(validateGroupRule(rule)).toEqual(rule);
+  });
+
   it('accepts a community rating rule without provider for backwards compatibility', () => {
     const rule = {
       type: 'group',
@@ -238,6 +248,16 @@ describe('validateGroupRule', () => {
       type: 'group',
       join: 'AND',
       rules: [{ type: 'rule', field: 'communityRating', operator: 'gte', value: 4.5, provider: 'kobo' }],
+    };
+
+    expect(() => validateGroupRule(rule)).toThrow(BadRequestException);
+  });
+
+  it('rejects unsupported providers on community rating count rules', () => {
+    const rule = {
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 1000, provider: 'kobo' }],
     };
 
     expect(() => validateGroupRule(rule)).toThrow(BadRequestException);

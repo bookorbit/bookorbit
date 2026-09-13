@@ -1,13 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NOTIFICATION_CATEGORIES, Permission } from '@bookorbit/types';
-import type { NotificationCategory, NotificationItem, NotificationType, NotificationPreferences } from '@bookorbit/types';
+import { NOTIFICATION_TYPE_META, NotificationType, Permission, isNotificationAllowed, resolveNotificationLevel } from '@bookorbit/types';
+import type { NotificationItem, NotificationPreferences } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 import { NotificationGateway } from './notification.gateway';
 import { NotificationRepository } from './notification.repository';
+import type { NewNotification } from '../../db/schema';
 
 export type NotificationScope =
   { kind: 'library'; libraryId: number } | { kind: 'user'; userId: number } | { kind: 'permission'; permission: Permission } | { kind: 'all' };
+
+/** Notifications are a transient feed, not an audit trail; the audit log is the durable record. */
+const NOTIFICATION_RETENTION_DAYS = 30;
+
+const COALESCED_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
+  NotificationType.ScanCompleted,
+  NotificationType.ScanFailed,
+  NotificationType.BooksUnavailable,
+  NotificationType.BooksRestored,
+  NotificationType.EmailSent,
+  NotificationType.EmailFailed,
+  NotificationType.FileWriteBackCompleted,
+  NotificationType.FileWriteBackFailed,
+  NotificationType.FileRenameCompleted,
+  NotificationType.FileRenameFailed,
+]);
 
 export interface NotifyPayload {
   type: NotificationType;
@@ -43,8 +60,7 @@ export class NotificationService {
       }
 
       const settingsMap = await this.repo.findUserSettings(targetUserIds);
-      const category = this.findCategory(payload.type);
-      const eligibleUserIds = targetUserIds.filter((uid) => this.isEnabled(settingsMap.get(uid), category));
+      const eligibleUserIds = targetUserIds.filter((uid) => this.isEnabled(settingsMap.get(uid), payload.type));
 
       if (eligibleUserIds.length === 0) {
         this.logger.log(
@@ -53,24 +69,32 @@ export class NotificationService {
         return;
       }
 
-      const rows = eligibleUserIds.map((userId) => ({
+      const groupKey = this.buildGroupKey(payload);
+      const rows: NewNotification[] = eligibleUserIds.map((userId) => ({
         userId,
         type: payload.type,
         title: payload.title,
         message: payload.message ?? null,
         actionUrl: payload.actionUrl ?? null,
         meta: payload.meta ?? null,
+        groupKey,
       }));
+      const persisted = await this.repo.insertOrCollapse(rows);
+      let insertedCount = 0;
+      let collapsedCount = 0;
 
-      const inserted = await this.repo.insertMany(rows);
-
-      for (const notification of inserted) {
-        const item = this.toItem(notification);
-        this.gateway.emitNew(notification.userId, item);
+      for (const notification of persisted) {
+        if (notification.count === 1) {
+          insertedCount++;
+          this.gateway.emitNew(notification.userId, this.toItem(notification));
+        } else {
+          collapsedCount++;
+          this.gateway.emitUpdated(notification.userId, this.toItem(notification));
+        }
       }
 
       this.logger.log(
-        `[${event}] [end] type=${payload.type} targetUsers=${targetUserIds.length} eligible=${eligibleUserIds.length} durationMs=${Date.now() - startedAt} - notification dispatch completed`,
+        `[${event}] [end] type=${payload.type} targetUsers=${targetUserIds.length} eligible=${eligibleUserIds.length} inserted=${insertedCount} collapsed=${collapsedCount} durationMs=${Date.now() - startedAt} - notification dispatch completed`,
       );
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
@@ -124,9 +148,27 @@ export class NotificationService {
     return this.repo.countUnread(userId);
   }
 
-  async deleteOlderThan(days: number): Promise<number> {
+  async runRetentionCleanup(days: number = NOTIFICATION_RETENTION_DAYS): Promise<number> {
+    const event = 'notification.retention_cleanup';
+    const startedAt = Date.now();
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    return this.repo.deleteOlderThan(cutoff);
+    this.logger.log(`[${event}] [start] retentionDays=${days} - notification retention cleanup started`);
+
+    try {
+      const { deleted, userIds } = await this.repo.deleteOlderThan(cutoff);
+      for (const userId of userIds) this.gateway.emitRefresh(userId);
+      this.logger.log(
+        `[${event}] [end] retentionDays=${days} deleted=${deleted} durationMs=${Date.now() - startedAt} - notification retention cleanup completed`,
+      );
+      return deleted;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.error(
+        `[${event}] [fail] retentionDays=${days} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - notification retention cleanup failed`,
+      );
+      throw err;
+    }
   }
 
   private async resolveUserIds(scope: NotificationScope): Promise<number[]> {
@@ -142,20 +184,27 @@ export class NotificationService {
     }
   }
 
-  private findCategory(type: NotificationType): NotificationCategory | null {
-    for (const [category, types] of Object.entries(NOTIFICATION_CATEGORIES)) {
-      if ((types as readonly string[]).includes(type)) {
-        return category as NotificationCategory;
-      }
+  private buildGroupKey(payload: NotifyPayload): string | null {
+    if (!COALESCED_NOTIFICATION_TYPES.has(payload.type)) return null;
+
+    switch (payload.scope.kind) {
+      case 'library':
+        return `${payload.type}:library:${payload.scope.libraryId}`;
+      case 'user':
+        return `${payload.type}:user`;
+      case 'permission':
+        return `${payload.type}:permission:${payload.scope.permission}`;
+      case 'all':
+        return `${payload.type}:all`;
     }
-    return null;
   }
 
-  private isEnabled(settings: Record<string, unknown> | undefined, category: NotificationCategory | null): boolean {
-    if (!category) return true;
+  private isEnabled(settings: Record<string, unknown> | undefined, type: NotificationType): boolean {
+    const meta = NOTIFICATION_TYPE_META[type];
+    if (!meta) return true;
     const prefs = settings?.notificationPreferences as NotificationPreferences | undefined;
-    if (!prefs) return true;
-    return prefs[category] !== false;
+    const level = resolveNotificationLevel(prefs?.[meta.category]);
+    return isNotificationAllowed(level, meta.severity);
   }
 
   private toItem(n: {
@@ -166,7 +215,9 @@ export class NotificationService {
     actionUrl: string | null;
     meta: unknown;
     read: boolean;
+    count: number;
     createdAt: Date;
+    updatedAt: Date;
   }): NotificationItem {
     return {
       id: n.id,
@@ -176,7 +227,9 @@ export class NotificationService {
       actionUrl: n.actionUrl,
       meta: (n.meta as Record<string, unknown>) ?? null,
       read: n.read,
+      count: n.count,
       createdAt: n.createdAt.toISOString(),
+      updatedAt: n.updatedAt.toISOString(),
     };
   }
 

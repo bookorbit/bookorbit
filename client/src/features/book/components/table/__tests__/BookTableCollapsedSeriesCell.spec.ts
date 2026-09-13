@@ -58,10 +58,17 @@ const CoverSurfaceStub = {
   template: '<div data-testid="surface" :data-comic="isComic"><slot /></div>',
 }
 
-function mountCell(format: string | null) {
+function mountCell(format: string | null, colId = 'cover') {
   return mount(BookTableCollapsedSeriesCell, {
-    props: { book: makeBook(format), colId: 'cover' as never },
-    global: { stubs: { BookCoverSurface: CoverSurfaceStub } },
+    props: { book: makeBook(format), colId },
+    global: {
+      stubs: {
+        BookCoverSurface: CoverSurfaceStub,
+        Tooltip: { template: '<div><slot /></div>' },
+        TooltipTrigger: { template: '<div><slot /></div>' },
+        TooltipContent: { template: '<div data-testid="tooltip-content"><slot /></div>' },
+      },
+    },
   })
 }
 
@@ -87,5 +94,24 @@ describe('BookTableCollapsedSeriesCell comic flag', () => {
 
     expect(imgs[0]!.attributes('src')).toBe('/api/v1/books/10/thumbnail?t=1704067200000')
     expect(imgs[1]!.attributes('src')).toBe('/api/v1/books/11/thumbnail?t=1706745600000')
+  })
+
+  it('identifies the series marker with a keyboard-triggered tooltip', () => {
+    const wrapper = mountCell('epub', 'lockRow')
+    const marker = wrapper.get('[role="img"]')
+
+    expect(marker.attributes('aria-label')).toBe('Series row')
+    expect(marker.attributes('tabindex')).toBe('0')
+    expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Series row')
+  })
+
+  it('offers a labeled button to open the series', async () => {
+    const wrapper = mountCell('epub', 'actions')
+    const button = wrapper.get('button')
+
+    expect(button.attributes('aria-label')).toBe('Open series')
+    expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Open series')
+    await button.trigger('click')
+    expect(wrapper.emitted('open-series')).toEqual([[]])
   })
 })

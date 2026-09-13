@@ -16,6 +16,7 @@ export function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
     avatarSource: 'none',
     avatarVersion: 0,
     provisioningMethod: 'local',
+    authenticationMethod: 'password',
     permissions: [],
     contentFilters: EMPTY_CONTENT_FILTER_RULES,
     ...overrides,

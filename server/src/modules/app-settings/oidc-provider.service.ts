@@ -3,11 +3,20 @@ import { ConfigService } from '@nestjs/config';
 import { OidcErrorCode } from '@bookorbit/types';
 import type { OidcAutoProvision, OidcClaimMapping } from '@bookorbit/types';
 
+import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { ensureSafeUrl, PrivateAddressException } from '../../common/utils/ssrf.utils';
 import { OidcProviderRepository } from './oidc-provider.repository';
 
 const OIDC_TEST_TIMEOUT_MS = 10_000;
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+const TLS_TRUST_ERROR_CODES = new Set([
+  'CERT_UNTRUSTED',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_GET_ISSUER_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+]);
 
 @Injectable()
 export class OidcProviderService {
@@ -138,7 +147,9 @@ export class OidcProviderService {
       const json: unknown = await res.json();
       if (!isOidcDiscoveryDoc(json)) throw new BadRequestException('Provider returned an invalid discovery document');
 
-      this.logger.log(`[oidc_provider.test_connection] [end] issuerUri=${issuerUri} durationMs=${Date.now() - start} - connection test succeeded`);
+      this.logger.log(
+        `[oidc_provider.test_connection] [end] issuerUri="${sanitizeLogValue(issuerUri)}" durationMs=${Date.now() - start} - connection test succeeded`,
+      );
       return {
         success: true,
         issuer: json.issuer,
@@ -157,13 +168,19 @@ export class OidcProviderService {
       const message = err instanceof Error ? err.message : String(err);
       if (err instanceof BadRequestException) {
         this.logger.warn(
-          `[oidc_provider.test_connection] [fail] issuerUri=${issuerUri} durationMs=${durationMs} errorClass=${errorClass} error="${message}" - test rejected`,
+          `[oidc_provider.test_connection] [fail] issuerUri="${sanitizeLogValue(issuerUri)}" durationMs=${durationMs} errorClass=${errorClass} error="${sanitizeLogValue(message)}" - test rejected`,
         );
         throw err;
       }
       this.logger.warn(
-        `[oidc_provider.test_connection] [fail] issuerUri=${issuerUri} durationMs=${durationMs} errorClass=${errorClass} error="${message}" - test failed`,
+        `[oidc_provider.test_connection] [fail] issuerUri="${sanitizeLogValue(issuerUri)}" durationMs=${durationMs} errorClass=${errorClass} error="${sanitizeLogValue(message)}" - test failed`,
       );
+      if (hasTlsTrustError(err)) {
+        throw new BadRequestException({
+          message: 'The OIDC provider TLS certificate is not trusted by BookOrbit.',
+          errorCode: OidcErrorCode.TLS_CERTIFICATE_UNTRUSTED,
+        });
+      }
       throw new BadRequestException(`OIDC connection test failed: ${message}`);
     } finally {
       clearTimeout(timeout);
@@ -211,4 +228,22 @@ function isOidcDiscoveryDoc(val: unknown): val is { issuer: string; authorizatio
     typeof (val as Record<string, unknown>)['issuer'] === 'string' &&
     typeof (val as Record<string, unknown>)['authorization_endpoint'] === 'string'
   );
+}
+
+function hasTlsTrustError(error: unknown): boolean {
+  const pending = [error];
+  const visited = new Set<object>();
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (typeof current !== 'object' || current === null || visited.has(current)) continue;
+    visited.add(current);
+
+    const errorLike = current as { cause?: unknown; code?: unknown; errors?: unknown };
+    if (typeof errorLike.code === 'string' && TLS_TRUST_ERROR_CODES.has(errorLike.code)) return true;
+    if (errorLike.cause !== undefined) pending.push(errorLike.cause);
+    if (Array.isArray(errorLike.errors)) pending.push(...errorLike.errors);
+  }
+
+  return false;
 }

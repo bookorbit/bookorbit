@@ -44,6 +44,12 @@ export const users = pgTable(
     provisioningMethod: varchar('provisioning_method', { length: 20 }).notNull().default('local'),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     lastAuthenticatedAt: timestamp('last_authenticated_at', { withTimezone: true }),
+    /**
+     * Lets a book that fulfilled this user's own request through their content filters. Off by
+     * default and settable only by an administrator, because for anyone without filters it is a
+     * no-op, and everyone it does affect is somebody an operator deliberately restricted.
+     */
+    seeOwnRequestedBooks: boolean('see_own_requested_books').notNull().default(false),
     readingInsightsSharingLevel: readingInsightsSharingLevelEnum('reading_insights_sharing_level').notNull().default('private'),
     readingInsightsConsentedAt: timestamp('reading_insights_consented_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -107,6 +113,7 @@ export const refreshTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     tokenHash: varchar('token_hash', { length: 255 }).notNull().unique(),
+    authenticationMethod: varchar('authentication_method', { length: 20 }).notNull().default('legacy'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     rotatedAt: timestamp('rotated_at', { withTimezone: true }),
@@ -117,6 +124,7 @@ export const refreshTokens = pgTable(
     index('refresh_tokens_user_id_idx').on(t.userId),
     index('refresh_tokens_expires_at_idx').on(t.expiresAt),
     check('refresh_tokens_expires_after_created_chk', sql`${t.expiresAt} > ${t.createdAt}`),
+    check('refresh_tokens_authentication_method_chk', sql`${t.authenticationMethod} in ('password', 'oidc', 'magic_link', 'setup', 'legacy')`),
   ],
 );
 

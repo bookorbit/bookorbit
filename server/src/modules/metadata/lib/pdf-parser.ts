@@ -22,7 +22,7 @@ export interface PdfParsed {
   isbn10: string | null;
   isbn13: string | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   rating: number | null;
   pageCount: number | null;
   googleBooksId: string | null;

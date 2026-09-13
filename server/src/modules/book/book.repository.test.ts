@@ -12,6 +12,7 @@ function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
     orderBy: vi.fn(),
     limit: vi.fn(),
     offset: vi.fn(),
+    for: vi.fn(),
   };
 
   chain.from.mockReturnValue(chain);
@@ -19,7 +20,11 @@ function makeSelectChain<T>(terminalMethod: string, terminalResult: T) {
   chain.innerJoin.mockReturnValue(chain);
   chain.offset.mockReturnValue(chain);
 
-  if (terminalMethod === 'where') {
+  if (terminalMethod === 'for') {
+    chain.where.mockReturnValue(chain);
+    chain.orderBy.mockReturnValue(chain);
+    chain.for.mockResolvedValue(terminalResult);
+  } else if (terminalMethod === 'where') {
     chain.where.mockResolvedValue(terminalResult);
     chain.orderBy.mockReturnValue(chain);
     chain.limit.mockReturnValue(chain);
@@ -48,6 +53,25 @@ function makeInsertChain() {
 }
 
 describe('BookRepository', () => {
+  it('updates absolute and relative book file paths together', async () => {
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn().mockReturnValue({ where });
+    const db = { update: vi.fn().mockReturnValue({ set }) };
+    const repo = new BookRepository(db as never);
+
+    await repo.updateBookFile(9, {
+      absolutePath: '/library/Author/new.epub',
+      relPath: 'Author/new.epub',
+    });
+
+    expect(set).toHaveBeenCalledWith({
+      absolutePath: '/library/Author/new.epub',
+      relPath: 'Author/new.epub',
+      updatedAt: expect.any(Date),
+    });
+    expect(where).toHaveBeenCalledOnce();
+  });
+
   it('runs callbacks inside db transactions', async () => {
     const db = {
       transaction: vi.fn((callback: (tx: { id: string }) => Promise<string>) => callback({ id: 'tx-1' })),
@@ -111,6 +135,73 @@ describe('BookRepository', () => {
 
     expect(db.select).toHaveBeenCalledTimes(1);
     expect(selectChain.leftJoin).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletes books and invalidates their exact scan-state paths in one transaction', async () => {
+    const bookRows = [{ id: 10, libraryFolderId: 7, folderPath: '/books/Series/Book' }];
+    const bookSelect = makeSelectChain('for', bookRows);
+    const folderSelect = makeSelectChain('for', [{ id: 7 }]);
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const stateDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const bookDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const tx = {
+      select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+      delete: vi.fn().mockReturnValueOnce({ where: stateDeleteWhere }).mockReturnValueOnce({ where: bookDeleteWhere }),
+    };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<void>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await repo.deleteByIdsAndInvalidateScanState([10, 10]);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(tx.update).toHaveBeenCalledTimes(1);
+    expect(tx.delete).toHaveBeenCalledTimes(2);
+    const invalidationQuery = new PgDialect().sqlToQuery(stateDeleteWhere.mock.calls[0]![0]);
+    expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."library_folder_id" = $1');
+    expect(invalidationQuery.sql).toContain('"library_dir_scan_state"."dir_path" in');
+    expect(invalidationQuery.params).toEqual([7, '/books/Series/Book', '/books/Series', '/books', '/']);
+    expect(invalidationQuery.params).not.toContain('/books/Sibling');
+  });
+
+  it('does not reach the book delete when scan-state invalidation fails', async () => {
+    const bookSelect = makeSelectChain('for', [{ id: 10, libraryFolderId: 7, folderPath: '/books/Book' }]);
+    const folderSelect = makeSelectChain('for', [{ id: 7 }]);
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const stateDeleteWhere = vi.fn().mockRejectedValue(new Error('invalidation failed'));
+    const tx = {
+      select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
+      update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: updateWhere }) }),
+      delete: vi.fn().mockReturnValue({ where: stateDeleteWhere }),
+    };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<void>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.deleteByIdsAndInvalidateScanState([10])).rejects.toThrow('invalidation failed');
+
+    expect(tx.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('chunks scan-state invalidation paths for large deletions', async () => {
+    const bookRows = Array.from({ length: 501 }, (_, index) => ({
+      id: index + 1,
+      libraryFolderId: 7,
+      folderPath: `/books/book-${index + 1}.epub`,
+    }));
+    const bookSelect = makeSelectChain('for', bookRows);
+    const folderSelect = makeSelectChain('for', [{ id: 7 }]);
+    const tx = {
+      select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
+      update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<void>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await repo.deleteByIdsAndInvalidateScanState(bookRows.map((row) => row.id));
+
+    expect(tx.delete).toHaveBeenCalledTimes(3);
   });
 
   it('findCards loads card rows and related collections for the current user', async () => {
@@ -257,6 +348,64 @@ describe('BookRepository', () => {
     expect(query.sql).not.toContain('FROM "collection_books"');
   });
 
+  it('computes row and book totals before paging collapsed cards', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new BookRepository({ execute } as never);
+
+    await repo.findCardsCollapsed({
+      where: undefined,
+      sort: [{ field: 'title', dir: 'asc' }],
+      limit: 20,
+      offset: 40,
+      userId: 7,
+    });
+
+    const query = new PgDialect().sqlToQuery(execute.mock.calls[0]![0]);
+    expect(query.sql).toContain('COUNT(*) AS total_count');
+    expect(query.sql).toContain('COALESCE(SUM(COALESCE(book_count, 1)), 0) AS book_total');
+    expect(query.sql).toContain('LEFT JOIN LATERAL');
+    expect(query.sql).toMatch(/LIMIT \$\d+ OFFSET \$\d+/);
+    expect(query.params).toEqual(expect.arrayContaining([20, 40]));
+  });
+
+  it('returns totals from the sentinel row when a collapsed page is empty', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      rows: [{ id: null, total_count: '30', book_total: '200' }],
+    });
+    const repo = new BookRepository({ execute } as never);
+
+    const result = await repo.findCardsCollapsed({
+      where: undefined,
+      sort: [{ field: 'title', dir: 'asc' }],
+      limit: 50,
+      offset: 1_000,
+      userId: 7,
+    });
+
+    expect(result.rows).toEqual([]);
+    expect(result.total).toBe(30);
+    expect(result.bookTotal).toBe(200);
+  });
+
+  it('returns zero totals when the collapsed scope has no books', async () => {
+    const execute = vi.fn().mockResolvedValue({
+      rows: [{ id: null, total_count: '0', book_total: '0' }],
+    });
+    const repo = new BookRepository({ execute } as never);
+
+    const result = await repo.findCardsCollapsed({
+      where: undefined,
+      sort: [{ field: 'title', dir: 'asc' }],
+      limit: 50,
+      offset: 0,
+      userId: 7,
+    });
+
+    expect(result.rows).toEqual([]);
+    expect(result.total).toBe(0);
+    expect(result.bookTotal).toBe(0);
+  });
+
   it('rejects an unusable collection id on the collapsed path', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
     const repo = new BookRepository({ execute } as never);
@@ -359,7 +508,17 @@ describe('BookRepository', () => {
     const libraryIdChain = makeSelectChain('limit', [{ libraryId: 5 }]);
     const missingLibraryChain = makeSelectChain('limit', []);
     const fileByIdChain = makeSelectChain('limit', [
-      { id: 9, absolutePath: '/books/a.epub', format: 'epub', bookId: 1, libraryId: 2, fileHash: null, sizeBytes: null },
+      {
+        id: 9,
+        absolutePath: '/books/a.epub',
+        relPath: 'a.epub',
+        libraryFolderPath: '/books',
+        format: 'epub',
+        bookId: 1,
+        libraryId: 2,
+        fileHash: null,
+        sizeBytes: null,
+      },
     ]);
     const missingFileChain = makeSelectChain('limit', []);
     const progressChain = makeSelectChain('limit', [{ percentage: 12 }]);
@@ -404,6 +563,8 @@ describe('BookRepository', () => {
     await expect(repo.findFileById(9)).resolves.toEqual({
       id: 9,
       absolutePath: '/books/a.epub',
+      relPath: 'a.epub',
+      libraryFolderPath: '/books',
       format: 'epub',
       bookId: 1,
       libraryId: 2,
@@ -572,41 +733,25 @@ describe('BookRepository', () => {
     await expect(repo.findPrimaryFile(2)).resolves.toBeNull();
   });
 
-  it('writes deletion, metadata updates, and audio progress rows', async () => {
+  it('writes deletion and metadata updates', async () => {
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     const deleteBuilder = { where: deleteWhere };
     const updateWhere = vi.fn().mockResolvedValue(undefined);
     const updateBuilder = { set: vi.fn().mockReturnValue({ where: updateWhere }) };
-    const audioInsert = {
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ bookId: 10, percentage: 33 }]),
-        }),
-      }),
-    };
-    const audioProgressSelect = makeSelectChain('limit', [{ percentage: 22 }]);
-    const missingAudioProgressSelect = makeSelectChain('limit', []);
     const db = {
       delete: vi.fn().mockReturnValue(deleteBuilder),
       update: vi.fn().mockReturnValue(updateBuilder),
-      insert: vi.fn().mockReturnValue(audioInsert),
-      select: vi.fn().mockReturnValueOnce(audioProgressSelect).mockReturnValueOnce(missingAudioProgressSelect),
     };
     const repo = new BookRepository(db as never);
 
     await repo.deleteByIds([10, 11]);
     await repo.updateMetadataFields(10, { title: 'Updated' });
-    await expect(repo.findAudioProgress(1, 10)).resolves.toEqual({ percentage: 22 });
-    await expect(repo.findAudioProgress(1, 11)).resolves.toBeNull();
-    await expect(repo.upsertAudioProgress(1, 10, 4, 120, 33)).resolves.toEqual({ bookId: 10, percentage: 33 });
-
     expect(db.delete).toHaveBeenCalledTimes(1);
     expect(deleteWhere).toHaveBeenCalledTimes(1);
     expect(db.update).toHaveBeenCalledTimes(2);
     expect(updateBuilder.set).toHaveBeenNthCalledWith(1, { title: 'Updated' });
     expect(updateBuilder.set).toHaveBeenNthCalledWith(2, expect.objectContaining({ updatedAt: expect.any(Date) }));
     expect(updateWhere).toHaveBeenCalledTimes(2);
-    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
   it('replaces all community rating rows: deletes old then inserts new', async () => {
@@ -666,7 +811,7 @@ describe('BookRepository', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
-  it('merges metadata rows with ordered author names per book', async () => {
+  it('merges metadata rows with ordered author and narrator names per book', async () => {
     const metaRows = [
       {
         bookId: 10,
@@ -696,11 +841,16 @@ describe('BookRepository', () => {
       { bookId: 10, name: 'Coauthor' },
       { bookId: 11, name: 'Dan Simmons' },
     ];
+    const narratorRows = [
+      { bookId: 10, name: 'Simon Vance' },
+      { bookId: 10, name: 'Scott Brick' },
+    ];
 
     const metaChain = makeSelectChain('where', metaRows);
     const authorChain = makeSelectChain('orderBy', authorRows);
+    const narratorChain = makeSelectChain('orderBy', narratorRows);
     const db = {
-      select: vi.fn().mockReturnValueOnce(metaChain).mockReturnValueOnce(authorChain),
+      select: vi.fn().mockReturnValueOnce(metaChain).mockReturnValueOnce(authorChain).mockReturnValueOnce(narratorChain),
     };
 
     const repo = new BookRepository(db as never);
@@ -711,10 +861,12 @@ describe('BookRepository', () => {
       {
         ...metaRows[0],
         authors: ['Frank Herbert', 'Coauthor'],
+        narrators: ['Simon Vance', 'Scott Brick'],
       },
       {
         ...metaRows[1],
         authors: ['Dan Simmons'],
+        narrators: [],
       },
     ]);
   });

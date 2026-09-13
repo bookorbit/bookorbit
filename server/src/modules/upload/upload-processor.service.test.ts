@@ -31,6 +31,7 @@ describe('UploadProcessorService', () => {
   const selectFrom = vi.fn();
   const selectWhere = vi.fn();
   const selectLimit = vi.fn();
+  const deleteWhere = vi.fn();
 
   const tx = {
     select: vi.fn(() => ({ from: selectFrom })),
@@ -48,6 +49,10 @@ describe('UploadProcessorService', () => {
     }),
     update: vi.fn((table: unknown) => {
       if (table === books) return { set: updateBooksSet };
+      throw new Error('unexpected table');
+    }),
+    delete: vi.fn((table: unknown) => {
+      if (table === books || table === bookFiles) return { where: deleteWhere };
       throw new Error('unexpected table');
     }),
   };
@@ -73,6 +78,7 @@ describe('UploadProcessorService', () => {
     insertBookFilesReturning.mockResolvedValue([{ id: 420 }]);
     updateBooksSet.mockReturnValue({ where: updateBooksWhere });
     updateBooksWhere.mockResolvedValue(undefined);
+    deleteWhere.mockResolvedValue(undefined);
 
     orchestrator.scheduleImportedBooksIfEligible.mockResolvedValue(0);
 
@@ -324,6 +330,77 @@ describe('UploadProcessorService', () => {
       serviceNoOrch.extractMetadataAsync(1, '/tmp/file.azw', 'azw');
 
       expect(metadataService.extractAndSave).toHaveBeenCalledWith(1, '/tmp/file.azw', 'azw');
+    });
+  });
+  /**
+   * Filing a 31-track audiobook through `createBookRecord` opened 31 transactions, so a failure on
+   * track three left the first two behind as a book nobody asked for.
+   */
+  describe('createUnitBookRecords', () => {
+    const unitFiles = [
+      { folderPath: '/library/Book', absolutePath: '/library/Book/track-01.mp3', relPath: 'Book/track-01.mp3', format: 'mp3', sizeBytes: 10 },
+      { folderPath: '/library/Book', absolutePath: '/library/Book/track-02.mp3', relPath: 'Book/track-02.mp3', format: 'mp3', sizeBytes: 20 },
+    ];
+
+    it('writes every file of the unit inside one transaction', async () => {
+      insertBooksReturning.mockResolvedValueOnce([{ id: 42 }]);
+      // The book created for the first file is found again for the second.
+      selectLimit
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 42 }])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.createUnitBookRecords(1, 2, unitFiles);
+
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ bookIds: [42], createdBookIds: [42], attachedFileIds: [] });
+      expect(insertBooksValues).toHaveBeenCalledTimes(1);
+      expect(insertBookFilesValues).toHaveBeenCalledTimes(2);
+    });
+
+    it('remembers file rows added to a book that was already there', async () => {
+      // Existing book, and no `book_files` row yet at that path.
+      selectLimit.mockResolvedValueOnce([{ id: 99 }]).mockResolvedValueOnce([]);
+      insertBookFilesReturning.mockResolvedValueOnce([{ id: 777 }]);
+
+      const result = await service.createUnitBookRecords(1, 2, [unitFiles[0]!]);
+
+      expect(result).toEqual({ bookIds: [99], createdBookIds: [], attachedFileIds: [777] });
+    });
+
+    it('leaves a row that already pointed at that path out of the rollback set', async () => {
+      selectLimit.mockResolvedValueOnce([{ id: 99 }]).mockResolvedValueOnce([{ id: 777 }]);
+
+      const result = await service.createUnitBookRecords(1, 2, [unitFiles[0]!]);
+
+      expect(result).toEqual({ bookIds: [99], createdBookIds: [], attachedFileIds: [] });
+    });
+
+    it('hashes every file before opening the transaction', async () => {
+      await service.createUnitBookRecords(1, 2, unitFiles);
+
+      expect(mockComputeFileHash).toHaveBeenCalledTimes(2);
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses an empty unit rather than creating a book with no files', async () => {
+      await expect(service.createUnitBookRecords(1, 2, [])).rejects.toBeInstanceOf(InternalServerErrorException);
+    });
+  });
+
+  describe('deleteUnitBookRecords', () => {
+    it('clears the file rows before the books that own them', async () => {
+      await service.deleteUnitBookRecords({ bookIds: [42], createdBookIds: [42], attachedFileIds: [777] });
+
+      expect(tx.delete).toHaveBeenNthCalledWith(1, bookFiles);
+      expect(tx.delete).toHaveBeenNthCalledWith(2, bookFiles);
+      expect(tx.delete).toHaveBeenNthCalledWith(3, books);
+    });
+
+    it('does nothing when the unit created nothing of its own', async () => {
+      await service.deleteUnitBookRecords({ bookIds: [99], createdBookIds: [], attachedFileIds: [] });
+
+      expect(db.transaction).not.toHaveBeenCalled();
     });
   });
 });

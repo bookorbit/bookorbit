@@ -40,7 +40,7 @@ import { BulkAuthorIdsDto } from './dto/bulk-author-ids.dto';
 import { DeleteAuthorsDto } from './dto/delete-authors.dto';
 import { ListAuthorBooksDto } from './dto/list-author-books.dto';
 import { ListAuthorMetadataDto } from './dto/list-author-metadata.dto';
-import { ListAuthorsDto } from './dto/list-authors.dto';
+import { ListAuthorLettersDto, ListAuthorsDto } from './dto/list-authors.dto';
 import { LookupAuthorMetadataDto } from './dto/lookup-author-metadata.dto';
 import { MergeAuthorsDto } from './dto/merge-authors.dto';
 import { PreviewAuthorEnrichmentCountDto } from './dto/preview-author-enrichment-count.dto';
@@ -62,6 +62,12 @@ export class AuthorsController {
   @Get()
   findAll(@CurrentUser() user: RequestUser, @Query() dto: ListAuthorsDto) {
     return this.authorsService.findAll(user, dto);
+  }
+
+  // Declared before ':id' so the literal path is not captured as an author id.
+  @Get('jump-buckets')
+  findJumpBuckets(@CurrentUser() user: RequestUser, @Query() dto: ListAuthorLettersDto) {
+    return this.authorsService.findJumpBuckets(user, dto);
   }
 
   @Get('metadata/providers')

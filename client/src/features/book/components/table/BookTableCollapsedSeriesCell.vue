@@ -4,11 +4,16 @@ import { useI18n } from 'vue-i18n'
 import { ChevronRight, LibraryBig } from '@lucide/vue'
 import { FORMAT_TO_GROUP, type BookCard } from '@bookorbit/types'
 import BookCoverSurface from '../BookCoverSurface.vue'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
 const props = defineProps<{
   book: BookCard
   colId: string
+}>()
+
+const emit = defineEmits<{
+  'open-series': []
 }>()
 
 const { t } = useI18n()
@@ -27,11 +32,22 @@ function thumbnailUrl(bookId: number): string {
   const version = bookId === props.book.id ? (props.book.updatedAt ?? props.book.addedAt) : collapsed.value.coverUpdatedAtByBookId?.[bookId]
   return coverUrl(bookId, 'thumbnail', version)
 }
+
+function handleOpenSeries() {
+  emit('open-series')
+}
 </script>
 
 <template>
   <div v-if="colId === 'lockRow'" class="flex h-6 w-6 items-center justify-center">
-    <LibraryBig :size="13" class="text-muted-foreground" />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <span role="img" tabindex="0" :aria-label="t('book.table.series.seriesRow')" class="rounded-sm focus-visible:ring-2 focus-visible:ring-ring">
+          <LibraryBig :size="13" class="text-muted-foreground" aria-hidden="true" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{{ t('book.table.series.seriesRow') }}</TooltipContent>
+    </Tooltip>
   </div>
 
   <div v-else-if="colId === 'readStatus'" class="flex w-full items-center px-1 py-0.5">
@@ -80,7 +96,19 @@ function thumbnailUrl(bookId: number): string {
   </div>
 
   <div v-else-if="colId === 'actions'" class="flex h-full w-6 items-center justify-center">
-    <ChevronRight :size="16" class="text-muted-foreground group-hover:text-foreground transition-colors" />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button
+          type="button"
+          :aria-label="t('book.tableView.openSeries')"
+          class="flex h-7 w-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          @click.stop="handleOpenSeries"
+        >
+          <ChevronRight :size="16" aria-hidden="true" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{{ t('book.tableView.openSeries') }}</TooltipContent>
+    </Tooltip>
   </div>
 
   <!-- Dash for all other columns -->

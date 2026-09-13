@@ -302,6 +302,18 @@
   {
     "file": "server/src/modules/auth/auth.controller.ts",
     "className": "AuthController",
+    "methodName": "loginOptions",
+    "httpMethod": "GET",
+    "path": "/auth/login-options",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/auth/auth.controller.ts",
+    "className": "AuthController",
     "methodName": "setup",
     "httpMethod": "POST",
     "path": "/auth/setup",

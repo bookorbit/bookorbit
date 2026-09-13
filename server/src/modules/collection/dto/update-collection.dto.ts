@@ -25,6 +25,10 @@ export class UpdateCollectionDto {
   @MaxLength(1000)
   description?: string;
 
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  isPublic?: boolean;
+
   @IsOptional()
   @IsBoolean()
   syncToKobo?: boolean;

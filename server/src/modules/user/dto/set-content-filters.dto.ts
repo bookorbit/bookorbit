@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsOptional } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional } from 'class-validator';
 
 export class SetContentFiltersDto {
   @IsOptional()
@@ -20,4 +20,9 @@ export class SetContentFiltersDto {
   @IsArray()
   @IsInt({ each: true })
   excludeGenreIds?: number[];
+
+  /** Lets books this user requested through the rules above. Omitted leaves the current setting. */
+  @IsOptional()
+  @IsBoolean()
+  seeOwnRequestedBooks?: boolean;
 }

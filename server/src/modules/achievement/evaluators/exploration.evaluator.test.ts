@@ -45,6 +45,7 @@ describe('ExplorationEvaluator', () => {
       {
         userId: 1,
         isSuperuser: false,
+        timeZone: 'UTC',
         eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
         payload: makeStatusPayload({ newStatus: 'reading' }) as never,
       },
@@ -57,7 +58,7 @@ describe('ExplorationEvaluator', () => {
     it('awards tier 1 at 5 genres', async () => {
       repo.countDistinctGenresRead.mockResolvedValue(5);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'genre_explorer_1' }));
@@ -68,7 +69,7 @@ describe('ExplorationEvaluator', () => {
     it('awards tier 1 at 2 languages', async () => {
       repo.countDistinctLanguagesRead.mockResolvedValue(2);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'polyglot_1' }));
@@ -79,7 +80,7 @@ describe('ExplorationEvaluator', () => {
     it('awards old_soul for pre-1900 book', async () => {
       repo.getBookPublishedYear.mockResolvedValue(1850);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'old_soul' }));
@@ -88,7 +89,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award old_soul for 1900+ book', async () => {
       repo.getBookPublishedYear.mockResolvedValue(1901);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'old_soul')).toBeUndefined();
@@ -99,7 +100,7 @@ describe('ExplorationEvaluator', () => {
     it('awards new_release for current year book', async () => {
       repo.getBookPublishedYear.mockResolvedValue(new Date().getFullYear());
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'new_release' }));
@@ -110,7 +111,7 @@ describe('ExplorationEvaluator', () => {
     it('awards century_span at 3+ centuries', async () => {
       repo.countDistinctCenturiesRead.mockResolvedValue(3);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'century_span' }));
@@ -121,7 +122,7 @@ describe('ExplorationEvaluator', () => {
     it('awards author_deep_dive at 5+ books from same author', async () => {
       repo.maxBooksPerAuthor.mockResolvedValue(5);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'author_deep_dive' }));
@@ -132,7 +133,7 @@ describe('ExplorationEvaluator', () => {
     it('awards decade_sampler when 5+ distinct decades read', async () => {
       repo.countDistinctDecadesRead.mockResolvedValue(5);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'decade_sampler' }));
@@ -141,7 +142,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award decade_sampler below 5 decades', async () => {
       repo.countDistinctDecadesRead.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'decade_sampler')).toBeUndefined();
@@ -150,7 +151,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award decade_sampler when already earned', async () => {
       repo.countDistinctDecadesRead.mockResolvedValue(10);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(['decade_sampler']),
       );
       expect(awards.find((a) => a.key === 'decade_sampler')).toBeUndefined();
@@ -161,7 +162,7 @@ describe('ExplorationEvaluator', () => {
     it('awards short_story_fan when 5+ short books finished', async () => {
       repo.countFinishedBooksByMaxPageCount.mockResolvedValue(5);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'short_story_fan' }));
@@ -170,7 +171,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award short_story_fan below 5 short books', async () => {
       repo.countFinishedBooksByMaxPageCount.mockResolvedValue(4);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'short_story_fan')).toBeUndefined();
@@ -179,7 +180,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award short_story_fan when already earned', async () => {
       repo.countFinishedBooksByMaxPageCount.mockResolvedValue(10);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(['short_story_fan']),
       );
       expect(awards.find((a) => a.key === 'short_story_fan')).toBeUndefined();
@@ -191,7 +192,7 @@ describe('ExplorationEvaluator', () => {
       repo.hasFinishedBookUnderPages.mockResolvedValue(true);
       repo.hasFinishedBookOverPages.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'thick_and_thin' }));
@@ -201,7 +202,7 @@ describe('ExplorationEvaluator', () => {
       repo.hasFinishedBookUnderPages.mockResolvedValue(true);
       repo.hasFinishedBookOverPages.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'thick_and_thin')).toBeUndefined();
@@ -211,7 +212,7 @@ describe('ExplorationEvaluator', () => {
       repo.hasFinishedBookUnderPages.mockResolvedValue(false);
       repo.hasFinishedBookOverPages.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'thick_and_thin')).toBeUndefined();
@@ -220,7 +221,7 @@ describe('ExplorationEvaluator', () => {
     it('short-circuits when no thin book - does not query thick books', async () => {
       repo.hasFinishedBookUnderPages.mockResolvedValue(false);
       await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(repo.hasFinishedBookOverPages).not.toHaveBeenCalled();
@@ -230,7 +231,7 @@ describe('ExplorationEvaluator', () => {
       repo.hasFinishedBookUnderPages.mockResolvedValue(true);
       repo.hasFinishedBookOverPages.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(['thick_and_thin']),
       );
       expect(awards.find((a) => a.key === 'thick_and_thin')).toBeUndefined();
@@ -241,7 +242,7 @@ describe('ExplorationEvaluator', () => {
     it('awards trilogy_master when a 3-book series is completed', async () => {
       repo.hasCompletedSeriesOfSize.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'trilogy_master' }));
@@ -250,7 +251,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award trilogy_master when no 3-book series completed', async () => {
       repo.hasCompletedSeriesOfSize.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'trilogy_master')).toBeUndefined();
@@ -259,7 +260,7 @@ describe('ExplorationEvaluator', () => {
     it('passes size=3 to repo method', async () => {
       repo.hasCompletedSeriesOfSize.mockResolvedValue(true);
       await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(repo.hasCompletedSeriesOfSize).toHaveBeenCalledWith(1, 3);
@@ -268,7 +269,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award trilogy_master when already earned', async () => {
       repo.hasCompletedSeriesOfSize.mockResolvedValue(true);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(['trilogy_master']),
       );
       expect(awards.find((a) => a.key === 'trilogy_master')).toBeUndefined();
@@ -279,7 +280,7 @@ describe('ExplorationEvaluator', () => {
     it('awards genre_devotee when 10+ books in same genre', async () => {
       repo.maxBooksPerGenre.mockResolvedValue(10);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards).toContainEqual(expect.objectContaining({ key: 'genre_devotee' }));
@@ -288,7 +289,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award genre_devotee below 10 books in a genre', async () => {
       repo.maxBooksPerGenre.mockResolvedValue(9);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(),
       );
       expect(awards.find((a) => a.key === 'genre_devotee')).toBeUndefined();
@@ -297,7 +298,7 @@ describe('ExplorationEvaluator', () => {
     it('does not award genre_devotee when already earned', async () => {
       repo.maxBooksPerGenre.mockResolvedValue(20);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, payload: makeStatusPayload() as never },
         new Set(['genre_devotee']),
       );
       expect(awards.find((a) => a.key === 'genre_devotee')).toBeUndefined();
@@ -305,7 +306,7 @@ describe('ExplorationEvaluator', () => {
   });
 
   describe('backfill for new exploration badges', () => {
-    const backfillCtx = { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never };
+    const backfillCtx = { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never };
 
     it('awards decade_sampler in backfill', async () => {
       repo.countDistinctDecadesRead.mockResolvedValue(5);

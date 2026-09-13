@@ -1,6 +1,12 @@
 import type { AnnotationHubItem } from '@bookorbit/types'
 import type { RouteLocationRaw } from 'vue-router'
 
+/**
+ * Builds the reader deep link for a hub annotation: it opens the annotation's jump
+ * file and carries the position as a `cfi` query for reflowable formats or a `page`
+ * query for paged formats (PDF). Returns null when the annotation has no resolvable
+ * jump file to open.
+ */
 export function annotationReaderRoute(annotation: AnnotationHubItem): RouteLocationRaw | null {
   if (!annotation.jumpFileId || !annotation.jumpFileFormat) return null
 

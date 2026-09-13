@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { ContentFilterRules, ContentFilterRulesWithNames } from '@bookorbit/types';
@@ -13,7 +13,7 @@ export class ContentFilterRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findByUserId(userId: number): Promise<ContentFilterRules> {
-    const [tagRows, genreRows] = await Promise.all([
+    const [tagRows, genreRows, exemptRows] = await Promise.all([
       this.db
         .select({ filterType: schema.userContentFilterTags.filterType, tagId: schema.userContentFilterTags.tagId })
         .from(schema.userContentFilterTags)
@@ -22,6 +22,7 @@ export class ContentFilterRepository {
         .select({ filterType: schema.userContentFilterGenres.filterType, genreId: schema.userContentFilterGenres.genreId })
         .from(schema.userContentFilterGenres)
         .where(eq(schema.userContentFilterGenres.userId, userId)),
+      this.db.select({ seeOwnRequestedBooks: schema.users.seeOwnRequestedBooks }).from(schema.users).where(eq(schema.users.id, userId)).limit(1),
     ]);
 
     return {
@@ -29,11 +30,12 @@ export class ContentFilterRepository {
       excludeTagIds: tagRows.filter((r) => r.filterType === 'exclude').map((r) => r.tagId),
       includeGenreIds: genreRows.filter((r) => r.filterType === 'include').map((r) => r.genreId),
       excludeGenreIds: genreRows.filter((r) => r.filterType === 'exclude').map((r) => r.genreId),
+      ...(exemptRows[0]?.seeOwnRequestedBooks ? { exemptRequestsFromUserId: userId } : {}),
     };
   }
 
   async findByUserIdWithNames(userId: number): Promise<ContentFilterRulesWithNames> {
-    const [tagRows, genreRows] = await Promise.all([
+    const [tagRows, genreRows, exemptRows] = await Promise.all([
       this.db
         .select({
           filterType: schema.userContentFilterTags.filterType,
@@ -52,6 +54,7 @@ export class ContentFilterRepository {
         .from(schema.userContentFilterGenres)
         .innerJoin(schema.genres, eq(schema.userContentFilterGenres.genreId, schema.genres.id))
         .where(eq(schema.userContentFilterGenres.userId, userId)),
+      this.db.select({ seeOwnRequestedBooks: schema.users.seeOwnRequestedBooks }).from(schema.users).where(eq(schema.users.id, userId)).limit(1),
     ]);
 
     return {
@@ -59,6 +62,7 @@ export class ContentFilterRepository {
       excludeTags: tagRows.filter((r) => r.filterType === 'exclude').map((r) => ({ id: r.tagId, name: r.tagName })),
       includeGenres: genreRows.filter((r) => r.filterType === 'include').map((r) => ({ id: r.genreId, name: r.genreName })),
       excludeGenres: genreRows.filter((r) => r.filterType === 'exclude').map((r) => ({ id: r.genreId, name: r.genreName })),
+      seeOwnRequestedBooks: exemptRows[0]?.seeOwnRequestedBooks ?? false,
     };
   }
 
@@ -125,6 +129,17 @@ export class ContentFilterRepository {
     for (const row of tagRows) result.add(row.userId);
     for (const row of genreRows) result.add(row.userId);
     return result;
+  }
+
+  /** Which of these users may see books they requested regardless of their own restrictions. */
+  async findExemptUserIds(userIds: number[]): Promise<Set<number>> {
+    if (userIds.length === 0) return new Set();
+
+    const rows = await this.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(and(inArray(schema.users.id, userIds), eq(schema.users.seeOwnRequestedBooks, true)));
+    return new Set(rows.map((r) => r.id));
   }
 
   private async validateEntityIds(tagIds: number[], genreIds: number[]): Promise<void> {

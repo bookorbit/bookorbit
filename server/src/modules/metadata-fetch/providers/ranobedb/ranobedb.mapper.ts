@@ -60,10 +60,10 @@ function resolvePublisher(book: RanobeDbBook): string | undefined {
   return pub.romaji ?? pub.name;
 }
 
-function resolveSeriesIndex(book: RanobeDbBook): number | undefined {
+function resolveSeriesIndex(book: RanobeDbBook): string | undefined {
   if (!book.series) return undefined;
   const pos = book.series.books.findIndex((b) => b.id === book.id);
-  return pos === -1 ? undefined : pos + 1;
+  return pos === -1 ? undefined : String(pos + 1);
 }
 
 function resolveGenres(book: RanobeDbBook): string[] {

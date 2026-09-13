@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, pgTable, primaryKey, real, serial, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { check, index, integer, pgTable, primaryKey, serial, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { books } from './books';
 
@@ -44,7 +44,7 @@ export const bookSeriesMemberships = pgTable(
     seriesId: integer('series_id')
       .notNull()
       .references(() => bookSeries.id, { onDelete: 'cascade' }),
-    seriesIndex: real('series_index'),
+    seriesIndex: varchar('series_index', { length: 20 }),
     displayOrder: integer('display_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -55,9 +55,15 @@ export const bookSeriesMemberships = pgTable(
   (t) => [
     primaryKey({ columns: [t.bookId, t.seriesId] }),
     uniqueIndex('book_series_memberships_book_display_uidx').on(t.bookId, t.displayOrder),
-    index('book_series_memberships_series_index_book_idx').on(t.seriesId, t.seriesIndex, t.bookId),
+    index('book_series_memberships_series_index_book_idx').on(
+      t.seriesId,
+      sql`(CASE WHEN ${t.seriesIndex} IS NULL THEN NULL ELSE ARRAY[split_part(${t.seriesIndex}, '.', 1)::numeric, CASE WHEN strpos(${t.seriesIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesIndex}, '.', 2)::numeric END] END)`,
+      sql`${t.seriesIndex} COLLATE "C"`,
+      t.bookId,
+    ),
     index('book_series_memberships_book_display_idx').on(t.bookId, t.displayOrder),
     check('book_series_memberships_display_order_nonnegative_chk', sql`${t.displayOrder} >= 0`),
+    check('book_series_memberships_series_index_format_chk', sql`${t.seriesIndex} is null or ${t.seriesIndex} ~ '^[0-9]+([.][0-9]+)?$'`),
   ],
 );
 

@@ -5,7 +5,16 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import * as schema from '../../db/schema';
-import { bookDockFiles, bookFiles, books, type NewBookDockFileRow, type BookDockFileRow } from '../../db/schema';
+import {
+  bookDockFiles,
+  bookDockUnitFiles,
+  bookFiles,
+  books,
+  type BookDockFileRow,
+  type BookDockUnitFileRow,
+  type NewBookDockFileRow,
+  type NewBookDockUnitFileRow,
+} from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -16,6 +25,15 @@ const SORT_COLUMNS = {
   status: bookDockFiles.status,
   fileSize: bookDockFiles.fileSize,
 } as const;
+
+/**
+ * Sidecars carry no sort order, so they sort after the content files rather than before them.
+ *
+ * The direction sits inside the fragment on purpose: wrapping it as `asc(sql\`... nulls last\`)`
+ * renders `sort_order nulls last asc`, which Postgres rejects outright. Exported so the SQL it
+ * produces can be read in a test rather than assumed.
+ */
+export const UNIT_FILE_ORDER = [sql`${bookDockUnitFiles.sortOrder} asc nulls last`, asc(bookDockUnitFiles.id)] as const;
 
 /** Below this, a provider match is treated as a guess the user should confirm. */
 export const NEEDS_REVIEW_CONFIDENCE_BELOW = 70;
@@ -40,6 +58,7 @@ function needsReviewCondition(): SQL {
 export interface ListOptions {
   status?: string;
   needsReview?: boolean;
+  readyToFile?: boolean;
   page: number;
   limit: number;
   sort: string;
@@ -55,6 +74,7 @@ export interface SelectionBatchOptions {
   excludedIds?: number[];
   status?: string;
   needsReview?: boolean;
+  readyToFile?: boolean;
   search?: string;
   userId: number;
   canManageAll: boolean;
@@ -65,7 +85,7 @@ export class BookDockRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findAll(opts: ListOptions): Promise<{ items: BookDockFileRow[]; total: number }> {
-    const conditions = this.buildSelectionConditions(opts.status, opts.search, opts.userId, opts.canManageAll, opts.needsReview);
+    const conditions = this.buildSelectionConditions(opts.status, opts.search, opts.userId, opts.canManageAll, opts.needsReview, opts.readyToFile);
 
     const where = conditions.length ? and(...conditions) : undefined;
 
@@ -118,6 +138,70 @@ export class BookDockRepository {
     return row;
   }
 
+  /**
+   * The anchor row and its children in one transaction. A unit that exists in the list without
+   * knowing which files it is made of would be finalized as a single file, which is the exact
+   * truncation this whole feature exists to stop.
+   */
+  async createUnit(data: NewBookDockFileRow, files: Array<Omit<NewBookDockUnitFileRow, 'dockFileId'>>): Promise<BookDockFileRow> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.insert(bookDockFiles).values(data).returning();
+      if (files.length > 0) {
+        await tx.insert(bookDockUnitFiles).values(files.map((file) => ({ ...file, dockFileId: row.id })));
+      }
+      return row;
+    });
+  }
+
+  async findUnitFiles(dockFileId: number): Promise<BookDockUnitFileRow[]> {
+    return this.db
+      .select()
+      .from(bookDockUnitFiles)
+      .where(eq(bookDockUnitFiles.dockFileId, dockFileId))
+      .orderBy(...UNIT_FILE_ORDER);
+  }
+
+  /** One query for a page of rows, so rendering a list of units is not an N+1. */
+  async findUnitFilesByDockFileIds(dockFileIds: number[]): Promise<Map<number, BookDockUnitFileRow[]>> {
+    const byDockFile = new Map<number, BookDockUnitFileRow[]>();
+    if (dockFileIds.length === 0) return byDockFile;
+
+    const rows = await this.db
+      .select()
+      .from(bookDockUnitFiles)
+      .where(inArray(bookDockUnitFiles.dockFileId, dockFileIds))
+      .orderBy(...UNIT_FILE_ORDER);
+
+    for (const row of rows) {
+      const existing = byDockFile.get(row.dockFileId);
+      if (existing) existing.push(row);
+      else byDockFile.set(row.dockFileId, [row]);
+    }
+    return byDockFile;
+  }
+
+  async findByUnitDirectory(unitDirectory: string): Promise<BookDockFileRow | undefined> {
+    const [row] = await this.db.select().from(bookDockFiles).where(eq(bookDockFiles.unitDirectory, unitDirectory)).limit(1);
+    return row;
+  }
+
+  /** Indexed, bounded lookups include secondary tracks as well as primary files. */
+  async findClaimedPaths(paths: string[]): Promise<Set<string>> {
+    const claimed = new Set<string>();
+    for (let offset = 0; offset < paths.length; offset += 500) {
+      const batch = paths.slice(offset, offset + 500);
+      const [anchors, members] = await Promise.all([
+        this.db.select({ absolutePath: bookDockFiles.absolutePath }).from(bookDockFiles).where(inArray(bookDockFiles.absolutePath, batch)),
+        this.db
+          .select({ absolutePath: bookDockUnitFiles.absolutePath })
+          .from(bookDockUnitFiles)
+          .where(inArray(bookDockUnitFiles.absolutePath, batch)),
+      ]);
+      for (const row of [...anchors, ...members]) claimed.add(row.absolutePath);
+    }
+    return claimed;
+  }
+
   async update(id: number, data: Partial<NewBookDockFileRow>): Promise<BookDockFileRow | undefined> {
     const [row] = await this.db.update(bookDockFiles).set(data).where(eq(bookDockFiles.id, id)).returning();
     return row;
@@ -143,8 +227,9 @@ export class BookDockRepository {
     userId?: number,
     canManageAll?: boolean,
     needsReview?: boolean,
+    readyToFile?: boolean,
   ): Promise<number[]> {
-    const conditions = this.buildSelectionConditions(status, search, userId, canManageAll ?? true, needsReview);
+    const conditions = this.buildSelectionConditions(status, search, userId, canManageAll ?? true, needsReview, readyToFile);
     if (excludedIds?.length) conditions.push(notInArray(bookDockFiles.id, excludedIds));
     const where = conditions.length ? and(...conditions) : undefined;
     const rows = await this.db.select({ id: bookDockFiles.id }).from(bookDockFiles).where(where);
@@ -179,7 +264,14 @@ export class BookDockRepository {
   }
 
   async findSelectionBatch(options: SelectionBatchOptions): Promise<BookDockFileRow[]> {
-    const conditions = this.buildSelectionConditions(options.status, options.search, options.userId, options.canManageAll, options.needsReview);
+    const conditions = this.buildSelectionConditions(
+      options.status,
+      options.search,
+      options.userId,
+      options.canManageAll,
+      options.needsReview,
+      options.readyToFile,
+    );
     if (options.excludedIds?.length) conditions.push(notInArray(bookDockFiles.id, options.excludedIds));
     if (options.afterId !== undefined) conditions.push(gt(bookDockFiles.id, options.afterId));
     const where = conditions.length ? and(...conditions) : undefined;
@@ -265,7 +357,14 @@ export class BookDockRepository {
     return eq(bookDockFiles.uploadedBy, userId);
   }
 
-  private buildSelectionConditions(status?: string, search?: string, userId?: number, canManageAll?: boolean, needsReview?: boolean): SQL[] {
+  private buildSelectionConditions(
+    status?: string,
+    search?: string,
+    userId?: number,
+    canManageAll?: boolean,
+    needsReview?: boolean,
+    readyToFile?: boolean,
+  ): SQL[] {
     const conditions: SQL[] = [];
     if (status === 'pending') {
       conditions.push(inArray(bookDockFiles.status, ['pending', 'extracting', 'fetching']));
@@ -273,6 +372,7 @@ export class BookDockRepository {
       conditions.push(eq(bookDockFiles.status, status));
     }
     if (needsReview) conditions.push(needsReviewCondition());
+    if (readyToFile) conditions.push(readyToFileCondition());
     if (search) conditions.push(accentInsensitiveIlike(bookDockFiles.fileName, `%${search}%`));
     if (userId !== undefined && !canManageAll) {
       conditions.push(eq(bookDockFiles.uploadedBy, userId));

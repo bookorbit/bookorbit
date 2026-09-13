@@ -79,6 +79,8 @@ export interface WidgetConfig {
 export interface DashboardConfig {
   readingGoal?: number;
   widgets?: WidgetConfig[];
+  /** Limits dashboard shelves and book-derived widgets to these accessible libraries. Omitted means all accessible libraries. */
+  libraryIds?: number[];
 }
 
 export interface ReadingGoalWidgetData {

@@ -59,7 +59,7 @@ describe('GoodreadsMapper', () => {
       coverUrl: 'https://images.gr-assets.com/books/123.jpg',
       sourceUrl: `https://www.goodreads.com/book/show/${bookId}`,
       seriesName: 'Great American Novels',
-      seriesIndex: 1,
+      seriesIndex: '1',
       communityRating: 4.02,
       communityRatingCount: 5_123_456,
     });
@@ -130,7 +130,7 @@ describe('GoodreadsMapper', () => {
     const result = mapGoodreadsApolloState(mockState, bookId);
 
     expect(result?.seriesName).toBe('Sword of Truth');
-    expect(result?.seriesIndex).toBe(11);
+    expect(result?.seriesIndex).toBe('11');
     expect(result?.seriesMemberships).toBeUndefined();
   });
 
@@ -255,7 +255,7 @@ describe('GoodreadsMapper', () => {
           avgRating: '4.42',
           ratingsCount: 987_654,
           imageUrl: 'https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1617768316i/68428._SY75_.jpg',
-          description: { html: 'For a thousand years the ash fell &amp; no flowers bloomed.<br/><br/>Once, a hero rose…', truncated: true },
+          description: { html: 'For a thousand years the ash fell &amp; no flowers bloomed.<br/><br/>Once, a hero rose.' },
         },
         '68428',
       );
@@ -266,12 +266,12 @@ describe('GoodreadsMapper', () => {
         title: 'Mistborn',
         subtitle: 'The Final Empire',
         authors: ['Brandon Sanderson'],
-        description: 'For a thousand years the ash fell & no flowers bloomed.\n\nOnce, a hero rose…',
+        description: 'For a thousand years the ash fell & no flowers bloomed.\n\nOnce, a hero rose.',
         pageCount: 541,
         coverUrl: 'https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1617768316i/68428.jpg',
         sourceUrl: 'https://www.goodreads.com/book/show/68428',
         seriesName: 'Mistborn',
-        seriesIndex: 1,
+        seriesIndex: '1',
         communityRating: 4.42,
         communityRatingCount: 987_654,
       });
@@ -331,6 +331,47 @@ describe('GoodreadsMapper', () => {
       const result = mapGoodreadsAutocompleteItem({ bookTitleBare: 'Untitled', numPages: 0 }, '7');
       expect(result?.pageCount).toBeUndefined();
       expect(result?.coverUrl).toBeUndefined();
+    });
+
+    // Real `/book/auto_complete` payload for goodreads.com/book/show/229004506. The endpoint caps
+    // the blurb near 180 characters and flags the cut with `truncated`.
+    it('drops a description the autocomplete payload flags as truncated', () => {
+      const result = mapGoodreadsAutocompleteItem(
+        {
+          bookId: '229004506',
+          bookUrl: '/book/show/229004506-the-widow',
+          title: 'The Widow',
+          bookTitleBare: 'The Widow',
+          author: { name: 'John Grisham' },
+          numPages: 404,
+          avgRating: '4.04',
+          ratingsCount: 146_591,
+          imageUrl: 'https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1742957382i/229004506._SY75_.jpg',
+          description: {
+            html: 'Simon Latch is a lawyer in rural Virginia, making just enough to pay his bills while his marriage slowly falls apart. Then into his office walks Eleanor Barnett, an elderly wi\u2026',
+            truncated: true,
+          },
+        },
+        '229004506',
+      );
+
+      expect(result?.description).toBeUndefined();
+      expect(result).toMatchObject({
+        title: 'The Widow',
+        authors: ['John Grisham'],
+        pageCount: 404,
+        communityRating: 4.04,
+        communityRatingCount: 146_591,
+      });
+    });
+
+    it('keeps a description the autocomplete payload does not flag as truncated', () => {
+      const result = mapGoodreadsAutocompleteItem(
+        { bookId: '1', bookTitleBare: 'Short Blurb', description: { html: 'A complete blurb.', truncated: false } },
+        '1',
+      );
+
+      expect(result?.description).toBe('A complete blurb.');
     });
   });
 

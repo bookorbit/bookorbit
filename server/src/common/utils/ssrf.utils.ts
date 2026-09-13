@@ -10,6 +10,12 @@ export class PrivateAddressException extends BadRequestException {
   }
 }
 
+export class RemoteHostResolutionException extends BadRequestException {
+  constructor() {
+    super('Unable to resolve URL host');
+  }
+}
+
 export interface SafeRemoteHostOptions {
   allowLocal?: boolean;
   allowPrivate?: boolean;
@@ -60,16 +66,17 @@ export async function ensureSafeRemoteHost(hostname: string, options?: SafeRemot
   try {
     resolved = await lookup(normalizedHost, { all: true, verbatim: true });
   } catch {
-    throw new BadRequestException('Unable to resolve URL host');
+    throw new RemoteHostResolutionException();
   }
 
-  if (resolved.length === 0) throw new BadRequestException('Unable to resolve URL host');
+  if (resolved.length === 0) throw new RemoteHostResolutionException();
   if (resolved.some((entry) => isPrivateOrLocalAddress(entry.address)) && !options?.allowPrivate) {
     throw new PrivateAddressException();
   }
 }
 
-function isPrivateOrLocalAddress(address: string): boolean {
+/** Exported so the one lookup a connection actually uses can apply the same policy. */
+export function isPrivateOrLocalAddress(address: string): boolean {
   const normalized = address.toLowerCase();
   const mappedV4Prefix = '::ffff:';
   const maybeV4 = normalized.startsWith(mappedV4Prefix) ? normalized.slice(mappedV4Prefix.length) : normalized;

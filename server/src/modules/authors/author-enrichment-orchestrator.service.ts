@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import type { AuthorEnrichmentFailedPage } from '@bookorbit/types';
-import { NotificationType } from '@bookorbit/types';
+import { NotificationType, Permission } from '@bookorbit/types';
 
 import { NotificationService } from '../notification/notification.service';
 import { METADATA_AUTHORS_REPLACED, MetadataAuthorsReplacedEvent, MetadataEventsService } from '../metadata/metadata-events.service';
@@ -213,7 +213,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
         type: hasFailed ? NotificationType.AuthorEnrichmentFailed : NotificationType.AuthorEnrichmentCompleted,
         title: hasFailed ? 'Author enrichment completed with errors' : 'Author enrichment completed',
         message: `Processed ${snapshot.sessionDone} of ${snapshot.sessionTotal} authors` + (hasFailed ? `, ${snapshot.sessionFailed} failed` : ''),
-        scope: { kind: 'all' },
+        scope: { kind: 'permission', permission: Permission.ManageMetadataConfig },
         meta: { sessionTotal: snapshot.sessionTotal, sessionDone: snapshot.sessionDone, failed: snapshot.sessionFailed },
       })
       .catch(() => {});

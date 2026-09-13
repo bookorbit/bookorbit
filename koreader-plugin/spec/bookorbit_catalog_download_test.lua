@@ -66,8 +66,11 @@ package.loaded["util"] = {
     makePath = function(path)
         table.insert(made_paths, path)
     end,
-    getSafeFilename = function(filename)
-        return filename:gsub("[\\/:*?\"<>|]", "_")
+    getSafeFilename = function(filename, path)
+        if path and path:match("^/mnt/") then
+            return filename:gsub("[\\/:*?\"<>|]", "_")
+        end
+        return filename
     end,
     trim = function(value)
         return tostring(value or ""):match("^%s*(.-)%s*$")
@@ -130,6 +133,27 @@ assertEqual(#made_paths, 0, "preview does not create directories")
 local resolved = Catalog:getLocalDownloadPath(detail.fallbackFilename, file.format, file.devicePath)
 assertEqual(resolved, "/mnt/onboard/library/Series/Southern Reach/1.00 - Annihilation.epub", "configured destination")
 assertEqual(made_paths[1], "/mnt/onboard/library/Series/Southern Reach", "configured parent created")
+
+made_paths = {}
+resolved = Catalog:getLocalDownloadPath(
+    "Bret Easton Ellis - The Shards: A Novel",
+    "epub",
+    "Standalone/Bret Easton Ellis - The Shards: A Novel.epub"
+)
+assertEqual(resolved, "/mnt/onboard/library/Standalone/Bret Easton Ellis - The Shards_ A Novel.epub", "device filename is filesystem safe")
+assertEqual(made_paths[1], "/mnt/onboard/library/Standalone", "sanitized filename keeps configured parent")
+
+made_paths = {}
+resolved = Catalog:getLocalDownloadPath("Fallback", "epub", "Series: One/Book? One.epub")
+assertEqual(resolved, "/mnt/onboard/library/Series_ One/Book_ One.epub", "every device path segment is filesystem safe")
+assertEqual(made_paths[1], "/mnt/onboard/library/Series_ One", "sanitized device parent is created")
+
+download_dir = "/library"
+made_paths = {}
+resolved = Catalog:getLocalDownloadPath("Fallback", "epub", "Standalone/Book: One.epub")
+assertEqual(resolved, "/library/Standalone/Book: One.epub", "permissive filesystem keeps supported characters")
+assertEqual(made_paths[1], "/library/Standalone", "permissive filesystem keeps configured parent")
+download_dir = "/mnt/onboard/library"
 
 made_paths = {}
 resolved = Catalog:getLocalDownloadPath("Preferred/Name", "EPUB", file.devicePath, true)

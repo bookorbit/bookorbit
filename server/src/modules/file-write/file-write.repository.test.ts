@@ -104,7 +104,7 @@ describe('FileWriteRepository', () => {
       language: 'en',
       pageCount: 412,
       seriesName: 'Dune',
-      seriesIndex: 1,
+      seriesIndex: '1',
       isbn10: '123',
       isbn13: '978123',
       googleBooksId: 'g',

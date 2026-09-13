@@ -10,7 +10,10 @@ package.loaded["ui/uimanager"] = {
     end,
 }
 
-local directories = { ["/downloads/.bookorbit-tmp"] = true }
+local directories = {
+    ["/.bookorbit-tmp"] = true,
+    ["/downloads/.bookorbit-tmp"] = true,
+}
 local files = {}
 local now = 1000
 package.loaded["libs/libkoreader-lfs"] = {
@@ -66,10 +69,16 @@ end
 -- Destination containment is checked before anything is written and again
 -- before the publishing rename.
 assertEqual(Transfer.isInsideRoot("/downloads", "/downloads/Books/a.epub"), true, "a path under the root is authorized")
+assertEqual(Transfer.isInsideRoot("/downloads", "/downloads/The Shards.epub"), true,
+    "a file directly under the download root is authorized")
 assertEqual(Transfer.isInsideRoot("/downloads", "/elsewhere/a.epub"), false, "a path outside the root is rejected")
 assertEqual(Transfer.isInsideRoot("/downloads", "/downloads/../etc/passwd"), false, "traversal is rejected")
 assertEqual(Transfer.isInsideRoot("/downloads", "/downloads"), false, "the root itself is not a destination")
 assertEqual(Transfer.tempDir("/downloads"), "/downloads/.bookorbit-tmp", "temporaries live under the destination root")
+assertEqual(Transfer.isInsideRoot("/", "/The Shards.epub"), true, "the filesystem root supports a direct book destination")
+assertEqual(Transfer.isInsideRoot("/", "/Standalone/The Shards.epub"), true, "the filesystem root supports nested destinations")
+assertEqual(Transfer.isInsideRoot("/", "/../etc/passwd"), false, "the filesystem root still rejects traversal")
+assertEqual(Transfer.tempDir("/"), "/.bookorbit-tmp", "the filesystem root gets one temporary directory separator")
 
 -- Leftovers from a killed run are removed, and the sweep stays bounded.
 files["/downloads/.bookorbit-tmp/bo_1_1.part"] = { size = 10, modified = 1 }
@@ -140,6 +149,25 @@ assertEqual(renames[1].to, "/downloads/Books/a.epub", "the file is published at 
 runScheduled()
 assertEqual(#scheduled, 0, "a poll that fires after completion does not reschedule itself")
 assertEqual(#observed, 1, "no progress is reported once the transfer returned")
+
+-- A user-selected filesystem root used to normalize to an empty string and
+-- reject the destination before perform could start the HTTP request.
+local root_request_started = false
+local root_completed = Transfer.run{
+    root = "/",
+    destination = "/The Shards.epub",
+    generation = 5,
+    expected_bytes = 2089926,
+    is_current = function() return true end,
+    perform = function(download_opts)
+        root_request_started = true
+        files[download_opts.temp_path] = { size = 2089926, modified = now }
+        return { temp_path = download_opts.temp_path, bytes = 2089926 }
+    end,
+}
+assertEqual(root_request_started, true, "the reported book reaches the HTTP transfer callback")
+assertEqual(root_completed, true, "the reported book publishes under a filesystem-root download folder")
+assertEqual(files["/The Shards.epub"] ~= nil, true, "the reported book is published at the requested destination")
 
 -- A cancelled generation discards a late child result instead of publishing it.
 renames = {}

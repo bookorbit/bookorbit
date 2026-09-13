@@ -59,7 +59,7 @@ export interface SourceBook {
   language: string | null;
   pageCount?: number | null;
   seriesName?: string | null;
-  seriesIndex?: number | null;
+  seriesIndex?: string | null;
   rating?: number | null;
   googleBooksId?: string | null;
   goodreadsId?: string | null;

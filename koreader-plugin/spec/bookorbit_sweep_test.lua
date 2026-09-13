@@ -167,6 +167,26 @@ do
         "a candidate-less matched book with no stamp is refreshed by the sweep")
 end
 
+-- An HTTP response proves that the server was reachable. It must not be
+-- collapsed into the transport-error path and shown as an offline failure.
+do
+    local harness = SweepHarness.install{
+        books = { { md5 = "aaa", id = 1, title = "A", last_open = 100 } },
+        match_error = 400,
+    }
+    local Sweep = require("bookorbit_sweep")
+
+    local _, result = startSweep(harness, Sweep)
+    harness.scheduler:drain()
+
+    local finished, err = result()
+    assertEqual(finished, true, "a rejected sweep reports completion")
+    assertEqual(err, "server", "an HTTP rejection is classified as a server failure")
+    assertEqual(harness.shown.text, "BookOrbit sync: server request failed.",
+        "an HTTP rejection is not presented as an unreachable server")
+    assertEqual(harness.calls.sweep_complete, 0, "a rejected match phase is not recorded as a completed sweep")
+end
+
 -- A library recreation can replace a server file without an intervening
 -- unmatched response. The rematch must reset the old target's cursor before
 -- the statistics queue is built, then retain the new server acknowledgment.

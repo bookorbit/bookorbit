@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 
 import { UserModule } from '../user/user.module';
+import { NotificationCleanupJob } from './notification-cleanup.job';
 import { NotificationController } from './notification.controller';
 import { NotificationGateway } from './notification.gateway';
 import { NotificationRepository } from './notification.repository';
@@ -21,7 +22,7 @@ import { NotificationService } from './notification.service';
     }),
   ],
   controllers: [NotificationController],
-  providers: [NotificationService, NotificationRepository, NotificationGateway],
+  providers: [NotificationService, NotificationRepository, NotificationGateway, NotificationCleanupJob],
   exports: [NotificationService],
 })
 export class NotificationModule {}

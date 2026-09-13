@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader2, Save } from '@lucide/vue'
+import { BookImage, BookOpen, Globe, Headphones, Loader2, RotateCcw, Save, Search } from '@lucide/vue'
 import { MetadataProviderKey } from '@bookorbit/types'
 import type { ProviderConfigurations, ProviderConnectionTestResult, ProviderStatus, ProviderThrottleRuntimeState } from '@bookorbit/types'
 import { toast } from 'vue-sonner'
-import { Badge } from '@/components/ui/badge'
-import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
+import { Button } from '@/components/ui/button'
+import { formatList } from '@/i18n/formatters'
 import { stripBearerPrefix } from '../lib/provider-token'
+import { PROVIDER_GROUP_ORDER } from '../lib/provider-rows'
+import type { ProviderChipView, ProviderDraftEntry, ProviderGroupId, ProviderRowDef } from '../lib/provider-rows'
+import { useProviderRows } from '../composables/useProviderRows'
+import ProviderRow from './ProviderRow.vue'
 
 const { t } = useI18n()
 
@@ -27,7 +30,23 @@ const emit = defineEmits<{
   test: [key: MetadataProviderKey, patch: Partial<ProviderConfigurations>]
 }>()
 
+type ProviderFilter = 'all' | 'enabled' | 'needsSetup'
+
+const GROUP_ICONS: Record<ProviderGroupId, typeof BookOpen> = {
+  books: BookOpen,
+  audiobooks: Headphones,
+  comics: BookImage,
+  regional: Globe,
+}
+
+const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER, MetadataProviderKey.ALADIN]
+
+const rows = useProviderRows()
 const draft = ref<ProviderConfigurations | null>(null)
+const expandedKeys = ref(new Set<string>())
+const search = ref('')
+const filter = ref<ProviderFilter>('all')
+
 const nowMs = ref(Date.now())
 let nowTicker: ReturnType<typeof setInterval> | null = null
 
@@ -45,227 +64,38 @@ onUnmounted(() => {
 
 watch(
   () => props.config,
-  (c) => {
-    if (!c) return
-    draft.value = JSON.parse(JSON.stringify(c)) as ProviderConfigurations
+  (config) => {
+    if (!config) return
+    draft.value = JSON.parse(JSON.stringify(config)) as ProviderConfigurations
   },
   { immediate: true },
 )
 
-const AMAZON_DOMAINS = [
-  'amazon.com',
-  'amazon.co.uk',
-  'amazon.de',
-  'amazon.fr',
-  'amazon.it',
-  'amazon.es',
-  'amazon.ca',
-  'amazon.com.au',
-  'amazon.co.jp',
-  'amazon.in',
-  'amazon.com.br',
-  'amazon.com.mx',
-  'amazon.nl',
-  'amazon.se',
-  'amazon.pl',
-  'amazon.sg',
-  'amazon.ae',
-  'amazon.sa',
-  'amazon.tr',
-]
-
-const AUDIBLE_DOMAINS = [
-  'audible.com',
-  'audible.co.uk',
-  'audible.de',
-  'audible.fr',
-  'audible.it',
-  'audible.es',
-  'audible.ca',
-  'audible.com.au',
-  'audible.co.jp',
-  'audible.in',
-]
-
-const KOBO_COUNTRIES = ['us', 'ca', 'gb', 'au', 'nz', 'de', 'fr', 'it', 'es', 'nl', 'pt', 'br', 'jp']
-const KOBO_LANGUAGES = ['en', 'fr', 'de', 'it', 'es', 'nl', 'pt', 'ja', 'all']
-
-type FieldDef = {
-  key: string
-  label: string
-  type: 'text' | 'password' | 'select'
-  options?: string[]
-  placeholder?: string
-  helper?: string
-  alwaysEditable?: boolean
-  widthClass?: string
-}
-
-type RowDef = {
-  key: keyof ProviderConfigurations
-  label: string
-  hint?: string
-  fields: FieldDef[]
-  enableRequirement?: {
-    isConfigured: (config: ProviderConfigurations) => boolean
-    blockedMessage: string
-    requiresPassingTest?: boolean
-    missingTestMessage?: string
-  }
-}
-
-const rows = computed<RowDef[]>(() => [
-  {
-    key: 'google',
-    label: 'Google Books',
-    hint: t('settings.metadata.providers.hints.google'),
-    fields: [
-      {
-        key: 'apiKey',
-        label: t('settings.metadata.providers.fields.apiKey'),
-        type: 'password',
-        placeholder: 'AIza...',
-        helper: t('settings.metadata.providers.helpers.googleApiKey'),
-        alwaysEditable: true,
-      },
-    ],
-    enableRequirement: {
-      isConfigured: (c) => !!c.google.apiKey.trim(),
-      blockedMessage: t('settings.metadata.providers.blocked.google'),
-    },
-  },
-  {
-    key: 'amazon',
-    label: 'Amazon',
-    hint: t('settings.metadata.providers.hints.amazon'),
-    fields: [
-      {
-        key: 'domain',
-        label: t('settings.metadata.providers.fields.region'),
-        type: 'select',
-        options: AMAZON_DOMAINS,
-        widthClass: 'md:w-[6.75rem] md:min-w-[6.75rem]',
-      },
-      {
-        key: 'cookie',
-        label: t('settings.metadata.providers.fields.cookie'),
-        type: 'password',
-        placeholder: 'session-id=...; ubid-main=...; x-main=...',
-      },
-    ],
-  },
-  { key: 'goodreads', label: 'Goodreads', hint: t('settings.metadata.providers.hints.goodreads'), fields: [] },
-  {
-    key: 'hardcover',
-    label: 'Hardcover',
-    hint: t('settings.metadata.providers.hints.hardcover'),
-    fields: [{ key: 'apiKey', label: t('settings.metadata.providers.fields.apiKey'), type: 'password', placeholder: 'eyJ...', alwaysEditable: true }],
-    enableRequirement: {
-      isConfigured: (c) => !!c.hardcover.apiKey.trim(),
-      blockedMessage: t('settings.metadata.providers.blocked.hardcover'),
-      requiresPassingTest: true,
-      missingTestMessage: t('settings.metadata.providers.blocked.hardcoverTest'),
-    },
-  },
-  { key: 'openLibrary', label: 'Open Library', hint: t('settings.metadata.providers.hints.openLibrary'), fields: [] },
-  {
-    key: 'itunes',
-    label: 'iTunes',
-    hint: t('settings.metadata.providers.hints.itunes'),
-    fields: [
-      { key: 'coverResolution', label: t('settings.metadata.providers.fields.coverResolution'), type: 'select', options: ['high', 'standard'] },
-    ],
-  },
-  {
-    key: 'kobo',
-    label: 'Kobo',
-    hint: t('settings.metadata.providers.hints.kobo'),
-    fields: [
-      {
-        key: 'country',
-        label: t('settings.metadata.providers.fields.country'),
-        type: 'select',
-        options: KOBO_COUNTRIES,
-        alwaysEditable: true,
-        widthClass: 'md:w-[5.25rem] md:min-w-[5.25rem]',
-      },
-      {
-        key: 'language',
-        label: t('settings.metadata.providers.fields.language'),
-        type: 'select',
-        options: KOBO_LANGUAGES,
-        alwaysEditable: true,
-        widthClass: 'md:w-[5.25rem] md:min-w-[5.25rem]',
-      },
-    ],
-  },
-  {
-    key: 'audible',
-    label: 'Audible',
-    hint: t('settings.metadata.providers.hints.audible'),
-    fields: [{ key: 'domain', label: t('settings.metadata.providers.fields.region'), type: 'select', options: AUDIBLE_DOMAINS }],
-  },
-  { key: 'audnexus', label: 'AudNexus', hint: t('settings.metadata.providers.hints.audnexus'), fields: [] },
-  {
-    key: 'librofm',
-    label: 'Libro.fm',
-    hint: 'DRM-free audiobook catalog metadata. Uses an undocumented Libro.fm endpoint and is disabled by default.',
-    fields: [],
-  },
-  {
-    key: 'comicvine',
-    label: 'ComicVine',
-    hint: t('settings.metadata.providers.hints.comicvine'),
-    fields: [{ key: 'apiKey', label: t('settings.metadata.providers.fields.apiKey'), type: 'password', alwaysEditable: true }],
-    enableRequirement: {
-      isConfigured: (c) => !!c.comicvine.apiKey.trim(),
-      blockedMessage: t('settings.metadata.providers.blocked.comicvine'),
-    },
-  },
-  { key: 'ranobedb', label: 'RanobeDB', hint: t('settings.metadata.providers.hints.ranobedb'), fields: [] },
-  {
-    key: 'lubimyczytac',
-    label: 'LubimyCzytac',
-    hint: t('settings.metadata.providers.hints.lubimyczytac'),
-    fields: [],
-  },
-  {
-    key: 'aladin',
-    label: 'Aladin',
-    hint: t('settings.metadata.providers.hints.aladin'),
-    fields: [{ key: 'ttbKey', label: t('settings.metadata.providers.fields.ttbKey'), type: 'password', placeholder: 'ttb...', alwaysEditable: true }],
-    enableRequirement: {
-      isConfigured: (c) => !!c.aladin.ttbKey.trim(),
-      blockedMessage: t('settings.metadata.providers.blocked.aladin'),
-    },
-  },
-])
-
-const TESTABLE_PROVIDERS: MetadataProviderKey[] = [MetadataProviderKey.AMAZON, MetadataProviderKey.HARDCOVER, MetadataProviderKey.ALADIN]
+/* ── Provider state ─────────────────────────────────────────────── */
 
 function statusFor(key: string) {
-  return props.statuses.find((s) => s.key === key)
-}
-
-function runtimeFor(key: string): ProviderThrottleRuntimeState | undefined {
-  return props.runtimeByKey?.[key as MetadataProviderKey]
+  return props.statuses.find((status) => status.key === key)
 }
 
 function throttleSecondsLeft(key: string): number | null {
-  const state = runtimeFor(key)
+  const state = props.runtimeByKey?.[key as MetadataProviderKey]
   if (!state?.throttled || !state.throttledUntil) return null
   const remaining = Math.ceil((Date.parse(state.throttledUntil) - nowMs.value) / 1000)
   return remaining > 0 ? remaining : null
 }
 
-function isThrottled(key: string): boolean {
-  return throttleSecondsLeft(key) !== null
-}
-
-function throttleMessage(key: string): string | null {
-  const seconds = throttleSecondsLeft(key)
-  if (seconds === null) return null
-  return t('settings.metadata.providers.retryIn', { duration: formatDuration(seconds) })
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds >= 3600) {
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+  if (totalSeconds >= 60) {
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes}m ${seconds}s`
+  }
+  return `${totalSeconds}s`
 }
 
 function isTesting(key: string): boolean {
@@ -274,13 +104,6 @@ function isTesting(key: string): boolean {
 
 function testResultFor(key: string): ProviderConnectionTestResult | null {
   return props.testResultsByKey?.[key as MetadataProviderKey] ?? null
-}
-
-function testResultClass(key: string): string {
-  const status = testResultFor(key)?.status
-  if (status === 'success') return 'text-emerald-600'
-  if (status === 'warning') return 'text-amber-600'
-  return 'text-destructive'
 }
 
 function isTestable(key: keyof ProviderConfigurations): key is MetadataProviderKey {
@@ -303,17 +126,18 @@ function hasPassingTestForCurrentInput(key: MetadataProviderKey): boolean {
   return expectedSignature === currentProviderSignature(key)
 }
 
-function enableBlockedMessage(row: RowDef): string | null {
+/** Why the source cannot be switched on yet, or null when nothing stands in the way. */
+function enableBlockedMessage(row: ProviderRowDef): string | null {
   if (!draft.value || !row.enableRequirement) return null
-  const req = row.enableRequirement
-  if (!req.isConfigured(draft.value)) return req.blockedMessage
-  if (req.requiresPassingTest && !hasPassingTestForCurrentInput(row.key as MetadataProviderKey)) {
-    return req.missingTestMessage ?? t('settings.metadata.providers.runTestBeforeEnabling')
+  const requirement = row.enableRequirement
+  if (!requirement.isConfigured(draft.value)) return requirement.blockedMessage
+  if (requirement.requiresPassingTest && !hasPassingTestForCurrentInput(row.key as MetadataProviderKey)) {
+    return requirement.missingTestMessage ?? t('settings.metadata.providers.runTestBeforeEnabling')
   }
   return null
 }
 
-function isConfiguredBadge(row: RowDef): boolean {
+function isConfigured(row: ProviderRowDef): boolean {
   const status = statusFor(row.key)
   if (!status) return false
   if (row.key !== 'hardcover') return status.configured
@@ -321,28 +145,126 @@ function isConfiguredBadge(row: RowDef): boolean {
   return hasPassingTestForCurrentInput(MetadataProviderKey.HARDCOVER)
 }
 
-type BadgeView = { label: string; variant: 'destructive' | 'outline'; class?: string }
-function badgeFor(row: RowDef): BadgeView | null {
-  if (!statusFor(row.key)) return null
-  if (!isConfiguredBadge(row)) return { label: t('settings.metadata.providers.badge.setupRequired'), variant: 'destructive' }
-  if (isThrottled(row.key)) {
-    return { label: t('settings.metadata.providers.badge.throttled'), variant: 'outline', class: 'text-amber-600 border-amber-500/30 bg-amber-500/5' }
-  }
-  return { label: t('settings.metadata.providers.badge.ready'), variant: 'outline', class: 'text-emerald-600 border-emerald-500/30 bg-emerald-500/5' }
+function needsSetup(row: ProviderRowDef): boolean {
+  if (statusFor(row.key)) return !isConfigured(row)
+  return !draft.value?.[row.key].enabled && enableBlockedMessage(row) !== null
 }
 
-function formatDuration(totalSeconds: number): string {
-  if (totalSeconds >= 3600) {
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+/**
+ * One chip per row. Throttling shows the countdown rather than the word, so the row
+ * answers "when does this work again" instead of only "something is wrong".
+ */
+function chipFor(row: ProviderRowDef): ProviderChipView | null {
+  if (!statusFor(row.key) || !draft.value) return null
+  if (!isConfigured(row)) return { kind: 'setup', label: t('settings.metadata.providers.badge.setupRequired') }
+  const seconds = throttleSecondsLeft(row.key)
+  if (seconds !== null) {
+    return {
+      kind: 'throttled',
+      label: formatDuration(seconds),
+      title: t('settings.metadata.providers.retryIn', { duration: formatDuration(seconds) }),
+    }
   }
-  if (totalSeconds >= 60) {
-    const minutes = Math.floor(totalSeconds / 60)
-    const seconds = totalSeconds % 60
-    return `${minutes}m ${seconds}s`
+  if (draft.value[row.key].enabled) return { kind: 'active', label: t('settings.metadata.providers.badge.active') }
+  return { kind: 'ready', label: t('settings.metadata.providers.badge.ready') }
+}
+
+function providerDraft(row: ProviderRowDef): ProviderDraftEntry {
+  const config = draft.value
+  if (!config) return { enabled: false }
+  return config[row.key] as unknown as ProviderDraftEntry
+}
+
+/* ── Filtering and grouping ─────────────────────────────────────── */
+
+const presentRows = computed(() => {
+  const config = draft.value
+  if (!config) return []
+  return rows.value.filter((row) => Object.prototype.hasOwnProperty.call(config, row.key))
+})
+
+const enabledCount = computed(() => presentRows.value.filter((row) => draft.value?.[row.key].enabled).length)
+
+const filteredRows = computed(() => {
+  const term = search.value.trim().toLowerCase()
+  return presentRows.value.filter((row) => {
+    if (filter.value === 'enabled' && !draft.value?.[row.key].enabled) return false
+    if (filter.value === 'needsSetup' && !needsSetup(row)) return false
+    if (!term) return true
+    return `${row.label} ${row.hint ?? ''}`.toLowerCase().includes(term)
+  })
+})
+
+const groups = computed(() =>
+  PROVIDER_GROUP_ORDER.map((id) => ({
+    id,
+    icon: GROUP_ICONS[id],
+    label: t(`settings.metadata.providers.groups.${id}`),
+    rows: filteredRows.value.filter((row) => row.group === id),
+    total: presentRows.value.filter((row) => row.group === id).length,
+    enabled: presentRows.value.filter((row) => row.group === id && draft.value?.[row.key].enabled).length,
+  })).filter((group) => group.rows.length > 0),
+)
+
+const FILTERS: { value: ProviderFilter; labelKey: string }[] = [
+  { value: 'all', labelKey: 'settings.metadata.providers.filter.all' },
+  { value: 'enabled', labelKey: 'settings.metadata.providers.filter.enabled' },
+  { value: 'needsSetup', labelKey: 'settings.metadata.providers.filter.needsSetup' },
+]
+
+/* ── Unsaved changes ────────────────────────────────────────────── */
+
+const dirtyRows = computed(() => {
+  const config = props.config
+  const current = draft.value
+  if (!config || !current) return []
+  return presentRows.value.filter((row) => JSON.stringify(current[row.key]) !== JSON.stringify(config[row.key]))
+})
+
+const dirtyNames = computed(() => formatList(dirtyRows.value.map((row) => row.label)))
+
+/* ── Actions ────────────────────────────────────────────────────── */
+
+function isExpanded(row: ProviderRowDef): boolean {
+  return expandedKeys.value.has(row.key)
+}
+
+function setExpanded(row: ProviderRowDef, expanded: boolean) {
+  const next = new Set(expandedKeys.value)
+  if (expanded) next.add(row.key)
+  else next.delete(row.key)
+  expandedKeys.value = next
+}
+
+function toggleProvider(row: ProviderRowDef) {
+  const provider = draft.value?.[row.key]
+  if (!provider) return
+  const blocked = provider.enabled ? null : enableBlockedMessage(row)
+  if (blocked) {
+    // The switch stays operable so the refusal can explain itself and open the fields
+    // that would satisfy it; a plain disabled control leaves the user guessing.
+    toast.error(blocked)
+    setExpanded(row, true)
+    return
   }
-  return `${totalSeconds}s`
+  provider.enabled = !provider.enabled
+}
+
+function updateField(row: ProviderRowDef, payload: { key: string; value: string }) {
+  const provider = draft.value?.[row.key] as unknown as Record<string, unknown> | undefined
+  if (!provider) return
+  provider[payload.key] = payload.value
+}
+
+function testProvider(row: ProviderRowDef) {
+  if (!draft.value || !isTestable(row.key)) return
+  const patch = { [row.key]: { ...draft.value[row.key] } } as Partial<ProviderConfigurations>
+  emit('test', row.key, patch)
+}
+
+function discard() {
+  if (!props.config) return
+  draft.value = JSON.parse(JSON.stringify(props.config)) as ProviderConfigurations
 }
 
 function save() {
@@ -350,159 +272,118 @@ function save() {
   emit('save', draft.value)
 }
 
-function testProvider(rowKey: keyof ProviderConfigurations) {
-  if (!draft.value || !isTestable(rowKey)) return
-  const patch = { [rowKey]: { ...draft.value[rowKey] } } as Partial<ProviderConfigurations>
-  emit('test', rowKey, patch)
+function setFilter(value: ProviderFilter) {
+  filter.value = value
 }
 
-function canEditField(row: RowDef, field: FieldDef): boolean {
-  if (!draft.value) return false
-  return draft.value[row.key].enabled || field.alwaysEditable === true
+function clearFilters() {
+  search.value = ''
+  filter.value = 'all'
 }
-
-function showHardcoverEnableHint(row: RowDef): boolean {
-  if (!draft.value || row.key !== 'hardcover') return false
-  if (draft.value.hardcover.enabled) return false
-  if (!draft.value.hardcover.apiKey.trim()) return false
-  return !hasPassingTestForCurrentInput(MetadataProviderKey.HARDCOVER)
-}
-
-function isToggleDisabled(row: RowDef): boolean {
-  if (!draft.value) return true
-  return !draft.value[row.key].enabled && enableBlockedMessage(row) !== null
-}
-
-function toggleProvider(row: RowDef) {
-  if (!draft.value) return
-  const provider = draft.value[row.key]
-  const blocked = !provider.enabled ? enableBlockedMessage(row) : null
-  if (blocked) {
-    toast.error(blocked)
-    return
-  }
-  provider.enabled = !provider.enabled
-}
-
-const draftReady = computed(() => draft.value !== null)
-const visibleRows = computed(() => {
-  if (!draft.value) return []
-  return rows.value.filter((row) => Object.prototype.hasOwnProperty.call(draft.value, row.key))
-})
 </script>
 
 <template>
-  <form class="border border-border rounded-lg bg-card overflow-hidden shadow-xs" @submit.prevent="save">
-    <div class="px-4 py-3.5 md:px-5 md:py-4 border-b border-border flex items-center justify-between bg-muted/30">
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-bold text-muted-foreground uppercase tracking-widest">{{ t('settings.metadata.providers.availableSources') }}</span>
-      </div>
-      <Button size="sm" type="submit" class="px-3" :disabled="saving || !draftReady">
-        <Loader2 v-if="saving" :size="14" class="animate-spin" />
-        <Save v-else :size="14" />
-        <span>{{ t('settings.metadata.providers.saveChanges') }}</span>
-      </Button>
-    </div>
+  <form @submit.prevent="save">
+    <div v-if="draft">
+      <div class="mb-4 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+        <p class="text-xs text-muted-foreground sm:mr-auto">
+          {{ t('settings.metadata.providers.sourcesEnabled', { enabled: enabledCount, total: presentRows.length }) }}
+        </p>
 
-    <div v-if="draft" class="divide-y divide-border">
-      <div
-        v-for="row in visibleRows"
-        :key="row.key"
-        class="px-4 py-3.5 md:px-5 md:py-4 flex flex-col md:flex-row md:items-start gap-3 md:gap-4 bg-card transition-colors hover:bg-muted/30"
+        <div class="relative sm:w-56">
+          <Search :size="14" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            v-model="search"
+            type="search"
+            :placeholder="t('settings.metadata.providers.searchPlaceholder')"
+            :aria-label="t('settings.metadata.providers.searchPlaceholder')"
+            class="h-8 w-full rounded-md border border-input bg-background pl-8 pr-2.5 text-sm transition-shadow placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
+
+        <div class="flex gap-1 rounded-lg bg-muted/60 p-1" role="group" :aria-label="t('settings.metadata.providers.filter.label')">
+          <button
+            v-for="option in FILTERS"
+            :key="option.value"
+            type="button"
+            :aria-pressed="filter === option.value"
+            class="h-6 flex-1 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none"
+            :class="
+              filter === option.value
+                ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+            "
+            @click="setFilter(option.value)"
+          >
+            {{ t(option.labelKey) }}
+          </button>
+        </div>
+      </div>
+
+      <section
+        v-if="groups.length"
+        class="overflow-hidden rounded-lg border border-border bg-card shadow-xs"
+        :aria-label="t('settings.metadata.providers.availableSources')"
       >
-        <div class="space-y-1 min-w-0 md:flex-1">
-          <div class="flex items-center gap-3">
-            <span class="settings-label">{{ row.label }}</span>
-            <Badge
-              v-if="badgeFor(row)"
-              :variant="badgeFor(row)!.variant"
-              class="h-4 px-1.5 text-[9px] font-bold uppercase tracking-wide"
-              :class="badgeFor(row)!.class"
-            >
-              {{ badgeFor(row)!.label }}
-            </Badge>
-          </div>
-          <p v-if="row.hint" class="settings-hint max-w-md text-[11px] leading-snug md:max-w-none">
-            {{ row.hint }}
-          </p>
-          <p v-if="throttleMessage(row.key)" class="text-xs text-amber-600">
-            {{ throttleMessage(row.key) }}
-          </p>
-        </div>
-
-        <div class="flex flex-col items-stretch md:items-end gap-2 w-full md:w-auto md:min-w-[22rem]">
-          <div v-if="row.fields.length" class="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end">
-            <div v-for="field in row.fields" :key="field.key" class="min-w-0 md:flex md:flex-col md:items-end">
-              <select
-                v-if="field.type === 'select'"
-                v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
-                :disabled="!canEditField(row, field)"
-                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all"
-                :class="field.widthClass ?? 'md:min-w-[11rem]'"
-              >
-                <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-              <input
-                v-else
-                v-model="(draft[row.key] as unknown as Record<string, string>)[field.key]"
-                v-bind="SECRET_INPUT_ATTRS"
-                :type="field.type === 'password' ? 'text' : field.type"
-                :name="`metadata-${row.key}-${field.key}`"
-                :placeholder="field.placeholder ?? field.label"
-                :disabled="!canEditField(row, field)"
-                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-xs font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 transition-all md:w-72 lg:w-80"
-                :class="{ 'input-secret': field.type === 'password' }"
-              />
-              <p v-if="field.helper" class="mt-0.5 max-w-72 text-[10px] leading-snug text-muted-foreground md:text-right">
-                {{ field.helper }}
-              </p>
-            </div>
+        <template v-for="(group, groupIndex) in groups" :key="group.id">
+          <div class="flex items-center gap-2.5 border-b border-border bg-muted/40 px-4 py-2 md:px-5" :class="{ 'border-t': groupIndex > 0 }">
+            <component :is="group.icon" :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{{ group.label }}</h3>
+            <span class="ml-auto text-[11px] font-semibold tabular-nums text-muted-foreground">
+              {{ t('settings.metadata.providers.groupEnabled', { enabled: group.enabled, total: group.total }) }}
+            </span>
           </div>
 
-          <div class="flex w-full flex-wrap items-center justify-between gap-2 md:justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              v-if="isTestable(row.key)"
-              type="button"
-              class="text-[11px]"
-              :disabled="isTesting(row.key)"
-              @click="testProvider(row.key)"
-            >
-              <Loader2 v-if="isTesting(row.key)" :size="11" class="animate-spin" />
-              <span>{{ isTesting(row.key) ? t('settings.metadata.providers.testing') : t('settings.metadata.providers.test') }}</span>
-            </Button>
-            <span v-else />
-            <span class="text-[11px] text-muted-foreground md:hidden">{{ t('settings.metadata.providers.enabled') }}</span>
-            <button
-              type="button"
-              role="switch"
-              :aria-checked="draft[row.key].enabled"
-              :aria-disabled="isToggleDisabled(row)"
-              :disabled="isToggleDisabled(row)"
-              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              :class="draft[row.key].enabled ? 'bg-primary' : 'bg-muted border border-border'"
-              @click="toggleProvider(row)"
-            >
-              <span
-                class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-xs transition-transform"
-                :class="draft[row.key].enabled ? 'translate-x-4.5' : 'translate-x-0.5'"
-              />
-            </button>
-          </div>
+          <ProviderRow
+            v-for="(row, rowIndex) in group.rows"
+            :key="row.key"
+            :class="{ 'border-t border-border': rowIndex > 0 }"
+            :row="row"
+            :provider="providerDraft(row)"
+            :chip="chipFor(row)"
+            :expanded="isExpanded(row)"
+            :testable="isTestable(row.key)"
+            :testing="isTesting(row.key)"
+            :test-result="testResultFor(row.key)"
+            :blocked-message="enableBlockedMessage(row)"
+            @toggle="toggleProvider(row)"
+            @test="testProvider(row)"
+            @update:expanded="setExpanded(row, $event)"
+            @update:field="updateField(row, $event)"
+          />
+        </template>
+      </section>
 
-          <p v-if="testResultFor(row.key)" class="text-[11px] leading-snug md:text-right" :class="testResultClass(row.key)">
-            {{ testResultFor(row.key)?.message }}
-          </p>
-          <p v-if="showHardcoverEnableHint(row)" class="text-[10px] text-muted-foreground md:text-right">
-            {{ t('settings.metadata.providers.hardcoverEnableHint') }}
-          </p>
-        </div>
+      <div v-else class="settings-empty-state">
+        <p class="text-sm text-muted-foreground">{{ t('settings.metadata.providers.noMatches') }}</p>
+        <Button type="button" variant="outline" size="sm" class="mt-3" @click="clearFilters">
+          {{ t('settings.metadata.providers.clearFilters') }}
+        </Button>
+      </div>
+
+      <div
+        v-if="dirtyRows.length"
+        class="sticky bottom-0 z-10 mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-card/95 px-3 py-2.5 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/80"
+      >
+        <span class="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+        <p class="min-w-0 flex-1 truncate text-xs">
+          <span class="font-semibold">{{ t('settings.metadata.providers.unsavedChanges', { count: dirtyRows.length }) }}</span>
+          <span class="text-muted-foreground"> · {{ dirtyNames }}</span>
+        </p>
+        <Button type="button" variant="outline" size="sm" :disabled="saving" @click="discard">
+          <RotateCcw :size="13" aria-hidden="true" />
+          <span>{{ t('settings.metadata.providers.discard') }}</span>
+        </Button>
+        <Button type="submit" size="sm" :disabled="saving">
+          <Loader2 v-if="saving" :size="13" class="animate-spin" aria-hidden="true" />
+          <Save v-else :size="13" aria-hidden="true" />
+          <span>{{ t('settings.metadata.providers.saveChanges') }}</span>
+        </Button>
       </div>
     </div>
 
-    <div v-else class="px-6 py-12 flex items-center justify-center">
-      <Loader2 :size="24" class="animate-spin text-muted-foreground" />
+    <div v-else class="settings-loading-state">
+      <Loader2 :size="20" class="animate-spin" aria-hidden="true" />
     </div>
   </form>
 </template>

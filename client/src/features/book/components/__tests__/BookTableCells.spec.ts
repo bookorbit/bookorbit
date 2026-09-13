@@ -486,14 +486,14 @@ describe('BookTableNumberCell', () => {
     expect(wrapper.emitted('save')?.[0]).toEqual([null])
   })
 
-  it('emits save with float when allowDecimal is true', async () => {
+  it('emits the exact series index label when allowDecimal is true', async () => {
     const wrapper = mount(BookTableNumberCell, {
-      props: { value: 1, isActive: true, allowDecimal: true },
+      props: { value: '1', isActive: true, allowDecimal: true },
     })
     const input = wrapper.find('input')
-    await input.setValue('1.5')
+    await input.setValue('5.10')
     await input.trigger('keydown', { key: 'Enter' })
-    expect(wrapper.emitted('save')?.[0]).toEqual([1.5])
+    expect(wrapper.emitted('save')?.[0]).toEqual(['5.10'])
   })
 
   it('emits cancel on Escape', async () => {
@@ -561,14 +561,14 @@ describe('BookTableNumberCell', () => {
     expect(wrapper.find('input').exists()).toBe(true)
   })
 
-  it('emits save with null for non-numeric input', async () => {
+  it('does not save an invalid series index label', async () => {
     const wrapper = mount(BookTableNumberCell, {
-      props: { value: 1, isActive: true, allowDecimal: true },
+      props: { value: '1', isActive: true, allowDecimal: true },
     })
     const input = wrapper.find('input')
     await input.setValue('abc')
     await input.trigger('keydown', { key: 'Enter' })
-    expect(wrapper.emitted('save')?.[0]).toEqual([null])
+    expect(wrapper.emitted('save')).toBeFalsy()
   })
 
   it('clamps saved values to min and max', async () => {

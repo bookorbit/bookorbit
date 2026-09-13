@@ -2,16 +2,16 @@ import { ref } from 'vue'
 import { Howl } from 'howler'
 
 export interface AudioFile {
-  id: number
-  format: string | null
-  durationSeconds: number | null
+  assetId: string
+  format: string
+  durationMs: number | null
 }
 
-function serveUrl(fileId: number): string {
-  return `/api/v1/books/files/${fileId}/serve`
+function serveUrl(bookId: number, assetId: string): string {
+  return `/api/v1/audiobooks/${bookId}/assets/${assetId}/content`
 }
 
-export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) => void) {
+export function useAudioQueue(bookId: number, files: AudioFile[], onFileEnd: (assetId: string) => void) {
   const currentIndex = ref(0)
   const isPlaying = ref(false)
   const currentPosition = ref(0)
@@ -19,7 +19,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   const loadError = ref<string | null>(null)
 
   // Only the active Howl and its immediate neighbours are kept alive.
-  const howls = new Map<number, Howl>()
+  const howls = new Map<string, Howl>()
 
   // Pending seek to apply when the current Howl finishes loading.
   // Using a single variable prevents stacking multiple once('load') seek handlers.
@@ -29,12 +29,12 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
     const file = files[index]!
     const fmt = file.format?.toLowerCase() ?? 'm4b'
     const howl = new Howl({
-      src: [serveUrl(file.id)],
+      src: [serveUrl(bookId, file.assetId)],
       format: [fmt],
       html5: true,
       preload: false,
       onend() {
-        onFileEnd(file.id)
+        onFileEnd(file.assetId)
       },
       onplay() {
         isPlaying.value = true
@@ -61,19 +61,19 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
 
   function getOrCreate(index: number): Howl {
     const file = files[index]!
-    if (!howls.has(file.id)) {
-      howls.set(file.id, buildHowl(index))
+    if (!howls.has(file.assetId)) {
+      howls.set(file.assetId, buildHowl(index))
     }
-    return howls.get(file.id)!
+    return howls.get(file.assetId)!
   }
 
   function evictDistant(activeIndex: number) {
-    for (const [fileId, howl] of howls) {
-      const idx = files.findIndex((f) => f.id === fileId)
+    for (const [assetId, howl] of howls) {
+      const idx = files.findIndex((f) => f.assetId === assetId)
       if (Math.abs(idx - activeIndex) > 1) {
         howl.stop()
         howl.unload()
-        howls.delete(fileId)
+        howls.delete(assetId)
       }
     }
   }
@@ -81,7 +81,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   function activateIndex(index: number, positionSeconds = 0) {
     const clamped = Math.max(0, Math.min(index, files.length - 1))
     if (clamped !== currentIndex.value) {
-      const prev = howls.get(files[currentIndex.value]!.id)
+      const prev = howls.get(files[currentIndex.value]!.assetId)
       prev?.stop()
       currentIndex.value = clamped
       pendingSeek = null
@@ -93,7 +93,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
     evictDistant(clamped)
 
     loadError.value = null
-    duration.value = files[clamped]!.durationSeconds ?? 0
+    duration.value = (files[clamped]!.durationMs ?? 0) / 1000
 
     if (howl.state() === 'loaded') {
       duration.value = howl.duration()
@@ -113,8 +113,8 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   }
 
   function currentHowl(): Howl | undefined {
-    const id = files[currentIndex.value]?.id
-    return id !== undefined ? howls.get(id) : undefined
+    const assetId = files[currentIndex.value]?.assetId
+    return assetId !== undefined ? howls.get(assetId) : undefined
   }
 
   function play() {
@@ -135,7 +135,8 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
   function seek(seconds: number) {
     const h = currentHowl()
     if (!h) return
-    const fileDur = files[currentIndex.value]?.durationSeconds
+    const fileDurationMs = files[currentIndex.value]?.durationMs
+    const fileDur = fileDurationMs === null || fileDurationMs === undefined ? null : fileDurationMs / 1000
     const upper = duration.value || (fileDur != null ? fileDur : Infinity)
     const s = Math.max(0, Math.min(seconds, upper))
     if (h.state() === 'loaded') {
@@ -162,8 +163,8 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
     for (const h of howls.values()) h.volume(vol)
   }
 
-  function goToFile(fileId: number, positionSeconds = 0) {
-    const idx = files.findIndex((f) => f.id === fileId)
+  function goToAsset(assetId: string, positionSeconds = 0) {
+    const idx = files.findIndex((f) => f.assetId === assetId)
     if (idx === -1) return
     activateIndex(idx, positionSeconds)
   }
@@ -198,7 +199,7 @@ export function useAudioQueue(files: AudioFile[], onFileEnd: (fileId: number) =>
     position,
     setSpeed,
     setVolume,
-    goToFile,
+    goToAsset,
     nextFile,
     prevFile,
     destroy,

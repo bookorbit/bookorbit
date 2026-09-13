@@ -90,9 +90,7 @@ describe('UserStatisticsRepository', () => {
       [],
       [{ hour: 9, format: 'EPUB', source: 'koreader', readingSeconds: 500, eventsCount: 3 }],
       [{ dayOfWeek: 2, source: 'manual', format: 'EPUB', readingSeconds: 900, eventsCount: 4 }],
-      [],
       [{ year: 2026, month: 4, count: 2 }],
-      [],
       [{ year: 2026, month: 4, count: 2 }],
     ]);
     const repo = new UserStatisticsRepository(db as never);
@@ -109,6 +107,44 @@ describe('UserStatisticsRepository', () => {
     ]);
     await expect(repo.getCompletionTimeline(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
     await expect(repo.getMonthlyCompletions(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
+  });
+
+  it('counts completed reading attempts when their sessions finish below 99 percent', async () => {
+    const calls: Array<{ text: string; params: unknown[] }> = [];
+    const fakeClient = {
+      query: vi.fn().mockImplementation((cfg: { text: string }, params: unknown[]) => {
+        calls.push({ text: cfg.text, params });
+        const count = cfg.text.includes('"reading_attempts"') ? 3 : 1;
+        return Promise.resolve({ rows: [[2026, 8, count]] });
+      }),
+    };
+    const db = drizzle({ client: fakeClient as never, schema });
+    const repo = new UserStatisticsRepository(db as never);
+
+    await expect(repo.getCompletionTimeline(5, true, undefined, 365)).resolves.toEqual([{ year: 2026, month: 8, count: 3 }]);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.text).toContain('"reading_attempts"');
+    expect(calls[0]!.text).not.toContain('"reading_sessions"."end_progress"');
+  });
+
+  it('uses completed reading attempt dates for completion latency', async () => {
+    const calls: Array<{ text: string; params: unknown[] }> = [];
+    const fakeClient = {
+      query: vi.fn().mockImplementation((cfg: { text: string }, params: unknown[]) => {
+        calls.push({ text: cfg.text, params });
+        return Promise.resolve({ rows: [[2]] });
+      }),
+    };
+    const db = drizzle({ client: fakeClient as never, schema });
+    const repo = new UserStatisticsRepository(db as never);
+
+    await expect(repo.getCompletionLatencyDays(5, true, undefined, 365)).resolves.toEqual([2]);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.text).toContain('"reading_attempts"');
+    expect(calls[0]!.text).toContain('"reading_attempts"."deleted_at" is null');
+    expect(calls[0]!.params).toContain('completed');
   });
 
   it('returns peak reading hour buckets in the provided timezone', async () => {
@@ -349,8 +385,6 @@ describe('UserStatisticsRepository', () => {
 
   it('normalizes completion latency, reading pace, survival, race, and archetype points', async () => {
     const db = makeDb([
-      [],
-      [],
       [{ days: '3.5' }, { days: -1 }, { days: 'not-a-number' }, { days: 7 }],
       [{ durationSeconds: 300, progressDelta: 1.25, source: 'kobo', format: 'PDF' }],
       [],
@@ -442,5 +476,147 @@ describe('UserStatisticsRepository', () => {
         sessionsCount: 1,
       }),
     ]);
+  });
+  it('takes the shared advisory locks in one global order', async () => {
+    // rebuildDailyStatsForUser locks ascending inside its own transaction. Walking the group map
+    // in query order can invert that for a user holding two libraries, and Postgres resolves the
+    // cycle by aborting one side: the rebuild logs and moves on, this pass loses the whole hour.
+    const txSelectQueue = [
+      [
+        { userId: 5, libraryId: 9, settings: { timezone: 'UTC' } },
+        { userId: 5, libraryId: 3, settings: { timezone: 'UTC' } },
+      ],
+      [],
+    ];
+    const tx = {
+      execute: vi.fn().mockResolvedValue({ rowCount: 0 }),
+      select: vi.fn((fields?: Record<string, unknown>) => makeChain(txSelectQueue.shift() ?? [], fields)),
+      insert: vi.fn().mockReturnValue({ values: vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) }) }),
+    };
+    const db = { transaction: vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx)) };
+    const repo = new UserStatisticsRepository(db as never);
+    const lock = vi.spyOn(repo as any, 'lockDailyStats').mockResolvedValue(undefined);
+
+    await repo.recomputeRecentDailyStats(2);
+
+    expect(lock.mock.calls.map((call) => [call[1], call[2]])).toEqual([
+      [5, 3],
+      [5, 9],
+    ]);
+  });
+
+  describe('rebuildDailyStatsForUser', () => {
+    function makeRebuildTx(distinctResults: unknown[], sessionPages: unknown[], deletedRowCount = 0) {
+      const distinct = [...distinctResults];
+      const pages = [...sessionPages];
+      const dailyValues = vi.fn().mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
+      const tx = {
+        // One pair per library: the advisory lock, then the delete whose count is reported.
+        execute: vi.fn().mockResolvedValue({ rowCount: deletedRowCount }),
+        selectDistinct: vi.fn((fields?: Record<string, unknown>) => makeChain(distinct.shift() ?? [], fields)),
+        select: vi.fn((fields?: Record<string, unknown>) => makeChain(pages.shift() ?? [], fields)),
+        insert: vi.fn().mockReturnValue({ values: dailyValues }),
+      };
+      const db = { transaction: vi.fn(async (callback: (trx: typeof tx) => Promise<unknown>) => callback(tx)) };
+      return { tx, db, dailyValues };
+    }
+
+    it('re-attributes history to the local day of the new timezone', async () => {
+      // The reported failure: a session at 00:49 UTC is the previous evening in Halifax, so a
+      // UTC-built row starts the streak a day late and leaves the real reading day empty.
+      const { db, tx, dailyValues } = makeRebuildTx(
+        [[{ libraryId: 3 }], [{ libraryId: 3 }]],
+        [
+          [
+            {
+              id: 11,
+              startedAt: new Date('2026-07-01T00:49:37.000Z'),
+              endedAt: new Date('2026-07-01T02:00:06.000Z'),
+              durationSeconds: 3941,
+              progressDelta: 4,
+            },
+          ],
+        ],
+        6,
+      );
+      const repo = new UserStatisticsRepository(db as never);
+
+      await expect(repo.rebuildDailyStatsForUser(5, 'America/Halifax')).resolves.toEqual({ deleted: 6, inserted: 1, libraries: 1 });
+
+      expect(dailyValues).toHaveBeenCalledWith([
+        expect.objectContaining({ userId: 5, libraryId: 3, day: '2026-06-30', readingSeconds: 3941, progressDelta: 4, sessionsCount: 1 }),
+      ]);
+      expect(tx.execute).toHaveBeenCalledTimes(2);
+    });
+
+    it('rebuilds libraries that only still hold rows, so stale days are dropped rather than kept', async () => {
+      const { db, tx, dailyValues } = makeRebuildTx([[{ libraryId: 9 }, { libraryId: 2 }], [{ libraryId: 2 }]], [[], []], 3);
+      const repo = new UserStatisticsRepository(db as never);
+
+      // Libraries are locked in ascending order so concurrent writers cannot deadlock on them.
+      await expect(repo.rebuildDailyStatsForUser(5, 'UTC')).resolves.toEqual({ deleted: 6, inserted: 0, libraries: 2 });
+      expect(tx.execute).toHaveBeenCalledTimes(4);
+      expect(dailyValues).not.toHaveBeenCalled();
+    });
+
+    it('accumulates across pages instead of stopping at the first batch', async () => {
+      const pageSize = 5_000;
+      const firstPage = Array.from({ length: pageSize }, (_, index) => ({
+        id: index + 1,
+        startedAt: new Date('2026-04-15T08:00:00.000Z'),
+        endedAt: new Date('2026-04-15T08:01:00.000Z'),
+        durationSeconds: 60,
+        progressDelta: null,
+      }));
+      const secondPage = [
+        {
+          id: pageSize + 1,
+          startedAt: new Date('2026-04-15T09:00:00.000Z'),
+          endedAt: new Date('2026-04-15T09:00:30.000Z'),
+          durationSeconds: 30,
+          progressDelta: null,
+        },
+      ];
+      const { db, tx, dailyValues } = makeRebuildTx([[{ libraryId: 1 }], []], [firstPage, secondPage]);
+      const repo = new UserStatisticsRepository(db as never);
+
+      await expect(repo.rebuildDailyStatsForUser(5, 'UTC')).resolves.toEqual({ deleted: 0, inserted: 1, libraries: 1 });
+
+      expect(tx.select).toHaveBeenCalledTimes(2);
+      expect(dailyValues).toHaveBeenCalledWith([
+        expect.objectContaining({ day: '2026-04-15', readingSeconds: pageSize * 60 + 30, sessionsCount: pageSize + 1 }),
+      ]);
+    });
+
+    it('does nothing for a user with no reading history at all', async () => {
+      const { db, tx, dailyValues } = makeRebuildTx([[], []], []);
+      const repo = new UserStatisticsRepository(db as never);
+
+      await expect(repo.rebuildDailyStatsForUser(5, 'Europe/Berlin')).resolves.toEqual({ deleted: 0, inserted: 0, libraries: 0 });
+      expect(tx.execute).not.toHaveBeenCalled();
+      expect(dailyValues).not.toHaveBeenCalled();
+    });
+
+    it('falls back to UTC rather than trusting an unusable timezone', async () => {
+      const { db, dailyValues } = makeRebuildTx(
+        [[{ libraryId: 1 }], []],
+        [
+          [
+            {
+              id: 1,
+              startedAt: new Date('2026-07-01T00:49:37.000Z'),
+              endedAt: new Date('2026-07-01T01:00:00.000Z'),
+              durationSeconds: 623,
+              progressDelta: null,
+            },
+          ],
+        ],
+      );
+      const repo = new UserStatisticsRepository(db as never);
+
+      await repo.rebuildDailyStatsForUser(5, 'Not/AZone');
+
+      expect(dailyValues).toHaveBeenCalledWith([expect.objectContaining({ day: '2026-07-01' })]);
+    });
   });
 });

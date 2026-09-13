@@ -95,7 +95,7 @@ describe('mergeBookCardWithDetail', () => {
       providerIds: { hardcover: 'new-book-slug' },
       hardcoverEditionId: '8941973',
       seriesName: 'My Series',
-      seriesIndex: 2,
+      seriesIndex: '2',
       rating: 8,
       metadataScore: 95,
     })
@@ -114,7 +114,7 @@ describe('mergeBookCardWithDetail', () => {
     expect(result.hardcoverId).toBe('new-book-slug')
     expect(result.hardcoverEditionId).toBe('8941973')
     expect(result.seriesName).toBe('My Series')
-    expect(result.seriesIndex).toBe(2)
+    expect(result.seriesIndex).toBe('2')
     expect(result.rating).toBe(8)
     expect(result.metadataScore).toBe(95)
   })

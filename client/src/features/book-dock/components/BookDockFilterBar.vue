@@ -22,12 +22,12 @@ const searchQuery = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Every chip maps to something the files endpoint can answer, so counts cover the whole dock. */
-const chips = computed<{ view: BookDockView; label: string; count: number }[]>(() => [
-  { view: 'all', label: t('bookDock.layout.filter.all'), count: props.summary.total },
-  { view: 'needsReview', label: t('bookDock.layout.filter.needsReview'), count: props.summary.needsReview },
-  { view: 'pending', label: t('bookDock.layout.filter.pending'), count: props.summary.pending },
-  { view: 'ready', label: t('bookDock.layout.filter.ready'), count: props.summary.ready },
-  { view: 'error', label: t('bookDock.layout.filter.error'), count: props.summary.error },
+const chips = computed<{ view: BookDockView; testId: string; label: string; count: number }[]>(() => [
+  { view: 'all', testId: 'all', label: t('bookDock.layout.filter.all'), count: props.summary.total },
+  { view: 'needsReview', testId: 'needsReview', label: t('bookDock.layout.filter.needsReview'), count: props.summary.needsReview },
+  { view: 'pending', testId: 'pending', label: t('bookDock.layout.filter.pending'), count: props.summary.pending },
+  { view: 'readyToFile', testId: 'ready', label: t('bookDock.layout.filter.ready'), count: props.summary.readyToFile },
+  { view: 'error', testId: 'error', label: t('bookDock.layout.filter.error'), count: props.summary.error },
 ])
 
 function selectView(view: BookDockView) {
@@ -53,7 +53,7 @@ function clearSearch() {
         v-for="chip in chips"
         :key="chip.view"
         type="button"
-        :data-testid="`book-dock-chip-${chip.view}`"
+        :data-testid="`book-dock-chip-${chip.testId}`"
         :aria-pressed="props.activeView === chip.view"
         :disabled="chip.count === 0 && props.activeView !== chip.view"
         class="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:opacity-45"

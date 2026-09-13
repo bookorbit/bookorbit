@@ -1,17 +1,55 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { and, asc, count, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { hash } from 'bcryptjs';
 
-import { Permission } from '@bookorbit/types';
-import type { UserListSortDirection, UserListSortField, UserListState } from '@bookorbit/types';
+import { Permission, withRequiredPermissions } from '@bookorbit/types';
+import type { UserAttentionReason, UserListSortDirection, UserListSortField, UserListState, UserListSummary } from '@bookorbit/types';
 import { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { AuthenticationPolicyService } from '../../common/services/authentication-policy.service';
 
 type Db = NodePgDatabase<typeof schema>;
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+export type ManagedUserMutationStatus = 'updated' | 'target_not_found' | 'requester_not_superuser' | 'last_superuser';
+export type SuperuserTransitionStatus = ManagedUserMutationStatus | 'unchanged' | 'self_target' | 'shared_target' | 'target_no_oidc';
+
+/**
+ * An account needs an administrator's attention when it is locked out, is still on the
+ * password it was created with, or was provisioned and never arrived. Disabled accounts are
+ * excluded: there is nothing to repair on an account nobody can sign in to.
+ */
+function attentionCondition(): SQL {
+  return and(
+    eq(schema.users.active, true),
+    or(
+      sql`${schema.users.lockedUntil} is not null and ${schema.users.lockedUntil} > now()`,
+      eq(schema.users.isDefaultPassword, true),
+      isNull(schema.users.lastAuthenticatedAt),
+    ),
+  )!;
+}
+
+/**
+ * One reason per account, most urgent first. `neverSignedIn` outranks `defaultPassword`
+ * because every freshly created account carries the default-password flag until its reset
+ * link is used - reporting that instead would hide every invite that never landed.
+ */
+function attentionReason(row: { lockedUntil: Date | null; lastAuthenticatedAt: Date | null }): UserAttentionReason {
+  if (row.lockedUntil && row.lockedUntil.getTime() > Date.now()) return 'locked';
+  if (row.lastAuthenticatedAt === null) return 'neverSignedIn';
+  return 'defaultPassword';
+}
+
+/** Same ranking as `attentionReason`, expressed for the ORDER BY. */
+const attentionRank = sql`case
+  when ${schema.users.lockedUntil} is not null and ${schema.users.lockedUntil} > now() then 0
+  when ${schema.users.lastAuthenticatedAt} is null then 1
+  else 2 end`;
 
 export interface UserListQuery {
   page: number;
@@ -25,7 +63,10 @@ export interface UserListQuery {
 
 @Injectable()
 export class UserRepository {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly authenticationPolicy: AuthenticationPolicyService,
+  ) {}
 
   async findAll(query: UserListQuery) {
     const { page, pageSize } = query;
@@ -36,7 +77,9 @@ export class UserRepository {
     const sortColumn = {
       username: schema.users.username,
       name: schema.users.name,
+      email: schema.users.email,
       createdAt: schema.users.createdAt,
+      lastActive: schema.users.lastAuthenticatedAt,
     }[query.sortBy];
     const direction = query.sortDir === 'desc' ? sql.raw('desc') : sql.raw('asc');
 
@@ -65,8 +108,11 @@ export class UserRepository {
         isSuperuser: schema.users.isSuperuser,
         isDefaultPassword: schema.users.isDefaultPassword,
         lockedUntil: schema.users.lockedUntil,
+        failedLoginAttempts: schema.users.failedLoginAttempts,
         provisioningMethod: schema.users.provisioningMethod,
+        avatarUrl: schema.users.avatarUrl,
         createdAt: schema.users.createdAt,
+        lastAuthenticatedAt: schema.users.lastAuthenticatedAt,
         permissionName: schema.userPermissions.permissionName,
       })
       .from(schema.users)
@@ -83,10 +129,14 @@ export class UserRepository {
       isSuperuser: boolean;
       isDefaultPassword: boolean;
       lockedUntil: Date | null;
+      failedLoginAttempts: number;
       provisioningMethod: string;
+      avatarUrl: string | null;
       createdAt: Date;
+      lastAuthenticatedAt: Date | null;
       permissions: Permission[];
       hasContentFilters: boolean;
+      libraryAccessCount: number;
     };
 
     const usersMap = new Map<number, UserListItem>();
@@ -101,10 +151,14 @@ export class UserRepository {
           isSuperuser: row.isSuperuser,
           isDefaultPassword: row.isDefaultPassword,
           lockedUntil: row.lockedUntil,
+          failedLoginAttempts: row.failedLoginAttempts,
           provisioningMethod: row.provisioningMethod,
+          avatarUrl: row.avatarUrl,
           createdAt: row.createdAt,
+          lastAuthenticatedAt: row.lastAuthenticatedAt,
           permissions: [],
           hasContentFilters: false,
+          libraryAccessCount: 0,
         });
       }
       if (row.permissionName) {
@@ -113,7 +167,7 @@ export class UserRepository {
     }
 
     if (userIds.length > 0) {
-      const [tagFilterUsers, genreFilterUsers] = await Promise.all([
+      const [tagFilterUsers, genreFilterUsers, libraryAccessCounts] = await Promise.all([
         this.db
           .select({ userId: schema.userContentFilterTags.userId })
           .from(schema.userContentFilterTags)
@@ -122,6 +176,11 @@ export class UserRepository {
           .select({ userId: schema.userContentFilterGenres.userId })
           .from(schema.userContentFilterGenres)
           .where(inArray(schema.userContentFilterGenres.userId, userIds)),
+        this.db
+          .select({ userId: schema.userLibraryAccess.userId, granted: count() })
+          .from(schema.userLibraryAccess)
+          .where(inArray(schema.userLibraryAccess.userId, userIds))
+          .groupBy(schema.userLibraryAccess.userId),
       ]);
       const usersWithFilters = new Set<number>();
       for (const r of tagFilterUsers) usersWithFilters.add(r.userId);
@@ -129,10 +188,84 @@ export class UserRepository {
       for (const [id, user] of usersMap) {
         if (usersWithFilters.has(id)) user.hasContentFilters = true;
       }
+      for (const row of libraryAccessCounts) {
+        const user = usersMap.get(row.userId);
+        if (user) user.libraryAccessCount = Number(row.granted);
+      }
     }
 
     const users = userIds.map((id) => usersMap.get(id)).filter((user): user is UserListItem => user !== undefined);
     return { users, total: normalizedTotal };
+  }
+
+  /** Counts across every account, deliberately ignoring the caller's current filter. */
+  async summary(): Promise<UserListSummary> {
+    const [row] = await this.db
+      .select({
+        total: sql<number>`count(*)::int`,
+        admins: sql<number>`count(*) filter (where ${schema.users.isSuperuser} = true)::int`,
+        active: sql<number>`count(*) filter (where ${schema.users.active} = true)::int`,
+        inactive: sql<number>`count(*) filter (where ${schema.users.active} = false)::int`,
+        attention: sql<number>`count(*) filter (where ${attentionCondition()})::int`,
+      })
+      .from(schema.users);
+    return row ?? { total: 0, admins: 0, active: 0, inactive: 0, attention: 0 };
+  }
+
+  async findNeedingAttention(limit: number) {
+    const rows = await this.db
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        name: schema.users.name,
+        avatarUrl: schema.users.avatarUrl,
+        provisioningMethod: schema.users.provisioningMethod,
+        createdAt: schema.users.createdAt,
+        lockedUntil: schema.users.lockedUntil,
+        isDefaultPassword: schema.users.isDefaultPassword,
+        lastAuthenticatedAt: schema.users.lastAuthenticatedAt,
+      })
+      .from(schema.users)
+      .where(attentionCondition())
+      .orderBy(attentionRank, asc(schema.users.createdAt))
+      .limit(limit);
+
+    if (rows.length === 0) return [];
+
+    // Only the newest unused link per account matters; the set is bounded by `limit`.
+    const tokens = await this.db
+      .select({
+        userId: schema.passwordResetTokens.userId,
+        expiresAt: schema.passwordResetTokens.expiresAt,
+      })
+      .from(schema.passwordResetTokens)
+      .where(
+        and(
+          inArray(
+            schema.passwordResetTokens.userId,
+            rows.map((r) => r.id),
+          ),
+          isNull(schema.passwordResetTokens.usedAt),
+        ),
+      )
+      .orderBy(desc(schema.passwordResetTokens.createdAt));
+
+    const latestLink = new Map<number, Date>();
+    for (const token of tokens) {
+      if (!latestLink.has(token.userId)) latestLink.set(token.userId, token.expiresAt);
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      username: row.username,
+      name: row.name,
+      avatarUrl: row.avatarUrl,
+      provisioningMethod: row.provisioningMethod,
+      createdAt: row.createdAt,
+      lockedUntil: row.lockedUntil,
+      reason: attentionReason(row),
+      resetLinkExpiresAt: latestLink.get(row.id) ?? null,
+    }));
   }
 
   private buildListFilters(query: UserListQuery): SQL[] {
@@ -152,6 +285,8 @@ export class UserRepository {
       filters.push(eq(schema.users.active, true));
     } else if (query.state === 'inactive') {
       filters.push(eq(schema.users.active, false));
+    } else if (query.state === 'attention') {
+      filters.push(attentionCondition());
     }
 
     return filters;
@@ -186,6 +321,7 @@ export class UserRepository {
           avatarSource: schema.users.avatarSource,
           avatarVersion: schema.users.avatarVersion,
           provisioningMethod: schema.users.provisioningMethod,
+          seeOwnRequestedBooks: schema.users.seeOwnRequestedBooks,
           permissionName: schema.userPermissions.permissionName,
         })
         .from(schema.users)
@@ -232,6 +368,7 @@ export class UserRepository {
         excludeTagIds: tagFilterRows.filter((r) => r.filterType === 'exclude').map((r) => r.tagId),
         includeGenreIds: genreFilterRows.filter((r) => r.filterType === 'include').map((r) => r.genreId),
         excludeGenreIds: genreFilterRows.filter((r) => r.filterType === 'exclude').map((r) => r.genreId),
+        ...(first.seeOwnRequestedBooks ? { exemptRequestsFromUserId: first.id } : {}),
       },
     };
   }
@@ -246,7 +383,7 @@ export class UserRepository {
     return user;
   }
 
-  async update(id: number, data: Partial<Pick<typeof schema.users.$inferInsert, 'name' | 'email' | 'active' | 'settings'>>) {
+  async update(id: number, data: Partial<Pick<typeof schema.users.$inferInsert, 'name' | 'email' | 'active' | 'settings' | 'seeOwnRequestedBooks'>>) {
     const { settings, ...rest } = data;
     const setData: Record<string, unknown> = { ...rest, updatedAt: new Date() };
     if (settings !== undefined) {
@@ -266,21 +403,114 @@ export class UserRepository {
     return user;
   }
 
+  async updateManagedUser(
+    requestingUserId: number,
+    targetUserId: number,
+    data: Partial<Pick<typeof schema.users.$inferInsert, 'name' | 'email' | 'active'>>,
+  ): Promise<{ status: ManagedUserMutationStatus; user?: Awaited<ReturnType<UserRepository['update']>> }> {
+    return this.db.transaction(async (tx) => {
+      await this.authenticationPolicy.lockAdministratorAvailability(tx);
+      const { requester, target } = await this.findLifecycleUsers(tx, requestingUserId, targetUserId);
+      if (!target) return { status: 'target_not_found' };
+      if (target.isSuperuser && !this.isActiveSuperuser(requester)) return { status: 'requester_not_superuser' };
+      if (data.active === false && target.isSuperuser && (await this.countOtherActiveSuperusers(tx, targetUserId)) === 0) {
+        return { status: 'last_superuser' };
+      }
+
+      const [user] = await tx
+        .update(schema.users)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.users.id, targetUserId))
+        .returning({
+          id: schema.users.id,
+          username: schema.users.username,
+          name: schema.users.name,
+          email: schema.users.email,
+          active: schema.users.active,
+          isDefaultPassword: schema.users.isDefaultPassword,
+          settings: schema.users.settings,
+          createdAt: schema.users.createdAt,
+          updatedAt: schema.users.updatedAt,
+        });
+      await this.authenticationPolicy.assertUsableOidcSuperuser(tx);
+      return user ? { status: 'updated', user } : { status: 'target_not_found' };
+    });
+  }
+
   async delete(id: number) {
     await this.db.delete(schema.users).where(eq(schema.users.id, id));
   }
 
+  async deleteManagedUser(requestingUserId: number, targetUserId: number, beforeDelete?: () => Promise<void>): Promise<ManagedUserMutationStatus> {
+    return this.db.transaction(async (tx) => {
+      await this.authenticationPolicy.lockAdministratorAvailability(tx);
+      const { requester, target } = await this.findLifecycleUsers(tx, requestingUserId, targetUserId);
+      if (!target) return 'target_not_found';
+      if (target.isSuperuser && !this.isActiveSuperuser(requester)) return 'requester_not_superuser';
+      if (target.isSuperuser && (await this.countOtherActiveSuperusers(tx, targetUserId)) === 0) return 'last_superuser';
+
+      if (beforeDelete) await beforeDelete();
+      await tx.delete(schema.users).where(eq(schema.users.id, targetUserId));
+      await this.authenticationPolicy.assertUsableOidcSuperuser(tx);
+      return 'updated';
+    });
+  }
+
+  /**
+   * The one chokepoint every assignment path reaches, which is why the dependency rule lives here
+   * rather than in the service: user creation, shared-user creation, the permissions endpoint and
+   * OIDC auto-provisioning all end up on this line, and the OIDC one skips the service's own
+   * normalisation entirely. A permission that is inert without another is granted with it.
+   */
   async setPermissions(userId: number, permissionNames: Permission[]) {
+    const resolved = withRequiredPermissions(permissionNames);
+
     await this.db.transaction(async (tx) => {
       await tx.delete(schema.userPermissions).where(eq(schema.userPermissions.userId, userId));
-      if (permissionNames.length > 0) {
-        await tx.insert(schema.userPermissions).values(permissionNames.map((permissionName) => ({ userId, permissionName })));
+      if (resolved.length > 0) {
+        await tx.insert(schema.userPermissions).values(resolved.map((permissionName) => ({ userId, permissionName })));
       }
     });
   }
 
-  async setSuperuser(userId: number, isSuperuser: boolean) {
-    await this.db.update(schema.users).set({ isSuperuser }).where(eq(schema.users.id, userId));
+  async setSuperuser(requestingUserId: number, targetUserId: number, isSuperuser: boolean): Promise<SuperuserTransitionStatus> {
+    return this.db.transaction(async (tx) => {
+      await this.authenticationPolicy.lockAdministratorAvailability(tx);
+      const { requester, target } = await this.findLifecycleUsers(tx, requestingUserId, targetUserId);
+      if (requestingUserId === targetUserId) return 'self_target';
+      if (!this.isActiveSuperuser(requester)) return 'requester_not_superuser';
+      if (!target) return 'target_not_found';
+      if (isSuperuser && target.provisioningMethod === 'shared') return 'shared_target';
+      if (target.isSuperuser === isSuperuser) return 'unchanged';
+      if (
+        isSuperuser &&
+        !this.authenticationPolicy.isPasswordLoginEnabled() &&
+        !(await this.authenticationPolicy.hasEnabledOidcIdentityForUser(tx, targetUserId))
+      ) {
+        return 'target_no_oidc';
+      }
+      if (!isSuperuser && (await this.countOtherActiveSuperusers(tx, targetUserId)) === 0) return 'last_superuser';
+
+      const now = new Date();
+      await tx
+        .update(schema.users)
+        .set({
+          isSuperuser,
+          tokenVersion: sql`${schema.users.tokenVersion} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(schema.users.id, targetUserId));
+      await tx
+        .update(schema.refreshTokens)
+        .set({ revokedAt: now })
+        .where(and(eq(schema.refreshTokens.userId, targetUserId), isNull(schema.refreshTokens.revokedAt)));
+      await tx
+        .update(schema.passwordResetTokens)
+        .set({ usedAt: now })
+        .where(and(eq(schema.passwordResetTokens.userId, targetUserId), isNull(schema.passwordResetTokens.usedAt)));
+      await this.authenticationPolicy.assertUsableOidcSuperuser(tx);
+      return 'updated';
+    });
   }
 
   async countOtherSuperusers(excludeUserId: number): Promise<number> {
@@ -288,6 +518,34 @@ export class UserRepository {
       .select({ total: count() })
       .from(schema.users)
       .where(and(eq(schema.users.isSuperuser, true), ne(schema.users.id, excludeUserId)));
+    return Number(total);
+  }
+
+  private async findLifecycleUsers(tx: Tx, requestingUserId: number, targetUserId: number) {
+    const rows = await tx
+      .select({
+        id: schema.users.id,
+        active: schema.users.active,
+        isSuperuser: schema.users.isSuperuser,
+        provisioningMethod: schema.users.provisioningMethod,
+      })
+      .from(schema.users)
+      .where(inArray(schema.users.id, [requestingUserId, targetUserId]));
+    return {
+      requester: rows.find((row) => row.id === requestingUserId),
+      target: rows.find((row) => row.id === targetUserId),
+    };
+  }
+
+  private isActiveSuperuser(user: { active: boolean; isSuperuser: boolean } | undefined): boolean {
+    return user?.active === true && user.isSuperuser;
+  }
+
+  private async countOtherActiveSuperusers(tx: Tx, excludeUserId: number): Promise<number> {
+    const [{ total }] = await tx
+      .select({ total: count() })
+      .from(schema.users)
+      .where(and(eq(schema.users.active, true), eq(schema.users.isSuperuser, true), ne(schema.users.id, excludeUserId)));
     return Number(total);
   }
 

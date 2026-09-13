@@ -428,7 +428,7 @@ describe('BookCoverCard', () => {
         id: 44,
         seriesId: 42,
         seriesName: 'Dune Chronicles',
-        seriesIndex: 1,
+        seriesIndex: '1',
         files: [makeFile({ id: 12, format: 'epub', role: 'primary' })],
       })
       const wrapper = mountCard({ book, showLabel: true })
@@ -656,19 +656,19 @@ describe('BookCoverCard', () => {
   describe('series position overlay', () => {
     it('hides badge when series-position is not in cardOverlays', () => {
       mockCardOverlays.value = []
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: 'Dune' }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3', seriesName: 'Dune' }) })
       expect(wrapper.text()).not.toContain('#3')
     })
 
     it('shows #3 badge when seriesIndex is 3 and overlay is enabled', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: 'Dune' }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3', seriesName: 'Dune' }) })
       expect(wrapper.text()).toContain('#3')
     })
 
     it('marks badge as a card-click blocker and disables hit-testing on hover', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: 'Dune' }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3', seriesName: 'Dune' }) })
       const badge = wrapper.find('[data-card-click-blocker]')
       expect(badge.exists()).toBe(true)
       expect(badge.classes()).toContain('group-hover:pointer-events-none')
@@ -676,15 +676,14 @@ describe('BookCoverCard', () => {
 
     it('shows #1.5 badge when seriesIndex is 1.5', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 1.5, seriesName: 'Dune' }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '1.5', seriesName: 'Dune' }) })
       expect(wrapper.text()).toContain('#1.5')
     })
 
-    it('strips trailing .0 for whole-number floats (3.0 shows as #3)', () => {
+    it('preserves trailing zeros in exact series labels', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3.0, seriesName: 'Dune' }) })
-      expect(wrapper.text()).toContain('#3')
-      expect(wrapper.text()).not.toContain('#3.0')
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3.0', seriesName: 'Dune' }) })
+      expect(wrapper.text()).toContain('#3.0')
     })
 
     it('hides badge when seriesIndex is null even if overlay is enabled', () => {
@@ -695,32 +694,32 @@ describe('BookCoverCard', () => {
 
     it('hides badge in selection mode', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 2, seriesName: 'Dune' }), selectionMode: true })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '2', seriesName: 'Dune' }), selectionMode: true })
       expect(wrapper.text()).not.toContain('#2')
     })
 
     it('hides badge for missing books', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 2, seriesName: 'Dune', status: 'missing' }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '2', seriesName: 'Dune', status: 'missing' }) })
       expect(wrapper.text()).not.toContain('#2')
     })
 
     it('tooltip content includes series name and number', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: 'Sprawl' }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3', seriesName: 'Sprawl' }) })
       expect(wrapper.text()).toContain('Sprawl #3')
     })
 
     it('tooltip content shows only number when seriesName is null', () => {
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: null }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3', seriesName: null }) })
       expect(wrapper.text()).toContain('#3')
     })
 
     it('does not open the reader when the series badge is clicked', async () => {
       setTouchMode(false)
       mockCardOverlays.value = ['series-position']
-      const wrapper = mountCard({ book: makeBook({ seriesIndex: 3, seriesName: 'Dune' }) })
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3', seriesName: 'Dune' }) })
       const badge = wrapper.find('[data-card-click-blocker]')
       expect(badge.exists()).toBe(true)
       await badge.trigger('click')

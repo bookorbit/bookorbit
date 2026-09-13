@@ -67,7 +67,7 @@ export class KoreaderController {
   @UseGuards(KoreaderAuthGuard)
   @Put('syncs/progress')
   async saveProgress(@CurrentUser() user: RequestUser, @Body() dto: KoreaderSaveProgressDto) {
-    return this.koreaderService.saveProgress(user.id, dto);
+    return this.koreaderService.saveProgress(user, dto);
   }
 
   @Public()

@@ -5,7 +5,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import LoginPage from '../LoginPage.vue'
 
 const { statusState, routeState } = vi.hoisted(() => ({
-  statusState: { allowRegistration: false },
+  statusState: { allowRegistration: false, passwordLoginEnabled: true },
   routeState: { query: {} as Record<string, unknown> },
 }))
 
@@ -15,7 +15,22 @@ vi.mock('../composables/useAuth', () => ({
 }))
 
 vi.mock('../composables/useOidc', () => ({
-  useOidc: () => ({ getPublicProviders: vi.fn<() => Promise<unknown[]>>(async () => []), initiateLogin: vi.fn<() => void>() }),
+  useOidc: () => ({ initiateLogin: vi.fn<() => void>() }),
+}))
+
+vi.mock('../composables/useLoginOptions', () => ({
+  useLoginOptions: () => {
+    const options = {
+      passwordLoginEnabled: statusState.passwordLoginEnabled,
+      allowRegistration: statusState.passwordLoginEnabled && statusState.allowRegistration,
+      oidcProviders: [],
+    }
+    return {
+      loginOptions: ref(options),
+      loginOptionsError: ref(null),
+      fetchLoginOptions: vi.fn<() => Promise<typeof options>>(async () => options),
+    }
+  },
 }))
 
 vi.mock('../composables/useSetupStatus', () => ({
@@ -59,6 +74,7 @@ function mountPage() {
 beforeEach(() => {
   vi.clearAllMocks()
   statusState.allowRegistration = false
+  statusState.passwordLoginEnabled = true
   routeState.query = {}
 })
 
@@ -86,6 +102,16 @@ describe('LoginPage sign-up affordance', () => {
     await flushPromises()
 
     expect(wrapper.findAll('a').some((a) => a.attributes('href') === '/forgot-password')).toBe(true)
+  })
+
+  it('omits every password affordance when password authentication is disabled', async () => {
+    statusState.passwordLoginEnabled = false
+    statusState.allowRegistration = true
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.findAll('a').some((a) => ['/register', '/forgot-password'].includes(a.attributes('href') ?? ''))).toBe(false)
   })
 })
 

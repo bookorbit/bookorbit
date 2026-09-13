@@ -1,4 +1,9 @@
-import { MetadataProviderKey, type MetadataCandidate, type MetadataSeriesMembership } from '@bookorbit/types';
+import {
+  MetadataProviderKey,
+  parseSeriesIndex as parseSeriesIndexLabel,
+  type MetadataCandidate,
+  type MetadataSeriesMembership,
+} from '@bookorbit/types';
 
 import { parsePublishedDateKey, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { stripHtml } from '../provider-utils';
@@ -22,10 +27,8 @@ function extractGenres(product: AudibleProduct): string[] | undefined {
   return genres.length ? genres : undefined;
 }
 
-function parseSeriesIndex(sequence: string | undefined): number | undefined {
-  if (sequence == null || sequence.trim() === '') return undefined;
-  const parsed = parseFloat(sequence);
-  return Number.isFinite(parsed) ? parsed : undefined;
+function parseSeriesIndex(sequence: string | undefined): string | undefined {
+  return parseSeriesIndexLabel(sequence) ?? undefined;
 }
 
 function extractSeriesMemberships(product: AudibleProduct): MetadataSeriesMembership[] | undefined {

@@ -1,0 +1,15 @@
+{
+  "name": "@bookorbit/plugin-api",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch --preserveWatchOutput"
+  }
+}

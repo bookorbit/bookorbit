@@ -124,6 +124,7 @@ interface HarnessOptions {
   // Issues the /issues/ endpoint holds, keyed "<volumeId>#<issueNumber>".
   issues?: Record<string, ComicVineIssue[]>;
   generalSearchResults?: ComicVineIssue[];
+  volumeDetails?: Record<number, ComicVineVolume>;
   issueDetails?: Record<string, ComicVineIssue>;
   issueDetailMs?: number;
   // Volumes and issue details ComicVine answers with HTTP 420, its throttle response.
@@ -137,6 +138,7 @@ interface Harness {
   throttleTracker: ProviderThrottleTracker;
   requestUrls: URL[];
   probedVolumeIds: number[];
+  detailVolumeIds: number[];
   detailIssueIds: string[];
   abortedPaths: string[];
 }
@@ -146,6 +148,7 @@ function buildHarness(options: HarnessOptions = {}): Harness {
   const issues = options.issues ?? {};
   const requestUrls: URL[] = [];
   const probedVolumeIds: number[] = [];
+  const detailVolumeIds: number[] = [];
   const detailIssueIds: string[] = [];
   const abortedPaths: string[] = [];
   const detailMs = options.issueDetailMs ?? ISSUE_DETAIL_MS;
@@ -183,6 +186,12 @@ function buildHarness(options: HarnessOptions = {}): Harness {
       );
     }
 
+    const volumeId = Number(/\/volume\/4050-(\d+)\//.exec(target.pathname)?.[1]);
+    if (Number.isSafeInteger(volumeId)) {
+      detailVolumeIds.push(volumeId);
+      return respondAfter(detailMs, () => okResponse(options.volumeDetails?.[volumeId] ?? null));
+    }
+
     const issueId = /\/issue\/4000-(\d+)\//.exec(target.pathname)?.[1] ?? '';
     detailIssueIds.push(issueId);
     return respondAfter(detailMs, () =>
@@ -199,7 +208,7 @@ function buildHarness(options: HarnessOptions = {}): Harness {
   );
   const service = new MetadataFetchService(new ProviderRegistry([provider]), new ProviderThrottleTracker(), {} as MetadataFetchRepository);
 
-  return { provider, service, throttleTracker, requestUrls, probedVolumeIds, detailIssueIds, abortedPaths };
+  return { provider, service, throttleTracker, requestUrls, probedVolumeIds, detailVolumeIds, detailIssueIds, abortedPaths };
 }
 
 async function runToCompletion<T>(work: Promise<T>): Promise<{ value: T; elapsedMs: number }> {
@@ -399,12 +408,17 @@ describe('ComicVine search budget', () => {
   it('falls back to the general issue search for a comic with no parsed series', async () => {
     const harness = buildHarness({
       generalSearchResults: [issue(900_001, ASM_2022, 'The Amazing Spider-Man', '67')],
+      volumeDetails: {
+        [ASM_2022]: { ...volume(ASM_2022, 'The Amazing Spider-Man', '2022', 93), publisher: { id: 31, name: 'Marvel' } },
+      },
     });
 
     const { value: candidates } = await runToCompletion(harness.provider.search({ title: 'The Amazing Spider-Man (2022) Volume 06 Issue 067' }));
 
     expect(harness.requestUrls[0].pathname).toBe('/api/search/');
     expect(harness.probedVolumeIds).toEqual([]);
+    expect(harness.detailVolumeIds).toEqual([ASM_2022]);
     expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.publisher).toBe('Marvel');
   });
 });

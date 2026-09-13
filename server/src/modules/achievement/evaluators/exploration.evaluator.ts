@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { getYearInTimeZone } from '../../../common/utils/timezone.utils';
 import { AchievementRepository } from '../achievement.repository';
 import { ACHIEVEMENT_EVENT_BACKFILL, ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED, type BookStatusChangedPayload } from '../achievement-events.service';
 import type { AchievementAward, EvaluationContext, IAchievementEvaluator } from './evaluator.interface';
@@ -36,7 +37,7 @@ export class ExplorationEvaluator implements IAchievementEvaluator {
 
   async evaluate(ctx: EvaluationContext, earnedKeys: Set<string>): Promise<AchievementAward[]> {
     if (ctx.eventName === ACHIEVEMENT_EVENT_BACKFILL) {
-      return this.evaluateBackfill(ctx.userId, earnedKeys);
+      return this.evaluateBackfill(ctx.userId, ctx.timeZone, earnedKeys);
     }
 
     const payload = ctx.payload as unknown as BookStatusChangedPayload;
@@ -47,7 +48,7 @@ export class ExplorationEvaluator implements IAchievementEvaluator {
     await this.evaluateGenreExplorerTiers(ctx.userId, earnedKeys, awards);
     await this.evaluatePolyglotTiers(ctx.userId, earnedKeys, awards);
     await this.evaluateOldSoul(ctx.userId, payload.bookId, earnedKeys, awards);
-    await this.evaluateNewRelease(ctx.userId, payload.bookId, earnedKeys, awards);
+    await this.evaluateNewRelease(ctx.userId, ctx.timeZone, payload.bookId, earnedKeys, awards);
     await this.evaluateCenturySpan(ctx.userId, earnedKeys, awards);
     await this.evaluateAuthorDeepDive(ctx.userId, earnedKeys, awards);
     await this.evaluateDecadeSampler(ctx.userId, earnedKeys, awards);
@@ -59,13 +60,13 @@ export class ExplorationEvaluator implements IAchievementEvaluator {
     return awards;
   }
 
-  private async evaluateBackfill(userId: number, earnedKeys: Set<string>): Promise<AchievementAward[]> {
+  private async evaluateBackfill(userId: number, timeZone: string, earnedKeys: Set<string>): Promise<AchievementAward[]> {
     const awards: AchievementAward[] = [];
 
     await this.evaluateGenreExplorerTiers(userId, earnedKeys, awards);
     await this.evaluatePolyglotTiers(userId, earnedKeys, awards);
     await this.evaluateOldSoulBackfill(userId, earnedKeys, awards);
-    await this.evaluateNewReleaseBackfill(userId, earnedKeys, awards);
+    await this.evaluateNewReleaseBackfill(userId, timeZone, earnedKeys, awards);
     await this.evaluateCenturySpan(userId, earnedKeys, awards);
     await this.evaluateAuthorDeepDive(userId, earnedKeys, awards);
     await this.evaluateDecadeSampler(userId, earnedKeys, awards);
@@ -112,10 +113,16 @@ export class ExplorationEvaluator implements IAchievementEvaluator {
     }
   }
 
-  private async evaluateNewRelease(userId: number, bookId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+  private async evaluateNewRelease(
+    userId: number,
+    timeZone: string,
+    bookId: number,
+    earnedKeys: Set<string>,
+    awards: AchievementAward[],
+  ): Promise<void> {
     if (earnedKeys.has('new_release')) return;
     const publishedYear = await this.repo.getBookPublishedYear(bookId);
-    const currentYear = new Date().getFullYear();
+    const currentYear = getYearInTimeZone(new Date(), timeZone);
     if (publishedYear !== null && publishedYear === currentYear) {
       const bookTitle = await this.repo.getBookTitle(bookId);
       awards.push({ key: 'new_release', context: { bookId, bookTitle, publishedYear } });
@@ -188,9 +195,9 @@ export class ExplorationEvaluator implements IAchievementEvaluator {
     }
   }
 
-  private async evaluateNewReleaseBackfill(userId: number, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
+  private async evaluateNewReleaseBackfill(userId: number, timeZone: string, earnedKeys: Set<string>, awards: AchievementAward[]): Promise<void> {
     if (earnedKeys.has('new_release')) return;
-    const currentYear = new Date().getFullYear();
+    const currentYear = getYearInTimeZone(new Date(), timeZone);
     const hasBook = await this.repo.hasFinishedBookPublishedInYear(userId, currentYear);
     if (hasBook) {
       awards.push({ key: 'new_release', context: { publishedYear: currentYear } });

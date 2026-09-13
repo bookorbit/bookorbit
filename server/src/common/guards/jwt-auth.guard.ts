@@ -5,6 +5,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ALLOW_DEFAULT_PASSWORD_KEY } from '../decorators/allow-default-password.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { RequestUser } from '../types/request-user';
+import { AuthenticationMethod } from '@bookorbit/types';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -23,7 +24,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       throw new UnauthorizedException();
     }
 
-    if (user.isDefaultPassword) {
+    if (user.isDefaultPassword && user.authenticationMethod !== AuthenticationMethod.Oidc) {
       const allowDefaultPassword = this.reflector.getAllAndOverride<boolean>(ALLOW_DEFAULT_PASSWORD_KEY, [context.getHandler(), context.getClass()]);
       if (!allowDefaultPassword) {
         throw new ForbiddenException('Password change required');

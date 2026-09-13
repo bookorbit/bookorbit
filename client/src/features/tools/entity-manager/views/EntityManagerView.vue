@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { formatDateTime } from '@/i18n/formatters'
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, RefreshCw, Search } from '@lucide/vue'
 import type { BrowseEntityItem, DuplicateCluster } from '@bookorbit/types'
 
 import { useEntityManager, type EntityManagerMode } from '../../composables/useEntityManager'
-import DuplicateClusterCard from '../components/DuplicateClusterCard.vue'
-import DuplicateScanControls from '../components/DuplicateScanControls.vue'
-import DismissedPairsSection from '../components/DismissedPairsSection.vue'
+import { useEntityRowDensity } from '../composables/useEntityRowDensity'
+import type { EntityRowDensity } from '../types'
+import DuplicateReviewControls from '../components/DuplicateReviewControls.vue'
+import DuplicatesPanel from '../components/DuplicatesPanel.vue'
+import EntityBrowseToolbar from '../components/EntityBrowseToolbar.vue'
 import EntityBrowseTable from '../components/EntityBrowseTable.vue'
 import EntityTypeSelector from '../components/EntityTypeSelector.vue'
 import ModeSwitcher from '../components/ModeSwitcher.vue'
@@ -18,8 +17,8 @@ import SplitModal from '../components/SplitModal.vue'
 import BulkDeleteModal from '../components/BulkDeleteModal.vue'
 import BrowseMergeModal from '../components/BrowseMergeModal.vue'
 
-const { t } = useI18n()
 const em = useEntityManager()
+const { density } = useEntityRowDensity()
 
 const renameTarget = ref<BrowseEntityItem | null>(null)
 const deleteTarget = ref<BrowseEntityItem | null>(null)
@@ -28,12 +27,14 @@ const showBulkDelete = ref(false)
 const showBrowseMerge = ref(false)
 
 const selectedBrowseItems = computed(() => Array.from(em.selectedItemsMap.value.values()))
+const hasActiveFilters = computed(() => em.browseSearch.value.length > 0 || em.browseBookCount.value === 'empty')
 const deleteDefaultMode = computed<'soft' | 'hard'>(() => (deleteTarget.value?.bookCount === 0 ? 'hard' : 'soft'))
 const bulkDeleteDefaultMode = computed<'soft' | 'hard'>(() =>
   selectedBrowseItems.value.length > 0 && selectedBrowseItems.value.every((item) => item.bookCount === 0) ? 'hard' : 'soft',
 )
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
+let skipNextSearchWatch = false
 
 function refreshBrowseFromFirstPage(): void {
   em.browsePage.value = 1
@@ -41,6 +42,10 @@ function refreshBrowseFromFirstPage(): void {
 }
 
 watch(em.browseSearch, () => {
+  if (skipNextSearchWatch) {
+    skipNextSearchWatch = false
+    return
+  }
   if (searchDebounce) clearTimeout(searchDebounce)
   searchDebounce = setTimeout(() => {
     refreshBrowseFromFirstPage()
@@ -54,6 +59,7 @@ watch(
       em.fetchBrowse()
     } else if (newMode === 'duplicates') {
       em.fetchScanStatus()
+      runScan()
     }
   },
   { immediate: true },
@@ -63,13 +69,14 @@ function handleUpdateMode(value: EntityManagerMode): void {
   em.mode.value = value
 }
 
-function handleUpdateMinSimilarity(value: number): void {
-  em.minSimilarity.value = value
-}
-
-function handleScan(): void {
+function runScan(): void {
   em.scanPage.value = 1
   em.scan()
+}
+
+function handleUpdateMinSimilarity(value: number): void {
+  em.minSimilarity.value = value
+  runScan()
 }
 
 function handleRefreshDuplicates(): void {
@@ -81,12 +88,11 @@ function handleScanPage(value: number): void {
   em.scan()
 }
 
-function handleScanPrevPage(): void {
-  handleScanPage(em.scanPage.value - 1)
-}
-
-function handleScanNextPage(): void {
-  handleScanPage(em.scanPage.value + 1)
+async function handleDismissCluster(cluster: DuplicateCluster): Promise<void> {
+  for (const pair of cluster.pairDetails) {
+    await em.dismissPair(pair.idA, pair.idB)
+  }
+  em.removeClustersByIds(cluster.entities.map((entity) => entity.id))
 }
 
 function handleUpdateSearch(value: string): void {
@@ -96,6 +102,33 @@ function handleUpdateSearch(value: string): void {
 function handleUpdatePage(value: number): void {
   em.browsePage.value = value
   em.fetchBrowse()
+}
+
+function handleUpdatePageSize(value: number): void {
+  em.browsePageSize.value = value
+  refreshBrowseFromFirstPage()
+}
+
+function handleUpdateDensity(value: EntityRowDensity): void {
+  density.value = value
+}
+
+function handleToggleAll(selected: boolean): void {
+  em.setSelection(
+    em.browseItems.value.map((item) => item.id),
+    selected,
+  )
+}
+
+function handleClearFilters(): void {
+  if (searchDebounce) {
+    clearTimeout(searchDebounce)
+    searchDebounce = null
+  }
+  if (em.browseSearch.value !== '') skipNextSearchWatch = true
+  em.browseSearch.value = ''
+  em.browseBookCount.value = 'any'
+  refreshBrowseFromFirstPage()
 }
 
 function handleBrowseSortChange(sortBy: 'name' | 'bookCount', sortOrder: 'asc' | 'desc'): void {
@@ -209,163 +242,88 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
 
 <template>
   <div class="flex flex-col h-full overflow-hidden">
-    <div class="flex-none space-y-5 pb-5">
-      <div class="flex flex-wrap items-center gap-3">
-        <EntityTypeSelector v-model="em.entityType.value" />
-        <ModeSwitcher :model-value="em.mode.value" @update:model-value="handleUpdateMode" />
-      </div>
+    <div class="flex flex-none flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-border bg-card px-2.5 py-2">
+      <EntityTypeSelector v-model="em.entityType.value" />
+      <span class="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden="true" />
+      <ModeSwitcher :model-value="em.mode.value" @update:model-value="handleUpdateMode" />
+      <span class="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden="true" />
 
-      <!-- Duplicates scan controls - only shown in duplicates mode -->
-      <div v-if="em.mode.value === 'duplicates'">
-        <DuplicateScanControls
-          :min-similarity="em.minSimilarity.value"
-          :scanning="em.scanning.value"
-          @update:min-similarity="handleUpdateMinSimilarity"
-          @scan="handleScan"
-        />
-
-        <!-- Compute status bar -->
-        <div v-if="em.duplicateScanStatus.value && !em.isInline.value" class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <template v-if="em.duplicateScanStatus.value.state === 'computing'">
-            <Loader2 class="h-3 w-3 animate-spin shrink-0" />
-            <span>
-              {{ t('tools.entityManager.duplicates.computing') }}
-              <template v-if="em.duplicateScanStatus.value.progressPct !== null">{{ em.duplicateScanStatus.value.progressPct }}%</template>
-            </span>
-          </template>
-          <template v-else-if="em.duplicateScanStatus.value.state === 'done' && em.duplicateScanStatus.value.computedAt">
-            <span>{{
-              t('tools.entityManager.duplicates.computedAt', { date: formatDateTime(new Date(em.duplicateScanStatus.value.computedAt)) })
-            }}</span>
-            <button class="flex items-center gap-1 hover:text-foreground transition-colors" @click="handleRefreshDuplicates">
-              <RefreshCw class="h-3 w-3" />
-              {{ t('tools.entityManager.duplicates.recompute') }}
-            </button>
-          </template>
-          <template v-else-if="em.duplicateScanStatus.value.state === 'idle'">
-            <span>{{ t('tools.entityManager.duplicates.noneComputed') }}</span>
-            <button class="flex items-center gap-1 hover:text-foreground transition-colors" @click="handleRefreshDuplicates">
-              <RefreshCw class="h-3 w-3" />
-              {{ t('tools.entityManager.duplicates.computeNow') }}
-            </button>
-          </template>
-        </div>
-
-        <div v-if="em.scanError.value" class="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {{ em.scanError.value }}
-        </div>
-      </div>
+      <EntityBrowseToolbar
+        v-if="em.mode.value === 'browse'"
+        :search="em.browseSearch.value"
+        :book-count="em.browseBookCount.value"
+        :total="em.browseTotal.value"
+        :density="density"
+        :selected-count="em.selectedIds.value.size"
+        :is-inline="em.isInline.value"
+        @update:search="handleUpdateSearch"
+        @update:book-count="handleUpdateBookCount"
+        @update:density="handleUpdateDensity"
+        @bulk-merge="handleBulkMerge"
+        @bulk-delete="handleBulkDelete"
+        @clear-selection="em.clearSelection"
+      />
+      <DuplicateReviewControls
+        v-else
+        :total="em.scanTotal.value"
+        :scanning="em.scanning.value"
+        :scan-status="em.duplicateScanStatus.value"
+        :min-similarity="em.minSimilarity.value"
+        :is-inline="em.isInline.value"
+        @update:min-similarity="handleUpdateMinSimilarity"
+        @recompute="handleRefreshDuplicates"
+      />
     </div>
 
-    <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto min-h-0">
-      <!-- Duplicates mode -->
-      <template v-if="em.mode.value === 'duplicates'">
-        <template v-if="!em.scanning.value && em.clusters.value.length === 0 && !em.scanError.value">
-          <div
-            v-if="!em.hasScanned.value"
-            class="rounded-lg border border-border/50 bg-card/40 px-6 py-12 flex flex-col items-center gap-4 text-center"
-          >
-            <div class="rounded-full bg-muted p-4">
-              <Search class="h-8 w-8 text-muted-foreground" />
-            </div>
-            <div class="space-y-1">
-              <p class="text-sm font-medium">{{ t('tools.entityManager.duplicates.emptyTitle') }}</p>
-              <p class="text-xs text-muted-foreground max-w-xs">{{ t('tools.entityManager.duplicates.emptyDescription') }}</p>
-            </div>
-          </div>
-          <div v-else class="rounded-lg border border-border/50 bg-card/40 px-6 py-12 flex flex-col items-center gap-4 text-center">
-            <div class="rounded-full bg-green-500/10 p-4">
-              <CheckCircle2 class="h-8 w-8 text-green-500" />
-            </div>
-            <div class="space-y-1">
-              <p class="text-sm font-medium">{{ t('tools.entityManager.duplicates.noneFoundTitle') }}</p>
-              <p class="text-xs text-muted-foreground">{{ t('tools.entityManager.duplicates.noneFoundDescription') }}</p>
-            </div>
-          </div>
-        </template>
+    <!-- Duplicates mode -->
+    <div v-if="em.mode.value === 'duplicates'" class="flex-1 min-h-0 overflow-hidden pt-3">
+      <DuplicatesPanel
+        :clusters="em.clusters.value"
+        :page="em.scanPage.value"
+        :total-pages="em.scanTotalPages.value"
+        :scanning="em.scanning.value"
+        :has-scanned="em.hasScanned.value"
+        :scan-error="em.scanError.value"
+        :operation-loading="em.operationLoading.value"
+        :dismissed-pairs="em.dismissedPairs.value"
+        :dismissed-loading="em.dismissedLoading.value"
+        :show-dismissed="em.showDismissed.value"
+        @update:page="handleScanPage"
+        @merge="handleMerge"
+        @dismiss-entity="handleDismissEntity"
+        @dismiss-pair="handleDismissPair"
+        @dismiss-cluster="handleDismissCluster"
+        @undismiss="handleUndismiss"
+        @toggle-dismissed="handleToggleDismissed"
+      />
+    </div>
 
-        <div v-if="em.clusters.value.length > 0" class="space-y-3">
-          <p class="text-sm text-muted-foreground">
-            {{ t('tools.entityManager.duplicates.clustersFound', { count: em.scanTotal.value }) }}
-          </p>
-          <DuplicateClusterCard
-            v-for="(cluster, idx) in em.clusters.value"
-            :key="idx"
-            :cluster="cluster"
-            :capabilities="em.capabilities.value"
-            :operation-loading="em.operationLoading.value"
-            @merge="handleMerge"
-            @dismiss-entity="(entityId) => handleDismissEntity(cluster, entityId)"
-            @dismiss-pair="handleDismissPair"
-          />
-
-          <div v-if="em.scanTotalPages.value > 1" class="flex items-center justify-center gap-3 pt-2">
-            <button
-              class="h-8 w-8 rounded-md border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-colors"
-              :disabled="em.scanPage.value <= 1"
-              @click="handleScanPrevPage"
-            >
-              <ChevronLeft class="h-4 w-4" />
-            </button>
-            <span class="text-sm text-muted-foreground">{{ em.scanPage.value }} / {{ em.scanTotalPages.value }}</span>
-            <button
-              class="h-8 w-8 rounded-md border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 disabled:pointer-events-none transition-colors"
-              :disabled="em.scanPage.value >= em.scanTotalPages.value"
-              @click="handleScanNextPage"
-            >
-              <ChevronRight class="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div class="pt-4 pb-2">
-          <button
-            class="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            @click="handleToggleDismissed"
-          >
-            <component :is="em.showDismissed.value ? ChevronUp : ChevronDown" class="h-4 w-4" />
-            <span>
-              {{ em.showDismissed.value ? t('tools.entityManager.dismissed.hidePairs') : t('tools.entityManager.dismissed.showPairs') }}
-              <template v-if="!em.showDismissed.value && em.dismissedPairs.value.length > 0"> ({{ em.dismissedPairs.value.length }}) </template>
-            </span>
-          </button>
-          <div v-if="em.showDismissed.value" class="mt-3">
-            <DismissedPairsSection :pairs="em.dismissedPairs.value" :loading="em.dismissedLoading.value" @undismiss="handleUndismiss" />
-          </div>
-        </div>
-      </template>
-
-      <!-- Browse mode -->
-      <template v-if="em.mode.value === 'browse'">
-        <EntityBrowseTable
-          :items="em.browseItems.value"
-          :total="em.browseTotal.value"
-          :page="em.browsePage.value"
-          :page-size="em.browsePageSize.value"
-          :total-pages="em.browseTotalPages.value"
-          :search="em.browseSearch.value"
-          :sort-by="em.browseSortBy.value"
-          :sort-order="em.browseSortOrder.value"
-          :book-count="em.browseBookCount.value"
-          :loading="em.browseLoading.value"
-          :selected-ids="em.selectedIds.value"
-          :capabilities="em.capabilities.value"
-          :is-inline="em.isInline.value"
-          @update:page="handleUpdatePage"
-          @update:search="handleUpdateSearch"
-          @update:book-count="handleUpdateBookCount"
-          @sort-change="handleBrowseSortChange"
-          @select="handleSelectItem"
-          @rename="handleRename"
-          @delete="handleDelete"
-          @split="handleSplit"
-          @bulk-delete="handleBulkDelete"
-          @bulk-merge="handleBulkMerge"
-          @clear-selection="em.clearSelection"
-          @refresh="em.fetchBrowse"
-        />
-      </template>
+    <!-- Browse mode: the data grid owns its own scroll so the header can stick -->
+    <div v-if="em.mode.value === 'browse'" class="flex-1 min-h-0 overflow-hidden pt-3">
+      <EntityBrowseTable
+        :items="em.browseItems.value"
+        :total="em.browseTotal.value"
+        :page="em.browsePage.value"
+        :page-size="em.browsePageSize.value"
+        :total-pages="em.browseTotalPages.value"
+        :sort-by="em.browseSortBy.value"
+        :sort-order="em.browseSortOrder.value"
+        :density="density"
+        :loading="em.browseLoading.value"
+        :has-active-filters="hasActiveFilters"
+        :selected-ids="em.selectedIds.value"
+        :capabilities="em.capabilities.value"
+        :is-inline="em.isInline.value"
+        @update:page="handleUpdatePage"
+        @update:page-size="handleUpdatePageSize"
+        @sort-change="handleBrowseSortChange"
+        @select="handleSelectItem"
+        @toggle-all="handleToggleAll"
+        @rename="handleRename"
+        @delete="handleDelete"
+        @split="handleSplit"
+        @clear-filters="handleClearFilters"
+      />
     </div>
 
     <!-- Modals -->

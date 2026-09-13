@@ -14,7 +14,9 @@
     "previous": "Previous",
     "retry": "Retry",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "show": "Show",
+    "hide": "Hide"
   },
   "settings": {
     "privacySharing": {
@@ -732,6 +734,7 @@
         "connected": "Connected - {issuer}",
         "connectionFailed": "Connection failed",
         "privateIssuerAddress": "The issuer URL resolves to a private or local network address, so the server refused to connect. Set OIDC_ALLOW_LOCAL_ISSUERS=true on the BookOrbit server to allow it.",
+        "tlsCertificateUntrusted": "BookOrbit could not verify the OIDC provider's TLS certificate. If the provider uses a private certificate authority, mount its PEM CA bundle, set NODE_EXTRA_CA_CERTS to the bundle's in-container path, and restart BookOrbit.",
         "hide": "Hide",
         "details": "Details",
         "supported": "supported",
@@ -1076,13 +1079,10 @@
         "syncMetadataToFiles": "Sync metadata to files",
         "deleteLibrary": "Delete library",
         "bookCount": "{count, plural, =0 {no books} one {# book} other {# books}}",
-        "addedDate": "Added {date}",
+        "booksUnit": "{count, plural, one {book} other {books}}",
+        "folderCount": "{count, plural, =0 {no folders} one {# folder} other {# folders}}",
         "fileMode": "File mode",
         "folderMode": "Folder mode",
-        "folderCount": "{count, plural, =0 {no folders} one {# folder} other {# folders}}",
-        "watching": "Watching",
-        "fileWrite": "File write",
-        "fileRename": "File rename",
         "emptyTitle": "No libraries yet",
         "emptyHint": "Add a library to start organizing your books.",
         "addFirstLibrary": "Add your first library",
@@ -1092,8 +1092,6 @@
         "deleting": "Deleting...",
         "deleteLibraryButton": "Delete Library",
         "syncConfirmTitle": "Sync metadata to files?",
-        "syncConfirmBodyPrefix": "This will overwrite the metadata inside every supported file in",
-        "syncConfirmBodySuffix": "directly on disk. This cannot be undone.",
         "syncFiles": "Sync files",
         "metadataSynced": "Metadata synced to files for \"{name}\"",
         "fileWriteNotEnabled": "Metadata file write is not enabled for this library. Enable it in the library settings.",
@@ -1108,12 +1106,111 @@
         "libraryUpdated": "Library \"{name}\" updated",
         "libraryDeleted": "\"{name}\" deleted",
         "deleteFailed": "Failed to delete library",
-        "scanningProgress": "Scanning {pct}% ({processed}/{total})",
-        "scanDone": "Done - {added} added, {updated} updated",
-        "scanFailedWithError": "Failed: {error}",
-        "scanFailed": "Scan failed",
         "refreshingCovers": "Refreshing covers {pct}% ({processed}/{total})",
-        "coversRefreshed": "Covers refreshed ({count} processed)"
+        "coversRefreshed": "Covers refreshed ({count} processed)",
+        "onDiskUnit": "{size} on disk",
+        "noFilesIndexed": "No files indexed",
+        "formatEntry": "{format} {count}",
+        "formatOverflow": "{count, plural, one {+# more format} other {+# more formats}}",
+        "extraFolders": "{count, plural, one {+# folder} other {+# folders}}",
+        "openLibrary": "Open {name}",
+        "moreActions": "More actions for {name}",
+        "statsFailed": "Could not load library counts. Everything else on this page still works.",
+        "filterLabel": "Filter libraries",
+        "filterPlaceholder": "Filter by name or path",
+        "filterClear": "Clear filter",
+        "sortLabel": "Sort",
+        "noMatchesTitle": "No libraries match that filter",
+        "noMatchesHint": "Nothing matches \"{query}\" by name or folder path.",
+        "totalLibraries": "{count, plural, one {# library} other {# libraries}}",
+        "neverScanned": "Never scanned",
+        "neverScannedHint": "Run a scan to index its folders",
+        "scanFailedAt": "Failed {time}",
+        "scanningPercent": "Scanning {pct}%",
+        "scanCounting": "Counting files",
+        "scanCounts": "{processed} of {total}",
+        "scanAdded": "{count, plural, one {+# added} other {+# added}}",
+        "scanUpdated": "{count, plural, one {# updated} other {# updated}}",
+        "scanMissing": "{count, plural, one {# missing} other {# missing}}",
+        "scanNoChange": "no change",
+        "outcomeSeparator": ", ",
+        "scanOutcome": "{trigger} - {outcome}",
+        "syncConfirmBody": "This will overwrite the metadata inside every supported file in {name} directly on disk. This cannot be undone.",
+        "columns": {
+          "library": "Library",
+          "contents": "Contents",
+          "onDisk": "On disk",
+          "automation": "Automation",
+          "lastScan": "Last scan",
+          "actions": "Actions"
+        },
+        "sort": {
+          "default": "Default order",
+          "name": "Name",
+          "books": "Books",
+          "size": "Size on disk",
+          "lastScan": "Last scan"
+        },
+        "trigger": {
+          "manual": "Manual",
+          "watcher": "Watcher",
+          "schedule": "Schedule"
+        },
+        "capability": {
+          "watch": "Watch folders",
+          "schedule": "Scheduled scan",
+          "fileWrite": "Write to file",
+          "fileRename": "Rename files",
+          "on": "{name}: on",
+          "off": "{name}: off",
+          "legendHint": "Dashed means off"
+        },
+        "stateOn": "On",
+        "stateOff": "Off",
+        "toggleDetail": "Show details for {name}",
+        "durationMs": "{ms} ms",
+        "durationSeconds": "{seconds}s",
+        "durationMinutes": "{minutes}m {seconds}s",
+        "history": {
+          "when": "When",
+          "trigger": "Trigger",
+          "duration": "Duration",
+          "result": "Result",
+          "status": "Status",
+          "statusValue": {
+            "running": "Running",
+            "completed": "Completed",
+            "failed": "Failed"
+          }
+        },
+        "detail": {
+          "foldersTitle": "Folders & layout",
+          "metadataTitle": "Metadata & reading",
+          "accessTitle": "Access",
+          "historyTitle": "Scan history",
+          "path": "Path {index}",
+          "organization": "Organization",
+          "excludePatterns": "Exclude patterns",
+          "precedence": "Source precedence",
+          "allowedFormats": "Allowed formats",
+          "countsAsStarted": "Counts as started",
+          "countsAsFinished": "Counts as finished",
+          "peopleWithAccess": "People with access",
+          "added": "Added",
+          "coverShape": "Cover shape",
+          "coverShapeValue": {
+            "portrait": "2:3 portrait",
+            "square": "1:1 square"
+          },
+          "none": "None",
+          "allSupported": "All supported",
+          "patternCount": "{count, plural, one {# pattern} other {# patterns}}",
+          "peopleCount": "{count, plural, =0 {No explicit grants} one {# person} other {# people}}",
+          "historyEmpty": "This library has never been scanned.",
+          "historyFailed": "Could not load the scan history for this library."
+        },
+        "scannedAt": "Scanned {time}",
+        "detailRegion": "Details for {name}"
       },
       "authorEnrichment": {
         "configuration": "Configuration",
@@ -1167,6 +1264,10 @@
         "resetToDefaultsButton": "Reset to defaults",
         "recalculateAll": "Recalculate all",
         "confirmReset": "Confirm reset",
+        "resetDialog": {
+          "title": "Reset every weight to its default?",
+          "description": "All 24 fields go back to the weights BookOrbit ships with. Nothing is saved until you choose Save and rescore."
+        },
         "reset": "Reset",
         "recalculate": "Recalculate",
         "subtotal": "subtotal: {count}",
@@ -1174,7 +1275,81 @@
         "saveFailed": "Failed to save score weights",
         "recalcStarted": "Score recalculation started in the background",
         "recalcFailed": "Recalculation failed",
-        "resetToDefaults": "Weights reset to defaults. Save to apply."
+        "resetToDefaults": "Weights reset to defaults. Save to apply.",
+        "howItWorks": {
+          "title": "How this works.",
+          "summary": "Every book gets a score out of 100 for how complete its metadata is. A weight is only meaningful next to the others, so each field below shows the share of a finished score it is responsible for. Doubling every weight changes nothing."
+        },
+        "readOnly": "You can see how scores are calculated, but changing weights needs the App settings permission.",
+        "compositionTitle": "Where a score comes from",
+        "compositionHint": "Percentages always add up to 100.",
+        "searchFields": "Filter fields",
+        "clearSearch": "Clear search",
+        "noMatches": "No fields match that search.",
+        "totalSummary": "{scoring} of 24 fields scoring, {total} points total",
+        "countGroups": "Count towards the score",
+        "notScored": "Not scored",
+        "notScoredHeading": "Not scored ({count})",
+        "notScoredHint": "A field at zero leaves the total too, so books missing it are not marked down.",
+        "decreaseWeight": "Decrease the weight of {field}",
+        "increaseWeight": "Increase the weight of {field}",
+        "revertField": "Revert {field} to the saved weight",
+        "table": {
+          "field": "Field",
+          "weight": "Weight",
+          "share": "Share of score",
+          "versusDefault": "Change"
+        },
+        "groups": {
+          "core": "Core",
+          "publishing": "Publishing",
+          "classification": "Classification",
+          "enrichment": "Enrichment",
+          "providers": "Provider IDs"
+        },
+        "rules": {
+          "text": "Counts when it is not empty",
+          "positive": "Counts when it is above zero",
+          "count": "Counts when at least one is set",
+          "cover": "Counts when a cover image is stored",
+          "providerId": "Counts when the ID is stored",
+          "seriesIndex": "Counts when above zero, so volume 0 never counts"
+        },
+        "rail": {
+          "title": "Where your books land",
+          "description": "The badge colour a reader sees on a book card, against every book you can see today.",
+          "bandsLabel": "Badge colour bands",
+          "bands": {
+            "poor": "UNDER 50",
+            "fair": "50-69",
+            "good": "70-89",
+            "great": "90+"
+          },
+          "median": "Median",
+          "belowFifty": "Under 50",
+          "ninetyPlus": "90 and up",
+          "noBooks": "No scored books yet. Run a rescore once your library has finished importing.",
+          "scopeNote": "Across {count, plural, one {# book} other {# books}} in the libraries you can access, scored with the weights currently saved."
+        },
+        "progress": {
+          "running": "Rescoring library",
+          "failed": "Rescore failed",
+          "count": "{processed} books processed",
+          "countOf": "{processed} of {total} books",
+          "failedCount": "({count} failed)",
+          "safeToLeave": "Safe to leave this page.",
+          "dismiss": "Dismiss"
+        },
+        "save": {
+          "upToDate": "All changes saved.",
+          "unsaved": "{count, plural, one {# field changed} other {# fields changed}}",
+          "totalShift": "total {from} to {to} points",
+          "rescores": "Saving rescores {count, plural, one {# book} other {# books}} in the background.",
+          "rescoresUnknown": "Saving rescores your library in the background.",
+          "action": "Save and rescore",
+          "discard": "Discard",
+          "leaveWarning": "You have unsaved weight changes. Leave the page and lose them?"
+        }
       },
       "tabs": {
         "users": "Users",
@@ -1197,6 +1372,7 @@
         "display": "Display",
         "reader": "Reader",
         "metadata": "Metadata",
+        "usersAccess": "Users & Access",
         "email": "Email",
         "opds": "OPDS",
         "kobo": "Kobo",
@@ -1243,20 +1419,39 @@
         "genres": "Genres",
         "narrators": "Narrators",
         "duration": "Duration",
-        "abridged": "Abridged"
+        "abridged": "Abridged",
+        "tags": "Tags",
+        "isbn13": "ISBN-13",
+        "isbn10": "ISBN-10",
+        "googleBooksId": "Google Books ID",
+        "goodreadsId": "Goodreads ID",
+        "amazonId": "Amazon ID",
+        "hardcoverId": "Hardcover ID",
+        "openLibraryId": "Open Library ID",
+        "itunesId": "iTunes ID",
+        "koboId": "Kobo ID",
+        "aladinId": "Aladin ID"
       },
       "mergeStrategy": {
         "fillMissing": {
           "label": "Fill missing",
-          "description": "Only write if field is currently empty"
+          "description": "Only write if field is currently empty",
+          "short": "Fill gaps"
+        },
+        "mergeExisting": {
+          "label": "Merge with existing",
+          "description": "Keep stored genres and append new provider genres",
+          "short": "Merge"
         },
         "overwriteIfProvided": {
           "label": "Overwrite if provided",
-          "description": "Write if provider returned a value"
+          "description": "Write if provider returned a value",
+          "short": "If provided"
         },
         "overwrite": {
           "label": "Always overwrite",
-          "description": "Always replace existing value"
+          "description": "Always replace existing value",
+          "short": "Always"
         }
       },
       "autoFetch": {
@@ -1324,16 +1519,38 @@
       "providers": {
         "availableSources": "Available Sources",
         "saveChanges": "Save Changes",
+        "discard": "Discard",
+        "configure": "Configure",
         "test": "Test",
         "testing": "Testing...",
+        "testHint": "Checks these credentials against the live service. Nothing is saved.",
         "enabled": "Enabled",
         "retryIn": "Retry in {duration}",
         "runTestBeforeEnabling": "Run Test before enabling",
         "hardcoverEnableHint": "Run Test with the current token to unlock the enable switch.",
+        "searchPlaceholder": "Filter sources",
+        "sourcesEnabled": "{enabled} of {total} sources enabled",
+        "groupEnabled": "{enabled} of {total} on",
+        "unsavedChanges": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+        "noMatches": "No sources match this filter.",
+        "clearFilters": "Clear filters",
+        "filter": {
+          "label": "Filter sources by state",
+          "all": "All",
+          "enabled": "Enabled",
+          "needsSetup": "Needs setup"
+        },
+        "groups": {
+          "books": "General book catalogues",
+          "audiobooks": "Audiobooks",
+          "comics": "Comics & light novels",
+          "regional": "Regional catalogues"
+        },
         "badge": {
           "setupRequired": "Setup Required",
           "throttled": "Throttled",
-          "ready": "Ready"
+          "ready": "Ready",
+          "active": "Active"
         },
         "fields": {
           "apiKey": "API Key",
@@ -1357,6 +1574,7 @@
           "kobo": "Scrapes Kobo's public book pages. Country and language must match Kobo URL paths; bot protection can block requests.",
           "audible": "Pulls audiobook metadata from Audible. No additional setup is required.",
           "audnexus": "Community-driven audiobook metadata. No setup required.",
+          "librofm": "DRM-free audiobook catalog metadata. Uses an undocumented Libro.fm endpoint and is disabled by default.",
           "comicvine": "Comic book metadata from ComicVine. A free API key is required from comicvine.gamespot.com.",
           "ranobedb": "Japanese light novel metadata from RanobeDB. No setup required.",
           "lubimyczytac": "Polish book catalog (lubimyczytac.pl). Scrapes public book pages. No setup required.",
@@ -1389,7 +1607,8 @@
             "fillMissingBody": "Only write if current value is empty.",
             "overwriteTerm": "Overwrite:",
             "overwriteBody": "Replace whenever a provider has data."
-          }
+          },
+          "summary": "Providers are tried top to bottom and the first one that returns a value wins. The merge strategy decides whether that value may replace what the book already has; genres can also append new unique values. Set defaults here, then override individual fields per library."
         },
         "libraryOverrides": {
           "title": "Library Overrides",
@@ -1417,6 +1636,10 @@
           "storeProviderIds": {
             "label": "Store provider IDs on books",
             "hint": "When fetching metadata, save the returned provider IDs (ISBN, ASIN, Goodreads ID, etc.) on the book record for more accurate future lookups."
+          },
+          "existingProviderIdsOnly": {
+            "label": "Use existing provider IDs only",
+            "hint": "For books already in the library, query only providers with a stored ID and never fall back to a search when an ID lookup fails. Manual search and new-book discovery are unaffected."
           }
         },
         "library": {
@@ -1442,13 +1665,15 @@
         },
         "groupSummary": {
           "base": "{fields} fields · {enabled} enabled",
-          "withOverrides": "{base} · {overrides} overrides"
+          "withOverrides": "{base} · {overrides} overrides",
+          "enabledOf": "{enabled} of {fields} enabled"
         },
         "table": {
           "field": "Field",
           "activeProviders": "Active Providers (ordered by priority)",
           "mergeStrategy": "Merge Strategy",
-          "status": "Status"
+          "status": "Status",
+          "noMatches": "No fields match these filters."
         },
         "field": {
           "noProviders": "Enabled but has no providers",
@@ -1456,7 +1681,19 @@
           "config": "Config",
           "custom": "Custom",
           "default": "Default",
-          "resetToDefault": "Reset to default"
+          "resetToDefault": "Reset to default",
+          "toggle": "Fetch {field} during metadata refresh",
+          "configure": "Configure {field}",
+          "add": "Add",
+          "addHint": "Added at the end of the order. Drag a chip to move it earlier.",
+          "addProviderTo": "Add a provider to {field}",
+          "removeProvider": "Remove {provider}",
+          "noProvidersYet": "No providers yet",
+          "skippedCount": "{count, plural, one {# skipped} other {# skipped}}",
+          "unsaved": "Unsaved",
+          "override": "Override",
+          "inherited": "Inherited",
+          "morePreview": "+{count} more"
         },
         "reservoir": {
           "disabled": "{provider} - disabled",
@@ -1470,6 +1707,69 @@
           "statusDisabled": "disabled",
           "statusNotConfigured": "not configured",
           "done": "Done"
+        },
+        "scope": {
+          "label": "Rule scope",
+          "global": "Global defaults",
+          "overrideCount": "{count, plural, one {# overridden field} other {# overridden fields}}",
+          "unsavedMarker": "Has unsaved changes"
+        },
+        "toolbar": {
+          "searchFields": "Search fields",
+          "clearSearch": "Clear search",
+          "provider": "Provider",
+          "anyProvider": "Any",
+          "providerMenuTitle": "Filter and bulk edit by provider",
+          "usedIn": "{count, plural, =0 {unused} one {# field} other {# fields}}",
+          "showOnlyThese": "Show only fields using it",
+          "bulkLabel": "Apply to all {count} fields that use it",
+          "makeFirst": "Make first everywhere",
+          "makeLast": "Make last everywhere",
+          "removeEverywhere": "Remove from all fields",
+          "allFields": "All fields",
+          "overridesOnly": "Overrides only",
+          "clearFilters": "Clear filters"
+        },
+        "providerState": {
+          "disabled": "Disabled",
+          "notConfigured": "Not configured",
+          "disabledDetail": "{provider} is turned off, so it stays in the order but is skipped.",
+          "notConfiguredDetail": "{provider} has no credentials yet, so it stays in the order but is skipped."
+        },
+        "detail": {
+          "priority": "Provider priority",
+          "priorityHint": "The first provider that returns a value wins.",
+          "moveUp": "Move {provider} earlier",
+          "moveDown": "Move {provider} later",
+          "result": "Result",
+          "resultHint": "On the next refresh this field resolves in this order:",
+          "noUsableProviders": "No usable provider - this field will not be filled.",
+          "skippedSummary": "{count, plural, one {{providers} is in the order but will be skipped.} other {{providers} are in the order but will be skipped.}}",
+          "appliesTo": "Applies to {scope}.",
+          "inheritGlobal": "Inherit global rule",
+          "inheritingGlobal": "Inheriting the global rule.",
+          "collapse": "Collapse"
+        },
+        "save": {
+          "upToDate": "No unsaved changes",
+          "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}} in {scope}",
+          "discard": "Discard",
+          "action": "Save {scope}"
+        },
+        "confirm": {
+          "clearProviders": {
+            "title": "Remove every provider?",
+            "description": "This empties the provider list on all 16 fields in {scope}. Nothing is saved until you choose Save."
+          },
+          "resetScope": {
+            "title": "Reset to defaults?",
+            "globalDescription": "This replaces your global field rules with the system defaults and saves immediately.",
+            "libraryDescription": "This removes every override on {scope} so it inherits the global rules again, and saves immediately."
+          },
+          "removeProvider": {
+            "title": "Remove {provider} from every field?",
+            "description": "This takes {provider} out of the provider order on every field in {scope}. Nothing is saved until you choose Save."
+          }
         }
       },
       "genreBlocklist": {
@@ -1543,7 +1843,7 @@
         "field-rules": "Field Rules",
         "custom-fields": "Custom Fields",
         "genre-blocklist": "Genre Blocklist",
-        "score": "Score",
+        "score": "Confidence Score",
         "auto-fetch": "Books",
         "authors": "Authors"
       },
@@ -1561,9 +1861,18 @@
         "field-rules": "Control which provider supplies each metadata field and how values are merged across your libraries.",
         "custom-fields": "Define custom metadata fields and choose which libraries use them.",
         "genre-blocklist": "Prevent unwanted provider genre values from being written to books.",
-        "score": "Assign weights to metadata fields to calculate how much to trust fetched results.",
+        "score": "How each metadata field counts towards the completeness score shown on every book.",
         "auto-fetch": "Automatically fetch covers, descriptions, and other details when new books are added to your library.",
         "authors": "Automatically fetch biographies and profile photos when new authors appear in your library."
+      },
+      "preferences": {
+        "toast": {
+          "saved": "Metadata preferences saved",
+          "saveFailed": "Could not save metadata preferences. Check your connection and try again.",
+          "globalReset": "Global field rules reset to system defaults",
+          "libraryReset": "Library reset to the global rules",
+          "resetFailed": "Could not reset metadata preferences. Check your connection and try again."
+        }
       }
     },
     "reader": {
@@ -1619,6 +1928,18 @@
         "fontSizeHint": "Base text size in pixels",
         "lineHeight": "Line height",
         "lineHeightHint": "Vertical spacing between lines",
+        "paragraphSpacing": "Paragraph spacing",
+        "paragraphSpacingHint": "Space between paragraphs. Book default preserves the publisher's spacing.",
+        "paragraphSpacingDefault": "Book default",
+        "paragraphSpacingValue": "{value} em",
+        "letterSpacing": "Letter spacing",
+        "letterSpacingHint": "Space between letters. Book default preserves the publisher's spacing.",
+        "wordSpacing": "Word spacing",
+        "wordSpacingHint": "Space between words. Book default preserves the publisher's spacing.",
+        "textIndent": "First-line indent",
+        "textIndentHint": "Indent at the start of ordinary paragraphs. Book default preserves the publisher's indentation.",
+        "custom": "Custom",
+        "emValue": "{value} em",
         "justify": "Justify text",
         "justifyHint": "Align text to both margins",
         "hyphenation": "Hyphenation",
@@ -1687,6 +2008,8 @@
         "widePageDisable": "Disable",
         "forceTwoPage": "Force two-page on small screens",
         "forceTwoPageHint": "Bypass mobile auto-fallback when paginated two-page mode is selected",
+        "autoAdvance": "Auto-advance to next book",
+        "autoAdvanceHint": "Turn past the last page to open the next book in the series",
         "off": "Off",
         "on": "On",
         "display": "Display",
@@ -1824,6 +2147,7 @@
         "modSort": "Last, First format",
         "modInitial": "First letter only",
         "modFixed2": "Two decimal places",
+        "modMax3": "Up to three values, otherwise nothing",
         "folderOnlyPrefix": "End a pattern with",
         "folderOnlySuffix": "to specify a folder only. The original filename will be preserved inside it.",
         "conditionalLogic": "Conditional Logic",
@@ -1879,6 +2203,7 @@
         "tokenTitle": "Book title",
         "tokenSubtitle": "Book subtitle",
         "tokenAuthors": "Author(s), comma-separated",
+        "tokenNarrators": "Narrator(s), comma-separated",
         "tokenYear": "Publication year",
         "tokenSeries": "Series name",
         "tokenSeriesIndex": "Series index (zero-padded)",
@@ -1889,7 +2214,104 @@
         "tokenOriginalFilename": "Original filename (without extension)",
         "tokenExtension": "File extension (without dot)",
         "patternHelpIntro": "Patterns use tokens like {titleToken} and {authorsToken}, plus modifiers and optional segments.",
-        "browseTokensAndExamples": "Browse tokens and examples"
+        "browseTokensAndExamples": "Browse tokens and examples",
+        "subtitleShort": "Folder and filename patterns for stored files.",
+        "rule": {
+          "fileAsBook": "File as Book default",
+          "folderAsBook": "Folder as Book default",
+          "download": "Download filename"
+        },
+        "howItWorks": {
+          "title": "How a path is chosen.",
+          "summary": "A library with a pattern of its own wins. Every other library follows the global default for its organization mode. Changing a pattern does not move books already on disk; new uploads follow it from the next upload on."
+        },
+        "filterRules": "Filter rules",
+        "librariesGroup": "Libraries",
+        "customCount": "{custom}/{total} custom",
+        "noRuleMatches": "No rule matches \"{query}\".",
+        "unsavedMarker": "Has unsaved changes",
+        "backToRules": "Back to naming rules",
+        "appliesToLibraries": "{count, plural, =0 {No libraries use this default} one {Applies to # library} other {Applies to # libraries}}",
+        "downloadScope": "Downloads and export ZIPs",
+        "badgeInherits": "Inherits default",
+        "badgeUnsaved": "Unsaved",
+        "patternLabel": "Pattern",
+        "readOnlyFromGlobal": "Read-only, from the global default",
+        "useGlobalDefault": "Use the global default",
+        "resetToShipped": "Reset to shipped default",
+        "addOverride": "Add an override",
+        "inheritsNotice": "This library follows the {base}. Add an override to give it a pattern of its own.",
+        "libraryRuleHint": "Overrides the {base} for this library only.",
+        "scopeLibrary": "Applies to uploads into {name} only.",
+        "scopeDownload": "Applies to every single-file download and every file inside an export ZIP.",
+        "scopeGlobal": "{count, plural, one {Applies to # library that has no pattern of its own.} other {Applies to # libraries that have no pattern of their own.}}",
+        "scopeGlobalNone": "No library uses this default right now; every library in this mode has its own pattern.",
+        "unbalancedOptional": "An optional group is missing its closing angle bracket",
+        "unbalancedToken": "A token is missing its closing brace",
+        "structure": "Structure",
+        "paletteOptional": "optional",
+        "paletteOptionalHint": "Wraps a segment so it is dropped when a token inside it is empty",
+        "paletteFallback": "fallback",
+        "paletteFallbackHint": "Inside an optional group, the text used when the left side cannot be filled",
+        "paletteSeparator": "folder",
+        "paletteSeparatorHint": "Starts a new folder level",
+        "modUpper": "UPPERCASE",
+        "modLower": "lowercase",
+        "recipesLabel": "Or start from a recipe",
+        "recipe": {
+          "seriesShelf": "Series shelf",
+          "calibre": "Calibre style",
+          "alphabetical": "Alphabetical",
+          "flat": "Flat, no folders",
+          "originalName": "Original filename",
+          "authorTitle": "Author and title",
+          "titleOnly": "Title only",
+          "seriesOrdered": "Series ordered"
+        },
+        "resultPanel": "Resolved result",
+        "resultFor": "Result: {rule}",
+        "copyResult": "Copy the resolved result",
+        "resultCopied": "Resolved result copied to clipboard",
+        "resultCopyFailed": "Failed to copy the resolved result",
+        "sampleBookNote": "Sample book used for every preview",
+        "missingMetadata": "If metadata is missing",
+        "caseNoSeriesLabel": "No series",
+        "caseNoYearLabel": "No year",
+        "caseNoAuthorLabel": "No author",
+        "previewEmpty": "This pattern resolves to nothing, so the original filename would be used instead.",
+        "previewEmptyShort": "Resolves to nothing",
+        "crossPlatformShortHint": "Replaces characters Windows rejects. Previews reflect this setting.",
+        "rulesSaved": "{count, plural, one {# naming rule saved} other {# naming rules saved}}",
+        "rulesSaveFailed": "{count, plural, one {Failed to save # naming rule} other {Failed to save # naming rules}}",
+        "rulesPartiallySaved": "Saved {saved}, failed {failed}. The rules that failed still have unsaved changes.",
+        "save": {
+          "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+          "upToDate": "No unsaved changes",
+          "discard": "Discard",
+          "action": "Save changes",
+          "blocked": "Fix the invalid pattern before saving"
+        },
+        "examplesDescription": "Idioms the recipes do not cover. A pattern ending in a slash resolves to a folder and keeps the uploaded filename inside it.",
+        "examplesApply": "Apply",
+        "examplesApplyAria": "Apply the {label} pattern",
+        "examplesUploadOnly": "These are upload patterns, shown here for reference. Switch to a File as Book or Folder as Book rule to apply one.",
+        "examplesFileModeOnly": "Folder as Book needs a filename segment of its own, so this idiom applies to File as Book libraries only.",
+        "example": {
+          "seriesOrStandalone": "Series, or a Standalone folder",
+          "optionalSubtitle": "Optional subtitle",
+          "languageFolder": "Language folder",
+          "publisherFolder": "Publisher folder",
+          "stackedOptional": "Stacked optional folders",
+          "folderDrop": "Folder only, keep the uploaded filename"
+        },
+        "exampleCase": {
+          "complete": "Complete",
+          "noSeries": "No series",
+          "noSubtitle": "No subtitle",
+          "noLanguage": "No language",
+          "noPublisher": "No publisher"
+        },
+        "unknownModifier": "Unknown modifier \"{modifier}\". It will be ignored, leaving the value unchanged."
       },
       "kobo": {
         "title": "Kobo Sync",
@@ -2391,8 +2813,486 @@
       "tabs": {
         "file-naming": "File Naming",
         "book-dock": "Book Dock",
+        "requests": "Requests",
         "maintenance": "Maintenance",
         "audit-log": "Audit Log"
+      },
+      "requests": {
+        "title": "Requests",
+        "subtitle": "Where releases are found, what fetches them, and what happens once they land.",
+        "tabs": {
+          "sources": "Sources",
+          "clients": "Download clients",
+          "automation": "Automation"
+        },
+        "loading": "Loading download clients...",
+        "clients": "Download clients",
+        "addClient": "Add client",
+        "editClient": "Edit client",
+        "deleteClient": "Delete {name}",
+        "clientsEmpty": {
+          "title": "No download client yet",
+          "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch releases delivered by torrent or Usenet too.",
+          "note": "qBittorrent, Transmission, Deluge and NZBGet are supported."
+        },
+        "summary": "{type} - category {category}, priority {priority}",
+        "disabled": "Disabled",
+        "test": "Test connection",
+        "testSaveFirst": "Save your changes before testing",
+        "testOk": "Connected to {client} {version}",
+        "testOkNoVersion": "Connected to {client}",
+        "lastTestOk": "Last tested {time}: connected",
+        "lastTestFailed": "Last tested {time}: {error}",
+        "saved": "Download client saved",
+        "deleted": "Download client removed",
+        "clientTypes": {
+          "qbittorrent": "qBittorrent",
+          "transmission": "Transmission",
+          "deluge": "Deluge",
+          "nzbget": "NZBGet"
+        },
+        "color": {
+          "label": "Color",
+          "hint": "Marks this client in transfer details. The transfer protocol keeps its own color.",
+          "none": "No color"
+        },
+        "fields": {
+          "name": "Name",
+          "type": "Client type",
+          "baseUrl": "Base URL",
+          "username": "Username",
+          "password": "Password",
+          "passwordKeep": "Leave blank to keep the stored password",
+          "passwordClear": "Clear",
+          "passwordKeepAction": "Keep",
+          "passwordWillClear": "The stored password is removed when you save",
+          "category": "Category",
+          "categoryHint": "Tags the downloads BookOrbit adds, so it only ever acts on its own.",
+          "priority": "Priority",
+          "enabled": "Enabled",
+          "useHardlinks": "Use hardlinks",
+          "allowPrivateAddress": "Allow private addresses",
+          "allowPrivateAddressHint": "Needed when the client runs on your local network or the same machine.",
+          "passwordBrief": "Stored encrypted.",
+          "useHardlinksBrief": "Imports without using the disk twice. Falls back to a copy across filesystems."
+        },
+        "mappings": {
+          "title": "Path mappings",
+          "hint": "Translate the paths the client reports into paths BookOrbit can open. Needed when the two run in separate containers.",
+          "add": "Add mapping",
+          "remove": "Remove mapping",
+          "remotePath": "Client path",
+          "localPath": "BookOrbit path",
+          "brief": "Required. Declares the directory BookOrbit may import from; when the client sees the same files at the same paths, map the download directory to itself.",
+          "identityExample": "Same filesystem? Use the same path on both sides, for example /downloads on the left and /downloads on the right."
+        },
+        "hardlink": {
+          "test": "Test hardlink",
+          "checking": "Checking...",
+          "works": "Hardlinks work here: imports will not use the disk twice.",
+          "unavailable": "Hardlinks are not available here: imports will copy, using the space twice.",
+          "link_refused": "This filesystem refused the link ({code}): imports will copy, using the space twice.",
+          "download_dir_unwritable": "BookOrbit cannot write to the download directory ({code}), so hardlinking could not be tested.",
+          "localMissing": "BookOrbit cannot see that path.",
+          "dockMissing": "The Book Dock folder is not readable."
+        },
+        "reconciliation": {
+          "action": "Reconcile",
+          "clean": "Every owned client item matches a retained BookOrbit download attempt.",
+          "unsupported": "This client cannot enumerate items by BookOrbit's ownership marker. For Deluge, enable the Label plugin; for Transmission, configure a category folder.",
+          "truncated": "The client returned more than 1,000 owned items. Resolve the visible entries, then reconcile again.",
+          "orphan": "No retained BookOrbit attempt owns this client item.",
+          "failedAttempt": "The client still holds this item, but its attempt for \"{title}\" is marked failed.",
+          "missing": "This {status} attempt is no longer present in the download client.",
+          "adopt": "Attach to {title}",
+          "adopted": "Attached the client item to {title}",
+          "remove": "Remove from client",
+          "removed": "Removed the orphaned client item",
+          "removeTitle": "Remove this orphaned client item?",
+          "removeDescription": "{name} is removed from the download client. Its downloaded files are kept.",
+          "notOrphan": "That client item is still attached to a BookOrbit download attempt.",
+          "notAdoptable": "That client item or failed attempt changed and can no longer be attached. Reconcile again."
+        },
+        "errors": {
+          "loadFailed": "Could not load download clients",
+          "saveFailed": "Could not save that download client",
+          "deleteFailed": "Could not remove that download client",
+          "testFailed": "Could not reach that download client",
+          "nameAndUrlRequired": "A name and a base URL are required",
+          "nameTaken": "A download client with that name already exists",
+          "urlUnsafe": "That base URL could not be reached. Check the address and that it uses http or https.",
+          "urlPrivate": "That address is on a private or local network. Turn on \"Allow private addresses\" if the client runs there.",
+          "encryptionKeyMissing": "Set BOOK_REQUEST_ENCRYPTION_KEY before saving a password. Generate one with: openssl rand -hex 32",
+          "encryptionKeyChanged": "The stored password could not be read. BOOK_REQUEST_ENCRYPTION_KEY may have changed since it was saved.",
+          "pathNotAbsolute": "Path mappings must use absolute paths on both sides",
+          "nameRequired": "Give this client a name.",
+          "urlRequired": "Enter the address BookOrbit should reach this client at.",
+          "mappingRequired": "Add at least one path mapping, so BookOrbit knows which directory it may import from."
+        },
+        "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY is not set, so a client password cannot be saved. Generate one with: openssl rand -hex 32",
+        "confirmDelete": {
+          "title": "Remove this download client?",
+          "description": "{name}'s address and stored password are deleted, and requests downloading there stop updating. Turn it off instead to keep the details.",
+          "confirm": "Remove client"
+        },
+        "indexers": {
+          "title": "Built-in indexers",
+          "hint": "Connect a Torznab feed for torrents or a Newznab feed for Usenet releases.",
+          "allDisabled": "Every source below is switched off, so no request search will find anything. Switch at least one back on.",
+          "loading": "Loading indexers...",
+          "empty": {
+            "title": "No sources yet",
+            "body": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one. There are two ways in.",
+            "bodyOneWay": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one.",
+            "responsibility": "What a source you add indexes is your responsibility.",
+            "pluginTitle": "Install a plugin",
+            "pluginBody": "One file that teaches BookOrbit to search a specific site. You supply it, then fill in its settings.",
+            "torznabTitle": "Add a Torznab indexer",
+            "torznabBody": "Point at a Prowlarr, Jackett or NZBHydra feed you already run. One per feed.",
+            "builtInTitle": "Add an indexer",
+            "builtInBody": "Point at a Torznab or Newznab feed you already use. One configuration per feed."
+          },
+          "add": "Add indexer",
+          "edit": "Edit indexer",
+          "delete": "Delete {name}",
+          "none": "No indexer yet.",
+          "disabled": "Disabled",
+          "test": "Test connection",
+          "testSaveFirst": "Save your changes before testing",
+          "testOk": "Connected to {name}",
+          "toggleAria": "Search with {name}",
+          "enabledNotice": "{name} will be searched",
+          "disabledNotice": "{name} will not be searched",
+          "lastTestOk": "Last tested {time}: connected",
+          "lastTestFailed": "Last tested {time}: {error}",
+          "saved": "Indexer saved",
+          "deleted": "Source deleted",
+          "unavailable": "This install has no \"{type}\" indexer type. Change the type or delete its plugin and saved configuration.",
+          "pluginFailed": "The plugin in \"{directory}\" did not load: {reason}",
+          "network": {
+            "title": "Advanced network",
+            "hint": "Only needed when the default path to this source does not work. What is allowed does not change: whatever address is reached is still checked the same way.",
+            "resolvers": "DNS servers",
+            "proxyUrl": "Proxy URL",
+            "proxyHint": "An http or https proxy to send this source's requests through. SOCKS is not supported.",
+            "brief": "Only needed when the default path to this source does not work.",
+            "resolversBrief": "Comma separated. Used instead of the system resolver for this source only; blank uses the system one.",
+            "proxyBrief": "An http or https proxy for this source. SOCKS is not supported."
+          },
+          "types": {
+            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)",
+            "newznab": "Newznab"
+          },
+          "fields": {
+            "name": "Name",
+            "type": "Indexer type",
+            "baseUrl": "Base URL",
+            "baseUrlHint": {
+              "torznab": "The Torznab feed URL, without the query string. Jackett shows it on each indexer as \"Torznab Feed\".",
+              "newznab": "The Newznab site URL or API endpoint, without a search query."
+            },
+            "credential": {
+              "apiKey": "API key",
+              "sessionId": "Session ID"
+            },
+            "credentialKeep": "Leave blank to keep the stored credential",
+            "credentialClear": "Clear",
+            "credentialKeepAction": "Keep",
+            "credentialWillClear": "The stored credential is removed when you save",
+            "enabled": "Enabled",
+            "allowPrivateAddress": "Allow private addresses",
+            "credentialBrief": "Stored encrypted.",
+            "allowPrivateAddressBrief": "Off by default. Only needed when the source is on your local network.",
+            "searchByIsbn": "Search by ISBN",
+            "searchByIsbnBrief": "On by default. Turn it off if this source returns the wrong book for an exact ISBN, and it will be searched by title and author instead."
+          },
+          "color": {
+            "label": "Color",
+            "hint": "Marks this source on every release it returns, so you can tell where a result came from before reading its name. Delivery protocols keep their own colors, which is why those colors are not offered here.",
+            "none": "No color",
+            "options": {
+              "blue": "Blue",
+              "indigo": "Indigo",
+              "purple": "Purple",
+              "pink": "Pink",
+              "red": "Red",
+              "orange": "Orange",
+              "yellow": "Yellow",
+              "lime": "Lime",
+              "green": "Green",
+              "teal": "Teal"
+            }
+          },
+          "mediaKinds": {
+            "label": "Search this source for",
+            "hint": "Turn off a medium this source is not worth asking about. An audiobook-only tracker behind a general proxy still says it carries everything, and searching it for ebooks costs a request on every search.",
+            "notCarried": "This source does not carry it."
+          },
+          "categories": {
+            "title": "Categories",
+            "brief": "The indexer's own category numbers, separated by commas."
+          },
+          "settings": {
+            "restoreDefault": "Restore defaults"
+          },
+          "seeding": {
+            "applyTracker": "Apply tracker seed goals",
+            "applyTrackerBrief": "When a manual value is blank, use a valid goal reported by the tracker. When this is off, blank values use the download client's defaults. Manual values still apply.",
+            "ratio": "Seed ratio",
+            "ratioBrief": "A positive decimal. Blank inherits from the tracker or client.",
+            "time": "Seed time (minutes)",
+            "timeBrief": "A positive whole number. Blank inherits from the tracker or client.",
+            "clientSupport": "qBittorrent accepts ratio and total seed time. Deluge and Transmission accept ratio only. Client global rules and whichever limit is reached first can stop seeding, so these values do not guarantee that every tracker minimum is met.",
+            "futureGrabs": "Changes apply to future grabs. Existing or adopted torrents can retain client-specific limits. Turning tracker fallback off leaves client defaults active; it does not mean unlimited seeding.",
+            "reset": "Reset seeding settings",
+            "summary": {
+              "title": "Policy summary",
+              "ratio": "Ratio",
+              "time": "Seed time",
+              "manual": "Manual: {value}",
+              "tracker": "Tracker fallback",
+              "client": "Client default"
+            },
+            "errors": {
+              "ratio": "Enter a finite number greater than zero, or leave this blank.",
+              "minutes": "Enter a whole number from 1 through 2,147,483,647, or leave this blank."
+            }
+          },
+          "confirmDelete": {
+            "title": "Delete this source?",
+            "description": "{name}'s address, settings and stored credential are deleted. Turn it off instead to stop searching it without losing them.",
+            "confirm": "Delete source"
+          },
+          "errors": {
+            "loadFailed": "Could not load indexers",
+            "saveFailed": "Could not save that indexer",
+            "deleteFailed": "Could not delete that source",
+            "testFailed": "Could not reach that indexer",
+            "nameAndUrlRequired": "A name and a base URL are required",
+            "nameTaken": "An indexer with that name already exists",
+            "urlUnsafe": "That base URL could not be reached. Check the address and that it uses http or https.",
+            "urlPrivate": "That address is on a private or local network. Turn on \"Allow private addresses\" if the indexer runs there.",
+            "credentialRequired": "That indexer needs a credential before it can be used",
+            "invalidSettings": "One or more source settings are invalid. Review the available choices.",
+            "nameRequired": "Give this indexer a name.",
+            "urlRequired": "Enter the address BookOrbit should search at."
+          },
+          "editName": "Edit {name}",
+          "editorDescription": "Settings for this indexer.",
+          "chooseType": "Choose an indexer type",
+          "chooseTypeHint": "Pick where BookOrbit should search. The form then asks only for what that source needs.",
+          "builtIn": "Built in",
+          "plugin": "Plugin",
+          "typeDescriptions": {
+            "torznab": "Your own Jackett, Prowlarr or NZBHydra. Uses categories and seed goals.",
+            "newznab": "A Newznab-compatible Usenet indexer. Uses categories and requires an API key."
+          },
+          "plugins": {
+            "title": "Plugins",
+            "hint": "A site BookOrbit can search, added as a single plugin file. Install one, then fill in its settings.",
+            "directoryLink": "Browse open library plugins",
+            "none": "No plugin installed. Install one to search a site the built-in protocols do not cover.",
+            "install": "Install plugin",
+            "installed": "Installed {label}.",
+            "installFailed": "That plugin could not be installed.",
+            "inspectFailed": "That file could not be read as a plugin.",
+            "removeAction": "Delete plugin",
+            "removed": "Deleted {type} and its sources.",
+            "removeFailed": "That plugin could not be deleted.",
+            "confirmRemove": "Delete the {label} plugin?",
+            "replaces": "This replaces the {type} plugin already installed.",
+            "restartRequired": "Restart BookOrbit for the plugin change to take effect.",
+            "confirmInstall": "Install plugin",
+            "configure": "Set up",
+            "notSetUp": "Not set up yet",
+            "brokenTitle": "A plugin did not load",
+            "managedHint": "Installed on this server. Updating replaces its code. Deleting permanently removes the plugin and every source of this type.",
+            "missingHint": "The plugin file is already gone. Delete this plugin entry to remove every remaining source, setting and stored credential for its type.",
+            "removeWarning": "{count, plural, one {# source and its saved settings and credential will be permanently deleted with this plugin.} other {# sources and their saved settings and credentials will be permanently deleted with this plugin.}}",
+            "configureAria": "Set up {label}",
+            "usedBy": "{count, plural, one {used by # source} other {used by # sources}}",
+            "unused": "no source uses it yet",
+            "update": "Update plugin",
+            "checkUpdates": "Check for updates",
+            "updateCheckComplete": "Plugin update check complete.",
+            "updateCheckFailed": "Could not check for plugin updates.",
+            "updateInspectFailed": "The published plugin update could not be verified.",
+            "reviewUpdate": "Review update",
+            "updated": "Updated {label} to {version}.",
+            "autoUpdate": "Install signed updates automatically",
+            "autoUpdateFailed": "Could not change automatic updates for this plugin.",
+            "installedVersion": "Installed version",
+            "updateChannel": "Signed update channel",
+            "signatureVerified": "The downloaded source matches the publisher's Ed25519 signature.",
+            "updateStates": {
+              "unsupported": "Manual updates",
+              "unchecked": "Not checked yet",
+              "current": "Up to date",
+              "available": "Version {version} available",
+              "custom": "Custom build",
+              "failed": "Update check failed"
+            },
+            "wrongType": "That file is the {found} plugin, not {expected}.",
+            "replaceTitle": "Replace this plugin?",
+            "replace": "Replace plugin",
+            "reviewTitle": "Install this plugin?",
+            "reviewDescription": "What the file declares about itself, and the code it will run.",
+            "declares": "What it declares",
+            "source": "What it will run",
+            "type": "Type",
+            "version": "Version",
+            "versionLabel": "Plugin version {version}",
+            "versionUnknown": "Plugin version unknown",
+            "versionUnknownValue": "Unknown",
+            "media": "Media",
+            "credential": "Credential",
+            "credentialRequired": "Required",
+            "credentialNone": "None",
+            "trustWarning": "A plugin runs inside BookOrbit with its access to your database, library files and encryption key. Install one only from a source you trust, and read it first.",
+            "sectionTitle": "Plugin",
+            "removeUnusedWarning": "The plugin will be permanently deleted from the server."
+          },
+          "posture": "BookOrbit does not provide or endorse indexer sources. Every source here is one you configured, and you are responsible for what you search and download through it."
+        },
+        "automation": {
+          "title": "Automation",
+          "pipeline": "When a download finishes it passes through the Book Dock, where its title and author are read so the file can be named and filed correctly, and then it moves into the request's destination library on its own. It only stops for you if import checking is on and the file does not match what was requested.",
+          "groupDownloads": "Automatic downloads",
+          "groupImports": "Import checks",
+          "stateOn": "On",
+          "stateOff": "Off",
+          "summaryOff": "Every approved request waits for a person to open the release picker and choose.",
+          "summaryNoRetry": "An approved request downloads its best release on its own, as long as that release scores {score} or more. If it fails, the request waits for a person.",
+          "summaryRetry": "An approved request downloads its best release on its own, as long as that release scores {score} or more. {count, plural, one {It is the only release tried before the request waits for a person.} other {Up to # releases are tried before the request waits for a person.}}",
+          "howDownloads": "How automatic downloads work",
+          "howImports": "How import checks work",
+          "minScoreShort": "Nothing below this is downloaded unattended.",
+          "autoRetryShort": "A failed download falls through to the runner-up.",
+          "maxAttemptsShort": "The first attempt and every retry count towards this.",
+          "verificationShort": "Below this, the file waits in the Book Dock for review.",
+          "loading": "Loading the automation settings...",
+          "loadFailed": "Could not load the automation settings",
+          "saveFailed": "Could not save that setting",
+          "saved": "Automation settings saved",
+          "autoGrab": "Download the best release automatically",
+          "noSourcesConfigured": "No search sources are set up, so nothing will be searched and every approved request will be handed straight back. Add one under Sources.",
+          "noSourcesEnabled": "Every search source is switched off, so nothing will be searched and every approved request will be handed straight back. Switch one back on under Sources.",
+          "autoGrabHint": "When a request is approved, its highest-scoring release goes straight to the download client and nobody has to open the release picker. Off by default, because matching a book to the right release is hard and a person is usually the better judge.",
+          "autoGrabEnabled": "Automatic downloads are on",
+          "autoGrabDisabled": "Automatic downloads are off",
+          "minScore": "Minimum score for automatic download",
+          "minScoreHint": "A release scoring below this is never downloaded automatically. Scores run to 100, and how well the title and author match makes up most of one, with format, file size, seeders and source priority behind it. If nothing scores high enough, the request waits for someone to pick a release by hand and says why it stopped.",
+          "minScoreHintV2": "A release scoring below this is never downloaded automatically. Scores run to 100. Title and author relevance contributes most, followed by format and plausible file size, with swarm health and freeleech used when a source provides them. If nothing scores high enough, the request waits for someone to pick a release by hand and says why it stopped.",
+          "autoRetry": "Try the next release after a failure",
+          "autoRetryHint": "When an automatic download fails, the next-best release is tried instead of giving up. This covers a source refusing to hand the file over and a download that dies partway through. It only applies to releases BookOrbit chose itself: one an approver picked by hand stays failed and waits for them.",
+          "maxAttempts": "Attempts per request",
+          "maxAttemptsHint": "Every release BookOrbit sends to a download client for this request counts towards this limit: the first automatic attempt, anything tried after a source turned one down, and anything tried after a download failed. Set it to 1 to stop after the first attempt.",
+          "autoSearch": "Keep looking for requests nothing was found for",
+          "autoSearchShort": "An approved request nothing matched is searched for again later.",
+          "autoSearchHint": "A request is searched for once when it is approved. If nothing good enough turns up, or the book has not been released yet, that request waits at approved and nothing looks for it again. Switch this on and BookOrbit keeps checking on its own, so a release posted next month is still found. It only runs while automatic downloads are on, since a search with nothing to do with what it finds only costs your sources traffic.",
+          "autoSearchEnabledToast": "Requests will be searched for again",
+          "autoSearchDisabledToast": "Requests will only be searched when they are approved",
+          "autoSearchInterval": "Search again after",
+          "autoSearchIntervalShort": "Counted from the last search, and stretched as a request ages.",
+          "autoSearchIntervalHint": "How long to wait before looking again for a request nothing was found for. The wait doubles for each week a request has been waiting, up to eight times this figure, so a long backlog of old requests does not turn into daily traffic against every source you have.",
+          "autoSearchIntervalUnit": "hours",
+          "autoSearchMaxAge": "Stop looking after",
+          "autoSearchMaxAgeShort": "Counted from when the request was made.",
+          "autoSearchMaxAgeHint": "A request older than this is left alone. It stays approved and can still have a release picked by hand at any time; nothing looks for it automatically any more.",
+          "autoSearchMaxAgeUnit": "days",
+          "verify": "Check imports against the request",
+          "verifyOnHint": "Every downloaded file is compared with the book that was requested before it is filed. Anything that does not match closely enough waits in the Book Dock for someone to look at.",
+          "verifyOffHint": "Nothing is held for review. Every download is filed as soon as its title and author have been read, so a mislabelled release lands in your library without warning.",
+          "verificationEnabled": "Import checking is on",
+          "verificationDisabled": "Import checking is off. Downloads will be filed without review",
+          "verification": "Verification threshold",
+          "verificationHint": "How closely a downloaded file has to match the request before it is filed on its own. Anything below this waits in the Book Dock for review instead. This applies to every request, including releases someone picked by hand.",
+          "destinations": "Default destinations",
+          "destinationsHint": "Where a book is filed when nobody chose a library for it. There is one default per medium, because the medium is picked before anything is searched and is the only thing known about the file that early. A destination the requester pinned, or one chosen at approval, is used ahead of these.",
+          "destinationUnset": "No default",
+          "destinationHiddenLibrary": "A library you cannot see",
+          "destinationHiddenFolder": "A folder you cannot see",
+          "selectFolder": "Choose a folder",
+          "destinationLibraryFor": "Default library for {medium} requests",
+          "destinationFolderFor": "Default folder for {medium} requests",
+          "destinationClearFor": "Clear the default destination for {medium} requests",
+          "importFormats": "Import formats",
+          "importFormatsHint": "What to keep when one release carries the same book in more than one format, such as an EPUB and a PDF together. This never applies to a multipart audiobook, because its parts are one book rather than competing editions.",
+          "importFormatsOption": {
+            "all": "All available",
+            "allHint": "Keep every format that came with the release.",
+            "preferred": "Preferred only",
+            "preferredHint": "Keep only the format that sits highest in the destination library's format priority."
+          }
+        },
+        "profiles": {
+          "title": "Release profiles",
+          "effectiveRule": "Auto-download rule: first matching tier, then highest score (minimum {score}).",
+          "summary": "Releases outside the profile remain available for manual selection. With no tiers, releases rank by score alone.",
+          "howProfiles": "How release profiles work",
+          "hint": "A release is matched against tiers from top to bottom and takes the first tier it fits. Automatic downloads consider only tiered releases when a profile exists. Manual selection still includes untiered releases after the tiered results.",
+          "bitrateNote": "A bitrate floor turns away a release that states a lower one. Most sources measure very few of their releases, and an unmeasured release is not turned away, so this narrows less than it looks.",
+          "empty": "No profile. Releases for this medium are ranked by score alone.",
+          "addTier": "Add tier",
+          "removeTier": "Remove this tier",
+          "moveUp": "Move this tier up",
+          "moveDown": "Move this tier down",
+          "tierName": "Tier name",
+          "newTier": "Tier {position}",
+          "formats": "Formats",
+          "files": "Files",
+          "anyLayout": "Any",
+          "minBitrate": "Min kbps",
+          "minSeeders": "Min seeders",
+          "torrentConditions": "Torrent conditions",
+          "nonTorrentConditions": "Seeder, freeleech and VIP conditions do not apply to the selected sources.",
+          "incompatibleTorrentConditions": "This non-torrent tier still has saved torrent conditions. They may be ignored or prevent the tier from matching.",
+          "removeTorrentConditions": "Remove torrent conditions",
+          "channels": "Channels",
+          "anyChannels": "Any",
+          "mono": "Mono",
+          "stereo": "Stereo",
+          "maxSize": "Max MB",
+          "languages": "Languages",
+          "indexers": "Sources",
+          "multiSelectHint": "Choose one or more, or leave it empty to allow any",
+          "multiSelectAny": "Any"
+        },
+        "health": {
+          "ok": "Connected",
+          "failed": "Not reachable",
+          "untested": "Never tested",
+          "disabled": "Disabled",
+          "testedAt": "tested {time}",
+          "failedAt": "failed {time}"
+        },
+        "categoryLabel": "category {category}",
+        "priorityLabel": "priority {priority}",
+        "editClientName": "Edit {name}",
+        "sections": {
+          "connection": "Connection",
+          "search": "What to search",
+          "access": "Access",
+          "seeding": "Seeding",
+          "availability": "Availability",
+          "behaviour": "Behaviour"
+        },
+        "continueWithType": "Continue",
+        "external": "External",
+        "editorDescription": "Settings for this download client.",
+        "chooseClientType": "Choose a client type",
+        "chooseClientTypeHint": "Pick which program BookOrbit hands downloads to.",
+        "clientTypeDescriptions": {
+          "qbittorrent": "Your own qBittorrent. Needs an address and an account.",
+          "transmission": "Your own Transmission. It has no categories, so the category becomes a subfolder of its download directory.",
+          "deluge": "Your own Deluge. Sign in with the Web UI password; the category needs the Label plugin switched on.",
+          "nzbget": "Your own NZBGet. BookOrbit sends NZB files over its JSON-RPC API."
+        },
+        "searchHealth": {
+          "failingOnce": "Last search failed",
+          "failingStreak": "{count} searches failed in a row",
+          "lastSearchAt": "last searched {time}"
+        }
       }
     },
     "nav": {
@@ -2402,10 +3302,14 @@
       "clearSearch": "Clear search",
       "noResults": "No settings match {query}.",
       "shortcutHint": "Press Cmd K to jump to any setting",
+      "status": {
+        "scanning": "Scanning"
+      },
       "groups": {
         "you": "You",
         "library": "Library",
-        "devices": "Devices & sync",
+        "devices": "Devices",
+        "accounts": "Accounts",
         "server": "Server"
       },
       "descriptions": {
@@ -2439,9 +3343,20 @@
         "oidc": "Single sign-on provider, claims, and provisioning.",
         "serverFonts": "Fonts installed for every reader on this server.",
         "bookDock": "Quick actions shown on book pages.",
-        "auditLog": "Who changed what, and when."
+        "auditLog": "Who changed what, and when.",
+        "requests": "Sources, download clients, and what happens to a book once it downloads."
       },
       "backToApp": "Back to library"
+    },
+    "field": {
+      "required": "(required)"
+    },
+    "editor": {
+      "discardTitle": "Discard your changes?",
+      "discardDescription": "This editor has changes that were never saved. Closing it now throws them away.",
+      "discardConfirm": "Discard changes",
+      "moreActions": "More actions",
+      "removeQuestion": "Remove this?"
     }
   },
   "achievements": {
@@ -2632,10 +3547,42 @@
         "email": "Email",
         "administration": "Administration",
         "notifications": "Notifications",
-        "restrictions": "Restrictions"
+        "restrictions": "Restrictions",
+        "libraryBooks": "Library & Books",
+        "bookRequests": "Book Requests",
+        "bookDock": "Book Dock",
+        "devices": "Devices",
+        "readingIntegrations": "Reading Integrations",
+        "emailNotifications": "Email & Notifications",
+        "libraryConfiguration": "Library Configuration",
+        "usersSecurity": "Users & Security",
+        "system": "System"
       },
+      "permissionLevels": {
+        "use": "Use",
+        "manage": "Manage"
+      },
+      "accountRestrictions": "Account Restrictions",
+      "demoRestrictedHint": "Limits this account to the restricted demo experience.",
       "superuserTarget": "Superuser Target",
       "superuserTargetHint": "Content restrictions cannot be applied to superusers.",
+      "superuserAccess": {
+        "title": "Superuser access",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "enabledHint": "This account has unrestricted server access. Its saved permissions, libraries, and restrictions will apply again after demotion.",
+        "disabledHint": "Promotion grants unrestricted server access and bypasses permissions, library assignments, and content restrictions.",
+        "selfHint": "You cannot change your own superuser access.",
+        "sharedHint": "Shared accounts cannot be promoted to superuser.",
+        "promote": "Promote to superuser",
+        "demote": "Remove superuser access",
+        "promoteDialogTitle": "Promote to superuser?",
+        "promoteDialogBody": "Grant {name} unrestricted server access. Their active sessions will end, and they must sign in again.",
+        "demoteDialogTitle": "Remove superuser access?",
+        "demoteDialogBody": "Remove unrestricted access from {name}. Their saved permissions, libraries, and restrictions will take effect, and they must sign in again.",
+        "changing": "Updating access...",
+        "changeError": "Failed to update superuser access. Reload the account and try again."
+      },
       "noRestrictions": "No content restrictions",
       "noRestrictionsHint": "This user has full access to all books in their assigned libraries.",
       "addRestrictions": "+ Add Content Restrictions",
@@ -2649,6 +3596,8 @@
       "includeGenresHint": "(show only books with these genres)",
       "excludeGenres": "Exclude genres",
       "excludeGenresHint": "(hide books with these genres)",
+      "seeOwnRequestedBooks": "Let this user see books they requested",
+      "seeOwnRequestedBooksHint": "Books that arrived through their own book requests ignore the rules above. Off by default.",
       "searchTagsPlaceholder": "Search tags...",
       "searchGenresPlaceholder": "Search genres...",
       "saving": "Saving...",
@@ -2659,8 +3608,67 @@
         "updateContentFilters": "Failed to update content filters",
         "emailRequired": "Email is required",
         "createSharedAccount": "Failed to create shared account",
-        "createUser": "Failed to create user"
-      }
+        "createUser": "Failed to create user",
+        "nameRequired": "Full name is required",
+        "usernameRequired": "Username is required"
+      },
+      "drawerDescription": "Edit this account's profile, library access, permissions and restrictions.",
+      "createHint": "New accounts hold no permissions until you grant them.",
+      "sectionsLabel": "Account settings",
+      "sections": {
+        "profile": "Profile",
+        "libraries": "Libraries",
+        "permissions": "Permissions",
+        "restrictions": "Restrictions"
+      },
+      "sectionSummary": {
+        "newAccount": "Not created yet",
+        "libraries": "{selected} of {total}",
+        "permissions": "{count, plural, =0 {No permissions} one {1 granted} other {# granted}}",
+        "restrictionsNone": "None",
+        "restrictionsContent": "Content filters",
+        "restrictionsDemo": "Demo restricted",
+        "restrictionsBoth": "Filters and demo mode"
+      },
+      "account": "Account",
+      "status": "Status",
+      "statusHint": "Suspended users cannot sign in or sync devices.",
+      "signInMethod": "Sign-in",
+      "signInMethods": {
+        "password": "Password",
+        "oidc": "Single sign-on",
+        "shared": "Magic link"
+      },
+      "created": "Created",
+      "lockedUntil": "Locked until {time}",
+      "lockedHint": "Too many failed sign-in attempts. Unlock from the users list.",
+      "usernameFixedHint": "Usernames cannot be changed.",
+      "emailHint": "Used for password resets and notifications.",
+      "libraryAccessHint": "Books outside these libraries are invisible to this user.",
+      "selectAll": "Select all",
+      "clearAll": "Clear",
+      "permissionsHint": "What this account is allowed to do. {granted} of {total} granted.",
+      "groupLegend": "{group}: {granted} of {total} granted",
+      "presets": {
+        "label": "Permission preset",
+        "none": "None",
+        "standard": "Standard",
+        "custom": "Custom",
+        "admin": "Admin",
+        "customHint": "This selection does not match a preset."
+      },
+      "filterPermissions": "Filter permissions",
+      "grantedOnly": "Granted only",
+      "noPermissionMatches": "No permissions match that filter.",
+      "clearFilters": "Clear filters",
+      "filteredNotice": "Filtered. Permissions that are hidden keep their current setting.",
+      "contentRestrictionsHint": "Limit which books this user can see, by tag or genre.",
+      "contentRestrictionsAfterCreate": "Content restrictions can be set once the account exists.",
+      "unsavedChanges": "{count, plural, one {1 unsaved change} other {# unsaved changes}}",
+      "libraryBookCount": "{count, plural, =0 {No books} one {1 book} other {# books}}",
+      "dangerZone": "Danger zone",
+      "deleteUserHint": "Permanently removes this account and its reading data. Books in the library are not affected.",
+      "libraryReach": "This account can see {selected} of {total} books."
     },
     "usersPage": {
       "usersTitle": "Users",
@@ -2672,7 +3680,10 @@
         "email": "Email",
         "access": "Access",
         "status": "Status",
-        "actions": "Actions"
+        "actions": "Actions",
+        "user": "User",
+        "libraries": "Libraries",
+        "lastActive": "Last active"
       },
       "adminBadge": "Admin",
       "permissionCount": "{count, plural, =0 {no permissions} one {one permission} other {# permissions}}",
@@ -2689,6 +3700,7 @@
       "resetPasswordSharedHint": "Shared accounts do not have passwords",
       "resetPasswordOidcHintFull": "OIDC users reset passwords in their identity provider.",
       "resetPasswordSharedHintFull": "Shared accounts do not have passwords.",
+      "resetPasswordDisabledHintFull": "Password authentication is disabled by the server configuration.",
       "deleteUserAction": "Delete user",
       "deleteDialogTitle": "Delete user?",
       "deleteDialogBody": "Delete user \"{username}\". This action cannot be undone.",
@@ -2721,11 +3733,6 @@
         "search": "Search users",
         "searchPlaceholder": "Search by name, username or email",
         "sort": "Sort users",
-        "usernameAsc": "Username A-Z",
-        "nameAsc": "Name A-Z",
-        "newest": "Newest first",
-        "oldest": "Oldest first",
-        "apply": "Apply",
         "clear": "Clear",
         "state": "Filter users",
         "allUsers": "All users",
@@ -2740,12 +3747,66 @@
       },
       "pagination": {
         "label": "Users pagination",
-        "page": "Page {page} of {totalPages}"
+        "page": "Page {page} of {totalPages}",
+        "showing": "Showing {shown} of {total} accounts"
       },
       "editUserAria": "Edit {name}",
       "resetPasswordAria": "Reset the password for {name}",
       "deleteUserAria": "Delete {name}",
-      "moreActionsAria": "More actions for {name}"
+      "moreActionsAria": "More actions for {name}",
+      "headerSummary": "{count, plural, =0 {No accounts} one {# account} other {# accounts}} · {admins} with administrator access",
+      "noEmail": "No address",
+      "editAccount": "Edit account",
+      "cardMeta": "{access} · {libraries} · {lastActive}",
+      "accessTier": {
+        "superuser": "Superuser",
+        "admin": "Admin",
+        "standard": "Standard",
+        "custom": "Custom",
+        "none": "No access"
+      },
+      "libraries": {
+        "all": "All {total}",
+        "some": "{granted} of {total}"
+      },
+      "statusLocked": "Locked",
+      "status": {
+        "never": "Never",
+        "neverSignedIn": "Never signed in",
+        "defaultPassword": "Default password",
+        "contentFiltered": "Content filtered",
+        "unlocksIn": "Unlocks {when}"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "count": "{count, plural, one {# account} other {# accounts}}",
+        "filter": "{count, plural, one {# needs attention} other {# need attention}}",
+        "more": "{count} more not shown here",
+        "reason": {
+          "locked": "{name} is locked out after too many failed sign-ins",
+          "neverSignedIn": "{name} has never signed in",
+          "defaultPassword": "{name} is still using the password the account was created with"
+        },
+        "detail": {
+          "unlocksIn": "Unlocks automatically {when}",
+          "created": "Created {when}",
+          "linkExpired": "Created {when} · the sign-in link has expired",
+          "linkValid": "Created {when} · sign-in link valid until {expiry}"
+        },
+        "action": {
+          "unlock": "Unlock now",
+          "sendResetLink": "Send reset link",
+          "sendNewLink": "Send new link"
+        },
+        "collapse": "Hide",
+        "expand": "Show"
+      },
+      "defaults": {
+        "title": "Defaults for new accounts",
+        "appliesTo": "Applies to self-registration and OIDC",
+        "startingLibraries": "Starting libraries",
+        "startingLibrariesHint": "Viewer access granted automatically to every new account."
+      }
     }
   },
   "annotations": {
@@ -2870,7 +3931,16 @@
         "noMatch": "No highlights match your filters.",
         "resetFilters": "Reset filters",
         "trashEmpty": "Trash is empty",
-        "noAnnotations": "No annotations yet. Highlights you create on the web or your e-reader appear here."
+        "noAnnotations": "No annotations yet. Highlights you create on the web or your e-reader appear here.",
+        "noMatchHint": "Try a shorter phrase, or clear the colour and book filters.",
+        "noAnnotationsBody": "Everything you mark, in any book and on any device, collects here.",
+        "readHere": "Read here",
+        "readHereBody": "Select text in the reader and pick a colour.",
+        "syncKobo": "Sync a Kobo",
+        "syncKoboBody": "Marks made on the device arrive on the next sync.",
+        "syncKoreader": "Sync KOReader",
+        "syncKoreaderBody": "The plugin uploads annotations with their positions.",
+        "goToLibrary": "Go to the library"
       },
       "toast": {
         "movedToTrash": "Moved to trash",
@@ -2880,8 +3950,70 @@
         "bulkTrashed": "{count, plural, =0 {Moved no annotations to trash} one {Moved # annotation to trash} other {Moved # annotations to trash}}",
         "bulkRestored": "{count, plural, =0 {Restored no annotations} one {Restored # annotation} other {Restored # annotations}}",
         "bulkRecolored": "{count, plural, =0 {Recolored no annotations} one {Recolored # annotation} other {Recolored # annotations}}",
-        "bulkRestyled": "{count, plural, =0 {Restyled no annotations} one {Restyled # annotation} other {Restyled # annotations}}"
-      }
+        "bulkRestyled": "{count, plural, =0 {Restyled no annotations} one {Restyled # annotation} other {Restyled # annotations}}",
+        "noteSaved": "Note saved"
+      },
+      "railTitle": "{marks} marks · {books} books",
+      "lastTwelveMonths": "Last 12 months",
+      "colour": "Colour",
+      "whereFrom": "Where they came from",
+      "theShelf": "The shelf",
+      "devices": "Devices",
+      "allBooks": "All {count} books",
+      "behindCount": "{count, plural, one {# behind} other {# behind}}",
+      "busiestWeek": "Busiest week",
+      "longestQuiet": "Longest quiet stretch",
+      "mostMarked": "Most marked",
+      "weekCount": "{count, plural, one {# week} other {# weeks}}",
+      "anchorsUnplaced": "{count, plural, one {# anchor could not be placed} other {# anchors could not be placed}}",
+      "reviewThem": "Review them",
+      "anchorLost": "Anchor lost",
+      "anchorRepaired": "Repaired",
+      "notes": "Notes",
+      "review": "Review",
+      "viewLabel": "Group and sort",
+      "views": {
+        "newest": "Newest first",
+        "oldest": "Oldest first",
+        "book": "By book",
+        "color": "By colour",
+        "source": "By source"
+      },
+      "matchCount": "{shown} of {total}",
+      "moreActions": "More actions",
+      "loadMore": "{count, plural, one {Load 1 more} other {Load # more}}",
+      "openBook": "Open book",
+      "noteLabel": "Note",
+      "yourNote": "Your note",
+      "notePlaceholder": "Say why this mattered.",
+      "openAtThisPage": "Open at this page",
+      "positionAndSync": "Position & sync",
+      "loadFailed": "Could not load your highlights. Try again in a moment.",
+      "chips": {
+        "dateBetween": "{from} to {to}",
+        "dateFrom": "From {from}",
+        "dateUntil": "Until {to}"
+      },
+      "activitySummary": "{count, plural, one {# highlight between {from} and {to}} other {# highlights between {from} and {to}}}",
+      "book": "Book",
+      "needsReview": "Needs review"
+    },
+    "sources": {
+      "web": "Web",
+      "koreader": "KOReader",
+      "kobo": "Kobo"
+    },
+    "colors": {
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "pink": "Pink",
+      "orange": "Orange",
+      "red": "Red",
+      "olive": "Olive",
+      "cyan": "Cyan",
+      "purple": "Purple",
+      "gray": "Gray"
     }
   },
   "audit": {
@@ -2994,6 +4126,9 @@
       "Collection": "Collection",
       "SmartScope": "Smart scope",
       "BookDockFile": "Book Dock file",
+      "BookRequest": "Book request",
+      "DownloadClient": "Download client",
+      "RequestIndexer": "Indexer",
       "Author": "Author",
       "AppSettings": "Application settings",
       "Genre": "Genre",
@@ -3051,6 +4186,7 @@
       "LibraryAccessRevoke": "Revoke library access",
       "LibraryWriteMetadataToFiles": "Write metadata to files",
       "LibraryBulkRename": "Rename library files",
+      "LibraryRecomputeAddedAt": "Recompute date added",
       "BookUpload": "Upload book",
       "BookMetadataUpdate": "Update book metadata",
       "BookMetadataLocksUpdate": "Update metadata locks",
@@ -3076,6 +4212,24 @@
       "SmartScopeUpdate": "Update smart scope",
       "SmartScopeDelete": "Delete smart scope",
       "BookDockFinalize": "Finalize Book Dock file",
+      "BookRequestCreate": "Create book request",
+      "BookRequestApprove": "Approve book request",
+      "BookRequestReject": "Reject book request",
+      "BookRequestCancel": "Cancel book request",
+      "BookRequestFulfill": "Fulfil book request",
+      "BookRequestGrab": "Send book request to a download client",
+      "BookRequestImport": "Import a book request download",
+      "BookRequestRemoveDownload": "Remove a book request download from its client",
+      "BookRequestDelete": "Delete book request",
+      "DownloadClientCreate": "Create download client",
+      "DownloadClientUpdate": "Update download client",
+      "DownloadClientDelete": "Delete download client",
+      "RequestIndexerCreate": "Indexer added",
+      "RequestIndexerUpdate": "Indexer updated",
+      "RequestIndexerDelete": "Source deleted",
+      "RequestIndexerPluginInspect": "Indexer plugin inspected",
+      "RequestIndexerPluginInstall": "Indexer plugin installed",
+      "RequestIndexerPluginRemove": "Indexer plugin deleted",
       "AuthorUpdate": "Update author",
       "AuthorDelete": "Delete author",
       "AuthorMerge": "Merge authors",
@@ -3110,7 +4264,10 @@
       "EmailRecipientGroupUpdate": "Update recipient group",
       "EmailRecipientGroupDelete": "Delete recipient group",
       "EmailRecipientGroupMemberAdd": "Add recipient to group",
-      "EmailRecipientGroupMemberRemove": "Remove recipient from group"
+      "EmailRecipientGroupMemberRemove": "Remove recipient from group",
+      "MaintenanceMissingBooksClean": "Cleaned missing books",
+      "MaintenanceBrokenCoversClean": "Cleaned broken covers",
+      "MaintenanceOrphanedCoversClean": "Cleaned orphaned cover folders"
     }
   },
   "auth": {
@@ -3150,6 +4307,8 @@
       "errors": {
         "invalidCredentials": "Invalid username or password",
         "tooManyAttempts": "Too many login attempts. Please wait a minute and try again.",
+        "passwordDisabled": "Password sign-in is disabled. Use a single sign-on provider.",
+        "optionsUnavailable": "Sign-in options could not be loaded. Please refresh the page or contact your administrator.",
         "accountLocked": "Your password is correct, but this account is temporarily locked after too many failed sign-in attempts. Try again in {minutes, plural, one {# minute} other {# minutes}}, or reset your password to unlock it now."
       }
     },
@@ -3249,19 +4408,16 @@
       "refreshMetadata": "Refresh Metadata",
       "deleteAuthor": "Delete Author"
     },
-    "listRow": {
-      "noRecentAdditions": "No recent additions",
-      "portraitAlt": "{name} portrait"
-    },
     "filters": {
-      "title": "Author Filters",
-      "clearAll": "Clear all",
       "allLibraries": "All Libraries",
-      "allAuthors": "All authors",
-      "hasPhoto": "Has photo",
-      "missingPhoto": "Missing photo",
-      "minBooks": "Min books",
-      "anyPlaceholder": "Any"
+      "chips": {
+        "groupLabel": "Filter authors",
+        "all": "All",
+        "noPortrait": "No portrait",
+        "multipleBooks": "2+ books",
+        "recentlyAdded": "Added this week",
+        "noSortName": "No sort name"
+      }
     },
     "header": {
       "never": "Never",
@@ -3408,6 +4564,16 @@
         "deleteSuccess": "Deleted author; affected {books} books",
         "deleteFailed": "Failed to delete author"
       }
+    },
+    "portrait": {
+      "fromTheirBook": "Cover of one of their books; no portrait on file"
+    },
+    "index": {
+      "bookCount": "{count, plural, =0 {no books} one {# book} other {# books}}",
+      "rowLabel": "{name}, {count, plural, =0 {no books} one {# book} other {# books}}",
+      "actionsFor": "Actions for {name}",
+      "refreshing": "Refreshing metadata for {name}",
+      "deleting": "Deleting {name}"
     }
   },
   "book": {
@@ -3428,6 +4594,10 @@
     "actions": {
       "read": "Read",
       "listen": "Listen",
+      "startReading": "Start reading",
+      "continueReading": "Continue reading",
+      "startListening": "Start listening",
+      "continueListening": "Continue listening",
       "peek": "Peek",
       "quickView": "Quick View",
       "details": "Details",
@@ -3457,7 +4627,13 @@
       "action": "Download",
       "audiobookZip": "Audiobook (ZIP)",
       "allFormatsZip": "All formats (ZIP)",
-      "primaryOnlyZip": "Primary only (ZIP)"
+      "primaryOnlyZip": "Primary only (ZIP)",
+      "preparing": "Preparing download...",
+      "preparingExport": "Preparing {count, plural, one {# book} other {# books}} for download...",
+      "progressPercent": "Downloading {percent} of {total}",
+      "progressBytes": "Downloading {transferred}",
+      "failed": "Download failed",
+      "exportFailed": "Export failed"
     },
     "sort": {
       "moveUp": "Move up",
@@ -3514,12 +4690,14 @@
         "collection": "Collection",
         "library": "Library",
         "format": "Format",
+        "fileSize": "Primary File Size",
         "addedAt": "Added Date",
         "startedAt": "Date Started",
         "finishedAt": "Date Finished",
         "fileAvailability": "File Availability",
         "rating": "Rating",
         "communityRating": "Community Rating",
+        "communityRatingCount": "Community Review Count",
         "readProgress": "Reading Progress",
         "readStatus": "Read Status",
         "description": "Description",
@@ -3572,7 +4750,8 @@
       "unit": {
         "days": "days",
         "weeks": "weeks",
-        "months": "months"
+        "months": "months",
+        "megabytes": "MB"
       },
       "scorePreset": {
         "outstanding": "Outstanding",
@@ -3581,6 +4760,9 @@
         "poor": "Poor"
       },
       "scoreRangePlaceholder": "0-100",
+      "fileSizePlaceholder": "e.g. 10",
+      "fileSizeValueAria": "Primary file size in megabytes",
+      "fileSizeMaximumAria": "Maximum primary file size in megabytes",
       "valuePlaceholder": "value",
       "maxPlaceholder": "max",
       "to": "to",
@@ -3920,7 +5102,33 @@
         "resetHoldNotice": "{device} still has the old position ({percent})",
         "resetHoldRelease": "Use this device's position",
         "resetHoldReleasing": "Releasing...",
-        "resetHoldReleaseFailed": "Could not use this position. Try again."
+        "resetHoldReleaseFailed": "Could not use this position. Try again.",
+        "editions": "Editions",
+        "editionsSummary": "{count} · {size}",
+        "moreFormats": "+{count} more",
+        "filesOnDisk": "Files on disk",
+        "yourReading": "Your reading",
+        "lastRead": "last read {when}",
+        "notStarted": "not started",
+        "noSessionsYet": "No reading sessions yet. Opening this book in the reader tracks time, pace and per-device progress.",
+        "activitySessions": "Sessions",
+        "activityTime": "Time",
+        "activityAverage": "Avg",
+        "activityProgress": "Progress",
+        "activityDayTooltip": "{day}: {minutes} min",
+        "activityReached": "{percent} reached",
+        "durationS": "{seconds}s",
+        "durationM": "{minutes}m",
+        "durationHm": "{hours}h {minutes}m",
+        "yourReview": "Your review",
+        "reviewNotWritten": "Not written yet",
+        "writeReview": "Write",
+        "collections": "Collections",
+        "noCollections": "None",
+        "onDisk": "On disk",
+        "detailsHeading": "Details",
+        "percentUnderOne": "<1%",
+        "percentOverNinetyNine": ">99%"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {no fields} one {one field} other {# fields}}",
@@ -3958,6 +5166,7 @@
         "writeToFile": "Write to file",
         "autoFill": "Auto-fill",
         "fetchingMetadata": "Fetching metadata...",
+        "noExistingProviderIds": "No metadata fetched: none of the active Field Rule providers has an ID stored on this book.",
         "allFieldsLocked": "All fields are locked",
         "autoFillTooltip": "Auto-fill fields using your metadata preferences",
         "lockAll": "Lock all",
@@ -4038,6 +5247,11 @@
           "pickCoverSource": "Pick cover source",
           "pickFromProvider": "Pick from another provider",
           "pickSource": "Pick source",
+          "genreWriteMode": {
+            "label": "How to apply genres",
+            "merge": "Merge",
+            "replace": "Replace"
+          },
           "empty": "empty",
           "showLess": "Show less",
           "showMore": "Show more",
@@ -4075,10 +5289,51 @@
           "searchPrompt": "Search above, then click a result to start comparing metadata."
         },
         "writeAndRename": "Write to File & Rename",
-        "writeAndRenameShort": "Write & Rename"
+        "writeAndRenameShort": "Write & Rename",
+        "identityCard": "Identity",
+        "catalogCard": "Catalog",
+        "sourceCard": "Source",
+        "score": "Score",
+        "scoreTooltip": "Metadata score {score} out of 100",
+        "emptyFields": "{count, plural, one {empty field} other {empty fields}}",
+        "emptyFieldsTooltip": "Not filled in yet: {fields}. Search online to look them up.",
+        "libraryRow": "Library",
+        "primaryRow": "Primary",
+        "writeBackRow": "Write-back",
+        "writeBackOff": "Off",
+        "lastWrittenRow": "Last written",
+        "neverWritten": "Never",
+        "fileCount": "{count, plural, =0 {no files} one {one file} other {# files}}",
+        "unknownFormat": "Unknown"
       },
       "files": {
         "title": "Book files",
+        "stats": {
+          "files": "Files",
+          "total": "Total",
+          "runtime": "Runtime",
+          "formats": "Formats"
+        },
+        "filesHeading": "Files",
+        "allPresent": "All present",
+        "groupedByReader": "grouped by reader",
+        "thisFile": "This file",
+        "writeBackShort": "Write-back",
+        "fieldsSet": "{filled} / {total} set",
+        "writtenSummary": "{fields} and {count, plural, one {# more field} other {# more fields}} are written into the {format}.",
+        "writtenSummaryAll": "{fields} are written into the {format}.",
+        "writtenNothing": "None of the {total} writable fields have a value yet.",
+        "writeBackOff": "Write-back is off for this book.",
+        "editMetadata": "Edit metadata",
+        "showAllTracks": "Show all",
+        "collapseTracks": "Collapse",
+        "moreTracks": "{count, plural, one {# more track} other {# more tracks}}",
+        "tracksRolled": "{count, plural, one {# track} other {# tracks}}",
+        "fileDetails": "File details",
+        "openDetails": "Open file details",
+        "closeDetails": "Close file details",
+        "trackFrom": "Track {track} of {total}, from {time}",
+        "throughCopy": "You are {percent} through this copy",
         "fileCount": "{count, plural, =0 {no files} one {# file} other {# files}}",
         "synced": "Synced {time}",
         "sortAria": "Sort files",
@@ -4129,7 +5384,93 @@
           "title": "Delete file?",
           "description": "Are you sure you want to delete \"{filename}\"? This action cannot be undone."
         },
-        "deleting": "Deleting..."
+        "deleting": "Deleting...",
+        "folderAria": "Folder location",
+        "folderContents": "Folder contents",
+        "inspectorAria": "Selected file",
+        "libraryRoot": "library root",
+        "onDisk": "On disk",
+        "missing": "Missing",
+        "backToFolder": "Back to folder",
+        "copyPath": "Copy full path",
+        "pathCopied": "Path copied to clipboard",
+        "resume": "Resume",
+        "audiobook": "Audiobook",
+        "writeTarget": "Write target",
+        "enabled": "Enabled",
+        "disabled": "Off",
+        "notSet": "not set",
+        "sortAdded": "Added",
+        "formatCount": "{count, plural, one {# format} other {# formats}}",
+        "trackCount": "{count, plural, one {# track} other {# tracks}}",
+        "formatsInFolder": "{count, plural, one {# format here} other {# formats here}}",
+        "compositionAria": "Share of folder size by format",
+        "percentRead": "{percent} read",
+        "trackOf": "Track {track} of {total}",
+        "groups": {
+          "ebook": "Ebook",
+          "document": "Document",
+          "comic": "Comic",
+          "audio": "Audio",
+          "extras": "Extras"
+        },
+        "roles": {
+          "primary": "Primary",
+          "content": "Alternate",
+          "supplement": "Supplement",
+          "cover": "Cover"
+        },
+        "reader": {
+          "none": "No reader",
+          "ebook": "Ebook reader",
+          "document": "PDF reader",
+          "comic": "Comic reader",
+          "audio": "Audio player"
+        },
+        "spec": {
+          "format": "Format",
+          "role": "Role",
+          "size": "Size",
+          "length": "Length",
+          "added": "Added",
+          "indexed": "Indexed",
+          "opensIn": "Opens in",
+          "writeBack": "Write-back",
+          "track": "Track",
+          "targetFile": "Target file",
+          "notWritten": "Not written"
+        },
+        "duration": {
+          "hoursMinutes": "{hours}h {minutes}m",
+          "minutes": "{minutes}m",
+          "minutesSeconds": "{minutes}m {seconds}s",
+          "seconds": "{seconds}s"
+        },
+        "positionHeading": "Your position in this copy",
+        "copiesStarted": "{started} of {total} copies started",
+        "nothingStarted": "Nothing started yet",
+        "throughFile": "{percent} through this file",
+        "notOpened": "Not opened yet",
+        "lastRead": "Last read {time}",
+        "noPosition": "No reading position stored",
+        "trackPositionHeading": "Where this track sits",
+        "totalRuntime": "{duration} total",
+        "startsAt": "Starts at {time}",
+        "trackLength": "{duration} long",
+        "switchFileHeading": "Switch file",
+        "writeBackHeading": "Written into this file",
+        "fieldsWithValue": "{filled} of {total} fields have a value",
+        "lastRun": "Last run {time}",
+        "neverRun": "Never run",
+        "historyHeading": "History",
+        "timeline": {
+          "written": "Metadata written to {format}",
+          "writtenMany": "Metadata written to {format} ×{count}",
+          "writeDetail": "{count, plural, one {# field} other {# fields}} · {ms}ms · {trigger}",
+          "failed": "Write failed",
+          "indexed": "{name} indexed",
+          "indexedMany": "{count} {format} files indexed"
+        }
       },
       "highlights": {
         "note": {
@@ -4163,9 +5504,247 @@
           "hint": "Select text while reading to create highlights"
         },
         "uncategorized": "Uncategorized",
-        "paginationUnit": "highlights"
+        "paginationUnit": "highlights",
+        "rail": {
+          "title": "Marks",
+          "unit": "{count, plural, one {highlight} other {highlights}}",
+          "withNotes": "carry a note",
+          "chaptersMarked": "chapters marked",
+          "ofChaptersMarked": "of {total} chapters marked",
+          "colour": "Colour",
+          "showOnly": "Show only {colour}",
+          "source": "Where they came from",
+          "health": "Position health",
+          "needsAttention": "{count, plural, one {# needs attention} other {# need attention}}",
+          "anchorLost": "{count, plural, one {one lost its anchor when the file changed} other {# lost their anchor when the file changed}}",
+          "reAnchored": "{count, plural, one {one was re-anchored automatically} other {# were re-anchored automatically}}",
+          "reviewPositions": "Review positions",
+          "span": "Span",
+          "firstMark": "First mark",
+          "lastMark": "Last mark",
+          "markingDays": "Marking days",
+          "exportCount": "Export {count}"
+        },
+        "row": {
+          "select": "Select this highlight",
+          "showMore": "Show more",
+          "showLess": "Show less",
+          "note": "Note",
+          "addNote": "Add a note",
+          "page": "p.{page}",
+          "anchorLost": "Anchor lost",
+          "reAnchored": "Re-anchored"
+        },
+        "stream": {
+          "title": "The stream",
+          "searchPlaceholder": "Search {count} highlights and notes",
+          "all": "All",
+          "notes": "Notes",
+          "review": "Review",
+          "density": "Switch between comfortable and compact rows",
+          "matchCount": "{shown} of {total} match",
+          "textChip": "text “{query}”",
+          "marks": "{count, plural, one {# mark} other {# marks}}",
+          "loadingMore": "Loading more"
+        },
+        "bulk": {
+          "selected": "{count} selected",
+          "selectAll": "Select all {count}",
+          "recolour": "Recolour the selection",
+          "recolourTo": "Recolour to {colour}",
+          "clear": "Clear the selection"
+        },
+        "index": {
+          "title": "Index",
+          "groupBy": "Group the stream by",
+          "byChapter": "Chapters",
+          "byColour": "Colours",
+          "byDay": "Days"
+        },
+        "activity": {
+          "title": "Marking activity",
+          "days": "{count, plural, one {# day} other {# days}}",
+          "showAll": "Show all {count} days",
+          "showFewer": "Show fewer"
+        },
+        "inspector": {
+          "title": "Highlight detail",
+          "back": "Back to the index",
+          "counter": "Mark {position} of {total}",
+          "previous": "Previous mark",
+          "next": "Next mark",
+          "notePrompt": "Why did this one matter? Notes are searchable and travel with the export.",
+          "style": "Style",
+          "position": "Position and sync",
+          "openHere": "Open here"
+        },
+        "band": {
+          "title": "Where the marks are",
+          "subtitle": "every marked chapter in reading order, coloured as you marked it",
+          "barTitle": "{chapter}, {count} marks",
+          "start": "Start",
+          "densest": "Densest",
+          "marks": "{count, plural, one {# mark} other {# marks}}",
+          "longestGap": "Longest run without a mark",
+          "chapters": "{count, plural, one {# chapter} other {# chapters}}",
+          "end": "End"
+        },
+        "emptyStage": {
+          "title": "No highlights in {title} yet",
+          "body": "Highlights arrive from three places, and this page collects all of them in one spine.",
+          "openReader": "Open the reader",
+          "web": {
+            "title": "Read it here",
+            "body": "Select text in the built-in reader and pick a colour."
+          },
+          "kobo": {
+            "title": "Sync a Kobo",
+            "body": "Highlights made on the device come across on the next sync."
+          },
+          "koreader": {
+            "title": "Sync KOReader",
+            "body": "The plugin uploads annotations with their exact positions."
+          }
+        },
+        "shortcuts": {
+          "title": "Keyboard",
+          "description": "Keyboard shortcuts for the highlights list.",
+          "move": "Next / previous mark",
+          "open": "Open the inspector",
+          "back": "Back to the index",
+          "search": "Search",
+          "note": "Write a note",
+          "recolour": "Recolour",
+          "select": "Select this mark",
+          "regroup": "Regroup the stream",
+          "copy": "Copy the quote",
+          "reader": "Open in the reader"
+        },
+        "railTitle": "{marks} marks · {chapters} chapters",
+        "whenMarked": "When they were marked",
+        "chapters": "Chapters",
+        "noChapter": "No chapter",
+        "views": {
+          "position": "In reading order",
+          "newest": "Newest first",
+          "oldest": "Oldest first",
+          "colour": "By colour",
+          "source": "By source"
+        }
       },
       "readingLog": {
+        "resetReadingState": "Reset reading state",
+        "vitals": {
+          "aria": "Reading summary",
+          "notSet": "Not set",
+          "started": "Started",
+          "finished": "Finished",
+          "editStarted": "Edit the date you started this book",
+          "editFinished": "Edit the date you finished this book",
+          "totalTime": "Total time",
+          "sessions": "Sessions",
+          "avgSession": "Average session",
+          "activeDays": "Active days",
+          "activeDaysOf": "{active} of {total}",
+          "pace": "Pace",
+          "pacePerHour": "{percent}%/h",
+          "lastRead": "Last read",
+          "whereYouRead": "Where you read it",
+          "addSession": "Add session",
+          "durationHm": "{hours}h {minutes}m",
+          "durationM": "{minutes}m",
+          "durationS": "{seconds}s"
+        },
+        "ledger": {
+          "title": "Sessions",
+          "none": "none",
+          "colDay": "Day",
+          "colTime": "Time",
+          "colLength": "Length",
+          "colChange": "Change",
+          "colPosition": "Position in book",
+          "colReached": "Reached",
+          "colSource": "Source",
+          "colFormat": "Format",
+          "gapDays": "{count, plural, one {# day without reading} other {# days without reading}}",
+          "attemptBegan": "Attempt {index} began",
+          "attemptOutsideAny": "Outside any attempt",
+          "empty": "No sessions recorded yet",
+          "emptyHint": "Open the book in the reader, sync a device, or add a session by hand."
+        },
+        "attempts": {
+          "title": "Attempts",
+          "none": "none",
+          "ordinal": "Attempt {index}",
+          "addPast": "Add a past attempt",
+          "reread": "Reread",
+          "rereadPrompt": "Start a new reading attempt?",
+          "rereadResetProgress": "Reset the reading position to the beginning. Synchronized devices may receive this reset.",
+          "rereadConfirm": "Start reread",
+          "fieldStarted": "Started",
+          "fieldEnded": "Ended",
+          "fieldOutcome": "Outcome",
+          "outcome": {
+            "completed": "Completed",
+            "skimmed": "Skimmed",
+            "abandoned": "Abandoned",
+            "inProgress": "In progress"
+          },
+          "spanRange": "{from} to {to}",
+          "spanSince": "since {from}",
+          "spanEnded": "ended {to}",
+          "spanUnknown": "No dates recorded",
+          "sessionCount": "{count, plural, one {# session} other {# sessions}}",
+          "endBeforeStart": "The end date must be on or after the start date.",
+          "editAria": "Edit this attempt",
+          "deleteAria": "Delete this attempt",
+          "cancelDeleteAria": "Cancel deleting this attempt",
+          "confirmDeleteAria": "Confirm deleting this attempt",
+          "empty": "No attempts recorded",
+          "emptyHint": "Start a reread, or add an attempt you finished before this library existed."
+        },
+        "records": {
+          "title": "Records",
+          "longestSession": "Longest session",
+          "bestDay": "Best day",
+          "longestStreak": "Longest streak",
+          "streakDays": "{count, plural, one {# day} other {# days}}",
+          "pace": "Reading pace",
+          "jumpedBack": "Jumped back",
+          "jumpedBackTimes": "{count, plural, one {# time} other {# times}}",
+          "firstOpened": "First opened",
+          "empty": "Records appear once this book has sessions."
+        },
+        "band": {
+          "curve": "Curve",
+          "trace": "Trace",
+          "switchAria": "Chart view",
+          "curveTitle": "Progress over time",
+          "traceTitle": "Where you were in the book",
+          "curveSubDays": "{active} active days across {total}",
+          "curveSubSitting": "one sitting, session by session",
+          "traceSub": "each bar is the stretch one session covered",
+          "traceSubWithBacktracks": "{count, plural, one {each bar is one session, # jumped back} other {each bar is one session, # jumped back}}",
+          "legendPosition": "Position reached",
+          "legendMinutes": "Minutes read",
+          "legendBacktrack": "Jumped back",
+          "traceEmpty": "No trace yet",
+          "traceEmptyHint": "Once sessions exist this shows the stretch of the book each one covered, and where you doubled back.",
+          "tooltipCovered": "Covered {from}% to {to}%",
+          "tooltipMinutes": "{minutes} min"
+        },
+        "emptyStage": {
+          "title": "Nothing logged for this book yet",
+          "description": "A reading log is built from sessions. BookOrbit records one every time you read in the web reader, and picks up the rest from the devices you sync.",
+          "readerTitle": "Read it here",
+          "readerBody": "Every minute in the BookOrbit reader is logged automatically.",
+          "koreaderTitle": "Sync KOReader",
+          "koreaderBody": "The plugin pushes each sitting back, with the page you reached.",
+          "koboTitle": "Sync a Kobo",
+          "koboBody": "Plug the device in and BookOrbit reads its own reading-time counter.",
+          "addSession": "Add a session by hand",
+          "recordPast": "Record a past reading"
+        },
         "moreActionsAria": "More reading log actions",
         "export": {
           "button": "Export"
@@ -4278,6 +5857,7 @@
           "colProgressChangeMobile": "Delta",
           "colEndProgress": "End Progress",
           "colEndProgressMobile": "End",
+          "jumpToProgress": "Jump to {progress}%",
           "empty": "No reading sessions recorded yet.",
           "emptyHint": "Add a session to start building this book's reading history.",
           "colPace": "Pace",
@@ -4327,6 +5907,7 @@
         "moveDown": "Move down",
         "removeSeries": "Remove series",
         "seriesIndexLabel": "Position in series",
+        "invalidSeriesIndex": "Enter digits with at most one decimal point, such as 5.10.",
         "totalLabel": "Books in series",
         "totalPlaceholder": "of",
         "totalHint": "Total books in this series. Shared with everyone who has this series."
@@ -4404,6 +5985,7 @@
         "unread": "Unread"
       },
       "series": {
+        "seriesRow": "Series row",
         "bookCount": "{count, plural, =0 {(no books)} one {(# book)} other {(# books)}}",
         "readOfCount": "{read} of {total} read"
       },
@@ -4545,6 +6127,7 @@
     "apply": "Apply",
     "done": "Done",
     "discard": "Discard",
+    "deselect": "Deselect",
     "finalize": "Finalize",
     "rescan": "Rescan",
     "uploadAction": "Upload",
@@ -4554,12 +6137,19 @@
     "bulkEditAction": "Bulk Edit",
     "applyFetched": "Apply Fetched",
     "retryErrors": "Retry Errors",
+    "discardDialog": {
+      "title": "{count, plural, =0 {Discard no files?} one {Discard the selected file?} other {Discard the # selected files?}}",
+      "description": "{count, plural, =0 {No files are selected.} one {This permanently deletes the selected file from disk. This action cannot be undone.} other {This permanently deletes the # selected files from disk. This action cannot be undone.}}",
+      "confirm": "{count, plural, one {Delete file} other {Delete # files}}",
+      "failed": "The selected files could not be deleted. Try again."
+    },
     "commaSeparated": "comma-separated",
     "destinationLibrary": "Destination Library",
     "destinationFolder": "Destination Folder",
     "nFailed": "{count} failed",
     "updatedOfFiles": "Updated {updated} of {total} files",
     "errorStatus": "Error {status}",
+    "invalidSeriesIndex": "Enter digits with at most one decimal point, such as 5.10.",
     "tab": {
       "all": "All",
       "pending": "Pending",
@@ -4705,6 +6295,7 @@
       },
       "empty": {
         "nothingToReview": "Nothing needs review. Every ready file has a destination and a confident match.",
+        "nothingReadyToFile": "No files are ready to file.",
         "dropHint": "Or drop files anywhere on this page."
       },
       "selectAllOnPage": "Select all files on this page",
@@ -4729,10 +6320,749 @@
         "access_denied": "No access",
         "invalid_format": "Bad format",
         "error": "Would fail"
+      },
+      "unit": {
+        "fileCount": "{count, plural, one {# file} other {# files}}",
+        "filesHeading": "{count, plural, one {File in this entry} other {# files in this entry}}",
+        "role": {
+          "content": "Book",
+          "cover": "Cover",
+          "metadata": "Metadata",
+          "supplement": "Extra"
+        }
       }
     }
   },
+  "bookRequests": {
+    "title": "Requests (Beta)",
+    "subtitle": "Ask for books the library does not have yet. This feature is experimental, expect minor bugs.",
+    "tabs": {
+      "search": "Request a book",
+      "mine": "My requests",
+      "all": "All requests"
+    },
+    "mediaKind": {
+      "ebook": "E-book",
+      "audiobook": "Audiobook",
+      "comic": "Comic"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled",
+      "searching": "Searching",
+      "grabbed": "Grabbed",
+      "downloading": "Downloading",
+      "importing": "Importing",
+      "needs_review": "Needs review",
+      "available": "Available",
+      "failed": "Failed"
+    },
+    "search": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Book title",
+      "authorLabel": "Author",
+      "authorPlaceholder": "Author name",
+      "mediaKindLabel": "Format",
+      "libraryLabel": "Add to library",
+      "libraryAny": "Let the approver decide",
+      "libraryDefault": "Default ({library})",
+      "libraryChoose": "Choose a library",
+      "libraryRequired": "Your requests are approved as soon as you make them, so pick the library the book should land in.",
+      "fulfillmentLabel": "Fulfillment",
+      "fulfillmentAutomatic": "Automatic",
+      "fulfillmentChooseRelease": "Choose a release",
+      "folderLabel": "Folder",
+      "languageLabel": "Request language",
+      "languageAny": "Any language",
+      "languageDefaultToggleLabel": "Use this language for new requests",
+      "languageDefaultSetHint": "Ask for this language on every new request",
+      "languageDefaultClearHint": "Stop asking for this language by default",
+      "languageDefaultSaved": "New requests will ask for {language}",
+      "languageDefaultCleared": "New requests will follow your interface language",
+      "languageDefaultFailed": "Could not save your language preference",
+      "submit": "Search",
+      "searching": "Searching providers...",
+      "noResultsTitle": "No matching books found",
+      "noResultsHint": "Try a different title or author.",
+      "noResultsIndexerHint": "Try a different title or author, or search the indexers for \"{title}\" and pick a release yourself.",
+      "freeTextAction": "Search indexers",
+      "manualSearchAction": "Search indexers manually",
+      "yearUnknown": "Year unknown",
+      "sourceCount": "{count, plural, one {# source} other {# sources}}",
+      "sourcesLabel": "Sources: {sources}",
+      "sourcesUnavailable": "Some sources did not respond, so results may be incomplete: {sources}",
+      "identifiers": {
+        "none": "No ISBN",
+        "one": "1 ISBN",
+        "confirmed": "ISBN confirmed",
+        "count": "{count} ISBNs",
+        "sourcesTitle": "Metadata sources",
+        "provider": "Provider",
+        "providerTitle": "Provider title",
+        "isbn": "ISBN",
+        "year": "Year",
+        "language": "Language",
+        "notProvided": "Not provided",
+        "searchScope": "Choose one of {count, plural, one {# ISBN} other {# ISBNs}} to search, or search by title and author.",
+        "searchScopeLimited": "Choose one ISBN to search.",
+        "titleAuthorOnly": "No ISBN was provided. BookOrbit will search once by title and author.",
+        "chooseSearch": "Choose an edition to search",
+        "searchByEdition": "Find a release for an edition",
+        "findRelease": "Find release",
+        "primaryIsbn": "ISBN {isbn}",
+        "primaryTitleAuthor": "Title and author",
+        "recommended": "Recommended",
+        "recommendationHelpLabel": "How BookOrbit chooses the recommended ISBN",
+        "recommendationTitle": "How the recommended search is chosen",
+        "recommendationLanguage": "Prefer the requested language, then an unknown language, before a known mismatch.",
+        "recommendationAgreement": "Prefer an ISBN confirmed by more independent metadata providers.",
+        "recommendationProvider": "Use BookOrbit's stable metadata-provider priority.",
+        "recommendationRelevance": "Use the edition's position in that provider's results.",
+        "recommendationYear": "Prefer an edition year closest to the work's earliest known year.",
+        "recommendationStable": "Use the ISBN itself as the final stable tie-breaker.",
+        "recommendationFallback": "If no valid ISBN is available, BookOrbit searches once by title and author. Choosing an edition from the menu always overrides this recommendation.",
+        "withoutIsbn": "Search by title and author",
+        "action": "Action"
+      },
+      "request": "Request",
+      "download": "Download",
+      "getAutomatically": "Get automatically",
+      "chooseRelease": "Choose release",
+      "joinRequest": "Add me too",
+      "submitted": "Request submitted",
+      "joinedExisting": "Added you to the existing request",
+      "submitFailed": "Could not submit that request",
+      "alreadyInLibrary": "Already in your library",
+      "alreadyRequested": "Already requested by someone else",
+      "alreadyRequestedByYou": "You already requested this",
+      "preferredFormatsLabel": "Preferred formats",
+      "preferredFormatsHint": "Releases in these formats are ranked higher. Other formats are still offered.",
+      "noteLabel": "Note for the approver",
+      "notePlaceholder": "Anything worth knowing about this request",
+      "moreOptions": "More options",
+      "fewerOptions": "Fewer options",
+      "optionsSummary": "{formats} · note added",
+      "formatToggleAria": "Prefer {format}"
+    },
+    "card": {
+      "details": "Details",
+      "mediaKind": "Format",
+      "library": "Library",
+      "requestedBy": "Requested by",
+      "requestedByAt": "{name} on {time}",
+      "alsoWanted": "Also wanted by",
+      "alsoWantedCount": "{count, plural, one {# other person wants this} other {# others want this}}",
+      "moreActions": "More actions for {title}",
+      "settledIn": "Filed in {library}, {time}",
+      "settledAt": "Closed {time}",
+      "dismissedBadge": "Dismissed"
+    },
+    "detail": {
+      "unknownAuthor": "Author unknown",
+      "requestedBy": "Requested by",
+      "requestedOn": "Requested on",
+      "library": "Library",
+      "series": "Series",
+      "isbn": "ISBN",
+      "decidedBy": "Decided by",
+      "requesterNote": "Note from the requester",
+      "decisionNote": "Decision note",
+      "statusReason": "What stopped it",
+      "alsoWanted": "Also wanted by",
+      "decisionNoteLabel": "Note (optional)",
+      "decisionNotePlaceholder": "Explain the decision",
+      "destinationLibraryLabel": "Destination library",
+      "destinationLibraryPlaceholder": "Choose a library",
+      "destinationFolderLabel": "Destination folder",
+      "languageLabel": "Language asked for",
+      "languageAny": "Any language",
+      "destinationRequired": "Approving files the book into a library, so pick one before you approve.",
+      "fulfilTitle": "Close this request",
+      "fulfilHint": "Point the request at the book you added, or at the Book Dock file waiting to be filed.",
+      "bookIdLabel": "Book ID",
+      "bookIdPlaceholder": "e.g. 128",
+      "dockFileIdLabel": "Book Dock file ID",
+      "dockFileIdPlaceholder": "e.g. 42",
+      "backToList": "All requests",
+      "loading": "Loading request...",
+      "transfer": "Transfer",
+      "requestSection": "Request",
+      "decideTitle": "Approve or reject",
+      "fulfilSourceLabel": "What closes this request",
+      "fulfilFromLibrary": "A book in the library",
+      "fulfilFromDock": "A Book Dock file",
+      "fulfilSearchLabel": "Search for the file that closes this request",
+      "fulfilSearchBooks": "Search your library by title or author",
+      "fulfilSearchDock": "Search the Book Dock by file name",
+      "fulfilSearching": "Searching...",
+      "fulfilNoResults": "Nothing matched. Try a different search.",
+      "errors": {
+        "notFound": "That request no longer exists.",
+        "forbidden": "That request belongs to someone else.",
+        "loadFailed": "Could not load that request"
+      },
+      "entityName": "Request"
+    },
+    "actions": {
+      "approve": "Approve",
+      "approveAndNext": "Approve and next",
+      "reject": "Reject",
+      "cancel": "Cancel request",
+      "cancelDownload": "Cancel download",
+      "dismiss": "Dismiss",
+      "restore": "Restore",
+      "delete": "Delete request",
+      "markFulfilled": "Mark fulfilled",
+      "grab": "Find a release",
+      "goToBook": "Go to book",
+      "retryRelease": "Try another release",
+      "leave": "Leave request"
+    },
+    "filters": {
+      "status": "Status",
+      "anyStatus": "Any status",
+      "mediaKind": "Format",
+      "anyMediaKind": "Any format",
+      "requester": "Requester",
+      "anyRequester": "Any requester",
+      "showDismissed": "Show dismissed",
+      "fulfilment": "Fulfilment",
+      "anyFulfilment": "Any fulfilment",
+      "selfServeOnly": "Self-served",
+      "approvedOnly": "Went through approval"
+    },
+    "list": {
+      "loading": "Loading requests...",
+      "emptyMine": "You have not requested any books yet.",
+      "emptyAll": "No book requests yet.",
+      "pagination": "Request pages",
+      "pageOf": "Page {page} of {total}",
+      "emptyHint": "Search for a book and it will show up here once you ask for it."
+    },
+    "toasts": {
+      "approved": "Request approved",
+      "rejected": "Request rejected",
+      "cancelled": "Request cancelled",
+      "downloadCancelled": "Download cancelled",
+      "dismissed": "Hidden from your list",
+      "restored": "Back on your list",
+      "deleted": "Request deleted",
+      "fulfilled": "Request marked fulfilled",
+      "grabbed": "Download started",
+      "downloadRemoved": "Removed from the download client",
+      "bulkApproved": "{count, plural, one {# request approved} other {# requests approved}}",
+      "bulkApprovedPartial": "{done} approved, {failed} could not be",
+      "bulkDismissed": "{count, plural, one {# request hidden} other {# requests hidden}}",
+      "bulkDismissedPartial": "{done} hidden, {failed} could not be",
+      "unitChosen": "Importing the book you chose",
+      "languageChanged": "Request language updated",
+      "left": "You have left this request",
+      "bulkRejected": "{count, plural, one {# request rejected} other {# requests rejected}}",
+      "bulkRejectedPartial": "{done} rejected, {failed} could not be",
+      "importDiscarded": "The imported file was discarded"
+    },
+    "errors": {
+      "loadFailed": "Could not load requests",
+      "approveFailed": "Could not approve that request",
+      "rejectFailed": "Could not reject that request",
+      "cancelFailed": "Could not cancel that request",
+      "cancelDownloadFailed": "Could not cancel that download",
+      "dismissFailed": "Could not hide that request",
+      "restoreFailed": "Could not bring that request back",
+      "deleteFailed": "Could not delete that request",
+      "fulfilFailed": "Could not close that request",
+      "grabFailed": "Could not start that download",
+      "removeDownloadFailed": "Could not remove that torrent from the download client",
+      "bulkApproveFailed": "Could not approve the selected requests",
+      "bulkDismissFailed": "Could not hide the selected requests",
+      "selectUnitFailed": "That book could not be imported.",
+      "languageChangeFailed": "Could not change the request language",
+      "leaveFailed": "That request could not be left",
+      "bulkRejectFailed": "That selection could not be rejected",
+      "discardImportFailed": "That import could not be discarded"
+    },
+    "grab": {
+      "title": "Send to a download client",
+      "subtitle": "Paste a magnet link or upload a .torrent for \"{title}\".",
+      "singleFileNote": "A release can be one book in several formats, an audiobook in parts, or an archive - all of those import as a single book. A release holding several separate books asks you which one to keep.",
+      "magnet": "Magnet link",
+      "torrentFile": ".torrent file",
+      "client": "Download client",
+      "submit": "Send",
+      "errors": {
+        "pickOne": "Provide either a magnet link or a .torrent file, not both",
+        "fileTooLarge": "That file is larger than {limit}, so it is not a .torrent file",
+        "fileUnreadable": "That file could not be read"
+      },
+      "noClientList": "BookOrbit will use its highest-priority enabled download client."
+    },
+    "attempts": {
+      "title": "Earlier attempts",
+      "loading": "Loading earlier attempts...",
+      "loadFailed": "Could not load the earlier attempts",
+      "refused": "Refused, nothing downloaded",
+      "handPicked": "Sent by hand"
+    },
+    "download": {
+      "source": {
+        "automatic": "Grabbed automatically",
+        "manual": "Picked by an approver",
+        "pasted": "Pasted by hand"
+      },
+      "transferred": "{done} of {total}",
+      "transferredUnknown": "{done} downloaded",
+      "progressLabel": "Download progress for {title}",
+      "status": {
+        "queued": "Queued for download",
+        "downloading": "Downloading",
+        "completed": "Download finished",
+        "importing": "Importing into your library",
+        "needs_review": "Waiting for review in the Book Dock",
+        "imported": "Added to your library",
+        "failed": "Download failed"
+      }
+    },
+    "releases": {
+      "title": "Pick a release",
+      "retryTitle": "Try another release",
+      "subtitle": "Ranked across every enabled indexer.",
+      "summaryCount": "{count, plural, one {# release} other {# releases}}",
+      "allFreeleech": "all freeleech",
+      "allLanguage": "all {language}",
+      "allFormat": "all {format}",
+      "allIndexer": "all from {name}",
+      "criteria": {
+        "label": "Active search",
+        "searched": "Searched",
+        "searchedTitleAuthor": "Searched title and author",
+        "nothingFound": "Nothing found for {key}",
+        "changeSearch": "Change search",
+        "closeSearch": "Close",
+        "sources": "Sources",
+        "sourceSearchedIsbn": "searched the ISBN",
+        "sourceSearchedTitleAuthor": "searched the title and author",
+        "sourceNoAdapter": "no matching adapter",
+        "sourceReleases": "{count, plural, one {# release} other {# releases}}",
+        "sourceNone": "no matches",
+        "sourceFiltered": "{count} filtered out",
+        "sourcesSearched": "{count, plural, one {# source searched} other {# sources searched}}",
+        "showEachSource": "Show each",
+        "uncovered": "{count, plural, one {# enabled source does} other {# enabled sources do}} not carry this kind of book",
+        "fixSource": "Fix in settings",
+        "searchInstead": "Search this instead",
+        "keyTried": "tried, nothing found",
+        "keyTriedCount": "tried, {count, plural, one {# release} other {# releases}}",
+        "searchWithoutIsbn": "Title and author",
+        "customIsbnSource": "Custom ISBN",
+        "filteredLocally": "Filtered locally:",
+        "title": "Title",
+        "author": "Author",
+        "additionalAuthors": "Additional authors",
+        "isbn10": "ISBN-10",
+        "isbn13": "ISBN-13",
+        "isbns": "ISBNs",
+        "mediaKind": "Media",
+        "language": "Language",
+        "formats": "Preferred formats",
+        "editFields": "Edit fields",
+        "closeEditor": "Close editor",
+        "authorsEditor": "Authors, one per line",
+        "authorsPlaceholder": "One author per line",
+        "authorsInvalid": "Use no more than 50 authors, with 255 characters or fewer per author.",
+        "languagePlaceholder": "Any language",
+        "formatsPlaceholder": "epub, azw3",
+        "formatsInvalid": "Use no more than 20 formats, with 20 characters or fewer per format.",
+        "isbnSelection": "Search method",
+        "isbnSelectionHint": "Choose one ISBN, title and author, or add a custom ISBN.",
+        "noIsbnSelected": "Title and author, without an ISBN",
+        "customIsbn": "Custom ISBN",
+        "customIsbnPlaceholder": "ISBN-10 or ISBN-13",
+        "addIsbn": "Add ISBN",
+        "invalidIsbn": "{isbn} is not a valid ISBN-10 or ISBN-13.",
+        "titleRequired": "Enter a title to search.",
+        "fixedMedia": "Media remains {media} because it controls compatible sources and the fulfillment path.",
+        "useRequestFields": "Use request fields",
+        "runSearch": "Search with these fields"
+      },
+      "previousFailure": "The last attempt failed: {reason}",
+      "refused": {
+        "sourceRefused": "This source turned down an earlier release",
+        "sourceUnavailable": "This source did not answer",
+        "vipRequired": "Needs a VIP account on this source",
+        "clientRefused": "Your download client refused an earlier release",
+        "clientUnavailable": "Your download client did not answer an earlier release"
+      },
+      "singleFileNote": "A release can be one book in several formats, an audiobook in parts, or an archive - all of those import as a single book. A release holding several separate books asks you which one to keep.",
+      "searching": "Searching indexers...",
+      "refresh": "Search again",
+      "cached": "Showing the last search. Search again for fresh results.",
+      "sortBy": "Sort by",
+      "sort": {
+        "score": "Best match",
+        "seeders": "Seeders",
+        "size": "Size",
+        "bitrate": "Bitrate",
+        "added": "Date added"
+      },
+      "freeleechOnly": "Freeleech only ({count})",
+      "clearFilters": "Clear filters",
+      "filteredEmpty": "No release matches these filters.",
+      "grab": "Download release",
+      "viewFiles": "View files",
+      "hideFiles": "Hide files",
+      "viewDetails": "About contents",
+      "hideDetails": "Hide details",
+      "inspectingFiles": "Reading the release file list...",
+      "inspectingNzb": "Fetching and validating the NZB...",
+      "inspectingShort": "Checking files...",
+      "inspectionFailed": "This release's file list could not be read.",
+      "manifest": {
+        "ready": "{count, plural, one {This release contains # file. The supported book file can be imported.} other {This release contains # files. The supported book file can be imported.}}",
+        "noSupported": "This release has no directly supported book file, so it cannot be sent.",
+        "contentsUnknown": "This release is packaged as an archive (RAR, ZIP or 7z). BookOrbit will extract it after downloading, so its contents are not known yet.",
+        "multipleBooks": "This release contains {count} separate books. After it downloads you will be asked which one to import.",
+        "multiPartBook": "{count, plural, one {This release is one book made of # file.} other {This release is one book made of # files, imported together as a single book.}}",
+        "metadataUnavailable": "This is a magnet link. Its file list is unavailable until a torrent client fetches the metadata from the swarm.",
+        "usenetMetadataUnavailable": "This is a Usenet release. Its final file list is unavailable until NZBGet downloads and post-processes it.",
+        "bookFile": "Book file",
+        "extraFile": "Extra",
+        "truncated": "Showing {shown} of {total} files.",
+        "untitledUnit": "Untitled",
+        "unitFiles": "{count, plural, one {# file} other {# files}}",
+        "unitsTruncated": "Showing {shown} of {total} books.",
+        "ignored": "{count, plural, one {Ignoring # sample or padding file.} other {Ignoring # sample and padding files.}}",
+        "mediaKind": {
+          "ebook": "E-book",
+          "audiobook": "Audiobook",
+          "comic": "Comic"
+        }
+      },
+      "manual": "Paste a link instead",
+      "manualTorrent": "Use magnet or .torrent instead",
+      "indexer": "Indexer",
+      "size": "Size",
+      "seeders": "Seeders",
+      "language": "Language",
+      "seederCountPlural": "{count, plural, one {# seeder} other {# seeders}}",
+      "seederCountUnknown": "Seeders unknown",
+      "format": "Format",
+      "files": "Files",
+      "fileLayout": {
+        "single": "One listed file",
+        "multi": "Multiple listed files"
+      },
+      "fileCount": "{count, plural, one {# file} other {# files}}",
+      "audio": "Audio",
+      "bitrateAtLeast": "{rate}k+",
+      "channels": {
+        "mono": "Mono",
+        "stereo": "Stereo"
+      },
+      "chapterCountPlural": "{count, plural, one {# chapter} other {# chapters}}",
+      "durationHm": "{hours}h {minutes}m",
+      "durationM": "{minutes}m",
+      "freeleech": "Freeleech",
+      "vipOnly": "VIP only",
+      "hideVipOnly": "Hide VIP only",
+      "noneMatchedProfile": "No release here matches your profile for this medium, so none of them will be downloaded automatically. You can still send one by hand. To widen it, add a tier with fewer conditions below the ones you have.",
+      "profileMismatch": {
+        "summary": "{count, plural, one {# release was found, but automatic download will skip it because it does not match any {medium} profile tier.} other {# releases were found, but automatic download will skip them because none matches a {medium} profile tier.}} Match score and profile rules are separate checks. You can still click Send.",
+        "review": "Review {medium} profile",
+        "row": "Automatic download will skip this. Closest tier: {tier}. {reasons}",
+        "failures": {
+          "formatUnknown": "{source} did not state a format; this tier requires {expected}.",
+          "format": "Format is {actual}; this tier requires {expected}.",
+          "fileLayoutUnknown": "{source} did not state a file count; this tier requires {expected}.",
+          "fileLayout": "File layout is {actual}; this tier requires {expected}.",
+          "bitrate": "Bitrate is {actual} kbps; this tier requires at least {expected} kbps.",
+          "channels": "Audio is {actual}; this tier requires {expected}.",
+          "languageUnknown": "{source} did not state a language; this tier requires {expected}.",
+          "language": "Language is {actual}; this tier requires {expected}.",
+          "source": "This source is not included in the tier.",
+          "seeders": "This release has {actual} seeders; this tier requires at least {expected}.",
+          "sizeUnknown": "{source} did not state a size; this tier allows up to {expected}.",
+          "size": "Size is {actual}; this tier allows up to {expected}.",
+          "freeleech": "This tier requires freeleech.",
+          "vipOnly": "This tier excludes VIP-only releases."
+        }
+      },
+      "alreadyGrabbed": "Already snatched",
+      "freeleechLabel": "Freeleech",
+      "published": "Published",
+      "scoreLabel": "Match score {score} out of 100",
+      "scoreBreakdown": "How this release scored",
+      "whyThisScore": "Why this score",
+      "failures": {
+        "unauthorized": "sign-in expired",
+        "throttled": "rate limited",
+        "timeout": "timed out",
+        "unreachable": "unreachable",
+        "unsupportedMedium": "does not carry this kind of book",
+        "error": "search failed"
+      },
+      "reasons": {
+        "isbnMatch": "ISBN matches",
+        "titleMatch": "Title match",
+        "authorMatch": "Title and author match",
+        "preferredFormat": "Preferred format {detail}",
+        "knownFormat": "Format {detail}",
+        "unknownFormat": "Format not stated",
+        "expectedSize": "Plausible size",
+        "suspiciousSize": "Unlikely size {detail}",
+        "seeders": "{detail} seeders",
+        "freeleech": "Freeleech",
+        "likelySeveralBooks": "{detail} files, may be several books"
+      },
+      "errors": {
+        "loadFailed": "Could not search for releases"
+      },
+      "backToRequest": "Back to the request",
+      "bestMatch": "Best match",
+      "flags": "Flags",
+      "score": "Score",
+      "release": "Release",
+      "send": "Send",
+      "tableCaption": "Releases, ranked",
+      "onlyBestMatch": "That is the only release that matched.",
+      "tiedWithBest": "{count, plural, one {# other release scored the same} other {# other releases scored the same}}",
+      "inspectionFailedHint": "It was not sent to a download client. Try again, or use Paste a link instead.",
+      "inspectionFailedHintGeneric": "It was not sent to a download client. Try again, or choose another release.",
+      "mediumUncovered": "No source carries this kind of book.",
+      "mediumUncoveredHint": "None of your enabled indexers cover it. Add one that does, or paste a link yourself.",
+      "noSourcesConfigured": "No search sources are set up yet.",
+      "noSourcesEnabled": "Every search source is switched off.",
+      "noSourcesConfiguredHint": "Nothing was searched. Add an indexer or install a source plugin, or paste a link to a release yourself.",
+      "noSourcesEnabledHint": "Nothing was searched. Switch one back on, or paste a link to a release yourself.",
+      "noSourcesAskAdmin": "Nothing was searched. Ask an administrator to set up a search source, or paste a link to a release yourself.",
+      "addSource": "Add a source",
+      "reviewSources": "Review sources",
+      "protocol": {
+        "torrent": "Torrent",
+        "usenet": "Usenet",
+        "direct": "Direct download",
+        "directPill": "Direct"
+      }
+    },
+    "seed": {
+      "title": "Download client",
+      "automated": "BookOrbit picked this release automatically.",
+      "loading": "Reading the download client...",
+      "loadFailed": "Could not reach the download client for this request.",
+      "notInClient": "The download client no longer has this torrent.",
+      "state": "Status",
+      "seeding": "Seeding",
+      "stopped": "Stopped",
+      "client": "Client",
+      "ratio": "Ratio",
+      "time": "Seeding time",
+      "uploaded": "Uploaded",
+      "hours": "{value} h",
+      "ofGoal": "{value} of {goal}",
+      "deleteFiles": "Also delete the downloaded files",
+      "remove": "Remove from client",
+      "removeHint": "BookOrbit never stops a seed on its own. The imported book stays in your library either way.",
+      "confirm": {
+        "title": "Remove this torrent?",
+        "description": "The torrent stops seeding. The downloaded files stay on disk.",
+        "descriptionWithFiles": "The torrent stops seeding and its downloaded files are deleted. The imported book stays in your library."
+      }
+    },
+    "pipeline": {
+      "label": "Progress",
+      "steps": {
+        "asked": "Asked",
+        "approved": "Approved",
+        "release": "Release found",
+        "downloading": "Downloading",
+        "filed": "Filed"
+      },
+      "summary": {
+        "waiting": "Waiting at: {step}",
+        "progress": "In progress at: {step}",
+        "done": "Filed in your library",
+        "failed": "Stopped by a failure at: {step}",
+        "stopped": "Stopped at: {step}"
+      }
+    },
+    "density": {
+      "label": "List density",
+      "comfortable": "Comfortable",
+      "compact": "Compact"
+    },
+    "drawer": {
+      "label": "Request detail",
+      "description": "The request, the stage it has reached and the decisions open on it.",
+      "previous": "Previous request",
+      "next": "Next request",
+      "position": "{position} of {total}",
+      "shortcuts": "J / K to move, A to approve, Esc to close"
+    },
+    "table": {
+      "caption": "Book requests, with the stage each one has reached",
+      "cover": "Cover",
+      "title": "Title",
+      "mediaKind": "Format",
+      "requestedBy": "Requested by",
+      "age": "Age",
+      "state": "State",
+      "outcome": "Outcome",
+      "actions": "Actions",
+      "selectAll": "Select every request waiting for approval",
+      "selectRow": "Select {title}",
+      "toggleDetail": "Show what happened to {title}",
+      "release": "Release",
+      "decidedBy": "Decided by",
+      "decisionNote": "Decision note",
+      "requestNote": "Request note",
+      "openDetail": "Open full detail"
+    },
+    "confirm": {
+      "cancelDownloadTitle": "Cancel this download?",
+      "cancelDownloadDescription": "The active transfer stops and the request stays open so another release can be chosen. Client-managed data is kept; partial direct-download staging is deleted.",
+      "cancelTitle": "Stop this request?",
+      "cancelDescription": "It moves to cancelled. Nobody waiting on it will get the book.",
+      "cancelDescriptionWithDownload": "The active transfer is stopped. Data in the download client is kept; partial direct-download staging is deleted.",
+      "deleteTitle": "Delete this request?",
+      "deleteDescription": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client with its files kept. Direct-download staging is cleaned automatically. Dismissing the request instead only hides it from your own list.",
+      "discardImportTitle": "Discard this import?",
+      "discardImportDescription": "The downloaded files are removed from the Book Dock and the request is marked failed. The torrent keeps seeding; stop it separately if you want it gone.",
+      "leaveTitle": "Leave this request?",
+      "leaveDescription": "You stop following it and stop being notified about it. Whoever asked for it keeps their request.",
+      "rejectDescription": "Everyone waiting on these requests is told they were turned down. Nothing is downloaded."
+    },
+    "outcome": {
+      "filedIn": "Filed in {library} {time}",
+      "filed": "Filed {time}",
+      "rejected": "Rejected {time}",
+      "cancelled": "Cancelled {time}",
+      "awaitingApproval": "Waiting for approval",
+      "awaitingReview": "Waiting for a manual check",
+      "failedUnknown": "Stopped without a reason from the indexer",
+      "atStage": {
+        "asked": "Just asked for",
+        "approved": "Approved, not searched yet",
+        "release": "Looking for a release",
+        "downloading": "Downloading the release",
+        "filed": "Filing into the library"
+      }
+    },
+    "handback": {
+      "AUTOMATION_DISABLED": "Automatic grabbing is off, so this one needs a release picked by hand",
+      "NO_DESTINATION": "This request has no destination library, so there is nowhere to file the book",
+      "ATTEMPT_LIMIT": "Automatic fulfilment gave up after {attempts} attempts",
+      "SEARCH_FAILED": "Could not search for a release: {detail}",
+      "NO_SOURCES_CONFIGURED": "No search sources are set up, so nothing was searched for this request",
+      "NO_SOURCES_ENABLED": "Every search source is switched off, so nothing was searched for this request",
+      "MEDIUM_UNCOVERED": "No enabled search source carries this kind of book, so nothing was searched for this request",
+      "PROFILE_EXCLUDED_ALL": "No release matched the profile for this medium, so this one needs a release picked by hand",
+      "ALL_TRIED": "Every release good enough to grab has already been tried, so this one needs a release picked by hand",
+      "BELOW_SCORE_FLOOR": "No release scored {floor} or better, so this one needs a release picked by hand",
+      "ALL_BLOCKED": "Every release good enough to grab was ruled out by an earlier failure, so this one needs a release picked by hand",
+      "ABANDONED": "No release was picked, so this download was not started"
+    },
+    "submitError": {
+      "SUBMIT_TITLE_REQUIRED": "Give the book a title before requesting it",
+      "SUBMIT_SELF_FULFIL_FORBIDDEN": "You are not allowed to fulfil your own requests",
+      "SUBMIT_LIBRARY_FORBIDDEN": "You do not have access to that library",
+      "SUBMIT_FOLDER_NEEDS_LIBRARY": "Pick a destination library before picking a folder",
+      "SUBMIT_FOLDER_NOT_IN_LIBRARY": "That folder is not part of the destination library",
+      "SUBMIT_DEFAULT_LIBRARY_UNREACHABLE": "Pick a destination library you can reach: this instance's default is not one of yours",
+      "SUBMIT_DESTINATION_REQUIRED": "Your requests are approved as soon as you make them, so pick the library the book should land in",
+      "SUBMIT_SELF_SERVE_LIMIT": "Finish or cancel some downloads first: you can have {limit} in flight at once",
+      "SUBMIT_ON_BEHALF_FORBIDDEN": "You are not allowed to request books for other people",
+      "SUBMIT_ON_BEHALF_UNKNOWN_USER": "That user cannot have a book request made for them"
+    },
+    "actionError": {
+      "BOOK_REQUEST_NOT_PENDING": "Only a pending request supports this action; this request is currently {status}",
+      "BOOK_REQUEST_NOT_CANCELLABLE": "A request that is {status} can no longer be cancelled",
+      "BOOK_REQUEST_DESTINATION_REQUIRED": "Pick a destination library before approving this request",
+      "BOOK_REQUEST_ACTION_FORBIDDEN": "You are not allowed to {action} this request",
+      "BOOK_REQUEST_STALE_TRANSITION": "This request changed while the action was being applied. It is now {status}."
+    },
+    "bulk": {
+      "selected": "{count, plural, one {# request selected} other {# requests selected}}",
+      "approveSelected": "{count, plural, one {Approve # request} other {Approve all #}}",
+      "clear": "Clear",
+      "dismissSelected": "{count, plural, one {Hide # request} other {Hide all #}}",
+      "rejectSelected": "{count, plural, one {Reject # request} other {Reject all #}}",
+      "rejectNoteLabel": "Reason (optional)",
+      "rejectNotePlaceholder": "Why these are being turned down",
+      "rejectTitle": "Reject {count, plural, one {# request} other {# requests}}?",
+      "rejectConfirm": "Reject"
+    },
+    "chooser": {
+      "title": "Choose which book to import",
+      "hint": "This release turned out to contain {count} separate books. The download is finished; pick the one that was requested and the rest are left behind.",
+      "untitled": "Untitled",
+      "files": "{count, plural, one {# file} other {# files}}",
+      "import": "Import this book",
+      "mediaKind": {
+        "ebook": "E-book",
+        "audiobook": "Audiobook",
+        "comic": "Comic"
+      }
+    },
+    "review": {
+      "title": "Why this is waiting",
+      "scoreShort": "The imported file scored {score} against this request, below the {threshold} needed to file it automatically.",
+      "scoreClears": "The imported file scored {score}, which clears the {threshold} needed to file it automatically.",
+      "verificationOff": "Import checking is off, so this file was never scored against the request.",
+      "reason": {
+        "isbn_match": "Its ISBN is the one that was requested.",
+        "above_threshold": "It looks like the book that was asked for.",
+        "below_threshold": "Check the fields below and decide whether it is the right book.",
+        "author_mismatch": "The title is close, but the author is somebody else.",
+        "no_title": "The file carries no readable title, so there was nothing to compare."
+      },
+      "field": {
+        "title": "Title",
+        "authors": "Author",
+        "isbn13": "ISBN"
+      },
+      "verdict": {
+        "match": "Matches",
+        "mismatch": "Does not match",
+        "unknown": "Not compared"
+      },
+      "requested": "Requested",
+      "imported": "Imported",
+      "absent": "Neither the request nor the file has one.",
+      "notSet": "Not set",
+      "filesTitle": "What landed",
+      "fileCount": "{count, plural, one {# file} other {# files}}",
+      "role": {
+        "cover": "Cover",
+        "metadata": "Metadata",
+        "supplement": "Extra"
+      },
+      "fileAnyway": "File it anyway",
+      "fileAnywayHint": "Files this into the destination library and marks the request available, exactly as a passing score would have.",
+      "noDestination": "This request has no destination library with a folder in it, so there is nowhere to file the book yet.",
+      "openDock": "Open the Book Dock",
+      "missingEntry": "The file this request was held over is no longer in the Book Dock. It was filed or discarded by hand, so there is nothing left here to review.",
+      "missingEntryNext": "If the book is already in your library, close this request against it below. If it is not, cancel the request and search for another release.",
+      "filed": "Filed into your library.",
+      "fileFailed": "Could not file this import",
+      "discard": "Discard this import",
+      "discardHint": "Use this when the release turned out to be the wrong book. The files are removed from the Book Dock and the request is marked failed."
+    },
+    "sources": {
+      "noneConfigured": "No search sources are set up.",
+      "allDisabled": "Every search source is switched off.",
+      "noneConfiguredHint": "Requests can be filed, but nothing will be searched for them until you add an indexer or install a source plugin.",
+      "allDisabledHint": "Requests can be filed, but nothing will be searched for them until you switch one back on.",
+      "askAdmin": "Requests can be filed, but nothing will be searched for them until an administrator sets one up.",
+      "addSource": "Add a source",
+      "reviewSources": "Review sources"
+    },
+    "selfServeBadge": "Self-served",
+    "selfServeBadgeHint": "Downloaded directly by the requester, with no approval step"
+  },
   "collection": {
+    "visibleToAll": "Visible to all users",
+    "visibleToAllHint": "Every user can see this collection, but only you can change its books",
     "dialog": {
       "name": "Name",
       "icon": "Icon",
@@ -4842,6 +7172,10 @@
       "newCollection": "New Collection",
       "noCollections": "No collections yet",
       "newReleaseNotes": "New release notes available",
+      "requestBadge": {
+        "allActive": "{count, plural, one {# active request across all users} other {# active requests across all users}}",
+        "mineActive": "{count, plural, one {# active request of yours} other {# active requests of yours}}"
+      },
       "support": "Support BookOrbit",
       "supportAria": "Support BookOrbit on Ko-fi",
       "sectionHeader": {
@@ -4937,7 +7271,17 @@
         "columnsHint": "Use the column visibility panel in the table header to show or hide columns.",
         "coverShape": "Cover shape",
         "circle": "Circle",
-        "square": "Square"
+        "square": "Square",
+        "rowDensity": "Row height",
+        "densityCompact": "Compact",
+        "densityComfortable": "Cosy",
+        "densityRoomy": "Roomy",
+        "coverFallback": "Use book covers for missing portraits"
+      },
+      "viewModes": {
+        "grid": "Grid view",
+        "list": "List view",
+        "table": "Table view"
       }
     },
     "iconPicker": {
@@ -4984,11 +7328,21 @@
       "sidebar": {
         "title": "Sidebar",
         "mobileDescription": "Displays the mobile sidebar.",
-        "toggle": "Toggle Sidebar"
+        "toggle": "Toggle Sidebar",
+        "collapse": "Collapse sidebar",
+        "expand": "Expand sidebar",
+        "open": "Open sidebar",
+        "close": "Close sidebar"
       },
       "chipInput": {
         "typeAndEnter": "Type and press Enter to add",
-        "pressEnter": "Press Enter to add"
+        "pressEnter": "Press Enter to add",
+        "remove": "Remove {value}"
+      },
+      "tokenSelect": {
+        "remove": "Remove {value}",
+        "noMatches": "No matches",
+        "showOptions": "Show options"
       }
     },
     "entityIndex": {
@@ -5008,6 +7362,20 @@
       "librariesEmptyHint": "Create a library to start adding books.",
       "smartScopesEmptyHint": "Smart scopes save a set of filters you use often.",
       "collectionsEmptyHint": "Collections group books you pick by hand."
+    },
+    "legalNotices": {
+      "about": "About BookOrbit",
+      "trigger": "Legal notices",
+      "title": "About BookOrbit",
+      "description": "BookOrbit attribution, licensing, and source code.",
+      "poweredBy": "Powered by BookOrbit",
+      "originalDevelopment": "This software contains material originally developed as BookOrbit.",
+      "copyright": "Copyright (C) 2025-2026 neon.",
+      "contributors": "Additional copyright is held by the respective BookOrbit contributors.",
+      "licenseSummary": "Licensed under the GNU Affero General Public License, version 3 only, with additional terms. This software is provided without warranty. You may redistribute and modify it under those terms.",
+      "sourceCode": "Source code",
+      "license": "AGPLv3 license",
+      "additionalTerms": "Additional terms"
     }
   },
   "customIcons": {
@@ -5098,6 +7466,14 @@
         "wideDescription": "Show one shelf per row.",
         "twoColumns": "Two columns",
         "twoColumnsDescription": "Show two shelves per row."
+      },
+      "libraryScope": {
+        "title": "Dashboard libraries",
+        "description": "Choose which libraries contribute books and reading data to this dashboard.",
+        "allLibraries": "All accessible libraries",
+        "summaryNone": "No libraries selected",
+        "summaryCount": "{count, plural, one {# library} other {# libraries}}",
+        "required": "Select at least one library."
       },
       "shelfRows": {
         "label": "Rows of books",
@@ -5710,6 +8086,49 @@
             "hint": "Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple files."
           }
         },
+        "addedAt": {
+          "title": "Date added",
+          "hint": "Choose what a book's \"date added\" reflects. This applies to books imported from now on.",
+          "options": {
+            "imported": {
+              "title": "When imported",
+              "hint": "The date BookOrbit first imported the book. This is the default."
+            },
+            "file_modified": {
+              "title": "File modified time",
+              "hint": "The file's last-modified time (mtime), often preserved when files are copied."
+            },
+            "file_created": {
+              "title": "File creation time",
+              "hint": "When the file first landed on disk (birthtime). Falls back to modified time on filesystems that don't record creation time."
+            }
+          },
+          "recompute": "Recompute now",
+          "recomputing": "Recomputing...",
+          "recomputeHint": "Update the date added for existing books using this setting.",
+          "recomputeSaveFirst": "Save your changes first, then recompute existing books.",
+          "backgroundConfirm": "Recompute dates for existing books? This runs in the background, and you can close this editor. Books with unreadable files keep their current date.",
+          "progressSummary": "Processed {processed} of {total}: {updated} updated, {unchanged} unchanged, {skipped} skipped, {failed} failed.",
+          "failedBooksHint": "Failed books kept their dates. Check file access, then run recompute again to retry.",
+          "jobStatus": {
+            "running": "Recomputing dates in the background.",
+            "completed": "Date recompute finished.",
+            "failed": "Recompute stopped before finishing. Completed changes were kept; you can safely run it again."
+          },
+          "errors": {
+            "sourceImported": "Save a file timestamp source before recomputing dates.",
+            "alreadyRunning": "A recompute is already running for this library.",
+            "busy": "Other recomputes are running. Try again shortly.",
+            "requestFailed": "Could not reach the recompute service. Close and reopen this editor to check its status.",
+            "interrupted": "The job status is no longer available. It may have been interrupted by a server restart. You can safely run recompute again."
+          },
+          "failureSample": "Book {bookId}: {reason}",
+          "failureReasons": {
+            "file_unavailable": "A content file could not be read.",
+            "unsafe_path": "A content file is outside its permitted library folder.",
+            "database_error": "The database update failed."
+          }
+        },
         "allowedFormats": {
           "title": "Allowed formats",
           "allowAll": "Allow all",
@@ -6256,6 +8675,9 @@
     "clear": "Clear",
     "empty": "No notifications yet",
     "loadMore": "Load more notifications",
+    "dismiss": "Dismiss notification",
+    "occurrences": "Happened {count} times",
+    "occurrencesShort": "x{count}",
     "preferences": {
       "title": "Notifications",
       "subtitle": "Choose which notification categories you want to receive.",
@@ -6274,6 +8696,20 @@
         "app": "App updates"
       },
       "enabledCount": "{enabled} of {total} enabled",
+      "levels": {
+        "off": {
+          "short": "Off",
+          "description": "Never notify me about this."
+        },
+        "problems": {
+          "short": "Problems",
+          "description": "Only notify me when something fails or needs attention."
+        },
+        "all": {
+          "short": "All",
+          "description": "Notify me every time, including successes."
+        }
+      },
       "categories": {
         "scanning": {
           "label": "Library scanning",
@@ -6297,7 +8733,7 @@
         },
         "bulkRename": {
           "label": "Bulk rename",
-          "description": "When a bulk rename across many books completes or fails."
+          "description": "When a bulk rename or a move of books between libraries completes or fails."
         },
         "migration": {
           "label": "Data migration",
@@ -6305,7 +8741,7 @@
         },
         "bookDock": {
           "label": "Book Dock",
-          "description": "When files dropped into the dock are ready to review or finalized."
+          "description": "When Book Dock finalization completes or encounters problems."
         },
         "koboSync": {
           "label": "Kobo sync",
@@ -6318,6 +8754,10 @@
         "achievements": {
           "label": "Achievements",
           "description": "When you unlock a new reading achievement."
+        },
+        "bookRequests": {
+          "label": "Book requests",
+          "description": "When a book request is submitted, decided, or the book becomes available."
         }
       }
     }
@@ -6327,7 +8767,69 @@
     "pdf": {
       "openError": "Unable to open this PDF",
       "preparing": "Preparing PDF reader",
-      "opening": "Opening PDF"
+      "opening": "Opening PDF",
+      "loading": "Loading PDF",
+      "loadFallback": "The document could not be loaded.",
+      "requestFailed": "The PDF request failed with status {status}.",
+      "emptyDocument": "The PDF request returned an empty document.",
+      "managerError": "The PDF document manager could not be initialized.",
+      "engineNoPages": "The PDF engine opened this document without any pages.",
+      "engineOpenError": "The PDF could not be opened by the document engine.",
+      "noPages": "This PDF opened without any pages",
+      "noPagesHint": "Reload the document to recover from the incomplete PDF engine response.",
+      "externalLinkTitle": "Open external link?",
+      "externalLinkDescription": "This PDF wants to open {host} in a new tab.",
+      "openLink": "Open link",
+      "annotationsLoadError": "Could not load highlights for this PDF.",
+      "loadingAnnotations": "Loading PDF highlights",
+      "loadMoreAnnotations": "Load more highlights",
+      "loadingMoreAnnotations": "Loading more highlights…",
+      "sidebar": {
+        "pages": "Pages",
+        "contents": "Contents",
+        "search": "Search",
+        "tabsLabel": "PDF navigation",
+        "closeNavigation": "Close navigation",
+        "goToPage": "Go to page {page}",
+        "noOutline": "This PDF has no document outline.",
+        "searchPlaceholder": "Search this PDF",
+        "clearSearch": "Clear search",
+        "matchCase": "Match case",
+        "wholeWord": "Whole word",
+        "resultPosition": "{current} of {total}",
+        "previousResult": "Previous result",
+        "nextResult": "Next result",
+        "searchingPage": "Searching page {page} of {total}",
+        "searchPrompt": "Type a term to search this PDF.",
+        "searchTooShort": "Enter at least {min} characters to search this PDF.",
+        "noSearchResults": "No searchable text matched your query.",
+        "page": "Page {page}",
+        "filterOutline": "Filter outline",
+        "noOutlineMatch": "No outline entries match your filter.",
+        "loadingOutline": "Loading outline",
+        "expandSection": "Expand {title}",
+        "collapseSection": "Collapse {title}",
+        "jumpToPage": "Jump to page",
+        "resizePanel": "Resize navigation panel"
+      },
+      "toolbar": {
+        "navigation": "Document navigation",
+        "previousPage": "Previous page",
+        "currentPage": "Current page",
+        "nextPage": "Next page",
+        "zoomOut": "Zoom out",
+        "zoomIn": "Zoom in",
+        "panTool": "Pan tool",
+        "pan": "Pan",
+        "selectTool": "Select text tool",
+        "selectText": "Select text",
+        "pinHeader": "Pin reader header",
+        "unpinHeader": "Unpin reader header",
+        "pinHeaderShort": "Pin header",
+        "unpinHeaderShort": "Unpin header",
+        "moreTools": "More PDF tools",
+        "settings": "PDF settings"
+      }
     },
     "loadingBook": "Loading book…",
     "failedToLoadBook": "Failed to load book",
@@ -6385,6 +8887,15 @@
       "fontStyle": "Style",
       "fontStyleItalicOf": "{style} Italic",
       "lineSpacing": "Line spacing",
+      "paragraphSpacing": "Paragraph spacing",
+      "paragraphSpacingDefault": "Default",
+      "paragraphSpacingValue": "{value} em",
+      "letterSpacing": "Letter spacing",
+      "wordSpacing": "Word spacing",
+      "textIndent": "First-line indent",
+      "bookDefault": "Book",
+      "custom": "Custom",
+      "emValue": "{value} em",
       "pageWidth": "Page width",
       "pageWidthNarrow": "Narrow",
       "pageWidthMedium": "Medium",
@@ -6480,7 +8991,15 @@
       "translate": "Translate",
       "define": "Define",
       "deleteAnnotation": "Delete annotation",
-      "apply": "Apply"
+      "apply": "Apply",
+      "color": "Highlight color: {color}",
+      "style": "Highlight style: {style}",
+      "styles": {
+        "highlight": "Highlight",
+        "underline": "Underline",
+        "strikethrough": "Strikethrough",
+        "squiggly": "Squiggly underline"
+      }
     },
     "note": {
       "title": "Add note",
@@ -6522,6 +9041,9 @@
       "scrollMode": "Scroll mode",
       "scrollModeHint": "Use \"No gaps\" for webtoons and vertical strips.",
       "readingDirection": "Reading direction",
+      "autoAdvance": "Auto-advance",
+      "autoAdvanceHint": "Turning past the last page opens the next book in the series.",
+      "autoAdvancePagedOnly": "Auto-advance applies in paged mode only.",
       "pageView": "Page view",
       "twoPagePagedOnly": "Two pages are shown only in paged mode.",
       "spreadSection": "Two-page spread",
@@ -6567,6 +9089,14 @@
         "black": "Black",
         "gray": "Gray",
         "white": "White"
+      },
+      "nextIssue": {
+        "eyebrow": "Next in series",
+        "action": "Read next",
+        "open": "Read next: {title}",
+        "numbered": "#{index} {title}",
+        "untitled": "Untitled",
+        "autoAdvanceHint": "Turn the page again to continue"
       }
     },
     "audiobook": {
@@ -6594,6 +9124,10 @@
       "playerSettings": "Player settings",
       "skipBack": "Skip back",
       "skipForward": "Skip forward"
+    },
+    "sheet": {
+      "expand": "Expand panel",
+      "collapse": "Collapse panel"
     }
   },
   "scanner": {
@@ -6609,7 +9143,10 @@
       "ownedOfExpected": "{owned} of {expected} in library"
     },
     "gaps": {
-      "label": "Possible gaps:"
+      "label": "Possible gaps:",
+      "missingCount": "{count, plural, one {# missing} other {# missing}}",
+      "missingList": "Missing {list}",
+      "previewMore": "{shown} +{count}"
     },
     "filters": {
       "title": "Series Filters",
@@ -6639,7 +9176,10 @@
         "bookCount": "Book Count",
         "recentAdditions": "Recent Additions",
         "readingProgress": "Reading Progress"
-      }
+      },
+      "clearSearch": "Clear search",
+      "noMatchHint": "Try another library, or clear what is set.",
+      "emptyHint": "Series appear once your books carry series metadata."
     },
     "detail": {
       "pageTitle": "Series",
@@ -6680,6 +9220,66 @@
         "ascending": "Ascending",
         "descending": "Descending"
       }
+    },
+    "authorsPlus": "{authors} +{count}",
+    "track": {
+      "readCount": "{count, plural, one {# read} other {# read}}",
+      "readingCount": "{count, plural, one {# in progress} other {# in progress}}",
+      "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+      "missingCount": "{count, plural, one {# missing} other {# missing}}",
+      "slotMissing": "{number} not in library",
+      "untitled": "Untitled"
+    },
+    "legend": {
+      "read": "Read",
+      "reading": "Reading",
+      "unread": "In library",
+      "missing": "Missing"
+    },
+    "status": {
+      "label": "Filter series by reading status",
+      "all": "All",
+      "reading": "Reading",
+      "unread": "Unread",
+      "complete": "Complete",
+      "gaps": "Gaps",
+      "read": "Read",
+      "inProgress": "In progress",
+      "hasGaps": "Has gaps",
+      "notStarted": "Not started"
+    },
+    "index": {
+      "columnSeries": "Series",
+      "columnVolumes": "Volumes",
+      "columnRead": "Read",
+      "columnNext": "Up next",
+      "columnAdded": "Added",
+      "percent": "{value}%",
+      "captionReading": "{base} · {count, plural, one {# in progress} other {# in progress}}",
+      "finished": "Read end to end",
+      "reading": "Reading",
+      "next": "Next",
+      "start": "Start"
+    },
+    "grouping": {
+      "label": "Group by",
+      "none": "No grouping",
+      "letter": "By letter",
+      "library": "By library",
+      "status": "By status"
+    },
+    "libraries": {
+      "more": "+{count}"
+    },
+    "card": {
+      "oneVolume": "One volume",
+      "oneVolumeShort": "1 vol",
+      "volumeCount": "{count, plural, one {# volume} other {# volumes}}",
+      "readSummary": "{base} · {read} read",
+      "publishedOf": "{owned} of {total} published",
+      "complete": "Complete",
+      "moreVolumes": "{count, plural, one {# more volume} other {# more volumes}}",
+      "label": "{name}, {read} of {total} volumes read"
     }
   },
   "smartScope": {
@@ -6913,7 +9513,8 @@
     "header": {
       "entityManager": "Entity Manager",
       "bulkRename": "Bulk Rename",
-      "duplicateBooks": "Duplicate Books"
+      "duplicateBooks": "Duplicate Books",
+      "missingResources": "Missing Resources"
     },
     "entityTypes": {
       "authors": "Authors",
@@ -6925,59 +9526,134 @@
       "series": "Series"
     },
     "bulkRename": {
-      "previewToolbar": "Rename preview",
-      "renameSettings": "Rename settings",
       "library": "Library",
       "selectLibraryPlaceholder": "Select a library...",
       "noEligibleLibraries": "No libraries have file rename enabled. Enable it in Library Settings.",
       "refresh": "Refresh",
-      "applyRename": "Apply Rename",
-      "showFullPaths": "Show full paths",
-      "columnsMenu": "Columns",
-      "renamingInProgress": "Renaming files - you can cancel at any time.",
-      "executionFailed": "Bulk rename failed",
       "previewFailed": "Failed to load preview",
-      "noBooksMatch": "No books found matching the current filter.",
+      "executionFailed": "Bulk rename failed",
       "openBookDetails": "Open book details",
-      "columns": {
-        "title": "Title",
-        "currentPath": "Current Path",
-        "newPath": "New Path",
-        "status": "Status"
-      },
-      "status": {
-        "willRename": "Will Rename",
-        "unchanged": "Unchanged",
-        "collision": "Collision",
-        "noPattern": "No Pattern",
-        "error": "Error"
+      "openBook": "Open book",
+      "toRenameCount": "{count, plural, =0 {nothing to rename} one {# to rename} other {# to rename}}",
+      "applyCount": "{count, plural, one {Apply # rename} other {Apply # renames}}",
+      "search": {
+        "placeholder": "Find a book or path",
+        "label": "Find a book",
+        "clear": "Clear search"
       },
       "filter": {
-        "all": "All"
+        "all": "All",
+        "changes": "Changes",
+        "conflicts": "Conflicts",
+        "unchanged": "Unchanged"
       },
-      "summary": {
-        "label": "Summary",
-        "toRename": "{count} to rename",
-        "unchanged": "{count} unchanged",
-        "collisions": "{count, plural, =0 {# collision} one {# collision} other {# collisions}}",
-        "errors": "{count, plural, =0 {# error} one {# error} other {# errors}}"
+      "status": {
+        "willRename": "Will rename",
+        "unchanged": "Unchanged",
+        "collision": "Conflict",
+        "noPattern": "No pattern",
+        "error": "Error"
+      },
+      "group": {
+        "collision": "Destination conflict",
+        "unchanged": "Already correct",
+        "noPattern": "No naming pattern",
+        "error": "Errored",
+        "includeAll": "Include every {kind} rename",
+        "expand": "Expand {kind}",
+        "collapse": "Collapse {kind}",
+        "heldBack": "These cannot be renamed"
+      },
+      "changeKind": {
+        "ungroup": "Series grouping removed",
+        "flatten": "Duplicate folder level removed",
+        "yearRemoved": "Publication year removed",
+        "yearAdded": "Publication year added",
+        "yearCorrected": "Publication year corrected",
+        "authorSpelling": "Author name spelling",
+        "capitalisation": "Capitalisation and spacing",
+        "unsafeCharacters": "Unsafe characters replaced",
+        "filenameRebuilt": "Filename rebuilt from metadata",
+        "folderRenamed": "Folder renamed",
+        "rebuilt": "Folder and filename rebuilt",
+        "restructured": "Path restructured",
+        "multiple": "Multiple changes"
+      },
+      "select": {
+        "ofSelected": "of {total} selected",
+        "toggleAll": "Select or clear every rename",
+        "toggleGroup": "Select or clear every {kind} rename",
+        "toggleBook": "Rename {title}"
+      },
+      "review": {
+        "loadMore": "Load more",
+        "queue": "Pending renames",
+        "position": "{index} of {total}",
+        "previous": "Previous book",
+        "next": "Next book",
+        "keyboardHint": "move",
+        "keyboardSkip": "skip",
+        "skip": "Skip",
+        "include": "Include",
+        "excluded": "Excluded",
+        "back": "Back to the list"
+      },
+      "detail": {
+        "whatChanges": "What changes",
+        "foldedFolders": "{count, plural, one {# unchanged folder} other {# unchanged folders}}",
+        "onDisk": "On disk",
+        "today": "Today",
+        "afterRename": "After rename",
+        "showLibraryFolders": "Show library folders",
+        "hideLibraryFolders": "Hide library folders",
+        "currentPath": "Current path",
+        "whyItMoves": "Why it moves",
+        "levelTop": "Top folder",
+        "levelFolder": "Folder {depth}",
+        "levelFilename": "Filename",
+        "levelRemoved": "Removed",
+        "tokenCount": "{count, plural, one {# token} other {# tokens}}",
+        "optionalLevel": "An optional folder level, produced by a group in the pattern.",
+        "removedExplainer": "The naming pattern has no folder at this level, so {folder} is dropped and its contents move up.",
+        "conflictTitle": "Another file already claims this destination.",
+        "conflictBody": "Renaming would overwrite it, so this book is held back until the conflict is resolved.",
+        "siblings": "{count, plural, one {# more with the same change} other {# more with the same change}}",
+        "siblingsMore": "+{count} more"
       },
       "empty": {
-        "title": "Pick a Library to Start",
-        "description": "Select a library above to preview rename changes, filter by status, and apply the bulk rename run.",
-        "chooseLibrary": "Choose Library"
-      },
-      "completed": {
-        "title": "Bulk rename completed",
-        "stats": "{succeeded} renamed, {failed} failed, {skipped} skipped ({processed} total)"
-      },
-      "pagination": {
-        "showing": "Showing {from}-{to} of {total}"
+        "title": "Pick a library to start",
+        "description": "Select a library to preview rename changes, review them one at a time, and apply the run.",
+        "chooseLibrary": "Choose library",
+        "noneTitle": "Nothing to review",
+        "noneDescription": "No book matches the current filter. Clear the search or switch to All.",
+        "noMatch": "No books match your search."
       },
       "confirmDialog": {
-        "title": "Confirm Bulk Rename",
-        "body": "{count, plural, =0 {This will rename # book on disk. Files with collisions or errors will be skipped. This action cannot be undone.} one {This will rename # book on disk. Files with collisions or errors will be skipped. This action cannot be undone.} other {This will rename # books on disk. Files with collisions or errors will be skipped. This action cannot be undone.}}",
-        "renameButton": "{count, plural, =0 {Rename # book} one {Rename # book} other {Rename # books}}"
+        "title": "{count, plural, one {Rename # file on disk?} other {Rename # files on disk?}}",
+        "body": "This moves real files inside {library}. BookOrbit records each move, but undoing means renaming back.",
+        "willRename": "Will be renamed",
+        "skippedByYou": "Skipped by you",
+        "heldBack": "Held back as conflicts",
+        "untouched": "Left untouched",
+        "confirm": "{count, plural, one {Rename # file} other {Rename # files}}",
+        "cannotRename": "Cannot be renamed"
+      },
+      "run": {
+        "preparing": "Preparing…",
+        "preparingHint": "Checking every file against the naming pattern before anything moves.",
+        "title": "Renaming {done} of {total}",
+        "runningHint": "Files are being renamed. You can stop after the current file finishes.",
+        "stop": "Stop after this file",
+        "resultTitle": "{done, plural, one {Renamed # of {total} files} other {Renamed # of {total} files}}",
+        "resultFailed": "{count, plural, one {# failed} other {# failed}}",
+        "resultSkipped": "{count, plural, one {# skipped} other {# skipped}}",
+        "dismiss": "Dismiss"
+      },
+      "executionError": {
+        "http": "The server rejected the request (HTTP {status}).",
+        "noBody": "The server did not send a response body.",
+        "incomplete": "The connection ended before the rename finished. Some files may not have been renamed.",
+        "unknown": "The rename could not be completed."
       }
     },
     "bookDuplicates": {
@@ -7075,7 +9751,8 @@
       },
       "actions": {
         "rename": "Rename",
-        "split": "Split"
+        "split": "Split",
+        "merge": "Merge"
       },
       "duplicates": {
         "similarity": "Similarity:",
@@ -7095,7 +9772,20 @@
         "percentSimilar": "{percent}% similar",
         "pairDetails": "Pair details",
         "dismissEntityTitle": "Dismiss all pairs for this entity",
-        "dismissPairTitle": "Dismiss this pair"
+        "dismissPairTitle": "Dismiss this pair",
+        "groupsLabel": "Possible duplicate groups",
+        "keepThisOne": "Keep this one",
+        "mergeAway": "Merge away",
+        "notAMatch": "Not a match",
+        "notAMatchTitle": "Dismiss every pair in this group",
+        "selectPromptTitle": "Select a group to review",
+        "selectPromptDescription": "Choose a group from the list to compare its entities side by side.",
+        "backToList": "Back to groups",
+        "noBookTitles": "No books linked to this record",
+        "thresholdLabel": "Minimum similarity",
+        "thresholdValue": "{percent}%+",
+        "willBeMerged": "{count, plural, one {# entity will be merged and removed} other {# entities will be merged and removed}}",
+        "chooseTargetHint": "Select the entity to keep. Everything else in the group merges into it."
       },
       "dismissed": {
         "loading": "Loading dismissed pairs...",
@@ -7119,7 +9809,44 @@
           "nameDesc": "Name Z-A",
           "fewestBooks": "Fewest books",
           "mostBooks": "Most books"
-        }
+        },
+        "sortByLabel": "Sort by",
+        "entityTypeLabel": "Entity type",
+        "resultCount": "{count, plural, =0 {no entities} one {# entity} other {# entities}}",
+        "selectedCount": "{count, plural, one {# selected} other {# selected}}",
+        "columns": {
+          "name": "Name",
+          "sortName": "Sort name",
+          "books": "Books",
+          "status": "Status",
+          "actions": "Actions"
+        },
+        "selectAllOnPage": "Select all entities on this page",
+        "selectEntity": "Select {name}",
+        "actionsFor": "Actions for {name}",
+        "status": {
+          "noBooks": "No books"
+        },
+        "filters": {
+          "all": "All",
+          "noBooks": "No books"
+        },
+        "density": {
+          "label": "Row height",
+          "comfortable": "Comfortable",
+          "compact": "Compact"
+        },
+        "rowsPerPage": "Rows per page",
+        "range": "Showing {from}-{to} of {total}",
+        "pagination": "Pagination",
+        "previousPage": "Previous page",
+        "nextPage": "Next page",
+        "goToPage": "Go to page {page}",
+        "morePages": "More pages",
+        "noEntitiesDescription": "Nothing has been added to this entity type yet.",
+        "noMatchesTitle": "No matches",
+        "noMatchesDescription": "No entities match your current search and filters.",
+        "clearFilters": "Clear filters"
       },
       "deleteMode": {
         "label": "Delete mode",
@@ -7155,6 +9882,77 @@
         "title": "Merge Entities",
         "description": "Select which entity to keep. The others will be merged into it and removed."
       }
+    },
+    "missingResources": {
+      "title": "Missing Resources",
+      "accessDenied": "You do not have permission to clean up missing resources.",
+      "categoriesLabel": "Cleanup category",
+      "untitled": "Untitled",
+      "clearSelection": "Clear selection",
+      "cleanSelected": "Clean {count} selected",
+      "selectAllMatching": "Select all {count} matching entries",
+      "allSelected": "All {count} matching entries are selected.",
+      "sweep": {
+        "title": "Cover check",
+        "description": "Checks every book that claims a cover against the files on disk, and looks for cover folders left behind by deleted books. Nothing is removed during the check.",
+        "run": "Run check",
+        "running": "Checking",
+        "progress": "Checked {processed} of {total} books",
+        "lastRun": "Last checked {at}",
+        "truncated": "Only the first results are listed. Clean these, then run the check again to see the rest."
+      },
+      "categories": {
+        "missing_books": "Missing books",
+        "broken_covers": "Broken covers",
+        "orphaned_cover_dirs": "Orphaned cover folders"
+      },
+      "found": {
+        "missing_books": "{count, plural, =0 {No books with missing files} one {One book with missing files} other {# books with missing files}}",
+        "broken_covers": "{count, plural, =0 {No broken cover references} one {One broken cover reference} other {# broken cover references}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {No orphaned cover folders} one {One orphaned cover folder} other {# orphaned cover folders}}"
+      },
+      "empty": {
+        "missing_books": "No missing books",
+        "broken_covers": "No broken cover references",
+        "orphaned_cover_dirs": "No orphaned cover folders",
+        "description": "Everything in this category is accounted for."
+      },
+      "needsSweep": {
+        "title": "Run the cover check first",
+        "description": "Cover results come from a disk check. Run it to see broken references and orphaned folders."
+      },
+      "coverSource": {
+        "extracted": "Extracted",
+        "custom": "Custom"
+      },
+      "table": {
+        "selectPage": "Select everything on this page",
+        "coverFolder": "Cover folder for book #{bookId}",
+        "fileCount": "{count, plural, one {# file} other {# files}}"
+      },
+      "confirm": {
+        "title": "Clean missing resources?",
+        "action": "Clean",
+        "missing_books": "{count, plural, one {Deletes the database record for one book whose files are gone. The book, its metadata, reading progress, and cover are removed. This cannot be undone.} other {Deletes the database records for # books whose files are gone. The books, their metadata, reading progress, and covers are removed. This cannot be undone.}}",
+        "broken_covers": "{count, plural, one {Clears the cover reference for one book so it shows as having no cover. Metadata is not otherwise changed.} other {Clears the cover references for # books so they show as having no cover. Metadata is not otherwise changed.}}",
+        "orphaned_cover_dirs": "{count, plural, one {Deletes one cover folder from disk. Its book is no longer in the database. This cannot be undone.} other {Deletes # cover folders from disk. Their books are no longer in the database. This cannot be undone.}}"
+      },
+      "cleaned": {
+        "missing_books": "{count, plural, =0 {Nothing to clean} one {Removed one missing book} other {Removed # missing books}}",
+        "broken_covers": "{count, plural, =0 {Nothing to clean} one {Cleared one broken cover reference} other {Cleared # broken cover references}}",
+        "orphaned_cover_dirs": "{count, plural, =0 {Nothing to clean} one {Removed one orphaned cover folder} other {Removed # orphaned cover folders}}"
+      },
+      "pagination": {
+        "label": "Missing resource pages",
+        "page": "Page {page} of {total}"
+      },
+      "errors": {
+        "summary": "Could not load the missing resource summary.",
+        "sweepStart": "Could not start the cover check.",
+        "sweep": "The cover check failed.",
+        "list": "Could not load these entries.",
+        "clean": "Cleanup failed."
+      }
     }
   },
   "views": {
@@ -7171,6 +9969,9 @@
       "sort": "Sort",
       "sortOn": "On",
       "resetSort": "Reset sort to default",
+      "shuffle": "Shuffle",
+      "shuffleAria": "Shuffle the book order",
+      "shuffleHint": "Draw a new random order",
       "filters": "Filters",
       "clear": "Clear",
       "clearAllFilters": "Clear all filters",
@@ -7421,6 +10222,7 @@
     "system": {
       "file-naming": "File Naming",
       "book-dock": "Book Dock",
+      "requests": "Requests",
       "maintenance": "Maintenance",
       "audit-log": "Audit Log"
     },
@@ -7431,7 +10233,11 @@
       "restrictions": "Content Restrictions"
     },
     "smartScopes": "Smart Scopes",
-    "collections": "Collections"
+    "collections": "Collections",
+    "missingResources": "Missing Resources",
+    "bookRequests": "Requests",
+    "bookRequestDetail": "Request",
+    "bookRequestReleases": "Pick a release"
   },
   "countryCodes": {
     "AD": "Andorra",

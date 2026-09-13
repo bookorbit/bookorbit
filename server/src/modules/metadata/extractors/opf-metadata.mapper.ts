@@ -17,6 +17,7 @@ export function hasOpfMetadata(metadata: ParsedOpf): boolean {
     metadata.seriesName !== null ||
     metadata.seriesIndex !== null ||
     metadata.authors.length > 0 ||
+    metadata.narrators.length > 0 ||
     metadata.genres.length > 0 ||
     metadata.tags.length > 0 ||
     metadata.googleBooksId !== null ||
@@ -47,6 +48,9 @@ export function mapOpfMetadata(metadata: ParsedOpf, cover: Buffer | null): Parse
     seriesName: metadata.seriesName,
     seriesIndex: metadata.seriesIndex,
     authors: metadata.authors,
+    // Left undefined when the OPF names none, so a sidecar without a narrator role never wipes
+    // narrators that the audio tags or a provider supplied.
+    narrators: metadata.narrators.length > 0 ? metadata.narrators : undefined,
     genres: metadata.genres,
     tags: metadata.tags,
     rating: metadata.rating,

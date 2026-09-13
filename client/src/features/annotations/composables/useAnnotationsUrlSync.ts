@@ -1,11 +1,9 @@
 import { watch } from 'vue'
 import { useRoute, useRouter, type LocationQuery, type LocationQueryRaw } from 'vue-router'
-import { SORT_OPTIONS, type SortKey } from '../lib/filter-options'
+import { isHubViewKey } from '../lib/hub-groups'
 import type { AnnotationsHubState, useAnnotationsHub } from './useAnnotationsHub'
 
 type Hub = ReturnType<typeof useAnnotationsHub>
-
-const VALID_SORT_KEYS = new Set<string>(SORT_OPTIONS.map((option) => option.value))
 const SEARCH_WRITE_DELAY_MS = 300
 
 function firstString(value: LocationQuery[string] | undefined): string | undefined {
@@ -45,20 +43,16 @@ export function annotationsStateFromQuery(query: LocationQuery): Partial<Annotat
 
   if (firstString(query.notes) === '1') state.notesOnly = true
 
+  if (firstString(query.review) === '1') state.needsReviewOnly = true
+
   const from = firstString(query.from)
   if (from) state.dateFrom = from
 
   const to = firstString(query.to)
   if (to) state.dateTo = to
 
-  const sort = firstString(query.sort)
-  if (sort && VALID_SORT_KEYS.has(sort)) state.sortKey = sort as SortKey
-
-  const page = firstString(query.page)
-  if (page) {
-    const parsed = Number(page)
-    if (Number.isInteger(parsed) && parsed > 1) state.page = parsed
-  }
+  const view = firstString(query.view)
+  if (view && isHubViewKey(view)) state.view = view
 
   return state
 }
@@ -74,10 +68,10 @@ export function annotationsQueryFromState(state: AnnotationsHubState): LocationQ
   if (state.styleFilter !== 'all') query.style = state.styleFilter
   if (state.originFilter !== 'all') query.origin = state.originFilter
   if (state.notesOnly) query.notes = '1'
+  if (state.needsReviewOnly) query.review = '1'
   if (state.dateFrom) query.from = state.dateFrom
   if (state.dateTo) query.to = state.dateTo
-  if (state.sortKey !== 'newest') query.sort = state.sortKey
-  if (state.page > 1) query.page = String(state.page)
+  if (state.view !== 'newest') query.view = state.view
   return query
 }
 
@@ -88,7 +82,7 @@ function sameQuery(next: LocationQueryRaw, current: LocationQuery): boolean {
 }
 
 /**
- * Two-way binds the annotations filter/sort/page state to the URL query: hydrates the hub from
+ * Two-way binds the annotations filter and view state to the URL query: hydrates the hub from
  * the query on setup, then mirrors later changes back via `router.replace` so refresh, bookmark,
  * and share restore the exact view without polluting browser history. Search writes are debounced.
  */
@@ -108,10 +102,10 @@ export function useAnnotationsUrlSync(hub: Hub) {
       styleFilter: hub.styleFilter.value,
       originFilter: hub.originFilter.value,
       notesOnly: hub.notesOnly.value,
+      needsReviewOnly: hub.needsReviewOnly.value,
       dateFrom: hub.dateFrom.value,
       dateTo: hub.dateTo.value,
-      sortKey: hub.sortKey.value,
-      page: hub.page.value,
+      view: hub.view.value,
     }
   }
 
@@ -129,7 +123,18 @@ export function useAnnotationsUrlSync(hub: Hub) {
   })
 
   watch(
-    [hub.status, hub.bookFilter, hub.colors, hub.styleFilter, hub.originFilter, hub.notesOnly, hub.dateFrom, hub.dateTo, hub.sortKey, hub.page],
+    [
+      hub.status,
+      hub.bookFilter,
+      hub.colors,
+      hub.styleFilter,
+      hub.originFilter,
+      hub.notesOnly,
+      hub.needsReviewOnly,
+      hub.dateFrom,
+      hub.dateTo,
+      hub.view,
+    ],
     write,
   )
 }

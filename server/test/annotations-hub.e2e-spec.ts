@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 
-import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
+import { createEpubFixture, createPdfFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
   closeReaderStateIsolationE2EContext,
@@ -20,13 +20,14 @@ const FIXTURE_CFI = 'epubcfi(/6/2!/4/2,/1:0,/1:7)';
 describe('Annotations hub (e2e)', { timeout: 120_000 }, () => {
   let ctx!: ReaderStateIsolationE2EContext;
   let epub!: LocatedBookFile;
+  let library!: Awaited<ReturnType<typeof createLibraryWithFolder>>;
   let owner!: TestUserSession;
   let outsider!: TestUserSession;
   const createdIds: number[] = [];
 
   beforeAll(async () => {
     ctx = await createReaderStateIsolationE2EContext();
-    const library = await createLibraryWithFolder(ctx, { name: `annotations-hub-${randomUUID()}` });
+    library = await createLibraryWithFolder(ctx, { name: `annotations-hub-${randomUUID()}` });
     const epubPath = await createEpubFixture(library.folderPath, 'hub-book.epub', {
       title: `Hub Book ${randomUUID()}`,
       uid: `urn:uuid:${randomUUID()}`,
@@ -67,6 +68,80 @@ describe('Annotations hub (e2e)', { timeout: 120_000 }, () => {
     // The e2e harness mocks metadata extraction, so the title may be null here.
     expect(body.items[0]).toHaveProperty('bookTitle');
     expect(body.items[0].jumpFileId).toBe(epub.bookFileId);
+  });
+
+  it('surfaces a PDF highlight in the hub with the fields a page deep link needs', async () => {
+    const marker = `pdfmarker-${randomUUID()}`;
+    const pdfPath = await createPdfFixture(library.folderPath, `hub-pdf-${randomUUID()}.pdf`, `Hub PDF ${randomUUID()}`);
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const pdf = await locateBookByAbsolutePath(ctx, pdfPath);
+
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${pdf.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: {
+        pdf: { page: 3, rect: { x: 10, y: 20, width: 100, height: 12 }, rects: [{ x: 10, y: 20, width: 100, height: 12 }] },
+        bookFileId: pdf.bookFileId,
+        text: marker,
+        color: '#FACC15',
+        style: 'highlight',
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const createdBody = created.json() as { cfi: string | null; pageno: number | null; pdf: { page: number } | null };
+    expect(createdBody.cfi).toBeNull();
+    expect(createdBody.pageno).toBe(4);
+    expect(createdBody.pdf).toMatchObject({ page: 3 });
+
+    const filePage = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${pdf.bookId}/annotations?page=1&pageSize=100&bookFileId=${pdf.bookFileId}&sortBy=position&sortDir=asc`,
+      headers: authHeader(owner.accessToken),
+    });
+    expect(filePage.statusCode).toBe(200);
+    const filePageBody = filePage.json() as { items: { jumpFileId: number | null; pdf: { page: number } | null }[]; total: number };
+    expect(filePageBody.total).toBe(1);
+    expect(filePageBody.items[0]).toMatchObject({ jumpFileId: pdf.bookFileId, pdf: { page: 3 } });
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/annotations?status=active&search=${marker}`,
+      headers: authHeader(owner.accessToken),
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as {
+      items: { cfi: string | null; jumpFileId: number | null; jumpFileFormat: string | null; pageno: number | null }[];
+      total: number;
+    };
+    expect(body.total).toBe(1);
+    // These are exactly the fields annotationReaderRoute() uses to build ?format=pdf&page=4.
+    expect(body.items[0]).toMatchObject({ jumpFileId: pdf.bookFileId, jumpFileFormat: 'pdf', cfi: null, pageno: 4 });
+
+    const geometry = { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] };
+    const missingFile = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${pdf.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { pdf: geometry, text: 'missing file id' },
+    });
+    expect(missingFile.statusCode).toBe(400);
+
+    const wrongBook = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${pdf.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { pdf: geometry, bookFileId: epub.bookFileId, text: 'wrong book' },
+    });
+    expect(wrongBook.statusCode).toBe(400);
+
+    const wrongFormat = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${epub.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { pdf: geometry, bookFileId: epub.bookFileId, text: 'wrong format' },
+    });
+    expect(wrongFormat.statusCode).toBe(400);
   });
 
   it('is isolated per user', async () => {

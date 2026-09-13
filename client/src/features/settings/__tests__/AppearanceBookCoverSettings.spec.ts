@@ -47,7 +47,7 @@ beforeEach(() => {
 
 afterEach(() => {
   showSpineOnComics.value = false
-  bookDetailCoverTint.value = 'single'
+  bookDetailCoverTint.value = 'off'
 })
 
 describe('AppearanceBookCoverSettings', () => {

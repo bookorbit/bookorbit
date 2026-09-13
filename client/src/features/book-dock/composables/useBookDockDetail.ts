@@ -68,14 +68,9 @@ export function useBookDockDetail() {
     return null
   }
 
-  async function discardFile(id: number) {
-    await api(`/api/v1/book-dock/files/${id}`, { method: 'DELETE' })
-    file.value = null
-  }
-
   function coverUrl(id: number): string {
     return `/api/v1/book-dock/files/${id}/cover`
   }
 
-  return { file, loading, saving, saved, saveError, loadFile, saveMetadata, debouncedSave, setTarget, discardFile, coverUrl }
+  return { file, loading, saving, saved, saveError, loadFile, saveMetadata, debouncedSave, setTarget, coverUrl }
 }

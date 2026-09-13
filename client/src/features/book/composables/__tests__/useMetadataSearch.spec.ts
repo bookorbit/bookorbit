@@ -20,8 +20,14 @@ describe('useMetadataSearch', () => {
     apiMock.mockReset()
   })
 
-  function provider(key: MetadataProviderKey, selectedByFieldRules?: boolean): MetadataProviderInfo {
-    return { key, label: key, identifiable: true, ...(selectedByFieldRules !== undefined ? { selectedByFieldRules } : {}) }
+  function provider(key: MetadataProviderKey, selectedByFieldRules?: boolean, coverPriority?: number): MetadataProviderInfo {
+    return {
+      key,
+      label: key,
+      identifiable: true,
+      ...(selectedByFieldRules !== undefined ? { selectedByFieldRules } : {}),
+      ...(coverPriority !== undefined ? { coverPriority } : {}),
+    }
   }
 
   function candidate(providerKey: MetadataProviderKey, providerId: string): MetadataCandidate {
@@ -110,6 +116,24 @@ describe('useMetadataSearch', () => {
     expect(apiMock).toHaveBeenLastCalledWith('/api/v1/metadata-fetch/stream?title=Dune&bookId=42&isAudiobook=false&providers=google%2Clubimyczytac', {
       signal: expect.any(AbortSignal),
     })
+  })
+
+  it('exposes the configured cover provider order independently of registry order', async () => {
+    apiMock.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        provider(MetadataProviderKey.GOOGLE, undefined, 2),
+        provider(MetadataProviderKey.OPEN_LIBRARY, undefined, 1),
+        provider(MetadataProviderKey.AMAZON, undefined, 0),
+      ],
+    })
+
+    const scope = effectScope()
+    const state = scope.run(() => useMetadataSearch())!
+    await state.loadProviders()
+    scope.stop()
+
+    expect(state.coverProviderOrder.value).toEqual([MetadataProviderKey.AMAZON, MetadataProviderKey.OPEN_LIBRARY, MetadataProviderKey.GOOGLE])
   })
 
   it('includes bookId in metadata stream searches', async () => {

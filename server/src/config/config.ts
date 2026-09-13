@@ -3,6 +3,7 @@ import { join, resolve } from 'path';
 
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  host: process.env.HOST?.trim() || '0.0.0.0',
   appUrl: process.env.APP_URL ?? 'http://localhost:5173',
   version: process.env.APP_VERSION ?? 'Local build',
   githubReleasesRepo: process.env.GITHUB_RELEASES_REPO?.trim() || 'bookorbit/bookorbit',
@@ -23,6 +24,7 @@ export const authConfig = registerAs('auth', () => ({
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   setupBootstrapToken: process.env.SETUP_BOOTSTRAP_TOKEN ?? '',
   refreshRotationGraceMs: parsePositiveInteger(process.env.AUTH_REFRESH_ROTATION_GRACE_MS, 30_000),
+  passwordLoginEnabled: !parseBooleanFlag(process.env.DISABLE_LOCAL_AUTH, false),
 }));
 
 export const storageConfig = registerAs('storage', () => {
@@ -49,6 +51,15 @@ export const emailConfig = registerAs('email', () => ({
 export const migrationConfig = registerAs('migration', () => ({
   encryptionKey: process.env.MIGRATION_ENCRYPTION_KEY ?? '',
   importRoot: process.env.MIGRATION_IMPORT_ROOT?.trim() ? resolve(process.env.MIGRATION_IMPORT_ROOT) : undefined,
+}));
+
+/**
+ * Download-client and (from phase 3) indexer credentials. Unlike the email and migration keys,
+ * `RequestCredentialService` refuses to store a secret when this is unset rather than falling
+ * back to plaintext.
+ */
+export const bookRequestConfig = registerAs('bookRequest', () => ({
+  encryptionKey: process.env.BOOK_REQUEST_ENCRYPTION_KEY ?? '',
 }));
 
 export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({

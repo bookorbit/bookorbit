@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { EPUB_FONT_SIZE_MAX, EPUB_FONT_SIZE_MIN, isCustomFontCssFamily, type FontNamedInstance, type FontVariant } from '@bookorbit/types'
+import {
+  EPUB_FONT_SIZE_MAX,
+  EPUB_FONT_SIZE_MIN,
+  EPUB_LETTER_SPACING_MAX,
+  EPUB_LETTER_SPACING_MIN,
+  EPUB_PARAGRAPH_SPACING_MAX,
+  EPUB_PARAGRAPH_SPACING_MIN,
+  EPUB_TEXT_INDENT_MAX,
+  EPUB_TEXT_INDENT_MIN,
+  EPUB_WORD_SPACING_MAX,
+  EPUB_WORD_SPACING_MIN,
+  isCustomFontCssFamily,
+  type FontNamedInstance,
+  type FontVariant,
+} from '@bookorbit/types'
 import {
   BookOpen,
   ChevronDown,
@@ -20,6 +34,7 @@ import type { FontFamily, useCustomFonts } from '../composables/useCustomFonts'
 import { themes } from '../constants/themes'
 import { BUILTIN_READER_FONT_OPTIONS, type ReaderBuiltInFontOption } from '@/features/reader/shared/constants/font-options'
 import { formatFontFamilyLabel } from '@/features/reader/shared/lib/font-display'
+import { formatNumber } from '@/i18n/formatters'
 import { FONT_WEIGHT_LABEL_KEYS, builtInVariants, closestVariant, familyVariants, isSameVariant } from '@/features/reader/shared/lib/font-variants'
 import ReaderRangeField from '@/features/reader/shared/components/ReaderRangeField.vue'
 import ReaderSegmentedControl from '@/features/reader/shared/components/ReaderSegmentedControl.vue'
@@ -59,13 +74,34 @@ const modeOptions = computed(() => [
 ])
 
 const flowOptions = computed(() => [
-  { value: 'paginated', label: t('reader.settings.flow.paginated'), icon: BookOpen },
-  { value: 'scrolled', label: t('reader.settings.flow.scrolled'), icon: ScrollText },
+  {
+    value: 'paginated',
+    label: t('reader.settings.flow.paginated'),
+    icon: BookOpen,
+  },
+  {
+    value: 'scrolled',
+    label: t('reader.settings.flow.scrolled'),
+    icon: ScrollText,
+  },
 ])
 
 const spreadOptions = computed(() => [
-  { value: 'auto', label: t('reader.settings.spread.bookDefault'), icon: LayoutGrid },
-  { value: 'none', label: t('reader.settings.spread.singlePage'), icon: BookOpen },
+  {
+    value: 'auto',
+    label: t('reader.settings.spread.bookDefault'),
+    icon: LayoutGrid,
+  },
+  {
+    value: 'none',
+    label: t('reader.settings.spread.singlePage'),
+    icon: BookOpen,
+  },
+])
+
+const typographySourceOptions = computed(() => [
+  { value: 'book', label: t('reader.settings.bookDefault') },
+  { value: 'custom', label: t('reader.settings.custom') },
 ])
 
 const currentMode = computed(() => (props.state.isDark ? 'dark' : 'light'))
@@ -82,6 +118,26 @@ const pageWidthLabel = computed(() => {
   return t('reader.settings.pageWidthFull')
 })
 
+const paragraphSpacingLabel = computed(() =>
+  props.state.paragraphSpacing === EPUB_PARAGRAPH_SPACING_MIN
+    ? t('reader.settings.paragraphSpacingDefault')
+    : t('reader.settings.paragraphSpacingValue', {
+        value: formatNumber(props.state.paragraphSpacing, {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }),
+      }),
+)
+const letterSpacingSource = computed(() => (props.state.letterSpacing === null ? 'book' : 'custom'))
+const wordSpacingSource = computed(() => (props.state.wordSpacing === null ? 'book' : 'custom'))
+const textIndentSource = computed(() => (props.state.textIndent === null ? 'book' : 'custom'))
+const letterSpacingValue = computed(() => props.state.letterSpacing ?? EPUB_LETTER_SPACING_MIN)
+const wordSpacingValue = computed(() => props.state.wordSpacing ?? EPUB_WORD_SPACING_MIN)
+const textIndentValue = computed(() => props.state.textIndent ?? EPUB_TEXT_INDENT_MIN)
+const letterSpacingLabel = computed(() => formatEmValue(letterSpacingValue.value, 2))
+const wordSpacingLabel = computed(() => formatEmValue(wordSpacingValue.value, 2))
+const textIndentLabel = computed(() => formatEmValue(textIndentValue.value, 2))
+
 const columnGapPercent = computed(() => Math.round(props.state.gap * 100))
 
 function setMode(value: string) {
@@ -93,19 +149,69 @@ function selectTheme(themeName: string) {
 }
 
 function decreaseTextSize() {
-  emit('update', { fontSize: Math.max(EPUB_FONT_SIZE_MIN, props.state.fontSize - 1) })
+  emit('update', {
+    fontSize: Math.max(EPUB_FONT_SIZE_MIN, props.state.fontSize - 1),
+  })
 }
 
 function increaseTextSize() {
-  emit('update', { fontSize: Math.min(EPUB_FONT_SIZE_MAX, props.state.fontSize + 1) })
+  emit('update', {
+    fontSize: Math.min(EPUB_FONT_SIZE_MAX, props.state.fontSize + 1),
+  })
 }
 
 function selectBuiltInFont(font: ReaderBuiltInFontOption) {
-  emit('update', { fontFamily: font.value, ...variantUpdateFor(builtInVariants()) })
+  emit('update', {
+    fontFamily: font.value,
+    ...variantUpdateFor(builtInVariants()),
+  })
 }
 
 function setLineHeight(value: number) {
   emit('update', { lineHeight: Math.round(value * 10) / 10 })
+}
+
+function setParagraphSpacing(value: number) {
+  emit('update', { paragraphSpacing: Math.round(value * 10) / 10 })
+}
+
+function formatEmValue(value: number, maximumFractionDigits: number): string {
+  return t('reader.settings.emValue', {
+    value: formatNumber(value, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits,
+    }),
+  })
+}
+
+function setLetterSpacingSource(value: string) {
+  emit('update', {
+    letterSpacing: value === 'book' ? null : (props.state.letterSpacing ?? 0),
+  })
+}
+
+function setWordSpacingSource(value: string) {
+  emit('update', {
+    wordSpacing: value === 'book' ? null : (props.state.wordSpacing ?? 0),
+  })
+}
+
+function setTextIndentSource(value: string) {
+  emit('update', {
+    textIndent: value === 'book' ? null : (props.state.textIndent ?? 0),
+  })
+}
+
+function setLetterSpacing(value: number) {
+  emit('update', { letterSpacing: Math.round(value * 100) / 100 })
+}
+
+function setWordSpacing(value: number) {
+  emit('update', { wordSpacing: Math.round(value * 20) / 20 })
+}
+
+function setTextIndent(value: number) {
+  emit('update', { textIndent: Math.round(value * 4) / 4 })
 }
 
 function setPageWidth(value: number) {
@@ -117,15 +223,21 @@ function setFlow(value: string) {
 }
 
 function setFixedLayoutSpread(value: string) {
-  emit('update', { fixedLayoutSpread: value as ReaderState['fixedLayoutSpread'] })
+  emit('update', {
+    fixedLayoutSpread: value as ReaderState['fixedLayoutSpread'],
+  })
 }
 
 function decreaseColumns() {
-  emit('update', { maxColumnCount: Math.max(COLUMN_MIN, props.state.maxColumnCount - 1) })
+  emit('update', {
+    maxColumnCount: Math.max(COLUMN_MIN, props.state.maxColumnCount - 1),
+  })
 }
 
 function increaseColumns() {
-  emit('update', { maxColumnCount: Math.min(COLUMN_MAX, props.state.maxColumnCount + 1) })
+  emit('update', {
+    maxColumnCount: Math.min(COLUMN_MAX, props.state.maxColumnCount + 1),
+  })
 }
 
 function setColumnGap(value: number) {
@@ -177,8 +289,16 @@ const customFontSections = computed(() => {
   const customFonts = props.customFonts
   if (!customFonts) return []
   return [
-    { key: 'server', label: t('reader.settings.fontServer'), families: customFonts.visibleServerFamilies.value },
-    { key: 'user', label: t('reader.settings.fontYours'), families: customFonts.families.value },
+    {
+      key: 'server',
+      label: t('reader.settings.fontServer'),
+      families: customFonts.visibleServerFamilies.value,
+    },
+    {
+      key: 'user',
+      label: t('reader.settings.fontYours'),
+      families: customFonts.families.value,
+    },
   ].filter((section) => section.families.length > 0)
 })
 
@@ -186,7 +306,11 @@ const hasCustomFontSections = computed(() => customFontSections.value.length > 0
 
 function selectCustomFont(family: FontFamily) {
   const cssFamilyName = props.customFonts?.getCssFamilyForDisplay(family.name, family.scope)
-  if (cssFamilyName) emit('update', { fontFamily: cssFamilyName, ...variantUpdateFor(familyVariants(family.variants)) })
+  if (cssFamilyName)
+    emit('update', {
+      fontFamily: cssFamilyName,
+      ...variantUpdateFor(familyVariants(family.variants)),
+    })
 }
 
 function isCustomFontSelected(family: FontFamily): boolean {
@@ -194,7 +318,10 @@ function isCustomFontSelected(family: FontFamily): boolean {
   return props.customFonts.isFontFamilySelected(family.name, props.state.fontFamily, family.scope)
 }
 
-const currentVariant = computed<FontVariant>(() => ({ weight: props.state.fontWeight, style: props.state.fontStyle }))
+const currentVariant = computed<FontVariant>(() => ({
+  weight: props.state.fontWeight,
+  style: props.state.fontStyle,
+}))
 
 /**
  * The styles the selected family offers. Built-in stacks have no file list to read, so
@@ -257,7 +384,9 @@ const cardBaseClass =
 <template>
   <section class="flex min-h-0 flex-col overflow-hidden bg-card text-card-foreground">
     <div class="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-2.5 transition-shadow" :class="isScrolled ? 'shadow-sm' : ''">
-      <h2 class="mr-auto text-sm font-semibold">{{ t('reader.settings.title') }}</h2>
+      <h2 class="mr-auto text-sm font-semibold">
+        {{ t('reader.settings.title') }}
+      </h2>
       <ReaderSegmentedControl
         class="w-[9.75rem] shrink-0"
         :options="modeOptions"
@@ -323,9 +452,17 @@ const cardBaseClass =
               aria-hidden="true"
               class="relative flex h-9 w-full items-center justify-center overflow-hidden rounded-md font-serif text-[13px] ring-2 ring-offset-2 ring-offset-card transition-all"
               :class="state.themeName === theme.name ? 'ring-primary' : 'ring-transparent group-hover:ring-border'"
-              :style="{ background: state.isDark ? theme.dark.bg : theme.light.bg, color: state.isDark ? theme.dark.fg : theme.light.fg }"
+              :style="{
+                background: state.isDark ? theme.dark.bg : theme.light.bg,
+                color: state.isDark ? theme.dark.fg : theme.light.fg,
+              }"
             >
-              <span class="absolute inset-x-0 top-0 h-[3px]" :style="{ background: state.isDark ? theme.dark.link : theme.light.link }" />
+              <span
+                class="absolute inset-x-0 top-0 h-[3px]"
+                :style="{
+                  background: state.isDark ? theme.dark.link : theme.light.link,
+                }"
+              />
               Aa
             </span>
             <span
@@ -364,7 +501,9 @@ const cardBaseClass =
           </div>
 
           <template v-for="section in customFontSections" :key="section.key">
-            <p class="mb-1.5 mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{{ section.label }}</p>
+            <p class="mb-1.5 mt-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {{ section.label }}
+            </p>
             <div class="grid grid-cols-2 gap-2">
               <button
                 v-for="family in section.families"
@@ -400,7 +539,11 @@ const cardBaseClass =
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border text-foreground hover:border-muted-foreground/40 hover:bg-muted'
                 "
-                :style="{ fontFamily: variantPreviewFamily, fontWeight: variant.weight, fontStyle: variant.style }"
+                :style="{
+                  fontFamily: variantPreviewFamily,
+                  fontWeight: variant.weight,
+                  fontStyle: variant.style,
+                }"
                 :aria-pressed="isVariantSelected(variant)"
                 @click="selectVariant(variant)"
               >
@@ -421,6 +564,20 @@ const cardBaseClass =
             :min-icon="Rows4"
             :max-icon="Rows2"
             @update:model-value="setLineHeight"
+          />
+        </div>
+
+        <div class="border-b border-border px-4 py-3.5">
+          <ReaderRangeField
+            :model-value="state.paragraphSpacing"
+            :min="EPUB_PARAGRAPH_SPACING_MIN"
+            :max="EPUB_PARAGRAPH_SPACING_MAX"
+            :step="0.1"
+            :label="t('reader.settings.paragraphSpacing')"
+            :display-value="paragraphSpacingLabel"
+            :min-icon="Rows4"
+            :max-icon="Rows2"
+            @update:model-value="setParagraphSpacing"
           />
         </div>
 
@@ -492,6 +649,72 @@ const cardBaseClass =
               @update:model-value="setColumnGap"
             />
 
+            <div class="space-y-2">
+              <p class="text-[13px] font-medium text-foreground">
+                {{ t('reader.settings.letterSpacing') }}
+              </p>
+              <ReaderSegmentedControl
+                :options="typographySourceOptions"
+                :model-value="letterSpacingSource"
+                :aria-label="t('reader.settings.letterSpacing')"
+                @update:model-value="setLetterSpacingSource"
+              />
+              <ReaderRangeField
+                v-if="state.letterSpacing !== null"
+                :model-value="letterSpacingValue"
+                :min="EPUB_LETTER_SPACING_MIN"
+                :max="EPUB_LETTER_SPACING_MAX"
+                :step="0.01"
+                :label="t('reader.settings.letterSpacing')"
+                :display-value="letterSpacingLabel"
+                @update:model-value="setLetterSpacing"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <p class="text-[13px] font-medium text-foreground">
+                {{ t('reader.settings.wordSpacing') }}
+              </p>
+              <ReaderSegmentedControl
+                :options="typographySourceOptions"
+                :model-value="wordSpacingSource"
+                :aria-label="t('reader.settings.wordSpacing')"
+                @update:model-value="setWordSpacingSource"
+              />
+              <ReaderRangeField
+                v-if="state.wordSpacing !== null"
+                :model-value="wordSpacingValue"
+                :min="EPUB_WORD_SPACING_MIN"
+                :max="EPUB_WORD_SPACING_MAX"
+                :step="0.05"
+                :label="t('reader.settings.wordSpacing')"
+                :display-value="wordSpacingLabel"
+                @update:model-value="setWordSpacing"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <p class="text-[13px] font-medium text-foreground">
+                {{ t('reader.settings.textIndent') }}
+              </p>
+              <ReaderSegmentedControl
+                :options="typographySourceOptions"
+                :model-value="textIndentSource"
+                :aria-label="t('reader.settings.textIndent')"
+                @update:model-value="setTextIndentSource"
+              />
+              <ReaderRangeField
+                v-if="state.textIndent !== null"
+                :model-value="textIndentValue"
+                :min="EPUB_TEXT_INDENT_MIN"
+                :max="EPUB_TEXT_INDENT_MAX"
+                :step="0.25"
+                :label="t('reader.settings.textIndent')"
+                :display-value="textIndentLabel"
+                @update:model-value="setTextIndent"
+              />
+            </div>
+
             <div class="flex items-center justify-between gap-3">
               <span :id="justifyLabelId" class="text-[13px] font-medium text-foreground">{{ t('reader.settings.justifyText') }}</span>
               <ToggleSwitch :model-value="state.justify" :aria-labelledby="justifyLabelId" @update:model-value="setJustify" />
@@ -513,7 +736,9 @@ const cardBaseClass =
           :aria-label="t('reader.settings.pageSpreads')"
           @update:model-value="setFixedLayoutSpread"
         />
-        <p class="mt-2 text-xs leading-snug text-muted-foreground">{{ t('reader.settings.pageSpreadsHint') }}</p>
+        <p class="mt-2 text-xs leading-snug text-muted-foreground">
+          {{ t('reader.settings.pageSpreadsHint') }}
+        </p>
       </div>
     </div>
   </section>

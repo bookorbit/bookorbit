@@ -144,16 +144,15 @@ describe('ICU message compilation', () => {
     ['pl', polish, [0, 1, 2, 5, 1_000_000]],
     ['pt', pt, [0, 1, 2, 1_234]],
     ['sl', sl, [0, 1, 2, 3, 5, 1_234]],
-  ] as const)('isolates the styled count in both dialogs for %s', (locale, catalog, counts) => {
+  ] as const)('isolates the styled count in the bulk delete dialog for %s', (locale, catalog, counts) => {
     const testI18n = createCatalogI18n(locale, catalog)
 
-    for (const key of ['tools.bulkRename.confirmDialog.body', 'tools.entityManager.bulkDeleteModal.confirm']) {
-      for (const count of counts) {
-        const normalMessage = testI18n.global.t(key, { count })
-        const parts = splitIcuCount(testI18n.global.t(key, icuCountValues(count)))
-        expect(parts.filter((part) => part.isCount)).toHaveLength(1)
-        expect(parts.map((part) => part.value).join('')).toBe(normalMessage)
-      }
+    for (const count of counts) {
+      const key = 'tools.entityManager.bulkDeleteModal.confirm'
+      const normalMessage = testI18n.global.t(key, { count })
+      const parts = splitIcuCount(testI18n.global.t(key, icuCountValues(count)))
+      expect(parts.filter((part) => part.isCount)).toHaveLength(1)
+      expect(parts.map((part) => part.value).join('')).toBe(normalMessage)
     }
   })
 

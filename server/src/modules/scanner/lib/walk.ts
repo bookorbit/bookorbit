@@ -1,6 +1,8 @@
+import { usableFileTime } from '../../../common/utils/file-time.utils';
 import { readdir, stat } from 'fs/promises';
 import { basename, dirname, join, relative } from 'path';
 
+import { naturalCompare } from '../../../common/utils/natural-sort.utils';
 import { classifyFile, isPrimaryFormat, isAudioFormat, type FileRole } from './classify';
 
 export interface FileStat {
@@ -9,6 +11,7 @@ export interface FileStat {
   ino: bigint;
   sizeBytes: number;
   mtime: Date;
+  birthtime: Date;
   format: string | null;
   role: FileRole;
 }
@@ -25,6 +28,34 @@ export interface WalkResult {
   dirMtimes: Map<string, number>;
 }
 
+/**
+ * Derive a book's "date added" from the earliest on-disk time of its content
+ * files. This approximates when the book first landed on disk, rather than when
+ * BookOrbit happened to import it. Cover/metadata/supplement sidecars are
+ * excluded because they can be added later without meaning the book is "newer".
+ *
+ * For 'file_modified' the earliest valid mtime is used. For 'file_created' the
+ * earliest valid birthtime is used, falling back to that same file's mtime when
+ * its birthtime is missing or invalid (some filesystems do not track creation
+ * time). Returns undefined when no content file yields a usable time, so callers
+ * can fall back to the DB defaultNow() (import time).
+ */
+export function earliestContentTime(files: FileStat[], source: 'file_modified' | 'file_created'): Date | undefined {
+  let earliest: Date | undefined;
+  for (const file of files) {
+    if (file.role !== 'content') continue;
+    let candidate: Date | undefined;
+    if (source === 'file_modified') {
+      candidate = usableFileTime(file.mtime);
+    } else {
+      candidate = usableFileTime(file.birthtime) ?? usableFileTime(file.mtime);
+    }
+    if (candidate === undefined) continue;
+    if (earliest === undefined || candidate < earliest) earliest = candidate;
+  }
+  return earliest;
+}
+
 const MAX_PATH_LENGTH = 4096;
 const DIR_CONCURRENCY_LIMIT = 50;
 
@@ -32,33 +63,14 @@ const DIR_CONCURRENCY_LIMIT = 50;
 // but avoids broad matches like "Discography".
 const DISC_DIR_PATTERN = /^(?:cd|disc|disk|part|pt|side)(?:[\s_-]*(?:\d+|[A-Za-z]|[IVXLCM]+))$/i;
 
-function isDiscDirectory(name: string): boolean {
+export function isDiscDirectory(name: string): boolean {
   return DISC_DIR_PATTERN.test(name);
 }
 
 // Returns the filename stem (basename without the last extension).
-function stemOf(name: string): string {
+export function stemOf(name: string): string {
   const i = name.lastIndexOf('.');
   return i > 0 ? name.slice(0, i) : name;
-}
-
-// Natural sort: splits on numeric runs so "Chapter 10" sorts after "Chapter 9"
-function naturalCompare(a: string, b: string): number {
-  const re = /(\d+)/;
-  const aParts = a.split(re);
-  const bParts = b.split(re);
-  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-    const ap = aParts[i] ?? '';
-    const bp = bParts[i] ?? '';
-    if (/^\d+$/.test(ap) && /^\d+$/.test(bp)) {
-      const diff = parseInt(ap, 10) - parseInt(bp, 10);
-      if (diff !== 0) return diff;
-    } else {
-      const diff = ap.localeCompare(bp);
-      if (diff !== 0) return diff;
-    }
-  }
-  return 0;
 }
 
 function buildExcludeMatcher(patterns: string[]): (name: string) => boolean {
@@ -107,6 +119,7 @@ async function statFilesIntoAcc(
       ino,
       sizeBytes: Number(s.size),
       mtime: s.mtime,
+      birthtime: s.birthtime,
       format,
       role,
     });
@@ -444,6 +457,7 @@ export async function buildSingleBookCandidate(
         ino: s.ino,
         sizeBytes: Number(s.size),
         mtime: s.mtime,
+        birthtime: s.birthtime,
         format,
         role,
       } satisfies FileStat;

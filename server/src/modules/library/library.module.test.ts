@@ -12,6 +12,7 @@ import { LibraryModule } from './library.module';
 import { LibraryRepository } from './library.repository';
 import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 import { LibraryService } from './library.service';
+import { LibraryAddedAtService } from './library-added-at.service';
 import { BulkRenameService } from './bulk-rename.service';
 
 describe('LibraryModule', () => {
@@ -22,6 +23,7 @@ describe('LibraryModule', () => {
       LibraryRepository,
       LibraryScanSchedulerService,
       BulkRenameService,
+      LibraryAddedAtService,
     ]);
     expect(Reflect.getMetadata('exports', LibraryModule)).toEqual([LibraryService, LibraryRepository]);
   });

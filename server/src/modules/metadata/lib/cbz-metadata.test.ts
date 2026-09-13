@@ -120,12 +120,12 @@ describe('extractCbzMetadata', () => {
     });
 
     it('extracts series name and issue number', async () => {
-      const xml = `<ComicInfo><Series>Amazing Series</Series><Number>5</Number></ComicInfo>`;
+      const xml = `<ComicInfo><Series>Amazing Series</Series><Number>5.10</Number></ComicInfo>`;
       mockZipFile(buildZipWithComicInfo(xml));
 
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.seriesName).toBe('Amazing Series');
-      expect(r?.seriesIndex).toBe(5);
+      expect(r?.seriesIndex).toBe('5.10');
     });
 
     it('extracts the series length from Count', async () => {
@@ -368,7 +368,7 @@ describe('extractCbzMetadata', () => {
       const r = await extractCbzMetadata('/book.cbz');
       expect(r?.title).toBe('JSON Comic');
       expect(r?.seriesName).toBe('JSON Series');
-      expect(r?.seriesIndex).toBe(3);
+      expect(r?.seriesIndex).toBe('3');
       expect(r?.publishedYear).toBe(2001);
       expect(r?.publisher).toBe('Image');
     });
@@ -429,7 +429,7 @@ describe('extractCbzMetadata', () => {
       mockZipFile(buildZipCommentOnly(comment));
 
       const r = await extractCbzMetadata('/book.cbz');
-      expect(r?.seriesIndex).toBe(0);
+      expect(r?.seriesIndex).toBe('0');
     });
   });
 

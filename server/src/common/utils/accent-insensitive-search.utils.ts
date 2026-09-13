@@ -8,6 +8,10 @@ export function accentInsensitiveIlike(value: SQLWrapper, pattern: string | SQLW
   return sql`public.bookorbit_unaccent(${value}) ILIKE public.bookorbit_unaccent(${pattern})`;
 }
 
+export function accentInsensitiveExactMatchRank(value: SQLWrapper, term: string): SQL<number> {
+  return sql<number>`case when lower(public.bookorbit_unaccent(${value})) = lower(public.bookorbit_unaccent(${term})) then 0 else 1 end`;
+}
+
 export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&');
 }

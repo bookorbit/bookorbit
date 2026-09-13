@@ -1,4 +1,4 @@
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { normalizeSeriesTotalBooks } from '../../../../common/utils/series-total-books.utils';
@@ -107,7 +107,7 @@ export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandida
     isbn13,
     genres: doc.genres,
     seriesName: doc.featured_series?.series?.name,
-    seriesIndex: doc.featured_series?.position ?? undefined,
+    seriesIndex: parseSeriesIndex(doc.featured_series?.position) ?? undefined,
     coverUrl: doc.image?.url,
     sourceUrl: `https://hardcover.app/books/${doc.slug}`,
     ...(communityRating !== undefined ? { communityRating } : {}),
@@ -143,7 +143,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     isbn10: edition.isbn_10,
     isbn13: edition.isbn_13,
     seriesName: book.featured_book_series?.series?.name,
-    seriesIndex: book.featured_book_series?.position ?? undefined,
+    seriesIndex: parseSeriesIndex(book.featured_book_series?.position) ?? undefined,
     seriesTotalBooks: normalizeSeriesTotalBooks(book.featured_book_series?.series?.books_count),
     coverUrl: edition.image?.url ?? book.image?.url,
     sourceUrl: `https://hardcover.app/books/${book.slug}`,

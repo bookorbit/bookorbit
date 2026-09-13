@@ -31,11 +31,14 @@ Transfer.TEMP_DIR_NAME = TEMP_DIR_NAME
 Transfer.POLL_INTERVAL = POLL_INTERVAL
 
 local function normalize(path)
-    return tostring(path or ""):gsub("\\", "/"):gsub("/+", "/"):gsub("/$", "")
+    local normalized = tostring(path or ""):gsub("\\", "/"):gsub("/+", "/")
+    if normalized == "/" then return normalized end
+    return normalized:gsub("/$", "")
 end
 
 function Transfer.tempDir(root)
-    return normalize(root) .. "/" .. TEMP_DIR_NAME
+    local normalized_root = normalize(root)
+    return (normalized_root ~= "/" and normalized_root or "") .. "/" .. TEMP_DIR_NAME
 end
 
 function Transfer.ensureTempDir(root)
@@ -52,7 +55,11 @@ function Transfer.isInsideRoot(root, path)
     local normalized_root = normalize(root)
     local normalized_path = normalize(path)
     if normalized_root == "" or normalized_path == "" then return false end
-    if normalized_path:sub(1, #normalized_root + 1) ~= normalized_root .. "/" then return false end
+    if normalized_root == "/" then
+        if normalized_path == "/" or normalized_path:sub(1, 1) ~= "/" then return false end
+    elseif normalized_path:sub(1, #normalized_root + 1) ~= normalized_root .. "/" then
+        return false
+    end
     for segment in normalized_path:gmatch("[^/]+") do
         if segment == ".." then return false end
     end

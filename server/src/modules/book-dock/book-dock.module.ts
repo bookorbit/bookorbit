@@ -54,6 +54,6 @@ import { BookDockRepository } from './book-dock.repository';
     BookDockWatcherService,
     BookDockGateway,
   ],
-  exports: [BookDockService, BookDockRepository],
+  exports: [BookDockService, BookDockRepository, BookDockEventsService, BookDockFinalizeService, BookDockIngestService],
 })
 export class BookDockModule {}

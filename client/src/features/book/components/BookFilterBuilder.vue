@@ -11,6 +11,7 @@ import {
   isCustomRuleField,
   parseCustomRuleFieldId,
   type CommunityRatingProvider,
+  type CommunityRatingRuleField,
   type CustomMetadataFieldType,
   type CustomRuleField,
   type GroupRule,
@@ -43,7 +44,17 @@ const emit = defineEmits<{
 }>()
 
 const MAX_DEPTH = 5
-const NUMERIC_FIELDS: RuleField[] = ['seriesIndex', 'publishedYear', 'pageCount', 'rating', 'communityRating', 'metadataScore']
+const BYTES_PER_MIB = 1024 ** 2
+const NUMERIC_FIELDS: RuleField[] = [
+  'seriesIndex',
+  'publishedYear',
+  'pageCount',
+  'fileSize',
+  'rating',
+  'communityRating',
+  'communityRatingCount',
+  'metadataScore',
+]
 const DATE_FIELDS: RuleField[] = ['publishedDate', 'addedAt', 'startedAt', 'finishedAt']
 const NO_VALUE_OPERATORS: RuleOperator[] = [
   'isEmpty',
@@ -134,6 +145,15 @@ function isNumericField(field: RuleField): boolean {
   return NUMERIC_FIELDS.includes(field) || customFieldType(field) === 'number'
 }
 
+function isCommunityRatingField(field: RuleField): field is CommunityRatingRuleField {
+  return field === 'communityRating' || field === 'communityRatingCount'
+}
+
+function providerForRule(rule: Rule): CommunityRatingProvider {
+  if (rule.field === 'communityRating' || rule.field === 'communityRatingCount') return rule.provider ?? 'any'
+  return 'any'
+}
+
 function isDateField(field: RuleField): boolean {
   return DATE_FIELDS.includes(field) || customFieldType(field) === 'date'
 }
@@ -167,13 +187,15 @@ function makeEmptyRule(): LocalNode {
 
 function toEditableRule(r: Rule): EditableRule {
   const usesChips = Array.isArray(r.value)
+  const value = r.field === 'fileSize' && typeof r.value === 'number' ? String(r.value / BYTES_PER_MIB) : String(r.value ?? '')
+  const valueTo = r.field === 'fileSize' && typeof r.valueTo === 'number' ? String(r.valueTo / BYTES_PER_MIB) : String(r.valueTo ?? '')
   return {
     field: r.field,
     operator: r.operator,
-    provider: r.field === 'communityRating' ? (r.provider ?? 'any') : 'any',
-    value: usesChips ? '' : String(r.value ?? ''),
+    provider: providerForRule(r),
+    value: usesChips ? '' : value,
     valueChips: usesChips ? (r.value as string[]) : [],
-    valueTo: String(r.valueTo ?? ''),
+    valueTo,
     valueUnit: 'days',
   }
 }
@@ -190,7 +212,7 @@ function toLocalNodes(group: GroupRule | undefined): LocalNode[] {
 function parseValue(field: RuleField, operator: RuleOperator, raw: string, chips: string[], unit: WithinLastUnit): Rule['value'] {
   if (NO_VALUE_OPERATORS.includes(operator)) return undefined
   if (COLLECTION_OPERATORS.includes(operator)) return chips
-  if (isNumericField(field)) return raw === '' ? undefined : Number(raw)
+  if (isNumericField(field)) return raw === '' ? undefined : field === 'fileSize' ? Math.round(Number(raw) * BYTES_PER_MIB) : Number(raw)
   if (isDateField(field) && operator === 'withinLast') {
     if (raw === '') return undefined
     const n = Number(raw)
@@ -248,11 +270,13 @@ function emitUpdate() {
         valueTo:
           BETWEEN_OPERATORS.includes(n.rule.operator) && n.rule.valueTo !== ''
             ? isNumericField(n.rule.field)
-              ? Number(n.rule.valueTo)
+              ? n.rule.field === 'fileSize'
+                ? Math.round(Number(n.rule.valueTo) * BYTES_PER_MIB)
+                : Number(n.rule.valueTo)
               : n.rule.valueTo
             : undefined,
       }
-      return n.rule.field === 'communityRating' ? ({ ...rule, provider: n.rule.provider } as Rule) : (rule as Rule)
+      return isCommunityRatingField(n.rule.field) ? ({ ...rule, provider: n.rule.provider } as Rule) : (rule as Rule)
     })
   const isSubGroup = (props.depth ?? 0) > 0
   if (!isSubGroup && rules.length === 0 && !props.preserveIncompleteRoot) {
@@ -381,12 +405,14 @@ function removeStatusChip(index: number, status: string) {
 function valueInputType(field: RuleField, operator: RuleOperator): string {
   if (NO_VALUE_OPERATORS.includes(operator)) return 'none'
   if (isDateField(field)) return operator === 'withinLast' ? 'number' : 'date'
+  if (field === 'seriesIndex') return 'text'
   if (isNumericField(field)) return 'number'
   return 'text'
 }
 
 function numericInputMin(field: RuleField): string | undefined {
-  if (field === 'communityRating') return '0'
+  if (field === 'fileSize') return '0'
+  if (isCommunityRatingField(field)) return '0'
   return undefined
 }
 
@@ -397,7 +423,9 @@ function numericInputMax(field: RuleField): string | undefined {
 }
 
 function numericInputStep(field: RuleField): string | undefined {
+  if (field === 'fileSize') return '0.1'
   if (field === 'communityRating') return '0.1'
+  if (field === 'communityRatingCount') return '1'
   return undefined
 }
 
@@ -457,7 +485,7 @@ function showValueToInput(operator: RuleOperator): boolean {
         </select>
 
         <div
-          v-if="node.rule.field === 'communityRating'"
+          v-if="isCommunityRatingField(node.rule.field)"
           class="h-9 flex items-center gap-2 rounded-md border border-input bg-background px-2 shrink-0"
         >
           <img
@@ -576,6 +604,38 @@ function showValueToInput(operator: RuleOperator): boolean {
           :endpoint="ENDPOINT_BY_FIELD[node.rule.field]!"
           @update:model-value="emitUpdate"
         />
+        <!-- Primary file size: MB input serialized as bytes -->
+        <template v-else-if="node.rule.field === 'fileSize' && !NO_VALUE_OPERATORS.includes(node.rule.operator)">
+          <div class="flex items-center gap-1.5">
+            <input
+              v-model="node.rule.value"
+              @input="emitUpdate"
+              type="number"
+              min="0"
+              step="0.1"
+              :aria-label="t('book.filter.fileSizeValueAria')"
+              :placeholder="t('book.filter.fileSizePlaceholder')"
+              class="h-9 w-28 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <span class="text-xs text-muted-foreground">{{ t('book.filter.unit.megabytes') }}</span>
+          </div>
+          <template v-if="showValueToInput(node.rule.operator)">
+            <span class="text-xs text-muted-foreground">{{ t('book.filter.to') }}</span>
+            <div class="flex items-center gap-1.5">
+              <input
+                v-model="node.rule.valueTo"
+                @input="emitUpdate"
+                type="number"
+                min="0"
+                step="0.1"
+                :aria-label="t('book.filter.fileSizeMaximumAria')"
+                :placeholder="t('book.filter.maxPlaceholder')"
+                class="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <span class="text-xs text-muted-foreground">{{ t('book.filter.unit.megabytes') }}</span>
+            </div>
+          </template>
+        </template>
         <!-- Metadata score: preset range chips + numeric input -->
         <template v-else-if="node.rule.field === 'metadataScore' && !NO_VALUE_OPERATORS.includes(node.rule.operator)">
           <div class="flex flex-wrap items-center gap-1.5">

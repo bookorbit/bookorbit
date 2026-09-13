@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import { Permission, type MigrationProgressEvent, type MigrationRunState } from '@bookorbit/types';
+import { Permission, type AuthenticationMethod, type MigrationProgressEvent, type MigrationRunState } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { AuthService } from '../auth/auth.service';
@@ -40,8 +40,8 @@ export class MigrationProgressGateway implements OnGatewayInit, OnGatewayConnect
     try {
       const token = client.handshake.auth?.token as string | undefined;
       if (!token) throw new UnauthorizedException('No token provided');
-      const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
-      const user = await this.authService.validateUser(payload.sub, payload.ver);
+      const payload = this.jwtService.verify<{ sub: number; ver: number; amr?: AuthenticationMethod }>(token, { algorithms: ['HS256'] });
+      const user = await this.authService.validateUser(payload.sub, payload.ver, payload.amr ?? 'legacy');
       if (!user) throw new UnauthorizedException('User not found or token revoked');
       this.assertCanViewMigrationProgress(user);
       (client.data as Record<string, unknown>).user = user;

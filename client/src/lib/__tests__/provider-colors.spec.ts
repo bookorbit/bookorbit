@@ -88,15 +88,19 @@ describe('providerBadgeStyle', () => {
 })
 
 describe('providerChipStyle', () => {
-  it('returns a style object for ranobedb when not disabled', () => {
-    const style = providerChipStyle('ranobedb', false)
-    expect(style).toHaveProperty('backgroundColor')
-    expect(style.color).toBe(RANOBEDB_COLOR)
-    expect(style.opacity).toBeUndefined()
+  it('exposes the brand colour as a custom property for the provider-chip class', () => {
+    expect(providerChipStyle('ranobedb')).toEqual({ '--provider-color': RANOBEDB_COLOR })
   })
 
-  it('sets opacity when disabled', () => {
-    const style = providerChipStyle('ranobedb', true)
-    expect(style.opacity).toBe('0.75')
+  // Fill, ink and ring are mixed from this value in CSS so light mode can darken the
+  // brand hue enough to clear contrast. Emitting the colour directly would defeat that.
+  it('does not set colour properties directly', () => {
+    const style = providerChipStyle('ranobedb')
+    expect(style.color).toBeUndefined()
+    expect(style.backgroundColor).toBeUndefined()
+  })
+
+  it('falls back to the default colour for an unknown provider', () => {
+    expect(providerChipStyle('unknown')['--provider-color']).toBe(getProviderColor('unknown'))
   })
 })

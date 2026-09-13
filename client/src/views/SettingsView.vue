@@ -41,7 +41,11 @@ watch(
           <span class="truncate">{{ crumb }}</span>
         </template>
       </div>
-      <SettingsPageHeader v-if="match" class="mb-0! mt-2" :title="pageTitle" :subtitle="pageDescription" />
+      <SettingsPageHeader v-if="match" class="mb-0! mt-2" :title="pageTitle" :subtitle="pageDescription">
+        <!-- Pages teleport their primary action here so it sits beside the title
+             instead of being wedged into the page body. -->
+        <div id="settings-header-actions" class="contents" />
+      </SettingsPageHeader>
     </div>
 
     <div ref="contentScroll" class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">

@@ -4,6 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { MetadataProviderKey, ProviderConfigurations, ProviderConnectionTestResult, ProviderStatus } from '@bookorbit/types';
 
 import { stripBearerPrefix, toBearerAuthorization } from '../../common/utils/bearer-token.utils';
+import { amazonRequestHeaders, isAmazonBotChallenge } from '../../common/utils/amazon-http.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { amazonOrigin, normalizeAmazonDomain, normalizeAudibleDomain } from '../../common/utils/metadata-provider-hosts.utils';
 import { DB } from '../../db';
@@ -20,19 +21,6 @@ const HARDCOVER_GRAPHQL_URL = 'https://api.hardcover.app/v1/graphql';
 const HARDCOVER_TEST_QUERY = 'query { me { username } }';
 const AMAZON_TEST_QUERY = 'books';
 const PROVIDER_TEST_TIMEOUT_MS = 10_000;
-const AMAZON_CAPTCHA_PATTERNS = [/validateCaptcha/i, /captcha/i, /not a robot/i];
-const AMAZON_TEST_HEADERS: HeadersInit = {
-  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'accept-language': 'en-US,en;q=0.9',
-  'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not_A Brand";v="24"',
-  'sec-ch-ua-mobile': '?0',
-  'sec-ch-ua-platform': '"macOS"',
-  'sec-fetch-dest': 'document',
-  'sec-fetch-mode': 'navigate',
-  'sec-fetch-site': 'none',
-};
-
 const DEFAULT_CONFIG: ProviderConfigurations = {
   google: { enabled: false, apiKey: '' },
   amazon: { enabled: true, domain: 'amazon.com', cookie: '' },
@@ -522,10 +510,10 @@ export class ProviderConfigService {
   private async testAmazonProvider(config: ProviderConfigurations['amazon']): Promise<ProviderConnectionTestResult> {
     const domain = normalizeAmazonDomain(config.domain);
     const cookie = this.normalizeAmazonCookie(config.cookie);
-    const url = new URL('/s', amazonOrigin(domain));
+    const url = new URL('/gp/aw/s', amazonOrigin(domain));
     url.searchParams.set('k', AMAZON_TEST_QUERY);
     url.searchParams.set('i', 'stripbooks');
-    const headers: HeadersInit = cookie ? { ...AMAZON_TEST_HEADERS, cookie } : AMAZON_TEST_HEADERS;
+    const headers = amazonRequestHeaders(url, cookie);
     const response = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(PROVIDER_TEST_TIMEOUT_MS) });
 
     if (!response.ok) {
@@ -538,8 +526,7 @@ export class ProviderConfigService {
     }
 
     const body = await response.text();
-    const captchaDetected = AMAZON_CAPTCHA_PATTERNS.some((pattern) => pattern.test(body));
-    if (captchaDetected) {
+    if (isAmazonBotChallenge(body)) {
       return {
         key: MetadataProviderKey.AMAZON,
         ok: false,

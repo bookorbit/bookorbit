@@ -7,6 +7,7 @@ export interface EvaluationContext {
   userId: number;
   isSuperuser: boolean;
   eventName: string;
+  timeZone: string;
   payload: Record<string, unknown>;
 }
 

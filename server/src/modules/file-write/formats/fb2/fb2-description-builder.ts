@@ -274,8 +274,8 @@ export function buildFb2Description(
   if (writes('seriesName')) {
     const seriesName = payload.seriesName!.trim();
     const index = payload.seriesIndex;
-    const writeIndex = mask.has('seriesIndex') && typeof index === 'number' && Number.isFinite(index);
-    const numberAttribute = writeIndex ? ` number="${escapeAttribute(String(index))}"` : '';
+    const writeIndex = mask.has('seriesIndex') && typeof index === 'string';
+    const numberAttribute = writeIndex ? ` number="${escapeAttribute(index)}"` : '';
     slots.set('sequence', [`${childIndent}<sequence name="${escapeAttribute(seriesName)}"${numberAttribute}/>`]);
     record('seriesName');
     if (writeIndex) record('seriesIndex');

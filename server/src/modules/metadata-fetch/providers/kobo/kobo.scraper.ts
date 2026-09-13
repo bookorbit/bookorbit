@@ -27,7 +27,7 @@ export interface KoboBookData {
   isbn10?: string;
   isbn13?: string;
   seriesName?: string;
-  seriesIndex?: number;
+  seriesIndex?: string;
   genres?: string[];
   coverUrl?: string;
   sourceUrl?: string;
@@ -237,14 +237,12 @@ function extractSeriesName($: CheerioAPI): string | undefined {
   return name || undefined;
 }
 
-function extractSeriesIndex($: CheerioAPI): number | undefined {
+function extractSeriesIndex($: CheerioAPI): string | undefined {
   const raw =
     cleanText($('span.series.product-field').last().find('span.sequenced-name-prefix').first().text()) ||
     cleanText($('[data-testid="series"]').first().text());
   const match = raw.match(/Book\s+(\d+(?:\.\d+)?)\s*-/i) ?? raw.match(/#\s*(\d+(?:\.\d+)?)/);
-  if (!match) return undefined;
-  const value = parseFloat(match[1]);
-  return Number.isNaN(value) ? undefined : value;
+  return match?.[1];
 }
 
 function extractDetails($: CheerioAPI): KoboDetails {

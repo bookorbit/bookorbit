@@ -13,7 +13,8 @@ import {
 
 export type EditableSeriesMembership = {
   seriesName: string
-  seriesIndex: number | null
+  seriesIndex: string | null
+  /** Series-level: saving it changes the total for every book in the series and every user. */
   expectedBookCount: number | null
 }
 
@@ -27,6 +28,8 @@ const ROOT_FIELDS = [
   'publishedYear',
   'language',
   'pageCount',
+  'seriesName',
+  'seriesIndex',
   'isbn10',
   'isbn13',
   'rating',
@@ -93,12 +96,14 @@ function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[]
     return normalizeSeriesMemberships(
       memberships.map((membership) => ({
         seriesName: membership.seriesName,
-        seriesIndex: membership.seriesIndex,
+        seriesIndex: membership.seriesIndex == null ? null : String(membership.seriesIndex),
         expectedBookCount: membership.expectedBookCount ?? null,
       })),
     )
   }
-  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null }] : []
+  return book.seriesName
+    ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex == null ? null : String(book.seriesIndex), expectedBookCount: null }]
+    : []
 }
 
 function changedCustomMetadataPayload(
@@ -132,7 +137,7 @@ export function useMetadataEditor() {
     pageCount: null as number | null,
     communityRatings: [] as BookCommunityRating[],
     seriesName: null as string | null,
-    seriesIndex: null as number | null,
+    seriesIndex: null as string | null,
     seriesMemberships: [] as EditableSeriesMembership[],
     isbn10: null as string | null,
     isbn13: null as string | null,
@@ -189,7 +194,7 @@ export function useMetadataEditor() {
     form.pageCount = book.pageCount
     form.communityRatings = [...book.communityRatings]
     form.seriesName = book.seriesName
-    form.seriesIndex = book.seriesIndex
+    form.seriesIndex = book.seriesIndex == null ? null : String(book.seriesIndex)
     form.seriesMemberships = seriesMembershipsFromBook(book)
     form.isbn10 = book.isbn10
     form.isbn13 = book.isbn13

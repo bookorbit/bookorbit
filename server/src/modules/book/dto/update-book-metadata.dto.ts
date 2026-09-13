@@ -1,6 +1,6 @@
 import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { MetadataProviderKey } from '@bookorbit/types';
+import { MetadataProviderKey, SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type SeriesIndex } from '@bookorbit/types';
 import { MAX_SERIES_TOTAL_BOOKS } from '../../../common/utils/series-total-books.utils';
 import { PROVIDER_ID_MAX_LENGTHS } from '../../../common/utils/provider-id.utils';
 import { CustomMetadataValueDto } from '../../custom-metadata/dto/custom-metadata-value.dto';
@@ -34,7 +34,7 @@ export class ComicMetadataDto {
 
 export class BookSeriesMembershipDto {
   @IsString() @MaxLength(500) seriesName!: string;
-  @IsOptional() @IsNumber() seriesIndex?: number | null;
+  @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
   // Series-level rather than book-level: writing it changes the total for every book in the
   // series and for every user. Bounds mirror the book_series range constraint.
   @IsOptional() @IsInt() @Min(1) @Max(MAX_SERIES_TOTAL_BOOKS) expectedBookCount?: number | null;
@@ -58,7 +58,7 @@ export class UpdateBookMetadataDto {
   // A provider page count of 0 (e.g. Google Books returns 0 when unknown) means "unknown"; normalize it to null instead of rejecting it (issue #329).
   @IsOptional() @Transform(({ value }) => (value === 0 ? null : value)) @IsInt() @Min(1) pageCount?: number | null;
   @IsOptional() @IsString() @MaxLength(500) seriesName?: string | null;
-  @IsOptional() @IsNumber() seriesIndex?: number | null;
+  @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => BookSeriesMembershipDto) seriesMemberships?: BookSeriesMembershipDto[] | null;
   @IsOptional() @IsString() @MaxLength(10) isbn10?: string | null;
   @IsOptional() @IsString() @MaxLength(13) isbn13?: string | null;

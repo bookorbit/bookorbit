@@ -44,9 +44,12 @@ vi.mock('@/composables/useVirtualKeyboard', () => ({
 function makeCollection(overrides: Partial<Collection> = {}): Collection {
   return {
     id: 10,
+    userId: 1,
     name: 'Favorites',
     icon: 'FolderOpen',
     description: null,
+    isPublic: false,
+    isOwner: true,
     syncToKobo: false,
     displayOrder: 0,
     bookCount: 3,

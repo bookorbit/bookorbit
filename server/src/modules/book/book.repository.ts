@@ -13,11 +13,14 @@ import type {
   TemporalJumpBucketPrecision,
   TemporalJumpBucketUnit,
 } from '@bookorbit/types';
-import type { BookRecommendation } from '@bookorbit/types';
+import type { UnscopedBookRecommendation } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { advanceIsoTimestamp } from '../../common/utils/iso-timestamp.utils';
+import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
+import { scanStateInvalidationPaths } from '../../common/utils/scan-state-paths.utils';
+import { seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
@@ -47,6 +50,7 @@ import {
   koreaderDeviceProgress,
   koreaderProgressResets,
   libraries,
+  libraryFolders,
   narrators,
   audiobookProgress,
   readingProgress,
@@ -63,7 +67,7 @@ type JsonObj = Record<string, unknown>;
 type BookRepositoryTx = Parameters<Parameters<NodePgDatabase<typeof schema>['transaction']>[0]>[0];
 
 type CollapsedRawRow = {
-  id: number;
+  id: number | null;
   status: string;
   cover_aspect_ratio: string;
   primary_file_id: number | null;
@@ -73,7 +77,7 @@ type CollapsedRawRow = {
   title: string | null;
   series_id: number | null;
   series_name: string | null;
-  series_index: number | null;
+  series_index: string | null;
   published_date: string | null;
   published_year: number | null;
   language: string | null;
@@ -97,6 +101,7 @@ type CollapsedRawRow = {
   latest_volume_book_id: number | null;
   first_unread_book_id: number | null;
   total_count: string;
+  book_total: string;
 };
 type PatternMetadataRow = {
   bookId: number;
@@ -109,9 +114,10 @@ type PatternMetadataRow = {
   language: string | null;
   seriesId: number | null;
   seriesName: string | null;
-  seriesIndex: number | null;
+  seriesIndex: string | null;
   isbn13: string | null;
   authors: string[];
+  narrators: string[];
 };
 
 function parseDateByBookId(value: JsonObj | null | undefined): Record<number, Date | null> {
@@ -140,7 +146,8 @@ const PROGRESS_EPSILON = 0.0001;
 // drift from listing offsets. Guarded by the jump-buckets invariant e2e test.
 const COLLAPSE_GROUP_KEY_SQL = `base.library_id, COALESCE(base.series_id::text, 'book_' || base.id::text)`;
 const COLLAPSE_REPRESENTATIVE_PICK_SQL = `${COLLAPSE_GROUP_KEY_SQL},
-          base.series_index ASC NULLS LAST,
+          ${seriesIndexSortKeySql('base.series_index')} ASC NULLS LAST,
+          base.series_index COLLATE "C" ASC NULLS LAST,
           base.added_at ASC,
           base.id ASC`;
 
@@ -623,7 +630,7 @@ export class BookRepository {
           bookId: number;
           seriesId: number;
           seriesName: string;
-          seriesIndex: number | null;
+          seriesIndex: string | null;
           displayOrder: number;
           expectedBookCount: number | null;
         }[],
@@ -757,6 +764,7 @@ export class BookRepository {
     userId: number;
     customFieldTypes?: CustomMetadataFieldTypeMap;
     defaultCollectionId?: number;
+    randomSeed?: number;
   }): Promise<{
     rows: Array<{
       id: number;
@@ -769,7 +777,7 @@ export class BookRepository {
       title: string | null;
       seriesName: string | null;
       seriesId: number | null;
-      seriesIndex: number | null;
+      seriesIndex: string | null;
       publishedDate: string | null;
       publishedYear: number | null;
       language: string | null;
@@ -810,18 +818,19 @@ export class BookRepository {
       bookId: number;
       seriesId: number;
       seriesName: string;
-      seriesIndex: number | null;
+      seriesIndex: string | null;
       displayOrder: number;
       expectedBookCount: number | null;
     }[];
     total: number;
+    bookTotal: number;
   }> {
     const { where, sort, limit, offset, userId, defaultCollectionId } = opts;
     if (defaultCollectionId !== undefined && (!Number.isSafeInteger(defaultCollectionId) || defaultCollectionId <= 0)) {
       throw new BadRequestException('Invalid default collection id');
     }
     const whereFragment = this.visibleWhere(where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     // The collectionOrder branch of the order by names sort_collection_position, so the column has
     // to exist even for the library and smart scope queries that can never sort on it.
     const collectionPosition =
@@ -891,7 +900,8 @@ export class BookRepository {
           base.added_at,
           ROW_NUMBER() OVER (
             PARTITION BY base.series_id, base.library_id
-            ORDER BY base.series_index ASC NULLS LAST, base.added_at ASC, base.id ASC
+            ORDER BY ${sql.raw(seriesIndexSortKeySql('base.series_index'))} ASC NULLS LAST,
+              base.series_index COLLATE "C" ASC NULLS LAST, base.added_at ASC, base.id ASC
           ) AS rn
         FROM base_rows base
         WHERE base.series_id IS NOT NULL
@@ -901,7 +911,8 @@ export class BookRepository {
           scc.series_id,
           scc.library_id,
           COALESCE(
-            ARRAY_AGG(scc.id ORDER BY scc.series_index ASC NULLS LAST, scc.added_at ASC, scc.id ASC) FILTER (WHERE scc.rn <= 4),
+            ARRAY_AGG(scc.id ORDER BY ${sql.raw(seriesIndexSortKeySql('scc.series_index'))} ASC NULLS LAST,
+              scc.series_index COLLATE "C" ASC NULLS LAST, scc.added_at ASC, scc.id ASC) FILTER (WHERE scc.rn <= 4),
             ARRAY[]::int[]
           ) AS cover_book_ids
         FROM series_cover_candidates scc
@@ -921,7 +932,8 @@ export class BookRepository {
             base.id,
             ROW_NUMBER() OVER (
               PARTITION BY base.series_id, base.library_id
-              ORDER BY base.series_index DESC NULLS LAST, base.added_at DESC, base.id DESC
+              ORDER BY ${sql.raw(seriesIndexSortKeySql('base.series_index'))} DESC NULLS LAST,
+                base.series_index COLLATE "C" DESC NULLS LAST, base.added_at DESC, base.id DESC
             ) AS rn
           FROM base_rows base
           WHERE base.series_id IS NOT NULL
@@ -937,7 +949,8 @@ export class BookRepository {
             base.id,
             ROW_NUMBER() OVER (
               PARTITION BY base.series_id, base.library_id
-              ORDER BY base.series_index ASC NULLS LAST, base.added_at ASC, base.id ASC
+              ORDER BY ${sql.raw(seriesIndexSortKeySql('base.series_index'))} ASC NULLS LAST,
+                base.series_index COLLATE "C" ASC NULLS LAST, base.added_at ASC, base.id ASC
             ) AS rn
           FROM base_rows base
           LEFT JOIN user_book_status ubs ON ubs.book_id = base.id AND ubs.user_id = ${userId}
@@ -1030,16 +1043,28 @@ export class BookRepository {
           ON sfu2.series_id = base.series_id
           AND sfu2.library_id = base.library_id
         ORDER BY ${sql.raw(COLLAPSE_REPRESENTATIVE_PICK_SQL)}
+      ),
+      totals AS (
+        SELECT
+          COUNT(*) AS total_count,
+          COALESCE(SUM(COALESCE(book_count, 1)), 0) AS book_total
+        FROM representatives
       )
-      SELECT r.*,
-        COUNT(*) OVER () AS total_count
-      FROM representatives r
+      SELECT r.*, totals.total_count, totals.book_total
+      FROM totals
+      LEFT JOIN LATERAL (
+        SELECT r.*
+        FROM representatives r
+        ORDER BY ${sql.raw(orderBy)}
+        LIMIT ${limit} OFFSET ${offset}
+      ) r ON true
       ORDER BY ${sql.raw(orderBy)}
-      LIMIT ${limit} OFFSET ${offset}
     `);
 
-    const rawRows = result.rows as CollapsedRawRow[];
-    const total = rawRows.length > 0 ? Number(rawRows[0].total_count) : 0;
+    const queryRows = result.rows as CollapsedRawRow[];
+    const total = Number(queryRows[0]?.total_count ?? 0);
+    const bookTotal = Number(queryRows[0]?.book_total ?? 0);
+    const rawRows = queryRows.filter((row): row is CollapsedRawRow & { id: number } => row.id !== null);
 
     const mappedRows = rawRows.map((r) => ({
       id: r.id,
@@ -1047,8 +1072,8 @@ export class BookRepository {
       coverAspectRatio: r.cover_aspect_ratio,
       primaryFileId: r.primary_file_id,
       folderPath: r.folder_path,
-      addedAt: new Date(r.added_at),
-      updatedAt: new Date(r.updated_at),
+      addedAt: parsePgTimestamptz(r.added_at),
+      updatedAt: parsePgTimestamptz(r.updated_at),
       title: r.title,
       seriesId: r.series_id,
       seriesName: r.series_name,
@@ -1070,7 +1095,7 @@ export class BookRepository {
       readCount: r.read_count !== null ? Number(r.read_count) : null,
       coverBookIds: r.cover_book_ids,
       coverUpdatedAtByBookId: parseDateByBookId(r.cover_updated_at_by_book_id),
-      seriesLatestAddedAt: r.sort_added_at ? new Date(r.sort_added_at) : null,
+      seriesLatestAddedAt: r.sort_added_at ? parsePgTimestamptz(r.sort_added_at) : null,
       firstVolumeBookId: r.first_volume_book_id ?? null,
       latestVolumeBookId: r.latest_volume_book_id ?? null,
       firstUnreadBookId: r.first_unread_book_id ?? null,
@@ -1079,7 +1104,7 @@ export class BookRepository {
     const bookRefs = mappedRows.map((row) => ({ id: row.id, primaryFileId: row.primaryFileId ?? null }));
     const enrichment = await this.enrichBookIds(bookRefs, userId);
 
-    return { rows: mappedRows, ...enrichment, total };
+    return { rows: mappedRows, ...enrichment, total, bookTotal };
   }
 
   async findJumpBuckets(opts: {
@@ -1160,11 +1185,12 @@ export class BookRepository {
     userId: number;
     maxBuckets: number;
     customFieldTypes?: CustomMetadataFieldTypeMap;
+    randomSeed?: number;
   }): Promise<JumpBucketsResponse> {
     const source = collapsedDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
     const whereFragment = this.visibleWhere(opts.where);
-    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes);
+    const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
     const result = await this.db.execute<DiscreteJumpBucketRawRow>(
@@ -1447,16 +1473,19 @@ export class BookRepository {
       .select({
         id: bookFiles.id,
         absolutePath: bookFiles.absolutePath,
+        relPath: bookFiles.relPath,
         format: bookFiles.format,
         role: bookFiles.role,
         bookId: bookFiles.bookId,
         libraryId: books.libraryId,
+        libraryFolderPath: libraryFolders.path,
         fileHash: bookFiles.fileHash,
         sizeBytes: bookFiles.sizeBytes,
         durationSeconds: bookFiles.durationSeconds,
       })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
       .where(eq(bookFiles.id, fileId))
       .limit(1);
     return file ?? null;
@@ -1466,7 +1495,10 @@ export class BookRepository {
     await this.db.delete(bookFiles).where(eq(bookFiles.id, fileId));
   }
 
-  async updateBookFile(fileId: number, data: { format?: string | null; role?: string; absolutePath?: string; sizeBytes?: number }): Promise<void> {
+  async updateBookFile(
+    fileId: number,
+    data: { format?: string | null; role?: string; absolutePath?: string; relPath?: string | null; sizeBytes?: number },
+  ): Promise<void> {
     await this.db
       .update(bookFiles)
       .set({ ...data, updatedAt: new Date() })
@@ -1706,7 +1738,7 @@ export class BookRepository {
       .where(inArray(books.id, bookIds));
   }
 
-  async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<BookRecommendation[]> {
+  async findRecommendationTitlesByBookIds(bookIds: number[]): Promise<UnscopedBookRecommendation[]> {
     if (bookIds.length === 0) return [];
 
     const [rows, authorRows] = await Promise.all([
@@ -1753,7 +1785,7 @@ export class BookRepository {
   async findPatternMetadataByBookIds(bookIds: number[]): Promise<PatternMetadataRow[]> {
     if (bookIds.length === 0) return [];
 
-    const [metaRows, authorRows] = await Promise.all([
+    const [metaRows, authorRows, narratorRows] = await Promise.all([
       this.db
         .select({
           bookId: books.id,
@@ -1779,16 +1811,32 @@ export class BookRepository {
         .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
         .where(inArray(bookAuthors.bookId, bookIds))
         .orderBy(bookAuthors.displayOrder),
+      this.db
+        .select({ bookId: bookNarrators.bookId, name: narrators.name })
+        .from(bookNarrators)
+        .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+        .where(inArray(bookNarrators.bookId, bookIds))
+        .orderBy(bookNarrators.displayOrder),
     ]);
 
-    const authorsByBookId = new Map<number, string[]>();
-    for (const row of authorRows) {
-      const list = authorsByBookId.get(row.bookId) ?? [];
-      list.push(row.name);
-      authorsByBookId.set(row.bookId, list);
-    }
+    const groupByBookId = (rows: { bookId: number; name: string }[]): Map<number, string[]> => {
+      const byBookId = new Map<number, string[]>();
+      for (const row of rows) {
+        const list = byBookId.get(row.bookId) ?? [];
+        list.push(row.name);
+        byBookId.set(row.bookId, list);
+      }
+      return byBookId;
+    };
 
-    return metaRows.map((row) => ({ ...row, authors: authorsByBookId.get(row.bookId) ?? [] }));
+    const authorsByBookId = groupByBookId(authorRows);
+    const narratorsByBookId = groupByBookId(narratorRows);
+
+    return metaRows.map((row) => ({
+      ...row,
+      authors: authorsByBookId.get(row.bookId) ?? [],
+      narrators: narratorsByBookId.get(row.bookId) ?? [],
+    }));
   }
 
   async findAllIds(): Promise<number[]> {
@@ -1865,6 +1913,66 @@ export class BookRepository {
 
   async deleteByIds(bookIds: number[]): Promise<void> {
     await this.db.delete(books).where(inArray(books.id, bookIds));
+  }
+
+  async deleteByIdsAndInvalidateScanState(bookIds: number[]): Promise<void> {
+    const uniqueBookIds = [...new Set(bookIds)].sort((a, b) => a - b);
+    if (uniqueBookIds.length === 0) return;
+
+    await this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ id: books.id, libraryFolderId: books.libraryFolderId, folderPath: books.folderPath })
+        .from(books)
+        .where(inArray(books.id, uniqueBookIds))
+        .orderBy(asc(books.id))
+        .for('update');
+      if (rows.length === 0) return;
+
+      const libraryFolderIds = [...new Set(rows.map((row) => row.libraryFolderId))].sort((a, b) => a - b);
+      await tx
+        .select({ id: libraryFolders.id })
+        .from(libraryFolders)
+        .where(inArray(libraryFolders.id, libraryFolderIds))
+        .orderBy(asc(libraryFolders.id))
+        .for('update');
+
+      await tx
+        .update(libraryFolders)
+        .set({ scanStateVersion: sql`${libraryFolders.scanStateVersion} + 1` })
+        .where(inArray(libraryFolders.id, libraryFolderIds));
+
+      const pathsByLibraryFolder = new Map<number, Set<string>>();
+      for (const row of rows) {
+        let paths = pathsByLibraryFolder.get(row.libraryFolderId);
+        if (!paths) {
+          paths = new Set<string>();
+          pathsByLibraryFolder.set(row.libraryFolderId, paths);
+        }
+        for (const path of scanStateInvalidationPaths(row.folderPath)) paths.add(path);
+      }
+
+      const chunkSize = 500;
+      for (const [libraryFolderId, paths] of pathsByLibraryFolder) {
+        const pathList = [...paths];
+        for (let offset = 0; offset < pathList.length; offset += chunkSize) {
+          await tx
+            .delete(schema.libraryDirScanState)
+            .where(
+              and(
+                eq(schema.libraryDirScanState.libraryFolderId, libraryFolderId),
+                inArray(schema.libraryDirScanState.dirPath, pathList.slice(offset, offset + chunkSize)),
+              ),
+            );
+        }
+      }
+
+      await tx.delete(books).where(
+        inArray(
+          books.id,
+          rows.map((row) => row.id),
+        ),
+      );
+    });
   }
 
   async bulkSetRating(bookIds: number[], rating: number | null, userId: number): Promise<void> {
@@ -2325,28 +2433,6 @@ export class BookRepository {
         AND sb.pending_delete = false
         AND sb.removed_by_device = false
     `);
-  }
-
-  async findAudioProgress(userId: number, bookId: number) {
-    const [row] = await this.db
-      .select()
-      .from(audiobookProgress)
-      .where(and(eq(audiobookProgress.userId, userId), eq(audiobookProgress.bookId, bookId)))
-      .limit(1);
-    return row ?? null;
-  }
-
-  async upsertAudioProgress(userId: number, bookId: number, currentFileId: number, positionSeconds: number, percentage: number) {
-    const now = new Date();
-    const [row] = await this.db
-      .insert(audiobookProgress)
-      .values({ userId, bookId, currentFileId, positionSeconds, percentage, updatedAt: now })
-      .onConflictDoUpdate({
-        target: [audiobookProgress.userId, audiobookProgress.bookId],
-        set: { currentFileId, positionSeconds, percentage, updatedAt: now },
-      })
-      .returning();
-    return row;
   }
 
   private clampProgressPercentage(value: number): number {

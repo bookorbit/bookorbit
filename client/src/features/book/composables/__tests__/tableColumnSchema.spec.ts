@@ -149,7 +149,7 @@ describe('tableColumnSchema', () => {
     const book = makeBook({
       title: 'Dune',
       seriesName: 'Dune Series',
-      seriesIndex: 1,
+      seriesIndex: '1',
       publishedDate: '1965-08-01',
       publishedYear: 1965,
       language: 'en',
@@ -187,9 +187,9 @@ describe('tableColumnSchema', () => {
   })
 
   it('seriesIndex accessor returns the series index', () => {
-    const book = makeBook({ seriesIndex: 2 })
+    const book = makeBook({ seriesIndex: '2' })
     const def = COLUMN_DEFS.find((c) => c.id === 'seriesIndex')!
-    expect(def.accessor!(book)).toBe(2)
+    expect(def.accessor!(book)).toBe('2')
   })
 
   it('publishedDate column uses the published year lock and full date sort field', () => {
@@ -213,7 +213,23 @@ describe('tableColumnSchema', () => {
       readStatus: { status: 'read', source: 'manual', startedAt: null, finishedAt: '2025-06-01T00:00:00Z', updatedAt: '2025-06-01T00:00:00Z' },
     })
     const def = COLUMN_DEFS.find((c) => c.id === 'finishedAt')!
-    expect(def.accessor!(book)).toBe('2025-06-01T00:00:00Z')
+    expect(def.accessor!(book)).toBe('2025-06-01')
+  })
+
+  it('finishedAt accessor keeps a projected UTC-midnight date west of UTC', () => {
+    const originalTimeZone = process.env.TZ
+    process.env.TZ = 'America/Sao_Paulo'
+    try {
+      const book = makeBook({
+        readStatus: { status: 'read', source: 'auto', startedAt: null, finishedAt: '2025-06-01T00:00:00.000Z', updatedAt: '2025-06-01T00:00:00Z' },
+      })
+      const def = COLUMN_DEFS.find((c) => c.id === 'finishedAt')!
+
+      expect(new Date('2025-06-01T00:00:00.000Z').getDate()).toBe(31)
+      expect(def.accessor!(book)).toBe('2025-06-01')
+    } finally {
+      process.env.TZ = originalTimeZone
+    }
   })
 
   it('finishedAt accessor returns null when readStatus is null', () => {

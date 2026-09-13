@@ -1,0 +1,4 @@
+DROP INDEX "annotations_user_created_active_idx";--> statement-breakpoint
+ALTER TABLE "annotations" ADD COLUMN "source_created_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "annotations_user_book_created_active_idx" ON "annotations" USING btree ("user_id","book_id",coalesce("source_created_at", "created_at") desc,"id" DESC NULLS LAST) WHERE "annotations"."deleted_at" is null;--> statement-breakpoint
+CREATE INDEX "annotations_user_created_active_idx" ON "annotations" USING btree ("user_id",coalesce("source_created_at", "created_at") desc,"id" DESC NULLS LAST) WHERE "annotations"."deleted_at" is null;

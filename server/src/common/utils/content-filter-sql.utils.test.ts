@@ -1,5 +1,6 @@
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...clauses: unknown[]) => ({ type: 'and', clauses })),
+  eq: vi.fn((left: unknown, right: unknown) => ({ type: 'eq', left, right })),
   or: vi.fn((...clauses: unknown[]) => ({ type: 'or', clauses })),
   inArray: vi.fn((left: unknown, right: unknown) => ({ type: 'inArray', left, right })),
   exists: vi.fn((subquery: unknown) => ({ type: 'exists', subquery })),
@@ -101,5 +102,15 @@ describe('buildContentFilterClauses', () => {
 
     expect(clauses).toHaveLength(2);
     expect(clauses.map((c) => (c as { type: string }).type)).toEqual(['notExists', 'notExists']);
+  });
+
+  it('exempts books fulfilled for either the requester or a subscriber', () => {
+    const { db, where } = makeDb();
+
+    const clauses = buildContentFilterClauses({ ...EMPTY_CONTENT_FILTER_RULES, includeTagIds: [1], exemptRequestsFromUserId: 7 }, db as any);
+
+    expect(clauses).toHaveLength(1);
+    expect(clauses[0]).toMatchObject({ type: 'or' });
+    expect(where).toHaveBeenCalledTimes(4);
   });
 });

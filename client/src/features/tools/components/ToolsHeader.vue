@@ -24,6 +24,7 @@ const sections = computed<ToolSection[]>(() => {
 
   if (hasPermission('library_delete_books')) {
     result.push({ label: t('tools.header.duplicateBooks'), routeName: 'tools-duplicate-books' })
+    result.push({ label: t('tools.header.missingResources'), routeName: 'tools-missing-resources' })
   }
 
   return result

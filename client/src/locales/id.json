@@ -1,1 +1,109 @@
-{}
+{
+  "common": {
+    "resetSortAria": "Kembalikan urutan ke pengaturan awal",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "delete": "Hapus",
+    "edit": "Sunting",
+    "close": "Tutup",
+    "confirm": "Konfirmasi",
+    "loading": "Memuat...",
+    "search": "Cari",
+    "back": "Kembali",
+    "next": "Berikutnya",
+    "previous": "Sebelumnya",
+    "retry": "Coba Lagi",
+    "yes": "Ya",
+    "no": "Tidak",
+    "show": "Tampilkan",
+    "hide": "Sembunyikan"
+  },
+  "settings": {
+    "privacySharing": {
+      "title": "Privasi & Berbagi",
+      "subtitle": "Atur apakah administrator dapat melihat ringkasan aktivitas membaca Anda yang memuat informasi identitas.",
+      "levelLegend": "Tingkat berbagi wawasan bacaan",
+      "current": "Pengaturan saat ini",
+      "levels": {
+        "private": {
+          "title": "Pribadi",
+          "description": "Hanya Anda yang dapat melihat statistik membaca Anda."
+        },
+        "summary": {
+          "title": "Bagikan ringkasan",
+          "description": "Bagikan data kebiasaan secara agregat tanpa menyertakan judul buku, penulis, seri, atau narator."
+        },
+        "detailed": {
+          "title": "Bagikan wawasan terperinci",
+          "description": "Bagikan juga buku, penulis, seri, genre, dan narator terbaru dan terpilih."
+        }
+      },
+      "fields": {
+        "frequency": "Frekuensi membaca dan hari aktif",
+        "completion": "Total buku yang mulai dibaca dan diselesaikan",
+        "formats": "Distribusi format",
+        "genres": "Distribusi genre umum",
+        "trend": "Trend bacaan agregat",
+        "books": "Judul-judul buku yang sedang dibaca, terbaru, dan paling banyak dibaca",
+        "authors": "Penulis terpilih",
+        "series": "Seri terpilih",
+        "narrators": "Narator terpilih"
+      },
+      "confirm": {
+        "shareTitle": "Aktifkan {level}?",
+        "shareDescription": "Administrator yang memiliki ijin akan dapat melihat informasi berikut.",
+        "stopTitle": "Berhenti membagikan wawasan bacaan?",
+        "stopDescription": "Akses administrator akan segera diblokir. Catatan akses yang sudah ada tetap ada dalam riwayat Anda."
+      },
+      "preview": {
+        "title": "Pratinjau profil yang Anda bagikan",
+        "action": "Muat pratinjau",
+        "readingTime": "Waktu baca",
+        "activeDays": "Hari aktif",
+        "started": "Buku yang mulai dibaca",
+        "completed": "Buku yang selesai dibaca",
+        "topBooks": "Buku pilihan"
+      },
+      "history": {
+        "title": "Riwayat akses profil"
+      },
+      "unknownTitle": "Buku tanpa judul",
+      "errors": {
+        "save": "Gagal memperbarui pengaturan berbagi."
+      }
+    },
+    "appearance": {
+      "language": {
+        "title": "Bahasa",
+        "label": "Bahasa"
+      },
+      "pageTitle": "Tampilan",
+      "themeMode": {
+        "light": "Cerah",
+        "dark": "Gelap",
+        "system": "Sistem"
+      },
+      "theme": {
+        "title": "Tema",
+        "colorScheme": {
+          "label": "Skema warna",
+          "hint": "Antarmuka cerah atau gelap"
+        },
+        "accents": {
+          "grey": "Abu-abu",
+          "scarlet": "Kirmizi",
+          "vermilion": "Merah terang",
+          "rose": "Merah muda",
+          "copper": "Tembaga",
+          "orange": "Jingga",
+          "chartreuse": "Hijau kekuningan",
+          "yellow": "Kuning",
+          "green": "Hijau",
+          "purple": "Ungu",
+          "blue": "Biru",
+          "indigo": "Indigo"
+        }
+      }
+    }
+  }
+}

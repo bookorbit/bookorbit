@@ -28,6 +28,7 @@ const mockVolume = {
   name: 'Batman',
   start_year: '2016',
   count_of_issues: 50,
+  publisher: { id: 10, name: 'DC Comics' },
 };
 
 const mockIssue = {
@@ -59,6 +60,7 @@ describe('ComicVineProvider', () => {
             searchIssuesInVolume: vi.fn().mockResolvedValue([]),
             searchIssues: vi.fn().mockResolvedValue([]),
             getIssueById: vi.fn().mockResolvedValue(null),
+            getVolumeById: vi.fn().mockResolvedValue(null),
             windowResetMs: vi.fn().mockReturnValue(0),
           },
         },
@@ -137,6 +139,8 @@ describe('ComicVineProvider', () => {
       expect(client.searchVolumes).toHaveBeenCalledWith('Batman', 'test-key', expect.any(AbortSignal));
       expect(client.searchIssuesInVolume).toHaveBeenCalledWith(mockVolume.id, '1', 'test-key', expect.any(AbortSignal));
       expect(results).toHaveLength(1);
+      expect(results[0]?.publisher).toBe('DC Comics');
+      expect(client.getVolumeById).not.toHaveBeenCalled();
     });
 
     it('falls back to the stored series when the title is a bare issue name', async () => {
@@ -301,6 +305,50 @@ describe('ComicVineProvider', () => {
       expect(client.searchVolumes).not.toHaveBeenCalled();
     });
 
+    it('fetches the linked volume and maps its publisher', async () => {
+      vi.mocked(client.searchIssues).mockResolvedValue([mockIssue]);
+      vi.mocked(client.getVolumeById).mockResolvedValue(mockVolume);
+
+      const results = await provider.search({ title: 'Batman' });
+
+      expect(client.getVolumeById).toHaveBeenCalledWith(mockIssue.volume.id, 'test-key', expect.any(AbortSignal));
+      expect(results[0]?.publisher).toBe('DC Comics');
+    });
+
+    it('looks up a shared volume only once per search', async () => {
+      const secondIssue = { ...mockIssue, id: 101, issue_number: '2' };
+      vi.mocked(client.searchIssues).mockResolvedValue([mockIssue, secondIssue]);
+      vi.mocked(client.getVolumeById).mockResolvedValue(mockVolume);
+
+      const results = await provider.search({ title: 'Batman' });
+
+      expect(client.getVolumeById).toHaveBeenCalledTimes(1);
+      expect(results.map((candidate) => candidate.publisher)).toEqual(['DC Comics', 'DC Comics']);
+    });
+
+    it('keeps the candidate when the linked volume cannot be loaded', async () => {
+      vi.mocked(client.searchIssues).mockResolvedValue([mockIssue]);
+      vi.mocked(client.getVolumeById).mockResolvedValue(null);
+
+      const results = await provider.search({ title: 'Batman' });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]?.publisher).toBeUndefined();
+    });
+
+    it('keeps all candidates and stops enriching after a volume lookup is throttled', async () => {
+      const secondIssue = { ...mockIssue, id: 101, volume: { id: 2, name: 'Detective Comics' } };
+      vi.mocked(client.searchIssues).mockResolvedValue([mockIssue, secondIssue]);
+      vi.mocked(client.getVolumeById).mockRejectedValueOnce(new ProviderThrottleError());
+      vi.mocked(client.windowResetMs).mockReturnValue(61_000);
+
+      const results = await provider.search({ title: 'Batman' });
+
+      expect(results).toHaveLength(2);
+      expect(client.getVolumeById).toHaveBeenCalledTimes(1);
+      expect(throttleTracker.record).toHaveBeenCalledWith(MetadataProviderKey.COMICVINE, 61);
+    });
+
     it('returns empty array when searchIssues returns nothing', async () => {
       vi.spyOn(client, 'searchIssues').mockResolvedValue([]);
 
@@ -396,11 +444,13 @@ describe('ComicVineProvider', () => {
 
     it('returns mapped candidate when issue is found', async () => {
       vi.spyOn(client, 'getIssueById').mockResolvedValue(mockIssue);
+      vi.spyOn(client, 'getVolumeById').mockResolvedValue(mockVolume);
 
       const result = await provider.lookupById('100');
 
       expect(client.getIssueById).toHaveBeenCalledWith('100', 'test-key');
-      expect(result).not.toBeNull();
+      expect(client.getVolumeById).toHaveBeenCalledWith(mockIssue.volume.id, 'test-key');
+      expect(result?.publisher).toBe('DC Comics');
     });
 
     it('returns null when issue is not found', async () => {
@@ -417,6 +467,37 @@ describe('ComicVineProvider', () => {
 
       expect(result).toBeNull();
       expect(throttleTracker.record).toHaveBeenCalledWith(MetadataProviderKey.COMICVINE, 3600);
+    });
+
+    it('keeps the issue candidate when volume enrichment is throttled', async () => {
+      vi.mocked(client.getIssueById).mockResolvedValue(mockIssue);
+      vi.mocked(client.getVolumeById).mockRejectedValue(new ProviderThrottleError());
+      vi.mocked(client.windowResetMs).mockReturnValue(62_000);
+
+      const result = await provider.lookupById('100');
+
+      expect(result?.providerId).toBe('100');
+      expect(result?.publisher).toBeUndefined();
+      expect(throttleTracker.record).toHaveBeenCalledWith(MetadataProviderKey.COMICVINE, 62);
+    });
+
+    it('keeps the issue candidate when the volume does not exist', async () => {
+      vi.mocked(client.getIssueById).mockResolvedValue(mockIssue);
+      vi.mocked(client.getVolumeById).mockResolvedValue(null);
+
+      const result = await provider.lookupById('100');
+
+      expect(result?.providerId).toBe('100');
+      expect(result?.publisher).toBeUndefined();
+    });
+
+    it('does not request a malformed volume id from an external payload', async () => {
+      vi.mocked(client.getIssueById).mockResolvedValue({ ...mockIssue, volume: { id: Number.NaN, name: 'Batman' } });
+
+      const result = await provider.lookupById('100');
+
+      expect(result?.providerId).toBe('100');
+      expect(client.getVolumeById).not.toHaveBeenCalled();
     });
 
     it('rethrows non-throttle errors', async () => {

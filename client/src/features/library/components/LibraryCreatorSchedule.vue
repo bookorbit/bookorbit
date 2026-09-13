@@ -2,11 +2,11 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Eye } from '@lucide/vue'
-import cronstrue from 'cronstrue'
 import { isFiveFieldCronExpression } from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { parseCronToHuman } from '@/features/library/utils/cron'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   watch: boolean
@@ -70,11 +70,8 @@ function humanReadableCron(cron: string | null): string {
     '0 0 * * 1': t('library.creator.schedule.human.weeklyMonday'),
   }
   if (map[cron]) return map[cron]
-  try {
-    return cronstrue.toString(cron)
-  } catch {
-    return t('library.creator.schedule.human.invalid')
-  }
+  const description = parseCronToHuman(cron, locale.value)
+  return !description || description === cron ? t('library.creator.schedule.human.invalid') : description
 }
 </script>
 

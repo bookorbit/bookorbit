@@ -1,7 +1,8 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class OidcUnlinkDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  password: string;
+  password?: string;
 }

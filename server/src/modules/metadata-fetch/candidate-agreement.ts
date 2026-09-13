@@ -3,7 +3,7 @@ import { MetadataCandidate } from '@bookorbit/types';
 import { matchableTitle, scoreCandidate } from './candidate-relevance';
 import { candidateHasNormalizedIsbn, candidatesShareIsbn, normalizeMetadataIsbn } from './isbn-match';
 import { MetadataSearchParams } from './providers/metadata-search-params';
-import { scoreTitleMatch, shareSignificantToken } from './title-match';
+import { scoreTitleMatch, shareSignificantToken } from '../../common/text-match/title-match';
 
 /**
  * How closely two providers' titles must match before their records are treated as the same book.

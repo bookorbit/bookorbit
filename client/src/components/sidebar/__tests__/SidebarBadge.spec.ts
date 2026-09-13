@@ -11,4 +11,16 @@ describe('SidebarBadge', () => {
 
     expect(wrapper.get('span').classes()).toContain('group-data-[collapsible=icon]:hidden')
   })
+
+  it('exposes the meaning of a count as an accessible label and hover title', () => {
+    const wrapper = mount(SidebarBadge, {
+      props: { label: '2 active requests across all users' },
+      slots: { default: '2' },
+    })
+
+    expect(wrapper.get('span').attributes()).toMatchObject({
+      'aria-label': '2 active requests across all users',
+      title: '2 active requests across all users',
+    })
+  })
 })

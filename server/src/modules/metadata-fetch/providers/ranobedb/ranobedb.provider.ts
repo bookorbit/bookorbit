@@ -4,6 +4,7 @@ import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { IdentifiableProvider } from '../metadata-provider';
 import { MetadataSearchParams } from '../metadata-search-params';
+import { rethrowWithPartialCandidates } from '../provider-utils';
 import { RanobeDbClient } from './ranobedb.client';
 import { mapRanobeDbBook } from './ranobedb.mapper';
 
@@ -32,11 +33,15 @@ export class RanobeDbProvider implements IdentifiableProvider {
     if (ids.length === 0) return [];
 
     const candidates: MetadataCandidate[] = [];
-    for (const id of ids) {
-      const response = await this.client.fetchBook(id, params.signal);
-      if (!response) continue;
-      const candidate = mapRanobeDbBook(response.book);
-      if (candidate) candidates.push(candidate);
+    try {
+      for (const id of ids) {
+        const response = await this.client.fetchBook(id, params.signal);
+        if (!response) continue;
+        const candidate = mapRanobeDbBook(response.book);
+        if (candidate) candidates.push(candidate);
+      }
+    } catch (err) {
+      rethrowWithPartialCandidates(err, candidates);
     }
     return candidates;
   }

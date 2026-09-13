@@ -90,11 +90,23 @@ describe('Kobo scraper', () => {
       isbn10: undefined,
       isbn13: '9781649374042',
       seriesName: 'The Empyrean',
-      seriesIndex: 1,
+      seriesIndex: '1',
       genres: ['Fantasy', 'Romance'],
       coverUrl: 'https://cdn.kobo.com/book-images/44f0/1650/2200/100/False/cover.jpg',
       sourceUrl: 'https://www.kobo.com/us/en/ebook/fourth-wing-1',
     });
+  });
+
+  it('preserves trailing zeros in a fractional series position', () => {
+    const html = `
+      <h1 class="title product-field">A Book</h1>
+      <span class="series product-field">
+        <span class="sequenced-name-prefix">Book 5.10 - </span>
+        <span class="product-sequence-field"><a>A Series</a></span>
+      </span>
+    `;
+
+    expect(parseKoboBookPage(html).seriesIndex).toBe('5.10');
   });
 
   it('parses visible subtitle and page stats from the current Kobo layout', () => {

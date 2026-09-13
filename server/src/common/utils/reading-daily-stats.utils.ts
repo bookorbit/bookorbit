@@ -98,6 +98,34 @@ export function splitReadingSessionByDay(session: ReadingSessionDailyStatsInput,
     .filter((segment) => segment.readingSeconds > 0);
 }
 
+/**
+ * Folds day segments into a running total. Split out from the aggregate below because a
+ * rebuild that pages through a user's whole history has to accumulate across batches, which
+ * a single call over one in-memory array cannot express.
+ */
+export function mergeReadingDailyStatsSegments(
+  into: Map<string, ReadingDailyStatsSegment>,
+  segments: readonly ReadingDailyStatsSegment[],
+  days?: Set<string>,
+): Map<string, ReadingDailyStatsSegment> {
+  for (const segment of segments) {
+    if (days && !days.has(segment.day)) continue;
+    const existing = into.get(segment.day);
+    if (existing) {
+      existing.readingSeconds += segment.readingSeconds;
+      existing.progressDelta += segment.progressDelta;
+      existing.sessionsCount += segment.sessionsCount;
+    } else {
+      into.set(segment.day, { ...segment });
+    }
+  }
+  return into;
+}
+
+export function sortReadingDailyStatsSegments(byDay: Map<string, ReadingDailyStatsSegment>): ReadingDailyStatsSegment[] {
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
 export function aggregateReadingSessionDailyStats(
   sessions: ReadingSessionDailyStatsInput[],
   timeZone: string,
@@ -105,17 +133,7 @@ export function aggregateReadingSessionDailyStats(
 ): ReadingDailyStatsSegment[] {
   const byDay = new Map<string, ReadingDailyStatsSegment>();
   for (const session of sessions) {
-    for (const segment of splitReadingSessionByDay(session, timeZone)) {
-      if (days && !days.has(segment.day)) continue;
-      const existing = byDay.get(segment.day);
-      if (existing) {
-        existing.readingSeconds += segment.readingSeconds;
-        existing.progressDelta += segment.progressDelta;
-        existing.sessionsCount += segment.sessionsCount;
-      } else {
-        byDay.set(segment.day, { ...segment });
-      }
-    }
+    mergeReadingDailyStatsSegments(byDay, splitReadingSessionByDay(session, timeZone), days);
   }
-  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+  return sortReadingDailyStatsSegments(byDay);
 }

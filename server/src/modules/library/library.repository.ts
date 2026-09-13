@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, getTableColumns, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, gt, lte, getTableColumns, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { AccessLevel, ContentFilterRules } from '@bookorbit/types';
+import type { AccessLevel, ContentFilterRules, LibraryStats } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
+import { MIN_VALID_FILE_TIME_MS } from '../../common/utils/file-time.utils';
 import * as schema from '../../db/schema';
 import { bookFiles, books, libraryFolders, libraries } from '../../db/schema';
 import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
@@ -176,6 +177,141 @@ export class LibraryRepository {
       totalSizeBytes: toSafeNumber(totalSizeBytes),
       formatCounts,
     };
+  }
+
+  /**
+   * The same aggregates as getStats, for many libraries in two round trips instead of two per
+   * library. Book counts come from books alone so titles with no primary file still count, while
+   * sizes and formats need the bookFiles join.
+   */
+  async getStatsForLibraries(libraryIds: number[]) {
+    if (libraryIds.length === 0) return new Map<number, LibraryStats>();
+
+    const [countRows, formatRows] = await Promise.all([
+      this.db
+        .select({ libraryId: books.libraryId, count: sql<number>`count(*)::int` })
+        .from(books)
+        .where(and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
+        .groupBy(books.libraryId),
+      this.db
+        .select({
+          libraryId: books.libraryId,
+          format: bookFiles.format,
+          count: sql<number>`count(*)::int`,
+          totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint`,
+        })
+        .from(books)
+        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+        .where(and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
+        .groupBy(books.libraryId, bookFiles.format),
+    ]);
+
+    const sizeByLibrary = new Map<number, bigint>();
+    const formatsByLibrary = new Map<number, Record<string, number>>();
+    for (const row of formatRows) {
+      sizeByLibrary.set(row.libraryId, (sizeByLibrary.get(row.libraryId) ?? 0n) + toBigInt(row.totalSize));
+      if (!row.format) continue;
+      const formats = formatsByLibrary.get(row.libraryId);
+      if (formats) formats[row.format] = row.count;
+      else formatsByLibrary.set(row.libraryId, { [row.format]: row.count });
+    }
+
+    const countByLibrary = new Map(countRows.map((row) => [row.libraryId, row.count]));
+    const stats = new Map<number, LibraryStats>();
+    for (const libraryId of libraryIds) {
+      stats.set(libraryId, {
+        totalBooks: countByLibrary.get(libraryId) ?? 0,
+        totalSizeBytes: toSafeNumber(sizeByLibrary.get(libraryId) ?? 0n),
+        formatCounts: formatsByLibrary.get(libraryId) ?? {},
+      });
+    }
+    return stats;
+  }
+
+  /**
+   * Which of these users can open this library, answered in one query rather than one per user.
+   *
+   * A superuser holds no row in the access table and reaches every library anyway, so the flag is
+   * read alongside the grants: filtering on grants alone would report an administrator as having
+   * access to nothing.
+   */
+  findUserIdsWithAccess(libraryId: number, userIds: number[]) {
+    return this.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .leftJoin(
+        schema.userLibraryAccess,
+        and(eq(schema.userLibraryAccess.userId, schema.users.id), eq(schema.userLibraryAccess.libraryId, libraryId)),
+      )
+      .where(and(inArray(schema.users.id, userIds), or(eq(schema.users.isSuperuser, true), isNotNull(schema.userLibraryAccess.userId))));
+  }
+
+  async getAddedAtRecomputeBounds(libraryId: number) {
+    const [row] = await this.db
+      .select({
+        total: sql<number>`count(*)::int`,
+        maxId: sql<number>`coalesce(max(${books.id}), 0)::int`,
+      })
+      .from(books)
+      .where(eq(books.libraryId, libraryId));
+    return row ?? { total: 0, maxId: 0 };
+  }
+
+  findAddedAtBookBatch(libraryId: number, afterId: number, maxId: number, limit: number) {
+    return this.db
+      .select({ id: books.id, addedAt: books.addedAt, previousAddedAt: sql<string>`${books.addedAt}::text` })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), gt(books.id, afterId), lte(books.id, maxId)))
+      .orderBy(books.id)
+      .limit(limit);
+  }
+
+  findAddedAtMtimes(libraryId: number, bookIds: number[]) {
+    return this.db
+      .select({ bookId: bookFiles.bookId, mtime: sql<Date>`min(${bookFiles.mtime})`.mapWith(bookFiles.mtime) })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .where(
+        and(
+          eq(books.libraryId, libraryId),
+          inArray(books.id, bookIds),
+          eq(bookFiles.role, 'content'),
+          gt(bookFiles.mtime, new Date(MIN_VALID_FILE_TIME_MS)),
+        ),
+      )
+      .groupBy(bookFiles.bookId);
+  }
+
+  findAddedAtFileBatch(libraryId: number, bookIds: number[], afterId: number, limit: number) {
+    return this.db
+      .select({
+        id: bookFiles.id,
+        bookId: bookFiles.bookId,
+        absolutePath: bookFiles.absolutePath,
+        mtime: bookFiles.mtime,
+        rootPath: libraryFolders.path,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, books.libraryFolderId))
+      .where(and(eq(books.libraryId, libraryId), inArray(books.id, bookIds), eq(bookFiles.role, 'content'), gt(bookFiles.id, afterId)))
+      .orderBy(bookFiles.id)
+      .limit(limit);
+  }
+
+  async updateAddedAtBatch(libraryId: number, values: { id: number; addedAt: Date; previousAddedAt: string }[]): Promise<number[]> {
+    if (values.length === 0) return [];
+    const rows = sql.join(
+      values.map(({ id, addedAt, previousAddedAt }) => sql`(${id}::int, ${addedAt.toISOString()}::timestamptz, ${previousAddedAt}::timestamptz)`),
+      sql`, `,
+    );
+    const result = await this.db
+      .update(books)
+      .set({ addedAt: sql`dates.added_at`, updatedAt: new Date() })
+      .from(sql`(values ${rows}) as dates(id, added_at, previous_added_at)`)
+      .where(and(eq(books.libraryId, libraryId), sql`${books.id} = dates.id`, sql`${books.addedAt} = dates.previous_added_at`))
+      .returning({ id: books.id });
+    return result.map(({ id }) => id);
   }
 
   async hasUserAccess(userId: number, libraryId: number): Promise<boolean> {

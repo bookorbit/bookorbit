@@ -10,10 +10,12 @@ import {
   bookFiles,
   bookMetadata,
   bookMoveJobs,
+  bookNarrators,
   books,
   koboDevices,
   libraries,
   libraryFolders,
+  narrators,
   userLibraryAccess,
   users,
 } from '../../db/schema';
@@ -50,9 +52,10 @@ export interface MoveBookData {
     isbn13: string | null;
     publishedYear: number | null;
     seriesName: string | null;
-    seriesIndex: number | null;
+    seriesIndex: string | null;
   };
   authors: string[];
+  narrators: string[];
   files: MoveBookFile[];
 }
 
@@ -163,12 +166,20 @@ export class BookMoveRepository {
         .where(inArray(bookFiles.bookId, batchIds))
         .orderBy(asc(bookFiles.id));
 
-      const authorRows = await this.db
-        .select({ bookId: bookAuthors.bookId, name: authors.name })
-        .from(bookAuthors)
-        .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
-        .where(inArray(bookAuthors.bookId, batchIds))
-        .orderBy(asc(bookAuthors.displayOrder));
+      const [authorRows, narratorRows] = await Promise.all([
+        this.db
+          .select({ bookId: bookAuthors.bookId, name: authors.name })
+          .from(bookAuthors)
+          .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+          .where(inArray(bookAuthors.bookId, batchIds))
+          .orderBy(asc(bookAuthors.displayOrder)),
+        this.db
+          .select({ bookId: bookNarrators.bookId, name: narrators.name })
+          .from(bookNarrators)
+          .innerJoin(narrators, eq(narrators.id, bookNarrators.narratorId))
+          .where(inArray(bookNarrators.bookId, batchIds))
+          .orderBy(asc(bookNarrators.displayOrder)),
+      ]);
 
       const filesByBook = new Map<number, MoveBookFile[]>();
       for (const file of fileRows) {
@@ -193,6 +204,13 @@ export class BookMoveRepository {
         else authorsByBook.set(author.bookId, [author.name]);
       }
 
+      const narratorsByBook = new Map<number, string[]>();
+      for (const narrator of narratorRows) {
+        const list = narratorsByBook.get(narrator.bookId);
+        if (list) list.push(narrator.name);
+        else narratorsByBook.set(narrator.bookId, [narrator.name]);
+      }
+
       for (const row of bookRows) {
         rows.push({
           bookId: row.bookId,
@@ -215,6 +233,7 @@ export class BookMoveRepository {
             seriesIndex: row.seriesIndex,
           },
           authors: authorsByBook.get(row.bookId) ?? [],
+          narrators: narratorsByBook.get(row.bookId) ?? [],
           files: filesByBook.get(row.bookId) ?? [],
         });
       }

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { basename, extname, join } from 'path';
+import { basename, dirname, extname, join, relative, sep } from 'path';
 import { mkdir, realpath, stat } from 'fs/promises';
 import { Readable } from 'stream';
 
@@ -11,6 +11,9 @@ import { SUPPORTED_BOOK_FORMATS, UploadValidatorService } from '../upload/upload
 import { UploadStorageService } from '../upload/upload-storage.service';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { MetadataFetchPipeline } from '../metadata-fetch/metadata-fetch-pipeline';
+import { interpretRelease } from '../scanner/lib/release-plan';
+import { buildSingleBookCandidate } from '../scanner/lib/walk';
+import { waitForDirectoryStability } from '../scanner/lib/stability';
 import { BookDockRepository } from './book-dock.repository';
 import { BookDockMetadataService } from './book-dock-metadata.service';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
@@ -31,6 +34,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
   private readonly logger = new Logger(BookDockIngestService.name);
   private bookDockPath: string;
   private readonly metadataQueue: BookDockWorkQueue;
+  private readonly forcedAutoFetchFileIds = new Set<number>();
 
   constructor(
     private readonly config: ConfigService,
@@ -111,6 +115,28 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     this.extractMetadataAsync(fileId, row.format, metadataQueuePriority(row));
   }
 
+  async refetchMetadata(fileId: number): Promise<boolean> {
+    const row = await this.repo.findById(fileId);
+    if (!row || (row.status !== 'ready' && row.status !== 'error')) return false;
+
+    const format = resolveSupportedFormat(row);
+    if (!format) return false;
+
+    this.forcedAutoFetchFileIds.add(fileId);
+    const updated = await this.repo.update(fileId, { status: 'pending', errorMessage: null });
+    if (!updated) {
+      this.forcedAutoFetchFileIds.delete(fileId);
+      return false;
+    }
+
+    const queued = this.extractMetadataAsync(fileId, format, metadataQueuePriority(row));
+    if (!queued) {
+      this.forcedAutoFetchFileIds.delete(fileId);
+      await this.repo.update(fileId, { status: row.status, errorMessage: row.errorMessage });
+    }
+    return queued;
+  }
+
   async ingestFromWatchedFolder(absolutePath: string): Promise<number | null> {
     const existing = await this.repo.findByAbsolutePath(absolutePath);
     if (existing) {
@@ -142,10 +168,96 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     return row.id;
   }
 
-  private extractMetadataAsync(fileId: number, format: string, priority?: BookDockWorkPriority): void {
-    if (!isSupportedFormat(format)) return;
+  /** Group a settled book folder, retaining the child directories absorbed by disc/stem folding. */
+  async ingestUnitDirectory(unitDirectory: string): Promise<{ created: number; consumedDirectories: Set<string> }> {
+    const startedAt = Date.now();
+    const result = { created: 0, consumedDirectories: new Set<string>() };
+    if (await this.processingState.isPaused()) return result;
+    if ((await this.repo.findByUnitDirectory(unitDirectory))?.autoFinalizeSuppressed) return result;
+    let candidate = await buildSingleBookCandidate(unitDirectory, unitDirectory, [], (message) =>
+      this.logger.debug(`[book_dock.ingest_unit] ${sanitizeLogValue(message)}`),
+    );
+    if (!candidate) return result;
+
+    await waitForDirectoryStability(unitDirectory);
+    if (await this.processingState.isPaused()) return result;
+    const directoryOwner = await this.repo.findByUnitDirectory(unitDirectory);
+    if (directoryOwner?.autoFinalizeSuppressed) return result;
+    candidate = await buildSingleBookCandidate(unitDirectory, unitDirectory);
+    if (!candidate) return result;
+
+    for (const file of candidate.files) {
+      const directory = dirname(file.absolutePath);
+      if (directory !== unitDirectory) result.consumedDirectories.add(directory);
+    }
+    const byPath = new Map(candidate.files.map((file) => [file.absolutePath, file]));
+    const plan = interpretRelease(
+      candidate.files.map((file) => ({ path: relative(unitDirectory, file.absolutePath).split(sep).join('/'), sizeBytes: file.sizeBytes })),
+      { rootName: basename(unitDirectory) },
+    );
+
+    if (plan.truncated) {
+      this.logger.warn(
+        `[book_dock.ingest_unit] [fail] path="${sanitizeLogValue(unitDirectory)}" files=${candidate.files.length} durationMs=${Date.now() - startedAt} errorClass=ReleaseLimit error="folder exceeds release file limit" - no partial units imported`,
+      );
+      return result;
+    }
+    const claimedPaths = await this.repo.findClaimedPaths([...byPath.keys()]);
+    for (const unit of plan.units) {
+      if (await this.processingState.isPaused()) break;
+      // A parent candidate may already include these tracks via disc or stem folding. Do not
+      // rediscover them as separate books when recursion reaches the child directory.
+      if (unit.files.some((file) => file.role === 'content' && claimedPaths.has(join(unitDirectory, file.path)))) continue;
+      const primaryPath = join(unitDirectory, unit.primaryPath);
+
+      const primary = byPath.get(primaryPath);
+      if (!primary?.format || !SUPPORTED_BOOK_FORMATS.has(primary.format)) continue;
+
+      // A shared folder cannot have another exclusive owner. Membership remains recorded even
+      // without a directory claim, so placement and discard still handle the complete book.
+      const owned = plan.units.length === 1 && !directoryOwner;
+
+      const row = await this.repo.createUnit(
+        {
+          fileName: basename(primaryPath),
+          absolutePath: primaryPath,
+          fileSize: primary.sizeBytes,
+          format: primary.format,
+          unitDirectory: owned ? unitDirectory : null,
+          status: 'pending',
+        },
+        unit.files
+          .filter((file) => !claimedPaths.has(join(unitDirectory, file.path)))
+          .map((file) => {
+            const stat = byPath.get(join(unitDirectory, file.path));
+            return {
+              absolutePath: join(unitDirectory, file.path),
+              fileName: basename(file.path),
+              fileSize: stat?.sizeBytes ?? file.sizeBytes,
+              format: file.format,
+              role: file.role,
+              sortOrder: file.sortOrder,
+            };
+          }),
+      );
+
+      this.extractMetadataAsync(row.id, primary.format, metadataQueuePriority(row));
+      for (const file of unit.files) claimedPaths.add(join(unitDirectory, file.path));
+      result.created++;
+    }
+
+    if (result.created > 0) {
+      this.logger.log(
+        `[book_dock.ingest_unit] [end] path="${sanitizeLogValue(unitDirectory)}" units=${result.created} files=${candidate.files.length} durationMs=${Date.now() - startedAt} - folder ingested as units`,
+      );
+    }
+    return result;
+  }
+
+  private extractMetadataAsync(fileId: number, format: string, priority?: BookDockWorkPriority): boolean {
+    if (!isSupportedFormat(format)) return false;
     if (this.processingState.getCachedPaused()) this.metadataQueue.pause();
-    this.metadataQueue.enqueue(fileId, priority);
+    return this.metadataQueue.enqueue(fileId, priority);
   }
 
   pauseProcessing(): void {
@@ -195,19 +307,24 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       return;
     }
 
-    const row = await this.repo.findById(fileId);
-    if (!row || !PROCESSABLE_METADATA_STATUSES.has(row.status)) return;
+    const forceAutoFetch = this.forcedAutoFetchFileIds.has(fileId);
+    try {
+      const row = await this.repo.findById(fileId);
+      if (!row || !PROCESSABLE_METADATA_STATUSES.has(row.status)) return;
 
-    const format = resolveSupportedFormat(row);
-    if (!format) return;
+      const format = resolveSupportedFormat(row);
+      if (!format) return;
 
-    const coversDir = join(this.bookDockPath, 'covers');
-    await this.repo.update(fileId, { status: 'extracting' });
-    this.emitChange();
-    await this.metadataService.extractAndSave(fileId, row.absolutePath, format, coversDir);
-    await this.autoFetchMetadataAsync(fileId);
-    this.emitChange();
-    this.events.emit(BOOK_DOCK_FILE_INGESTED, fileId);
+      const coversDir = join(this.bookDockPath, 'covers');
+      await this.repo.update(fileId, { status: 'extracting' });
+      this.emitChange();
+      await this.metadataService.extractAndSave(fileId, row.absolutePath, format, coversDir);
+      await this.autoFetchMetadataAsync(fileId, forceAutoFetch);
+      this.emitChange();
+      this.events.emit(BOOK_DOCK_FILE_INGESTED, fileId);
+    } finally {
+      this.forcedAutoFetchFileIds.delete(fileId);
+    }
   }
 
   private logMetadataQueueFailure(fileId: number, err: unknown): void {
@@ -218,9 +335,11 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     );
   }
 
-  private async autoFetchMetadataAsync(fileId: number): Promise<void> {
-    const enabled = await this.appSettings.isBookDockAutoFetchEnabled();
-    if (!enabled) return;
+  private async autoFetchMetadataAsync(fileId: number, force = false): Promise<void> {
+    if (!force) {
+      const enabled = await this.appSettings.isBookDockAutoFetchEnabled();
+      if (!enabled) return;
+    }
 
     const row = await this.repo.findById(fileId);
     if (!row || row.status === 'error') return;
@@ -254,7 +373,14 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
               confidence: computeConfidence(row.embeddedMetadata ?? {}, fetched),
               fetchedMetadataSources,
             }
-          : { status: 'ready' as const };
+          : force
+            ? {
+                status: 'ready' as const,
+                fetchedMetadata: null,
+                confidence: null,
+                fetchedMetadataSources: null,
+              }
+            : { status: 'ready' as const };
       await this.repo.update(fileId, updates);
     } catch (err) {
       this.logger.warn(`Auto-fetch metadata failed for Book Dock file ${fileId}: ${err instanceof Error ? err.message : String(err)}`);

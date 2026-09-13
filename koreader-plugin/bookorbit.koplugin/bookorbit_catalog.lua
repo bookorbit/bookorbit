@@ -256,8 +256,13 @@ local Menu_onFirstPage = Menu.onFirstPage
 local Menu_onLastPage = Menu.onLastPage
 local Menu_onClose = Menu.onClose
 
+function BookOrbitCatalog:setApi(api)
+    self.api = api
+    self.client = BookOrbitApi.new(api)
+end
+
 function BookOrbitCatalog:init()
-    self.client = BookOrbitApi.new(self.api)
+    self:setApi(self.api)
     self.stack = {}
     self.settings = self.settings or {}
     CatalogWidgets.setAssetIconFiles({
@@ -832,7 +837,10 @@ function BookOrbitCatalog:showServerError(err)
 end
 
 function BookOrbitCatalog:errorText(err)
-    if isAuthError(err) then
+    local transfer_error = CatalogUtil.transferErrorText(err)
+    if transfer_error then
+        return transfer_error
+    elseif isAuthError(err) then
         return _("BookOrbit login failed. Check your KOReader credentials.")
     elseif type(err) == "number" then
         return T(_("BookOrbit server error (%1)."), err)

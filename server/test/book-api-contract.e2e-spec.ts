@@ -1,9 +1,13 @@
 import { randomUUID } from 'crypto';
-import { rm } from 'fs/promises';
+
+import { eq } from 'drizzle-orm';
+import { rm, stat } from 'fs/promises';
 import { join } from 'path';
 
 import * as unzipper from 'unzipper';
 import { Permission } from '@bookorbit/types';
+
+import { books } from '../src/db/schema/books';
 
 import {
   authHeader,
@@ -312,6 +316,33 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
       });
 
       expectError(invalidLimit, 400, 'limit must not be greater than 20');
+    });
+
+    it('filters books by the selected primary file size', async () => {
+      const primaryFileSize = (await stat(visibleEpub.absolutePath)).size;
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/books/query',
+        headers: authHeader(limitedUser.accessToken),
+        payload: {
+          filter: {
+            type: 'group',
+            join: 'AND',
+            rules: [
+              { type: 'rule', field: 'title', operator: 'eq', value: 'Alpha Contract EPUB' },
+              { type: 'rule', field: 'fileSize', operator: 'eq', value: primaryFileSize },
+            ],
+          },
+          sort: [{ field: 'title', dir: 'asc' }],
+          pagination: { page: 0, size: 10 },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        total: 1,
+        items: [{ id: visibleEpub.bookId, files: [{ id: visibleEpub.bookFileId, role: 'primary', sizeBytes: primaryFileSize }] }],
+      });
     });
   });
 
@@ -709,5 +740,44 @@ describe('Book API contract (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
 
       expectError(missingThumbnail, 404, `No thumbnail for book ${visibleEpub.bookId}`);
     });
+  });
+
+  describe('user-supplied added dates', () => {
+    // Issue #1143: an added date the user typed, such as year 0025, came back from Postgres
+    // as an Invalid Date, so serializing the card threw and every listing holding the book
+    // answered 500. These are the year bands the driver's own decoder gets wrong.
+    it.each(['0025-08-25', '0013-01-01', '0031-12-31', '0050-06-15', '0001-01-01'])(
+      'round-trips an added date of %s through storage and back into a listing',
+      async (addedAt) => {
+        const bookId = hiddenEpub.bookId;
+        const [original] = await ctx.db.select({ addedAt: books.addedAt }).from(books).where(eq(books.id, bookId));
+        const expected = `${addedAt}T00:00:00.000Z`;
+
+        try {
+          const update = await ctx.app.inject({
+            method: 'PATCH',
+            url: `/api/v1/books/${bookId}/added-at`,
+            headers: authHeader(ctx.adminToken),
+            payload: { addedAt },
+          });
+
+          expect(update.statusCode).toBe(200);
+          expect((update.json() as { addedAt: string | null }).addedAt).toBe(expected);
+
+          const listing = await ctx.app.inject({
+            method: 'POST',
+            url: '/api/v1/books/query',
+            headers: authHeader(ctx.adminToken),
+            payload: { pagination: { page: 0, size: 200 } },
+          });
+
+          expect(listing.statusCode).toBe(201);
+          const items = (listing.json() as { items: { id: number; addedAt: string }[] }).items;
+          expect(items.find((item) => item.id === bookId)?.addedAt).toBe(expected);
+        } finally {
+          await ctx.db.update(books).set({ addedAt: original!.addedAt }).where(eq(books.id, bookId));
+        }
+      },
+    );
   });
 });

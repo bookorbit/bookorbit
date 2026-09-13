@@ -42,7 +42,9 @@ function resolveAchievementToastPayload(item: NotificationItem): { name: string;
 }
 
 function requestNotifications(reset: boolean, markLoading: boolean): Promise<void> {
-  if (fetchPromise) return fetchPromise
+  if (fetchPromise) {
+    return reset ? fetchPromise.then(() => requestNotifications(true, markLoading)) : fetchPromise
+  }
   if (markLoading) loading.value = true
   if (reset) offset = 0
 
@@ -89,6 +91,7 @@ function getSocket(): Socket {
 
     socket.on('notification:new', (item: NotificationItem) => {
       notifications.value = [item, ...notifications.value]
+      offset = notifications.value.length
       total.value++
       unreadCount.value++
 
@@ -96,6 +99,26 @@ function getSocket(): Socket {
         const { name, rarity } = resolveAchievementToastPayload(item)
         showAchievementToast(name, rarity)
       }
+    })
+
+    // A collapsed occurrence: the row was already present and already counted, so neither the
+    // unread badge nor the page total may move. Re-sort by updatedAt so it surfaces.
+    socket.on('notification:updated', (item: NotificationItem) => {
+      const idx = notifications.value.findIndex((n) => n.id === item.id)
+      if (idx === -1) {
+        notifications.value = [item, ...notifications.value]
+        offset = notifications.value.length
+        return
+      }
+      const next = [...notifications.value]
+      next.splice(idx, 1)
+      notifications.value = [item, ...next]
+      offset = notifications.value.length
+    })
+
+    socket.on('notification:refresh', () => {
+      void requestNotifications(true, false)
+      void requestUnreadCount()
     })
 
     socket.on('notification:unread-count', (data: { count: number }) => {
@@ -111,6 +134,7 @@ function getSocket(): Socket {
 
     socket.on('notification:dismissed', (data: { id: number }) => {
       notifications.value = notifications.value.filter((n) => n.id !== data.id)
+      offset = notifications.value.length
       total.value = Math.max(0, total.value - 1)
     })
 
@@ -121,6 +145,7 @@ function getSocket(): Socket {
 
     socket.on('notification:cleared', () => {
       notifications.value = []
+      offset = 0
       total.value = 0
       unreadCount.value = 0
     })
@@ -207,17 +232,20 @@ export function useNotifications() {
     if (idx === -1) return
     const removed = notifications.value[idx]!
     notifications.value = notifications.value.filter((n) => n.id !== id)
+    offset = notifications.value.length
     total.value = Math.max(0, total.value - 1)
     if (!removed.read) unreadCount.value = Math.max(0, unreadCount.value - 1)
     try {
       const res = await api(`/api/v1/notifications/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         notifications.value.splice(idx, 0, removed)
+        offset = notifications.value.length
         total.value++
         if (!removed.read) unreadCount.value++
       }
     } catch {
       notifications.value.splice(idx, 0, removed)
+      offset = notifications.value.length
       total.value++
       if (!removed.read) unreadCount.value++
     }
@@ -228,17 +256,20 @@ export function useNotifications() {
     const previousTotal = total.value
     const previousUnread = unreadCount.value
     notifications.value = []
+    offset = 0
     total.value = 0
     unreadCount.value = 0
     try {
       const res = await api('/api/v1/notifications', { method: 'DELETE' })
       if (!res.ok) {
         notifications.value = previousNotifications
+        offset = notifications.value.length
         total.value = previousTotal
         unreadCount.value = previousUnread
       }
     } catch {
       notifications.value = previousNotifications
+      offset = notifications.value.length
       total.value = previousTotal
       unreadCount.value = previousUnread
     }

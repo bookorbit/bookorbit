@@ -33,6 +33,22 @@ describe('Library DTO validation', () => {
     ).toBe(false);
   });
 
+  it('CreateLibraryDto accepts every added_at source and rejects unknown ones', async () => {
+    for (const addedAtSource of ['imported', 'file_modified', 'file_created']) {
+      expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource }))).toBe(false);
+    }
+    expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource: 'bad' }))).toBe(true);
+  });
+
+  it('CreateLibraryDto survives the global whitelist rules with an added_at source', async () => {
+    // The library creator posts its whole form, and main.ts runs ValidationPipe with
+    // whitelist and forbidNonWhitelisted, so a field the DTO does not declare fails
+    // the whole request rather than being quietly dropped.
+    const dto = plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource: 'file_modified' });
+    const errors = await validate(dto as any, { whitelist: true, forbidNonWhitelisted: true });
+    expect(errors).toHaveLength(0);
+  });
+
   it('CreateLibraryDto requires a non-empty icon and UpdateLibraryDto rejects empty icons when provided', async () => {
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', folders: ['/books/scifi'] }))).toBe(true);
     expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'Sci-Fi', icon: '   ', folders: ['/books/scifi'] }))).toBe(true);
@@ -61,9 +77,13 @@ describe('Library DTO validation', () => {
     expect(await hasErrors(plainToInstance(UpdateLibraryAccessDto, { accessLevel: 'owner' }))).toBe(false);
   });
 
-  it('PrescanLibraryDto requires at least one non-empty path', async () => {
+  it('PrescanLibraryDto requires at least one non-empty path and validates an optional library ID', async () => {
     expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: [''] }))).toBe(true);
     expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'] }))).toBe(false);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: 12 }))).toBe(false);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: 0 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: 1.5 }))).toBe(true);
+    expect(await hasErrors(plainToInstance(PrescanLibraryDto, { paths: ['/books'], libraryId: '12' }))).toBe(true);
   });
 
   it('ReorderLibrariesDto validates nested order items', async () => {
@@ -146,6 +166,14 @@ describe('Library DTO validation', () => {
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 1 }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 10000 }))).toBe(false);
       expect(await hasErrors(plainToInstance(CreateLibraryDto, { ...base, fileWriteKindleMaxFileSizeMb: 10001 }))).toBe(true);
+    });
+
+    it('rejects null and invalid date sources before they reach the database', async () => {
+      for (const addedAtSource of [null, 'unknown', 12]) {
+        expect(await hasErrors(plainToInstance(CreateLibraryDto, { name: 'x', icon: 'BookOpen', folders: ['/a'], addedAtSource }))).toBe(true);
+        expect(await hasErrors(plainToInstance(UpdateLibraryDto, { addedAtSource }))).toBe(true);
+      }
+      expect(await hasErrors(plainToInstance(UpdateLibraryDto, {}))).toBe(false);
     });
 
     it('CreateLibraryDto accepts the Kindle enable flag', async () => {

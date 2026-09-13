@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { X } from '@lucide/vue'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -15,6 +16,7 @@ const { t } = useI18n()
 
 const name = ref('')
 const icon = ref('')
+const isPublic = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const trimmedName = computed(() => name.value.trim())
@@ -32,9 +34,10 @@ async function submit() {
   saving.value = true
   error.value = null
   try {
-    const collection = await createCollection(trimmedName.value, trimmedIcon.value)
+    const collection = await createCollection(trimmedName.value, trimmedIcon.value, undefined, isPublic.value)
     name.value = ''
     icon.value = ''
+    isPublic.value = false
     emit('close')
     router.push({ name: 'collection', params: { id: collection.id } })
   } catch {
@@ -72,6 +75,14 @@ async function submit() {
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-foreground">{{ t('collection.dialog.icon') }}</label>
             <IconPicker v-model="icon" :placeholder="t('collection.dialog.iconPlaceholder')" />
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <div>
+              <p class="text-sm font-medium text-foreground">{{ t('collection.visibleToAll') }}</p>
+              <p class="mt-0.5 text-xs text-muted-foreground">{{ t('collection.visibleToAllHint') }}</p>
+            </div>
+            <ToggleSwitch v-model="isPublic" :aria-label="t('collection.visibleToAll')" />
           </div>
 
           <p v-if="error" class="text-sm text-destructive">{{ error }}</p>

@@ -58,7 +58,7 @@ describe('audio metadata round-trip', () => {
         genres: ['Fantasy', 'Adventure'],
         language: 'eng',
         seriesName: 'Roundtrip Series',
-        seriesIndex: 4,
+        seriesIndex: '4',
         audibleId: 'B0ROUNDTRIP',
         librofmId: '9781234567890',
       },
@@ -95,7 +95,7 @@ describe('audio metadata round-trip', () => {
         description: 'Roundtrip Description',
         language: 'eng',
         seriesName: 'Roundtrip Series',
-        seriesIndex: 4,
+        seriesIndex: '4',
         genres: ['Fantasy', 'Adventure'],
         audibleId: 'B0ROUNDTRIP',
         librofmId: '9781234567890',
@@ -125,7 +125,7 @@ describe('audio metadata round-trip', () => {
         genres: ['Sci-Fi', 'Adventure'],
         language: 'eng',
         seriesName: 'Extended Series',
-        seriesIndex: 7,
+        seriesIndex: '7',
         audibleId: 'B0EXTENDED',
         librofmId: '9780987654321',
       },
@@ -160,7 +160,7 @@ describe('audio metadata round-trip', () => {
         publishedYear: 2026,
         language: 'eng',
         seriesName: 'Extended Series',
-        seriesIndex: 7,
+        seriesIndex: '7',
         audibleId: 'B0EXTENDED',
         librofmId: '9780987654321',
       }),
@@ -183,7 +183,7 @@ describe('audio metadata round-trip', () => {
       {
         title: 'Covered Title',
         seriesName: 'Covered Series',
-        seriesIndex: 2.5,
+        seriesIndex: '5.10',
         coverBytes: await readFile(coverPath),
       },
       { dryRun: false, fieldMask: createBookWriteFieldMask() },
@@ -195,18 +195,18 @@ describe('audio metadata round-trip', () => {
     expect(coverStream?.disposition?.attached_pic).toBe(1);
     const coveredTags = await probeFormatTags(filePath);
     expect(coveredTags.show).toBe('Covered Series');
-    expect(coveredTags.episode_id).toBe('2.5');
+    expect(coveredTags.episode_id).toBe('5.10');
 
     vi.resetModules();
     const { extractAudioMetadata } = await import('../../../metadata/extractors/audio.extractor');
     const extracted = await extractAudioMetadata(filePath);
     expect(extracted.coverBytes?.length).toBeGreaterThan(0);
     expect(extracted.seriesName).toBe('Covered Series');
-    expect(extracted.seriesIndex).toBe(2.5);
+    expect(extracted.seriesIndex).toBe('5.10');
 
     await writer.write(
       filePath,
-      { title: 'Retitled Covered Book', seriesName: 'Preserved Cover Series', seriesIndex: 3.5 },
+      { title: 'Retitled Covered Book', seriesName: 'Preserved Cover Series', seriesIndex: '3.5' },
       { dryRun: false, fieldMask: new Set(['title', 'seriesName', 'seriesIndex']) },
     );
 
@@ -217,7 +217,7 @@ describe('audio metadata round-trip', () => {
     const extractedAfterTextOnlyWrite = await extractAudioMetadata(filePath);
     expect(extractedAfterTextOnlyWrite.coverBytes?.length).toBeGreaterThan(0);
     expect(extractedAfterTextOnlyWrite.seriesName).toBe('Preserved Cover Series');
-    expect(extractedAfterTextOnlyWrite.seriesIndex).toBe(3.5);
+    expect(extractedAfterTextOnlyWrite.seriesIndex).toBe('3.5');
 
     await writer.write(filePath, { seriesName: null, seriesIndex: null }, { dryRun: false, fieldMask: new Set(['seriesName', 'seriesIndex']) });
 

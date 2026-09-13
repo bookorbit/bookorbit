@@ -21,10 +21,11 @@ describe('DevicesEvaluator', () => {
   const progressCtx = {
     userId: 1,
     isSuperuser: false,
+    timeZone: 'UTC',
     eventName: ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
     payload: { userId: 1, bookId: 5, progress: 50, source: 'kobo' } as never,
   };
-  const backfillCtx = { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never };
+  const backfillCtx = { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_BACKFILL, payload: { userId: 1 } as never };
 
   beforeEach(() => {
     repo = makeRepo();
@@ -85,7 +86,7 @@ describe('DevicesEvaluator', () => {
     it('short-circuits a web session when the user has no external device', async () => {
       repo.hasAnyExternalDevice.mockResolvedValue(false);
       const awards = await evaluator.evaluate(
-        { userId: 1, isSuperuser: false, eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: { userId: 1 } as never },
+        { userId: 1, isSuperuser: false, timeZone: 'UTC', eventName: ACHIEVEMENT_EVENT_READING_SESSION_SAVED, payload: { userId: 1 } as never },
         new Set(),
       );
       expect(awards).toHaveLength(0);

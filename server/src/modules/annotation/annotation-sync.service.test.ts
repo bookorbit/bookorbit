@@ -14,6 +14,7 @@ const TX = Symbol('tx');
 function makeIncoming(overrides: Partial<IncomingDeviceAnnotation> = {}): IncomingDeviceAnnotation {
   return {
     datetime: '2026-06-01 21:14:03',
+    sourceCreatedAt: new Date('2026-06-02T03:14:03.000Z'),
     datetimeUpdated: null,
     drawer: 'lighten',
     color: 'yellow',
@@ -43,6 +44,7 @@ function makeAnnotationRow(overrides: Record<string, unknown> = {}) {
     deletedAt: null,
     deviceCreatedAt: '2026-06-01 21:14:03',
     deviceUpdatedAt: null,
+    sourceCreatedAt: null,
     createdAt: new Date('2026-06-01T21:14:03Z'),
     updatedAt: new Date('2026-06-01T21:14:03Z'),
     ...overrides,
@@ -109,6 +111,8 @@ function makeRepo(): RepoMock {
     setDeviceIdentitySilent: vi.fn().mockResolvedValue(undefined),
     setDeviceIdentitiesSilent: vi.fn().mockResolvedValue(undefined),
     setDeviceUpdatedAtSilent: vi.fn().mockResolvedValue(undefined),
+    setSourceCreatedAtSilent: vi.fn().mockResolvedValue(undefined),
+    setSourceCreatedAtsSilent: vi.fn().mockResolvedValue(undefined),
     bumpVersion: vi.fn().mockResolvedValue(5),
     softDeleteById: vi.fn().mockResolvedValue(undefined),
     setDeleteAcked: vi.fn().mockResolvedValue(undefined),
@@ -180,6 +184,7 @@ describe('AnnotationSyncService', () => {
         color: '#84CC16',
         version: 1,
         deviceCreatedAt: '2026-06-01 21:14:03',
+        sourceCreatedAt: new Date('2026-06-02T03:14:03.000Z'),
       });
       expect(position).toMatchObject({
         bookFileId: BOOK_FILE_ID,
@@ -296,6 +301,7 @@ describe('AnnotationSyncService', () => {
       const result = await ingest(service, [makeIncoming()]);
 
       expect(result).toMatchObject({ unchanged: 1, updated: 0, created: 0 });
+      expect(repo.setSourceCreatedAtSilent).toHaveBeenCalledWith(100, new Date('2026-06-02T03:14:03.000Z'), TX);
       expect(repo.touchState).toHaveBeenCalled();
       expect(repo.applyContentPatch).not.toHaveBeenCalled();
     });
@@ -444,8 +450,19 @@ describe('AnnotationSyncService', () => {
   });
 
   describe('detectDeviceDeletions', () => {
-    const detect = (presentKeys: { k: string; dt: string }[]) =>
+    const detect = (presentKeys: { k: string; dt: string; sourceCreatedAt?: Date | null }[]) =>
       service.detectDeviceDeletions({ userId: USER_ID, source: 'koreader', deviceId: DEVICE_ID, bookId: BOOK_ID, presentKeys });
+
+    it('backfills source creation times from a complete key set without changing annotation versions', async () => {
+      const state = makeStateRow();
+      repo.findStatesForDeviceBook.mockResolvedValue([{ state, annotation: makeAnnotationRow() }]);
+      const sourceCreatedAt = new Date('2026-06-02T03:14:03.000Z');
+
+      await detect([{ k: state.externalKey as string, dt: state.externalCreatedAt as string, sourceCreatedAt }]);
+
+      expect(repo.setSourceCreatedAtsSilent).toHaveBeenCalledWith([{ annotationId: 100, sourceCreatedAt }], TX);
+      expect(repo.applyContentPatch).not.toHaveBeenCalled();
+    });
 
     it('soft-deletes annotations missing from the device key set and acks this device', async () => {
       repo.findStatesForDeviceBook.mockResolvedValue([{ state: makeStateRow(), annotation: makeAnnotationRow() }]);
@@ -498,7 +515,25 @@ describe('AnnotationSyncService', () => {
       expect(result.adds).toHaveLength(1);
       expect(result.more).toBe(false);
       expect(repo.findEditCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 10);
-      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 9);
+      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 9, ['xpointer', 'cfi']);
+    });
+
+    it('requests KOReader-compatible positions before add pagination', async () => {
+      const compatible = makeAnnotationRow({ id: 500 });
+      repo.findAddCandidates.mockImplementation((_userId, _source, _deviceId, _bookId, _limit, requiredFormats) =>
+        requiredFormats?.includes('cfi') ? [compatible] : Array.from({ length: 101 }, (_, index) => makeAnnotationRow({ id: index + 1 })),
+      );
+
+      const result = await service.computePushDown(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 100);
+
+      expect(result.adds.map((row) => row.id)).toEqual([500]);
+      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'koreader', DEVICE_ID, BOOK_ID, 101, ['xpointer', 'cfi']);
+    });
+
+    it('does not filter Kobo add candidates by KOReader position formats', async () => {
+      await service.computePushDown(USER_ID, 'kobo', DEVICE_ID, BOOK_ID, 10);
+
+      expect(repo.findAddCandidates).toHaveBeenCalledWith(USER_ID, 'kobo', DEVICE_ID, BOOK_ID, 11, undefined);
     });
 
     it('reports more when a category overflows the remaining budget', async () => {

@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 import { SORT_DIRECTIONS, type SortDirection } from './list-authors.dto';
 
@@ -33,4 +33,10 @@ export class ListAuthorBooksDto {
   @IsInt()
   @Min(1)
   libraryId?: number;
+
+  /** Fold each series into a single card, the way the library and collection listings do. */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  collapseSeries?: boolean;
 }

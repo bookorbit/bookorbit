@@ -482,6 +482,30 @@
   {
     "file": "server/src/modules/user/user.controller.ts",
     "className": "UserController",
+    "methodName": "summary",
+    "httpMethod": "GET",
+    "path": "/users/summary",
+    "permissions": ["Permission.ManageUsers"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
+    "methodName": "findNeedingAttention",
+    "httpMethod": "GET",
+    "path": "/users/attention",
+    "permissions": ["Permission.ManageUsers"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/user/user.controller.ts",
+    "className": "UserController",
     "methodName": "findAssignable",
     "httpMethod": "GET",
     "path": "/users/assignable",

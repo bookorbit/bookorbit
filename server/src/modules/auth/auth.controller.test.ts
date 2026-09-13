@@ -90,7 +90,7 @@ describe('AuthController', () => {
     await controller.oidcGenerateLinkState({ id: 7 } as never, 'keycloak');
     await controller.oidcGeneratePreviewState('keycloak');
     await controller.oidcGetIdentities({ id: 7 } as never);
-    await controller.oidcUnlinkIdentity({ id: 7 } as never, 3, { password: 'Secret1!' });
+    await controller.oidcUnlinkIdentity({ id: 7, authenticationMethod: 'oidc' } as never, 3, { password: 'Secret1!' });
 
     expect(oidcService.generateState).toHaveBeenCalledWith('keycloak');
     expect(oidcService.handleCallback).toHaveBeenCalledWith({ code: 'abc' }, reply);
@@ -99,7 +99,7 @@ describe('AuthController', () => {
     expect(oidcService.generateLinkState).toHaveBeenCalledWith(7, 'keycloak');
     expect(oidcService.generatePreviewState).toHaveBeenCalledWith('keycloak');
     expect(oidcService.getLinkedIdentities).toHaveBeenCalledWith(7);
-    expect(oidcService.unlinkIdentity).toHaveBeenCalledWith(7, 3, 'Secret1!');
+    expect(oidcService.unlinkIdentity).toHaveBeenCalledWith(7, 3, 'Secret1!', 'oidc');
   });
 
   it('delegates magic link endpoints to MagicLinkService', async () => {

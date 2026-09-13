@@ -12,6 +12,8 @@ export function useBookDockFinalize() {
     selectAll?: boolean
     excludedIds?: number[]
     status?: string
+    needsReview?: boolean
+    readyToFile?: boolean
     search?: string
     defaultLibraryId?: number
     defaultFolderId?: number

@@ -14,6 +14,10 @@ const readerSettingsMock = vi.hoisted(() => ({
       fontStyle: 'normal',
       fontSize: 16,
       lineHeight: 1.5,
+      paragraphSpacing: 0,
+      letterSpacing: null,
+      wordSpacing: null,
+      textIndent: null,
       maxColumnCount: 2,
       gap: 0.05,
       maxInlineSize: 720,
@@ -56,6 +60,9 @@ describe('EbookSettings', () => {
     readerSettingsMock.effective.value.fontFamily = null
     readerSettingsMock.effective.value.fontWeight = 400
     readerSettingsMock.effective.value.fontStyle = 'normal'
+    readerSettingsMock.effective.value.letterSpacing = null
+    readerSettingsMock.effective.value.wordSpacing = null
+    readerSettingsMock.effective.value.textIndent = null
     customFontsMock.cssFamilyAvailable.mockReturnValue(true)
     customFontsMock.fetchAllFonts.mockResolvedValue(undefined)
   })
@@ -82,6 +89,48 @@ describe('EbookSettings', () => {
     expect(wrapper.get(`label[for="${select.attributes('id')}"]`).text()).toBe('Font style')
   })
 
+  it('shows and updates the paragraph spacing default', async () => {
+    const wrapper = mount(EbookSettings, { props: { embedded: true } })
+    await flushPromises()
+
+    const slider = wrapper.get('input[id^="ebook-paragraph-spacing-"]')
+    expect(wrapper.get(`label[for="${slider.attributes('id')}"]`).text()).toBe('Paragraph spacing')
+    expect(slider.attributes('aria-valuetext')).toBe('Book default')
+
+    await slider.setValue('1.2')
+    expect(readerSettingsMock.update).toHaveBeenCalledWith({
+      paragraphSpacing: 1.2,
+    })
+  })
+
+  it('switches typography defaults between publisher and custom values', async () => {
+    const wrapper = mount(EbookSettings, { props: { embedded: true } })
+    await flushPromises()
+
+    const letterSource = wrapper.get('select[id^="ebook-letter-spacing-source-"]')
+    expect((letterSource.element as HTMLSelectElement).value).toBe('book')
+
+    await letterSource.setValue('custom')
+    expect(readerSettingsMock.update).toHaveBeenCalledWith({
+      letterSpacing: 0,
+    })
+
+    readerSettingsMock.effective.value.letterSpacing = 0.1
+    const customized = mount(EbookSettings, { props: { embedded: true } })
+    await flushPromises()
+    const slider = customized.get('input[id^="ebook-letter-spacing-"]')
+    expect(slider.attributes('aria-valuetext')).toBe('0.1 em')
+    await slider.setValue('0.13')
+    expect(readerSettingsMock.update).toHaveBeenCalledWith({
+      letterSpacing: 0.13,
+    })
+
+    await customized.get('select[id^="ebook-letter-spacing-source-"]').setValue('book')
+    expect(readerSettingsMock.update).toHaveBeenCalledWith({
+      letterSpacing: null,
+    })
+  })
+
   it('waits for both font catalogs before resetting an unavailable saved family', async () => {
     readerSettingsMock.effective.value.fontFamily = fontCssFamilyGroupName('Removed')
     readerSettingsMock.effective.value.fontWeight = 1000
@@ -94,6 +143,10 @@ describe('EbookSettings', () => {
     mount(EbookSettings, { props: { embedded: true } })
     await flushPromises()
 
-    expect(readerSettingsMock.update).toHaveBeenCalledWith({ fontFamily: null, fontWeight: 700, fontStyle: 'italic' })
+    expect(readerSettingsMock.update).toHaveBeenCalledWith({
+      fontFamily: null,
+      fontWeight: 700,
+      fontStyle: 'italic',
+    })
   })
 })

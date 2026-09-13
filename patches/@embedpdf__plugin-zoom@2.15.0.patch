@@ -1,0 +1,15 @@
+diff --git a/dist/index.js b/dist/index.js
+index f33d50ed18a00f00cba6b102f5e7ab18f141364e..bb9085c18a295b7ac1e621423e94652803a647fc 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -609,6 +609,10 @@ const _ZoomPlugin = class _ZoomPlugin extends BasePlugin {
+   recalcAuto(documentId, focus) {
+     const docState = this.getDocumentState(documentId);
+     if (!docState) return;
++    if (typeof docState.zoomLevel === "number") {
++      if (this.viewport.hasGate("zoom", documentId)) this.handleRequest({ level: docState.zoomLevel, focus }, documentId);
++      return;
++    }
+     if (docState.zoomLevel === ZoomMode.Automatic || docState.zoomLevel === ZoomMode.FitPage || docState.zoomLevel === ZoomMode.FitWidth) {
+       this.handleRequest({ level: docState.zoomLevel, focus }, documentId);
+     }

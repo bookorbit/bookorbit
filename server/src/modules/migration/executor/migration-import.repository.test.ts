@@ -83,20 +83,6 @@ describe('MigrationImportRepository', () => {
     );
   });
 
-  it('clearUserBookStatuses no-ops for empty targets and deduplicates ids otherwise', async () => {
-    const where = vi.fn().mockResolvedValue(undefined);
-    const deleteFn = vi.fn().mockReturnValue({ where });
-    const repo = new MigrationImportRepository({ delete: deleteFn } as never);
-
-    await repo.clearUserBookStatuses([], [1, 2]);
-    await repo.clearUserBookStatuses([1], []);
-    expect(deleteFn).not.toHaveBeenCalled();
-
-    await repo.clearUserBookStatuses([1, 1, 2], [10, 10, 11]);
-    expect(deleteFn).toHaveBeenCalledTimes(1);
-    expect(where).toHaveBeenCalledTimes(1);
-  });
-
   it('clearUserBookRatings no-ops for empty targets and deduplicates ids otherwise', async () => {
     const where = vi.fn().mockResolvedValue(undefined);
     const deleteFn = vi.fn().mockReturnValue({ where });
@@ -111,14 +97,14 @@ describe('MigrationImportRepository', () => {
     expect(where).toHaveBeenCalledTimes(1);
   });
 
-  it('chunks user/book clear queries for large migration runs', async () => {
+  it('chunks user/book rating clear queries for large migration runs', async () => {
     const where = vi.fn().mockResolvedValue(undefined);
     const deleteFn = vi.fn().mockReturnValue({ where });
     const repo = new MigrationImportRepository({ delete: deleteFn } as never);
     const userIds = Array.from({ length: 501 }, (_, index) => index + 1);
     const bookIds = Array.from({ length: 1001 }, (_, index) => index + 1);
 
-    await repo.clearUserBookStatuses(userIds, bookIds);
+    await repo.clearUserBookRatings(userIds, bookIds);
 
     expect(deleteFn).toHaveBeenCalledTimes(6);
     expect(where).toHaveBeenCalledTimes(6);
@@ -549,7 +535,7 @@ describe('MigrationImportRepository', () => {
     const insert = vi.fn().mockReturnValue({ values });
     const repo = new MigrationImportRepository({ insert } as never);
 
-    await repo.batchUpsertUserBookStatuses([]);
+    await repo.batchMergeUserBookStatuses([]);
     await repo.batchUpsertReadingProgress([]);
     await repo.batchUpsertAudiobookProgress([]);
     await repo.batchInsertBookmarks([]);
@@ -557,7 +543,9 @@ describe('MigrationImportRepository', () => {
     await repo.batchInsertCollectionBooks([]);
     expect(insert).not.toHaveBeenCalled();
 
-    await repo.batchUpsertUserBookStatuses([{ userId: 1, bookId: 2, status: 'read', source: 'manual', updatedAt: new Date() } as never]);
+    await repo.batchMergeUserBookStatuses([
+      { userId: 1, bookId: 2, status: 'read', source: 'manual', sourceUpdatedAt: new Date('2026-01-02T00:00:00.000Z') },
+    ]);
     await repo.batchUpsertReadingProgress([{ userId: 1, bookFileId: 10, percentage: 50, updatedAt: new Date() } as never]);
     await repo.batchUpsertAudiobookProgress([
       { userId: 1, bookId: 2, percentage: 25, currentFileId: 10, positionSeconds: 0, updatedAt: new Date() } as never,
@@ -573,5 +561,23 @@ describe('MigrationImportRepository', () => {
     expect(insert).toHaveBeenCalledWith(schema.annotations);
     expect(insert).toHaveBeenCalledWith(schema.annotationPositions);
     expect(insert).toHaveBeenCalledWith(schema.collectionBooks);
+    expect(onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: [schema.userBookStatus.userId, schema.userBookStatus.bookId],
+        setWhere: expect.anything(),
+      }),
+    );
+  });
+
+  it('inserts statuses without source timestamps but does not update conflicts', async () => {
+    const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn().mockReturnValue({ onConflictDoNothing });
+    const insert = vi.fn().mockReturnValue({ values });
+    const repo = new MigrationImportRepository({ insert } as never);
+
+    await repo.batchMergeUserBookStatuses([{ userId: 1, bookId: 2, status: 'reading', source: 'manual', sourceUpdatedAt: null }]);
+
+    expect(values).toHaveBeenCalledWith([expect.objectContaining({ userId: 1, bookId: 2, status: 'reading', updatedAt: expect.any(Date) })]);
+    expect(onConflictDoNothing).toHaveBeenCalledOnce();
   });
 });

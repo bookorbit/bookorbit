@@ -55,14 +55,14 @@ function normalizeSourceRating(value: number | null | undefined): number | null 
   return null;
 }
 
-type UserBookStatusUpsert = {
+type UserBookStatusMerge = {
   userId: number;
   bookId: number;
   status: ReadStatus;
   source: ReadStatusSource;
   startedAt: Date | null;
   finishedAt: Date | null;
-  updatedAt: Date;
+  sourceUpdatedAt: Date | null;
 };
 
 type UserBookRatingUpsert = {
@@ -181,7 +181,7 @@ export class UserStateImporter {
       return;
     }
 
-    const batch: UserBookStatusUpsert[] = [];
+    const batch: UserBookStatusMerge[] = [];
 
     for (const row of planned.execution.sourceData.userBookStatuses) {
       await ensureRunning();
@@ -200,15 +200,14 @@ export class UserStateImporter {
         source: 'manual',
         startedAt: toDate(row.startedAt),
         finishedAt: toDate(row.finishedAt),
-        updatedAt: toDate(row.updatedAt) ?? new Date(),
+        sourceUpdatedAt: toDate(row.updatedAt),
       });
       counters.imported += 1;
     }
-    const dedupedBatch = dedupeByKey(batch, (item) => `${item.userId}:${item.bookId}`, preferLatestByUpdatedAt);
+    const dedupedBatch = dedupeByKey(batch, (item) => `${item.userId}:${item.bookId}`, preferUserBookStatusEvidence);
 
     await this.importRepo.withTransaction(async (importRepo) => {
-      await importRepo.clearUserBookStatuses([...userMap.values()], [...bookMap.values()]);
-      await importRepo.batchUpsertUserBookStatuses(dedupedBatch);
+      await importRepo.batchMergeUserBookStatuses(dedupedBatch);
     });
     await this.repo.setRunMetric(runId, 'user_state', 'user_book_status', counters);
   }
@@ -894,6 +893,14 @@ function preferLatestByUpdatedAt<T extends { updatedAt: Date }>(current: T, cand
   const candidateTs = candidate.updatedAt.getTime();
   if (candidateTs > currentTs) return candidate;
   if (candidateTs < currentTs) return current;
+  return candidate;
+}
+
+function preferUserBookStatusEvidence(current: UserBookStatusMerge, candidate: UserBookStatusMerge): UserBookStatusMerge {
+  if (current.sourceUpdatedAt === null) return candidate;
+  if (candidate.sourceUpdatedAt === null) return current;
+  if (candidate.sourceUpdatedAt > current.sourceUpdatedAt) return candidate;
+  if (candidate.sourceUpdatedAt < current.sourceUpdatedAt) return current;
   return candidate;
 }
 

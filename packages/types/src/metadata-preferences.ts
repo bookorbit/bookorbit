@@ -40,15 +40,19 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
 ];
 
 export type MergeStrategy = "fillMissing" | "overwrite" | "overwriteIfProvided";
+export type MetadataMergeStrategy = MergeStrategy | "mergeExisting";
 export type GenreMergeMode = "firstProvider" | "merge";
+export type ProviderIdFetchMode = "preferExisting" | "existingOnly";
 export const MERGE_STRATEGIES: MergeStrategy[] = ["fillMissing", "overwrite", "overwriteIfProvided"];
+export const GENRE_MERGE_STRATEGIES: MetadataMergeStrategy[] = ["fillMissing", "mergeExisting", "overwriteIfProvided", "overwrite"];
 export const GENRE_MERGE_MODES: GenreMergeMode[] = ["firstProvider", "merge"];
+export const PROVIDER_ID_FETCH_MODES: ProviderIdFetchMode[] = ["preferExisting", "existingOnly"];
 export const MAX_METADATA_GENRE_COUNT = 50;
 
 export interface FieldPreference {
   enabled: boolean;
   providers: MetadataProviderKey[];
-  mergeStrategy: MergeStrategy;
+  mergeStrategy: MetadataMergeStrategy;
 }
 
 export type FieldPreferenceOverrides = Partial<Record<MetadataField, FieldPreference>>;
@@ -60,6 +64,7 @@ export interface MetadataFetchOptions {
     maxCount: number | null;
   };
   saveProviderIds: boolean;
+  providerIdMode: ProviderIdFetchMode;
 }
 
 export interface MetadataFetchPreferences {

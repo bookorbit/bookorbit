@@ -8,8 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { DialogRoot, DialogContent, DialogPortal, DialogOverlay, DialogClose, DialogTitle, DialogDescription } from 'reka-ui'
 import { formatBytes } from '@/lib/formatting'
 import { getProviderColor } from '@/lib/provider-colors'
-import { providerIconPath } from '@/features/book/lib/provider-icons'
-import { libroFmAudiobookUrl, lubimyczytacBookUrl } from '@/features/book/lib/provider-links'
+import { createBookProviderLinks } from '@/features/book/lib/provider-links'
 import { useBookDetail } from '../composables/useBookDetail'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { getFormatColor } from '../lib/format-colors'
@@ -31,14 +30,6 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   action: [type: 'add-to-collection' | 'delete']
 }>()
-
-type ProviderLink = {
-  key: string
-  label: string
-  url: string
-  iconUrl: string
-  fallback: string
-}
 
 const router = useRouter()
 const { detail, loading, fetch } = useBookDetail()
@@ -76,108 +67,12 @@ const coverPlaceholderTitle = computed(() => (detail.value ? (detail.value.title
 const seriesLine = computed(() => {
   if (!detail.value?.seriesName) return null
   const idx = detail.value.seriesIndex
-  return idx != null ? `${detail.value.seriesName} #${idx % 1 === 0 ? Math.floor(idx) : idx}` : detail.value.seriesName
+  return idx != null ? `${detail.value.seriesName} #${idx}` : detail.value.seriesName
 })
 
 const authorLine = computed(() => detail.value?.authors.map((a) => a.name).join(', ') ?? null)
 const ratingStars = [1, 2, 3, 4, 5]
-const providerLinks = computed<ProviderLink[]>(() => {
-  const out: ProviderLink[] = []
-  const ids = detail.value?.providerIds
-  if (!ids) return out
-  if (ids.google) {
-    out.push({
-      key: 'google',
-      label: 'Google Books',
-      url: `https://books.google.com/books?id=${ids.google}`,
-      iconUrl: providerIconPath('google'),
-      fallback: 'G',
-    })
-  }
-  if (ids.goodreads) {
-    out.push({
-      key: 'goodreads',
-      label: 'Goodreads',
-      url: `https://www.goodreads.com/book/show/${ids.goodreads}`,
-      iconUrl: providerIconPath('goodreads'),
-      fallback: 'GR',
-    })
-  }
-  if (ids.amazon) {
-    out.push({
-      key: 'amazon',
-      label: 'Amazon',
-      url: `https://www.amazon.com/dp/${ids.amazon}`,
-      iconUrl: providerIconPath('amazon'),
-      fallback: 'A',
-    })
-  }
-  if (ids.hardcover) {
-    out.push({
-      key: 'hardcover',
-      label: 'Hardcover',
-      url: `https://hardcover.app/books/${ids.hardcover}`,
-      iconUrl: providerIconPath('hardcover'),
-      fallback: 'H',
-    })
-  }
-  if (ids.openLibrary) {
-    const path = String(ids.openLibrary).startsWith('/works/') ? String(ids.openLibrary) : `/works/${ids.openLibrary}`
-    out.push({
-      key: 'openLibrary',
-      label: 'Open Library',
-      url: `https://openlibrary.org${path}`,
-      iconUrl: providerIconPath('openLibrary'),
-      fallback: 'OL',
-    })
-  }
-  if (ids.itunes) {
-    out.push({
-      key: 'itunes',
-      label: 'Apple Books',
-      url: `https://books.apple.com/book/id${ids.itunes}`,
-      iconUrl: providerIconPath('itunes'),
-      fallback: '',
-    })
-  }
-  if (ids.librofm) {
-    out.push({
-      key: 'librofm',
-      label: 'Libro.fm',
-      url: libroFmAudiobookUrl(ids.librofm),
-      iconUrl: providerIconPath('librofm'),
-      fallback: 'Lf',
-    })
-  }
-  if (ids.ranobedb) {
-    out.push({
-      key: 'ranobedb',
-      label: 'RanobeDB',
-      url: `https://ranobedb.org/book/${ids.ranobedb}`,
-      iconUrl: providerIconPath('ranobedb'),
-      fallback: 'RN',
-    })
-  }
-  if (ids.lubimyczytac) {
-    out.push({
-      key: 'lubimyczytac',
-      label: 'LubimyCzytac',
-      url: lubimyczytacBookUrl(ids.lubimyczytac),
-      iconUrl: providerIconPath('lubimyczytac'),
-      fallback: 'LC',
-    })
-  }
-  if (ids.aladin) {
-    out.push({
-      key: 'aladin',
-      label: 'Aladin',
-      url: `https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=${ids.aladin}`,
-      iconUrl: providerIconPath('aladin'),
-      fallback: '알',
-    })
-  }
-  return out
-})
+const providerLinks = computed(() => (detail.value ? createBookProviderLinks(detail.value.providerIds) : []))
 
 const safeDescription = useSafeHtml(() => detail.value?.description)
 
@@ -351,7 +246,7 @@ function handleDelete() {
                     :style="providerLinkStyle(link.key)"
                   >
                     <img
-                      v-if="!providerIconErrors[link.key]"
+                      v-if="link.iconUrl && !providerIconErrors[link.key]"
                       :src="link.iconUrl"
                       :alt="link.label"
                       class="size-3.5 rounded-[2px] object-contain"
