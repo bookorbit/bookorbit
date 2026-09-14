@@ -657,10 +657,27 @@ describe('UserService', () => {
     expect(contentFilterRepo.findByUserIdWithNames).toHaveBeenCalledWith(5);
   });
 
-  it('getContentFilters blocks non-superusers from reading another user filters', async () => {
+  it('getContentFilters allows manage_users to read another user filters', async () => {
+    const filters = {
+      includeTags: [{ id: 1, name: 'Sci-Fi' }],
+      excludeTags: [],
+      includeGenres: [],
+      excludeGenres: [],
+    };
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
+    contentFilterRepo.findByUserIdWithNames.mockResolvedValue(filters);
 
-    await expect(service.getContentFilters(5, reqUser({ id: 1, isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getContentFilters(5, reqUser({ id: 1, isSuperuser: false, permissions: [Permission.ManageUsers] }))).resolves.toEqual(
+      filters,
+    );
+    expect(contentFilterRepo.findByUserIdWithNames).toHaveBeenCalledWith(5);
+  });
+
+  it('getContentFilters blocks callers without manage_users from reading another user filters', async () => {
+    await expect(
+      service.getContentFilters(5, reqUser({ id: 1, isSuperuser: false, permissions: [Permission.LibraryDownload] })),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(userRepo.findByIdWithPermissions).not.toHaveBeenCalled();
     expect(contentFilterRepo.findByUserIdWithNames).not.toHaveBeenCalled();
   });
 
@@ -687,17 +704,41 @@ describe('UserService', () => {
     await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('setContentFilters blocks non-superusers from updating filters', async () => {
+  it('setContentFilters allows manage_users to update filters', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: false });
 
-    await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: false }))).rejects.toBeInstanceOf(ForbiddenException);
-    expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
+    await expect(
+      service.setContentFilters(
+        5,
+        { includeTagIds: [1], excludeGenreIds: [3], seeOwnRequestedBooks: true } as any,
+        reqUser({ isSuperuser: false, permissions: [Permission.ManageUsers] }),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(contentFilterRepo.replaceFilters).toHaveBeenCalledWith(5, {
+      includeTagIds: [1],
+      excludeTagIds: [],
+      includeGenreIds: [],
+      excludeGenreIds: [3],
+    });
+    expect(userRepo.update).toHaveBeenCalledWith(5, { seeOwnRequestedBooks: true });
   });
 
-  it('setContentFilters rejects administrator targets', async () => {
+  it('setContentFilters blocks callers without manage_users from updating filters', async () => {
+    await expect(
+      service.setContentFilters(5, {} as any, reqUser({ isSuperuser: false, permissions: [Permission.LibraryDownload] })),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(userRepo.findByIdWithPermissions).not.toHaveBeenCalled();
+    expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
+    expect(userRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('setContentFilters rejects superuser targets even for manage_users callers', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 5, isSuperuser: true });
 
-    await expect(service.setContentFilters(5, {} as any, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.setContentFilters(5, {} as any, reqUser({ isSuperuser: false, permissions: [Permission.ManageUsers] })),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(contentFilterRepo.replaceFilters).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Permission } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { emailProviders } from '../../db/schema';
@@ -100,7 +101,9 @@ export class EmailProviderService {
   }
 
   async toggleShared(id: number, user: RequestUser) {
-    if (!user.isSuperuser) throw new ForbiddenException('Only superusers can share providers');
+    if (!user.isSuperuser && !user.permissions.includes(Permission.ManageEmail)) {
+      throw new ForbiddenException(`Missing permission: ${Permission.ManageEmail}`);
+    }
     const provider = await this.getOwned(id, user);
     const [updated] = await this.repo.setSharedByOwner(id, user.id, !provider.isShared);
     if (!updated) throw new NotFoundException('Provider not found');

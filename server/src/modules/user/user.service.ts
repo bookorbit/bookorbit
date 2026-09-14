@@ -522,20 +522,20 @@ export class UserService {
   }
 
   async getContentFilters(targetUserId: number, requestingUser: RequestUser) {
-    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
-    if (!target) throw new NotFoundException('User not found');
-    if (targetUserId !== requestingUser.id && !requestingUser.isSuperuser) {
+    if (targetUserId !== requestingUser.id && !this.canManageUsers(requestingUser)) {
       throw new ForbiddenException('Cannot view another user content filters');
     }
+    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
+    if (!target) throw new NotFoundException('User not found');
     return this.contentFilterRepo.findByUserIdWithNames(targetUserId);
   }
 
   async setContentFilters(targetUserId: number, dto: SetContentFiltersDto, requestingUser: RequestUser) {
+    if (!this.canManageUsers(requestingUser)) {
+      throw new ForbiddenException(`Missing permission: ${Permission.ManageUsers}`);
+    }
     const target = await this.userRepo.findByIdWithPermissions(targetUserId);
     if (!target) throw new NotFoundException('User not found');
-    if (!requestingUser.isSuperuser) {
-      throw new ForbiddenException('Only administrators can set content filters');
-    }
     if (target.isSuperuser) {
       throw new BadRequestException('Content filters cannot be applied to administrators');
     }
@@ -550,5 +550,9 @@ export class UserService {
     if (dto.seeOwnRequestedBooks !== undefined) {
       await this.userRepo.update(targetUserId, { seeOwnRequestedBooks: dto.seeOwnRequestedBooks });
     }
+  }
+
+  private canManageUsers(user: RequestUser): boolean {
+    return user.isSuperuser || user.permissions.includes(Permission.ManageUsers);
   }
 }
