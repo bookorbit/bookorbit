@@ -46,8 +46,8 @@
   <text x="440" y="203" text-anchor="end" class="pct-label">72%</text>
   <text x="20" y="228" class="lang-label">🇩🇪  German</text>
   <rect x="142" y="220" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="220" width="165" height="6" rx="3" class="bar-low" />
-  <text x="440" y="228" text-anchor="end" class="pct-label">67%</text>
+  <rect x="142" y="220" width="170" height="6" rx="3" class="bar-low" />
+  <text x="440" y="228" text-anchor="end" class="pct-label">69%</text>
   <text x="20" y="253" class="lang-label">🇸🇮  Slovenian</text>
   <rect x="142" y="245" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="245" width="162" height="6" rx="3" class="bar-low" />
