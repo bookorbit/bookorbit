@@ -103,6 +103,8 @@ An OIDC provider signed by a private certificate authority requires its PEM CA b
 
 For the full installation guide including reverse proxy setup, file permissions on NAS, external databases, and environment variable reference, see **[bookorbit.app/installation](https://bookorbit.app/installation)**.
 
+You can also deploy BookOrbit with one click using the official [Easypanel](https://easypanel.io/) template, which provisions the required PostgreSQL database automatically: https://easypanel.io/templates/bookorbit
+
 ## KOReader Plugin
 
 The BookOrbit plugin for KOReader adds progress sync, two-way annotation sync, and a native catalog browser: navigate, search, and download books from your library without leaving the device.
