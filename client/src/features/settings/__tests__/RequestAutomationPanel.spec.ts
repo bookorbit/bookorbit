@@ -41,6 +41,18 @@ async function mountPanel(loaded: BookRequestAutomationSettings = settings()) {
         pluginFailures: [],
       })
     }
+    if (url === '/api/v1/admin/request-indexer-managers') {
+      return response({
+        managers: [
+          {
+            id: 3,
+            name: 'Prowlarr',
+            sources: [{ id: 13, name: 'Managed books', adapterType: 'torznab' }],
+          },
+        ],
+        encryptionConfigured: true,
+      })
+    }
     if (url === '/api/v1/book-requests/source-status') return response({ configured: 2, enabled: 2 })
     return response(loaded)
   })
@@ -452,14 +464,14 @@ describe('RequestAutomationPanel', () => {
         }
 
         await pick('languages', 'English', 'French')
-        await pick('indexers', 'Public books', 'Private books')
+        await pick('indexers', 'Public books', 'Private books', 'Prowlarr / Managed books')
         await vi.advanceTimersByTimeAsync(1000)
 
         const profiles = lastBody().profiles as {
           ebook: { conditions: { languages: string[]; indexerIds: number[] } }[]
         }
         expect(profiles.ebook[0]!.conditions.languages).toEqual(['en', 'fr'])
-        expect(profiles.ebook[0]!.conditions.indexerIds).toEqual([11, 12])
+        expect(profiles.ebook[0]!.conditions.indexerIds).toEqual([11, 12, 13])
       } finally {
         vi.useRealTimers()
       }

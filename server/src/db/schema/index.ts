@@ -22,6 +22,7 @@ export * from './book-dock';
 export * from './book-requests';
 export * from './download-clients';
 export * from './request-indexers';
+export * from './request-indexer-managers';
 export * from './file-write';
 export * from './email-templates';
 export * from './email-providers';

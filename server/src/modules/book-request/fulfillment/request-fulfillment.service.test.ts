@@ -386,6 +386,63 @@ describe('RequestFulfillmentService.grab from a picked release', () => {
     expect(adapter.add).toHaveBeenCalledWith(expect.objectContaining({ magnet: MAGNET, clientKey: INFO_HASH }), expect.anything());
   });
 
+  it('refreshes an expired managed download URL once and keeps the exact release', async () => {
+    const fresh = { ...RELEASE, downloadUrl: 'https://prowlarr.example.test/fresh' };
+    const { service, releases, indexerAdapter } = makeService({
+      releases: {
+        find: vi.fn().mockReturnValue(RELEASE),
+        refreshCandidate: vi.fn().mockResolvedValue(fresh),
+      },
+      indexers: {
+        resolveConfig: vi.fn().mockResolvedValue({
+          id: 9,
+          name: 'managed tracker',
+          adapterType: 'torznab',
+          managerId: 3,
+          applyTrackerSeedGoals: true,
+          seedRatioGoal: null,
+          seedTimeMinutes: null,
+        }),
+      },
+      indexerAdapter: {
+        fetchTorrentFile: vi
+          .fn()
+          .mockRejectedValueOnce(new IndexerSearchException('error', 'The indexer answered 404 for that download link'))
+          .mockResolvedValueOnce(torrentBytes()),
+      },
+    });
+
+    await service.grab(7, { indexerId: 9, releaseGuid: 'r-1' }, user());
+
+    expect(releases.refreshCandidate).toHaveBeenCalledWith(7, 9, RELEASE);
+    expect(indexerAdapter.fetchTorrentFile).toHaveBeenNthCalledWith(2, fresh, expect.anything());
+  });
+
+  it('reports the original refusal when refreshing a managed release fails', async () => {
+    const refusal = new IndexerSearchException('error', 'The indexer answered 404 for that download link');
+    const { service, indexerAdapter } = makeService({
+      releases: {
+        find: vi.fn().mockReturnValue(RELEASE),
+        refreshCandidate: vi.fn().mockRejectedValue(new Error('the stored credential could not be read')),
+      },
+      indexers: {
+        resolveConfig: vi.fn().mockResolvedValue({
+          id: 9,
+          name: 'managed tracker',
+          adapterType: 'torznab',
+          managerId: 3,
+          applyTrackerSeedGoals: true,
+          seedRatioGoal: null,
+          seedTimeMinutes: null,
+        }),
+      },
+      indexerAdapter: { fetchTorrentFile: vi.fn().mockRejectedValue(refusal) },
+    });
+
+    await expect(service.grab(7, { indexerId: 9, releaseGuid: 'r-1' }, user())).rejects.toThrow(/404 for that download link/);
+    expect(indexerAdapter.fetchTorrentFile).toHaveBeenCalledOnce();
+  });
+
   it('fetches a Newznab release and hands its NZB to an NZBGet client', async () => {
     const nzb = Buffer.from('<?xml version="1.0"?><nzb />');
     const clientKey = newznabClientKey(9, 'r-1');

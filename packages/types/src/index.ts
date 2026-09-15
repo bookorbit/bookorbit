@@ -43,6 +43,7 @@ export * from "./book-request-profile";
 export * from "./book-request-review";
 export * from "./download-client";
 export * from "./indexer";
+export * from "./indexer-manager";
 export * from "./request-credential";
 export * from "./file-write";
 export * from "./epub";

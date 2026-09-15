@@ -71,7 +71,7 @@ class IndexerCategoriesDto {
  * it is validated here in full: the proxy address is the one value that decides where a request
  * actually goes, and a bad one must be refused at the form.
  */
-class NetworkProfileDto {
+export class NetworkProfileDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(4)

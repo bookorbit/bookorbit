@@ -13,7 +13,14 @@ import {
   MIN_AUTO_SEARCH_INTERVAL_HOURS,
   MIN_AUTO_SEARCH_MAX_AGE_DAYS,
 } from '@bookorbit/types'
-import type { BookRequestImportFormats, BookRequestMediaKind, ReleaseTier, RequestDestination } from '@bookorbit/types'
+import type {
+  BookRequestImportFormats,
+  BookRequestMediaKind,
+  IndexerItem,
+  IndexerManagerListResult,
+  ReleaseTier,
+  RequestDestination,
+} from '@bookorbit/types'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import ReleaseProfileEditor from './components/ReleaseProfileEditor.vue'
 import RequestDestinationRow from './components/RequestDestinationRow.vue'
@@ -23,12 +30,28 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useIndexers } from '@/features/book-requests/composables/useIndexers'
 import { useRequestAutomation } from '@/features/book-requests/composables/useRequestAutomation'
 import { useRequestSourceStatus } from '@/features/book-requests/composables/useRequestSourceStatus'
+import { api } from '@/lib/api'
 
 const { t } = useI18n()
 
 const { settings, loading, loadFailed, fetchSettings, save } = useRequestAutomation()
 const { libraries, fetchLibraries } = useLibraries()
 const { indexers, adapters, fetchIndexers } = useIndexers()
+const managedIndexers = ref<Array<Pick<IndexerItem, 'id' | 'name' | 'adapterType'>>>([])
+const profileIndexers = computed(() => [...indexers.value, ...managedIndexers.value])
+
+async function fetchManagedIndexers() {
+  try {
+    const res = await api('/api/v1/admin/request-indexer-managers')
+    if (!res.ok) throw new Error('manager load failed')
+    const result = (await res.json()) as IndexerManagerListResult
+    managedIndexers.value = result.managers.flatMap((manager) =>
+      manager.sources.map((source) => ({ id: source.id, name: `${manager.name} / ${source.name}`, adapterType: source.adapterType })),
+    )
+  } catch {
+    toast.error(t('settings.system.requests.managers.errors.load'))
+  }
+}
 /**
  * Auto-grab switched on with nothing to search is the one setting on this tab that reports success
  * and does nothing. Every request it touches is handed straight back, and the summary above it
@@ -90,6 +113,7 @@ onMounted(fetchSettings)
 onMounted(fetchLibraries)
 onMounted(fetchSourceStatus)
 onMounted(fetchIndexers)
+onMounted(fetchManagedIndexers)
 
 watch(loading, async (isLoading) => {
   if (isLoading || !/^#release-profile-(ebook|audiobook|comic)$/.test(window.location.hash)) return
@@ -458,7 +482,7 @@ function handleVerificationChange(enabled: boolean) {
                   :key="`${mediaKind}-${editorRevision}`"
                   :media-kind="mediaKind"
                   :tiers="settings.profiles[mediaKind]"
-                  :indexers="indexers"
+                  :indexers="profileIndexers"
                   :adapters="adapters"
                   @update="handleProfileChange"
                 />

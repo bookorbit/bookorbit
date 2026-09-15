@@ -3009,15 +3009,18 @@
           "confirm": "Remove client"
         },
         "indexers": {
-          "title": "Built-in indexers",
-          "hint": "Connect a Torznab feed for torrents or a Newznab feed for Usenet releases.",
+          "title": "Direct feeds",
+          "hint": "Connect an individual Torznab feed for torrents or Newznab feed for Usenet releases.",
           "allDisabled": "Every source below is switched off, so no request search will find anything. Switch at least one back on.",
           "loading": "Loading indexers...",
           "empty": {
             "title": "No sources yet",
-            "body": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one. There are two ways in.",
+            "body": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one. Choose the setup that fits your indexers.",
             "bodyOneWay": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one.",
             "responsibility": "What a source you add indexes is your responsibility.",
+            "prowlarrTitle": "Connect Prowlarr",
+            "prowlarrBody": "Manage several torrent and Usenet indexers through one connection.",
+            "recommended": "Recommended",
             "pluginTitle": "Install a plugin",
             "pluginBody": "One file that teaches BookOrbit to search a specific site. You supply it, then fill in its settings.",
             "torznabTitle": "Add a Torznab indexer",
@@ -3042,6 +3045,18 @@
           "deleted": "Source deleted",
           "unavailable": "This install has no \"{type}\" indexer type. Change the type or delete its plugin and saved configuration.",
           "pluginFailed": "The plugin in \"{directory}\" did not load: {reason}",
+          "sources": {
+            "title": "Sources",
+            "hint": "Everything BookOrbit can search, grouped by connection.",
+            "add": "Add source",
+            "prowlarr": "Connect Prowlarr",
+            "prowlarrHint": "Manage several torrent and Usenet indexers together.",
+            "direct": "Add Torznab or Newznab",
+            "directHint": "Connect one compatible feed directly.",
+            "plugin": "Install a plugin",
+            "pluginHint": "Add a specialized source implementation.",
+            "activeSummary": "{count, plural, one {# active source} other {# active sources}}: {torrent} torrent, {usenet} Usenet, {direct} direct"
+          },
           "network": {
             "title": "Advanced network",
             "hint": "Only needed when the default path to this source does not work. What is allowed does not change: whatever address is reached is still checked the same way.",
@@ -3162,7 +3177,7 @@
           },
           "plugins": {
             "title": "Plugins",
-            "hint": "A site BookOrbit can search, added as a single plugin file. Install one, then fill in its settings.",
+            "hint": "A site BookOrbit can search, added as a single plugin file.",
             "directoryLink": "Browse open library plugins",
             "none": "No plugin installed. Install one to search a site the built-in protocols do not cover.",
             "install": "Install plugin",
@@ -3226,6 +3241,59 @@
             "removeUnusedWarning": "The plugin will be permanently deleted from the server."
           },
           "posture": "BookOrbit does not provide or endorse indexer sources. Every source here is one you configured, and you are responsible for what you search and download through it."
+        },
+        "managers": {
+          "add": "Add Prowlarr",
+          "loading": "Loading Prowlarr connections...",
+          "managedSources": "{count, plural, one {# managed indexer} other {# managed indexers}}",
+          "protocol": {
+            "torrent": "Torrent",
+            "usenet": "Usenet"
+          },
+          "saved": "Prowlarr settings saved",
+          "deleted": "Prowlarr removed",
+          "synced": "Prowlarr sources synchronized",
+          "test": "Test connection",
+          "sync": "Synchronize",
+          "testOk": "Connected to Prowlarr {version}. Found {count, plural, one {# source} other {# sources}}.",
+          "unavailable": "Unavailable",
+          "priority": "Prowlarr priority {priority}",
+          "toggleSource": "Search with {name}",
+          "changeColor": "Change color for {name}",
+          "sourceColor": "Source color",
+          "sourceColorHint": "Marks releases returned by {name} throughout BookOrbit.",
+          "noSources": "No compatible torrent or Usenet indexers were discovered. Synchronize after adding one in Prowlarr.",
+          "unknown": "Unknown",
+          "editorDescription": "Connection and source synchronization settings for Prowlarr.",
+          "confirmDelete": "Remove this Prowlarr connection?",
+          "deleteConsequence": "The connection, encrypted API key, and all synchronized sources are deleted. Downloads already in progress are not removed.",
+          "fields": {
+            "name": "Name",
+            "color": "Connection color",
+            "colorHint": "Marks this Prowlarr connection here. Each managed indexer has its own release color.",
+            "baseUrl": "Base URL",
+            "apiKey": "API key",
+            "apiKeyHint": "Found in Prowlarr under Settings > General > Security. Stored encrypted.",
+            "syncNew": "Enable newly discovered sources",
+            "syncNewHint": "New Prowlarr indexers are searchable immediately. Sources you switch off here stay off after later synchronizations.",
+            "autoExpand": "Retry without category filters",
+            "autoExpandHint": "When an indexer answers successfully with no results, retry once without BookOrbit's book category filter.",
+            "inheritSeedLimits": "Use Prowlarr seed limits",
+            "inheritSeedLimitsHint": "Apply each torrent indexer's configured seed ratio and seed time to future downloads when no BookOrbit override exists.",
+            "perIndexerTimeout": "Indexer timeout (seconds)",
+            "perIndexerTimeoutHint": "How long one synchronized source may take. Slow FlareSolverr-backed indexers may need more time.",
+            "overallBudget": "Prowlarr budget (seconds)",
+            "overallBudgetHint": "Maximum wall-clock time shared by all sources from this Prowlarr connection during one search."
+          },
+          "errors": {
+            "load": "Could not load indexer managers",
+            "required": "Enter a name, base URL, and API key.",
+            "save": "Could not save the Prowlarr connection",
+            "delete": "Could not remove the Prowlarr connection",
+            "test": "Could not reach Prowlarr",
+            "sync": "Could not synchronize Prowlarr sources",
+            "source": "Could not change that source"
+          }
         },
         "automation": {
           "title": "Automation",

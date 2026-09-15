@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Plug, Plus, Search, Server, Upload } from '@lucide/vue'
+import { Plug, Plus, Search, Server, ServerCog, Upload } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import PluginDirectoryLink from './PluginDirectoryLink.vue'
 import SettingsEmptyPanel from './SettingsEmptyPanel.vue'
@@ -17,7 +17,11 @@ const props = defineProps<{
   canInstallPlugins: boolean
 }>()
 
-const emit = defineEmits<{ installPlugin: []; addIndexer: [] }>()
+const emit = defineEmits<{
+  installPlugin: []
+  addIndexer: []
+  addManager: []
+}>()
 
 const { t } = useI18n()
 
@@ -28,24 +32,51 @@ function handleInstallPlugin() {
 function handleAddIndexer() {
   emit('addIndexer')
 }
+
+function handleAddManager() {
+  emit('addManager')
+}
 </script>
 
 <template>
   <SettingsEmptyPanel
     :title="t('settings.system.requests.indexers.empty.title')"
-    :body="props.canInstallPlugins ? t('settings.system.requests.indexers.empty.body') : t('settings.system.requests.indexers.empty.bodyOneWay')"
+    :body="t('settings.system.requests.indexers.empty.body')"
     :note="t('settings.system.requests.indexers.empty.responsibility')"
   >
     <template #icon>
       <Search :size="18" />
     </template>
 
-    <div class="grid gap-3" :class="props.canInstallPlugins ? 'sm:grid-cols-2' : 'max-w-sm'">
+    <div class="grid gap-3" :class="props.canInstallPlugins ? 'sm:grid-cols-3' : 'sm:grid-cols-2'">
+      <div class="flex flex-col rounded-lg border border-primary/45 bg-primary/6 p-4 shadow-xs">
+        <div class="flex flex-wrap items-center gap-2 text-muted-foreground">
+          <ServerCog :size="15" aria-hidden="true" />
+          <h3 class="text-sm font-medium text-foreground">
+            {{ t('settings.system.requests.indexers.empty.prowlarrTitle') }}
+          </h3>
+          <span class="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-medium text-primary">
+            {{ t('settings.system.requests.indexers.empty.recommended') }}
+          </span>
+        </div>
+        <p class="mt-1.5 flex-1 text-xs leading-relaxed text-muted-foreground">
+          {{ t('settings.system.requests.indexers.empty.prowlarrBody') }}
+        </p>
+        <div class="mt-3.5">
+          <Button size="sm" @click="handleAddManager">
+            <Plus :size="15" aria-hidden="true" />
+            {{ t('settings.system.requests.managers.add') }}
+          </Button>
+        </div>
+      </div>
+
       <!-- Not offered to anyone who cannot install one: a plugin runs its code in the server. -->
       <div v-if="props.canInstallPlugins" class="flex flex-col rounded-lg border border-border bg-card p-4 shadow-xs">
         <div class="flex items-center gap-2 text-muted-foreground">
           <Plug :size="15" aria-hidden="true" />
-          <h3 class="text-sm font-medium text-foreground">{{ t('settings.system.requests.indexers.empty.pluginTitle') }}</h3>
+          <h3 class="text-sm font-medium text-foreground">
+            {{ t('settings.system.requests.indexers.empty.pluginTitle') }}
+          </h3>
         </div>
         <p class="mt-1.5 flex-1 text-xs leading-relaxed text-muted-foreground">
           {{ t('settings.system.requests.indexers.empty.pluginBody') }}
@@ -62,7 +93,9 @@ function handleAddIndexer() {
       <div class="flex flex-col rounded-lg border border-border bg-card p-4 shadow-xs">
         <div class="flex items-center gap-2 text-muted-foreground">
           <Server :size="15" aria-hidden="true" />
-          <h3 class="text-sm font-medium text-foreground">{{ t('settings.system.requests.indexers.empty.builtInTitle') }}</h3>
+          <h3 class="text-sm font-medium text-foreground">
+            {{ t('settings.system.requests.indexers.empty.builtInTitle') }}
+          </h3>
         </div>
         <p class="mt-1.5 flex-1 text-xs leading-relaxed text-muted-foreground">
           {{ t('settings.system.requests.indexers.empty.builtInBody') }}
