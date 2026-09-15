@@ -196,6 +196,32 @@ describe('DownloadClientConfigService', () => {
     expect(repo.createWithPathMappings).toHaveBeenCalledWith(expect.objectContaining({ credentialsEnc: 'cipher' }), expect.anything());
   });
 
+  it('requires an API key when creating SABnzbd and stores it in the encrypted credential field', async () => {
+    const { service, credentials, repo } = makeService();
+    const sabDto = { ...createDto, name: 'sab', adapterType: 'sabnzbd' as const };
+
+    await expect(service.create(sabDto)).rejects.toMatchObject({ response: { errorCode: 'DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED' } });
+    expect(repo.createWithPathMappings).not.toHaveBeenCalled();
+
+    await service.create({ ...sabDto, password: 'api-key' });
+    expect(credentials.encrypt).toHaveBeenCalledWith('api-key');
+    expect(repo.createWithPathMappings).toHaveBeenCalledWith(
+      expect.objectContaining({ adapterType: 'sabnzbd', username: null, credentialsEnc: 'cipher' }),
+      expect.anything(),
+    );
+  });
+
+  it('does not allow the required SABnzbd API key to be cleared', async () => {
+    const { service, repo } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue({ client: clientRow({ adapterType: 'sabnzbd' }), pathMappings: [] }) },
+    });
+
+    await expect(service.update(4, { password: '' })).rejects.toMatchObject({
+      response: { errorCode: 'DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED' },
+    });
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
   it('lets the credential service refuse a save when no encryption key is set', async () => {
     const { service } = makeService({
       credentials: {

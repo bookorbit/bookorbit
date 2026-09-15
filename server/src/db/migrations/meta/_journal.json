@@ -638,6 +638,13 @@
       "when": 1789316739511,
       "tag": "0090_add_indexer_seed_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1789451109779,
+      "tag": "0091_add_sabnzbd_download_client",
+      "breakpoints": true
     }
   ]
 }

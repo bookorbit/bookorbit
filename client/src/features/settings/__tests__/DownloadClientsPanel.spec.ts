@@ -129,6 +129,7 @@ describe('DownloadClientsPanel', () => {
       'transmission',
       'deluge',
       'nzbget',
+      'sabnzbd',
     ])
     expect(sheet().querySelector('#download-client-name')).toBeNull()
 
@@ -137,6 +138,49 @@ describe('DownloadClientsPanel', () => {
 
     expect(sheet().querySelector('#download-client-name')).not.toBeNull()
     expect(sheet().querySelector('#download-client-url')).not.toBeNull()
+  })
+
+  it('asks for an API key rather than username and password when adding SABnzbd', async () => {
+    const wrapper = await mountPanel()
+    await clickInPanel(wrapper, 'Add client')
+
+    const sabnzbd = sheet().querySelector<HTMLInputElement>('input[name="download-client-type"][value="sabnzbd"]')
+    if (sabnzbd === null) throw new Error('no SABnzbd client option')
+    sabnzbd.click()
+    clickInSheet('Continue')
+    await flushPromises()
+
+    expect(sheet().querySelector('#download-client-username')).toBeNull()
+    expect(sheet().querySelector('label[for="download-client-password"]')?.textContent).toContain('API key')
+
+    typeInto('#download-client-name', 'SAB')
+    typeInto('#download-client-url', 'http://sabnzbd:8080')
+    fillMapping()
+    clickInSheet('Save')
+    await flushPromises()
+    expect(sheet().textContent).toContain('Enter the SABnzbd API key')
+    expect(apiMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+
+    typeInto('#download-client-password', 'secret-key')
+    clickInSheet('Save')
+    await flushPromises()
+    const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'POST')
+    expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({ adapterType: 'sabnzbd', password: 'secret-key', username: '' })
+  })
+
+  it('keeps the stored SABnzbd API key when saving an unrelated edit', async () => {
+    const wrapper = await mountPanel([client({ name: 'My SABnzbd', adapterType: 'sabnzbd', username: null })])
+    await clickInPanel(wrapper, 'Edit My SABnzbd')
+
+    expect(sheet().querySelector<HTMLInputElement>('#download-client-password')?.placeholder).toContain('stored API key')
+    typeInto('#download-client-name', 'Renamed SABnzbd')
+    clickInSheet('Save')
+    await flushPromises()
+
+    const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+    const body = JSON.parse(String(saveCall?.[1]?.body))
+    expect(body.name).toBe('Renamed SABnzbd')
+    expect(body).not.toHaveProperty('password')
   })
 
   it('keeps the list rendered while a row is being edited', async () => {

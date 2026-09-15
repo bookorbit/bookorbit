@@ -75,6 +75,7 @@ export class DownloadClientConfigService {
     // behind, which the operator then cannot save over because the name is taken.
     await this.assertReachableUrl(dto.baseUrl, dto.allowPrivateAddress ?? true);
     const pathMappings = requireMappings(normalizeMappings(dto.pathMappings));
+    this.assertCredentialPresent(dto.adapterType, Boolean(dto.password?.trim()));
     const credentialsEnc = dto.password ? this.credentials.encrypt(dto.password) : null;
 
     let created: DownloadClientRow;
@@ -108,6 +109,8 @@ export class DownloadClientConfigService {
     if (dto.adapterType !== undefined && dto.adapterType !== existing.client.adapterType) {
       throw new BadRequestException('A saved download client cannot change type. Create a separate client instead.');
     }
+    const hasCredential = dto.password === undefined ? existing.client.credentialsEnc !== null : Boolean(dto.password.trim());
+    this.assertCredentialPresent(existing.client.adapterType as DownloadClientType, hasCredential);
 
     const baseUrl = dto.baseUrl?.trim() ?? existing.client.baseUrl;
     const allowPrivate = dto.allowPrivateAddress ?? existing.client.allowPrivateAddress;
@@ -267,6 +270,12 @@ export class DownloadClientConfigService {
       return new ConflictException({ message: 'A download client with this name already exists', errorCode: 'DOWNLOAD_CLIENT_NAME_TAKEN' });
     }
     return error;
+  }
+
+  private assertCredentialPresent(adapterType: DownloadClientType, hasCredential: boolean): void {
+    if (adapterType === 'sabnzbd' && !hasCredential) {
+      throw downloadClientError('DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED', 'SABnzbd needs an API key');
+    }
   }
 }
 
