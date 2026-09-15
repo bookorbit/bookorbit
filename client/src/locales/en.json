@@ -2900,7 +2900,7 @@
         "clientsEmpty": {
           "title": "No download client yet",
           "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch releases delivered by torrent or Usenet too.",
-          "note": "qBittorrent, Transmission, Deluge and NZBGet are supported."
+          "note": "qBittorrent, Transmission, Deluge, NZBGet and SABnzbd are supported."
         },
         "summary": "{type} - category {category}, priority {priority}",
         "disabled": "Disabled",
@@ -2916,7 +2916,8 @@
           "qbittorrent": "qBittorrent",
           "transmission": "Transmission",
           "deluge": "Deluge",
-          "nzbget": "NZBGet"
+          "nzbget": "NZBGet",
+          "sabnzbd": "SABnzbd"
         },
         "color": {
           "label": "Color",
@@ -2929,10 +2930,13 @@
           "baseUrl": "Base URL",
           "username": "Username",
           "password": "Password",
+          "apiKey": "API key",
           "passwordKeep": "Leave blank to keep the stored password",
+          "apiKeyKeep": "Leave blank to keep the stored API key",
           "passwordClear": "Clear",
           "passwordKeepAction": "Keep",
           "passwordWillClear": "The stored password is removed when you save",
+          "apiKeyWillClear": "The stored API key is removed when you save",
           "category": "Category",
           "categoryHint": "Tags the downloads BookOrbit adds, so it only ever acts on its own.",
           "priority": "Priority",
@@ -2941,6 +2945,7 @@
           "allowPrivateAddress": "Allow private addresses",
           "allowPrivateAddressHint": "Needed when the client runs on your local network or the same machine.",
           "passwordBrief": "Stored encrypted.",
+          "apiKeyBrief": "Found in SABnzbd under Config > General. Stored encrypted.",
           "useHardlinksBrief": "Imports without using the disk twice. Falls back to a copy across filesystems."
         },
         "mappings": {
@@ -2989,17 +2994,18 @@
           "nameTaken": "A download client with that name already exists",
           "urlUnsafe": "That base URL could not be reached. Check the address and that it uses http or https.",
           "urlPrivate": "That address is on a private or local network. Turn on \"Allow private addresses\" if the client runs there.",
-          "encryptionKeyMissing": "Set BOOK_REQUEST_ENCRYPTION_KEY before saving a password. Generate one with: openssl rand -hex 32",
-          "encryptionKeyChanged": "The stored password could not be read. BOOK_REQUEST_ENCRYPTION_KEY may have changed since it was saved.",
+          "encryptionKeyMissing": "Set BOOK_REQUEST_ENCRYPTION_KEY before saving a client credential. Generate one with: openssl rand -hex 32",
+          "encryptionKeyChanged": "The stored client credential could not be read. BOOK_REQUEST_ENCRYPTION_KEY may have changed since it was saved.",
           "pathNotAbsolute": "Path mappings must use absolute paths on both sides",
           "nameRequired": "Give this client a name.",
           "urlRequired": "Enter the address BookOrbit should reach this client at.",
-          "mappingRequired": "Add at least one path mapping, so BookOrbit knows which directory it may import from."
+          "mappingRequired": "Add at least one path mapping, so BookOrbit knows which directory it may import from.",
+          "apiKeyRequired": "Enter the SABnzbd API key from Config > General."
         },
-        "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY is not set, so a client password cannot be saved. Generate one with: openssl rand -hex 32",
+        "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY is not set, so a client credential cannot be saved. Generate one with: openssl rand -hex 32",
         "confirmDelete": {
           "title": "Remove this download client?",
-          "description": "{name}'s address and stored password are deleted, and requests downloading there stop updating. Turn it off instead to keep the details.",
+          "description": "{name}'s address and stored credential are deleted, and requests downloading there stop updating. Turn it off instead to keep the details.",
           "confirm": "Remove client"
         },
         "indexers": {
@@ -3353,7 +3359,8 @@
           "qbittorrent": "Your own qBittorrent. Needs an address and an account.",
           "transmission": "Your own Transmission. It has no categories, so the category becomes a subfolder of its download directory.",
           "deluge": "Your own Deluge. Sign in with the Web UI password; the category needs the Label plugin switched on.",
-          "nzbget": "Your own NZBGet. BookOrbit sends NZB files over its JSON-RPC API."
+          "nzbget": "Your own NZBGet. BookOrbit sends NZB files over its JSON-RPC API.",
+          "sabnzbd": "Your own SABnzbd. BookOrbit sends NZB files using its API key."
         },
         "searchHealth": {
           "failingOnce": "Last search failed",

@@ -6,7 +6,7 @@ import type { IndexerColor, ReleaseUnitChoice } from "./indexer";
  * deliberately absent: it has no address, no credentials and nothing to choose, so making it a
  * configurable client type would only ask an operator to create a record of nothing.
  */
-export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "nzbget"] as const;
+export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "nzbget", "sabnzbd"] as const;
 export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
 
 /**
@@ -21,6 +21,18 @@ export const DOWNLOAD_CLIENT_DELIVERY: Record<DownloadClientType, DownloadDelive
   transmission: "torrent",
   deluge: "torrent",
   nzbget: "usenet",
+  sabnzbd: "usenet",
+};
+
+export type DownloadClientCredentialKind = "usernamePassword" | "apiKey";
+
+/** Shapes the settings form without making one daemon's authentication model universal. */
+export const DOWNLOAD_CLIENT_CREDENTIAL_KIND: Record<DownloadClientType, DownloadClientCredentialKind> = {
+  qbittorrent: "usernamePassword",
+  transmission: "usernamePassword",
+  deluge: "usernamePassword",
+  nzbget: "usernamePassword",
+  sabnzbd: "apiKey",
 };
 
 export interface DownloadClientPathMapping {
@@ -46,6 +58,7 @@ export const DOWNLOAD_CLIENT_ERROR_CODES = [
   "DOWNLOAD_CLIENT_URL_PRIVATE",
   "DOWNLOAD_CLIENT_PATH_NOT_ABSOLUTE",
   "DOWNLOAD_CLIENT_MAPPING_REQUIRED",
+  "DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED",
   /** The test ran and the client refused or could not be reached. Carries the adapter's reason. */
   "DOWNLOAD_CLIENT_TEST_FAILED",
   "DOWNLOAD_CLIENT_RECONCILIATION_UNSUPPORTED",
