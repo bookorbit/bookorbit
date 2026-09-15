@@ -16,7 +16,7 @@
   <rect width="458" height="736" x="1" y="1" class="card" />
 
   <text x="20" y="35" class="title">Translation Progress</text>
-  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 56% average</text>
+  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 57% average</text>
 
   <line x1="20" y1="51" x2="440" y2="51" class="grid" />
 
