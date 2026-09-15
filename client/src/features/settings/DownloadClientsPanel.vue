@@ -216,6 +216,13 @@ const credentialBrief = computed(() => t(`settings.system.requests.fields.${uses
 const credentialKeep = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyKeep' : 'passwordKeep'}`))
 const credentialWillClear = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyWillClear' : 'passwordWillClear'}`))
 
+// Watched rather than reset in the picker's handler: the create form changes the type through its
+// own select, and a username left behind there is saved, hidden by the form it was saved from, and
+// then no longer editable.
+watch(usesApiKey, (apiKey) => {
+  if (apiKey && draft.value) draft.value.username = ''
+})
+
 function toggleClearPassword() {
   const current = draft.value
   if (!current) return
@@ -250,7 +257,6 @@ const typeOptions = computed<AdapterTypeOption[]>(() =>
 function handleTypePicked(type: string) {
   if (!draft.value) return
   draft.value.adapterType = type as DownloadClientType
-  if (DOWNLOAD_CLIENT_CREDENTIAL_KIND[draft.value.adapterType] === 'apiKey') draft.value.username = ''
 }
 
 /** Leaves the picker for the form the chosen client actually needs. */

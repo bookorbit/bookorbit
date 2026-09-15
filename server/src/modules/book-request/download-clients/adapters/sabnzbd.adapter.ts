@@ -55,7 +55,11 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
     if (!release.nzbFile?.length) throw new BadRequestException('A SABnzbd grab needs an NZB file');
     const key = normalizeKey(release.clientKey);
     await this.requireCategory(config);
-    if ((await this.findOwned(config)).has(key)) return { clientKey: key };
+    // A failed history entry is not an in-flight job. SABnzbd keeps one until somebody clears its
+    // history, and the client key is a stable digest, so adopting it would fail every later grab of
+    // the same release before an NZB was ever sent.
+    const owned = (await this.findOwned(config)).get(key);
+    if (owned && toStatus(key, owned).state !== 'failed') return { clientKey: key };
 
     const filename = safeNzbName(release.nzbFileName);
     const nzbBytes = new Uint8Array(new ArrayBuffer(release.nzbFile.byteLength));

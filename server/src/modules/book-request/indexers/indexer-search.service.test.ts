@@ -813,6 +813,19 @@ describe('IndexerSearchService', () => {
     expect(torznab.search.mock.calls[1]?.[1].categories.ebook).toEqual([]);
   });
 
+  it('keeps the title-only query when it expands categories after an author retry', async () => {
+    const torznab = { search: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([release()]) };
+    const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
+
+    await service.search(request());
+
+    expect(torznab.search).toHaveBeenCalledTimes(3);
+    expect(torznab.search.mock.calls[0]?.[0].author).toBe('Frank Herbert');
+    expect(torznab.search.mock.calls[1]?.[0].author).toBeNull();
+    expect(torznab.search.mock.calls[2]?.[0].author).toBeNull();
+    expect(torznab.search.mock.calls[2]?.[1].categories.ebook).toEqual([]);
+  });
+
   it('does not expand categories after a failed search', async () => {
     const torznab = { search: vi.fn().mockRejectedValue(new IndexerSearchException('unreachable', 'offline')) };
     const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
