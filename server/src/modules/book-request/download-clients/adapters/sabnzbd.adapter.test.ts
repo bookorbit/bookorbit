@@ -127,6 +127,19 @@ describe('SabnzbdAdapter', () => {
     expect(calls.some((call) => call.url.searchParams.get('mode') === 'addfile')).toBe(false);
   });
 
+  it('re-uploads rather than adopting a failed history entry for the same release', async () => {
+    const calls = mockApi({
+      queue: { queue: { slots: [] } },
+      history: { history: { slots: [{ nzo_id: 'SABnzbd_nzo_1', name: `bookorbit-9-${CLIENT_KEY}-Dune`, category: 'bookorbit', status: 'Failed' }] } },
+      get_config: configuredCategory(),
+      addfile: { status: true, nzo_ids: ['SABnzbd_nzo_2'] },
+    });
+
+    await new SabnzbdAdapter().add({ nzbFile: Buffer.from('<nzb />'), clientKey: CLIENT_KEY }, config());
+
+    expect(calls.some((call) => call.url.searchParams.get('mode') === 'addfile')).toBe(true);
+  });
+
   it('maps queue progress and completed history storage into download statuses', async () => {
     mockApi({
       queue: {

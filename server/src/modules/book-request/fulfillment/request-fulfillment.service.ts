@@ -605,8 +605,15 @@ export class RequestFulfillmentService {
       let finalError = error;
       if (indexer.managerId != null && release.downloadUrl && isRefreshableManagedReleaseError(error)) {
         // A failed refresh is not an answer about the release. The original refusal is what the
-        // caller and the log line below are owed, so nothing here may replace or escape it.
-        const refreshed = await this.releases.refreshCandidate(requestId, release.indexerId, release).catch(() => undefined);
+        // caller and the log line below are owed, so nothing here may replace or escape it - but a
+        // swallowed error still gets its own line, or the second search leaves nothing behind.
+        const refreshStartedAt = Date.now();
+        const refreshed = await this.releases.refreshCandidate(requestId, release.indexerId, release).catch((refreshError: unknown) => {
+          this.logger.warn(
+            `[book_request.release_refresh] [fail] requestId=${requestId} indexerId=${release.indexerId} durationMs=${Date.now() - refreshStartedAt} errorClass=${refreshError instanceof Error ? refreshError.constructor.name : typeof refreshError} error="${sanitizeLogValue(refreshError instanceof Error ? refreshError.message : String(refreshError))}" - could not re-search the managed release`,
+          );
+          return undefined;
+        });
         if (refreshed) {
           try {
             return await this.resolveReleaseFor(indexer, refreshed);

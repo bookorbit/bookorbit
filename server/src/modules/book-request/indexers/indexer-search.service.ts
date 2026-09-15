@@ -406,7 +406,13 @@ export class IndexerSearchService {
       }
       if (releases.length === 0 && config.autoExpandCategories && config.categories[query.mediaKind].length > 0) {
         releases = await withDeadline(
-          adapter.search(indexerScopedQuery, { ...config, categories: { ...config.categories, [query.mediaKind]: [] } }, deadline),
+          adapter.search(
+            // The author was already tried and answered nothing, so the widest retry drops it here
+            // too rather than narrowing the text again while it widens the categories.
+            { ...indexerScopedQuery, author: null },
+            { ...config, categories: { ...config.categories, [query.mediaKind]: [] } },
+            deadline,
+          ),
           deadline,
           () => new IndexerSearchException('timeout', `${config.name} did not answer in time`),
         );
