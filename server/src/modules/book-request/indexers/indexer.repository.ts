@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { BookRequestSourceStatus } from '@bookorbit/types';
+import type { BookRequestSourceStatus, IndexerColor } from '@bookorbit/types';
 
 import { DB } from '../../../db';
 import * as schema from '../../../db/schema';
@@ -23,12 +23,17 @@ export class IndexerRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findAll(): Promise<RequestIndexerRow[]> {
-    return this.db.select().from(requestIndexers).orderBy(asc(requestIndexers.id));
+    return this.db.select().from(requestIndexers).where(isNull(requestIndexers.managerId)).orderBy(asc(requestIndexers.id));
   }
 
   async findAssignedColors(): Promise<Array<RequestIndexerRow['color']>> {
     const rows = await this.db.select({ color: requestIndexers.color }).from(requestIndexers);
     return rows.map((row) => row.color);
+  }
+
+  async findColorsByIds(ids: number[]): Promise<Array<{ id: number; color: IndexerColor | null }>> {
+    if (ids.length === 0) return [];
+    return this.db.select({ id: requestIndexers.id, color: requestIndexers.color }).from(requestIndexers).where(inArray(requestIndexers.id, ids));
   }
 
   async findById(id: number): Promise<RequestIndexerRow | undefined> {
@@ -59,7 +64,7 @@ export class IndexerRepository {
     const [row] = await this.db
       .select({
         configured: sql<number>`count(*)::int`,
-        enabled: sql<number>`count(*) filter (where ${requestIndexers.enabled})::int`,
+        enabled: sql<number>`count(*) filter (where ${requestIndexers.enabled} and ${requestIndexers.managerAvailable})::int`,
       })
       .from(requestIndexers);
     return { configured: row?.configured ?? 0, enabled: row?.enabled ?? 0 };
@@ -67,7 +72,11 @@ export class IndexerRepository {
 
   /** Every enabled row. Order is stable rather than meaningful: all of them are searched. */
   async findAllEnabled(): Promise<RequestIndexerRow[]> {
-    return this.db.select().from(requestIndexers).where(eq(requestIndexers.enabled, true)).orderBy(asc(requestIndexers.id));
+    return this.db
+      .select()
+      .from(requestIndexers)
+      .where(and(eq(requestIndexers.enabled, true), eq(requestIndexers.managerAvailable, true)))
+      .orderBy(asc(requestIndexers.id));
   }
 
   async create(data: NewRequestIndexerRow): Promise<RequestIndexerRow> {

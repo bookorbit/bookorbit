@@ -373,7 +373,7 @@ export class BookRequestDownloadRepository {
         download: bookRequestDownloads,
         downloadClientName: downloadClients.name,
         downloadClientColor: downloadClients.color,
-        indexerName: requestIndexers.name,
+        indexerName: sql<string | null>`coalesce(${requestIndexers.managerMetadata}->>'displayName', ${requestIndexers.name})`,
         indexerColor: requestIndexers.color,
       })
       .from(bookRequestDownloads)
@@ -396,7 +396,7 @@ export class BookRequestDownloadRepository {
         download: bookRequestDownloads,
         downloadClientName: downloadClients.name,
         downloadClientColor: downloadClients.color,
-        indexerName: requestIndexers.name,
+        indexerName: sql<string | null>`coalesce(${requestIndexers.managerMetadata}->>'displayName', ${requestIndexers.name})`,
         indexerColor: requestIndexers.color,
       })
       .from(bookRequestDownloads)

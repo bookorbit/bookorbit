@@ -645,6 +645,13 @@
       "when": 1789451109779,
       "tag": "0091_add_sabnzbd_download_client",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1789460538956,
+      "tag": "0092_add_prowlarr_indexer_manager",
+      "breakpoints": true
     }
   ]
 }

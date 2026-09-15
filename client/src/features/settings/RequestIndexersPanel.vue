@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Loader2, Plug, Plus, RefreshCw, Server as ServerIcon, Trash2, TriangleAlert, Upload } from '@lucide/vue'
+import { ChevronDown, Loader2, Plug, Plus, RefreshCw, Server as ServerIcon, ServerCog, Trash2, TriangleAlert, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { BOOK_REQUEST_MEDIA_KINDS, INDEXER_ADAPTER_TYPES, MAX_INDEXER_SEED_TIME_MINUTES } from '@bookorbit/types'
 import type { IndexerAdapterDescriptor, IndexerItem, IndexerSettingsField } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import ChipInput from '@/components/ui/ChipInput.vue'
@@ -15,6 +16,7 @@ import RequestSourceRow from './components/RequestSourceRow.vue'
 import PluginVersionBadge from './components/PluginVersionBadge.vue'
 import PluginUpdateControls from './components/PluginUpdateControls.vue'
 import RequestSourcesEmpty from './components/RequestSourcesEmpty.vue'
+import IndexerManagersPanel from './IndexerManagersPanel.vue'
 import SettingsEditorSheet from './components/SettingsEditorSheet.vue'
 import SettingsField from './components/SettingsField.vue'
 import SettingsSection from './components/SettingsSection.vue'
@@ -66,6 +68,57 @@ const reviewedPublishedUpdate = computed(() => (pluginReview.value && 'verified'
 /** The row whose test is in flight, and the row whose enabled flag is; both go inert on their own. */
 const testingId = ref<number | null>(null)
 const togglingId = ref<number | null>(null)
+const managerPanel = ref<InstanceType<typeof IndexerManagersPanel> | null>(null)
+const managerConfigured = ref(false)
+const managerLoaded = ref(false)
+const managerSourceSummary = ref({ configured: 0, active: 0, torrent: 0, usenet: 0 })
+const nothingConfiguredOverall = computed(() => managerLoaded.value && nothingConfigured.value && !managerConfigured.value)
+
+const standaloneSourceSummary = computed(() => {
+  const summary = { configured: 0, active: 0, torrent: 0, usenet: 0, direct: 0 }
+
+  for (const indexer of indexers.value) {
+    const adapter = adapterFor(indexer.adapterType)
+    if (!adapter) continue
+
+    summary.configured += 1
+    if (!indexer.enabled) continue
+
+    summary.active += 1
+    if (adapter.delivery === 'torrent') summary.torrent += 1
+    else if (adapter.delivery === 'usenet') summary.usenet += 1
+    else summary.direct += 1
+  }
+
+  return summary
+})
+
+const sourceSummary = computed(() => ({
+  configured: managerSourceSummary.value.configured + standaloneSourceSummary.value.configured,
+  active: managerSourceSummary.value.active + standaloneSourceSummary.value.active,
+  torrent: managerSourceSummary.value.torrent + standaloneSourceSummary.value.torrent,
+  usenet: managerSourceSummary.value.usenet + standaloneSourceSummary.value.usenet,
+  direct: standaloneSourceSummary.value.direct,
+}))
+
+const hasConfiguredSources = computed(() => managerConfigured.value || indexers.value.length > 0)
+const allConfiguredSourcesDisabled = computed(() => sourceSummary.value.configured > 0 && sourceSummary.value.active === 0)
+
+function handleManagerConfigured(configured: boolean) {
+  managerConfigured.value = configured
+}
+
+function handleManagerLoaded() {
+  managerLoaded.value = true
+}
+
+function handleManagerSummary(summary: { configured: number; active: number; torrent: number; usenet: number }) {
+  managerSourceSummary.value = summary
+}
+
+function startCreateManager() {
+  managerPanel.value?.startCreate()
+}
 
 const {
   draft,
@@ -125,7 +178,6 @@ const {
   pluginRows,
   builtInRows,
   nothingConfigured,
-  allSourcesDisabled,
   editingPluginType,
   editingPlugin,
   pluginUseCount,
@@ -228,7 +280,12 @@ async function handleTest(indexer: IndexerItem) {
   testingId.value = indexer.id
   try {
     const result = await test(indexer.id)
-    if (result.success) toast.success(t('settings.system.requests.indexers.testOk', { name: result.indexerName ?? indexer.name }))
+    if (result.success)
+      toast.success(
+        t('settings.system.requests.indexers.testOk', {
+          name: result.indexerName ?? indexer.name,
+        }),
+      )
     else toast.error(result.error ?? t('settings.system.requests.indexers.errors.testFailed'))
   } finally {
     testingId.value = null
@@ -269,7 +326,9 @@ function handleTestCurrent() {
   </div>
 
   <div v-else class="space-y-4">
-    <p v-if="loadFailed" role="alert" class="text-sm text-destructive">{{ t('settings.system.requests.indexers.errors.loadFailed') }}</p>
+    <p v-if="loadFailed" role="alert" class="text-sm text-destructive">
+      {{ t('settings.system.requests.indexers.errors.loadFailed') }}
+    </p>
 
     <!--
       Kept outside both groups. It is how a plugin is chosen from the empty panel too, and that
@@ -281,16 +340,54 @@ function handleTestCurrent() {
       type="file"
       accept=".mjs"
       class="sr-only"
-      :aria-label="t('settings.system.requests.indexers.plugins.install')"
+      tabindex="-1"
+      aria-hidden="true"
       @change="handlePluginChosen"
     />
 
-    <!--
-      Said once, above the list rather than on any row. BookOrbit bundles no source: every row here
-      is an address or a plugin somebody added, and the page that names Prowlarr and Jackett is the
-      one place where whose responsibility that is has to be stated plainly.
-    -->
-    <p class="settings-hint">{{ t('settings.system.requests.indexers.posture') }}</p>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="request-sources-heading" class="settings-group-label mb-0">
+          {{ t('settings.system.requests.indexers.sources.title') }}
+        </h2>
+        <p class="settings-hint mt-1.5">
+          {{ t('settings.system.requests.indexers.sources.hint') }}
+        </p>
+      </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button size="sm">
+            <Plus :size="14" aria-hidden="true" />
+            {{ t('settings.system.requests.indexers.sources.add') }}
+            <ChevronDown :size="14" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-80">
+          <DropdownMenuItem class="items-start py-2.5" @select="startCreateManager">
+            <ServerCog class="mt-0.5" aria-hidden="true" />
+            <span>
+              <span class="block text-foreground">{{ t('settings.system.requests.indexers.sources.prowlarr') }}</span>
+              <span class="block text-xs text-muted-foreground">{{ t('settings.system.requests.indexers.sources.prowlarrHint') }}</span>
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem class="items-start py-2.5" @select="startCreate">
+            <ServerIcon class="mt-0.5" aria-hidden="true" />
+            <span>
+              <span class="block text-foreground">{{ t('settings.system.requests.indexers.sources.direct') }}</span>
+              <span class="block text-xs text-muted-foreground">{{ t('settings.system.requests.indexers.sources.directHint') }}</span>
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem v-if="canInstallPlugins" class="items-start py-2.5" @select="startPluginInstall">
+            <Plug class="mt-0.5" aria-hidden="true" />
+            <span>
+              <span class="block text-foreground">{{ t('settings.system.requests.indexers.sources.plugin') }}</span>
+              <span class="block text-xs text-muted-foreground">{{ t('settings.system.requests.indexers.sources.pluginHint') }}</span>
+            </span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
 
     <p v-if="pluginRestartPending" role="status" class="settings-hint text-primary">
       {{ t('settings.system.requests.indexers.plugins.restartRequired') }}
@@ -301,34 +398,48 @@ function handleTestCurrent() {
       comes to find out why nothing is being searched. Stated above the groups rather than on each
       row, because the fact is about the set rather than about any one source.
     -->
-    <p v-if="allSourcesDisabled" role="status" class="settings-hint text-warning">
+    <p v-if="allConfiguredSourcesDisabled" role="status" class="settings-hint text-warning">
       {{ t('settings.system.requests.indexers.allDisabled') }}
     </p>
 
+    <div
+      v-if="managerLoaded && hasConfiguredSources"
+      role="status"
+      class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-primary/8 px-3 py-2 text-sm text-foreground"
+    >
+      <span class="size-2 rounded-full bg-primary" aria-hidden="true"></span>
+      {{
+        t('settings.system.requests.indexers.sources.activeSummary', {
+          count: sourceSummary.active,
+          torrent: sourceSummary.torrent,
+          usenet: sourceSummary.usenet,
+          direct: sourceSummary.direct,
+        })
+      }}
+    </div>
+
+    <IndexerManagersPanel ref="managerPanel" @configured="handleManagerConfigured" @loaded="handleManagerLoaded" @summary="handleManagerSummary" />
+
     <RequestSourcesEmpty
-      v-if="nothingConfigured"
+      v-if="nothingConfiguredOverall"
       :can-install-plugins="canInstallPlugins"
       @install-plugin="startPluginInstall"
       @add-indexer="startCreate"
+      @add-manager="startCreateManager"
     />
 
-    <!--
-      Two things, added two ways. A plugin is a file you install and then fill in; a built-in
-      indexer is an address you already have.
-    -->
-    <!-- A wider gap than anything inside a group takes, so the two labels read as a boundary. -->
-    <div v-else class="space-y-6">
+    <!-- The larger gap and ruled labels keep each connection type distinct without hiding any of them. -->
+    <div v-else class="mt-8 space-y-8">
       <section aria-labelledby="request-plugins-heading" class="space-y-3">
-        <!-- Label and hint are one block, and the row keeps a button's height whether it has one or
-             not, so both groups read at the same rhythm. -->
         <div>
-          <div class="flex min-h-8 items-center justify-between gap-2">
-            <h2 id="request-plugins-heading" class="settings-group-label mb-0">{{ t('settings.system.requests.indexers.plugins.title') }}</h2>
-            <!-- Only while the group has rows. With none, the one call to action lives in the slot
-                 below rather than twice on the same line of the page. -->
-            <div v-if="canInstallPlugins && pluginRows.length" class="flex items-center gap-2">
+          <div class="flex min-h-8 items-center gap-3">
+            <h2 id="request-plugins-heading" class="settings-group-label mb-0 shrink-0">
+              {{ t('settings.system.requests.indexers.plugins.title') }}
+            </h2>
+            <span class="h-px min-w-8 flex-1 bg-border" aria-hidden="true"></span>
+            <div v-if="canInstallPlugins" class="flex shrink-0 items-center gap-2">
               <Button
-                v-if="hasPluginUpdateChannels"
+                v-if="hasPluginUpdateChannels && pluginRows.length"
                 size="sm"
                 variant="outline"
                 :disabled="checkingPluginUpdates || pluginBusy"
@@ -345,7 +456,7 @@ function handleTestCurrent() {
             </div>
           </div>
 
-          <p class="settings-hint settings-prose mt-1.5">
+          <p class="settings-hint mt-1.5">
             {{ t('settings.system.requests.indexers.plugins.hint') }}
             <PluginDirectoryLink v-if="canInstallPlugins" />
           </p>
@@ -358,10 +469,6 @@ function handleTestCurrent() {
           <p role="status" class="min-w-56 flex-1 text-sm text-muted-foreground">
             {{ t('settings.system.requests.indexers.plugins.none') }}
           </p>
-          <Button v-if="canInstallPlugins" size="sm" variant="outline" :disabled="pluginBusy" @click="startPluginInstall">
-            <Upload :size="14" aria-hidden="true" />
-            {{ t('settings.system.requests.indexers.plugins.install') }}
-          </Button>
         </div>
 
         <ul v-else class="space-y-2">
@@ -377,9 +484,16 @@ function handleTestCurrent() {
                   <TriangleAlert :size="17" />
                 </span>
                 <div class="min-w-0">
-                  <p class="settings-label">{{ t('settings.system.requests.indexers.plugins.brokenTitle') }}</p>
+                  <p class="settings-label">
+                    {{ t('settings.system.requests.indexers.plugins.brokenTitle') }}
+                  </p>
                   <p class="mt-1 text-xs break-words text-destructive">
-                    {{ t('settings.system.requests.indexers.pluginFailed', { directory: row.failure.directory, reason: row.failure.reason }) }}
+                    {{
+                      t('settings.system.requests.indexers.pluginFailed', {
+                        directory: row.failure.directory,
+                        reason: row.failure.reason,
+                      })
+                    }}
                   </p>
                 </div>
               </div>
@@ -410,7 +524,9 @@ function handleTestCurrent() {
                       {{ t('settings.system.requests.indexers.plugins.notSetUp') }}
                     </span>
                   </div>
-                  <p class="mt-1 font-mono text-xs break-all text-muted-foreground">{{ row.adapter.type }}</p>
+                  <p class="mt-1 font-mono text-xs break-all text-muted-foreground">
+                    {{ row.adapter.type }}
+                  </p>
                   <PluginUpdateControls
                     :updateable="row.adapter.updateable === true"
                     :status="updateStatusFor(row.adapter.type)"
@@ -492,15 +608,20 @@ function handleTestCurrent() {
 
       <section aria-labelledby="request-indexers-heading" class="space-y-3">
         <div>
-          <div class="flex min-h-8 items-center justify-between gap-2">
-            <h2 id="request-indexers-heading" class="settings-group-label mb-0">{{ t('settings.system.requests.indexers.title') }}</h2>
-            <Button v-if="builtInRows.length" size="sm" variant="outline" @click="startCreate">
+          <div class="flex min-h-8 items-center gap-3">
+            <h2 id="request-indexers-heading" class="settings-group-label mb-0 shrink-0">
+              {{ t('settings.system.requests.indexers.title') }}
+            </h2>
+            <span class="h-px min-w-8 flex-1 bg-border" aria-hidden="true"></span>
+            <Button class="shrink-0" size="sm" variant="outline" @click="startCreate">
               <Plus :size="14" aria-hidden="true" />
               {{ t('settings.system.requests.indexers.add') }}
             </Button>
           </div>
 
-          <p class="settings-hint settings-prose mt-1.5">{{ t('settings.system.requests.indexers.hint') }}</p>
+          <p class="settings-hint mt-1.5">
+            {{ t('settings.system.requests.indexers.hint') }}
+          </p>
         </div>
 
         <div v-if="!builtInRows.length" class="settings-empty-state flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 text-start md:px-5">
@@ -510,10 +631,6 @@ function handleTestCurrent() {
           <p role="status" class="min-w-56 flex-1 text-sm text-muted-foreground">
             {{ t('settings.system.requests.indexers.none') }}
           </p>
-          <Button size="sm" variant="outline" @click="startCreate">
-            <Plus :size="14" aria-hidden="true" />
-            {{ t('settings.system.requests.indexers.add') }}
-          </Button>
         </div>
 
         <ul v-else class="space-y-2">
@@ -545,13 +662,19 @@ function handleTestCurrent() {
       "
       :remove-confirm="
         editingPluginType
-          ? t('settings.system.requests.indexers.plugins.confirmRemove', { label: editingPlugin?.label ?? draft.name })
+          ? t('settings.system.requests.indexers.plugins.confirmRemove', {
+              label: editingPlugin?.label ?? draft.name,
+            })
           : t('settings.system.requests.indexers.confirmDelete.title')
       "
       :remove-consequence="
         editingPluginType
-          ? t('settings.system.requests.indexers.plugins.removeWarning', { count: pluginUseCount })
-          : t('settings.system.requests.indexers.confirmDelete.description', { name: draft.name })
+          ? t('settings.system.requests.indexers.plugins.removeWarning', {
+              count: pluginUseCount,
+            })
+          : t('settings.system.requests.indexers.confirmDelete.description', {
+              name: draft.name,
+            })
       "
       @save="handleSave"
       @cancel="cancelEdit"
@@ -698,8 +821,12 @@ function handleTestCurrent() {
 
         <SettingsSection :title="t('settings.system.requests.sections.search')">
           <fieldset v-if="canScopeMediaKinds">
-            <legend class="settings-label">{{ t('settings.system.requests.indexers.mediaKinds.label') }}</legend>
-            <p class="settings-hint">{{ t('settings.system.requests.indexers.mediaKinds.hint') }}</p>
+            <legend class="settings-label">
+              {{ t('settings.system.requests.indexers.mediaKinds.label') }}
+            </legend>
+            <p class="settings-hint">
+              {{ t('settings.system.requests.indexers.mediaKinds.hint') }}
+            </p>
 
             <div class="mt-3 grid gap-3 sm:grid-cols-3">
               <SettingsToggleField
@@ -802,18 +929,28 @@ function handleTestCurrent() {
             </SettingsField>
           </div>
 
-          <p class="settings-hint">{{ t('settings.system.requests.indexers.seeding.clientSupport') }}</p>
-          <p class="settings-hint">{{ t('settings.system.requests.indexers.seeding.futureGrabs') }}</p>
+          <p class="settings-hint">
+            {{ t('settings.system.requests.indexers.seeding.clientSupport') }}
+          </p>
+          <p class="settings-hint">
+            {{ t('settings.system.requests.indexers.seeding.futureGrabs') }}
+          </p>
 
           <div class="rounded-md border border-border bg-muted/30 p-3">
-            <p class="settings-label">{{ t('settings.system.requests.indexers.seeding.summary.title') }}</p>
+            <p class="settings-label">
+              {{ t('settings.system.requests.indexers.seeding.summary.title') }}
+            </p>
             <dl class="mt-2 grid gap-2 text-xs sm:grid-cols-2">
               <div>
-                <dt class="text-muted-foreground">{{ t('settings.system.requests.indexers.seeding.summary.ratio') }}</dt>
+                <dt class="text-muted-foreground">
+                  {{ t('settings.system.requests.indexers.seeding.summary.ratio') }}
+                </dt>
                 <dd class="text-foreground">{{ ratioSeedSummary }}</dd>
               </div>
               <div>
-                <dt class="text-muted-foreground">{{ t('settings.system.requests.indexers.seeding.summary.time') }}</dt>
+                <dt class="text-muted-foreground">
+                  {{ t('settings.system.requests.indexers.seeding.summary.time') }}
+                </dt>
                 <dd class="text-foreground">{{ timeSeedSummary }}</dd>
               </div>
             </dl>
@@ -920,7 +1057,9 @@ function handleTestCurrent() {
           <summary class="settings-label cursor-pointer rounded focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none">
             {{ t('settings.system.requests.indexers.network.title') }}
           </summary>
-          <p class="settings-hint mt-1">{{ t('settings.system.requests.indexers.network.brief') }}</p>
+          <p class="settings-hint mt-1">
+            {{ t('settings.system.requests.indexers.network.brief') }}
+          </p>
 
           <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <SettingsField
@@ -974,10 +1113,16 @@ function handleTestCurrent() {
 
     <ConfirmDialog
       :open="pluginPendingRemoval !== null"
-      :title="t('settings.system.requests.indexers.plugins.confirmRemove', { label: pluginPendingRemoval?.label ?? '' })"
+      :title="
+        t('settings.system.requests.indexers.plugins.confirmRemove', {
+          label: pluginPendingRemoval?.label ?? '',
+        })
+      "
       :description="
         pendingRemovalUsage > 0
-          ? t('settings.system.requests.indexers.plugins.removeWarning', { count: pendingRemovalUsage })
+          ? t('settings.system.requests.indexers.plugins.removeWarning', {
+              count: pendingRemovalUsage,
+            })
           : t('settings.system.requests.indexers.plugins.removeUnusedWarning')
       "
       :confirm-label="t('settings.system.requests.indexers.plugins.removeAction')"
@@ -1006,35 +1151,53 @@ function handleTestCurrent() {
         <SettingsSection :title="t('settings.system.requests.indexers.plugins.declares')">
           <dl class="grid gap-2 text-sm sm:grid-cols-2">
             <div>
-              <dt class="settings-hint">{{ t('settings.system.requests.indexers.fields.name') }}</dt>
+              <dt class="settings-hint">
+                {{ t('settings.system.requests.indexers.fields.name') }}
+              </dt>
               <dd class="text-foreground">{{ pluginReview.label }}</dd>
             </div>
             <div>
-              <dt class="settings-hint">{{ t('settings.system.requests.indexers.plugins.type') }}</dt>
+              <dt class="settings-hint">
+                {{ t('settings.system.requests.indexers.plugins.type') }}
+              </dt>
               <dd class="text-foreground">{{ pluginReview.type }}</dd>
             </div>
             <div>
-              <dt class="settings-hint">{{ t('settings.system.requests.indexers.plugins.version') }}</dt>
+              <dt class="settings-hint">
+                {{ t('settings.system.requests.indexers.plugins.version') }}
+              </dt>
               <dd class="text-foreground">
                 {{ pluginReview.version ?? t('settings.system.requests.indexers.plugins.versionUnknownValue') }}
               </dd>
             </div>
             <div v-if="reviewedPublishedUpdate">
-              <dt class="settings-hint">{{ t('settings.system.requests.indexers.plugins.installedVersion') }}</dt>
+              <dt class="settings-hint">
+                {{ t('settings.system.requests.indexers.plugins.installedVersion') }}
+              </dt>
               <dd class="text-foreground">
                 {{ reviewedPublishedUpdate.currentVersion ?? t('settings.system.requests.indexers.plugins.versionUnknownValue') }}
               </dd>
             </div>
             <div v-if="pluginReview.update" class="sm:col-span-2">
-              <dt class="settings-hint">{{ t('settings.system.requests.indexers.plugins.updateChannel') }}</dt>
-              <dd class="font-mono text-xs break-all text-foreground">{{ pluginReview.update.manifestUrl }}</dd>
+              <dt class="settings-hint">
+                {{ t('settings.system.requests.indexers.plugins.updateChannel') }}
+              </dt>
+              <dd class="font-mono text-xs break-all text-foreground">
+                {{ pluginReview.update.manifestUrl }}
+              </dd>
             </div>
             <div>
-              <dt class="settings-hint">{{ t('settings.system.requests.indexers.plugins.media') }}</dt>
-              <dd class="text-foreground">{{ pluginReview.mediaKinds.join(', ') }}</dd>
+              <dt class="settings-hint">
+                {{ t('settings.system.requests.indexers.plugins.media') }}
+              </dt>
+              <dd class="text-foreground">
+                {{ pluginReview.mediaKinds.join(', ') }}
+              </dd>
             </div>
             <div>
-              <dt class="settings-hint">{{ t('settings.system.requests.indexers.plugins.credential') }}</dt>
+              <dt class="settings-hint">
+                {{ t('settings.system.requests.indexers.plugins.credential') }}
+              </dt>
               <dd class="text-foreground">
                 {{
                   pluginReview.requiresCredential
@@ -1052,7 +1215,11 @@ function handleTestCurrent() {
             {{ t('settings.system.requests.indexers.plugins.signatureVerified') }}
           </p>
           <p v-if="pluginReview.replaces" role="status" class="settings-hint text-primary">
-            {{ t('settings.system.requests.indexers.plugins.replaces', { type: pluginReview.type }) }}
+            {{
+              t('settings.system.requests.indexers.plugins.replaces', {
+                type: pluginReview.type,
+              })
+            }}
           </p>
         </SettingsSection>
 
