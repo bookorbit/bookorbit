@@ -1636,6 +1636,7 @@
             "hint": "Beim Abrufen von Metadaten die zurückgegebenen Anbieter-IDs (ISBN, ASIN, Goodreads-ID usw.) im Buchdatensatz speichern, für genauere zukünftige Suchen."
           },
           "existingProviderIdsOnly": {
+            "label": "Nur vorhandene Provider-IDs verwenden",
             "hint": "Für Bücher, die bereits in der Bibliothek sind, werden nur Anbieter mit einer gespeicherten ID abgefragt und nie auf eine Suche zurückgefallen, wenn eine ID-Suche fehlschlägt. Manuelle Suche und Neubucherkennung bleiben davon unberührt."
           }
         },
@@ -1927,7 +1928,16 @@
         "lineHeightHint": "Vertikaler Abstand zwischen den Zeilen",
         "paragraphSpacing": "Absatzabstand",
         "paragraphSpacingHint": "Abstand zwischen den Absätzen. Standard Buch bewahrt den Abstand des Herausgebers.",
+        "paragraphSpacingDefault": "Buchstandard",
+        "paragraphSpacingValue": "{value} em",
+        "letterSpacing": "Zeichenabstand",
+        "letterSpacingHint": "Abstand zwischen Buchstaben. Buchstandard bewahrt den Abstand des Herausgebers.",
+        "wordSpacing": "Wortabstand",
+        "wordSpacingHint": "Abstand zwischen Wörtern. Buchstandard bewahrt den Abstand des Herausgebers.",
+        "textIndent": "Einzug erste Zeile",
         "textIndentHint": "Einzug am Anfang von normalen Absätzen. Buchstandard beibehaltet die vom Verlag vorgegebenen Einzug.",
+        "custom": "Benutzerdefiniert",
+        "emValue": "{value} em",
         "justify": "Text ausrichten",
         "justifyHint": "Text an beiden Rändern ausrichten",
         "hyphenation": "Silbentrennung",
@@ -2801,38 +2811,263 @@
       "tabs": {
         "file-naming": "Dateibenennung",
         "book-dock": "Bücherablage",
+        "requests": "Anfragen",
         "maintenance": "Wartung",
         "audit-log": "Prüfprotokoll"
       },
       "requests": {
+        "title": "Anfragen",
+        "subtitle": "Wo Veröffentlichungen gefunden werden, was holt sie herab und was passiert, sobald sie verfügbar werden.",
+        "tabs": {
+          "sources": "Quellen",
+          "clients": "Download Programme",
+          "automation": "Automatisierung"
+        },
+        "loading": "Lädt Download Programme...",
+        "clients": "Download Programme",
+        "addClient": "Programm hinzufügen",
+        "editClient": "Programm bearbeiten",
+        "deleteClient": "{name} löschen",
+        "clientsEmpty": {
+          "title": "Noch kein Download Programm",
+          "body": "Ein direkter HTTP-Download benötigt kein Programm. Verbinde eins, damit BookOrbit auch das abrufen kann, was ein Tracker als Torrent anbietet.",
+          "note": "qBittorrent, Transmission und Deluge werden unterstützt."
+        },
+        "summary": "{type} - Kategorie {category}, Priorität {priority}",
+        "disabled": "Deaktiviert",
+        "test": "Verbindung testen",
+        "testSaveFirst": "Änderungen vor dem Testen speichern",
+        "testOk": "Verbunden mit {client} {version}",
+        "testOkNoVersion": "Verbunden mit {client}",
         "lastTestOk": "Zuletzt getestet {time}: verbunden",
+        "lastTestFailed": "Zuletzt getestet: {time}: {error}",
+        "saved": "Download Programm gespeichert",
+        "deleted": "Download Programm entfernt",
+        "clientTypes": {
+          "qbittorrent": "qBittorrent",
+          "transmission": "Transmission",
+          "deluge": "Deluge"
+        },
+        "color": {
+          "label": "Farbe",
+          "hint": "Markiert dieses Programm in Transferdetails. Das Transferprotokoll behält seine eigene Farbe.",
+          "none": "Keine Farbe"
+        },
         "fields": {
           "name": "Name",
+          "type": "Programm-Typ",
+          "baseUrl": "Basis URL",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "passwordKeep": "Leer lassen, um das aktuelle Passwort beizubehalten",
+          "passwordClear": "Leeren",
           "passwordKeepAction": "Behalten",
-          "enabled": "Aktiviert"
+          "passwordWillClear": "Das gespeicherte Passwort wird beim Speichern entfernt",
+          "category": "Kategorie",
+          "categoryHint": "Schlagwörter, die der BookOrbit hinzufügt, so dass er nur eigene Torrents bearbeitet.",
+          "priority": "Priorität",
+          "enabled": "Aktiviert",
+          "useHardlinks": "Hardlinks verwenden",
+          "allowPrivateAddress": "Erlaube private Adressen",
+          "allowPrivateAddressHint": "Benötigt, wenn das Programm in Ihrem lokalen Netzwerk oder auf dem gleichen Rechner läuft.",
+          "passwordBrief": "Verschlüsselt gespeichert.",
+          "useHardlinksBrief": "Seeded ohne den Speicherplatz zweimal zu verwenden. Verwendet nur eine Kopie über Dateisysteme."
+        },
+        "mappings": {
+          "title": "Pfadzuordnungen",
+          "hint": "Geben Sie die Pfade, die das Programm meldet, in Pfade an, die BookOrbit öffnen kann. Benötigt wenn die beiden in separaten Containern ausgeführt werden.",
+          "add": "Zuordnung hinzufügen",
+          "remove": "Zuordnung entfernen",
+          "remotePath": "Programm Pfad",
+          "localPath": "BookOrbit Pfad",
+          "brief": "Erforderlich. Bestimmt das Verzeichnis , aus dem BookOrbit importiert; wenn das Programm die gleichen Dateien in den gleichen Pfaden sieht, ordnet das Downloadverzeichnis sich selbst zu.",
+          "identityExample": "Gleiches Dateisystem? Benutzen Sie den gleichen Pfad auf beiden Seiten, zum Beispiel /downloads auf der linken Seite und /downloads auf der rechten Seite."
+        },
+        "hardlink": {
+          "test": "Hardlink testen",
+          "checking": "Überprüfe...",
+          "works": "Hardlinks funktionieren: Importe verwenden den Speicherplatz nicht doppelt.",
+          "unavailable": "Hardlinks sind hier nicht verfügbar: Importe werden kopiert und der Speicherplatz doppelt verwendet.",
+          "link_refused": "Dieses Dateisystem hat den Hardlink abgelehnt ({code}): Importe werden kopiert und der Speicherplatz doppelt verwendet.",
+          "download_dir_unwritable": "BookOrbit kann nicht in das Downloadverzeichnis schreiben ({code}), daher konnte Hardlink nicht getestet werden.",
+          "localMissing": "BookOrbit kann diesen Pfad nicht erkennen.",
+          "dockMissing": "Der Ordner Book Dock ist nicht lesbar."
+        },
+        "reconciliation": {
+          "action": "Abgleichen",
+          "clean": "Jedes eigene Programm-Element entspricht einem gespeicherten BookOrbit-Downloadversuch.",
+          "unsupported": "Dieses Programm kann keine Einträge nach BookOrbit Eigentümer-Kennzeichnung auflisten. Aktivieren Sie für Deluge das Label-Plugin; für Transmission konfigurieren Sie einen Kategorie-Ordner.",
+          "truncated": "Das Programm hat mehr als 1.000 Einträge zurückgegeben. Beheben Sie die sichtbaren Einträge, dann gleichen Sie nochmal ab.",
+          "orphan": "Kein BookOrbit Versuch besitzt diesen Programm-Eintrag.",
+          "failedAttempt": "Das Programm enthält diesen Artikel noch, aber der Versuch nach \"{title}\" ist fehlgeschlagen.",
+          "missing": "Dieser {status} Versuch ist nicht mehr im Download-Programm vorhanden.",
+          "adopt": "An {title} anhängen",
+          "adopted": "Programm-Eintrag an {title} angehängt",
+          "remove": "Vom Programm entfernen",
+          "removed": "Verwaiste Programm-Element entfernt.",
+          "removeTitle": "Das verwaiste Client-Element entfernen?",
+          "removeDescription": "{name} wurde vom Download-Programm entfernt. Die heruntergeladenen Dateien werden beibehalten.",
+          "notOrphan": "Dieses Client-Element ist noch mit einem BookOrbit Download-Versuch verbunden."
+        },
+        "errors": {
+          "loadFailed": "Download Programm konnte nicht laden werden",
+          "saveFailed": "Download Programm konnte nicht gespeichert werden",
+          "deleteFailed": "Download Programm konnte nicht entfernt werden",
+          "testFailed": "Download Programm konnte nicht erreicht werden",
+          "nameAndUrlRequired": "Ein Name und eine Basis-URL sind erforderlich",
+          "nameTaken": "Ein Download Programm mit diesem Namen existiert bereits",
+          "urlPrivate": "Diese Adresse ist in einem privaten oder lokalen Netzwerk. Aktivieren Sie \"Private Adressen erlauben\", wenn der Client dort läuft.",
+          "nameRequired": "Geben Sie diesem Client einen Namen.",
+          "urlRequired": "Geben Sie die Adresse ein, unter der BookOrbit diesen Client erreichen soll."
+        },
+        "confirmDelete": {
+          "title": "Dieses Download Programm entfernen?",
+          "confirm": "Programm entfernen"
         },
         "indexers": {
+          "title": "Torrent-Indexer",
+          "loading": "Lade Indexer...",
+          "empty": {
+            "title": "Noch keine Quellen",
+            "pluginTitle": "Plugin installieren",
+            "torznabTitle": "Torznab-Indexer hinzufügen"
+          },
+          "add": "Indexer hinzufügen",
+          "edit": "Indexer bearbeiten",
+          "delete": "{name} löschen",
+          "none": "Noch kein Indexer.",
+          "disabled": "Deaktiviert",
+          "test": "Verbindung testen",
+          "testSaveFirst": "Änderungen vor dem Testen speichern",
+          "testOk": "Verbunden mit ${name}",
+          "toggleAria": "Suche mit {name}",
+          "enabledNotice": "{name} wird durchsucht",
+          "disabledNotice": "{name} wird nicht durchsucht",
+          "lastTestOk": "Zuletzt getestet {time}: verbunden",
+          "lastTestFailed": "Zuletzt getestete {time}: {error}",
+          "saved": "Indexer gespeichert",
+          "deleted": "Quelle gelöscht",
+          "pluginFailed": "Das Plugin in \"{directory}\" wurde nicht geladen: {reason}",
+          "network": {
+            "title": "Erweitertes Netzwerk",
+            "resolvers": "DNS-Server",
+            "proxyUrl": "Proxy-URL"
+          },
+          "types": {
+            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)"
+          },
           "fields": {
             "name": "Name",
-            "credentialKeepAction": "Behalten"
+            "type": "Indexer-Typ",
+            "baseUrl": "Basis-URL",
+            "credential": {
+              "apiKey": "API-Schlüssel",
+              "sessionId": "Session-ID"
+            },
+            "credentialKeep": "Leer lassen, um das aktuelle Passwort beizubehalten",
+            "credentialClear": "Leeren",
+            "credentialKeepAction": "Behalten",
+            "credentialWillClear": "Die gespeicherten Anmeldeinformationen werden beim Speichern entfernt",
+            "enabled": "Aktiviert",
+            "allowPrivateAddress": "Private Adressen erlauben",
+            "credentialBrief": "Verschlüsselt gespeichert.",
+            "searchByIsbn": "Suche nach ISBN"
           },
           "color": {
+            "label": "Farbe",
+            "none": "Keine Farbe",
             "options": {
               "blue": "Blau",
+              "indigo": "Indigo",
+              "purple": "Lila",
               "pink": "Pink",
               "red": "Rot",
+              "orange": "Orange",
+              "yellow": "Gelb",
               "lime": "Lindgrün",
+              "green": "Grün",
               "teal": "Aquamarin"
             }
           },
+          "mediaKinds": {
+            "label": "Diese Quelle durchsuchen nach"
+          },
+          "categories": {
+            "title": "Kategorien"
+          },
+          "settings": {
+            "restoreDefault": "Standard wiederherstellen"
+          },
+          "confirmDelete": {
+            "title": "Diese Quelle löschen",
+            "confirm": "Quelle löschen"
+          },
+          "errors": {
+            "loadFailed": "Indexer konnte nicht geladen werden",
+            "saveFailed": "Indexer konnte nicht gespeichert werden",
+            "deleteFailed": "Quelle konnte nicht gelöscht werden",
+            "testFailed": "Indexer konnte nicht erreicht werden",
+            "nameAndUrlRequired": "Ein Name und eine Basis-URL sind erforderlich",
+            "nameTaken": "Ein Indexer mit diesem Namen existiert bereits",
+            "urlUnsafe": "Diese Basis-URL konnte nicht erreicht werden. Überprüfe die Adresse und ob sie http oder https verwendet.",
+            "urlPrivate": "Diese Adresse ist in einem privaten oder lokalen Netzwerk. Aktivieren Sie \"Private Adressen erlauben\", wenn der Indexer dort läuft.",
+            "credentialRequired": "Dieser Indexer benötigt Anmeldeinformationen, bevor er verwendet werden kann",
+            "nameRequired": "Geben Sie diesem Indexer einen Namen.",
+            "urlRequired": "Geben Sie die Adresse ein, nach der BookOrbit suchen soll."
+          },
+          "editName": "{name} bearbeiten",
+          "editorDescription": "Einstellungen für diesen Indexer.",
+          "chooseType": "Wählen Sie einen Indexer-Typ",
+          "builtIn": "Integriert",
+          "plugin": "Plugin",
           "plugins": {
+            "title": "Plugins",
+            "install": "Plugin installieren",
+            "installFailed": "Dieses Plugin konnte nicht installiert werden.",
+            "inspectFailed": "Diese Datei konnte nicht als Plugin gelesen werden.",
+            "removeAction": "Plugin löschen",
+            "removed": "{type} und seine Quellen gelöscht.",
+            "removeFailed": "Dieses Plugin konnte nicht gelöscht werden.",
+            "confirmRemove": "{label} Plugin löschen?",
+            "replaces": "Dies ersetzt das bereits installierte {type} Plugin.",
+            "restartRequired": "Starte BookOrbit neu, damit die Plugin-Änderung wirksam wird.",
+            "confirmInstall": "Plugin installieren",
+            "configure": "Einrichten",
+            "notSetUp": "Noch nicht eingerichtet",
+            "brokenTitle": "Ein Plugin lädt nicht",
+            "update": "Plugin updaten",
+            "replaceTitle": "Dieses Plugin ersetzen?",
+            "replace": "Plugin ersetzen",
+            "reviewTitle": "Dieses Plugin installieren?",
             "type": "Typ",
-            "credentialNone": "Keine"
+            "version": "Version",
+            "versionLabel": "Plugin-Version {version}",
+            "versionUnknown": "Plugin-Version unbekannt",
+            "versionUnknownValue": "Unbekannt",
+            "media": "Medien",
+            "credential": "Anmeldeinformationen",
+            "credentialRequired": "Erforderlich",
+            "credentialNone": "Keine",
+            "sectionTitle": "Plugin"
           }
         },
         "automation": {
+          "title": "Automatisierung",
+          "groupDownloads": "Automatische Downloads",
+          "groupImports": "Import-Prüfungen",
+          "stateOn": "An",
           "stateOff": "Aus",
-          "autoSearchMaxAgeUnit": "Tage"
+          "howDownloads": "Wie automatische Downloads funktionieren",
+          "howImports": "Wie Import-Prüfungen funktionieren",
+          "saveFailed": "Diese Einstellung konnte nicht gespeichert werden",
+          "autoGrabEnabled": "Automatische Downloads sind an",
+          "autoGrabDisabled": "Automatische Downloads sind aus",
+          "minScore": "Minimaler Release-Wert",
+          "maxAttempts": "Versuche pro Anfrage",
+          "autoSearchInterval": "Suche erneut nach",
+          "autoSearchIntervalUnit": "Stunden",
+          "autoSearchMaxAgeUnit": "Tage",
+          "selectFolder": "Wähle einen Ordner"
         },
         "profiles": {
           "anyLayout": "Beliebig",
@@ -2840,6 +3075,8 @@
           "mono": "Mono",
           "multiSelectAny": "Beliebig"
         },
+        "continueWithType": "Weiter",
+        "editorDescription": "Einstellungen für dieses Download Programm.",
         "searchHealth": {
           "failingStreak": "{count} Suche in einer Zeile fehlgeschlagen"
         }
@@ -3519,6 +3756,7 @@
       "Collection": "Sammlung",
       "SmartScope": "Intelligenter Bereich",
       "BookDockFile": "Bücherablage-Datei",
+      "DownloadClient": "Download Programm",
       "Author": "Autor",
       "AppSettings": "App-Einstellungen",
       "Genre": "Genre",
@@ -3547,6 +3785,9 @@
       "BookDelete": "Buch löschen",
       "BookBulkDelete": "Bücher löschen",
       "BookDockFinalize": "Bücherablage-Datei finalisieren",
+      "DownloadClientCreate": "Download Programm erstellen",
+      "DownloadClientUpdate": "Download Programm aktualisieren",
+      "DownloadClientDelete": "Download Programm löschen",
       "EntityManagerSplit": "Entität aufteilen"
     }
   },
@@ -3582,6 +3823,7 @@
       "orDivider": "oder",
       "forgotPassword": "Passwort vergessen?",
       "signUp": "Registrieren",
+      "registeredNotice": "Konto erstellt. Melden Sie sich an, um fortzufahren. Ein Administrator muss Berechtigungen erteilen, bevor Sie auf die Bibliothek zugreifen können.",
       "errors": {
         "invalidCredentials": "Ungültiger Benutzername oder ungültiges Passwort",
         "tooManyAttempts": "Zu viele Anmeldeversuche. Bitte warten Sie eine Minute und versuchen Sie es erneut."
@@ -3669,6 +3911,7 @@
         "all": "Alle",
         "noPortrait": "Kein Portrait",
         "multipleBooks": "2+ Bücher",
+        "recentlyAdded": "Diese Woche hinzugefügt",
         "noSortName": "Keine Namenssortierung"
       }
     },
@@ -5248,6 +5491,7 @@
       },
       "sort": {
         "label": "Sortieren nach",
+        "createdAt": "Kürzlich hinzugefügt",
         "fileName": "Dateiname",
         "fileSize": "Größe",
         "format": "Format",
@@ -5276,6 +5520,25 @@
       "dockFileIdLabel": "Bücherablage Datei-ID",
       "dockFileIdPlaceholder": "z.b. 42",
       "fulfilFromDock": "Eine Bücherablage-Datei"
+    },
+    "toasts": {
+      "downloadRemoved": "Vom Download Programm entfernt"
+    },
+    "errors": {
+      "removeDownloadFailed": "Dieser Torrent konnte nicht vom Download Programm entfernt werden"
+    },
+    "grab": {
+      "title": "An ein Download Programm senden",
+      "noClientList": "BookOrbit verwendet das aktivierte Download Programm mit der höchsten Priorität."
+    },
+    "releases": {
+      "refused": {
+        "clientRefused": "Ihr Download Programm hat eine frühere Veröffentlichung abgelehnt"
+      }
+    },
+    "seed": {
+      "loadFailed": "Das Download Programm konnte für diese Anfrage nicht erreicht werden.",
+      "notInClient": "Das Download Programm hat diesen Torrent nicht mehr."
     },
     "table": {
       "age": "Alter"
@@ -5355,6 +5618,7 @@
       "annotations": "Anmerkungen",
       "uploadBooks": "Bücher hochladen",
       "appearance": "Erscheinungsbild",
+      "appearanceDescription": "Wählen Sie Themen-, Akzent-, Eckradius-, Oberflächen- und Hintergrundoptionen.",
       "theme": "Design",
       "accent": "Akzent",
       "radius": "Rundung",
@@ -5374,6 +5638,7 @@
         "body": "Wenn BookOrbit Ihnen bei Ihrer Bibliothek hilft, geben Sie dem Projekt doch einen Stern auf GitHub. Das hilft mehr Menschen, die App zu entdecken, und unterstützt die weitere Entwicklung.",
         "cta": "BookOrbit auf GitHub mit Stern versehen"
       },
+      "surfaceOpacity": "Oberflächentransparenz",
       "surfaceOpacityValue": "{value}%",
       "surfaceBrightnessValue": "{value}%"
     },
@@ -5590,6 +5855,9 @@
         "longWait": "Das lange Warten"
       },
       "shelfNames": {
+        "recentlyAdded": "Kürzlich hinzugefügt",
+        "continueReading": "Weiterlesen",
+        "continueListening": "Weiterhören",
         "smartScope": "Intelligenter Bereich"
       },
       "shelfLayout": {
@@ -7571,7 +7839,8 @@
         "previousPage": "Vorherige Seite",
         "nextPage": "Nächste Seite",
         "morePages": "Weitere Seiten",
-        "noMatchesTitle": "Keine Treffer"
+        "noMatchesTitle": "Keine Treffer",
+        "clearFilters": "Filter zurücksetzen"
       },
       "deleteMode": {
         "label": "Löschmodus",
@@ -7610,10 +7879,16 @@
     },
     "missingResources": {
       "untitled": "Unbenannt",
+      "clearSelection": "Auswahl leeren",
       "sweep": {
         "title": "Cover-Überprüfung",
         "run": "Überprüfung ausführen",
-        "running": "Überprüfe"
+        "running": "Überprüfe",
+        "lastRun": "Zuletzt überprüfte {at}"
+      },
+      "categories": {
+        "missing_books": "Fehlende Bücher",
+        "broken_covers": "Defekte Cover"
       },
       "coverSource": {
         "extracted": "Extrahiert",
@@ -7824,6 +8099,7 @@
     "notFound": "Nicht gefunden",
     "signIn": "Anmelden",
     "initialSetup": "Ersteinrichtung",
+    "register": "Konto erstellen",
     "forgotPassword": "Passwort vergessen",
     "resetPassword": "Passwort zurücksetzen",
     "completingSignIn": "Anmeldung wird abgeschlossen",
@@ -7873,11 +8149,13 @@
       "users": "Benutzer",
       "account-activity": "Kontoaktivität",
       "magic-links": "Magic Links",
-      "oidc": "OIDC / SSO"
+      "oidc": "OIDC / SSO",
+      "server-fonts": "Server-Schriftarten"
     },
     "system": {
       "file-naming": "Dateibenennung",
       "book-dock": "Bücherablage",
+      "requests": "Anfragen",
       "maintenance": "Wartung",
       "audit-log": "Prüfprotokoll"
     },
@@ -7887,6 +8165,11 @@
       "notifications": "Benachrichtigungen",
       "restrictions": "Inhaltsbeschränkungen"
     },
-    "collections": "Sammlungen"
+    "smartScopes": "Smart Scopes",
+    "collections": "Sammlungen",
+    "missingResources": "Fehlende Ressourcen",
+    "bookRequests": "Anfragen",
+    "bookRequestDetail": "Anfrage",
+    "bookRequestReleases": "Wähle eine Version"
   }
 }

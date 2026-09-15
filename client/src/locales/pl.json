@@ -222,6 +222,7 @@
         "title": "Okładki książek",
         "coverSearch": {
           "label": "Domyślny dostawca wyszukiwania okładek",
+          "hint": "Wybierz źródło wybrane po otwarciu funkcji „Znajdź okładkę online”. Zostanie ono zapisane na Twoim koncie, dzięki czemu będzie dostępne na każdym urządzeniu.",
           "loadError": "Nie udało się załadować domyślnego dostawcy okładek",
           "saveError": "Nie udało się zapisać domyślnego dostawcy okładek"
         },
@@ -262,11 +263,15 @@
           "hint": "Zastosuj efekt grzbietu i połysku do okładek komiksów (cbz, cbr, cb7)"
         },
         "detailCoverTint": {
+          "title": "Szczegóły książki odcień okładki",
+          "hint": "Kolor pobrany z okładki za grafiką i tytułem na stronie ze szczegółami książki",
           "off": {
-            "label": "Wyłącz"
+            "label": "Wyłącz",
+            "hint": "Proste tło kartki"
           },
           "single": {
-            "label": "Jednokolorowy"
+            "label": "Jednokolorowy",
+            "hint": "Wyłącznie dominujący kolor okładki"
           },
           "duotone": {
             "label": "Dwukolorowy"
@@ -779,6 +784,7 @@
         "importFromBooklore": "Import z Booklore",
         "bookloreImportConfigured": "Skonfigurowano import Booklore",
         "importLibraryData": "Importuj dane biblioteki",
+        "migrationConfigured": "Źródło migracji skonfigurowane",
         "migrationRunning": "Trwa migracja",
         "migrationCompleted": "Migracja zakończona",
         "migrationFailed": "Migracja nie powiodła się",
@@ -833,6 +839,7 @@
         "stepReport": "Raport",
         "stepReportTitle": "Raport o migracji",
         "subtitleSource": "Skonfiguruj połączenie bazy danych ze źródłową instancją Booklore.",
+        "genericSubtitleSource": "Skonfiguruj połączenie z aplikacją biblioteki źródłowej.",
         "subtitleMappings": "Mapuj użytkowników źródłowych na użytkowników docelowych i tłumacz ścieżki plików.",
         "subtitleDryRun": "Przed uruchomieniem migracji na żywo możesz wyświetlić podgląd tego, co zostanie zaimportowane.",
         "subtitleRun": "Rozpocznij import na żywo i monitoruj jego postęp.",
@@ -919,6 +926,7 @@
         "reasonNoIsbnMatch": "ISBN nie pasuje do żadnej książki w tej bibliotece",
         "reasonInsufficientSourceData": "Za mało metadanych, aby podjąć próbę dopasowania",
         "reasonAmbiguousIsbnMatch": "Wiele książek pasuje do tego samego ISBN",
+        "reasonAmbiguousAsinMatch": "Wiele książek pasuje do tego samego ASIN",
         "reasonAmbiguousFileHashMatch": "Wiele książek pasowało do tego samego skrótu pliku",
         "reasonAmbiguousFilePathMatch": "Wiele książek miało tę samą ścieżkę pliku",
         "reasonAmbiguousTitleAuthorMatch": "Wiele książek miało ten sam tytuł i autora",
@@ -1099,9 +1107,11 @@
         "openLibrary": "Otwórz {name}",
         "moreActions": "Więcej działań dla {name}",
         "filterLabel": "Filtruj biblioteki",
+        "filterPlaceholder": "Filtruj według nazwy lub ścieżki",
         "filterClear": "Wyczyść filtry",
         "sortLabel": "Sortuj",
         "neverScanned": "Nigdy nie skanowane",
+        "scanFailedAt": "Nieudane {time}",
         "scanningPercent": "Skanowanie {pct}%",
         "scanCounting": "Liczenie plików",
         "scanCounts": "{processed} z {total}",
@@ -1123,11 +1133,13 @@
           "lastScan": "Ostatni skan"
         },
         "trigger": {
+          "manual": "Ręczne",
           "watcher": "Obserwator",
           "schedule": "Harmonogram"
         },
         "capability": {
           "watch": "Obserwuj foldery",
+          "schedule": "Zaplanowane skanowanie",
           "fileWrite": "Zapisz do pliku",
           "fileRename": "Zmień nazwę plików",
           "on": "{name}: włączone",
@@ -1143,6 +1155,7 @@
         "history": {
           "when": "Kiedy",
           "trigger": "Wyzwalacz",
+          "duration": "Czas trwania",
           "result": "Wynik",
           "status": "Status",
           "statusValue": {
@@ -1152,9 +1165,12 @@
           }
         },
         "detail": {
+          "foldersTitle": "Foldery i układ",
+          "metadataTitle": "Metadane & czytanie",
           "accessTitle": "Dostęp",
           "historyTitle": "Historia skanowania",
           "path": "Ścieżka {index}",
+          "organization": "Organizacje",
           "excludePatterns": "Wyklucz wzorce",
           "allowedFormats": "Dozwolone formaty",
           "peopleWithAccess": "Osoby mające dostęp",
@@ -1166,8 +1182,10 @@
           },
           "none": "Brak",
           "allSupported": "Wszystkie obsługiwane",
-          "historyEmpty": "Ta biblioteka nigdy nie została zeskanowana."
-        }
+          "historyEmpty": "Ta biblioteka nigdy nie została zeskanowana.",
+          "historyFailed": "Nie udało się załadować historii skanowania dla tej biblioteki."
+        },
+        "detailRegion": "Szczegóły dotyczące {name}"
       },
       "authorEnrichment": {
         "configuration": "Konfiguracja",
@@ -1199,6 +1217,7 @@
           "description": "Biografia",
           "photo": "Zdjęcie",
           "birthDate": "Urodzony(-a)",
+          "deathDate": "Zmarł",
           "website": "Strona internetowa",
           "genres": "Gatunki"
         },
@@ -1215,6 +1234,10 @@
         "resetToDefaultsButton": "Przywróć ustawienia domyślne",
         "recalculateAll": "Przelicz wszystko",
         "confirmReset": "Potwierdź reset",
+        "resetDialog": {
+          "title": "Czy zresetować wszystkie wartości wag do ustawień domyślnych?",
+          "description": "Wszystkie 24 pola przywracają domyślne wagi dostarczone wraz z BookOrbit. Żadne zmiany nie zostaną zapisane, dopóki nie wybierzesz opcji „Zapisz i przelicz”."
+        },
         "reset": "Zresetuj",
         "recalculate": "Przelicz",
         "subtotal": "suma częściowa: {count}",
@@ -1247,11 +1270,17 @@
           "versusDefault": "Zmień"
         },
         "groups": {
+          "core": "Rdzeń",
           "classification": "Klasyfikacja",
           "providers": "Identyfikatory dostawców"
         },
         "rules": {
-          "text": "Liczy się, gdy nie jest puste"
+          "text": "Liczy się, gdy nie jest puste",
+          "positive": "Liczy, kiedy jest powyżej zera",
+          "count": "Liczy, gdy co najmniej jedna jest ustawiona",
+          "cover": "Liczy, gdy obraz okładki jest zapisany",
+          "providerId": "Liczy, gdy ID jest zapisane",
+          "seriesIndex": "Liczy, gdy powyżej zera, więc wolumen 0 nigdy nie liczy"
         },
         "rail": {
           "title": "Gdzie lądują Twoje książki",
@@ -1449,10 +1478,20 @@
         "retryIn": "Spróbuj ponownie za {duration}",
         "runTestBeforeEnabling": "Uruchom test przed włączeniem",
         "hardcoverEnableHint": "Uruchom test z bieżącym tokenem, aby odblokować przełącznik włączający.",
+        "filter": {
+          "all": "Wszystkie",
+          "enabled": "Włączone",
+          "needsSetup": "Wymaga ustawienia"
+        },
+        "groups": {
+          "books": "Ogólny katalog książek",
+          "audiobooks": "Audiobooki"
+        },
         "badge": {
           "setupRequired": "Wymagana konfiguracja",
           "throttled": "Ograniczony",
-          "ready": "Gotowy"
+          "ready": "Gotowy",
+          "active": "Aktywne"
         },
         "fields": {
           "apiKey": "API Klucz",
@@ -1526,6 +1565,9 @@
           "combineGenres": {
             "label": "Łącz gatunki od wszystkich wybranych dostawców",
             "hint": "Zbieraj i deduplikuj gatunki od każdego dostawcy przypisanego do pola Gatunki, zamiast zatrzymywać się na pierwszym wyniku."
+          },
+          "maxGenres": {
+            "unlimited": "Bez ograniczeń"
           },
           "storeProviderIds": {
             "label": "Przechowuj identyfikatory dostawców na książkach",
@@ -1618,6 +1660,9 @@
         "confirm": {
           "resetScope": {
             "title": "Przywrócić ustawienia domyślne?"
+          },
+          "removeProvider": {
+            "description": "Usuwa {provider} z kolejności dostawców na każdym polu w {scope}. Nic nie zostanie zapisane, dopóki nie wybierzesz opcji Zapisz."
           }
         }
       },
@@ -1713,6 +1758,13 @@
         "score": "Przypisz wagi do pól metadanych, aby obliczyć, jak bardzo ufać pobranym wynikom.",
         "auto-fetch": "Automatycznie pobieraj okładki, opisy i inne szczegóły, gdy do Twojej biblioteki dodawane są nowe książki.",
         "authors": "Automatycznie pobieraj biografie i zdjęcia profilowe, gdy w Twojej bibliotece pojawią się nowi autorzy."
+      },
+      "preferences": {
+        "toast": {
+          "globalReset": "Globalne reguły pól zresetowane do ustawień domyślnych systemu",
+          "libraryReset": "Biblioteka resetuje się do globalnych zasad",
+          "resetFailed": "Nie udało się zresetować preferencji metadanych. Sprawdź połączenie i spróbuj ponownie."
+        }
       }
     },
     "reader": {
@@ -1760,12 +1812,26 @@
         "typography": "Typografia",
         "font": "Czcionka",
         "fontHint": "Krój pisma używany w tekście głównym",
+        "fontStyle": "Styl czcionki",
+        "fontStyleHint": "Grubość i pochylenie tekstu. Pogrubienie i kursywa w książce pozostają względem niego.",
         "builtInFonts": "Wbudowane czcionki",
         "yourFonts": "Twoje czcionki",
         "fontSize": "Rozmiar czcionki",
         "fontSizeHint": "Podstawowy rozmiar tekstu w pikselach",
         "lineHeight": "Wysokość linii",
         "lineHeightHint": "Pionowe odstępy między wierszami",
+        "paragraphSpacing": "Odstępy między akapitami",
+        "paragraphSpacingHint": "Odstępy między akapitami. Domyślnie zachowuje odstępy określone przez wydawcę.",
+        "paragraphSpacingDefault": "Domyślnie dla książki",
+        "paragraphSpacingValue": "{value} em",
+        "letterSpacing": "Odstępy między literami",
+        "letterSpacingHint": "Odstępy między literami. Domyślnie zachowuje odstępy określone przez wydawcę.",
+        "wordSpacing": "Odstępy między wyrazami",
+        "wordSpacingHint": "Odstępy między wyrazami. Domyślnie zachowuje odstępy określone przez wydawcę.",
+        "textIndent": "Wcięcie pierwszego wiersza",
+        "textIndentHint": "Wcięcie na początku zwykłych akapitów. Domyślnie zachowuje wcięcie zastosowane przez wydawcę.",
+        "custom": "Niestandardowe",
+        "emValue": "{value} em",
         "justify": "Justuj tekst",
         "justifyHint": "Wyrównaj tekst do obu marginesów",
         "hyphenation": "Dzielenie wyrazów",
@@ -2492,6 +2558,58 @@
         "book-dock": "Book Dock",
         "maintenance": "Konserwacja",
         "audit-log": "Dziennik audytu"
+      },
+      "requests": {
+        "indexers": {
+          "categories": {
+            "title": "Kategorie"
+          },
+          "settings": {
+            "restoreDefault": "Przywróć domyślne"
+          },
+          "confirmDelete": {
+            "title": "Usunąć to źródło?",
+            "confirm": "Usuń źródło"
+          },
+          "errors": {
+            "loadFailed": "Nie można załadować indeksatorów",
+            "saveFailed": "Nie można zapisań indeksera",
+            "deleteFailed": "Nie można było usunąć źródła",
+            "testFailed": "Nie udało się połączyć z indekserem",
+            "nameAndUrlRequired": "Nazwa i bazowy adres URL są wymagane"
+          },
+          "plugins": {
+            "removeAction": "Usuń wtyczkę",
+            "removed": "Usunięto {type} i jego źródła.",
+            "removeFailed": "Nie udało się usunąć wtyczki.",
+            "confirmRemove": "Usunąć wtyczkę {label}?",
+            "confirmInstall": "Zainstaluj wtyczkę",
+            "configure": "Skonfiguruj",
+            "notSetUp": "Jeszcze nie skonfigurowano",
+            "brokenTitle": "Nie udało się załadować wtyczki",
+            "update": "Aktualizuj wtyczkę",
+            "replaceTitle": "Zastąp tę wtyczkę",
+            "replace": "Zastąp wtyczkę",
+            "reviewTitle": "Zainstaluj tę wtyczkę",
+            "type": "Typ",
+            "version": "Wersja",
+            "versionLabel": "Wersja wtyczki {version}",
+            "versionUnknown": "Nieznana wersja wtyczki",
+            "versionUnknownValue": "Nieznana",
+            "media": "Multimedia",
+            "credential": "Dane uwierzytelniające",
+            "credentialRequired": "Wymagany",
+            "credentialNone": "Brak",
+            "sectionTitle": "Wtyczka",
+            "removeUnusedWarning": "Ta wtyczka zostanie na stałe usunięta z serwera"
+          }
+        },
+        "automation": {
+          "title": "Automatyzacje",
+          "groupDownloads": "Automatyczne pobieranie",
+          "stateOn": "Włączone",
+          "stateOff": "Wyłączone"
+        }
       }
     }
   },
@@ -6640,7 +6758,8 @@
           "nameDesc": "Imię Z-A",
           "fewestBooks": "Najmniej książek",
           "mostBooks": "Większość książek"
-        }
+        },
+        "clearFilters": "Wyczyść filtry"
       },
       "deleteMode": {
         "label": "Tryb usuwania",
@@ -6676,6 +6795,31 @@
         "title": "Połącz podmioty",
         "description": "Wybierz, który element chcesz zachować. Pozostałe zostaną z nim połączone i usunięte."
       }
+    },
+    "missingResources": {
+      "title": "Brakujące zasoby",
+      "accessDenied": "Nie masz uprawnień do usuwania brakujących zasobów.",
+      "untitled": "Bez tytułu",
+      "clearSelection": "Odznacz",
+      "cleanSelected": "Wyczyść {count} zaznaczone",
+      "selectAllMatching": "Zaznacz wszystkie {count} pasujące wpisy",
+      "allSelected": "Wybrano wszystkie {count} pasujące wpisy.",
+      "sweep": {
+        "title": "Sprawdzenie okładki"
+      },
+      "table": {
+        "coverFolder": "Okładka foldera dla książki #{bookId}",
+        "fileCount": "{count, plural, one {# plik} other {# pliki} few {# pliki} many {# pliki}}"
+      },
+      "confirm": {
+        "title": "Wyczyścić brakujące zasoby?",
+        "action": "Wyczyść",
+        "missing_books": "{count, plural, one {Usuwa rekord z bazy danych dotyczący jednej książki, której pliki zostały utracone. Książka, jej metadane, postęp do czytania oraz okładka zostaną usunięte. Czynności tej nie można cofnąć.} other {Usuwa rekordy z bazy danych dotyczące # książek, których pliki zostały utracone. Książki, ich metadane, postęp do czytania oraz okładki zostaną usunięte. Czynności tej nie można cofnąć.} few {Usuwa rekordy z bazy danych dotyczące # książek, których pliki zostały utracone. Książki, ich metadane, postęp do czytania oraz okładki zostaną usunięte. Czynności tej nie można cofnąć.} many {Usuwa rekordy z bazy danych dotyczące # książek, których pliki zostały utracone. Książki, ich metadane, postęp do czytania oraz okładki zostaną usunięte. Czynności tej nie można cofnąć.}}"
+      },
+      "errors": {
+        "list": "Nie udało się załadować tych wpisów.",
+        "clean": "Operacja czyszczenia nie powiodła się."
+      }
     }
   },
   "views": {
@@ -6692,6 +6836,8 @@
       "sort": "Sortuj",
       "sortOn": "Włączone",
       "resetSort": "Zresetuj sortowanie do ustawień domyślnych",
+      "shuffle": "Losowo",
+      "shuffleAria": "Losowa kolejności książek",
       "filters": "Filtry",
       "clear": "Wyczyść",
       "clearAllFilters": "Wyczyść wszystkie filtry",
@@ -6809,6 +6955,9 @@
       "defaultName": "Inteligentny zakres",
       "filter": "Filtruj",
       "edit": "Edytuj inteligentny zakres",
+      "koboSync": {
+        "label": "Zsynchronizuj z moim Kobo"
+      },
       "showControlsAria": "Pokaż elementy sterujące inteligentnego zakresu",
       "hideFilter": "Ukryj filtr",
       "showFilter": "Pokaż filtr",
@@ -6877,6 +7026,7 @@
     "notFound": "Nie znaleziono",
     "signIn": "Zaloguj się",
     "initialSetup": "Konfiguracja wstępna",
+    "register": "Stwórz konto",
     "forgotPassword": "Zapomniałem hasła",
     "resetPassword": "Zresetuj hasło",
     "completingSignIn": "Kończenie logowania",
@@ -6894,7 +7044,8 @@
       "book-covers": "Okładki książek",
       "icons": "Ikony",
       "layout": "Układ wyświetlacza",
-      "behavior": "Zachowanie biblioteki"
+      "behavior": "Zachowanie biblioteki",
+      "language": "Język"
     },
     "reader": {
       "general": "Ustawienia czytnika",
@@ -6925,11 +7076,13 @@
       "users": "Użytkownicy",
       "account-activity": "Aktywność konta",
       "magic-links": "Magiczne linki",
-      "oidc": "OIDC / Jednokrotne logowanie"
+      "oidc": "OIDC / Jednokrotne logowanie",
+      "server-fonts": "Czcionka serwera"
     },
     "system": {
       "file-naming": "Nazewnictwo plików",
       "book-dock": "Book Dock",
+      "requests": "zapytania",
       "maintenance": "Konserwacja",
       "audit-log": "Dziennik audytu"
     },
@@ -6940,6 +7093,10 @@
       "restrictions": "Ograniczenia dotyczące treści"
     },
     "smartScopes": "Inteligentne zakresy",
-    "collections": "Kolekcje"
+    "collections": "Kolekcje",
+    "missingResources": "Brakujące zasoby",
+    "bookRequests": "zapytania",
+    "bookRequestDetail": "zapytanie",
+    "bookRequestReleases": "Wybierz wydanie"
   }
 }

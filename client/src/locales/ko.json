@@ -2853,7 +2853,14 @@
         "fields": {
           "name": "이름",
           "type": "클라이언트 유형",
-          "baseUrl": "기본 URL"
+          "baseUrl": "기본 URL",
+          "username": "사용자 이름",
+          "password": "비밀번호",
+          "passwordKeep": "저장된 비밀번호를 유지하려면 이 칸을 비워두세요",
+          "passwordClear": "초기화",
+          "passwordKeepAction": "유지",
+          "passwordWillClear": "저장된 비밀번호는 저장할 때 제거됩니다",
+          "category": "카테고리"
         },
         "errors": {
           "nameAndUrlRequired": "이름 및 기본 URL을 입력하세요",

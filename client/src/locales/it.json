@@ -676,7 +676,7 @@
     "oidc": {
       "title": "OIDC /SSO",
       "subtitle": "Gestisci i provider OpenID Connect per il Single Sign-On.",
-      "providers": "Fornitori",
+      "providers": "Fonti",
       "addProvider": "Aggiungi fornitore",
       "editProvider": "Modifica fornitore",
       "configureNew": "Configura un nuovo provider OIDC.",
@@ -1206,7 +1206,7 @@
           "historyEmpty": "Questa biblioteca non è mai stata scansionata.",
           "historyFailed": "Impossibile caricare la cronologia di scansione per questa libreria."
         },
-        "scannedAt": "Scansionato alle {time}",
+        "scannedAt": "Scansionato {time}",
         "detailRegion": "Dettagli per {name}"
       },
       "authorEnrichment": {
@@ -1509,7 +1509,9 @@
         "noMatches": "Nessuna sorgente corrisponde a questo filtro.",
         "clearFilters": "Cancella filtri",
         "filter": {
-          "label": "Filtra sorgenti per stato"
+          "label": "Filtra sorgenti per stato",
+          "all": "Tutte",
+          "needsSetup": "Da configurare"
         },
         "badge": {
           "setupRequired": "Configurazione richiesta",
@@ -1559,7 +1561,7 @@
         "dragProvidersHint": "Trascina i fornitori da qui su qualsiasi campo per aggiungerli",
         "dragProviderHere": "trascina un fornitore qui",
         "howItWorks": {
-          "title": "Come funzionano le regole sul campo",
+          "title": "Come funzionano le regole per i campi",
           "priorityOrder": {
             "title": "Ordine di priorità",
             "body": "Trascina i fornitori nell'elenco per riordinarli. Il provider principale che restituisce un risultato sarà la fonte primaria per quel campo."
@@ -1570,7 +1572,8 @@
             "fillMissingBody": "Scrivi solo se il valore corrente è vuoto.",
             "overwriteTerm": "Sovrascrivi:",
             "overwriteBody": "Sostituisci ogni volta che un provider dispone di dati."
-          }
+          },
+          "summary": "Le fonti sono controllate dall'alto verso il basso e viene utilizzata la prima che restituisce un valore. La strategia di fusione stabilisce se il valore può rimpiazzare quello già presente nel libro; i generi possono anche aggiungere nuovi valori. Imposta i valori predefiniti, quindi puoi sovrascrivere singoli campi in per ogni biblioteca."
         },
         "libraryOverrides": {
           "title": "Sostituzioni della libreria",
@@ -1617,7 +1620,8 @@
         },
         "groupSummary": {
           "base": "Campi {fields} · {enabled} abilitati",
-          "withOverrides": "{base} · {overrides} sostituisce"
+          "withOverrides": "{base} · {overrides} sostituisce",
+          "enabledOf": "{enabled} di {fields} abilitate"
         },
         "table": {
           "field": "Campo",
@@ -1768,7 +1772,7 @@
       },
       "tabs": {
         "providers": "Fornitori",
-        "field-rules": "Regole sul campo",
+        "field-rules": "Regole per i campi",
         "custom-fields": "Campi personalizzati",
         "genre-blocklist": "Blocklist di genere",
         "score": "Punteggio",
@@ -2106,7 +2110,8 @@
         "tokenOriginalFilename": "Nome file originale (senza estensione)",
         "tokenExtension": "Estensione del file (senza punto)",
         "patternHelpIntro": "I modelli usano token come {titleToken} e {authorsToken}, oltre a modificatori e segmenti facoltativi.",
-        "browseTokensAndExamples": "Sfoglia token ed esempi"
+        "browseTokensAndExamples": "Sfoglia token ed esempi",
+        "librariesGroup": "Biblioteche"
       },
       "kobo": {
         "title": "Kobo Sincronizza",
@@ -4044,7 +4049,7 @@
           "searchScope": "Ambito di ricerca",
           "allEnabled": "Tutto abilitato",
           "all": "Tutto",
-          "fieldRules": "Regole sul campo",
+          "fieldRules": "Regole per i campi",
           "custom": "Personalizzato",
           "providerNotInFieldRules": "{provider} è abilitato ma non nelle regole di campo",
           "notInFieldRulesLabel": "Non nelle regole sul campo:",
@@ -6649,6 +6654,10 @@
         "title": "Scegli una libreria per iniziare",
         "description": "Seleziona una libreria qui sopra per visualizzare in anteprima le modifiche di ridenominazione, filtrare per stato e applicare l'esecuzione di ridenominazione in blocco.",
         "chooseLibrary": "Scegli Libreria"
+      },
+      "confirmDialog": {
+        "title": "{count, plural, one {Rinomina # file sul disco?} other {Rinomina # file sul disco?}}",
+        "body": "Questo sposta i file reali dentro {library}. BookOrbit registra ogni mossa, ma annullare significa tornare all'originale."
       }
     },
     "bookDuplicates": {

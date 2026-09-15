@@ -4531,7 +4531,7 @@
       "audiobook": "Audiolibro"
     },
     "actions": {
-      "read": "Marcar como leído",
+      "read": "Leer",
       "listen": "Escuchar",
       "peek": "Vistazo",
       "quickView": "Vista rápida",
