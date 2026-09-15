@@ -1,11 +1,14 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { INDEXER_COLORS, type IndexerAdapterDescriptor, type IndexerItem } from '@bookorbit/types'
+import { INDEXER_COLORS, type IndexerAdapterDescriptor, type IndexerItem, type IndexerManagerItem } from '@bookorbit/types'
 
 const { apiMock, toastMock, superuser } = vi.hoisted(() => ({
   superuser: { value: true },
   apiMock: vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(),
-  toastMock: { success: vi.fn<(message: string) => void>(), error: vi.fn<(message: string) => void>() },
+  toastMock: {
+    success: vi.fn<(message: string) => void>(),
+    error: vi.fn<(message: string) => void>(),
+  },
 }))
 
 /**
@@ -15,7 +18,12 @@ const { apiMock, toastMock, superuser } = vi.hoisted(() => ({
  */
 vi.mock('@/features/auth/composables/usePermissions', async () => {
   const { computed } = await import('vue')
-  return { usePermissions: () => ({ isSuperuser: computed(() => superuser.value), hasPermission: () => true }) }
+  return {
+    usePermissions: () => ({
+      isSuperuser: computed(() => superuser.value),
+      hasPermission: () => true,
+    }),
+  }
 })
 vi.mock('@/lib/api', () => ({ api: apiMock }))
 vi.mock('vue-sonner', () => ({ toast: toastMock }))
@@ -24,6 +32,7 @@ import RequestIndexersPanel from '../RequestIndexersPanel.vue'
 
 let mounted: VueWrapper | null = null
 const PATH = '/api/v1/admin/request-indexers'
+const MANAGER_PATH = '/api/v1/admin/request-indexer-managers'
 
 function descriptor(overrides: Partial<IndexerAdapterDescriptor> = {}): IndexerAdapterDescriptor {
   return {
@@ -116,6 +125,53 @@ function indexer(overrides: Partial<IndexerItem> = {}): IndexerItem {
   }
 }
 
+function manager(overrides: Partial<IndexerManagerItem> = {}): IndexerManagerItem {
+  return {
+    id: 9,
+    name: 'Prowlarr',
+    color: null,
+    type: 'prowlarr',
+    enabled: true,
+    baseUrl: 'http://127.0.0.1:9696',
+    hasCredential: true,
+    allowPrivateAddress: true,
+    syncNewIndexers: true,
+    perIndexerTimeoutSeconds: 20,
+    overallSearchBudgetSeconds: 60,
+    autoExpandCategories: true,
+    inheritSeedLimits: true,
+    networkProfile: null,
+    lastTestedAt: '2026-09-15T00:00:00.000Z',
+    lastTestOk: true,
+    lastErrorMessage: null,
+    lastSyncedAt: '2026-09-15T00:00:00.000Z',
+    lastSyncOk: true,
+    lastSyncError: null,
+    version: '2.5.2',
+    sources: [
+      {
+        id: 91,
+        externalId: '6',
+        name: 'Nzb.life',
+        color: 'purple',
+        implementation: 'Newznab',
+        protocol: 'usenet',
+        adapterType: 'newznab',
+        enabled: true,
+        available: true,
+        priority: 25,
+        lastSeenAt: '2026-09-15T00:00:00.000Z',
+        lastSearchAt: null,
+        lastSearchOk: null,
+        lastSearchError: null,
+      },
+    ],
+    createdAt: '2026-09-15T00:00:00.000Z',
+    updatedAt: '2026-09-15T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
 /**
  * The editor's own actions live in a menu that opens on a pointer gesture jsdom does not raise, so
  * its content is rendered flat. What that costs is the open/closed state, which is reka's to get
@@ -125,33 +181,45 @@ const DROPDOWN_STUBS = {
   DropdownMenu: { template: '<div><slot /></div>' },
   DropdownMenuTrigger: { template: '<div><slot /></div>' },
   DropdownMenuContent: { template: '<div><slot /></div>' },
-  DropdownMenuItem: { emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' },
+  DropdownMenuItem: {
+    emits: ['click'],
+    template: '<button @click="$emit(\'click\')"><slot /></button>',
+  },
   DropdownMenuSeparator: { template: '<hr />' },
 }
 
 function response(body: unknown, ok = true): Response {
-  return { ok, status: ok ? 200 : 500, json: vi.fn<() => Promise<unknown>>().mockResolvedValue(body) } as unknown as Response
+  return {
+    ok,
+    status: ok ? 200 : 500,
+    json: vi.fn<() => Promise<unknown>>().mockResolvedValue(body),
+  } as unknown as Response
 }
 
 async function mountPanel(
   options: {
     indexers?: IndexerItem[]
     adapters?: IndexerAdapterDescriptor[]
+    managers?: IndexerManagerItem[]
     pluginFailures?: Array<{ directory: string; reason: string }>
     pluginUpdates?: unknown[]
   } = {},
 ) {
-  const { indexers = [], adapters = [descriptor(), OPEN_LIBRARY], pluginFailures = [], pluginUpdates = [] } = options
+  const { indexers = [], adapters = [descriptor(), OPEN_LIBRARY], managers = [], pluginFailures = [], pluginUpdates = [] } = options
   apiMock.mockImplementation((url: string) =>
     Promise.resolve(
-      url.endsWith('/adapters')
-        ? response({ adapters, pluginFailures })
-        : url.endsWith('/plugins/updates')
-          ? response({ updates: pluginUpdates })
-          : response({ indexers, encryptionConfigured: true }),
+      url === MANAGER_PATH
+        ? response({ managers, encryptionConfigured: true })
+        : url.endsWith('/adapters')
+          ? response({ adapters, pluginFailures })
+          : url.endsWith('/plugins/updates')
+            ? response({ updates: pluginUpdates })
+            : response({ indexers, encryptionConfigured: true }),
     ),
   )
-  const wrapper = mount(RequestIndexersPanel, { global: { stubs: DROPDOWN_STUBS } })
+  const wrapper = mount(RequestIndexersPanel, {
+    global: { stubs: DROPDOWN_STUBS },
+  })
   mounted = wrapper
   await flushPromises()
   return wrapper
@@ -263,7 +331,10 @@ describe('RequestIndexersPanel', () => {
     /** The panel picks a file through a hidden input; this is what the browser would hand it. */
     async function chooseFile(wrapper: VueWrapper, name = 'index.mjs') {
       const input = wrapper.find<HTMLInputElement>('input[type="file"]')
-      Object.defineProperty(input.element, 'files', { value: [new File(['export default {}'], name)], configurable: true })
+      Object.defineProperty(input.element, 'files', {
+        value: [new File(['export default {}'], name)],
+        configurable: true,
+      })
       await input.trigger('change')
       await flushPromises()
     }
@@ -365,7 +436,15 @@ describe('RequestIndexersPanel', () => {
     })
 
     it('shows, verifies and installs a published signed update', async () => {
-      const updates = [{ type: 'demo-tracker', currentVersion: '2.4.1', latestVersion: '2.5.0', state: 'available', autoUpdate: false }]
+      const updates = [
+        {
+          type: 'demo-tracker',
+          currentVersion: '2.4.1',
+          latestVersion: '2.5.0',
+          state: 'available',
+          autoUpdate: false,
+        },
+      ]
       const review = {
         ...INSPECTION,
         type: 'demo-tracker',
@@ -376,17 +455,28 @@ describe('RequestIndexersPanel', () => {
         verified: true,
         replaces: true,
       }
-      const usingPlugin = indexer({ adapterType: 'demo-tracker', name: 'A tracker' })
+      const usingPlugin = indexer({
+        adapterType: 'demo-tracker',
+        name: 'A tracker',
+      })
       apiMock.mockImplementation((url: string, init?: RequestInit) => {
         if (url.endsWith('/plugins/demo-tracker/update/inspect')) return Promise.resolve(response(review))
         if (url.endsWith('/plugins/demo-tracker/update') && init?.method === 'POST') {
-          return Promise.resolve(response({ ...updates[0], currentVersion: '2.5.0', state: 'current' }))
+          return Promise.resolve(
+            response({
+              ...updates[0],
+              currentVersion: '2.5.0',
+              state: 'current',
+            }),
+          )
         }
         if (url.endsWith('/plugins/updates')) return Promise.resolve(response({ updates }))
         if (url.endsWith('/adapters')) return Promise.resolve(response({ adapters: [descriptor(), PLUGIN], pluginFailures: [] }))
         return Promise.resolve(response({ indexers: [usingPlugin], encryptionConfigured: true }))
       })
-      const wrapper = mount(RequestIndexersPanel, { global: { stubs: DROPDOWN_STUBS } })
+      const wrapper = mount(RequestIndexersPanel, {
+        global: { stubs: DROPDOWN_STUBS },
+      })
       mounted = wrapper
       await flushPromises()
 
@@ -399,15 +489,31 @@ describe('RequestIndexersPanel', () => {
 
       expect(apiMock).toHaveBeenCalledWith(
         `${PATH}/plugins/demo-tracker/update`,
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ sha256: 'a'.repeat(64) }) }),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ sha256: 'a'.repeat(64) }),
+        }),
       )
       expect(toastMock.success).toHaveBeenCalledWith('Updated Demo Tracker to 2.5.0.')
     })
 
     it('requires an explicit per-plugin opt-in for automatic signed updates', async () => {
-      const status = { type: 'demo-tracker', currentVersion: '2.4.1', latestVersion: '2.5.0', state: 'available', autoUpdate: false }
-      const usingPlugin = indexer({ adapterType: 'demo-tracker', name: 'A tracker' })
-      const wrapper = await mountPanel({ indexers: [usingPlugin], adapters: [descriptor(), PLUGIN], pluginUpdates: [status] })
+      const status = {
+        type: 'demo-tracker',
+        currentVersion: '2.4.1',
+        latestVersion: '2.5.0',
+        state: 'available',
+        autoUpdate: false,
+      }
+      const usingPlugin = indexer({
+        adapterType: 'demo-tracker',
+        name: 'A tracker',
+      })
+      const wrapper = await mountPanel({
+        indexers: [usingPlugin],
+        adapters: [descriptor(), PLUGIN],
+        pluginUpdates: [status],
+      })
       apiMock.mockClear()
       apiMock.mockResolvedValue(response({ ...status, autoUpdate: true }))
 
@@ -418,7 +524,10 @@ describe('RequestIndexersPanel', () => {
 
       expect(apiMock).toHaveBeenCalledWith(
         `${PATH}/plugins/demo-tracker/auto-update`,
-        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ enabled: true }) }),
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ enabled: true }),
+        }),
       )
       expect(automatic.attributes('aria-checked')).toBe('true')
     })
@@ -465,7 +574,10 @@ describe('RequestIndexersPanel', () => {
      * inside that source rather than from a list of its own that reads like a duplicate.
      */
     describe('managing the plugin from the source that uses it', () => {
-      const USING_PLUGIN = indexer({ adapterType: 'demo-tracker', name: 'A tracker' })
+      const USING_PLUGIN = indexer({
+        adapterType: 'demo-tracker',
+        name: 'A tracker',
+      })
 
       function withPlugin(inspection: unknown, ok = true) {
         apiMock.mockImplementation((url: string) => {
@@ -473,8 +585,14 @@ describe('RequestIndexersPanel', () => {
           if (String(url).includes('/plugins/')) return Promise.resolve(response(null, ok))
           return Promise.resolve(
             url.endsWith('/adapters')
-              ? response({ adapters: [descriptor(), PLUGIN], pluginFailures: [] })
-              : response({ indexers: [USING_PLUGIN], encryptionConfigured: true }),
+              ? response({
+                  adapters: [descriptor(), PLUGIN],
+                  pluginFailures: [],
+                })
+              : response({
+                  indexers: [USING_PLUGIN],
+                  encryptionConfigured: true,
+                }),
           )
         })
       }
@@ -485,7 +603,10 @@ describe('RequestIndexersPanel', () => {
 
       /** The plugin is managed from the row it occupies, next to the source that runs it. */
       it('offers update and remove on the plugin row, and not on a torznab one', async () => {
-        const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: [USING_PLUGIN, indexer({ id: 2, name: 'Plain' })] })
+        const wrapper = await mountPanel({
+          adapters: [descriptor(), PLUGIN],
+          indexers: [USING_PLUGIN, indexer({ id: 2, name: 'Plain' })],
+        })
 
         const rowNames = (name: string) => {
           const row = wrapper.findAll('li').find((item) => item.text().includes(name))
@@ -498,7 +619,10 @@ describe('RequestIndexersPanel', () => {
 
       /** In the editor the plugin is a fact about the source, not a second form inside its form. */
       it('states the plugin in the editor without giving it buttons of its own', async () => {
-        const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: [USING_PLUGIN] })
+        const wrapper = await mountPanel({
+          adapters: [descriptor(), PLUGIN],
+          indexers: [USING_PLUGIN],
+        })
 
         await openDrawer(wrapper)
 
@@ -508,8 +632,16 @@ describe('RequestIndexersPanel', () => {
       })
 
       it('reviews a chosen file as a replacement', async () => {
-        const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: [USING_PLUGIN] })
-        withPlugin({ ...INSPECTION, type: 'demo-tracker', label: 'Demo Tracker', replaces: true })
+        const wrapper = await mountPanel({
+          adapters: [descriptor(), PLUGIN],
+          indexers: [USING_PLUGIN],
+        })
+        withPlugin({
+          ...INSPECTION,
+          type: 'demo-tracker',
+          label: 'Demo Tracker',
+          replaces: true,
+        })
 
         await clickInPanel(wrapper, 'Update plugin')
         await chooseFile(wrapper)
@@ -519,7 +651,10 @@ describe('RequestIndexersPanel', () => {
 
       /** Otherwise updating one plugin from the wrong file quietly installs a different one. */
       it('refuses a file that declares a different plugin', async () => {
-        const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: [USING_PLUGIN] })
+        const wrapper = await mountPanel({
+          adapters: [descriptor(), PLUGIN],
+          indexers: [USING_PLUGIN],
+        })
         withPlugin({ ...INSPECTION, type: 'something-else', replaces: false })
 
         await clickInPanel(wrapper, 'Update plugin')
@@ -531,7 +666,10 @@ describe('RequestIndexersPanel', () => {
 
       /** Removing one plugin also deletes every source and credential configured for its type. */
       it('asks before deleting the plugin, and states that all of its sources are deleted', async () => {
-        const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: [USING_PLUGIN] })
+        const wrapper = await mountPanel({
+          adapters: [descriptor(), PLUGIN],
+          indexers: [USING_PLUGIN],
+        })
         withPlugin(null)
 
         await clickInPanel(wrapper, 'Delete plugin')
@@ -594,7 +732,10 @@ describe('RequestIndexersPanel', () => {
     })
 
     it('keeps source-only deletion for built-in Torznab sources', async () => {
-      const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [indexer({ name: 'My Torznab' })] })
+      const wrapper = await mountPanel({
+        adapters: [descriptor()],
+        indexers: [indexer({ name: 'My Torznab' })],
+      })
 
       await clickInPanel(wrapper, 'Edit My Torznab')
 
@@ -627,16 +768,26 @@ describe('RequestIndexersPanel', () => {
       expect(wrapper.text()).toContain('a request search finds nothing')
     })
 
-    /** The two ways in are the two groups it replaced, so both have to be reachable from it. */
-    it('offers both ways in, and opens the torznab form from its own button', async () => {
+    it('offers Prowlarr, a direct feed, and a plugin without a second manager empty state', async () => {
       const wrapper = await mountPanel({ adapters: [descriptor()] })
 
       const names = wrapper.findAll('button').map((button) => nameOf(button.element as HTMLButtonElement))
+      expect(names).toContain('Add Prowlarr')
       expect(names).toContain('Install plugin')
       expect(names).toContain('Add indexer')
+      expect(wrapper.text()).not.toContain('No indexer manager yet')
 
       await clickInPanel(wrapper, 'Add indexer')
       expect(sheet().querySelector('#indexer-name')).not.toBeNull()
+    })
+
+    it('opens the Prowlarr editor from the unified onboarding panel', async () => {
+      const wrapper = await mountPanel({ adapters: [descriptor()] })
+
+      await clickInPanel(wrapper, 'Add Prowlarr')
+
+      expect(sheet().querySelector('#manager-name')).not.toBeNull()
+      expect(sheet().querySelector('#manager-url')).not.toBeNull()
     })
 
     /** A door nobody can open is worse than one door: the copy stops promising two, as well. */
@@ -656,7 +807,10 @@ describe('RequestIndexersPanel', () => {
 
     /** A plugin that would not load is the one row somebody has to act on, so it is not "nothing". */
     it('keeps the groups when a plugin failed to load', async () => {
-      const wrapper = await mountPanel({ adapters: [descriptor()], pluginFailures: [{ directory: 'busted', reason: 'boom' }] })
+      const wrapper = await mountPanel({
+        adapters: [descriptor()],
+        pluginFailures: [{ directory: 'busted', reason: 'boom' }],
+      })
 
       expect(wrapper.text()).not.toContain('No sources yet')
       expect(wrapper.find('section[aria-labelledby="request-plugins-heading"]').exists()).toBe(true)
@@ -664,12 +818,68 @@ describe('RequestIndexersPanel', () => {
     })
   })
 
-  /**
-   * The common state once anything exists. A second full-height panel would compete with a real
-   * list, so the group that is still empty keeps its heading and says so on one line.
-   */
-  it('states an empty group on one line, with its action on that line rather than twice', async () => {
-    const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: [indexer({ adapterType: 'demo-tracker', name: 'A tracker' })] })
+  it('renders Prowlarr as a source connection with its indexers nested beneath it', async () => {
+    const wrapper = await mountPanel({
+      adapters: [descriptor()],
+      managers: [manager()],
+    })
+
+    expect(wrapper.get('#request-sources-heading').text()).toBe('Sources')
+    expect(wrapper.text()).toContain('1 active source: 0 torrent, 1 Usenet, 0 direct')
+    expect(wrapper.text()).toContain('Prowlarr')
+    expect(wrapper.text()).toContain('Nzb.life')
+    expect(wrapper.text()).not.toContain('Other source types')
+    expect(wrapper.get('#request-plugins-heading').text()).toBe('Plugins')
+    expect(wrapper.get('#request-indexers-heading').text()).toBe('Direct feeds')
+    expect(wrapper.text()).not.toContain('No sources yet')
+    expect(wrapper.text()).not.toContain('No indexer manager yet')
+    expect(wrapper.get('button[aria-label="Change color for Nzb.life"] span').classes()).toContain('bg-[var(--pill-source-purple)]')
+  })
+
+  it('summarizes managed, plugin, and direct sources together', async () => {
+    const wrapper = await mountPanel({
+      adapters: [descriptor(), OPEN_LIBRARY, PLUGIN],
+      managers: [manager()],
+      indexers: [
+        indexer({ id: 2, adapterType: 'demo-tracker', name: 'A tracker' }),
+        indexer({ id: 3, adapterType: 'open-library', name: 'Open Library' }),
+      ],
+    })
+
+    expect(wrapper.text()).toContain('3 active sources: 1 torrent, 1 Usenet, 1 direct')
+  })
+
+  it('updates a managed source color without rewriting its Prowlarr settings', async () => {
+    const current = manager()
+    const updated = manager({
+      sources: current.sources.map((source) => ({ ...source, color: 'orange' })),
+    })
+    const wrapper = await mountPanel({ adapters: [descriptor()], managers: [current] })
+    apiMock.mockClear()
+    apiMock.mockResolvedValueOnce(response(updated))
+
+    await wrapper.get('button[aria-label="Change color for Nzb.life"]').trigger('click')
+    await flushPromises()
+    const orange = document.body.querySelector<HTMLInputElement>('input[name="managed-source-color-91"][value="orange"]')
+    expect(orange).not.toBeNull()
+    orange!.click()
+    await flushPromises()
+
+    expect(apiMock).toHaveBeenCalledWith(
+      `${MANAGER_PATH}/9/sources/91`,
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ color: 'orange' }),
+      }),
+    )
+    expect(wrapper.get('button[aria-label="Change color for Nzb.life"] span').classes()).toContain('bg-[var(--pill-source-orange)]')
+  })
+
+  it('keeps one action in the heading of an empty group', async () => {
+    const wrapper = await mountPanel({
+      adapters: [descriptor(), PLUGIN],
+      indexers: [indexer({ adapterType: 'demo-tracker', name: 'A tracker' })],
+    })
 
     const torznab = wrapper.find('section[aria-labelledby="request-indexers-heading"]')
     expect(torznab.text()).toContain('No indexer yet.')
@@ -677,8 +887,15 @@ describe('RequestIndexersPanel', () => {
   })
 
   it('offers every built-in indexer type for a new source', async () => {
-    const newznab = descriptor({ type: 'newznab', label: 'Newznab', seedsBack: false, delivery: 'usenet' })
-    const wrapper = await mountPanel({ adapters: [descriptor(), newznab, OPEN_LIBRARY, PLUGIN] })
+    const newznab = descriptor({
+      type: 'newznab',
+      label: 'Newznab',
+      seedsBack: false,
+      delivery: 'usenet',
+    })
+    const wrapper = await mountPanel({
+      adapters: [descriptor(), newznab, OPEN_LIBRARY, PLUGIN],
+    })
 
     await clickInPanel(wrapper, 'Add indexer')
 
@@ -816,7 +1033,13 @@ describe('RequestIndexersPanel', () => {
     it('populates values and serializes a clear as null rather than zero', async () => {
       const wrapper = await mountPanel({
         adapters: [descriptor()],
-        indexers: [indexer({ applyTrackerSeedGoals: false, seedRatioGoal: 2.5, seedTimeMinutes: 90 })],
+        indexers: [
+          indexer({
+            applyTrackerSeedGoals: false,
+            seedRatioGoal: 2.5,
+            seedTimeMinutes: 90,
+          }),
+        ],
       })
       await clickInPanel(wrapper, 'Edit My Prowlarr')
       expect(sheet().querySelector<HTMLInputElement>('#indexer-seed-ratio')?.value).toBe('2.5')
@@ -827,7 +1050,10 @@ describe('RequestIndexersPanel', () => {
       await flushPromises()
 
       const put = apiMock.mock.calls.find(([, init]) => init?.method === 'PUT')!
-      expect(JSON.parse(String((put[1] as RequestInit).body))).toMatchObject({ seedRatioGoal: null, seedTimeMinutes: 90 })
+      expect(JSON.parse(String((put[1] as RequestInit).body))).toMatchObject({
+        seedRatioGoal: null,
+        seedTimeMinutes: 90,
+      })
     })
 
     it('keeps manual inputs usable when tracker fallback is off', async () => {
@@ -862,7 +1088,13 @@ describe('RequestIndexersPanel', () => {
     it('resets only the draft and updates the summaries', async () => {
       const wrapper = await mountPanel({
         adapters: [descriptor()],
-        indexers: [indexer({ applyTrackerSeedGoals: false, seedRatioGoal: 2, seedTimeMinutes: 90 })],
+        indexers: [
+          indexer({
+            applyTrackerSeedGoals: false,
+            seedRatioGoal: 2,
+            seedTimeMinutes: 90,
+          }),
+        ],
       })
       await clickInPanel(wrapper, 'Edit My Prowlarr')
       expect(sheet().textContent).toContain('Manual: 90')
@@ -878,7 +1110,13 @@ describe('RequestIndexersPanel', () => {
     it('does not serialize hidden fields when a saved plugin descriptor is missing', async () => {
       const wrapper = await mountPanel({
         adapters: [descriptor()],
-        indexers: [indexer({ adapterType: 'missing-plugin', seedRatioGoal: 2, seedTimeMinutes: 90 })],
+        indexers: [
+          indexer({
+            adapterType: 'missing-plugin',
+            seedRatioGoal: 2,
+            seedTimeMinutes: 90,
+          }),
+        ],
       })
       await clickInPanel(wrapper, 'Edit My Prowlarr')
       expect(sheet().querySelector('#indexer-seed-ratio')).toBeNull()
@@ -894,7 +1132,10 @@ describe('RequestIndexersPanel', () => {
 
     it('retains a changed seed draft after save failure and restores persisted values after cancel', async () => {
       const stored = indexer({ seedRatioGoal: 2 })
-      const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [stored] })
+      const wrapper = await mountPanel({
+        adapters: [descriptor()],
+        indexers: [stored],
+      })
       await clickInPanel(wrapper, 'Edit My Prowlarr')
       typeInto('#indexer-seed-ratio', '3')
       await flushPromises()
@@ -903,7 +1144,13 @@ describe('RequestIndexersPanel', () => {
       apiMock.mockImplementation((url: string, init?: RequestInit) =>
         Promise.resolve(
           init?.method === 'PUT'
-            ? response({ errorCode: 'INDEXER_SETTINGS_INVALID', message: 'invalid policy' }, false)
+            ? response(
+                {
+                  errorCode: 'INDEXER_SETTINGS_INVALID',
+                  message: 'invalid policy',
+                },
+                false,
+              )
             : url.endsWith('/adapters')
               ? response({ adapters: [descriptor()], pluginFailures: [] })
               : response({ indexers: [stored], encryptionConfigured: true }),
@@ -962,7 +1209,13 @@ describe('RequestIndexersPanel', () => {
   it('repairs casing, duplicates, and unknown values from an older saved list', async () => {
     const wrapper = await mountPanel({
       adapters: [PLUGIN],
-      indexers: [indexer({ adapterType: 'demo-tracker', name: 'A tracker', settings: { formats: 'EPUB,epub,not-a-format' } })],
+      indexers: [
+        indexer({
+          adapterType: 'demo-tracker',
+          name: 'A tracker',
+          settings: { formats: 'EPUB,epub,not-a-format' },
+        }),
+      ],
     })
 
     await clickInPanel(wrapper, 'Edit A tracker')
@@ -978,7 +1231,15 @@ describe('RequestIndexersPanel', () => {
   it('keeps free-entry chips for a list with no declared options', async () => {
     const plugin = descriptor({
       ...PLUGIN,
-      settingsFields: [{ key: 'mirrors', type: 'string', format: 'list', label: 'Mirrors', default: 'one,two' }],
+      settingsFields: [
+        {
+          key: 'mirrors',
+          type: 'string',
+          format: 'list',
+          label: 'Mirrors',
+          default: 'one,two',
+        },
+      ],
     })
 
     const wrapper = await mountPanel({ adapters: [plugin] })
@@ -1029,7 +1290,10 @@ describe('RequestIndexersPanel', () => {
     const existing = INDEXER_COLORS.filter((color) => color !== 'teal').map((color, offset) =>
       indexer({ id: offset + 1, name: `Source ${offset + 1}`, color }),
     )
-    const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: existing })
+    const wrapper = await mountPanel({
+      adapters: [descriptor(), PLUGIN],
+      indexers: existing,
+    })
 
     await openCreate(wrapper, 'demo-tracker')
 
@@ -1039,7 +1303,10 @@ describe('RequestIndexersPanel', () => {
   })
 
   it('opens the editor on the colour the source already has, and offers to take it away', async () => {
-    const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [indexer({ color: 'purple' })] })
+    const wrapper = await mountPanel({
+      adapters: [descriptor()],
+      indexers: [indexer({ color: 'purple' })],
+    })
     await clickInPanel(wrapper, 'Edit My Prowlarr')
 
     const checked = sheet().querySelector<HTMLInputElement>('input[name="indexer-color"]:checked')
@@ -1123,7 +1390,9 @@ describe('RequestIndexersPanel', () => {
 
   /** A broken plugin must remain diagnosable and deletable instead of becoming a dead-end row. */
   it('says why a plugin failed to load and can delete it', async () => {
-    const wrapper = await mountPanel({ pluginFailures: [{ directory: 'Broken Plugin', reason: 'it exports no search function' }] })
+    const wrapper = await mountPanel({
+      pluginFailures: [{ directory: 'Broken Plugin', reason: 'it exports no search function' }],
+    })
 
     expect(wrapper.text()).toContain('Broken Plugin')
     expect(wrapper.text()).toContain('it exports no search function')
@@ -1150,14 +1419,23 @@ describe('RequestIndexersPanel', () => {
       const wrapper = await mountPanel({ indexers: [indexer()] })
       apiMock.mockClear()
       apiMock.mockImplementation((url: string, init?: RequestInit) =>
-        Promise.resolve(init?.method === 'PUT' ? response({}) : response({ indexers: [indexer({ enabled: false })], encryptionConfigured: true })),
+        Promise.resolve(
+          init?.method === 'PUT'
+            ? response({})
+            : response({
+                indexers: [indexer({ enabled: false })],
+                encryptionConfigured: true,
+              }),
+        ),
       )
 
       await switchFor(wrapper, 'My Prowlarr').trigger('click')
       await flushPromises()
 
       const [, init] = apiMock.mock.calls.find(([, options]) => (options as RequestInit | undefined)?.method === 'PUT') ?? []
-      expect(JSON.parse(String((init as RequestInit).body))).toEqual({ enabled: false })
+      expect(JSON.parse(String((init as RequestInit).body))).toEqual({
+        enabled: false,
+      })
     })
 
     it('offers it for a plugin-backed source too', async () => {
@@ -1173,7 +1451,14 @@ describe('RequestIndexersPanel', () => {
     it('reads the state back off the row once the save lands', async () => {
       const wrapper = await mountPanel({ indexers: [indexer()] })
       apiMock.mockImplementation((url: string, init?: RequestInit) =>
-        Promise.resolve(init?.method === 'PUT' ? response({}) : response({ indexers: [indexer({ enabled: false })], encryptionConfigured: true })),
+        Promise.resolve(
+          init?.method === 'PUT'
+            ? response({})
+            : response({
+                indexers: [indexer({ enabled: false })],
+                encryptionConfigured: true,
+              }),
+        ),
       )
 
       await switchFor(wrapper, 'My Prowlarr').trigger('click')
@@ -1217,7 +1502,10 @@ describe('RequestIndexersPanel', () => {
     }
 
     it('keeps it when a typed credential is erased again', async () => {
-      const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [indexer({ name: 'My Torznab' })] })
+      const wrapper = await mountPanel({
+        adapters: [descriptor()],
+        indexers: [indexer({ name: 'My Torznab' })],
+      })
 
       const body = await editAndSave(wrapper, () => {
         typeInto('#indexer-credential', 'abcdef')
@@ -1228,7 +1516,10 @@ describe('RequestIndexersPanel', () => {
     })
 
     it('sends a typed credential', async () => {
-      const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [indexer({ name: 'My Torznab' })] })
+      const wrapper = await mountPanel({
+        adapters: [descriptor()],
+        indexers: [indexer({ name: 'My Torznab' })],
+      })
 
       const body = await editAndSave(wrapper, () => typeInto('#indexer-credential', 'abcdef'))
 
@@ -1236,7 +1527,10 @@ describe('RequestIndexersPanel', () => {
     })
 
     it('removes it only when clearing is asked for outright', async () => {
-      const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [indexer({ name: 'My Torznab' })] })
+      const wrapper = await mountPanel({
+        adapters: [descriptor()],
+        indexers: [indexer({ name: 'My Torznab' })],
+      })
 
       const body = await editAndSave(wrapper, () => clickInSheet('Clear'))
 
@@ -1244,14 +1538,20 @@ describe('RequestIndexersPanel', () => {
     })
 
     it('offers no clearing on a source that has no stored credential', async () => {
-      const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [indexer({ name: 'My Torznab', hasCredential: false })] })
+      const wrapper = await mountPanel({
+        adapters: [descriptor()],
+        indexers: [indexer({ name: 'My Torznab', hasCredential: false })],
+      })
       await clickInPanel(wrapper, 'Edit My Torznab')
 
       expect([...sheet().querySelectorAll('button')].map(nameOf)).not.toContain('Clear')
     })
 
     it('offers no clearing when the adapter requires a credential', async () => {
-      const wrapper = await mountPanel({ adapters: [PLUGIN], indexers: [indexer({ name: 'A tracker', adapterType: PLUGIN.type })] })
+      const wrapper = await mountPanel({
+        adapters: [PLUGIN],
+        indexers: [indexer({ name: 'A tracker', adapterType: PLUGIN.type })],
+      })
       await clickInPanel(wrapper, 'Edit A tracker')
 
       expect([...sheet().querySelectorAll('button')].map(nameOf)).not.toContain('Clear')
@@ -1260,7 +1560,10 @@ describe('RequestIndexersPanel', () => {
 
   /** Test runs against the saved row, so a green tick for a draft would be a tick for old values. */
   it('refuses to test while the draft differs from the saved source', async () => {
-    const wrapper = await mountPanel({ adapters: [descriptor()], indexers: [indexer({ name: 'My Torznab' })] })
+    const wrapper = await mountPanel({
+      adapters: [descriptor()],
+      indexers: [indexer({ name: 'My Torznab' })],
+    })
     await clickInPanel(wrapper, 'Edit My Torznab')
 
     expect(sheet().querySelector<HTMLButtonElement>('button[aria-label="Test connection"]')?.disabled).toBe(false)
@@ -1281,7 +1584,10 @@ describe('RequestIndexersPanel', () => {
    * must not do is take the populated panel away and put a spinner where the reader was looking.
    */
   it('refreshes the adapters after a plugin removal without blanking the panel', async () => {
-    const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN], indexers: [indexer({ adapterType: 'demo-tracker', name: 'A tracker' })] })
+    const wrapper = await mountPanel({
+      adapters: [descriptor(), PLUGIN],
+      indexers: [indexer({ adapterType: 'demo-tracker', name: 'A tracker' })],
+    })
 
     let releaseList = () => {}
     const pending = new Promise<Response>((resolve) => {

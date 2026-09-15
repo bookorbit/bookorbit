@@ -34,9 +34,14 @@ import { QbittorrentAdapter } from './download-clients/adapters/qbittorrent.adap
 import { TransmissionAdapter } from './download-clients/adapters/transmission.adapter';
 import { DelugeAdapter } from './download-clients/adapters/deluge.adapter';
 import { NzbgetAdapter } from './download-clients/adapters/nzbget.adapter';
+import { SabnzbdAdapter } from './download-clients/adapters/sabnzbd.adapter';
 import { INDEXER_ADAPTERS } from './indexers/indexer-adapter';
 import { IndexerConfigService } from './indexers/indexer-config.service';
 import { IndexerController } from './indexers/indexer.controller';
+import { IndexerManagerController } from './indexers/indexer-manager.controller';
+import { IndexerManagerRepository } from './indexers/indexer-manager.repository';
+import { IndexerManagerService } from './indexers/indexer-manager.service';
+import { ProwlarrClient } from './indexers/prowlarr.client';
 import { IndexerCredentialStore } from './indexers/indexer-credential-store';
 import { IndexerKeepaliveService } from './indexers/indexer-keepalive.service';
 import { IndexerOperationLock } from './indexers/indexer-operation-lock';
@@ -91,6 +96,7 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     BookRequestAutomationController,
     DownloadClientController,
     IndexerController,
+    IndexerManagerController,
   ],
   providers: [
     BookRequestService,
@@ -111,18 +117,23 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     TransmissionAdapter,
     DelugeAdapter,
     NzbgetAdapter,
+    SabnzbdAdapter,
     {
       provide: DOWNLOAD_CLIENT_ADAPTERS,
-      useFactory: (qbittorrent: QbittorrentAdapter, transmission: TransmissionAdapter, deluge: DelugeAdapter, nzbget: NzbgetAdapter) => [
-        qbittorrent,
-        transmission,
-        deluge,
-        nzbget,
-      ],
-      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, NzbgetAdapter],
+      useFactory: (
+        qbittorrent: QbittorrentAdapter,
+        transmission: TransmissionAdapter,
+        deluge: DelugeAdapter,
+        nzbget: NzbgetAdapter,
+        sabnzbd: SabnzbdAdapter,
+      ) => [qbittorrent, transmission, deluge, nzbget, sabnzbd],
+      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, NzbgetAdapter, SabnzbdAdapter],
     },
 
     IndexerRepository,
+    IndexerManagerRepository,
+    IndexerManagerService,
+    ProwlarrClient,
     IndexerConfigService,
     IndexerRegistry,
     PluginInstallService,

@@ -602,14 +602,34 @@ export class RequestFulfillmentService {
     try {
       return await this.resolveReleaseFor(indexer, release);
     } catch (error) {
+      let finalError = error;
+      if (indexer.managerId != null && release.downloadUrl && isRefreshableManagedReleaseError(error)) {
+        // A failed refresh is not an answer about the release. The original refusal is what the
+        // caller and the log line below are owed, so nothing here may replace or escape it - but a
+        // swallowed error still gets its own line, or the second search leaves nothing behind.
+        const refreshStartedAt = Date.now();
+        const refreshed = await this.releases.refreshCandidate(requestId, release.indexerId, release).catch((refreshError: unknown) => {
+          this.logger.warn(
+            `[book_request.release_refresh] [fail] requestId=${requestId} indexerId=${release.indexerId} durationMs=${Date.now() - refreshStartedAt} errorClass=${refreshError instanceof Error ? refreshError.constructor.name : typeof refreshError} error="${sanitizeLogValue(refreshError instanceof Error ? refreshError.message : String(refreshError))}" - could not re-search the managed release`,
+          );
+          return undefined;
+        });
+        if (refreshed) {
+          try {
+            return await this.resolveReleaseFor(indexer, refreshed);
+          } catch (retryError) {
+            finalError = retryError;
+          }
+        }
+      }
       // The refusal travels to the caller as a 4xx, and the filter deliberately logs no client
       // error, so without this line a source that searches fine and only fails on download leaves
       // nothing behind but a route and a status. Searching already logs its own failures; this is
       // the other half, and it is the half that names which source refused.
       this.logger.warn(
-        `[book_request.release_resolve] [fail] requestId=${requestId} indexerId=${indexer.id} indexerName="${sanitizeLogValue(indexer.name)}" errorCode=${errorCodeOf(error)} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - could not resolve the picked release`,
+        `[book_request.release_resolve] [fail] requestId=${requestId} indexerId=${indexer.id} indexerName="${sanitizeLogValue(indexer.name)}" errorCode=${errorCodeOf(finalError)} error="${sanitizeLogValue(finalError instanceof Error ? finalError.message : String(finalError))}" - could not resolve the picked release`,
       );
-      throw error;
+      throw finalError;
     }
   }
 
@@ -789,6 +809,11 @@ export class RequestFulfillmentService {
           : `Download client "${client.name}" cannot accept a magnet link or .torrent file`,
     );
   }
+}
+
+function isRefreshableManagedReleaseError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(401|403|404|410)\b|empty \.torrent|invalid .*torrent|not a valid NZB|empty NZB/i.test(message);
 }
 
 /**
