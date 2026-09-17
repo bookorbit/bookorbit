@@ -23,10 +23,13 @@ const ROOT_FIELDS = [
   'subtitle',
   'description',
   'publisher',
+  'originCountry',
   'publishedDate',
   'publishedYear',
   'language',
   'pageCount',
+  'seriesName',
+  'seriesIndex',
   'isbn10',
   'isbn13',
   'rating',
@@ -93,12 +96,14 @@ function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[]
     return normalizeSeriesMemberships(
       memberships.map((membership) => ({
         seriesName: membership.seriesName,
-        seriesIndex: membership.seriesIndex,
+        seriesIndex: membership.seriesIndex == null ? null : String(membership.seriesIndex),
         expectedBookCount: membership.expectedBookCount ?? null,
       })),
     )
   }
-  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null }] : []
+  return book.seriesName
+    ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex == null ? null : String(book.seriesIndex), expectedBookCount: null }]
+    : []
 }
 
 function changedCustomMetadataPayload(
@@ -111,15 +116,8 @@ function changedCustomMetadataPayload(
     .map((field) => ({ fieldId: field.fieldId, value: field.value }))
 }
 
-/**
- * A failed save, kept structured rather than pre-rendered: `detail` is the server's own English
- * description of what it rejected, which no catalog can translate, while everything else has to
- * resolve to a translated message in the component.
- */
 export type MetadataSaveFailure = {
-  /** Server-supplied description, or null when the response carried none. */
   detail: string | null
-  /** HTTP status, or null when the request failed before producing a response. */
   status: number | null
 }
 
@@ -132,6 +130,7 @@ export function useMetadataEditor() {
     subtitle: null as string | null,
     description: null as string | null,
     publisher: null as string | null,
+    originCountry: null as string | null,
     publishedDate: null as string | null,
     publishedYear: null as number | null,
     language: null as string | null,
@@ -188,13 +187,14 @@ export function useMetadataEditor() {
     form.subtitle = book.subtitle
     form.description = book.description
     form.publisher = book.publisher
+    form.originCountry = book.originCountry ?? null
     form.publishedDate = book.publishedDate
     form.publishedYear = book.publishedYear
     form.language = book.language
     form.pageCount = book.pageCount
     form.communityRatings = [...book.communityRatings]
     form.seriesName = book.seriesName
-    form.seriesIndex = book.seriesIndex
+    form.seriesIndex = book.seriesIndex == null ? null : String(book.seriesIndex)
     form.seriesMemberships = seriesMembershipsFromBook(book)
     form.isbn10 = book.isbn10
     form.isbn13 = book.isbn13

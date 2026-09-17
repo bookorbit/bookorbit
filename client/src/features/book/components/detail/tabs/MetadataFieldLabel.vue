@@ -45,7 +45,7 @@ function handleToggle() {
       >
         <Transition name="icon" mode="out-in">
           <Loader2 v-if="loading" key="loading" class="size-3.5 animate-spin" aria-hidden="true" />
-          <Lock v-else-if="locked" key="locked" class="size-4 sm:size-3.5" aria-hidden="true" />
+          <Lock v-else-if="locked" key="locked" class="size-4 sm:size-3.5 text-primary" aria-hidden="true" />
           <LockOpen v-else key="unlocked" class="size-4 sm:size-3.5" aria-hidden="true" />
         </Transition>
       </button>

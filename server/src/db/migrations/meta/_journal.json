@@ -638,6 +638,20 @@
       "when": 1789316739511,
       "tag": "0090_add_indexer_seed_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1789340474211,
+      "tag": "0091_custom_local_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1789340568241,
+      "tag": "0092_add_origin_country",
+      "breakpoints": true
     }
   ]
 }

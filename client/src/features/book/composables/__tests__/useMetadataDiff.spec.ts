@@ -11,6 +11,7 @@ describe('useMetadataDiff', () => {
     genres: ['Genre 1'],
     description: 'Original Description',
     publisher: 'Original Publisher',
+    originCountry: null,
     publishedDate: null,
     publishedYear: 2020,
     language: 'en',
