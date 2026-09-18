@@ -174,6 +174,44 @@ export class OpdsBookService {
       .orderBy(libraries.name);
   }
 
+  async getAccessibleLibrariesPage(
+    userId: number,
+    opts: { limit: number; offset: number },
+    isSuperuser = false,
+  ): Promise<{ items: { id: number; name: string; bookCount: number }[]; hasNext: boolean }> {
+    const rows = isSuperuser
+      ? await this.db
+          .select({
+            id: libraries.id,
+            name: libraries.name,
+            bookCount: sql<number>`count(${books.id})::int`,
+          })
+          .from(libraries)
+          .leftJoin(books, and(eq(books.libraryId, libraries.id), eq(books.status, 'present')))
+          .groupBy(libraries.id)
+          .orderBy(libraries.name, libraries.id)
+          .limit(opts.limit + 1)
+          .offset(opts.offset)
+      : await this.db
+          .select({
+            id: libraries.id,
+            name: libraries.name,
+            bookCount: sql<number>`count(${books.id})::int`,
+          })
+          .from(libraries)
+          .innerJoin(userLibraryAccess, and(eq(userLibraryAccess.libraryId, libraries.id), eq(userLibraryAccess.userId, userId)))
+          .leftJoin(books, and(eq(books.libraryId, libraries.id), eq(books.status, 'present')))
+          .groupBy(libraries.id)
+          .orderBy(libraries.name, libraries.id)
+          .limit(opts.limit + 1)
+          .offset(opts.offset);
+
+    return {
+      items: rows.slice(0, opts.limit),
+      hasNext: rows.length > opts.limit,
+    };
+  }
+
   async getBooksPage(
     userId: number,
     sortOrder: OpdsSortOrder,
@@ -571,7 +609,7 @@ export class OpdsBookService {
       .innerJoin(books, and(eq(books.id, bookSeriesMemberships.bookId), eq(books.status, 'present'), ...filterClauses))
       .where(and(...where))
       .groupBy(bookSeries.id, bookSeries.name)
-      .orderBy(sql`${bookSeries.name} ASC`)
+      .orderBy(sql`${bookSeries.name} ASC`, bookSeries.id)
       .limit(opts.limit + 1)
       .offset(opts.offset);
 
@@ -591,6 +629,30 @@ export class OpdsBookService {
       .where(eq(collections.userId, userId))
       .groupBy(collections.id)
       .orderBy(collections.name);
+  }
+
+  async getUserCollectionsPage(
+    userId: number,
+    opts: { limit: number; offset: number },
+  ): Promise<{ items: { id: number; name: string; bookCount: number }[]; hasNext: boolean }> {
+    const rows = await this.db
+      .select({
+        id: collections.id,
+        name: collections.name,
+        bookCount: sql<number>`count(${collectionBooks.bookId})::int`,
+      })
+      .from(collections)
+      .leftJoin(collectionBooks, eq(collectionBooks.collectionId, collections.id))
+      .where(eq(collections.userId, userId))
+      .groupBy(collections.id)
+      .orderBy(collections.name, collections.id)
+      .limit(opts.limit + 1)
+      .offset(opts.offset);
+
+    return {
+      items: rows.slice(0, opts.limit),
+      hasNext: rows.length > opts.limit,
+    };
   }
 
   // Badge counts only need the totals, so these skip the per-entity book counts
@@ -628,6 +690,28 @@ export class OpdsBookService {
       .from(smartScopes)
       .where(or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true)))
       .orderBy(smartScopes.name);
+  }
+
+  async getUserSmartScopesPage(
+    userId: number,
+    opts: { limit: number; offset: number },
+  ): Promise<{ items: { id: number; name: string; icon: string | null }[]; hasNext: boolean }> {
+    const rows = await this.db
+      .select({
+        id: smartScopes.id,
+        name: smartScopes.name,
+        icon: smartScopes.icon,
+      })
+      .from(smartScopes)
+      .where(or(eq(smartScopes.userId, userId), eq(smartScopes.isPublic, true)))
+      .orderBy(smartScopes.name, smartScopes.id)
+      .limit(opts.limit + 1)
+      .offset(opts.offset);
+
+    return {
+      items: rows.slice(0, opts.limit),
+      hasNext: rows.length > opts.limit,
+    };
   }
 
   async validateBookAccess(bookId: number, userId: number, isSuperuser = false, contentFilters?: ContentFilterRules): Promise<void> {

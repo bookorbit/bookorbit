@@ -176,6 +176,20 @@ describe('OpdsService', () => {
       expect(xml).toContain(`${BASE}/catalog?seriesId=42`);
       expect(xml).not.toContain('catalog?series=The%20Lord%20of%20the%20Rings');
     });
+
+    it('includes navigation links for additional pages', () => {
+      const service = makeService();
+      const xml = service.generateAuthorsNavigation([{ name: 'Brandon Sanderson', bookCount: 2 }], {
+        page: 2,
+        size: 15,
+        selfPath: `${BASE}/authors?page=2&size=15`,
+        hasNext: true,
+      });
+
+      expect(xml).toContain(`rel="first" href="${BASE}/authors?page=1&amp;size=15"`);
+      expect(xml).toContain(`rel="previous" href="${BASE}/authors?page=1&amp;size=15"`);
+      expect(xml).toContain(`rel="next" href="${BASE}/authors?page=3&amp;size=15"`);
+    });
   });
 
   describe('generateAcquisitionFeed', () => {

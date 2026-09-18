@@ -228,16 +228,49 @@ describe('OpdsBookService', () => {
   });
 
   it('returns user collections and smartScopes', async () => {
-    const { service, db } = makeService([[{ id: 4, name: 'Favorites', bookCount: 1 }], [{ id: 7, name: 'Unread', icon: 'sparkles' }]]);
+    const { service, db } = makeService([
+      [{ id: 4, name: 'Favorites', bookCount: 1 }],
+      [{ id: 7, name: 'Unread', icon: 'sparkles' }],
+      [
+        { id: 4, name: 'Favorites', bookCount: 1 },
+        { id: 5, name: 'Later', bookCount: 0 },
+      ],
+      [
+        { id: 7, name: 'Unread', icon: 'sparkles' },
+        { id: 8, name: 'Public', icon: null },
+      ],
+    ]);
 
     await expect(service.getUserCollections(8)).resolves.toEqual([{ id: 4, name: 'Favorites', bookCount: 1 }]);
     await expect(service.getUserSmartScopes(8)).resolves.toEqual([{ id: 7, name: 'Unread', icon: 'sparkles' }]);
+    await expect(service.getUserCollectionsPage(8, { limit: 1, offset: 0 })).resolves.toEqual({
+      items: [{ id: 4, name: 'Favorites', bookCount: 1 }],
+      hasNext: true,
+    });
+    await expect(service.getUserSmartScopesPage(8, { limit: 1, offset: 0 })).resolves.toEqual({
+      items: [{ id: 7, name: 'Unread', icon: 'sparkles' }],
+      hasNext: true,
+    });
 
     const chains = (db.select as ReturnType<typeof vi.fn>).mock.results.map((r) => r.value as Record<string, unknown>);
     const smartScopeChain = chains[1]!;
     const whereClause = (smartScopeChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(collectValues(whereClause)).toContain(8);
     expect(collectValues(whereClause)).toContain(true);
+  });
+
+  it('bounds library navigation pages', async () => {
+    const { service } = makeService([
+      [
+        { id: 1, name: 'Main', bookCount: 10 },
+        { id: 2, name: 'Archive', bookCount: 4 },
+      ],
+    ]);
+
+    await expect(service.getAccessibleLibrariesPage(8, { limit: 1, offset: 0 }, true)).resolves.toEqual({
+      items: [{ id: 1, name: 'Main', bookCount: 10 }],
+      hasNext: true,
+    });
   });
 
   it('enforces validateBookAccess ownership checks', async () => {

@@ -1,4 +1,5 @@
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsInt, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator';
+import { OPDS_MAX_PAGE_SIZE, OPDS_MIN_PAGE_SIZE } from '@bookorbit/types';
 
 const SORT_ORDER_VALUES = ['recent', 'title_asc', 'title_desc', 'author_asc', 'author_desc', 'series_asc', 'series_desc'] as const;
 
@@ -12,7 +13,13 @@ export class CreateOpdsUserDto {
   @MinLength(8)
   password: string;
 
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsEnum(SORT_ORDER_VALUES)
   sortOrder?: (typeof SORT_ORDER_VALUES)[number];
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(OPDS_MIN_PAGE_SIZE)
+  @Max(OPDS_MAX_PAGE_SIZE)
+  pageSize?: number;
 }

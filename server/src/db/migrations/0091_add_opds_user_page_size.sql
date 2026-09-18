@@ -1,0 +1,2 @@
+ALTER TABLE "opds_users" ADD COLUMN "page_size" integer DEFAULT 50 NOT NULL;--> statement-breakpoint
+ALTER TABLE "opds_users" ADD CONSTRAINT "opds_users_page_size_range_chk" CHECK ("opds_users"."page_size" >= 1 and "opds_users"."page_size" <= 100);

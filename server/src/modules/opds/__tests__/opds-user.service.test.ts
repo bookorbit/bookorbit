@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 vi.mock('bcryptjs', () => ({
@@ -53,7 +53,7 @@ describe('OpdsUserService', () => {
 
   describe('findAllForUser', () => {
     it('returns OPDS users for the given userId', async () => {
-      const expected = [{ id: 1, userId: 5, username: 'reader', sortOrder: 'recent', createdAt: new Date() }];
+      const expected = [{ id: 1, userId: 5, username: 'reader', sortOrder: 'recent', pageSize: 50, createdAt: new Date() }];
       db.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -69,13 +69,14 @@ describe('OpdsUserService', () => {
 
   describe('create', () => {
     it('creates an OPDS user with hashed password', async () => {
-      const created = { id: 1, userId: 5, username: 'newuser', sortOrder: 'recent', createdAt: new Date() };
+      const created = { id: 1, userId: 5, username: 'newuser', sortOrder: 'recent', pageSize: 50, createdAt: new Date() };
       mockValues.mockReturnValue({
         returning: vi.fn().mockResolvedValue([created]),
       });
 
       const result = await service.create(5, { username: 'newuser', password: 'password123' });
       expect(result).toEqual(created);
+      expect(mockValues).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 50 }));
     });
 
     it('throws ConflictException on duplicate username', async () => {
@@ -114,7 +115,7 @@ describe('OpdsUserService', () => {
       const existing = { id: 10, userId: 5 };
       db.query.opdsUsers.findFirst.mockResolvedValue(existing);
 
-      const updated = { id: 10, userId: 5, username: 'reader', sortOrder: 'title_asc', createdAt: new Date() };
+      const updated = { id: 10, userId: 5, username: 'reader', sortOrder: 'title_asc', pageSize: 50, createdAt: new Date() };
       mockReturning.mockResolvedValue([updated]);
 
       const result = await service.update(5, 10, { sortOrder: 'title_asc' });
@@ -132,6 +133,20 @@ describe('OpdsUserService', () => {
       mockReturning.mockResolvedValue([]);
 
       await expect(service.update(5, 10, { sortOrder: 'title_asc' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('updates page size without changing sort order', async () => {
+      db.query.opdsUsers.findFirst.mockResolvedValue({ id: 10, userId: 5 });
+      mockReturning.mockResolvedValue([{ id: 10, userId: 5, username: 'reader', sortOrder: 'recent', pageSize: 15, createdAt: new Date() }]);
+
+      await expect(service.update(5, 10, { pageSize: 15 })).resolves.toEqual(expect.objectContaining({ sortOrder: 'recent', pageSize: 15 }));
+      expect(mockSet).toHaveBeenLastCalledWith({ pageSize: 15 });
+    });
+
+    it('rejects an update with no settings', async () => {
+      db.query.opdsUsers.findFirst.mockResolvedValue({ id: 10, userId: 5 });
+
+      await expect(service.update(5, 10, {})).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -189,7 +204,7 @@ describe('OpdsUserService', () => {
       const { hash } = await import('bcryptjs');
       const passwordHash = await hash('correctpass', 4);
 
-      const opdsUser = { id: 1, userId: 5, username: 'reader', passwordHash, sortOrder: 'recent' };
+      const opdsUser = { id: 1, userId: 5, username: 'reader', passwordHash, sortOrder: 'recent', pageSize: 15 };
       const parentUser = { id: 5, username: 'admin', active: true };
 
       db.query.opdsUsers.findFirst.mockResolvedValue(opdsUser);

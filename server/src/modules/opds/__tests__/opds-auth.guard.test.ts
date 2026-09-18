@@ -33,6 +33,7 @@ const OPDS_USER = {
   username: 'reader',
   passwordHash: '$2a',
   sortOrder: 'recent' as const,
+  pageSize: 15,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -140,6 +141,7 @@ describe('OpdsAuthGuard', () => {
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
     expect((request.opdsUser as OpdsRequestUser).userId).toBe(1);
+    expect((request.opdsUser as OpdsRequestUser).pageSize).toBe(50);
   });
 
   it('rejects a same-length tampered cover token', async () => {
@@ -160,6 +162,7 @@ describe('OpdsAuthGuard', () => {
     expect(opdsUser.userId).toBe(1);
     expect(opdsUser.username).toBe('reader');
     expect(opdsUser.sortOrder).toBe('recent');
+    expect(opdsUser.pageSize).toBe(15);
     expect(opdsUser.isSuperuser).toBe(false);
     expect(typeof opdsUser.coverToken).toBe('string');
     expect(opdsUser.coverToken).toMatch(/^1\./);

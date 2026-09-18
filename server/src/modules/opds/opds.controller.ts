@@ -16,12 +16,14 @@ import { readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply } from 'fastify';
+import { OPDS_DEFAULT_PAGE_SIZE, OPDS_MAX_PAGE_SIZE, OPDS_MIN_PAGE_SIZE } from '@bookorbit/types';
 
 import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { Public } from '../../common/decorators/public.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
+import { BookService } from '../book/book.service';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import type { OpdsRequestUser } from './opds-auth.guard';
@@ -29,7 +31,7 @@ import { OpdsEnabledGuard } from './opds-enabled.guard';
 import { OpdsUser } from './opds-user.decorator';
 import { OpdsBookService } from './opds-book.service';
 import { OpdsService } from './opds.service';
-import { BookService } from '../book/book.service';
+import type { OpdsNavigationPagination } from './opds.service';
 
 @Controller('opds')
 @Public()
@@ -52,6 +54,26 @@ export class OpdsController {
     }
   }
 
+  private resolvePageSize(size: number | undefined, defaultSize: number): number {
+    return Math.min(Math.max(size ?? defaultSize ?? OPDS_DEFAULT_PAGE_SIZE, OPDS_MIN_PAGE_SIZE), OPDS_MAX_PAGE_SIZE);
+  }
+
+  private resolveNavigationPage(page: number | undefined, size: number | undefined, defaultSize: number) {
+    const resolvedSize = this.resolvePageSize(size, defaultSize);
+    const resolvedPage = Math.max(page ?? 1, 1);
+    this.assertPaginationWindow(resolvedPage, resolvedSize);
+    return { page: resolvedPage, size: resolvedSize, offset: (resolvedPage - 1) * resolvedSize };
+  }
+
+  private createNavigationPagination(path: string, page: { page: number; size: number }, hasNext: boolean): OpdsNavigationPagination {
+    return {
+      page: page.page,
+      size: page.size,
+      selfPath: `${path}?page=${page.page}&size=${page.size}`,
+      hasNext,
+    };
+  }
+
   @Get()
   root(@OpdsUser() _user: OpdsRequestUser, @Res() reply: FastifyReply) {
     const xml = this.opdsService.generateRootNavigation();
@@ -59,37 +81,94 @@ export class OpdsController {
   }
 
   @Get('libraries')
-  async libraries(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const libs = await this.opdsBookService.getAccessibleLibraries(user.userId, user.isSuperuser);
-    const xml = this.opdsService.generateLibrariesNavigation(libs);
+  async libraries(
+    @OpdsUser() user: OpdsRequestUser,
+    @Res() reply: FastifyReply,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
+  ) {
+    const pagination = this.resolveNavigationPage(page, size, user.pageSize);
+    const { items, hasNext } = await this.opdsBookService.getAccessibleLibrariesPage(
+      user.userId,
+      { limit: pagination.size, offset: pagination.offset },
+      user.isSuperuser,
+    );
+    const xml = this.opdsService.generateLibrariesNavigation(items, this.createNavigationPagination('/api/v1/opds/libraries', pagination, hasNext));
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
   @Get('collections')
-  async collections(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const cols = await this.opdsBookService.getUserCollections(user.userId);
-    const xml = this.opdsService.generateCollectionsNavigation(cols);
+  async collections(
+    @OpdsUser() user: OpdsRequestUser,
+    @Res() reply: FastifyReply,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
+  ) {
+    const pagination = this.resolveNavigationPage(page, size, user.pageSize);
+    const { items, hasNext } = await this.opdsBookService.getUserCollectionsPage(user.userId, {
+      limit: pagination.size,
+      offset: pagination.offset,
+    });
+    const xml = this.opdsService.generateCollectionsNavigation(
+      items,
+      this.createNavigationPagination('/api/v1/opds/collections', pagination, hasNext),
+    );
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
   @Get('smart-scopes')
-  async smartScopes(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const items = await this.opdsBookService.getUserSmartScopes(user.userId);
-    const xml = this.opdsService.generateSmartScopesNavigation(items);
+  async smartScopes(
+    @OpdsUser() user: OpdsRequestUser,
+    @Res() reply: FastifyReply,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
+  ) {
+    const pagination = this.resolveNavigationPage(page, size, user.pageSize);
+    const { items, hasNext } = await this.opdsBookService.getUserSmartScopesPage(user.userId, {
+      limit: pagination.size,
+      offset: pagination.offset,
+    });
+    const xml = this.opdsService.generateSmartScopesNavigation(
+      items,
+      this.createNavigationPagination('/api/v1/opds/smart-scopes', pagination, hasNext),
+    );
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
   @Get('authors')
-  async authors(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const items = await this.opdsBookService.getDistinctAuthors(user.userId, user.isSuperuser, user.contentFilters);
-    const xml = this.opdsService.generateAuthorsNavigation(items);
+  async authors(
+    @OpdsUser() user: OpdsRequestUser,
+    @Res() reply: FastifyReply,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
+  ) {
+    const pagination = this.resolveNavigationPage(page, size, user.pageSize);
+    const { items, hasNext } = await this.opdsBookService.getDistinctAuthorsPage(
+      user.userId,
+      { limit: pagination.size, offset: pagination.offset },
+      user.isSuperuser,
+      user.contentFilters,
+    );
+    const xml = this.opdsService.generateAuthorsNavigation(items, this.createNavigationPagination('/api/v1/opds/authors', pagination, hasNext));
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
   @Get('series')
-  async series(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const items = await this.opdsBookService.getDistinctSeries(user.userId, user.isSuperuser, user.contentFilters);
-    const xml = this.opdsService.generateSeriesNavigation(items.filter((s): s is { id: number; name: string; bookCount: number } => s.name !== null));
+  async series(
+    @OpdsUser() user: OpdsRequestUser,
+    @Res() reply: FastifyReply,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
+    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
+  ) {
+    const pagination = this.resolveNavigationPage(page, size, user.pageSize);
+    const { items, hasNext } = await this.opdsBookService.getDistinctSeriesPage(
+      user.userId,
+      { limit: pagination.size, offset: pagination.offset },
+      user.isSuperuser,
+      user.contentFilters,
+    );
+    const namedItems = items.filter((item): item is { id: number; name: string; bookCount: number } => item.name !== null);
+    const xml = this.opdsService.generateSeriesNavigation(namedItems, this.createNavigationPagination('/api/v1/opds/series', pagination, hasNext));
     this.sendXml(reply, xml, OPDS_MIME_NAV);
   }
 
@@ -97,7 +176,7 @@ export class OpdsController {
   async catalog(
     @OpdsUser() user: OpdsRequestUser,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
+    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
     @Query('libraryId') libraryIdStr?: string,
     @Query('collectionId') collectionIdStr?: string,
     @Query('smartScopeId') smartScopeIdStr?: string,
@@ -107,7 +186,7 @@ export class OpdsController {
     @Res() reply?: FastifyReply,
     @Query('seriesId') seriesIdStr?: string,
   ) {
-    const clampedSize = Math.min(Math.max(size, 1), 100);
+    const clampedSize = this.resolvePageSize(size, user.pageSize);
     const clampedPage = Math.max(page, 1);
     this.assertPaginationWindow(clampedPage, clampedSize);
 
@@ -156,10 +235,10 @@ export class OpdsController {
   async recent(
     @OpdsUser() user: OpdsRequestUser,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('size', new DefaultValuePipe(50), ParseIntPipe) size: number,
+    @Query('size', new ParseIntPipe({ optional: true })) size?: number,
     @Res() reply?: FastifyReply,
   ) {
-    const clampedSize = Math.min(Math.max(size, 1), 100);
+    const clampedSize = this.resolvePageSize(size, user.pageSize);
     const clampedPage = Math.max(page, 1);
     this.assertPaginationWindow(clampedPage, clampedSize);
 
@@ -185,16 +264,17 @@ export class OpdsController {
   }
 
   @Get('surprise')
-  async surprise(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply) {
-    const entries = await this.opdsBookService.getRandomBooks(user.userId, 25, user.isSuperuser, user.contentFilters);
+  async surprise(@OpdsUser() user: OpdsRequestUser, @Res() reply: FastifyReply, @Query('size', new ParseIntPipe({ optional: true })) size?: number) {
+    const pageSize = this.resolvePageSize(size, user.pageSize);
+    const entries = await this.opdsBookService.getRandomBooks(user.userId, pageSize, user.isSuperuser, user.contentFilters);
     const xml = this.opdsService.generateAcquisitionFeed(
       'Random Books',
       'urn:bookorbit:surprise',
       entries,
       entries.length,
       1,
-      25,
-      '/api/v1/opds/surprise',
+      pageSize,
+      size === undefined ? '/api/v1/opds/surprise' : `/api/v1/opds/surprise?size=${pageSize}`,
       user.coverToken,
     );
     this.sendXml(reply, xml, OPDS_MIME_ACQ);
