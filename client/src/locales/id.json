@@ -53,10 +53,12 @@
         "shareTitle": "Aktifkan {level}?",
         "shareDescription": "Administrator yang memiliki ijin akan dapat melihat informasi berikut.",
         "stopTitle": "Berhenti membagikan wawasan bacaan?",
-        "stopDescription": "Akses administrator akan segera diblokir. Catatan akses yang sudah ada tetap ada dalam riwayat Anda."
+        "stopDescription": "Akses administrator akan segera diblokir. Catatan akses yang sudah ada tetap ada dalam riwayat Anda.",
+        "recordedNotice": "Setiap tampilan profil administrator dicatat dan muncul dalam riwayat akses Anda."
       },
       "preview": {
         "title": "Pratinjau profil yang Anda bagikan",
+        "description": "Lihat informasi yang saat ini tersedia bagi administrator yang berwenang.",
         "action": "Muat pratinjau",
         "readingTime": "Waktu baca",
         "activeDays": "Hari aktif",
@@ -65,19 +67,31 @@
         "topBooks": "Buku pilihan"
       },
       "history": {
-        "title": "Riwayat akses profil"
+        "title": "Riwayat akses profil",
+        "description": "Riwayat tampilan profil bacaan bersama Anda oleh administrator baru-baru ini.",
+        "empty": "Belum ada administrator yang melihat profil bacaan bersama Anda.",
+        "paginationLabel": "Halaman riwayat akses profil"
       },
+      "durationMinutes": "{count, plural, one {# menit} other {# menit}}",
+      "durationHours": "{count, plural, one {# jam} other {# jam}}",
       "unknownTitle": "Buku tanpa judul",
       "errors": {
-        "save": "Gagal memperbarui pengaturan berbagi."
+        "load": "Gagal memuat pengaturan berbagi.",
+        "save": "Gagal memperbarui pengaturan berbagi.",
+        "preview": "Gagal memuat pratinjau profil bersama."
       }
     },
     "appearance": {
       "language": {
         "title": "Bahasa",
-        "label": "Bahasa"
+        "description": "Pilih bahasa yang akan digunakan di seluruh antarmuka.",
+        "label": "Bahasa",
+        "loadError": "Gagal memuat bahasa yang dipilih",
+        "saveError": "Gagal menyimpan preferensi bahasa"
       },
       "pageTitle": "Tampilan",
+      "pageSubtitle": "Atur tema, sampul, tata letak, dan cara perpustakaan Anda ditampilkan.",
+      "mobileSummary": "Tema: {theme} • Aksen: {accent} • Latar Belakang: {background}",
       "themeMode": {
         "light": "Cerah",
         "dark": "Gelap",
@@ -97,11 +111,73 @@
           "copper": "Tembaga",
           "orange": "Jingga",
           "chartreuse": "Hijau kekuningan",
+          "marigold": "Marigold",
+          "wasabi": "Wasabi",
+          "amber": "Amber",
+          "malachite": "Malachite",
           "yellow": "Kuning",
+          "viridian": "Viridian",
+          "turquoise": "Turquoise",
+          "lime": "Lime",
           "green": "Hijau",
+          "acid-green": "Acid Green",
+          "emerald": "Emerald",
+          "teal": "Teal",
+          "electric-blue": "Electric Blue",
+          "cyan": "Cyan",
+          "jade": "Jade",
+          "ultramarine": "Ultramarine",
+          "iris": "Iris",
           "purple": "Ungu",
           "blue": "Biru",
-          "indigo": "Indigo"
+          "indigo": "Indigo",
+          "violet": "Violet",
+          "amethyst": "Amethyst",
+          "fuchsia": "Amethyst",
+          "raspberry": "Raspberry",
+          "pink": "Pink",
+          "white": "White",
+          "rosewater": "Rosewater",
+          "salmon": "Salmon",
+          "coral": "Coral",
+          "sand": "Sand",
+          "peach": "Peach",
+          "pear": "Pear",
+          "flax": "Flax",
+          "sprout": "Sprout",
+          "butter": "Butter",
+          "aloe": "Aloe",
+          "lemon": "Lemon",
+          "foam": "Foam",
+          "aqua": "Aqua",
+          "celadon": "Celadon",
+          "sage": "Sage",
+          "mint": "Mint",
+          "seafoam": "Seafoam",
+          "baby-blue": "Baby Blue",
+          "powder": "Powder",
+          "sea-glass": "Sea Glass",
+          "bluebell": "Bluebell",
+          "cornflower": "Cornflower",
+          "thistle": "Thistle",
+          "periwinkle": "Periwinkle",
+          "wisteria": "Wisteria",
+          "lavender": "Lavender",
+          "mauve": "Mauve",
+          "orchid": "Orchid",
+          "rose-quartz": "Rose Quartz",
+          "blush": "Blush"
+        },
+        "accentColor": {
+          "label": "Accent color"
+        },
+        "cornerRadius": {
+          "label": "Corner radius",
+          "hint": "Roundness of cards and UI elements"
+        },
+        "surfaceBrightness": {
+          "label": "Surface brightness",
+          "hint": "Lighten dark mode surfaces"
         }
       }
     }

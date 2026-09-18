@@ -239,7 +239,7 @@
           },
           "naturalBottom": {
             "label": "Fondo naturale",
-            "hint": "Mantenere il rapporto di copertura originale e ancorare la copertura al fondo"
+            "hint": "Mantenere il rapporto della copertina originale e ancorare la copertina in fondo"
           }
         },
         "spine": {
@@ -446,7 +446,7 @@
         "usage": {
           "libraries": "{count, plural, =0 {niente biblioteche} one {# biblioteca} other {# biblioteche} many {# biblioteche}}",
           "collections": "{count, plural, =0 {nessuna raccolta} one {# raccolta} other {# collezioni} many {# collezioni}}",
-          "smartScopes": "{count, plural, =0 {nessun ambito intelligente} one {# ambito intelligente} other {# ambiti intelligenti} many {# ambiti intelligenti}}"
+          "smartScopes": "{count, plural, =0 {nessun filtro intelligente} one {# filtro intelligente} other {# filtri intelligenti} many {# filyti intelligenti}}"
         },
         "confirm": {
           "deleteOne": "Eliminare \"{name}\"? Gli usi esistenti torneranno alla loro icona predefinita.",
@@ -734,6 +734,7 @@
         "connected": "Connesso - {issuer}",
         "connectionFailed": "Connessione non riuscita",
         "privateIssuerAddress": "L'URL dell'emittente si risolve a un indirizzo di rete privato o locale, quindi il server si è rifiutato di connettersi. Imposta OIDC_ALLOW_LOCAL_ISSUERS=true sul server BookOrbit per consentirlo.",
+        "tlsCertificateUntrusted": "BookOrbit non può verificare il certificato TLS del provider OIDC. Se il provider utilizza un'autorità di certificazione privata, monta il suo pacchetto PEM CA, imposta NODE_EXTRA_CA_CERTS sul percorso nel contenitore del pacchetto e riavvia BookOrbit.",
         "hide": "Nasconditi",
         "details": "Dettagli",
         "supported": "supportato",
@@ -953,7 +954,7 @@
         "host": "Host",
         "port": "Porta",
         "user": "Utente",
-        "password": "Parola d'ordine",
+        "password": "Password",
         "passwordSavedPlaceholder": "Salvato: lascia invariato",
         "passwordEmptyPlaceholder": "Nessuna password impostata",
         "database": "Banca dati",
@@ -1203,6 +1204,8 @@
           },
           "none": "Nessuno",
           "allSupported": "Tutti i formati supportati",
+          "patternCount": "{count, plural, one {# modello} other {# modelli}}",
+          "peopleCount": "{count, plural, =0 {Nessuna concessione esplicita} one {# persona} other {# persone}}",
           "historyEmpty": "Questa biblioteca non è mai stata scansionata.",
           "historyFailed": "Impossibile caricare la cronologia di scansione per questa libreria."
         },
@@ -1277,19 +1280,32 @@
           "title": "Come funziona.",
           "summary": "Ogni libro ottiene un punteggio su 100 in base a quanto sono completi i suoi metadati. Un peso è significativo solo accanto agli altri, quindi ogni campo sottostante mostra la parte di un punteggio finito di cui è responsabile. Raddoppiare ogni peso non cambia niente."
         },
+        "readOnly": "Puoi vedere come vengono calcolati i punteggi, ma modificare i pesi richiede l'autorizzazione delle impostazioni dell'app.",
+        "compositionTitle": "Da dove proviene un punteggio",
+        "compositionHint": "Le percentuali sono sempre fino a 100.",
         "searchFields": "Filtro campi",
         "clearSearch": "Cancella la ricerca",
         "noMatches": "Nessun libro corrisponde a questa ricerca.",
+        "totalSummary": "{scoring} del punteggio di 24 campi, {total} punti totali",
+        "countGroups": "Incluso nel punteggio",
         "notScored": "Nessun punteggio",
         "notScoredHeading": "Nessun punteggio ({count})",
+        "notScoredHint": "Un campo a zero lascia anche il totale, quindi i libri mancanti non sono contrassegnati.",
         "decreaseWeight": "Diminuisce il peso di {field}",
         "increaseWeight": "Aumenta il peso di {field}",
+        "revertField": "Ripristina {field} al peso salvato",
         "table": {
           "field": "Campo",
-          "weight": "Peso"
+          "weight": "Peso",
+          "share": "Incidenza sul punteggio",
+          "versusDefault": "Cambia"
         },
         "groups": {
-          "enrichment": "Arricchimento"
+          "core": "Nucleo",
+          "publishing": "Dati editoriali",
+          "classification": "Classificazione",
+          "enrichment": "Arricchimento",
+          "providers": "ID fornitore"
         },
         "rules": {
           "text": "Conta quando non è vuoto",
@@ -1301,6 +1317,8 @@
         },
         "rail": {
           "title": "Dove si trovano i tuoi libri",
+          "description": "Il colore del badge che il lettore vede sulla scheda di un libro, confrontato con quello di tutti i libri attualmente visibili.",
+          "bandsLabel": "Fasce di colore dei badge",
           "bands": {
             "poor": "SOTTO 50",
             "fair": "50-69",
@@ -1325,7 +1343,12 @@
         "save": {
           "upToDate": "Tutte le modifiche salvate.",
           "unsaved": "{count, plural, one {# campo modificato} other {# campi modificati}}",
-          "totalShift": "{from} totali a {to} punti"
+          "totalShift": "{from} totali a {to} punti",
+          "rescores": "Saving rescores {count, plural, one {# book} other {# books}} in the background.",
+          "rescoresUnknown": "Il salvataggio ricalcola in background i punteggi della tua libreria.",
+          "action": "Salva e applica punteggi",
+          "discard": "Abbandona",
+          "leaveWarning": "Hai modifiche di peso non salvate. Lasci la pagina perdendoli?"
         }
       },
       "tabs": {
@@ -1349,6 +1372,7 @@
         "display": "Visualizzazione",
         "reader": "Lettore",
         "metadata": "Metadati",
+        "usersAccess": "Utenti e accessi",
         "email": "E-mail",
         "opds": "OPDS",
         "kobo": "Kobo",
@@ -1506,17 +1530,26 @@
         "searchPlaceholder": "Filtra le fonti",
         "sourcesEnabled": "{enabled} di {total} abilitati",
         "groupEnabled": "{enabled} di {total} abilitati",
+        "unsavedChanges": "{count, plural, one {# campo modificato} other {# campi modificati}}",
         "noMatches": "Nessuna sorgente corrisponde a questo filtro.",
         "clearFilters": "Cancella filtri",
         "filter": {
           "label": "Filtra sorgenti per stato",
           "all": "Tutte",
+          "enabled": "Abilitato",
           "needsSetup": "Da configurare"
+        },
+        "groups": {
+          "books": "Cataloghi generali di libri",
+          "audiobooks": "Audiolibri",
+          "comics": "Fumetti e graphic novel",
+          "regional": "Cataloghi regionali"
         },
         "badge": {
           "setupRequired": "Configurazione richiesta",
           "throttled": "Strozzato",
-          "ready": "Pronto"
+          "ready": "Pronto",
+          "active": "Attivo"
         },
         "fields": {
           "apiKey": "API Chiave",
@@ -1540,6 +1573,7 @@
           "kobo": "Raschia le pagine del libro pubblico di Kobo. Il paese e la lingua devono corrispondere ai percorsi Kobo URL; la protezione dai bot può bloccare le richieste.",
           "audible": "Estrae i metadati dell'audiolibro da Audible. Non è richiesta alcuna configurazione aggiuntiva.",
           "audnexus": "Metadati degli audiolibri gestiti dalla comunità. Nessuna configurazione richiesta.",
+          "librofm": "Metadati del catalogo audiolibro senza DRM. Utilizza un endpoint Libro.fm non documentato ed è disabilitato per impostazione predefinita.",
           "comicvine": "Metadati dei fumetti da ComicVine. È richiesta una chiave API gratuita da comicvine.gamespot.com.",
           "ranobedb": "Metadati delle light novel giapponesi da RanobeDB. Nessuna configurazione richiesta.",
           "lubimyczytac": "Catalogo dei libri polacchi (lubimyczytac.pl). Raschia le pagine dei libri pubblici. Nessuna configurazione richiesta.",
@@ -1592,9 +1626,19 @@
             "label": "Combina i generi di tutti i fornitori selezionati",
             "hint": "Raccogli e deduplica i generi da ogni provider assegnato al campo Generi, invece di fermarti al primo risultato."
           },
+          "maxGenres": {
+            "label": "Numero massimo di generi per libro",
+            "hint": "Applicato dopo le esclusioni e la rimozione dei duplicati. Lascia vuoto per non impostare un limite. Questa impostazione influisce sui futuri recuperi dei metadati.",
+            "unlimited": "Illimitato",
+            "error": "Inserisci un numero intero da 1 a {max} o lascia vuoto il campo."
+          },
           "storeProviderIds": {
             "label": "Memorizza gli ID dei fornitori sui libri",
             "hint": "Quando recuperi i metadati, salva gli ID fornitore restituiti (ISBN, ASIN, Goodreads ID e così via) nel record del libro per ricerche future più accurate."
+          },
+          "existingProviderIdsOnly": {
+            "label": "Usa solo gli ID dei fornitori già presenti",
+            "hint": "Per i libri già presenti nella libreria, interroga solo i fornitori per cui è già memorizzato un ID, senza mai ricorrere a una ricerca se il recupero tramite ID non riesce. La ricerca manuale e la scoperta di nuovi libri non sono interessate da questa impostazione."
           }
         },
         "library": {
@@ -1627,7 +1671,8 @@
           "field": "Campo",
           "activeProviders": "Fornitori attivi (ordinati per priorità)",
           "mergeStrategy": "Strategia di fusione",
-          "status": "Stato"
+          "status": "Stato",
+          "noMatches": "Nessun campo corrisponde a questi filtri."
         },
         "field": {
           "noProviders": "Abilitato ma non ha provider",
@@ -1636,6 +1681,14 @@
           "custom": "Personalizzato",
           "default": "Predefinito",
           "resetToDefault": "Ripristina le impostazioni predefinite",
+          "toggle": "Recupera {field} durante l'aggiornamento dei metadati",
+          "configure": "Configura {field}",
+          "add": "Aggiungi",
+          "addHint": "Aggiunto in fondo all’ordine. Trascina un’etichetta per anticiparne la posizione.",
+          "addProviderTo": "Aggiungi un fornitore a {field}",
+          "removeProvider": "Rimuovi {provider}",
+          "noProvidersYet": "Ancora nessun fornitore",
+          "skippedCount": "{count, plural, one {# ignorato} other {# ignorati}}",
           "unsaved": "Non salvato",
           "override": "Sovrascrivi",
           "inherited": "Ereditato",
@@ -1657,6 +1710,7 @@
         "scope": {
           "label": "Campo di applicazione della regola",
           "global": "Impostazioni predefinite globali",
+          "overrideCount": "{count, plural, one {# campo sovrascritto} other {# campi sovrascritti}}",
           "unsavedMarker": "Modifiche non salvate"
         },
         "toolbar": {
@@ -1664,7 +1718,12 @@
           "clearSearch": "Pulisci ricerca",
           "provider": "Fornitore",
           "anyProvider": "Qualunque",
+          "providerMenuTitle": "Filtra e modifica in blocco per fornitore",
+          "usedIn": "{count, plural, =0 {inutilizzato} one {# campo} other {# campi}}",
+          "showOnlyThese": "Mostra solo i campi che lo usano",
           "bulkLabel": "Applica a tutti i campi {count} che lo usano",
+          "makeFirst": "Imposta come primo ovunque",
+          "makeLast": "Imposta come ultimo ovunque",
           "removeEverywhere": "Rimuovi da tutti i campi",
           "allFields": "Tutti i campi",
           "overridesOnly": "Solo sovrascrittura",
@@ -1684,6 +1743,7 @@
           "result": "Risultato",
           "resultHint": "Al prossimo aggiornamento questo campo si risolve in questo ordine:",
           "noUsableProviders": "Nessun provider utilizzabile - questo campo non sarà riempito.",
+          "skippedSummary": "{count, plural, one {{providers} è nell’ordine ma verrà ignorato.} other {{providers} sono nell’ordine ma verranno ignorati.}}",
           "appliesTo": "Si applica a {scope}.",
           "inheritGlobal": "Eredita regola globale",
           "inheritingGlobal": "Eredendo la regola globale.",
@@ -1691,6 +1751,7 @@
         },
         "save": {
           "upToDate": "Nessuna modifica non registrata",
+          "unsaved": "{count, plural, one {# modifica non salvata} other {# modifiche non salvate}} in {scope}",
           "discard": "Scarta",
           "action": "Salva {scope}"
         },
@@ -1700,7 +1761,13 @@
             "description": "Questo svuota la lista dei provider su tutti i 16 campi in {scope}. Niente viene salvato fino a quando non si sceglie Salva."
           },
           "resetScope": {
-            "title": "Ripristina le impostazioni predefinite?"
+            "title": "Ripristina le impostazioni predefinite?",
+            "globalDescription": "Questo sostituisce le tue regole di campo globali con le impostazioni predefinite di sistema e salva immediatamente.",
+            "libraryDescription": "Questo rimuove ogni override su {scope} quindi eredita nuovamente le regole globali e salva immediatamente."
+          },
+          "removeProvider": {
+            "title": "Rimuovere {provider} da ogni campo?",
+            "description": "Questo porta {provider} fuori dall'ordine del provider su ogni campo in {scope}. Niente è salvato fino a quando non scegli Salva."
           }
         }
       },
@@ -1796,6 +1863,15 @@
         "score": "Assegna pesi ai campi di metadati per calcolare quanto fidarsi dei risultati recuperati.",
         "auto-fetch": "Recupera automaticamente copertine, descrizioni e altri dettagli quando nuovi libri vengono aggiunti alla tua libreria.",
         "authors": "Recupera automaticamente biografie e foto del profilo quando nuovi autori compaiono nella tua libreria."
+      },
+      "preferences": {
+        "toast": {
+          "saved": "Preferenze dei metadati salvate",
+          "saveFailed": "Impossibile salvare le preferenze dei metadati. Controllare la connessione e riprovare.",
+          "globalReset": "Regole globali di campo reimpostate ai valori predefiniti di sistema",
+          "libraryReset": "Libreria ripristinata alle regole globali",
+          "resetFailed": "Impossibile ripristinare le preferenze dei metadati. Controllare la connessione e riprovare."
+        }
       }
     },
     "reader": {
@@ -1843,12 +1919,26 @@
         "typography": "Tipografia",
         "font": "Carattere",
         "fontHint": "Carattere tipografico utilizzato per il corpo del testo",
+        "fontStyle": "Stile Carattere",
+        "fontStyleHint": "Peso e inclinazione del testo del corpo. Grassetto e corsivo nel libro rimangono relativi ad esso.",
         "builtInFonts": "Caratteri incorporati",
         "yourFonts": "I tuoi caratteri",
         "fontSize": "Dimensione del carattere",
         "fontSizeHint": "Dimensione base del testo in pixel",
         "lineHeight": "Altezza della linea",
         "lineHeightHint": "Spaziatura verticale tra le righe",
+        "paragraphSpacing": "Spaziatura dei paragrafi",
+        "paragraphSpacingHint": "Spazio tra i paragrafi. Il valore predefinito del libro preserva la spaziatura dell'editore.",
+        "paragraphSpacingDefault": "Predefinito nel libro",
+        "paragraphSpacingValue": "{value} em",
+        "letterSpacing": "Spaziatura tra le lettere",
+        "letterSpacingHint": "Spazio tra le lettere. Il valore predefinito del libro preserva la spaziatura dell'editore.",
+        "wordSpacing": "Spazio tra parole",
+        "wordSpacingHint": "Spazio tra le parole. Il valore predefinito del libro preserva la spaziatura dell'editore.",
+        "textIndent": "Rientro prima riga",
+        "textIndentHint": "Rientro all'inizio dei paragrafi ordinari. Il default del libro preserva l'indentazione dell'editore.",
+        "custom": "Personalizzato",
+        "emValue": "{value} em",
         "justify": "Giustificare il testo",
         "justifyHint": "Allinea il testo su entrambi i margini",
         "hyphenation": "Sillabazione",
@@ -1917,6 +2007,8 @@
         "widePageDisable": "Disabilita",
         "forceTwoPage": "Forza due pagine su schermi piccoli",
         "forceTwoPageHint": "Ignora la modalità alternativa automatica per dispositivi mobili quando è selezionata la modalità impaginata a due pagine",
+        "autoAdvance": "Avanzamento automatico al libro successivo",
+        "autoAdvanceHint": "Gira oltre l'ultima pagina per aprire il libro successivo della serie",
         "off": "Spento",
         "on": "Su",
         "display": "Visualizzazione",
@@ -1962,6 +2054,9 @@
         "deleteVariant": "Elimina variante",
         "styleNormal": "Normale",
         "styleItalic": "Corsivo",
+        "weightItalicOf": "{weight} Corsivo",
+        "variableRange": "Variabile {min}-{max}",
+        "variableStyles": "{count, plural, one {# stile} other {# stili}}",
         "weightThin": "Sottile",
         "weightExtraLight": "Extra leggero",
         "weightLight": "Luce",
@@ -1978,7 +2073,12 @@
         "deleteFamilyFailed": "Impossibile eliminare la famiglia di caratteri",
         "demoCannotManage": "L'account con limitazioni demo non può gestire i caratteri",
         "fileAdded": "\"{name}\" aggiunto",
-        "uploadFailed": "Caricamento non riuscito"
+        "uploadFailed": "Caricamento non riuscito",
+        "serverFontsTitle": "Caratteri server (condivisi da admin)",
+        "serverFontsHint": "Questi caratteri provengono dall'amministratore del server. Disattivane uno per escluderlo dal lettore.",
+        "serverFontsShown": "Mostrati {count} di {total}",
+        "serverFontsAllHidden": "Tutti i caratteri del server sono nascosti. Il tuo lettore mostrerà solo i caratteri incorporati e quelli personali.",
+        "serverFontVisibilityFailed": "Impossibile aggiornare la visibilità del carattere del server"
       },
       "bookDock": {
         "title": "Book Dock",
@@ -2046,6 +2146,7 @@
         "modSort": "Formato Cognome, Nome",
         "modInitial": "Solo la prima lettera",
         "modFixed2": "Due cifre decimali",
+        "modMax3": "Fino a tre valori, altrimenti niente",
         "folderOnlyPrefix": "Termina uno schema con",
         "folderOnlySuffix": "per specificare solo una cartella. Il nome del file originale verrà conservato al suo interno.",
         "conditionalLogic": "Logica condizionale",
@@ -2101,17 +2202,99 @@
         "tokenTitle": "Titolo del libro",
         "tokenSubtitle": "Sottotitolo del libro",
         "tokenAuthors": "Autore/i, separati da virgole",
+        "tokenNarrators": "Narratori (divisi da virgole)",
         "tokenYear": "Anno di pubblicazione",
         "tokenSeries": "Nome della serie",
         "tokenSeriesIndex": "Indice della serie (con zeri iniziali)",
         "tokenPublisher": "Editore",
         "tokenIsbn": "ISBN-13",
         "tokenLanguage": "Lingua",
+        "tokenLibrary": "Nome della biblioteca",
         "tokenOriginalFilename": "Nome file originale (senza estensione)",
         "tokenExtension": "Estensione del file (senza punto)",
         "patternHelpIntro": "I modelli usano token come {titleToken} e {authorsToken}, oltre a modificatori e segmenti facoltativi.",
         "browseTokensAndExamples": "Sfoglia token ed esempi",
-        "librariesGroup": "Biblioteche"
+        "subtitleShort": "Cartella e modelli di nome file per i file memorizzati.",
+        "rule": {
+          "fileAsBook": "Impostazione predefinita File come libro",
+          "folderAsBook": "Impostazione predefinita Cartella come libro",
+          "download": "Scarica nome file"
+        },
+        "howItWorks": {
+          "title": "Come viene scelto un percorso.",
+          "summary": "Una libreria con un proprio schema ha la precedenza. Tutte le altre seguono l’impostazione globale per l’organizzazione. Modificare uno schema non sposta i libri già presenti sul disco; la modifica si applica ai nuovi caricamenti."
+        },
+        "filterRules": "Regole di filtro",
+        "librariesGroup": "Biblioteche",
+        "customCount": "{custom}/{total} personalizzate",
+        "noRuleMatches": "Nessuna regola corrisponde \"{query}\".",
+        "unsavedMarker": "Modifiche non salvate",
+        "backToRules": "Torna alle regole di denominazione",
+        "appliesToLibraries": "{count, plural, =0 {Nessuna libreria usa questo predefinito} one {Applica a # libreria} other {Applica a # librerie}}",
+        "downloadScope": "Scarica ed esporta ZIP",
+        "badgeInherits": "Eredita predefinito",
+        "badgeUnsaved": "Non salvato",
+        "patternLabel": "Modello",
+        "readOnlyFromGlobal": "Solo lettura, dal valore predefinito globale",
+        "useGlobalDefault": "Usa il valore predefinito globale",
+        "resetToShipped": "Ripristina le impostazioni predefinite",
+        "addOverride": "Aggiungi una override",
+        "inheritsNotice": "Questa libreria segue {base}. Aggiungi un override per dargli uno schema proprio.",
+        "libraryRuleHint": "Sostituisce {base} solo per questa libreria.",
+        "scopeLibrary": "Si applica solo per caricare in {name}.",
+        "scopeDownload": "Si applica a ogni singolo file di download e a ogni file all'interno di un ZIP di esportazione.",
+        "scopeGlobal": "{count, plural, one {Si applica a # libreria che non ha uno schema proprio.} other {Si applica a # librerie che non hanno uno schema proprio.}}",
+        "scopeGlobalNone": "Nessuna libreria utilizza questo valore predefinito in questo momento; ogni libreria in questa modalità ha un suo modello.",
+        "unbalancedOptional": "Un gruppo opzionale manca della relativa parentesi angolare di chiusura",
+        "unbalancedToken": "Un token manca della sua parentesi di chiusura",
+        "structure": "Struttura",
+        "paletteOptional": "facoltativo",
+        "paletteOptionalHint": "Avvolge un segmento in modo che venga eliminato quando un token dentro di esso è vuoto",
+        "paletteFallback": "alternativa",
+        "paletteFallbackHint": "All'interno di un gruppo opzionale, il testo usato quando il lato sinistro non può essere riempito",
+        "paletteSeparator": "cartella",
+        "paletteSeparatorHint": "Inizia un nuovo livello di cartella",
+        "modUpper": "MAIUSCOLO",
+        "modLower": "minuscolo",
+        "recipesLabel": "Oppure parti da una configurazione predefinita",
+        "recipe": {
+          "seriesShelf": "Scaffale della serie",
+          "calibre": "In stile Calibre",
+          "alphabetical": "Alfabetico",
+          "flat": "Piatto, nessuna cartella",
+          "originalName": "Nome file originale",
+          "authorTitle": "Autore e titolo",
+          "titleOnly": "Solo titolo",
+          "seriesOrdered": "Serie ordinata"
+        },
+        "resultPanel": "Risultato risolto",
+        "resultFor": "Risultato: {rule}",
+        "copyResult": "Copia il risultato risolto",
+        "resultCopied": "Risultato risolto copiato negli appunti",
+        "resultCopyFailed": "Impossibile copiare il risultato risolto",
+        "sampleBookNote": "Libro di esempio usato per ogni anteprima",
+        "missingMetadata": "Se mancano i metadati",
+        "caseNoSeriesLabel": "Nessuna serie",
+        "caseNoYearLabel": "Senza anno",
+        "caseNoAuthorLabel": "Nessun autore",
+        "previewEmpty": "Questo modello non risolve a niente, quindi sarebbe usato il nome del file originale.",
+        "previewEmptyShort": "Si risolve a niente",
+        "save": {
+          "upToDate": "Nessuna modifica non registrata",
+          "discard": "Abbandona",
+          "action": "Salva modifiche",
+          "blocked": "Correggi il modello non valido prima di salvare"
+        },
+        "examplesApply": "Applica",
+        "examplesApplyAria": "Applica il modello {label}",
+        "example": {
+          "optionalSubtitle": "Sottotitolo facoltativo",
+          "languageFolder": "Cartella lingua",
+          "publisherFolder": "Cartella dell'editore"
+        },
+        "exampleCase": {
+          "noSeries": "Nessuna serie"
+        }
       },
       "kobo": {
         "title": "Kobo Sincronizza",
@@ -2335,7 +2518,7 @@
         "createFormHint": "Queste credenziali autenticano i tuoi dispositivi KOReader con BookOrbit.",
         "username": "Nome utente",
         "usernamePlaceholder": "ad es. miolettore",
-        "password": "Parola d'ordine",
+        "password": "Password",
         "passwordPlaceholder": "Minimo 6 caratteri",
         "changeCredentials": {
           "newPassword": "Nuova password",
@@ -2517,7 +2700,13 @@
         "deviceRemoved": "Dispositivo rimosso",
         "removeDeviceFailed": "Impossibile rimuovere il dispositivo",
         "removeDeviceConfirmTitle": "Rimuovere {device}?",
-        "removeDeviceConfirmBody": "Questa operazione eliminerà permanentemente i progressi sincronizzati di questo dispositivo, l'attività di lettura e tutte le voci di libri senza corrispondenza non più segnalate da un altro dispositivo. Se il dispositivo si sincronizza nuovamente in un secondo momento, riapparirà come una nuova voce."
+        "removeDeviceConfirmBody": "Questa operazione eliminerà permanentemente i progressi sincronizzati di questo dispositivo, l'attività di lettura e tutte le voci di libri senza corrispondenza non più segnalate da un altro dispositivo. Se il dispositivo si sincronizza nuovamente in un secondo momento, riapparirà come una nuova voce.",
+        "deviceRetired": "Dispositivo rimosso",
+        "deviceRestored": "Dispositivo ripristinato",
+        "retireDeviceFailed": "Impossibile rimuovere il dispositivo",
+        "restoreDeviceFailed": "Impossibile ripristinare il dispositivo",
+        "retiredDevices": "{count, plural, one {# dispositivo rimosso} other {# dispositivi rimossi}}",
+        "retiredOnLabel": "Ritirato"
       },
       "opds": {
         "title": "OPDS",
@@ -2534,7 +2723,7 @@
         "username": "Nome utente",
         "usernameLabel": "Nome utente",
         "usernamePlaceholder": "ad es. koreader",
-        "password": "Parola d'ordine",
+        "password": "Password",
         "passwordPlaceholder": "Minimo 8 caratteri",
         "defaultSort": "Ordinamento predefinito",
         "sortLabel": "Ordina",
@@ -2582,8 +2771,46 @@
       "tabs": {
         "file-naming": "Denominazione dei file",
         "book-dock": "Book Dock",
+        "requests": "Richieste",
         "maintenance": "Manutenzione",
         "audit-log": "Registro di controllo"
+      },
+      "requests": {
+        "title": "Richieste",
+        "tabs": {
+          "sources": "Sorgenti",
+          "clients": "Client per il download",
+          "automation": "Automazione"
+        },
+        "loading": "Caricamento dei client di download...",
+        "clients": "Client per il download",
+        "addClient": "Aggiungi client",
+        "editClient": "Modifica il client",
+        "deleteClient": "Elimina {name}",
+        "clientsEmpty": {
+          "title": "Ancora nessun client di download",
+          "body": "Un download HTTP diretto non ha bisogno di alcun client. Collegane uno in modo che BookOrbit possa recuperare rilasci consegnati anche da torrent o Usenet.",
+          "note": "sono supportati qBittorrent, Trasmissione, Deluge e NZBGet."
+        },
+        "disabled": "Disabilitato",
+        "test": "Test di connessione",
+        "testSaveFirst": "Salva le tue modifiche prima di testare",
+        "testOk": "Connesso a {client} {version}",
+        "testOkNoVersion": "Connesso a {client}",
+        "lastTestOk": "Ultimo test {time}: connesso",
+        "lastTestFailed": "Ultimo test {time}: {error}",
+        "saved": "Client per il download salvato",
+        "deleted": "Client per il download rimosso",
+        "fields": {
+          "passwordClear": "Cancella",
+          "passwordKeepAction": "Mantieni",
+          "passwordWillClear": "La password memorizzata viene rimossa quando si salva",
+          "category": "Categoria"
+        },
+        "hardlink": {
+          "unavailable": "I collegamenti non sono disponibili qui: le importazioni copieranno, raddoppiando lo spazio.",
+          "link_refused": "Questo filesystem ha rifiutato il link ({code}): le importazioni copieranno raddoppiando lo spazio."
+        }
       }
     },
     "nav": {
@@ -3254,7 +3481,7 @@
     },
     "fields": {
       "username": "Nome utente",
-      "password": "Parola d'ordine",
+      "password": "Password",
       "email": "E-mail",
       "emailAddress": "Indirizzo e-mail",
       "fullName": "Nome completo",
@@ -3318,6 +3545,16 @@
         "invalidOrExpired": "Collegamento di ripristino non valido o scaduto. Si prega di richiederne uno nuovo."
       }
     },
+    "register": {
+      "errors": {
+        "username": {
+          "untrimmed": "Il tuo nome non può iniziare o terminare con uno spazio."
+        },
+        "name": {
+          "untrimmed": "Il tuo nome non può iniziare o terminare con uno spazio."
+        }
+      }
+    },
     "setup": {
       "title": "Configurazione iniziale",
       "subtitle": "Crea il primo account amministratore.",
@@ -3354,7 +3591,15 @@
       "deleteAuthor": "Elimina autore"
     },
     "filters": {
-      "allLibraries": "Tutte le biblioteche"
+      "allLibraries": "Tutte le biblioteche",
+      "chips": {
+        "groupLabel": "Filtra autori",
+        "all": "Tutti",
+        "noPortrait": "Senza foto",
+        "multipleBooks": ">2 libri",
+        "recentlyAdded": "Aggiunti questa settimana",
+        "noSortName": "Senza ordinamento nome"
+      }
     },
     "header": {
       "never": "Mai",
@@ -3389,7 +3634,7 @@
       "sort": {
         "name": "Nome",
         "sortName": "Ordina nome",
-        "bookCount": "Conteggio dei libri",
+        "bookCount": "Numero di libri",
         "recentAdditions": "Aggiunte recenti",
         "lastEnriched": "Ultimo arricchito"
       },
@@ -3516,6 +3761,8 @@
     "actions": {
       "read": "Leggi",
       "listen": "Ascolta",
+      "continueReading": "Continua a leggere",
+      "continueListening": "Continua ad ascoltare",
       "peek": "Sbircia",
       "quickView": "Visualizzazione rapida",
       "details": "Dettagli",
@@ -3524,7 +3771,7 @@
       "metadata": "Metadati",
       "editMetadata": "Modifica metadati",
       "refreshMetadata": "Aggiorna metadati",
-      "regenerateCover": "Rigenera copertura",
+      "regenerateCover": "Rigenera copertina",
       "addToCollection": "Aggiungi alla raccolta",
       "setStatus": "Imposta stato",
       "sendViaEmail": "Invia tramite e-mail",
@@ -3552,6 +3799,11 @@
       "moveDown": "Spostati giù",
       "ascending": "Ascendente",
       "descending": "Discendente",
+      "fields": {
+        "series": "Serie",
+        "seriesIndex": "Serie N",
+        "finishedAt": "Data di completamento"
+      },
       "remove": "Rimuovi",
       "emptyState": "Nessun ordinamento configurato. Verrà utilizzato il titolo crescente.",
       "addLevel": "Aggiungi livello di ordinamento"
@@ -3562,7 +3814,10 @@
       "any": "QUALSIASI",
       "ofFollowingRules": "delle seguenti regole",
       "fields": {
-        "cover": "Copertina"
+        "series": "Serie",
+        "finishedAt": "Data di completamento",
+        "cover": "Copertina",
+        "seriesStatus": "Stato della serie"
       },
       "anyProvider": "Qualsiasi fornitore",
       "communityRatingProvider": "Fornitore di valutazioni della comunità",
@@ -3827,7 +4082,7 @@
         "saving": "Salvataggio...",
         "saveCover": "Salva la copertina",
         "revertToOriginal": "Ripristina originale",
-        "regenerateCover": "Rigenera copertura"
+        "regenerateCover": "Rigenera copertina"
       },
       "coverSearch": {
         "title": "Ricerca in linea",
@@ -3893,8 +4148,8 @@
         "added": "Aggiunto",
         "dateStarted": "Data di inizio",
         "saving": "Salvataggio...",
-        "cancelDateStartedEdit": "Annulla data di inizio modifica",
-        "editDateStarted": "Data di inizio modifica",
+        "cancelDateStartedEdit": "Annulla modifica data di inizio",
+        "editDateStarted": "Modifica data di inizio",
         "dateFinished": "Data di fine",
         "cancelDateFinishedEdit": "Annulla data di fine modifica",
         "editDateFinished": "Data di modifica terminata",
@@ -3904,6 +4159,7 @@
         "dateStartedFutureError": "La data di inizio non può essere futura.",
         "dateFinishedFutureError": "La data di fine non può essere futura.",
         "dateFinishedBeforeStartedError": "La data di fine deve essere uguale o successiva alla data di inizio.",
+        "dateFinishedBeforeStartedErrorWithDate": "La data di completamento deve essere uguale o successiva alla data di inizio ({date}).",
         "saveReadingDatesError": "Impossibile salvare le date di lettura.",
         "koboPendingDelete": "In attesa di eliminazione dal dispositivo",
         "koboPendingDeleteTooltip": "Kobo lo rimuoverà alla prossima sincronizzazione.",
@@ -3912,7 +4168,8 @@
         "koboNotSynced": "Non sincronizzato",
         "koboNotSyncedTooltip": "In coda per la prossima sincronizzazione Kobo.",
         "filesNotFound": "File non trovati",
-        "filesNotFoundDescription": "I file per questo libro non possono più essere trovati sul disco. I metadati sono ancora disponibili. Esegui una scansione della libreria per confermare o rimuovere il record."
+        "filesNotFoundDescription": "I file per questo libro non possono più essere trovati sul disco. I metadati sono ancora disponibili. Esegui una scansione della libreria per confermare o rimuovere il record.",
+        "noSessionsYet": "Ancora nessuna sessione di lettura. Aprire questo libro nel lettore tiene traccia di tempo, ritmo e avanzamento per dispositivo."
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {nessun campo} one {un campo} other {# campi} many {# campi}}",
@@ -3980,7 +4237,7 @@
         "pageCountLabel": "Conteggio pagine",
         "isbn13Label": "ISBN-13",
         "isbn10Label": "ISBN-10",
-        "durationLabel": "Durata/i",
+        "durationLabel": "Durata (s)",
         "abridgedLabel": "Ridotto",
         "providerIds": "ID fornitore",
         "comicDetails": "Dettagli comici",
@@ -4022,10 +4279,10 @@
         "diff": {
           "locked": "Bloccato",
           "previewAlt": "Anteprima",
-          "currentCoverAlt": "Copertura attuale",
+          "currentCoverAlt": "Copertina attuale",
           "newCoverAlt": "Nuova copertina",
-          "pickCoverFromProvider": "Scegli la copertura da un altro fornitore",
-          "pickCoverSource": "Scegli la fonte di copertura",
+          "pickCoverFromProvider": "Scegli la copertina da un altro fornitore",
+          "pickCoverSource": "Scegli la copertina sorgente",
           "pickFromProvider": "Scegli da un altro fornitore",
           "pickSource": "Scegli la fonte",
           "empty": "vuoto",
@@ -4150,6 +4407,16 @@
         "paginationUnit": "evidenzia"
       },
       "readingLog": {
+        "vitals": {
+          "editFinished": "Modifica la data in cui hai finito questo libro",
+          "pace": "Ritmo",
+          "pacePerHour": "{percent}%/h"
+        },
+        "records": {
+          "longestStreak": "Serie di lettura più lunga",
+          "streakDays": "{count, plural, one {# giorno} other {# giorni}}",
+          "pace": "Ritmo di lettura"
+        },
         "moreActionsAria": "Altre azioni del registro di lettura",
         "export": {
           "button": "Esportazione"
@@ -4308,7 +4575,12 @@
         "seriesPlaceholder": "Serie",
         "moveUp": "Vai su",
         "moveDown": "Spostati giù",
-        "removeSeries": "Rimuovi serie"
+        "removeSeries": "Rimuovi serie",
+        "seriesIndexLabel": "Posizione nella serie",
+        "invalidSeriesIndex": "Inserisci cifre con al massimo un punto decimale, come ad esempio 5.10.",
+        "totalLabel": "Libri nella serie",
+        "totalPlaceholder": "di",
+        "totalHint": "Libri totali in questa serie. Condivisi con tutti quelli che hanno questa serie."
       }
     },
     "table": {
@@ -4373,7 +4645,7 @@
       },
       "read": {
         "play": "Ascolta",
-        "read": "Letto",
+        "read": "Leggi",
         "primary": "Principale",
         "peekFormat": "Sbircia {format}",
         "chooseFormat": "Scegli il formato per leggere o riprodurre",
@@ -4469,6 +4741,7 @@
     "apply": "Applica",
     "done": "Fatto",
     "discard": "Scarta",
+    "deselect": "Deseleziona",
     "finalize": "Finalizzare",
     "rescan": "Nuova scansione",
     "uploadAction": "Carica",
@@ -4592,9 +4865,33 @@
       "import": "Importa"
     },
     "layout": {
+      "filter": {
+        "all": "Tutti",
+        "needsReview": "Da revisionare",
+        "pending": "In attesa",
+        "ready": "Pronti",
+        "error": "Errori"
+      },
       "row": {
+        "setDestination": "Imposta destinazione",
+        "match": "{percent}% corrispondenza",
+        "noAuthor": "Nessun autore al momento",
+        "editDetails": "Modifica dettagli",
+        "refetch": "Ricarica metadati",
         "clickToZoom": "Fai clic su una copertina per ingrandirla"
+      },
+      "empty": {
+        "dropHint": "O trascina i file da qualche parte in questa pagina."
+      },
+      "keyboardHint": "J / K per spostare · spazio per selezionare · Invio per espandere",
+      "sort": {
+        "createdAt": "Aggiunto di recente"
       }
+    }
+  },
+  "bookRequests": {
+    "detail": {
+      "series": "Serie"
     }
   },
   "collection": {
@@ -4698,7 +4995,7 @@
       "libraries": "Biblioteche",
       "newLibrary": "Nuova Biblioteca",
       "scanProgress": "{processed} / {total} libri",
-      "smartScopes": "Ambiti intelligenti",
+      "smartScopes": "Filtri intelligenti",
       "newSmartScope": "Nuovo ambito intelligente",
       "noSmartScopes": "Ancora nessuno Smart Scope",
       "collections": "Collezioni",
@@ -4721,12 +5018,12 @@
       "filterSummary": "{shown} di {total} mostrati",
       "filterLibraries": "Filtra biblioteche",
       "filterLibrariesPlaceholder": "Filtra biblioteche...",
-      "filterSmartScopes": "Filtra ambiti intelligenti",
-      "filterSmartScopesPlaceholder": "Filtra ambiti intelligenti...",
+      "filterSmartScopes": "Cerca filtri intelligenti",
+      "filterSmartScopesPlaceholder": "Cerca filtri intelligenti...",
       "filterCollections": "Filtra collezioni",
       "filterCollectionsPlaceholder": "Filtra collezioni...",
       "seeAllLibraries": "Vedi tutte le biblioteche ({count})",
-      "seeAllSmartScopes": "Vedi tutti gli ambiti intelligenti ({count})",
+      "seeAllSmartScopes": "Vedi tutti i filtri intelligenti ({count})",
       "seeAllCollections": "Vedi tutte le collezioni ({count})",
       "updateAvailable": "Aggiorna {version}",
       "zones": {
@@ -4799,6 +5096,10 @@
         "coverShape": "Forma della copertina",
         "circle": "Cerchio",
         "square": "Quadrato"
+      },
+      "viewModes": {
+        "grid": "Vista a griglia",
+        "table": "Vista tabellare"
       }
     },
     "iconPicker": {
@@ -4854,7 +5155,7 @@
       "noMatchesHint": "Prova con un altro termine di ricerca.",
       "bookCount": "Libri: {count}",
       "librariesEmptyHint": "Crea una biblioteca per iniziare ad aggiungere libri.",
-      "smartScopesEmptyHint": "Gli ambiti intelligenti salvano un insieme di filtri che usi spesso.",
+      "smartScopesEmptyHint": "I filtri intelligenti salvano un insieme di filtri che usi spesso.",
       "collectionsEmptyHint": "Le collezioni raggruppano i libri che scegli manualmente."
     }
   },
@@ -4912,7 +5213,13 @@
         "widgets": "Widget",
         "shelves": "Scaffali"
       },
+      "widgetNames": {
+        "readingStreak": "Continuità di lettura"
+      },
       "shelfNames": {
+        "recentlyAdded": "Aggiunto di recente",
+        "continueReading": "Continua a leggere",
+        "continueListening": "Continua ad ascoltare",
         "random": "Scopri qualcosa di nuovo"
       },
       "reorderHintWidget": "Trascina per riordinare. Seleziona per mostrare o nascondere un widget.",
@@ -4947,7 +5254,7 @@
         }
       },
       "highlightOfTheDay": {
-        "title": "Momento clou della giornata",
+        "title": "Passaggio del giorno",
         "empty": "Evidenzia i passaggi durante la lettura per vederli qui"
       },
       "libraryOverview": {
@@ -4982,7 +5289,7 @@
         "shuffle": "Mescola"
       },
       "readingDna": {
-        "title": "Leggere il DNA",
+        "title": "DNA di lettura",
         "notEnoughData": "Leggi almeno 5 libri per sbloccare il tuo DNA della lettura",
         "basedOn": "{count, plural, =0 {Basato su nessun libro} one {Basato su # libro} other {Basato su # libri} many {Basato su # libri}}",
         "traits": {
@@ -5010,14 +5317,14 @@
         "avgPerDay": "media {time}/giorno"
       },
       "readingStreak": {
-        "title": "Striscia di lettura",
-        "empty": "Leggi oggi per iniziare la tua serie di vittorie consecutive",
+        "title": "Continuità di lettura",
+        "empty": "Leggi oggi per iniziare la tua serie di letture consecutive",
         "streakLabel": "{count, plural, =0 {serie di giorni} one {serie di giorni} other {giorni consecutivi} many {giorni consecutivi}}",
         "best": "{count, plural, =0 {Migliore: # giorno} one {Migliore: # giorno} other {Migliore: # giorni} many {Migliore: # giorni}}",
         "lastSevenDays": "Ultimi 7 giorni"
       },
       "yearProjection": {
-        "title": "Proiezione dell'anno",
+        "title": "Proiezione annuale",
         "books": "libri",
         "trendUp": "Tendenza in alto",
         "trendDown": "Tendenza al ribasso",
@@ -5064,7 +5371,7 @@
       "host": "Host",
       "port": "Porta",
       "username": "Nome utente",
-      "password": "Parola d'ordine",
+      "password": "Password",
       "passwordEdit": "Password (lascia vuoto per restare aggiornato)",
       "fromName": "Dal nome",
       "fromNamePlaceholder": "La mia biblioteca",
@@ -5521,6 +5828,11 @@
             "hint": "Tratta ogni file come un singolo libro. Ideale per le biblioteche con un formato per titolo. Evita se i tuoi audiolibri occupano più file."
           }
         },
+        "addedAt": {
+          "jobStatus": {
+            "completed": "Ricalcolo data terminato."
+          }
+        },
         "allowedFormats": {
           "title": "Formati consentiti",
           "allowAll": "Consenti tutto",
@@ -5781,7 +6093,7 @@
         "host": "Host",
         "port": "Porta",
         "user": "Utente",
-        "password": "Parola d'ordine",
+        "password": "Password",
         "passwordSaved": "Salvato: lascia invariato",
         "passwordNotSet": "Nessuna password impostata",
         "database": "Banca dati",
@@ -6139,7 +6451,10 @@
       },
       "columnGap": "Spazio tra le colonne",
       "justifyText": "Giustificare il testo",
-      "hyphenation": "Sillabazione"
+      "hyphenation": "Sillabazione",
+      "fonts": {
+        "monospace": "Monospazio"
+      }
     },
     "search": {
       "placeholder": "Cerca nel libro (min {min} caratteri)...",
@@ -6309,8 +6624,13 @@
     "completion": {
       "readOfTotal": "{read} di {total} letto ({percentage}%)"
     },
+    "ownership": {
+      "label": "Nella biblioteca",
+      "ownedOfExpected": "{owned} di {expected} nella biblioteca"
+    },
     "gaps": {
-      "label": "Possibili lacune:"
+      "label": "Possibili lacune:",
+      "missingList": "Mancanti {list}"
     },
     "filters": {
       "title": "Filtri di serie",
@@ -6337,10 +6657,12 @@
       "empty": "Nessuna serie trovata nelle tue librerie.",
       "sort": {
         "name": "Nome",
-        "bookCount": "Conteggio dei libri",
+        "bookCount": "Numero di libri",
         "recentAdditions": "Aggiunte recenti",
         "readingProgress": "Progresso nella lettura"
-      }
+      },
+      "clearSearch": "Cancella ricerca",
+      "noMatchHint": "Prova un'altra biblioteca, o cancella i filtri impostati."
     },
     "detail": {
       "pageTitle": "Serie",
@@ -6382,14 +6704,41 @@
         "descending": "Discendente"
       }
     },
+    "track": {
+      "slotMissing": "{number} non presenti nella biblioteca",
+      "untitled": "Senza titolo"
+    },
     "legend": {
-      "read": "Letto"
+      "read": "Letto",
+      "reading": "In lettura",
+      "unread": "Nella biblioteca",
+      "missing": "Mancante"
     },
     "status": {
-      "read": "Letta"
+      "label": "Filtra serie per stato di lettura",
+      "all": "Tutti",
+      "reading": "In lettura",
+      "unread": "Non letti",
+      "complete": "Completate",
+      "gaps": "Mancanti",
+      "read": "Letta",
+      "inProgress": "In corso",
+      "hasGaps": "Ha volumi mancanti",
+      "notStarted": "Non iniziate"
     },
     "index": {
-      "columnRead": "Letto"
+      "columnSeries": "Serie",
+      "columnVolumes": "Volumi",
+      "columnRead": "Letto",
+      "columnAdded": "Aggiunta",
+      "reading": "In lettura"
+    },
+    "grouping": {
+      "label": "Raggruppa",
+      "none": "Nessun raggruppamento",
+      "letter": "Alfabetico",
+      "library": "Per biblioteca",
+      "status": "Per stato"
     }
   },
   "smartScope": {
@@ -7098,7 +7447,7 @@
       "notifications": "Notifiche",
       "restrictions": "Restrizioni sui contenuti"
     },
-    "smartScopes": "Ambiti intelligenti",
+    "smartScopes": "Filtri intelligenti",
     "collections": "Collezioni"
   }
 }

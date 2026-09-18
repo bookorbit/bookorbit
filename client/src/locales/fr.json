@@ -1981,7 +1981,7 @@
         "infiniteNoGaps": "Infini (pas de trous)",
         "pageView": "Affichage des pages",
         "pageViewHint": "Afficher une ou deux pages côte à côte",
-        "single": "Célibataire",
+        "single": "Une page",
         "twoPage": "Deux pages",
         "fitMode": "Mode d'ajustement",
         "fitModeHint": "Comment les pages sont mises à l'échelle pour s'adapter à l'écran",
@@ -8910,7 +8910,7 @@
         "actual": "Taille réelle"
       },
       "view": {
-        "single": "Célibataire",
+        "single": "Une page",
         "twoPage": "Deux pages"
       },
       "scroll": {

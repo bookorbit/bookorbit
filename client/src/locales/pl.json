@@ -924,6 +924,7 @@
         "reasonNoFilePathMatch": "Ścieżka pliku nie pasuje do żadnej książki w tej bibliotece",
         "reasonNoFileHashMatch": "Skrót pliku nie pasuje do żadnej książki w tej bibliotece",
         "reasonNoIsbnMatch": "ISBN nie pasuje do żadnej książki w tej bibliotece",
+        "reasonNoAsinMatch": "ASIN nie odpowiada żadnej książce w tej bibliotece",
         "reasonInsufficientSourceData": "Za mało metadanych, aby podjąć próbę dopasowania",
         "reasonAmbiguousIsbnMatch": "Wiele książek pasuje do tego samego ISBN",
         "reasonAmbiguousAsinMatch": "Wiele książek pasuje do tego samego ASIN",
@@ -2093,7 +2094,9 @@
         "tokenOriginalFilename": "Oryginalna nazwa pliku (bez rozszerzenia)",
         "tokenExtension": "Rozszerzenie pliku (bez kropki)",
         "patternHelpIntro": "Wzorce używają tokenów takich jak {titleToken} i {authorsToken}, a także modyfikatorów i segmentów opcjonalnych.",
-        "browseTokensAndExamples": "Przeglądaj tokeny i przykłady"
+        "browseTokensAndExamples": "Przeglądaj tokeny i przykłady",
+        "patternLabel": "Wzorzec",
+        "useGlobalDefault": "Użyj globalnych ustawień globalnych"
       },
       "kobo": {
         "title": "Kobo Synchronizacja",

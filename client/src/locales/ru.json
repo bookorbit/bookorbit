@@ -14,7 +14,8 @@
     "previous": "Предыдущий",
     "retry": "Повторить",
     "yes": "Да",
-    "no": "Нет"
+    "no": "Нет",
+    "show": "Показать"
   },
   "settings": {
     "privacySharing": {
@@ -825,6 +826,7 @@
       "migration": {
         "title": "Миграция",
         "subtitle": "Единоразовый Booklore импорт: подключить источник, сопоставить пользователей, сухой запуск, начать миграцию и экспортировать отчет.",
+        "genericSubtitle": "Единоразовый импорт библиотеки: соединить источник, карту пользователей, запустить сухой пробег, начать миграцию и экспортировать отчет.",
         "progress": "Прогресс",
         "stepSourceConnection": "Подключение к источнику",
         "stepUserPathMapping": "Сопоставление пользователя и пути",
@@ -1064,6 +1066,7 @@
         "syncMetadataToFiles": "Синхронизировать метаданные с файлами",
         "deleteLibrary": "Удалить библиотеку",
         "bookCount": "{count, plural, =0 {нет книг} one {# книга} few {# книги} many {# книги} other {# книги}}",
+        "booksUnit": "{count, plural, one {# книга} few {# книг} many {# книг} other {# книг}}",
         "folderCount": "{count, plural, =0 {Нет папок} one {# папок} few {# папок} many {# папок} other {# папок}}",
         "fileMode": "Режим файла",
         "folderMode": "Режим папки",
@@ -1092,6 +1095,9 @@
         "deleteFailed": "Не удалось удалить библиотеку",
         "refreshingCovers": "Обновление покрытий {pct}% ({processed}/{total})",
         "coversRefreshed": "Обложки обновлены ( Обработано{count})",
+        "onDiskUnit": "{size} На диске",
+        "openLibrary": "Открыть {name}",
+        "moreActions": "Больше действий {name}",
         "filterLabel": "Фильтровать библиотеки",
         "filterPlaceholder": "Фильтр по названию или пути",
         "filterClear": "Сбросить фильтр",
