@@ -1,4 +1,5 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { OPDS_DEFAULT_PAGE_SIZE } from '@bookorbit/types';
 import { compare, hash } from 'bcryptjs';
 import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -32,6 +33,7 @@ export class OpdsUserService {
         userId: schema.opdsUsers.userId,
         username: schema.opdsUsers.username,
         sortOrder: schema.opdsUsers.sortOrder,
+        pageSize: schema.opdsUsers.pageSize,
         createdAt: schema.opdsUsers.createdAt,
       })
       .from(schema.opdsUsers)
@@ -49,12 +51,14 @@ export class OpdsUserService {
           username: dto.username,
           passwordHash,
           sortOrder: dto.sortOrder ?? 'recent',
+          pageSize: dto.pageSize ?? OPDS_DEFAULT_PAGE_SIZE,
         })
         .returning({
           id: schema.opdsUsers.id,
           userId: schema.opdsUsers.userId,
           username: schema.opdsUsers.username,
           sortOrder: schema.opdsUsers.sortOrder,
+          pageSize: schema.opdsUsers.pageSize,
           createdAt: schema.opdsUsers.createdAt,
         });
       return created;
@@ -68,13 +72,25 @@ export class OpdsUserService {
 
   async update(userId: number, opdsUserId: number, dto: UpdateOpdsUserDto) {
     await this.verifyOwnership(userId, opdsUserId);
-    const [updated] = await this.db.update(schema.opdsUsers).set({ sortOrder: dto.sortOrder }).where(eq(schema.opdsUsers.id, opdsUserId)).returning({
-      id: schema.opdsUsers.id,
-      userId: schema.opdsUsers.userId,
-      username: schema.opdsUsers.username,
-      sortOrder: schema.opdsUsers.sortOrder,
-      createdAt: schema.opdsUsers.createdAt,
-    });
+    if (dto.sortOrder === undefined && dto.pageSize === undefined) {
+      throw new BadRequestException('At least one OPDS setting is required');
+    }
+
+    const [updated] = await this.db
+      .update(schema.opdsUsers)
+      .set({
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+        ...(dto.pageSize !== undefined ? { pageSize: dto.pageSize } : {}),
+      })
+      .where(eq(schema.opdsUsers.id, opdsUserId))
+      .returning({
+        id: schema.opdsUsers.id,
+        userId: schema.opdsUsers.userId,
+        username: schema.opdsUsers.username,
+        sortOrder: schema.opdsUsers.sortOrder,
+        pageSize: schema.opdsUsers.pageSize,
+        createdAt: schema.opdsUsers.createdAt,
+      });
     if (!updated) throw new NotFoundException('OPDS user not found');
     return updated;
   }

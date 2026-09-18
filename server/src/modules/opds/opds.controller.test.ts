@@ -10,6 +10,7 @@ vi.mock('fs/promises', () => ({
 import { createReadStream } from 'fs';
 import { readdir, stat } from 'fs/promises';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import type { MockedFunction } from 'vitest';
 
 import { OpdsController } from './opds.controller';
@@ -28,16 +29,21 @@ function makeController() {
     generateSeriesNavigation: vi.fn().mockReturnValue('<series />'),
     generateAcquisitionFeed: vi.fn().mockReturnValue('<feed />'),
     generateOpenSearchDescription: vi.fn().mockReturnValue('<search />'),
-  } as never;
+  };
   const opdsBookService = {
     getAccessibleLibraries: vi.fn().mockResolvedValue([{ id: 1, name: 'Main', bookCount: 10 }]),
+    getAccessibleLibrariesPage: vi.fn().mockResolvedValue({ items: [{ id: 1, name: 'Main', bookCount: 10 }], hasNext: false }),
     getUserCollections: vi.fn().mockResolvedValue([{ id: 4, name: 'Favorites', bookCount: 2 }]),
+    getUserCollectionsPage: vi.fn().mockResolvedValue({ items: [{ id: 4, name: 'Favorites', bookCount: 2 }], hasNext: false }),
     getUserSmartScopes: vi.fn().mockResolvedValue([{ id: 7, name: 'Unread', icon: 'sparkles' }]),
+    getUserSmartScopesPage: vi.fn().mockResolvedValue({ items: [{ id: 7, name: 'Unread', icon: 'sparkles' }], hasNext: false }),
     getDistinctAuthors: vi.fn().mockResolvedValue([{ name: 'Frank Herbert', bookCount: 3 }]),
+    getDistinctAuthorsPage: vi.fn().mockResolvedValue({ items: [{ name: 'Frank Herbert', bookCount: 3 }], hasNext: false }),
     getDistinctSeries: vi.fn().mockResolvedValue([
       { name: null, bookCount: 1 },
       { name: 'Dune', bookCount: 2 },
     ]),
+    getDistinctSeriesPage: vi.fn().mockResolvedValue({ items: [{ id: 42, name: 'Dune', bookCount: 2 }], hasNext: false }),
     getBooksPage: vi.fn().mockResolvedValue({ entries: [{ id: 1 }], total: 1 }),
     getRecentBooksPage: vi.fn().mockResolvedValue({ entries: [{ id: 2 }], total: 1 }),
     getRandomBooks: vi.fn().mockResolvedValue([{ id: 3 }]),
@@ -48,23 +54,30 @@ function makeController() {
       title: 'Book Title',
       authorName: 'Author Name',
     }),
-  } as never;
+  };
   const config = {
     get: vi.fn().mockReturnValue('/books'),
-  } as never;
+  };
   const bookService = {
     resolveDownloadFilename: vi.fn().mockResolvedValue('BadTitle - Author.epub'),
-  } as never;
+  };
 
   return {
-    controller: new OpdsController(opdsService, opdsBookService, config, bookService),
+    controller: new OpdsController(opdsService as never, opdsBookService as never, config as never, bookService as never),
     opdsService,
     opdsBookService,
     bookService,
   };
 }
 
-function makeReply() {
+type MockReply = FastifyReply & {
+  header: ReturnType<typeof vi.fn>;
+  type: ReturnType<typeof vi.fn>;
+  status: ReturnType<typeof vi.fn>;
+  send: ReturnType<typeof vi.fn>;
+};
+
+function makeReply(): MockReply {
   const reply = {
     header: vi.fn(),
     type: vi.fn(),
@@ -76,7 +89,7 @@ function makeReply() {
   reply.type.mockReturnValue(reply);
   reply.status.mockReturnValue(reply);
 
-  return reply as never;
+  return reply as MockReply;
 }
 
 describe('OpdsController', () => {
@@ -97,7 +110,7 @@ describe('OpdsController', () => {
 
   it('renders navigation endpoints with OPDS navigation mime type', async () => {
     const { controller, opdsBookService, opdsService } = makeController();
-    const user = { userId: 8, isSuperuser: false } as never;
+    const user = { userId: 8, isSuperuser: false, pageSize: 15 } as never;
 
     await controller.libraries(user, makeReply());
     await controller.collections(user, makeReply());
@@ -105,12 +118,15 @@ describe('OpdsController', () => {
     await controller.authors(user, makeReply());
     await controller.series(user, makeReply());
 
-    expect(opdsBookService.getAccessibleLibraries).toHaveBeenCalledWith(8, false);
-    expect(opdsBookService.getUserCollections).toHaveBeenCalledWith(8);
-    expect(opdsBookService.getUserSmartScopes).toHaveBeenCalledWith(8);
-    expect(opdsBookService.getDistinctAuthors).toHaveBeenCalledWith(8, false, undefined);
-    expect(opdsBookService.getDistinctSeries).toHaveBeenCalledWith(8, false, undefined);
-    expect(opdsService.generateSeriesNavigation).toHaveBeenCalledWith([{ name: 'Dune', bookCount: 2 }]);
+    expect(opdsBookService.getAccessibleLibrariesPage).toHaveBeenCalledWith(8, { limit: 15, offset: 0 }, false);
+    expect(opdsBookService.getUserCollectionsPage).toHaveBeenCalledWith(8, { limit: 15, offset: 0 });
+    expect(opdsBookService.getUserSmartScopesPage).toHaveBeenCalledWith(8, { limit: 15, offset: 0 });
+    expect(opdsBookService.getDistinctAuthorsPage).toHaveBeenCalledWith(8, { limit: 15, offset: 0 }, false, undefined);
+    expect(opdsBookService.getDistinctSeriesPage).toHaveBeenCalledWith(8, { limit: 15, offset: 0 }, false, undefined);
+    expect(opdsService.generateSeriesNavigation).toHaveBeenCalledWith(
+      [{ id: 42, name: 'Dune', bookCount: 2 }],
+      expect.objectContaining({ page: 1, size: 15, hasNext: false }),
+    );
   });
 
   it('catalog clamps pagination and passes parsed filters to the book service', async () => {
@@ -144,6 +160,39 @@ describe('OpdsController', () => {
       1,
       100,
       expect.stringContaining('/api/v1/opds/catalog?'),
+      'token',
+    );
+  });
+
+  it('uses the account page size when the request omits size', async () => {
+    const { controller, opdsBookService, opdsService } = makeController();
+    const user = { userId: 7, isSuperuser: false, sortOrder: 'recent', pageSize: 15, coverToken: 'token' } as never;
+
+    await controller.catalog(user, 1, undefined, undefined, undefined, undefined, undefined, undefined, undefined, makeReply());
+    await controller.recent(user, 1, undefined, makeReply());
+
+    expect(opdsBookService.getBooksPage).toHaveBeenCalledWith(7, 'recent', 1, 15, {}, false, undefined);
+    expect(opdsBookService.getRecentBooksPage).toHaveBeenCalledWith(7, 1, 15, false, undefined);
+    expect(opdsService.generateAcquisitionFeed).toHaveBeenNthCalledWith(
+      1,
+      'Catalog',
+      'urn:bookorbit:catalog',
+      [{ id: 1 }],
+      1,
+      1,
+      15,
+      expect.stringContaining('size=15'),
+      'token',
+    );
+    expect(opdsService.generateAcquisitionFeed).toHaveBeenNthCalledWith(
+      2,
+      'Recent Books',
+      'urn:bookorbit:recent',
+      [{ id: 2 }],
+      1,
+      1,
+      15,
+      '/api/v1/opds/recent?page=1&size=15',
       'token',
     );
   });
@@ -219,20 +268,20 @@ describe('OpdsController', () => {
 
   it('renders recent and surprise acquisition feeds', async () => {
     const { controller, opdsBookService, opdsService } = makeController();
-    const user = { userId: 12, isSuperuser: false, coverToken: 'cover-token' } as never;
+    const user = { userId: 12, isSuperuser: false, pageSize: 15, coverToken: 'cover-token' } as never;
 
     await controller.recent(user, 0, 1000, makeReply());
     await controller.surprise(user, makeReply());
 
     expect(opdsBookService.getRecentBooksPage).toHaveBeenCalledWith(12, 1, 100, false, undefined);
-    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(12, 25, false, undefined);
+    expect(opdsBookService.getRandomBooks).toHaveBeenCalledWith(12, 15, false, undefined);
     expect(opdsService.generateAcquisitionFeed).toHaveBeenCalledWith(
       'Random Books',
       'urn:bookorbit:surprise',
       [{ id: 3 }],
       1,
       1,
-      25,
+      15,
       '/api/v1/opds/surprise',
       'cover-token',
     );

@@ -638,6 +638,13 @@
       "when": 1789316739511,
       "tag": "0090_add_indexer_seed_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1789736045017,
+      "tag": "0091_add_opds_user_page_size",
+      "breakpoints": true
     }
   ]
 }

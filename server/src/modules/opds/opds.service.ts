@@ -6,6 +6,13 @@ import type { OpdsBookEntry } from './opds-book.service';
 const BASE = '/api/v1/opds';
 const SEARCH_TEMPLATE = `${BASE}/catalog?q={searchTerms}`;
 
+export interface OpdsNavigationPagination {
+  page: number;
+  size: number;
+  selfPath: string;
+  hasNext: boolean;
+}
+
 @Injectable()
 export class OpdsService {
   generateRootNavigation(): string {
@@ -18,7 +25,7 @@ export class OpdsService {
       [
         this.navEntry('urn:bookorbit:all', 'All Books', 'Browse the full catalog', `${BASE}/catalog`, now),
         this.navEntry('urn:bookorbit:recent', 'Recent Books', 'Recently added books', `${BASE}/recent`, now),
-        this.navEntry('urn:bookorbit:surprise', 'Random Books', '25 random picks', `${BASE}/surprise`, now),
+        this.navEntry('urn:bookorbit:surprise', 'Random Books', 'Random picks', `${BASE}/surprise`, now),
         this.navEntry('urn:bookorbit:libraries', 'Libraries', 'Browse by library', `${BASE}/libraries`, now),
         this.navEntry('urn:bookorbit:collections', 'Collections', 'Browse your collections', `${BASE}/collections`, now),
         this.navEntry('urn:bookorbit:smartScopes', 'SmartScopes', 'Browse your smartScopes', `${BASE}/smart-scopes`, now),
@@ -28,7 +35,7 @@ export class OpdsService {
     );
   }
 
-  generateLibrariesNavigation(libs: { id: number; name: string; bookCount: number }[]): string {
+  generateLibrariesNavigation(libs: { id: number; name: string; bookCount: number }[], pagination?: OpdsNavigationPagination): string {
     const now = new Date().toISOString();
     const entries = libs.map((lib) =>
       this.navEntry(`urn:bookorbit:library:${lib.id}`, lib.name, `${lib.bookCount} books`, `${BASE}/catalog?libraryId=${lib.id}`, now),
@@ -37,12 +44,12 @@ export class OpdsService {
       'Libraries',
       'urn:bookorbit:libraries',
       now,
-      [xmlLink('self', `${BASE}/libraries`, OPDS_MIME_NAV), ...this.searchLinks()],
+      this.navigationLinks(pagination?.selfPath ?? `${BASE}/libraries`, pagination),
       entries,
     );
   }
 
-  generateCollectionsNavigation(cols: { id: number; name: string; bookCount: number }[]): string {
+  generateCollectionsNavigation(cols: { id: number; name: string; bookCount: number }[], pagination?: OpdsNavigationPagination): string {
     const now = new Date().toISOString();
     const entries = cols.map((col) =>
       this.navEntry(`urn:bookorbit:collection:${col.id}`, col.name, `${col.bookCount} books`, `${BASE}/catalog?collectionId=${col.id}`, now),
@@ -51,12 +58,12 @@ export class OpdsService {
       'Collections',
       'urn:bookorbit:collections',
       now,
-      [xmlLink('self', `${BASE}/collections`, OPDS_MIME_NAV), ...this.searchLinks()],
+      this.navigationLinks(pagination?.selfPath ?? `${BASE}/collections`, pagination),
       entries,
     );
   }
 
-  generateSmartScopesNavigation(items: { id: number; name: string; icon: string | null }[]): string {
+  generateSmartScopesNavigation(items: { id: number; name: string; icon: string | null }[], pagination?: OpdsNavigationPagination): string {
     const now = new Date().toISOString();
     const entries = items.map((smartScope) =>
       this.navEntry(
@@ -71,12 +78,12 @@ export class OpdsService {
       'SmartScopes',
       'urn:bookorbit:smartScopes',
       now,
-      [xmlLink('self', `${BASE}/smart-scopes`, OPDS_MIME_NAV), ...this.searchLinks()],
+      this.navigationLinks(pagination?.selfPath ?? `${BASE}/smart-scopes`, pagination),
       entries,
     );
   }
 
-  generateAuthorsNavigation(items: { name: string; bookCount: number }[]): string {
+  generateAuthorsNavigation(items: { name: string; bookCount: number }[], pagination?: OpdsNavigationPagination): string {
     const now = new Date().toISOString();
     const entries = items.map((a) =>
       this.navEntry(
@@ -91,12 +98,12 @@ export class OpdsService {
       'Authors',
       'urn:bookorbit:authors',
       now,
-      [xmlLink('self', `${BASE}/authors`, OPDS_MIME_NAV), ...this.searchLinks()],
+      this.navigationLinks(pagination?.selfPath ?? `${BASE}/authors`, pagination),
       entries,
     );
   }
 
-  generateSeriesNavigation(items: { id?: number; name: string; bookCount: number }[]): string {
+  generateSeriesNavigation(items: { id?: number; name: string; bookCount: number }[], pagination?: OpdsNavigationPagination): string {
     const now = new Date().toISOString();
     const entries = items.map((s) =>
       this.navEntry(
@@ -107,7 +114,7 @@ export class OpdsService {
         now,
       ),
     );
-    return this.wrapFeed('Series', 'urn:bookorbit:series', now, [xmlLink('self', `${BASE}/series`, OPDS_MIME_NAV), ...this.searchLinks()], entries);
+    return this.wrapFeed('Series', 'urn:bookorbit:series', now, this.navigationLinks(pagination?.selfPath ?? `${BASE}/series`, pagination), entries);
   }
 
   generateAcquisitionFeed(
@@ -208,6 +215,28 @@ export class OpdsService {
 
     lines.push('</entry>');
     return lines.join('\n');
+  }
+
+  private navigationLinks(selfPath: string, pagination?: OpdsNavigationPagination): string[] {
+    const links = [xmlLink('self', selfPath, OPDS_MIME_NAV), xmlLink('start', BASE, OPDS_MIME_NAV), ...this.searchLinks()];
+    if (!pagination) return links;
+
+    const url = new URL(selfPath, 'http://localhost');
+    const pageUrl = (page: number) => {
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('size', String(pagination.size));
+      return `${url.pathname}?${url.searchParams.toString()}`;
+    };
+
+    if (pagination.page > 1) {
+      links.push(xmlLink('first', pageUrl(1), OPDS_MIME_NAV));
+      links.push(xmlLink('previous', pageUrl(pagination.page - 1), OPDS_MIME_NAV));
+    }
+    if (pagination.hasNext) {
+      links.push(xmlLink('next', pageUrl(pagination.page + 1), OPDS_MIME_NAV));
+    }
+
+    return links;
   }
 
   // Both links are needed. Compliant clients follow the OpenSearch description; Moon+ Reader

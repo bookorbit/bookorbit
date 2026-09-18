@@ -8,6 +8,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { api } from '@/lib/api'
 import { copyToClipboard } from '@/lib/clipboard'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { OPDS_DEFAULT_PAGE_SIZE, OPDS_MAX_PAGE_SIZE, OPDS_MIN_PAGE_SIZE } from '@bookorbit/types'
 import type { OpdsUser, OpdsSortOrder } from '@bookorbit/types'
 import { useMediaQuery } from '@vueuse/core'
 import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
@@ -25,6 +26,7 @@ const showCreateForm = ref(false)
 const createUsername = ref('')
 const createPassword = ref('')
 const createSortOrder = ref<OpdsSortOrder>('recent')
+const createPageSize = ref(OPDS_DEFAULT_PAGE_SIZE)
 const creating = ref(false)
 const createError = ref<string | null>(null)
 const deleteConfirmUser = ref<OpdsUser | null>(null)
@@ -105,6 +107,7 @@ async function createUser() {
         username: createUsername.value,
         password: createPassword.value,
         sortOrder: createSortOrder.value,
+        pageSize: createPageSize.value,
       }),
     })
     if (!res.ok) {
@@ -119,6 +122,7 @@ async function createUser() {
     createUsername.value = ''
     createPassword.value = ''
     createSortOrder.value = 'recent'
+    createPageSize.value = OPDS_DEFAULT_PAGE_SIZE
     toast.success(t('settings.reader.opds.userCreated', { username: user.username }))
   } catch {
     toast.error(t('settings.reader.opds.createUserFailed'))
@@ -144,6 +148,48 @@ async function updateSortOrder(user: OpdsUser, sortOrder: OpdsSortOrder) {
     }
   } catch {
     toast.error(t('settings.reader.opds.updateSortFailed'))
+  }
+}
+
+/**
+ * A cleared spinner reads back as an empty string and neither box clamps what is typed into it, so
+ * anything the endpoint would reject is put back rather than sent for a 400.
+ */
+function pageSizeFrom(event: Event): number | null {
+  const value = Number((event.target as HTMLInputElement).value)
+  return Number.isInteger(value) && value >= OPDS_MIN_PAGE_SIZE && value <= OPDS_MAX_PAGE_SIZE ? value : null
+}
+
+function handleCreatePageSize(event: Event) {
+  createPageSize.value = pageSizeFrom(event) ?? OPDS_DEFAULT_PAGE_SIZE
+}
+
+async function updatePageSize(user: OpdsUser, event: Event) {
+  const input = event.target as HTMLInputElement
+  const pageSize = pageSizeFrom(event)
+  if (pageSize === null) {
+    input.value = String(user.pageSize)
+    return
+  }
+
+  try {
+    const res = await api(`/api/v1/opds-users/${user.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pageSize }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      const idx = opdsUsers.value.findIndex((u) => u.id === user.id)
+      if (idx >= 0) opdsUsers.value[idx] = updated
+      toast.success(t('settings.reader.opds.pageSizeUpdated', { username: user.username }))
+    } else {
+      input.value = String(user.pageSize)
+      toast.error(t('settings.reader.opds.updatePageSizeFailed'))
+    }
+  } catch {
+    input.value = String(user.pageSize)
+    toast.error(t('settings.reader.opds.updatePageSizeFailed'))
   }
 }
 
@@ -306,6 +352,22 @@ function cancelDelete() {
             </option>
           </select>
         </div>
+        <div>
+          <label for="create-opds-page-size" class="block text-xs font-medium text-muted-foreground mb-1.5">
+            {{ t('settings.reader.opds.pageSize') }}
+          </label>
+          <input
+            id="create-opds-page-size"
+            v-model.number="createPageSize"
+            type="number"
+            :min="OPDS_MIN_PAGE_SIZE"
+            :max="OPDS_MAX_PAGE_SIZE"
+            inputmode="numeric"
+            step="1"
+            class="input-field w-full"
+            @change="handleCreatePageSize"
+          />
+        </div>
         <div v-if="createError" class="text-xs text-destructive">
           {{ createError }}
         </div>
@@ -344,6 +406,17 @@ function cancelDelete() {
             </p>
           </div>
           <div class="flex items-center gap-2">
+            <input
+              :id="`opds-page-size-${user.id}`"
+              :value="user.pageSize"
+              type="number"
+              :min="OPDS_MIN_PAGE_SIZE"
+              :max="OPDS_MAX_PAGE_SIZE"
+              inputmode="numeric"
+              step="1"
+              class="input-field text-xs h-9 md:h-auto py-1 w-20"
+              @change="updatePageSize(user, $event)"
+            />
             <select
               :value="user.sortOrder"
               class="select-field text-xs h-9 md:h-auto py-1 w-full md:w-auto"
@@ -377,6 +450,8 @@ function cancelDelete() {
               <span class="font-mono text-foreground break-all">{{ user.username }}</span>
               <span class="text-muted-foreground">{{ t('settings.reader.opds.sortLabel') }}</span>
               <span class="text-foreground">{{ sortOrderLabel(user.sortOrder) }}</span>
+              <span class="text-muted-foreground">{{ t('settings.reader.opds.pageSize') }}</span>
+              <span class="text-foreground">{{ user.pageSize }}</span>
             </div>
           </div>
         </div>

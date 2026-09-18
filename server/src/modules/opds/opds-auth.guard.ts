@@ -4,7 +4,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Unauthor
 import { ConfigService } from '@nestjs/config';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { Permission } from '@bookorbit/types';
+import { OPDS_DEFAULT_PAGE_SIZE, Permission } from '@bookorbit/types';
 import type { ContentFilterRules } from '@bookorbit/types';
 import { PermissionService } from '../../common/services/permission.service';
 import { OpdsUserService } from './opds-user.service';
@@ -15,6 +15,7 @@ export interface OpdsRequestUser {
   userId: number;
   username: string;
   sortOrder: 'recent' | 'title_asc' | 'title_desc' | 'author_asc' | 'author_desc' | 'series_asc' | 'series_desc';
+  pageSize: number;
   isSuperuser: boolean;
   coverToken: string;
   contentFilters: ContentFilterRules;
@@ -84,6 +85,7 @@ export class OpdsAuthGuard implements CanActivate {
         userId: fullUser.id,
         username: fullUser.username,
         sortOrder: 'recent',
+        pageSize: OPDS_DEFAULT_PAGE_SIZE,
         isSuperuser: fullUser.isSuperuser,
         coverToken: tokenParam,
         contentFilters: fullUser.contentFilters,
@@ -134,6 +136,7 @@ export class OpdsAuthGuard implements CanActivate {
       userId: result.parentUser.id,
       username: result.opdsUser.username,
       sortOrder: result.opdsUser.sortOrder,
+      pageSize: result.opdsUser.pageSize,
       isSuperuser: fullUser.isSuperuser,
       coverToken: createCoverToken(result.parentUser.id, secret),
       contentFilters: fullUser.contentFilters,

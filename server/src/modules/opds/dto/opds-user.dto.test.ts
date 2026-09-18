@@ -12,9 +12,10 @@ describe('OPDS user DTOs', () => {
       username: 'reader-user',
       password: 'password123',
       sortOrder: 'author_asc',
+      pageSize: 15,
     });
     const updateDto = plainToInstance(UpdateOpdsUserDto, {
-      sortOrder: 'series_desc',
+      pageSize: 25,
     });
 
     expect(await validate(createDto)).toEqual([]);
@@ -26,9 +27,10 @@ describe('OPDS user DTOs', () => {
       username: 'ab',
       password: 'short',
       sortOrder: 'invalid_order',
+      pageSize: 0,
     });
     const badUpdate = plainToInstance(UpdateOpdsUserDto, {
-      sortOrder: 'invalid_order',
+      pageSize: 101,
     });
 
     expect((await validate(badCreate)).length).toBeGreaterThan(0);

@@ -87,6 +87,7 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
   let visibleAlphaAlternativeFileIds!: Record<'mobi' | 'azw3' | 'fb2', number>;
 
   let ownerCredentials!: OpdsCredentials;
+  let ownerOpdsUserId!: number;
   let disabledCredentials!: OpdsCredentials;
   let revokedCredentials!: OpdsCredentials;
   let fb2Credentials!: OpdsCredentials;
@@ -204,6 +205,7 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
     });
 
     ownerCredentials = { username: ownerOpds.row.username, password: ownerOpds.password };
+    ownerOpdsUserId = ownerOpds.row.id;
     disabledCredentials = { username: disabledOpds.row.username, password: disabledOpds.password };
     revokedCredentials = { username: revokedOpds.row.username, password: revokedOpds.password };
     fb2Credentials = { username: fb2Opds.row.username, password: fb2Opds.password };
@@ -298,11 +300,12 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
           username,
           password: 'LifecyclePass123',
           sortOrder: 'recent',
+          pageSize: 15,
         },
       });
       expect(createResponse.statusCode).toBe(201);
-      const created = createResponse.json() as { id: number; username: string; sortOrder: string };
-      expect(created).toMatchObject({ username, sortOrder: 'recent' });
+      const created = createResponse.json() as { id: number; username: string; sortOrder: string; pageSize: number };
+      expect(created).toMatchObject({ username, sortOrder: 'recent', pageSize: 15 });
 
       const listResponse = await ctx.app.inject({
         method: 'GET',
@@ -320,6 +323,15 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       });
       expect(updateResponse.statusCode).toBe(200);
       expect(updateResponse.json()).toEqual(expect.objectContaining({ id: created.id, sortOrder: 'title_asc' }));
+
+      const pageSizeUpdateResponse = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/opds-users/${created.id}`,
+        headers: authHeader(owner.accessToken),
+        payload: { pageSize: 25 },
+      });
+      expect(pageSizeUpdateResponse.statusCode).toBe(200);
+      expect(pageSizeUpdateResponse.json()).toEqual(expect.objectContaining({ id: created.id, pageSize: 25 }));
 
       const foreignUpdateResponse = await ctx.app.inject({
         method: 'PATCH',
@@ -553,6 +565,31 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
       expect(isbnSearchResponse.body).toContain('Visible Alpha');
       expect(isbnSearchResponse.body).not.toContain('Visible Beta');
       expect(isbnSearchResponse.body).not.toContain('Hidden Gamma');
+    });
+
+    it('uses the account page size when catalog size is omitted', async () => {
+      const updateResponse = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/opds-users/${ownerOpdsUserId}`,
+        headers: authHeader(owner.accessToken),
+        payload: { pageSize: 1 },
+      });
+      expect(updateResponse.statusCode).toBe(200);
+
+      try {
+        const response = await opdsGet('/api/v1/opds/catalog', ownerCredentials);
+        expect(response.statusCode).toBe(200);
+        expect(response.body.match(/<entry>/g) ?? []).toHaveLength(1);
+        expect(response.body).toContain('size=1');
+        expect(response.body).toContain('rel="next"');
+      } finally {
+        await ctx.app.inject({
+          method: 'PATCH',
+          url: `/api/v1/opds-users/${ownerOpdsUserId}`,
+          headers: authHeader(owner.accessToken),
+          payload: { pageSize: 50 },
+        });
+      }
     });
   });
 
