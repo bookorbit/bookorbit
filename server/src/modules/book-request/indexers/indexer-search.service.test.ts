@@ -30,7 +30,10 @@ const pluginType = (slug: string) => slug as IndexerAdapterType;
 function indexer(overrides: Partial<ResolvedIndexerConfig> = {}): ResolvedIndexerConfig {
   return {
     id: 1,
+    managerId: null,
+    managerPriority: null,
     name: 'jackett',
+    color: null,
     adapterType: 'torznab',
     baseUrl: 'http://127.0.0.1:9117',
     credential: null,
@@ -43,6 +46,9 @@ function indexer(overrides: Partial<ResolvedIndexerConfig> = {}): ResolvedIndexe
     isbnSearchDisabled: false,
     settings: null,
     networkProfile: null,
+    perIndexerTimeoutSeconds: 20,
+    overallSearchBudgetSeconds: null,
+    autoExpandCategories: false,
     credentialError: null,
     ...overrides,
   };
@@ -83,6 +89,9 @@ function makeService(
   const indexers = {
     resolveEnabledConfigs: vi.fn().mockResolvedValue(configs),
     resolveConfig: vi.fn((id: number) => Promise.resolve(configs.find((config) => config.id === id))),
+    findColorsByIds: vi.fn((ids: number[]) =>
+      Promise.resolve(configs.filter((config) => ids.includes(config.id)).map((config) => ({ id: config.id, color: config.color }))),
+    ),
     countSources: vi.fn().mockResolvedValue({ configured: configs.length, enabled: configs.length }),
     recordSearchOutcomes: vi.fn().mockResolvedValue(undefined),
   };
@@ -413,7 +422,7 @@ describe('IndexerSearchService', () => {
       {
         indexerId: 1,
         indexerName: 'jackett',
-        color: undefined,
+        color: null,
         ok: false,
         count: 0,
         filtered: 0,
@@ -426,7 +435,7 @@ describe('IndexerSearchService', () => {
       {
         indexerId: 2,
         indexerName: 'archive',
-        color: undefined,
+        color: null,
         ok: true,
         count: 1,
         filtered: 0,
@@ -497,6 +506,20 @@ describe('IndexerSearchService', () => {
     const refreshed = await service.search(request(), { refresh: true });
     expect(refreshed.cached).toBe(false);
     expect(torznab.search).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes source colors when serving a cached search', async () => {
+    const config = indexer({ color: 'blue' });
+    const torznab = { search: vi.fn().mockResolvedValue([release()]) };
+    const { service } = makeService([config], { torznab });
+
+    await service.search(request());
+    config.color = 'orange';
+
+    const cached = await service.search(request());
+    expect(cached.cached).toBe(true);
+    expect(cached.indexers[0]?.color).toBe('orange');
+    expect(torznab.search).toHaveBeenCalledOnce();
   });
 
   it('keeps manual and default search caches separate while retaining both pickable result sets', async () => {
@@ -757,5 +780,86 @@ describe('IndexerSearchService', () => {
       expect.objectContaining({ indexerId: 2, ok: true, count: 1 }),
     ]);
     expect(result.releases).toHaveLength(1);
+  });
+
+  it('uses Prowlarr priority only after tier, score, and seeders are tied', async () => {
+    const torznab = {
+      search: vi
+        .fn()
+        .mockResolvedValueOnce([release({ indexerId: 1, guid: 'lower-priority' })])
+        .mockResolvedValueOnce([release({ indexerId: 2, guid: 'higher-priority' })]),
+    };
+    const { service } = makeService(
+      [
+        indexer({ id: 1, managerId: 3, managerPriority: 20, overallSearchBudgetSeconds: 60 }),
+        indexer({ id: 2, managerId: 3, managerPriority: 5, overallSearchBudgetSeconds: 60 }),
+      ],
+      { torznab },
+    );
+
+    const result = await service.search(request());
+
+    expect(result.releases.map((item) => item.guid)).toEqual(['higher-priority', 'lower-priority']);
+  });
+
+  it('expands categories only after a successful empty response', async () => {
+    const torznab = { search: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([release()]) };
+    const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
+
+    await service.search(request({ authors: [] }));
+
+    expect(torznab.search).toHaveBeenCalledTimes(2);
+    expect(torznab.search.mock.calls[0]?.[1].categories.ebook).toEqual([7020]);
+    expect(torznab.search.mock.calls[1]?.[1].categories.ebook).toEqual([]);
+  });
+
+  it('keeps the title-only query when it expands categories after an author retry', async () => {
+    const torznab = { search: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([release()]) };
+    const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
+
+    await service.search(request());
+
+    expect(torznab.search).toHaveBeenCalledTimes(3);
+    expect(torznab.search.mock.calls[0]?.[0].author).toBe('Frank Herbert');
+    expect(torznab.search.mock.calls[1]?.[0].author).toBeNull();
+    expect(torznab.search.mock.calls[2]?.[0].author).toBeNull();
+    expect(torznab.search.mock.calls[2]?.[1].categories.ebook).toEqual([]);
+  });
+
+  it('does not expand categories after a failed search', async () => {
+    const torznab = { search: vi.fn().mockRejectedValue(new IndexerSearchException('unreachable', 'offline')) };
+    const { service } = makeService([indexer({ autoExpandCategories: true })], { torznab });
+
+    const result = await service.search(request({ authors: [] }));
+
+    expect(torznab.search).toHaveBeenCalledTimes(1);
+    expect(result.indexers[0]).toMatchObject({ ok: false, failure: 'unreachable' });
+  });
+
+  it('keeps a picked candidate actionable after the visible result cache expires', async () => {
+    vi.useFakeTimers();
+    try {
+      const torznab = { search: vi.fn().mockResolvedValue([release()]) };
+      const { service } = makeService([indexer()], { torznab });
+      await service.search(request());
+
+      vi.advanceTimersByTime(4 * 60 * 1000);
+
+      expect(service.find(7, 1, 'g1')).toMatchObject({ guid: 'g1' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refreshes a stale managed URL only when the release identity still matches', async () => {
+    const stale = release({ infoHash: 'ABC', downloadUrl: 'https://prowlarr.test/old' });
+    const exact = release({ infoHash: 'abc', downloadUrl: 'https://prowlarr.test/fresh' });
+    const lookalike = release({ guid: 'other', infoHash: 'def', downloadUrl: 'https://prowlarr.test/wrong' });
+    const torznab = { search: vi.fn().mockResolvedValueOnce([stale]).mockResolvedValueOnce([lookalike, exact]) };
+    const managed = indexer({ managerId: 3, managerPriority: 10, overallSearchBudgetSeconds: 60 });
+    const { service } = makeService([managed], { torznab });
+    await service.search(request());
+
+    await expect(service.refreshCandidate(7, 1, stale)).resolves.toMatchObject({ downloadUrl: 'https://prowlarr.test/fresh' });
   });
 });

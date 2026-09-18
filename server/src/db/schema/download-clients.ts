@@ -49,7 +49,7 @@ export const downloadClients = pgTable(
   (t) => [
     uniqueIndex('download_clients_name_lower_uidx').on(sql`lower(${t.name})`),
     index('download_clients_enabled_priority_idx').on(t.enabled, t.priority),
-    check('download_clients_adapter_type_chk', sql`${t.adapterType} in ('qbittorrent', 'transmission', 'deluge', 'nzbget')`),
+    check('download_clients_adapter_type_chk', sql`${t.adapterType} in ('qbittorrent', 'transmission', 'deluge', 'nzbget', 'sabnzbd')`),
 
     check('download_clients_priority_range_chk', sql`${t.priority} >= 1 and ${t.priority} <= 100`),
   ],

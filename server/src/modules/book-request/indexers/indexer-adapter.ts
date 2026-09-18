@@ -14,6 +14,8 @@ import type {
 /** An indexer row with its credential already decrypted. Never logged, never returned over HTTP. */
 export interface ResolvedIndexerConfig {
   id: number;
+  managerId: number | null;
+  managerPriority: number | null;
   name: string;
   /** The operator's colour for this source, carried so a search status can report it unlooked-up. */
   color: IndexerColor | null;
@@ -44,6 +46,9 @@ export interface ResolvedIndexerConfig {
   settings: IndexerSettings | null;
   /** How to reach this source, applied by the host rather than chosen by the adapter. */
   networkProfile: NetworkProfile | null;
+  perIndexerTimeoutSeconds: number;
+  overallSearchBudgetSeconds: number | null;
+  autoExpandCategories: boolean;
 }
 
 /** Non-secret host policy read immediately before a configured-indexer torrent is added. */

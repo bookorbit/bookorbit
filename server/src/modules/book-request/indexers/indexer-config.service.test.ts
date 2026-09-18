@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { DEFAULT_INDEXER_CATEGORIES, INDEXER_COLORS } from '@bookorbit/types';
 
-import type { RequestIndexerRow } from '../../../db/schema';
+import type { RequestIndexerManagerRow, RequestIndexerRow } from '../../../db/schema';
 import { IndexerConfigService } from './indexer-config.service';
 
 function indexerRow(overrides: Partial<RequestIndexerRow> = {}): RequestIndexerRow {
@@ -9,6 +9,11 @@ function indexerRow(overrides: Partial<RequestIndexerRow> = {}): RequestIndexerR
     id: 9,
     name: 'jackett',
     adapterType: 'torznab',
+    managerId: null,
+    managerExternalId: null,
+    managerAvailable: true,
+    managerLastSeenAt: null,
+    managerMetadata: null,
     enabled: true,
     // TEST-NET-3 literal: no DNS lookup in tests, and not a private address.
     baseUrl: 'http://203.0.113.10:9117',
@@ -41,6 +46,7 @@ function makeService(
     credentials?: Record<string, unknown>;
     adapter?: Record<string, unknown>;
     registry?: Record<string, unknown>;
+    managers?: Record<string, unknown>;
   } = {},
 ) {
   const repo = {
@@ -81,18 +87,76 @@ function makeService(
     seedsBack: vi.fn().mockReturnValue(true),
     ...overrides.registry,
   };
+  const managers = {
+    findRowsByIds: vi.fn().mockResolvedValue([]),
+    findById: vi.fn().mockResolvedValue(undefined),
+    ...overrides.managers,
+  };
   return {
-    service: new IndexerConfigService(repo as never, credentials as never, registry as never),
+    service: new IndexerConfigService(repo as never, credentials as never, registry as never, managers as never),
     repo,
     credentials,
     registry,
     adapter,
+    managers,
   };
 }
 
 const createDto = { name: 'jackett', adapterType: 'torznab' as const, baseUrl: 'http://203.0.113.10:9117' };
 
 describe('IndexerConfigService', () => {
+  it('resolves a managed child with its manager credential and policy', async () => {
+    const managed = indexerRow({
+      managerId: 3,
+      managerExternalId: '7',
+      managerMetadata: { displayName: 'Managed books', implementation: 'Cardigann', protocol: 'torrent', priority: 5 },
+      credentialsEnc: null,
+    });
+    const manager = {
+      id: 3,
+      credentialsEnc: 'manager-cipher',
+      allowPrivateAddress: true,
+      networkProfile: { resolvers: ['1.1.1.1'] },
+      perIndexerTimeoutSeconds: 90,
+      overallSearchBudgetSeconds: 120,
+      autoExpandCategories: true,
+    } as RequestIndexerManagerRow;
+    const { service, credentials } = makeService({
+      repo: { findAllEnabled: vi.fn().mockResolvedValue([managed]) },
+      managers: { findRowsByIds: vi.fn().mockResolvedValue([manager]) },
+    });
+
+    await expect(service.resolveEnabledConfigs()).resolves.toEqual([
+      expect.objectContaining({
+        id: 9,
+        name: 'Managed books',
+        managerId: 3,
+        managerPriority: 5,
+        credential: 'api-key',
+        allowPrivateAddress: true,
+        networkProfile: { resolvers: ['1.1.1.1'] },
+        perIndexerTimeoutSeconds: 90,
+        overallSearchBudgetSeconds: 120,
+        autoExpandCategories: true,
+      }),
+    ]);
+    expect(credentials.decrypt).toHaveBeenCalledWith('manager-cipher');
+  });
+
+  it('refuses direct edits and deletion of a managed child', async () => {
+    const managed = indexerRow({
+      managerId: 3,
+      managerExternalId: '7',
+      managerMetadata: { displayName: 'Managed', implementation: null, protocol: 'torrent', priority: null },
+    });
+    const { service, repo } = makeService({ repo: { findById: vi.fn().mockResolvedValue(managed) } });
+
+    await expect(service.update(9, { enabled: false })).rejects.toThrow(/manager/);
+    await expect(service.remove(9)).rejects.toThrow(/manager/);
+    expect(repo.update).not.toHaveBeenCalled();
+    expect(repo.delete).not.toHaveBeenCalled();
+  });
+
   it('never returns the stored credential, only whether there is one', async () => {
     const { service } = makeService();
 

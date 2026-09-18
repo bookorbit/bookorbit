@@ -107,13 +107,15 @@ torrents already in a client.
 ## Download clients
 
 Settings > System > Requests > Download clients. qBittorrent, Transmission and Deluge accept
-torrents; NZBGet accepts NZBs. A Newznab source therefore needs an enabled NZBGet client, while a
-Torznab source needs an enabled torrent client. Direct HTTP sources need no external client.
+torrents; NZBGet and SABnzbd accept NZBs. A Newznab source therefore needs an enabled Usenet
+client, while a Torznab source needs an enabled torrent client. Direct HTTP sources need no
+external client.
 
-BookOrbit does not connect to an NNTP article server. Configure the article-server account in
-NZBGet, then give BookOrbit a separate NZBGet API account. BookOrbit fetches the credentialed NZB,
-sends its bytes to NZBGet, and monitors the item by a stable ownership key rather than a transient
-NZBGet queue ID.
+BookOrbit does not connect to an NNTP article server. Configure that provider account in NZBGet or
+SABnzbd, then connect BookOrbit to the download client. NZBGet uses its control username and
+password; SABnzbd uses the API key under Config > General. BookOrbit fetches the credentialed NZB,
+sends its bytes to the client, and monitors the item with a stable BookOrbit ownership marker. The
+configured SABnzbd category must already exist; otherwise SABnzbd silently assigns its `*` category.
 
 Each client needs at least one **path mapping**, including when BookOrbit and the client run on the
 same host. A mapping translates the download directory the client reports into a path BookOrbit can

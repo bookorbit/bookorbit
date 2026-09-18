@@ -16,11 +16,12 @@ import type {
 import { isUniqueViolation } from '../../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { PrivateAddressException, ensureSafeUrl } from '../../../common/utils/ssrf.utils';
-import type { RequestIndexerRow } from '../../../db/schema';
+import type { RequestIndexerManagerRow, RequestIndexerRow } from '../../../db/schema';
 import { RequestCredentialService } from '../request-credential.service';
 import type { ResolvedIndexerConfig, ResolvedIndexerSeedPolicy } from './indexer-adapter';
 import { IndexerRegistry } from './indexer-registry';
 import { IndexerRepository } from './indexer.repository';
+import { IndexerManagerRepository } from './indexer-manager.repository';
 import type { CreateIndexerDto, UpdateIndexerDto } from './dto/indexer.dto';
 
 const MAX_INDEXER_SETTING_STRING_LENGTH = 2_048;
@@ -36,6 +37,7 @@ export class IndexerConfigService {
     private readonly repo: IndexerRepository,
     private readonly credentials: RequestCredentialService,
     private readonly registry: IndexerRegistry,
+    private readonly managers: IndexerManagerRepository,
   ) {}
 
   async findAll(): Promise<IndexerListResult> {
@@ -97,6 +99,7 @@ export class IndexerConfigService {
 
   async update(id: number, dto: UpdateIndexerDto): Promise<IndexerItem> {
     const existing = await this.requireIndexer(id);
+    if (existing.managerId !== null) throw new BadRequestException('A managed indexer must be changed through its indexer manager');
 
     const baseUrl = dto.baseUrl?.trim() ?? existing.baseUrl;
     const allowPrivate = dto.allowPrivateAddress ?? existing.allowPrivateAddress;
@@ -160,6 +163,7 @@ export class IndexerConfigService {
 
   async remove(id: number): Promise<void> {
     const existing = await this.requireIndexer(id);
+    if (existing.managerId !== null) throw new BadRequestException('A managed indexer must be deleted with its indexer manager');
     if (!(INDEXER_ADAPTER_TYPES as readonly string[]).includes(existing.adapterType)) {
       throw new BadRequestException('A plugin-backed source must be deleted with its plugin');
     }
@@ -194,6 +198,10 @@ export class IndexerConfigService {
     return this.repo.countSources();
   }
 
+  findColorsByIds(ids: number[]) {
+    return this.repo.findColorsByIds(ids);
+  }
+
   /**
    * How the last real search went, per source. Written by the search rather than read by it: the
    * settings list is where this is shown, and a picker's live failure list stops existing the
@@ -214,15 +222,18 @@ export class IndexerConfigService {
    */
   async resolveEnabledConfigs(): Promise<ResolvedIndexerConfig[]> {
     const rows = await this.repo.findAllEnabled();
+    const managerIds = [...new Set(rows.flatMap((row) => (row.managerId === null ? [] : [row.managerId])))];
+    const managers = new Map((managerIds.length === 0 ? [] : await this.managers.findRowsByIds(managerIds)).map((manager) => [manager.id, manager]));
     return rows.map((row) => {
+      const manager = row.managerId === null ? null : (managers.get(row.managerId) ?? null);
       try {
-        return this.toConfig(row);
+        return this.toConfig(row, manager);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `[request_indexer.resolve] [fail] indexerId=${row.id} error="${sanitizeLogValue(message)}" - the stored credential could not be read, so this source is reported as unauthorized`,
         );
-        return { ...this.toConfig({ ...row, credentialsEnc: null }), credentialError: message };
+        return { ...this.toConfig({ ...row, credentialsEnc: null }, manager ? { ...manager, credentialsEnc: '' } : null), credentialError: message };
       }
     });
   }
@@ -232,7 +243,9 @@ export class IndexerConfigService {
    * `credentialsEnc` blob cannot reach a response body or a log line by accident.
    */
   async resolveConfig(id: number): Promise<ResolvedIndexerConfig> {
-    return this.toConfig(await this.requireIndexer(id));
+    const row = await this.requireIndexer(id);
+    const manager = row.managerId === null ? null : ((await this.managers.findById(row.managerId))?.manager ?? null);
+    return this.toConfig(row, manager);
   }
 
   async resolveSeedPolicy(id: number): Promise<ResolvedIndexerSeedPolicy> {
@@ -246,16 +259,25 @@ export class IndexerConfigService {
     };
   }
 
-  private toConfig(row: RequestIndexerRow): ResolvedIndexerConfig {
+  private toConfig(row: RequestIndexerRow, manager: RequestIndexerManagerRow | null = null): ResolvedIndexerConfig {
+    const managed = row.managerId !== null;
     return {
       id: row.id,
-      name: row.name,
+      managerId: row.managerId,
+      managerPriority: row.managerMetadata?.priority ?? null,
+      name: managed ? (row.managerMetadata?.displayName ?? row.name) : row.name,
       color: row.color ?? null,
       adapterType: row.adapterType as IndexerAdapterType,
       baseUrl: row.baseUrl,
-      credential: row.credentialsEnc ? this.credentials.decrypt(row.credentialsEnc) : null,
+      credential: managed
+        ? manager?.credentialsEnc
+          ? this.credentials.decrypt(manager.credentialsEnc)
+          : null
+        : row.credentialsEnc
+          ? this.credentials.decrypt(row.credentialsEnc)
+          : null,
       credentialError: null,
-      allowPrivateAddress: row.allowPrivateAddress,
+      allowPrivateAddress: manager?.allowPrivateAddress ?? row.allowPrivateAddress,
       applyTrackerSeedGoals: row.applyTrackerSeedGoals,
       seedRatioGoal: row.seedRatioGoal,
       seedTimeMinutes: row.seedTimeMinutes,
@@ -263,7 +285,10 @@ export class IndexerConfigService {
       disabledMediaKinds: normalizeDisabledMediaKinds(row.disabledMediaKinds),
       isbnSearchDisabled: row.isbnSearchDisabled,
       settings: row.settings ?? null,
-      networkProfile: row.networkProfile ?? null,
+      networkProfile: manager?.networkProfile ?? row.networkProfile ?? null,
+      perIndexerTimeoutSeconds: manager?.perIndexerTimeoutSeconds ?? 20,
+      overallSearchBudgetSeconds: manager?.overallSearchBudgetSeconds ?? null,
+      autoExpandCategories: manager?.autoExpandCategories ?? false,
     };
   }
 
