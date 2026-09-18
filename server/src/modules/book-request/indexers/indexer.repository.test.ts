@@ -65,6 +65,7 @@ describe('IndexerRepository', () => {
 
     expect(queries).toHaveLength(1);
     expect(queries[0].sql).toMatch(/update "request_indexers" set "last_search_at" = \$1, "last_search_ok" = case when/);
+    expect(queries[0].sql).toMatch(/"last_search_ok" = case when .* then \$\d+::boolean/);
     expect(queries[0].sql).toMatch(/"request_indexers"\."id" in \(\$\d+, \$\d+\)/);
     expect(queries[0].sql).toMatch(/"request_indexers"\."last_search_at" is null or "request_indexers"\."last_search_at" < \$\d+/);
     expect(queries[0].params).toContain('The tracker answered 429');

@@ -142,7 +142,7 @@ export class IndexerRepository {
     const at = new Date();
     const ids = outcomes.map((outcome) => outcome.indexerId);
     const okCase = sql.join(
-      outcomes.map((outcome) => sql`when ${requestIndexers.id} = ${outcome.indexerId} then ${outcome.ok}`),
+      outcomes.map((outcome) => sql`when ${requestIndexers.id} = ${outcome.indexerId} then ${outcome.ok}::boolean`),
       sql` `,
     );
     const errorCase = sql.join(
