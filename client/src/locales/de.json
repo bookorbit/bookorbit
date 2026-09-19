@@ -2846,7 +2846,8 @@
         "clientTypes": {
           "qbittorrent": "qBittorrent",
           "transmission": "Transmission",
-          "deluge": "Deluge"
+          "deluge": "Deluge",
+          "nzbget": "NZBGet"
         },
         "color": {
           "label": "Farbe",
@@ -2916,21 +2917,36 @@
           "testFailed": "Download Programm konnte nicht erreicht werden",
           "nameAndUrlRequired": "Ein Name und eine Basis-URL sind erforderlich",
           "nameTaken": "Ein Download Programm mit diesem Namen existiert bereits",
+          "urlUnsafe": "Diese Basis-URL konnte nicht erreicht werden. Überprüfe die Adresse und ob sie http oder https verwendet.",
           "urlPrivate": "Diese Adresse ist in einem privaten oder lokalen Netzwerk. Aktivieren Sie \"Private Adressen erlauben\", wenn der Client dort läuft.",
+          "encryptionKeyMissing": "Setze BOOK_REQUEST_ENCRYPTION_KEY bevor du ein Passwort speicherst. Generiere eins mit: openssl rand -hex 32",
+          "encryptionKeyChanged": "Das gespeicherte Passwort konnte nicht gelesen werden. BOOK_REQUEST_ENCRYPTION_KEY kann seit dem Speichern geändert worden sein.",
+          "pathNotAbsolute": "Pfadzuordnungen müssen absolute Pfade auf beiden Seiten sein.",
           "nameRequired": "Geben Sie diesem Client einen Namen.",
-          "urlRequired": "Geben Sie die Adresse ein, unter der BookOrbit diesen Client erreichen soll."
+          "urlRequired": "Geben Sie die Adresse ein, unter der BookOrbit diesen Client erreichen soll.",
+          "mappingRequired": "Fügen Sie mindestens eine Pfadzuordnung hinzu, so dass BookOrbit weiß, aus welchem Verzeichnis es importieren darf."
         },
+        "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY ist nicht gesetzt, daher kann kein Client-Passwort gespeichert werden. Generieren Sie eins mit: openssl rand -hex 32",
         "confirmDelete": {
           "title": "Dieses Download Programm entfernen?",
           "confirm": "Programm entfernen"
         },
         "indexers": {
           "title": "Torrent-Indexer",
+          "hint": "Verbinden Sie einen Torznab-Feed für Torrents oder einen Newznab-Feed für Usenet-Releases.",
+          "allDisabled": "Jede Quelle unten ist ausgeschaltet, so dass keine Suche Ergebnisse liefern wird. Schalten Sie mindestens eine Suche wieder ein.",
           "loading": "Lade Indexer...",
           "empty": {
             "title": "Noch keine Quellen",
+            "body": "BookOrbit stellt keine eigenen Quellen bereit, so dass eine Anfrage nichts findet, bis du Quellen hinzufügst. Es gibt zwei Wege.",
+            "bodyOneWay": "BookOrbit stellt keine eigenen Quellen bereit, so dass eine Anfrage nichts findet, bis du Quellen hinzufügst. ",
+            "responsibility": "Sie sind verantwortlich für die hinzugefügten Quellen.",
             "pluginTitle": "Plugin installieren",
-            "torznabTitle": "Torznab-Indexer hinzufügen"
+            "pluginBody": "Eine Plugin-Datei, die es BookOrbit ermöglicht, eine bestimmte Seite zu durchsuchen. Sie müssen die Plugin-Datei bereitstellen und die Einstellungen vornehmen.",
+            "torznabTitle": "Torznab-Indexer hinzufügen",
+            "torznabBody": "Geben Sie einen bereits bestehenden Feed von Prowlarr, Jackett oder NZBHydra ein.",
+            "builtInTitle": "Indexer hinzufügen",
+            "builtInBody": "Geben Sie ein bereits bestehenden Feed von Torznab oder Newznab ein. Eine Konfiguration pro Feed"
           },
           "add": "Indexer hinzufügen",
           "edit": "Indexer bearbeiten",
@@ -2951,10 +2967,15 @@
           "network": {
             "title": "Erweitertes Netzwerk",
             "resolvers": "DNS-Server",
-            "proxyUrl": "Proxy-URL"
+            "proxyUrl": "Proxy-URL",
+            "proxyHint": "Ein http oder https Proxy um Anfragen dieser Quelle zu senden. SOCKS wird nicht unterstützt.",
+            "brief": "Nur erforderlich, wenn der Standardpfad zu dieser Quelle nicht funktioniert.",
+            "resolversBrief": "Komma getrennt. Wird anstelle des System-Resolvers nur für diese Quelle verwendet; leer verwendet das System.",
+            "proxyBrief": "Ein http oder https Proxy für diese Quelle. SOCKS wird nicht unterstützt."
           },
           "types": {
-            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)"
+            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)",
+            "newznab": "Newznab"
           },
           "fields": {
             "name": "Name",
@@ -2997,6 +3018,22 @@
           },
           "settings": {
             "restoreDefault": "Standard wiederherstellen"
+          },
+          "seeding": {
+            "ratio": "Seeding-Verhältnis",
+            "time": "Seed Zeit (Minuten)",
+            "reset": "Seeding Einstellungen zurücksetzen",
+            "summary": {
+              "title": "Richtlinienzusammenfassung",
+              "ratio": "Verhältnis",
+              "time": "Seed Zeit",
+              "manual": "Manuell: {value}",
+              "tracker": "Tracker fallback",
+              "client": "Client-Standard"
+            },
+            "errors": {
+              "minutes": "Geben Sie eine ganze Zahl von 1 bis 2.147.483.647 ein oder lassen Sie dieses Feld leer."
+            }
           },
           "confirmDelete": {
             "title": "Diese Quelle löschen",
@@ -3075,7 +3112,12 @@
           "mono": "Mono",
           "multiSelectAny": "Beliebig"
         },
+        "sections": {
+          "availability": "Verfügbarkeit",
+          "behaviour": "Verhalten"
+        },
         "continueWithType": "Weiter",
+        "external": "Extern",
         "editorDescription": "Einstellungen für dieses Download Programm.",
         "searchHealth": {
           "failingStreak": "{count} Suche in einer Zeile fehlgeschlagen"
@@ -3089,10 +3131,14 @@
       "clearSearch": "Suche zurücksetzen",
       "noResults": "Keine Einstellungen entsprechen {query}.",
       "shortcutHint": "Drücke Cmd K um zu einer beliebigen Einstellung zu springen",
+      "status": {
+        "scanning": "Wird gescannt "
+      },
       "groups": {
         "you": "Du",
         "library": "Bibliothek",
         "devices": "Geräte & Synchronisation",
+        "accounts": "Konten",
         "server": "Server"
       },
       "descriptions": {
@@ -3114,7 +3160,17 @@
         "restrictions": "Altersbewertungen und verborgene Inhalte für dieses Konto.",
         "libraries": "Scanne Pfade, beobachtete Ordner und ErfassungesRegeln.",
         "accountActivity": "Lese- und Sitzungsaktivität pro Benutzer."
-      }
+      },
+      "backToApp": "Zurück zur Bibliothek"
+    },
+    "field": {
+      "required": "(erforderlich)"
+    },
+    "editor": {
+      "discardTitle": "Änderungen verwerfen?",
+      "discardConfirm": "Änderungen verwerfen",
+      "moreActions": "Weitere Aktionen",
+      "removeQuestion": "Entfernen?"
     }
   },
   "achievements": {
@@ -3306,14 +3362,25 @@
         "administration": "Verwaltung",
         "notifications": "Benachrichtigungen",
         "restrictions": "Einschränkungen",
-        "bookDock": "Bücherablage"
+        "libraryBooks": "Bibliothek & Bücher",
+        "bookRequests": "Buchanfragen",
+        "bookDock": "Bücherablage",
+        "devices": "Geräte",
+        "readingIntegrations": "Lese Integrationen",
+        "emailNotifications": "E-Mail & Benachrichtigungen",
+        "libraryConfiguration": "Bibliothekskonfiguration",
+        "usersSecurity": "Nutzer & Sicherheit",
+        "system": "System"
       },
       "permissionLevels": {
-        "use": "Verwenden"
+        "use": "Verwenden",
+        "manage": "Verwalten"
       },
+      "accountRestrictions": "Kontoeinschränkungen ",
       "superuserTarget": "Superuser-Ziel",
       "superuserTargetHint": "Inhaltseinschränkungen können nicht auf Superuser angewendet werden.",
       "superuserAccess": {
+        "title": "Superuser Zugriff",
         "enabled": "Aktiviert",
         "disabled": "Deaktiviert"
       },
@@ -3343,8 +3410,33 @@
         "createUser": "Erstellen des Benutzers fehlgeschlagen"
       },
       "sectionSummary": {
-        "restrictionsNone": "Keine"
-      }
+        "restrictionsNone": "Keine",
+        "restrictionsContent": "Inhaltsfilter",
+        "restrictionsBoth": "Filter und Demo Modus"
+      },
+      "account": "Konto",
+      "status": "Status",
+      "statusHint": "Gesperrte Benutzer können sich nicht anmelden oder Geräte synchronisieren.",
+      "signInMethod": "Anmelden",
+      "signInMethods": {
+        "password": "Passwort",
+        "oidc": "Single-Sign-On",
+        "shared": "Magic Links"
+      },
+      "created": "Erstellt",
+      "selectAll": "Alle auswählen",
+      "clearAll": "Zurücksetzen",
+      "presets": {
+        "label": "Berechtigungsvorgabe",
+        "none": "Keine",
+        "standard": "Standard",
+        "custom": "Benutzerdefiniert",
+        "admin": "Administrator",
+        "customHint": "Diese Auswahl stimmt nicht mit einer Voreinstellung überein."
+      },
+      "filterPermissions": "Filterberechtigungen",
+      "clearFilters": "Filter zurücksetzen",
+      "dangerZone": "Gefahrenbereich"
     },
     "usersPage": {
       "usersTitle": "Benutzer",
@@ -3368,6 +3460,8 @@
       "statusActive": "Aktiv",
       "statusInactive": "Inaktiv",
       "lockedBadge": "Gesperrt",
+      "unlockAccount": "Konto entsperren",
+      "unlockAria": "{name} entsperren",
       "resetPassword": "Passwort zurücksetzen",
       "resetPasswordOidcHint": "OIDC-Benutzer setzen Passwörter bei ihrem Identitätsanbieter zurück",
       "resetPasswordSharedHint": "Gemeinsame Konten haben keine Passwörter",
@@ -3454,7 +3548,9 @@
           "neverSignedIn": "{name} hat sich noch nie angemeldet"
         },
         "action": {
-          "unlock": "Jetzt freischalten"
+          "unlock": "Jetzt freischalten",
+          "sendResetLink": "Link zum Zurücksetzen senden",
+          "sendNewLink": "Neuen Link senden"
         },
         "collapse": "Ausblenden",
         "expand": "Anzeigen"
@@ -3592,6 +3688,7 @@
         "noAnnotations": "Noch keine Markierungen. Im Web oder auf Ihrem E-Reader erstellte Markierungen erscheinen hier.",
         "readHere": "Hier lesen",
         "syncKobo": "Mit Kobo synchronisieren",
+        "syncKoreader": "KOReader synchronisieren",
         "syncKoreaderBody": "Das Plugin lädt Anmerkungen mit ihren Positionen hoch.",
         "goToLibrary": "Gehe zur Bibliothek"
       },
@@ -3711,7 +3808,10 @@
     "showing": "Zeige {from}-{to} von {total}",
     "prev": "Zurück",
     "chips": {
+      "search": "Suche: {value}",
       "action": "Aktion: {value}",
+      "eventType": "Ereignistyp: {value}",
+      "resource": "Ressource: {value}",
       "user": "Benutzer: {value}",
       "from": "Von: {value}",
       "to": "Bis: {value}"
@@ -3741,6 +3841,7 @@
       "ip": "IP"
     },
     "categories": {
+      "authentication": "Authentifizierung",
       "books": "Bücher",
       "users": "Benutzer",
       "libraries": "Bibliotheken",
@@ -3756,7 +3857,9 @@
       "Collection": "Sammlung",
       "SmartScope": "Intelligenter Bereich",
       "BookDockFile": "Bücherablage-Datei",
+      "BookRequest": "Buchanfrage",
       "DownloadClient": "Download Programm",
+      "RequestIndexer": "Indexer",
       "Author": "Autor",
       "AppSettings": "App-Einstellungen",
       "Genre": "Genre",
@@ -3775,19 +3878,69 @@
       "ReadingInsightsProfile": "Leseprofil"
     },
     "actionLabels": {
+      "AuthRegister": "Benutzerkonto erstellen",
       "AuthLogin": "Anmelden",
+      "AuthLoginFailed": "Fehler beim Anmelden",
       "AuthLogout": "Abmelden",
+      "AuthPasswordChange": "Passwort ändern",
+      "AuthPasswordResetRequest": "Zurücksetzen des Passworts anfordern",
+      "AuthPasswordReset": "Passwort zurücksetzen",
+      "AuthPasswordAdminReset": "Passwort zurücksetzen",
       "AuthSessionRevoke": "Sitzung widerrufen",
+      "MagicLinkCreate": "Magic Link erstellen",
       "UserCreate": "Benutzer erstellen",
       "UserUpdate": "Benutzer aktualisieren",
       "UserDelete": "Benutzer löschen",
+      "LibraryCreate": "Bibliothek erstellen",
+      "LibraryUpdate": "Bibliothek aktualisieren",
+      "LibraryDelete": "Bibliothek löschen",
+      "LibraryFolderAdd": "Bibliothekordner hinzufügen",
+      "LibraryFolderRemove": "Bibliotheksordner entfernen",
+      "LibraryAccessGrant": "Bibliothekszugriff gewähren",
+      "LibraryAccessUpdate": "Bibliothekszugriff aktualisieren",
+      "LibraryAccessRevoke": "Bibliothekszugriff widerrufen",
       "BookUpload": "Buch hochladen",
       "BookDelete": "Buch löschen",
       "BookBulkDelete": "Bücher löschen",
+      "BookBulkSetStatus": "Buchstatus festlegen",
+      "BookBulkSetRating": "Buchbewertung festlegen",
+      "BookBulkSetMetadata": "Metadaten festlegen",
+      "BookBulkUpdateTags": "Tags aktualisieren",
+      "BookBulkSetMetadataLock": "Metadaten-Sperren setzen",
+      "BookBulkEditMetadata": "Metadaten bearbeiten",
+      "BookBulkMoveLibrary": "Bücher in eine andere Bibliothek verschieben",
+      "BookReadingStateReset": "Lesestatus zurücksetzen",
+      "BookWriteAndRename": "Metadaten schreiben und Datei umbenennen",
+      "CollectionCreate": "Sammlung erstellen",
+      "CollectionUpdate": "Sammlung aktualisieren",
+      "CollectionDelete": "Sammlung löschen",
+      "CollectionBooksAdd": "Zur Sammlung hinzufügen",
+      "CollectionBooksRemove": "Aus Sammlung entfernen",
+      "SmartScopeCreate": "Smart Scope erstellen",
+      "SmartScopeUpdate": "Smart Scope aktualisieren",
+      "SmartScopeDelete": "Smart Scope löschen",
       "BookDockFinalize": "Bücherablage-Datei finalisieren",
+      "BookRequestCreate": "Anfrage erstellen",
+      "BookRequestApprove": "Anfrage genehmigen",
+      "BookRequestReject": "Anfrage ablehnen",
+      "BookRequestCancel": "Anfrage abbrechen",
+      "BookRequestFulfill": "Anfrage erfüllen",
+      "BookRequestGrab": "Anfrage an einen Download-Client senden",
+      "BookRequestImport": "Download importieren",
+      "BookRequestRemoveDownload": "Download vom Client entfernen",
+      "BookRequestDelete": "Anfrage löschen",
       "DownloadClientCreate": "Download Programm erstellen",
       "DownloadClientUpdate": "Download Programm aktualisieren",
       "DownloadClientDelete": "Download Programm löschen",
+      "RequestIndexerCreate": "Indexer hinzugefügt",
+      "RequestIndexerUpdate": "Indexer aktualisiert",
+      "RequestIndexerDelete": "Quelle gelöscht",
+      "RequestIndexerPluginInspect": "Indexer Plugin überprüft",
+      "RequestIndexerPluginInstall": "Indexer-Plugin installiert",
+      "RequestIndexerPluginRemove": "Indexer-Plugin gelöscht",
+      "AuthorUpdate": "Autor aktualisieren",
+      "AuthorDelete": "Autor löschen",
+      "AuthorMerge": "Autoren zusammenführen",
       "EntityManagerSplit": "Entität aufteilen"
     }
   },

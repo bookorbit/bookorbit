@@ -734,6 +734,7 @@
         "connected": "Conectado - {issuer}",
         "connectionFailed": "Falha na conexão",
         "privateIssuerAddress": "A URL do emissor resolve um endereço de rede privado ou local, então o servidor recusou-se a se conectar. Definir OIDC_ALLOW_LOCAL_ISSUERS=true no servidor da BookOrbit para permitir.",
+        "tlsCertificateUntrusted": "BookOrbit não pôde verificar o certificado TLS do provedor OIDC. Se o provedor usa uma autoridade certificadora privada, montar seu pacote CA PEM, configurar NODE_EXTRA_CA_CERTS no caminho interno do pacote e reiniciar o BookOrbit.",
         "hide": "Ocultar",
         "details": "Detalhes",
         "supported": "suportado",
@@ -2846,7 +2847,8 @@
         "clientTypes": {
           "qbittorrent": "qBittorrent",
           "transmission": "Transmission",
-          "deluge": "Deluge"
+          "deluge": "Deluge",
+          "nzbget": "NZBGet"
         },
         "color": {
           "label": "Cor",
@@ -2945,7 +2947,9 @@
             "pluginTitle": "Instalar um plugin",
             "pluginBody": "Um arquivo que ensina ao BookOrbit como pesquisar um site específico. Você o fornece, e então preencha suas configurações.",
             "torznabTitle": "Adicionar indexador do Torznab",
-            "torznabBody": "Ponto para um Prowlarr, Jackett ou NZBHydra que você já executa. Um por feed."
+            "torznabBody": "Ponto para um Prowlarr, Jackett ou NZBHydra que você já executa. Um por feed.",
+            "builtInTitle": "Adicionar um indexador",
+            "builtInBody": "Ponto para a fonte Torznab ou Newznab que você já utiliza. Uma configuração por feed."
           },
           "add": "Adicionar indexador",
           "edit": "Editar indexador",
@@ -2975,14 +2979,16 @@
             "proxyBrief": "Um proxy http ou https para esta fonte. SOCKS não é suportado."
           },
           "types": {
-            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)"
+            "torznab": "Torznab (Jackett, Prowlarr, NZBHydra)",
+            "newznab": "Newznab"
           },
           "fields": {
             "name": "Nome",
             "type": "Tipo de indexador",
             "baseUrl": "URL base",
             "baseUrlHint": {
-              "torznab": "A URL do feed torznab sem a string de consulta. Jackett a mostra em cada indexador como \"Torznab Feed\"."
+              "torznab": "A URL do feed torznab sem a string de consulta. Jackett a mostra em cada indexador como \"Torznab Feed\".",
+              "newznab": "O URL do site Newznab ou ponto de extremidade da API, sem uma consulta de pesquisa."
             },
             "credential": {
               "apiKey": "Chave API",
@@ -3028,6 +3034,29 @@
           "settings": {
             "restoreDefault": "Restaurar padrões"
           },
+          "seeding": {
+            "applyTracker": "Aplicar metas de seeds no rastreador",
+            "applyTrackerBrief": "Quando um valor manual está em branco, use um objetivo válido relatado pelo rastreador. Quando esta opção estiver desligada, valores em branco usam os padrões de download do cliente. Valores manuais ainda se aplicam.",
+            "ratio": "Proporção de seeds",
+            "ratioBrief": "Um decimal positivo. O vazio herda do rastreador ou do cliente.",
+            "time": "Tempo da seed (minutos)",
+            "timeBrief": "Um número inteiro positivo. O vazio herda do rastreador ou do cliente.",
+            "clientSupport": "qBittorrent aceita a taxa e o tempo total de sementes. Apenas taxa de Deluge e Transmissão. Regras globais do cliente e o limite que for alcançado primeiro podem parar o seed, então esses valores não garantem que cada rastreador mínimo seja cumprido.",
+            "futureGrabs": "As alterações se aplicam a futuras capturas. Torrents existentes ou adotados podem manter limites específicos do cliente. Virar o fallback rastreador deixa o defeito ativo do cliente; não significa semeamento ilimitado.",
+            "reset": "Redefinir configurações de semeamento",
+            "summary": {
+              "title": "Resumo das políticas",
+              "ratio": "Proporção",
+              "time": "Tempo semeando",
+              "manual": "Manual: {value}",
+              "tracker": "Tracker fallback",
+              "client": "Padrão do cliente"
+            },
+            "errors": {
+              "ratio": "Digite um número finito maior que zero, ou deixe em branco.",
+              "minutes": "Digite um número natural de 1 a 2.147.483,647 ou deixe em branco."
+            }
+          },
           "confirmDelete": {
             "title": "Excluir esta fonte?",
             "description": "O endereço {name}, as configurações e as credenciais armazenadas são excluídas. Desative-o para parar de procurá-lo sem perdê-lo.",
@@ -3054,7 +3083,8 @@
           "builtIn": "Construído em",
           "plugin": "Plugin",
           "typeDescriptions": {
-            "torznab": "Seu próprio Jackett, Prowlarr ou NZBHydra. Usa categorias e objetivos de sementes."
+            "torznab": "Seu próprio Jackett, Prowlarr ou NZBHydra. Usa categorias e objetivos de sementes.",
+            "newznab": "Um indexador Usenet compatível com Newznab. Usa categorias e requer uma chave de API."
           },
           "plugins": {
             "title": "Plugins",
@@ -3082,6 +3112,25 @@
             "usedBy": "{count, plural, one {usado pela fonte #} other {usado por # sources}}",
             "unused": "nenhuma fonte o utiliza ainda",
             "update": "Atualizar plugins",
+            "checkUpdates": "Verificar atualizações",
+            "updateCheckComplete": "Verificação de atualização do plugin concluída.",
+            "updateCheckFailed": "Não foi possível verificar se há atualizações para os plugins.",
+            "updateInspectFailed": "Não foi possível verificar a atualização do plugin publicado.",
+            "reviewUpdate": "Avaliação atualizada",
+            "updated": "Atualizado {label} para {version}.",
+            "autoUpdate": "Instalar atualizações assinadas automaticamente",
+            "autoUpdateFailed": "Não foi possível alterar as atualizações automáticas para este plugin.",
+            "installedVersion": "Versão instalada",
+            "updateChannel": "Canal de atualização assinado",
+            "signatureVerified": "A fonte baixada corresponde à assinatura Ed25519 do editor.",
+            "updateStates": {
+              "unsupported": "Atualizações manuais",
+              "unchecked": "Não verificado ainda",
+              "current": "Atualizado",
+              "available": "A versão {version} está disponível",
+              "custom": "Compilação personalizada",
+              "failed": "Falha ao procurar por atualizações"
+            },
             "wrongType": "Esse arquivo é o plugin {found}, e não {expected}.",
             "replaceTitle": "Substituir este plugin?",
             "replace": "Substituir plugin",
@@ -3132,6 +3181,7 @@
           "autoGrabDisabled": "Downloads automáticos estão desligados",
           "minScore": "Pontuação mínima da versão",
           "minScoreHint": "Releases com pontuação abaixo deste limite nunca são baixados automaticamente. As pontuações vão até 100, sendo determinadas principalmente pela correspondência exata de título e autor, seguidas por formato, tamanho do arquivo, seeders e prioridade da fonte. Se nenhum release atingir a pontuação necessária, a solicitação aguardará uma seleção manual, indicando o motivo da interrupção.",
+          "minScoreHintV2": "Uma versão de pontuação abaixo disso nunca é baixada automaticamente. Pontuações executam até 100. A relevância do título e do autor contribui bastante, seguida de formato e tamanho plausível de arquivo, com saúde do swarm e freeleech usados quando uma fonte fornece eles. Se nada marcar alto o suficiente, o pedido espera que alguém escolha um manualmente e diga porque parou.",
           "autoRetry": "Tente o próximo lançamento depois de uma falha",
           "autoRetryHint": "Quando um download automático falha, a próxima melhor opção é tentada em vez de cancelar a solicitação. Isso abrange fontes que se recusam a transferir o arquivo e downloads interrompidos pelo caminho. Aplica-se apenas a releases escolhidos pelo próprio BookOrbit: itens selecionados manualmente por um aprovador permanecem em estado de falha aguardando ação do usuário.",
           "maxAttempts": "Tentativas por pedido",
@@ -3176,6 +3226,9 @@
         },
         "profiles": {
           "title": "Perfis da versão",
+          "effectiveRule": "Regra de download automático: primeiro nível de correspondência, depois pontuação mais alta (mínimo {score}).",
+          "summary": "Lançamentos fora do perfil permanecem disponíveis para seleção manual. Sem níveis, libera a classificação apenas por pontuação.",
+          "howProfiles": "Como funcionam os perfis de lançamento",
           "hint": "A edição desejada, em ordem de preferência. Os releases são avaliados de cima para baixo e enquadrados no primeiro nível correspondente. O download automático seleciona apenas a partir destes níveis: releases que não atendem a nenhum critério nunca são baixados automaticamente, embora continuem visíveis no seletor para envio manual. Se deixar um tipo de mídia vazio, nenhum filtro ou recusa será aplicado, e os releases serão ordenados exclusivamente pela pontuação.",
           "bitrateNote": "Um limite mínimo de bitrate rejeita releases que declarem um valor inferior. A maioria das fontes raramente informa a taxa de bits de seus releases, e itens sem essa medição não são recusados; portanto, este filtro restringe menos do que aparenta.",
           "empty": "Sem perfil. Lançamentos para esse meio são classificados apenas por pontuação.",
@@ -3190,6 +3243,10 @@
           "anyLayout": "Qualquer",
           "minBitrate": "Min kbps",
           "minSeeders": "Min seeders",
+          "torrentConditions": "Condições do torrent",
+          "nonTorrentConditions": "As condições para semear, freeleech e VIP não se aplicam às fontes selecionadas.",
+          "incompatibleTorrentConditions": "Este nível não torrent ainda salvou as condições dos torrents. Eles podem ser ignorados ou impedir o nível de correspondência.",
+          "removeTorrentConditions": "Remover condições do torrent",
           "channels": "Canais",
           "anyChannels": "Qualquer",
           "mono": "Mono",
@@ -3215,6 +3272,7 @@
           "connection": "Conexão",
           "search": "Pronto para buscar",
           "access": "Acesso",
+          "seeding": "Semeando",
           "availability": "Disponibilidade",
           "behaviour": "Comportamento"
         },
@@ -3226,7 +3284,8 @@
         "clientTypeDescriptions": {
           "qbittorrent": "Seu próprio qBittorrent. Precisa de um endereço e uma conta.",
           "transmission": "Sua própria transmissão. Ela não tem categorias, então a categoria se torna uma subpasta de seu diretório de download.",
-          "deluge": "Seu próprio Deluge. Faça login com a senha da interface da web; a categoria precisa do plugin de Etiqueta ligado."
+          "deluge": "Seu próprio Deluge. Faça login com a senha da interface da web; a categoria precisa do plugin de Etiqueta ligado.",
+          "nzbget": "Seu próprio NZBGet. BookOrbit envia arquivos NZB sobre sua API JSON-RPC."
         },
         "searchHealth": {
           "failingOnce": "A última pesquisa falhou",
@@ -4126,6 +4185,7 @@
       "LibraryAccessRevoke": "Revogar acesso à biblioteca",
       "LibraryWriteMetadataToFiles": "Gravar metadados nos arquivos",
       "LibraryBulkRename": "Renomear arquivos da biblioteca",
+      "LibraryRecomputeAddedAt": "Recalcular data de adição",
       "BookUpload": "Upload de livros",
       "BookMetadataUpdate": "Atualizar metadados do livro",
       "BookMetadataLocksUpdate": "Atualizar bloqueios de metadados",
@@ -4533,6 +4593,10 @@
     "actions": {
       "read": "Ler",
       "listen": "Ouvir",
+      "startReading": "Começar a ler",
+      "continueReading": "Continuar lendo",
+      "startListening": "Começar a ouvir",
+      "continueListening": "Continuar ouvindo",
       "peek": "Espiar",
       "quickView": "Visualização Rápida",
       "details": "Detalhes",
@@ -5920,6 +5984,7 @@
         "unread": "Não Lido"
       },
       "series": {
+        "seriesRow": "Nº da Série",
         "bookCount": "{count, plural, =0 {(nenhum livro)} one {(# livro)} many {(# livros)} other {(# livros)}}",
         "readOfCount": "{read} de {total} lidos"
       },
@@ -6646,7 +6711,10 @@
       "grab": "Baixar versão",
       "viewFiles": "Visualizar arquivos",
       "hideFiles": "Ocultar arquivos",
+      "viewDetails": "Sobre o conteúdo",
+      "hideDetails": "Ocultar detalhes",
       "inspectingFiles": "Lendo a lista de arquivos de lançamento...",
+      "inspectingNzb": "Buscando e validando o NZB...",
       "inspectingShort": "Verificando os arquivos...",
       "inspectionFailed": "A lista de arquivos desta versão não pôde ser lida.",
       "manifest": {
@@ -6656,6 +6724,7 @@
         "multipleBooks": "Este release contém {count} livros separados. Após o download, você escolherá qual deles importar.",
         "multiPartBook": "{count, plural, one {Este release é um livro composto por # arquivo.} other {Este release é um livro composto por # arquivos, importados juntos como um único livro.}}",
         "metadataUnavailable": "Este é um link magnet. Sua lista de arquivos está indisponível até um cliente torrent buscar os metadados do enxame.",
+        "usenetMetadataUnavailable": "Esta é uma versão do Usenet. Sua lista final de arquivos não está disponível até que NZBGet downloads e pós-processo.",
         "bookFile": "Arquivos do livro",
         "extraFile": "Extra",
         "truncated": "Mostrando {shown} de arquivos {total}.",
@@ -6670,6 +6739,7 @@
         }
       },
       "manual": "Colar um link",
+      "manualTorrent": "Usar magnet ou .torrent em vez disso",
       "indexer": "Indexador",
       "size": "Tamanho",
       "seeders": "Seeders",
@@ -6696,6 +6766,26 @@
       "vipOnly": "Somente VIP",
       "hideVipOnly": "Ocultar apenas VIP",
       "noneMatchedProfile": "Nenhuma versão aqui corresponde ao seu perfil para este meio, então nenhuma delas será baixada automaticamente. Você ainda pode enviar um manualmente. Para ampliá-lo, adicione um nível com menos condições abaixo das que você tem.",
+      "profileMismatch": {
+        "summary": "{count, plural, one {A versão # foi encontrada, mas o download automático pulará ela porque ela não corresponde a nenhum nível de perfil {medium}.} other {# lançamentos foram encontrados, mas o download automático irá ignorá-los porque nenhum combina com um nível do perfil {medium}.}} A pontuação da partida e as regras do perfil são verificações separadas. Você ainda pode clicar em Enviar.",
+        "review": "Revisar perfil {medium}",
+        "failures": {
+          "formatUnknown": "{source} não definiu um formato; este nível requer {expected}.",
+          "format": "Formato é {actual}; este nível requer {expected}.",
+          "fileLayoutUnknown": "{source} não definiu um formato; este nível requer {expected}.",
+          "fileLayout": "O layout do arquivo é {actual}; este nível requer {expected}.",
+          "bitrate": "Bitrate é {actual} kbps; este nível requer pelo menos {expected} kbps.",
+          "channels": "O áudio é {actual}; este nível requer {expected}.",
+          "languageUnknown": "{source} não indicou uma linguagem; este nível requer {expected}.",
+          "language": "O idioma é {actual}; esse nível requer {expected}.",
+          "source": "Esta fonte não está incluída no nível.",
+          "seeders": "Esta versão tem {actual} seeders; este nível requer pelo menos {expected}.",
+          "sizeUnknown": "{source} não indicou um tamanho; este nível permite até {expected}.",
+          "size": "O tamanho é {actual}; esse nível permite até {expected}.",
+          "freeleech": "Este nível requer freeleech.",
+          "vipOnly": "Este nível exclui os lançamentos apenas VIP."
+        }
+      },
       "alreadyGrabbed": "Já encontrado",
       "freeleechLabel": "FreeLeech",
       "published": "Publicado",
@@ -6736,6 +6826,7 @@
       "onlyBestMatch": "Essa é a única versão correspondida.",
       "tiedWithBest": "{count, plural, one {# outro release obteve a mesma pontuação} other {# outros releases obtiveram a mesma pontuação}}",
       "inspectionFailedHint": "Não foi enviado para um cliente de download. Tente novamente ou use Colar um link em vez disso.",
+      "inspectionFailedHintGeneric": "Não foi enviado para um cliente de download. Tente novamente ou escolha outra versão.",
       "mediumUncovered": "Nenhuma fonte carrega este tipo de livro.",
       "mediumUncoveredHint": "Nenhum dos seus indexadores habilitados cobre. Adicione um que faça ou cole um link você mesmo.",
       "noSourcesConfigured": "Ainda não há fontes de pesquisa configuradas.",
@@ -6747,6 +6838,7 @@
       "reviewSources": "Revisar fontes",
       "protocol": {
         "torrent": "Torrent",
+        "usenet": "Usenet",
         "direct": "Download direto",
         "directPill": "Direto"
       }
@@ -7234,7 +7326,11 @@
       "sidebar": {
         "title": "Barra lateral",
         "mobileDescription": "Exibe a barra lateral em dispositivos móveis.",
-        "toggle": "Alternar Barra Lateral"
+        "toggle": "Alternar Barra Lateral",
+        "collapse": "Diminuir a barra lateral",
+        "expand": "Expandir barra lateral",
+        "open": "Abrir barra lateral",
+        "close": "Fechar barra lateral"
       },
       "chipInput": {
         "typeAndEnter": "Digite e pressione Enter para adicionar",
@@ -7264,6 +7360,20 @@
       "librariesEmptyHint": "Criar uma biblioteca para começar a adicionar livros.",
       "smartScopesEmptyHint": "Escopos inteligentes salvam um conjunto de filtros que você usa com frequência.",
       "collectionsEmptyHint": "Coleções agrupam livros que você escolhe à mão."
+    },
+    "legalNotices": {
+      "about": "Sobre o BookOrbit",
+      "trigger": "Avisos legais",
+      "title": "Sobre o BookOrbit",
+      "description": "Atribuição BookOrbit, licenciamento e código-fonte.",
+      "poweredBy": "Desenvolvido por BookOrbit",
+      "originalDevelopment": "Este software contém material originalmente desenvolvido como BookOrbit.",
+      "copyright": "Copyright (C) 2025-2026 neon.",
+      "contributors": "Direitos autorais adicionais são mantidos pelos respectivos colaboradores da BookOrbit.",
+      "licenseSummary": "Licenciado nos termos da GNU Affero General Public License, versão 3 apenas, com termos adicionais. Este software é fornecido sem garantia. Você pode redistribuir e modificá-lo sob esses termos.",
+      "sourceCode": "Código fonte",
+      "license": "Licença AGPLv3",
+      "additionalTerms": "Termos adicionais"
     }
   },
   "customIcons": {
@@ -7972,6 +8082,49 @@
           "fileAsBook": {
             "title": "Arquivo como Livro",
             "hint": "Trata cada arquivo como um livro individual. Mais adequado para bibliotecas com um formato por título. Evite se seus audiolivros abrangerem vários arquivos."
+          }
+        },
+        "addedAt": {
+          "title": "Data de Adição",
+          "hint": "Escolha o que \"data adicionada\" reflete a um livro. Isto se aplica a livros importados de agora em diante.",
+          "options": {
+            "imported": {
+              "title": "Quando importado",
+              "hint": "A data em que o BookOrbit importou o livro pela primeira vez. Este é o padrão."
+            },
+            "file_modified": {
+              "title": "Tempo de modificação do arquivo",
+              "hint": "O último tempo de modificação do arquivo (mtime), muitas vezes preservados quando os arquivos são copiados."
+            },
+            "file_created": {
+              "title": "Data da criação",
+              "hint": "Quando o arquivo chegou pela primeira vez no disco (hora de criação). Volta ao tempo modificado em sistemas de arquivos que não registram o tempo de criação."
+            }
+          },
+          "recompute": "Recalcular agora",
+          "recomputing": "Recalculando...",
+          "recomputeHint": "Atualizar a data adicionada para livros existentes usando esta configuração.",
+          "recomputeSaveFirst": "Salve suas alterações primeiro e depois recuse os livros existentes.",
+          "backgroundConfirm": "Recalcular datas para livros existentes? Isso é executado em segundo plano e você pode fechar este editor. Livros com arquivos ilegíveis mantêm a data atual deles.",
+          "progressSummary": "Processado {processed} de {total}: {updated} atualizado, {unchanged} inalterado, {skipped} ignorado, {failed} falhou.",
+          "failedBooksHint": "Os livros que falharam mantiveram suas datas. Verifique o acesso ao arquivo, e então execute novamente para tentar novamente.",
+          "jobStatus": {
+            "running": "Recalculando datas em segundo plano.",
+            "completed": "Data de recálculo terminada.",
+            "failed": "Recalcular parou antes de finalizar. As alterações concluídas foram mantidas; você pode executá-lo novamente com segurança."
+          },
+          "errors": {
+            "sourceImported": "Salve um arquivo de data e hora antes de recalcular datas.",
+            "alreadyRunning": "Uma recálculo já está sendo executado para esta biblioteca.",
+            "busy": "Outras recontagens estão em execução. Tente novamente em breve.",
+            "requestFailed": "Não foi possível alcançar o serviço de recálculo. Feche e reabra este editor para verificar o seu status.",
+            "interrupted": "O status da tarefa não está mais disponível. Ele pode ter sido interrompido por uma reinicialização do servidor. Você pode executar novamente com segurança."
+          },
+          "failureSample": "Livro {bookId}: {reason}",
+          "failureReasons": {
+            "file_unavailable": "Um arquivo de conteúdo não pôde ser lido.",
+            "unsafe_path": "Um arquivo de conteúdo está fora da sua pasta de biblioteca permitida.",
+            "database_error": "A atualização do banco de dados falhou."
           }
         },
         "allowedFormats": {
