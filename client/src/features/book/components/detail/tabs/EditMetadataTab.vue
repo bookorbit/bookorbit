@@ -24,7 +24,7 @@ import type {
   MetadataProviderInfo,
   WriteResult,
 } from '@bookorbit/types'
-import { BOOK_FILE_WRITE_FIELD_LABELS, FORMAT_TO_GROUP, isValidSeriesIndex, parseSeriesIndex } from '@bookorbit/types'
+import { BOOK_FILE_WRITE_FIELD_LABELS, FORMAT_TO_GROUP } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { metadataScoreColor } from '@/lib/metadata-score-color'
@@ -64,7 +64,18 @@ const emit = defineEmits<{
   fileRenamed: []
 }>()
 
-const { t } = useI18n()
+const { t, locale, tm } = useI18n()
+
+const sortedCountries = computed(() => {
+  const rawCountries = tm('countryCodes') as Record<string, string>
+  if (!rawCountries) return []
+
+  const collator = new Intl.Collator(locale.value, { sensitivity: 'base', usage: 'sort' })
+
+  return Object.entries(rawCountries)
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => collator.compare(a.name, b.name))
+})
 
 const DIRECT_PATCH_FIELDS = [
   'title',
@@ -73,6 +84,7 @@ const DIRECT_PATCH_FIELDS = [
   'authors',
   'genres',
   'publisher',
+  'originCountry',
   'language',
   'pageCount',
   'seriesName',
@@ -270,9 +282,6 @@ watch(
   { immediate: true },
 )
 
-// The server names the field it rejected ("amazonId must be shorter than..."), which is the only
-// text that tells the user what to fix. It is untranslated, so it is preferred over the generic
-// catalog message rather than replacing it.
 const saveErrorMessage = computed(() => {
   const failure = error.value
   if (!failure) return null
@@ -283,8 +292,6 @@ const saveErrorMessage = computed(() => {
 
 const combinedError = computed(() => lockError.value ?? saveErrorMessage.value)
 
-// Fields whose emptiness the toolbar counts. Provider ids are deliberately excluded: most books
-// legitimately have none, so counting them would report a gap on every healthy record.
 const emptyFields = computed(() => {
   const checks: { label: string; filled: boolean }[] = [
     { label: t('book.detail.editMetadata.publisherLabel'), filled: Boolean(form.publisher?.trim()) },
@@ -305,8 +312,6 @@ const metadataScoreColour = computed(() => (metadataScore.value == null ? null :
 
 function controlClass(isEmpty: boolean, mono = false): string {
   const base = mono ? FIELD_CONTROL_MONO_CLASS : FIELD_CONTROL_CLASS
-  // Shape, not colour: an unset field reads as a dashed outline in every theme and for
-  // anyone who cannot separate the amber accent from the default border.
   return isEmpty ? `${base} border-dashed` : base
 }
 
@@ -340,13 +345,15 @@ const comicWideFields = computed(
 
 const hasLockedFields = computed(() => lockedFields.value.length > 0)
 const hasPendingChanges = computed(() => isDirty.value || locksDirty.value)
-const hasInvalidSeriesIndex = computed(() =>
-  form.seriesMemberships.some((membership) => membership.seriesIndex !== null && !isValidSeriesIndex(membership.seriesIndex)),
-)
+
 const isSeriesLocked = computed(() => isLocked('seriesName') || isLocked('seriesIndex'))
 const communityRatingLines = computed(() =>
   form.communityRatings.map((rating) => formatCommunityRatingLine(rating, availableMetadataProviders.value ?? [])),
 )
+
+const formMutationPending = computed(() => autoFilling.value || loadingFromFile.value || Boolean(coverPanel.value?.busy))
+const formDisabled = computed(() => saving.value || writingAndRenaming.value || formMutationPending.value)
+const submitDisabled = computed(() => formDisabled.value || !hasPendingChanges.value)
 
 async function submit() {
   if (submitDisabled.value) return
@@ -413,8 +420,6 @@ function trackLockedField(field: BookMetadataLockField, skippedFields: BookMetad
   }
 }
 
-const normalizeSeriesIndex = parseSeriesIndex
-
 function setSeriesMemberships(memberships: EditableSeriesMembership[]) {
   form.seriesMemberships = memberships
   const primary = memberships.find((membership) => membership.seriesName.trim())
@@ -438,7 +443,7 @@ function applyPrimarySeriesPatch(field: 'seriesName' | 'seriesIndex', value: unk
   const patched =
     field === 'seriesName'
       ? { ...primary, seriesName: typeof value === 'string' ? value : value == null ? '' : String(value) }
-      : { ...primary, seriesIndex: normalizeSeriesIndex(value) }
+      : { ...primary, seriesIndex: typeof value === 'string' ? value : value == null ? null : String(value) }
 
   if (next.length > 0) {
     next[0] = patched
@@ -457,15 +462,18 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
     return 0
   }
 
-  // Providers do not report series length in this patch, so carry the current value across
-  // rather than letting an applied suggestion silently clear a total someone entered.
   const totalsByName = new Map(form.seriesMemberships.map((m) => [m.seriesName.trim().toLowerCase(), m.expectedBookCount ?? null]))
 
   setSeriesMemberships(
     normalizeSeriesMemberships(
       (formPatch.seriesMemberships ?? []).map((membership) => ({
         seriesName: membership.seriesName,
-        seriesIndex: normalizeSeriesIndex(membership.seriesIndex),
+        seriesIndex:
+          typeof membership.seriesIndex === 'string'
+            ? membership.seriesIndex
+            : membership.seriesIndex == null
+              ? null
+              : String(membership.seriesIndex),
         expectedBookCount: totalsByName.get(membership.seriesName.trim().toLowerCase()) ?? null,
       })),
     ),
@@ -643,10 +651,7 @@ const {
   writeAndRename,
   dismiss: dismissWriteAndRenameResult,
 } = useWriteAndRename()
-const coverMutationPending = computed(() => Boolean(coverPanel.value?.busy))
-const formMutationPending = computed(() => autoFilling.value || loadingFromFile.value || coverMutationPending.value)
-const formDisabled = computed(() => saving.value || writingAndRenaming.value || formMutationPending.value)
-const submitDisabled = computed(() => formDisabled.value || !hasPendingChanges.value || hasInvalidSeriesIndex.value)
+
 let dismissTimer: ReturnType<typeof setTimeout> | null = null
 
 function pluralizeField(count: number): string {
@@ -701,13 +706,15 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     authors: preview.authors,
     genres: preview.genres,
     publisher: preview.publisher,
+    originCountry: preview.originCountry,
     publishedDate: preview.publishedDate,
     publishedYear: preview.publishedYear,
     language: preview.language,
     pageCount: preview.pageCount,
     communityRatings: preview.communityRatings,
     seriesName: preview.seriesName,
-    seriesIndex: preview.seriesIndex,
+    seriesIndex:
+      typeof preview.seriesIndex === 'string' ? preview.seriesIndex : preview.seriesIndex == null ? undefined : String(preview.seriesIndex),
     seriesMemberships: preview.seriesMemberships,
     googleBooksId: preview.googleBooksId,
     goodreadsId: preview.goodreadsId,
@@ -741,10 +748,7 @@ async function autoFill() {
 
   const preview = result.metadata
   if (Object.keys(preview).length === 0) {
-    const message =
-      result.diagnostics.reason === 'no_existing_provider_ids'
-        ? t('book.detail.editMetadata.noExistingProviderIds')
-        : metadataRefreshEmptyMessage(result.diagnostics, props.book)
+    const message = metadataRefreshEmptyMessage(result.diagnostics, props.book)
     toast.info(message, { closeButton: true, duration: AUTO_FILL_EMPTY_TOAST_DURATION_MS })
     return
   }
@@ -1062,6 +1066,167 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
               >
                 <input v-model="form.subtitle" :class="FIELD_CONTROL_CLASS" :disabled="isLocked('subtitle')" />
               </MetadataFieldLabel>
+
+              <!-- Language | Country | Published Date | Year | Page Count | ISBN-13 | ISBN-10 | Duration (audio) | Abridged (audio) -->
+              <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
+                <MetadataFieldLabel
+                  class="col-span-2 sm:w-32 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.languageLabel')"
+                  field="language"
+                  :locked="isLocked('language')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <InputWithSuggestions
+                    v-model="form.language"
+                    :search-fn="searchLanguage"
+                    :disabled="isLocked('language')"
+                    :maxlength="10"
+                    :class="'w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed'"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-48 sm:shrink-0"
+                  :label="t('settings.metadata.fields.originCountry')"
+                  field="originCountry"
+                  :locked="isLocked('originCountry')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <select
+                    v-model="form.originCountry"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('originCountry')"
+                  >
+                    <option :value="null">--</option>
+                    <option v-for="country in sortedCountries" :key="country.code" :value="country.code">
+                      {{ country.name }}
+                    </option>
+                  </select>
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-40 sm:shrink-0"
+                  :label="t('bookDock.field.publishedDate')"
+                  field="publishedYear"
+                  :locked="isLocked('publishedYear')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.publishedDate ?? ''"
+                    type="date"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('publishedYear')"
+                    @input="setPublishedDateField"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-28 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.yearLabel')"
+                  field="publishedYear"
+                  :locked="isLocked('publishedYear')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.publishedYear ?? ''"
+                    type="number"
+                    min="1"
+                    max="2100"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('publishedYear')"
+                    @input="setIntField('publishedYear', $event)"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:w-28 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.pageCountLabel')"
+                  field="pageCount"
+                  :locked="isLocked('pageCount')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.pageCount ?? ''"
+                    type="number"
+                    min="1"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('pageCount')"
+                    @input="setIntField('pageCount', $event)"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:flex-1 sm:min-w-22.5"
+                  :label="t('book.detail.editMetadata.isbn13Label')"
+                  field="isbn13"
+                  :locked="isLocked('isbn13')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    v-model="form.isbn13"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    maxlength="13"
+                    :disabled="isLocked('isbn13')"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  class="sm:flex-1 sm:min-w-21.25"
+                  :label="t('book.detail.editMetadata.isbn10Label')"
+                  field="isbn10"
+                  :locked="isLocked('isbn10')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    v-model="form.isbn10"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm font-mono outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    maxlength="10"
+                    :disabled="isLocked('isbn10')"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  v-if="isPrimaryAudio"
+                  class="sm:w-30 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.durationLabel')"
+                  field="durationSeconds"
+                  :locked="isLocked('durationSeconds')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <input
+                    :value="form.durationSeconds ?? ''"
+                    type="number"
+                    min="1"
+                    class="w-full h-8 rounded-lg border border-input bg-background px-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-ring transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="isLocked('durationSeconds')"
+                    @input="setIntField('durationSeconds', $event)"
+                  />
+                </MetadataFieldLabel>
+                <MetadataFieldLabel
+                  v-if="isPrimaryAudio"
+                  class="sm:w-20 sm:shrink-0"
+                  :label="t('book.detail.editMetadata.abridgedLabel')"
+                  field="abridged"
+                  :locked="isLocked('abridged')"
+                  :is-updating="isUpdatingLock"
+                  @toggle="handleLockToggle"
+                >
+                  <div
+                    class="flex h-8 items-center rounded-lg border border-input bg-background px-3 pr-12"
+                    :class="isLocked('abridged') ? 'opacity-50 cursor-not-allowed' : ''"
+                  >
+                    <input
+                      id="abridged-check"
+                      v-model="form.abridged"
+                      type="checkbox"
+                      class="h-4 w-4 rounded border-input accent-primary"
+                      :aria-label="t('book.detail.editMetadata.abridgedLabel')"
+                      :disabled="isLocked('abridged')"
+                    />
+                  </div>
+                </MetadataFieldLabel>
+              </div>
 
               <MetadataFieldLabel
                 :label="t('book.detail.editMetadata.authorsLabel')"
@@ -1562,6 +1727,34 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             <MetadataSourceCard :book="props.book" class="@min-[60rem]/edit:hidden" />
           </div>
         </fieldset>
+      </div>
+
+      <!-- Phone and tablet: the toolbar's save pair is hidden above, so it lives here instead -->
+      <div
+        class="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-border bg-background/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:px-6 lg:hidden"
+      >
+        <button
+          class="flex h-11 items-center gap-1.5 rounded-lg border border-input bg-background px-4 text-sm transition-colors hover:bg-muted disabled:opacity-40"
+          :disabled="submitDisabled"
+          @click="handleReset"
+        >
+          <X class="size-3.5" aria-hidden="true" />
+          {{ t('common.cancel') }}
+        </button>
+        <button
+          class="inline-grid h-11 flex-1 grid-cols-1 grid-rows-1 items-center justify-items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+          :disabled="submitDisabled"
+          @click="submit"
+        >
+          <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: saving }">
+            <Check class="size-3.5" aria-hidden="true" />
+            {{ t('common.save') }}
+          </span>
+          <span class="col-start-1 row-start-1 flex items-center gap-1.5" :class="{ invisible: !saving }">
+            <Loader2 class="size-3.5 animate-spin" aria-hidden="true" />
+            {{ t('book.detail.editMetadata.saving') }}
+          </span>
+        </button>
       </div>
     </div>
   </div>

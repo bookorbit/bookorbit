@@ -76,6 +76,7 @@ function makeDetail(overrides: Partial<BookDetail> = {}): BookDetail {
     isbn10: null,
     isbn13: null,
     publisher: null,
+    originCountry: null,
     publishedDate: null,
     publishedYear: null,
     language: null,

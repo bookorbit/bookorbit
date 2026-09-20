@@ -1,1 +1,0 @@
-CREATE INDEX "scan_jobs_library_started_at_idx" ON "scan_jobs" USING btree ("library_id","started_at" desc);
