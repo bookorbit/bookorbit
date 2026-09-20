@@ -14,7 +14,8 @@
     "previous": "Vorige",
     "retry": "Opnieuw proberen",
     "yes": "Ja",
-    "no": "Nee"
+    "no": "Nee",
+    "hide": "Verbergen"
   },
   "settings": {
     "privacySharing": {
