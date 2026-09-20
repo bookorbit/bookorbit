@@ -2940,6 +2940,7 @@
           "empty": {
             "title": "Sem fontes ainda",
             "body": "Pacotes do BookOrbit não possui fontes próprias, então uma pesquisa de solicitação não encontra nada até você adicionar um. Existem duas maneiras de entrar.",
+            "bodyOneWay": "Pacotes do BookOrbit não são fontes próprias, então uma pesquisa não encontra nada até você adicionar um.",
             "responsibility": "O que você adiciona aos índices é de sua responsabilidade.",
             "pluginTitle": "Instalar um plugin",
             "pluginBody": "Um arquivo que ensina ao BookOrbit como pesquisar um site específico. Você o fornece, e então preencha suas configurações.",

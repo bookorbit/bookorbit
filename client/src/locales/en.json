@@ -3016,6 +3016,7 @@
           "empty": {
             "title": "No sources yet",
             "body": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one. Choose the setup that fits your indexers.",
+            "bodyOneWay": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one.",
             "responsibility": "What a source you add indexes is your responsibility.",
             "prowlarrTitle": "Connect Prowlarr",
             "prowlarrBody": "Manage several torrent and Usenet indexers through one connection.",

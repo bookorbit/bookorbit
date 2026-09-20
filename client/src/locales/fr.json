@@ -3005,6 +3005,7 @@
           "empty": {
             "title": "Aucune source pour l'instant",
             "body": "BookOrbit ne fournit aucune source, une recherche de demande ne trouve donc rien tant que vous n'en ajoutez pas une. Il y a deux façons de procéder.",
+            "bodyOneWay": "BookOrbit ne fournit aucune source, une recherche de demande ne trouve donc rien tant que vous n'en ajoutez pas une.",
             "responsibility": "Ce qu'indexe une source que vous ajoutez relève de votre responsabilité.",
             "pluginTitle": "Installer un plugin",
             "pluginBody": "Un fichier unique qui apprend à BookOrbit à interroger un site précis. Vous le fournissez, puis vous renseignez ses paramètres.",

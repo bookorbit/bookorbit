@@ -3007,6 +3007,7 @@
           "empty": {
             "title": "Aún no hay fuentes",
             "body": "BookOrbit no incluye fuentes propias, por lo que una búsqueda de solicitudes no encuentra nada hasta que añadas una. Hay dos vías.",
+            "bodyOneWay": "BookOrbit no incluye fuentes propias, por lo que una búsqueda de solicitudes no encuentra nada hasta que añadas una.",
             "responsibility": "Tú eres responsable de las fuentes que añadas al indexador.",
             "pluginTitle": "Instalar un plugin",
             "pluginBody": "Un archivo que enseña a BookOrbit a buscar en un sitio específico. Tú lo proporcionas y, después, completas su configuración.",

@@ -2937,6 +2937,7 @@
           "empty": {
             "title": "Még nincsenek források",
             "body": "A BookOrbit nem tartalmaz saját forrásokat, így a keresési kérések semmit sem találnak, amíg hozzá nem adsz egyet. Kétféleképpen lehetséges.",
+            "bodyOneWay": "A BookOrbit nem tartalmaz saját forrásokat, így a keresési kérések semmit sem találnak, amíg hozzá nem adsz egyet.",
             "responsibility": "Az, hogy milyen forrásból adsz hozzá indexeket, a te felelősséged.",
             "pluginTitle": "Bővítmény telepítése",
             "pluginBody": "Egy fájl, ami megtanítja a BookOrbitnak, hogy egy adott oldalon keressen. Megadod, majd kitöltöd a beállításait.",
