@@ -3016,7 +3016,6 @@
           "empty": {
             "title": "No sources yet",
             "body": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one. Choose the setup that fits your indexers.",
-            "bodyOneWay": "BookOrbit bundles no sources of its own, so a request search finds nothing until you add one.",
             "responsibility": "What a source you add indexes is your responsibility.",
             "prowlarrTitle": "Connect Prowlarr",
             "prowlarrBody": "Manage several torrent and Usenet indexers through one connection.",
@@ -3287,6 +3286,8 @@
           },
           "errors": {
             "load": "Could not load indexer managers",
+            "nameTaken": "A Prowlarr connection with that name already exists",
+            "urlPrivate": "That address is on a private or local network. Turn on \"Allow private addresses\" if Prowlarr runs there.",
             "required": "Enter a name, base URL, and API key.",
             "save": "Could not save the Prowlarr connection",
             "delete": "Could not remove the Prowlarr connection",

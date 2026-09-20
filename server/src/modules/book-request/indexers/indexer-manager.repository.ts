@@ -50,6 +50,15 @@ export class IndexerManagerRepository {
     return { manager, sources };
   }
 
+  /**
+   * The manager row alone. `findById` also reads every source the manager owns, which a search
+   * resolving one of forty managed indexers has no use for and would pay for forty times over.
+   */
+  async findRowById(id: number): Promise<RequestIndexerManagerRow | undefined> {
+    const [row] = await this.db.select().from(requestIndexerManagers).where(eq(requestIndexerManagers.id, id)).limit(1);
+    return row;
+  }
+
   async findRowsByIds(ids: number[]): Promise<RequestIndexerManagerRow[]> {
     if (ids.length === 0) return [];
     return this.db.select().from(requestIndexerManagers).where(inArray(requestIndexerManagers.id, ids));

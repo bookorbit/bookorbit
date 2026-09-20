@@ -164,6 +164,7 @@ function manager(overrides: Partial<IndexerManagerItem> = {}): IndexerManagerIte
         lastSearchAt: null,
         lastSearchOk: null,
         lastSearchError: null,
+        searchFailureStreak: 0,
       },
     ],
     createdAt: '2026-09-15T00:00:00.000Z',

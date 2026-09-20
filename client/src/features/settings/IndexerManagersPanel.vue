@@ -19,6 +19,7 @@ import { api } from '@/lib/api'
 import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 import { sourceDotClass } from '@/features/book-requests/sourceColors'
 import ConnectionHealth from './ConnectionHealth.vue'
+import SearchHealth from './SearchHealth.vue'
 import ManagedSourceColorControl from './components/ManagedSourceColorControl.vue'
 import SettingsEditorSheet from './components/SettingsEditorSheet.vue'
 import SettingsField from './components/SettingsField.vue'
@@ -58,6 +59,26 @@ const activeManagerId = ref<number | null>(null)
 const activeSourceId = ref<number | null>(null)
 const draft = ref<Draft | null>(null)
 const credentialVisible = ref(false)
+
+/**
+ * Server codes carry the copy. The English `message` is the last resort, and the one case where it
+ * is the right answer: a refusal Prowlarr itself worded has no key here to translate it with.
+ */
+const SAVE_ERROR_KEYS: Record<string, string> = {
+  INDEXER_MANAGER_NAME_TAKEN: 'settings.system.requests.managers.errors.nameTaken',
+  INDEXER_MANAGER_URL_UNSAFE: 'settings.system.requests.indexers.errors.urlUnsafe',
+  INDEXER_MANAGER_URL_PRIVATE: 'settings.system.requests.managers.errors.urlPrivate',
+  REQUEST_ENCRYPTION_KEY_MISSING: 'settings.system.requests.errors.encryptionKeyMissing',
+  REQUEST_ENCRYPTION_KEY_CHANGED: 'settings.system.requests.errors.encryptionKeyChanged',
+}
+
+async function describeFailure(res: Response, fallbackKey: string): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { message?: string | string[]; errorCode?: string } | null
+  const key = body?.errorCode ? SAVE_ERROR_KEYS[body.errorCode] : undefined
+  if (key) return t(key)
+  const message = Array.isArray(body?.message) ? body?.message[0] : body?.message
+  return message || t(fallbackKey)
+}
 
 const sheetTitle = computed(() => (draft.value?.id === null ? t('settings.system.requests.managers.add') : (draft.value?.name ?? '')))
 const activeSources = computed(() =>
@@ -188,16 +209,14 @@ async function saveDraft() {
       body: JSON.stringify(payload),
     })
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as {
-        message?: string
-      } | null
-      throw new Error(body?.message)
+      toast.error(await describeFailure(res, 'settings.system.requests.managers.errors.save'))
+      return
     }
     closeEditor()
     await fetchManagers()
     toast.success(t('settings.system.requests.managers.saved'))
-  } catch (error) {
-    toast.error(error instanceof Error && error.message ? error.message : t('settings.system.requests.managers.errors.save'))
+  } catch {
+    toast.error(t('settings.system.requests.managers.errors.save'))
   } finally {
     busy.value = false
   }
@@ -226,8 +245,12 @@ async function testManager(manager: IndexerManagerItem) {
     const res = await api(`${BASE_PATH}/${manager.id}/test`, {
       method: 'POST',
     })
-    const result = (await res.json().catch(() => ({}))) as IndexerManagerTestResult & { message?: string }
-    if (!res.ok || !result.success) throw new Error(result.error ?? result.message)
+    const result = (await res.json().catch(() => ({}))) as IndexerManagerTestResult & { message?: string; errorCode?: string }
+    if (!res.ok || !result.success) {
+      const key = result.errorCode ? SAVE_ERROR_KEYS[result.errorCode] : undefined
+      toast.error(key ? t(key) : (result.error ?? result.message ?? t('settings.system.requests.managers.errors.test')))
+      return
+    }
     toast.success(
       t('settings.system.requests.managers.testOk', {
         version: result.version ?? t('settings.system.requests.managers.unknown'),
@@ -235,8 +258,8 @@ async function testManager(manager: IndexerManagerItem) {
       }),
     )
     await fetchManagers()
-  } catch (error) {
-    toast.error(error instanceof Error && error.message ? error.message : t('settings.system.requests.managers.errors.test'))
+  } catch {
+    toast.error(t('settings.system.requests.managers.errors.test'))
   } finally {
     activeManagerId.value = null
   }
@@ -249,15 +272,13 @@ async function syncManager(manager: IndexerManagerItem) {
       method: 'POST',
     })
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as {
-        message?: string
-      } | null
-      throw new Error(body?.message)
+      toast.error(await describeFailure(res, 'settings.system.requests.managers.errors.sync'))
+      return
     }
     await fetchManagers()
     toast.success(t('settings.system.requests.managers.synced'))
-  } catch (error) {
-    toast.error(error instanceof Error && error.message ? error.message : t('settings.system.requests.managers.errors.sync'))
+  } catch {
+    toast.error(t('settings.system.requests.managers.errors.sync'))
   } finally {
     activeManagerId.value = null
   }
@@ -366,6 +387,13 @@ function setSourceColor(manager: IndexerManagerItem, sourceId: number, color: In
                     />
                     <span class="text-sm font-medium text-foreground">{{ source.name }}</span>
                     <span v-if="!source.available" class="text-xs text-destructive">{{ t('settings.system.requests.managers.unavailable') }}</span>
+                    <!-- A source Prowlarr no longer lists is not failing; nothing is searching it. -->
+                    <SearchHealth
+                      :last-search-at="source.lastSearchAt"
+                      :last-search-ok="source.lastSearchOk"
+                      :search-failure-streak="source.searchFailureStreak"
+                      :enabled="source.enabled && source.available && manager.enabled"
+                    />
                   </div>
                   <p class="mt-0.5 text-xs text-muted-foreground">
                     {{ t(`settings.system.requests.managers.protocol.${source.protocol}`) }}

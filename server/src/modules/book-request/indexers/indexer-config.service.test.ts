@@ -89,6 +89,7 @@ function makeService(
   };
   const managers = {
     findRowsByIds: vi.fn().mockResolvedValue([]),
+    findRowById: vi.fn().mockResolvedValue(undefined),
     findById: vi.fn().mockResolvedValue(undefined),
     ...overrides.managers,
   };
@@ -141,6 +142,28 @@ describe('IndexerConfigService', () => {
       }),
     ]);
     expect(credentials.decrypt).toHaveBeenCalledWith('manager-cipher');
+  });
+
+  it("resolves one managed child without reading its manager's other sources", async () => {
+    const managed = indexerRow({
+      managerId: 3,
+      managerExternalId: '7',
+      managerMetadata: { displayName: 'Managed books', implementation: null, protocol: 'torrent', priority: 5 },
+      credentialsEnc: null,
+    });
+    const manager = { id: 3, credentialsEnc: 'manager-cipher', allowPrivateAddress: true, perIndexerTimeoutSeconds: 90 } as RequestIndexerManagerRow;
+    const { service, managers, credentials } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(managed) },
+      managers: { findRowById: vi.fn().mockResolvedValue(manager) },
+    });
+
+    await expect(service.resolveConfig(9)).resolves.toEqual(
+      expect.objectContaining({ id: 9, name: 'Managed books', managerId: 3, credential: 'api-key', perIndexerTimeoutSeconds: 90 }),
+    );
+    expect(credentials.decrypt).toHaveBeenCalledWith('manager-cipher');
+    // A search resolves every enabled row in turn, so reading the manager's whole source list here
+    // would cost one full read of it per managed indexer being searched.
+    expect(managers.findById).not.toHaveBeenCalled();
   });
 
   it('refuses direct edits and deletion of a managed child', async () => {

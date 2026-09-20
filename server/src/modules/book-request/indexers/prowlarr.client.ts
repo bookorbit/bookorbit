@@ -84,7 +84,7 @@ export class ProwlarrClient {
 
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers.get('location');
-          void response.body?.cancel().catch(() => undefined);
+          discard(response);
           if (!location) throw new BadGatewayException(`Prowlarr answered ${response.status} without a redirect location`);
           const redirected = await ensureSafeUrl(new URL(location, current).href, { allowPrivate: connection.allowPrivateAddress });
           if (redirected.origin !== base.origin) throw new BadGatewayException('Prowlarr redirected its API to a different host');
@@ -92,8 +92,13 @@ export class ProwlarrClient {
           continue;
         }
 
-        if (response.status === 401 || response.status === 403) throw new BadGatewayException('Prowlarr rejected the API key');
-        if (!response.ok) throw new BadGatewayException(`Prowlarr answered ${response.status}`);
+        if (!response.ok) {
+          // An unread body holds its socket until the garbage collector gets to it, and every one
+          // of these paths leaves without reading.
+          discard(response);
+          if (response.status === 401 || response.status === 403) throw new BadGatewayException('Prowlarr rejected the API key');
+          throw new BadGatewayException(`Prowlarr answered ${response.status}`);
+        }
 
         try {
           return JSON.parse(await readBoundedText(response, MAX_JSON_BYTES));
@@ -121,6 +126,10 @@ function endpoint(base: URL, path: string): URL {
   target.search = '';
   target.hash = '';
   return target;
+}
+
+function discard(response: Response): void {
+  void response.body?.cancel().catch(() => undefined);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

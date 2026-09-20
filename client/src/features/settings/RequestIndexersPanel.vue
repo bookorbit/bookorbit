@@ -389,6 +389,13 @@ function handleTestCurrent() {
       </DropdownMenu>
     </div>
 
+    <!--
+      Said once, above the list rather than on any row. BookOrbit bundles no source: every row here
+      is an address, a Prowlarr connection or a plugin somebody added, and the page that names
+      Prowlarr is the one place where whose responsibility that is has to be stated plainly.
+    -->
+    <p class="settings-hint settings-prose">{{ t('settings.system.requests.indexers.posture') }}</p>
+
     <p v-if="pluginRestartPending" role="status" class="settings-hint text-primary">
       {{ t('settings.system.requests.indexers.plugins.restartRequired') }}
     </p>

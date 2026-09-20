@@ -19,6 +19,7 @@ export interface IndexerManagerSourceItem {
   lastSearchAt: string | null;
   lastSearchOk: boolean | null;
   lastSearchError: string | null;
+  searchFailureStreak: number;
 }
 
 export interface IndexerManagerItem {

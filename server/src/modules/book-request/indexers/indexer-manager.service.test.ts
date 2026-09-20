@@ -104,6 +104,17 @@ describe('IndexerManagerService', () => {
     expect(repo.recordTestResult).toHaveBeenCalledWith(3, true, null, '1.2.3');
   });
 
+  it('lets an unreadable credential keep its own code instead of reading as a failed test', async () => {
+    const { service, repo, credentials, prowlarr } = makeService();
+    credentials.decrypt.mockImplementationOnce(() => {
+      throw new BadRequestException({ message: 'key changed', errorCode: 'REQUEST_ENCRYPTION_KEY_CHANGED' });
+    });
+
+    await expect(service.test(3)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prowlarr.status).not.toHaveBeenCalled();
+    expect(repo.recordTestResult).not.toHaveBeenCalled();
+  });
+
   it('records a synchronization failure without marking missing children unavailable', async () => {
     const { service, repo, prowlarr } = makeService();
     prowlarr.indexers.mockRejectedValueOnce(new Error('Prowlarr unavailable'));

@@ -125,8 +125,10 @@ export class IndexerManagerService {
 
   async test(id: number): Promise<IndexerManagerTestResult> {
     const row = (await this.requireManager(id)).manager;
+    // Outside the catch: an unreadable credential is this install's configuration, not an answer
+    // from Prowlarr, and mapping it to a test failure would bury the code that names the fix.
+    const connection = this.resolveConnection(row);
     try {
-      const connection = this.resolveConnection(row);
       const [{ version }, sources] = await Promise.all([this.prowlarr.status(connection), this.prowlarr.indexers(connection)]);
       await this.repo.recordTestResult(id, true, null, version);
       return { success: true, ...(version ? { version } : {}), sourceCount: sources.length };
@@ -253,5 +255,6 @@ function toSourceItem(source: RequestIndexerRow): IndexerManagerSourceItem {
     lastSearchAt: source.lastSearchAt?.toISOString() ?? null,
     lastSearchOk: source.lastSearchOk,
     lastSearchError: source.lastSearchError,
+    searchFailureStreak: source.searchFailureStreak,
   };
 }

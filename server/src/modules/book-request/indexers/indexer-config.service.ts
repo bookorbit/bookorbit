@@ -244,7 +244,7 @@ export class IndexerConfigService {
    */
   async resolveConfig(id: number): Promise<ResolvedIndexerConfig> {
     const row = await this.requireIndexer(id);
-    const manager = row.managerId === null ? null : ((await this.managers.findById(row.managerId))?.manager ?? null);
+    const manager = row.managerId === null ? null : ((await this.managers.findRowById(row.managerId)) ?? null);
     return this.toConfig(row, manager);
   }
 
