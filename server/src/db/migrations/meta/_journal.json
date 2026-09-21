@@ -666,6 +666,13 @@
       "when": 1789930465236,
       "tag": "0094_add_book_duplicate_dismissals_and_sort_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1789949424697,
+      "tag": "0095_add_sabnzbd_and_prowlarr_support",
+      "breakpoints": true
     }
   ]
 }

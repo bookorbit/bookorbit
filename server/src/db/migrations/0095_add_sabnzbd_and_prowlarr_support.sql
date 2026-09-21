@@ -27,6 +27,7 @@ CREATE TABLE "request_indexer_managers" (
 	CONSTRAINT "request_indexer_managers_budget_chk" CHECK ("request_indexer_managers"."overall_search_budget_seconds" between 5 and 300)
 );
 --> statement-breakpoint
+ALTER TABLE "download_clients" DROP CONSTRAINT "download_clients_adapter_type_chk";--> statement-breakpoint
 ALTER TABLE "request_indexers" ADD COLUMN "manager_id" integer;--> statement-breakpoint
 ALTER TABLE "request_indexers" ADD COLUMN "manager_external_id" varchar(100);--> statement-breakpoint
 ALTER TABLE "request_indexers" ADD COLUMN "manager_available" boolean DEFAULT true NOT NULL;--> statement-breakpoint
@@ -36,4 +37,5 @@ CREATE UNIQUE INDEX "request_indexer_managers_name_lower_uidx" ON "request_index
 ALTER TABLE "request_indexers" ADD CONSTRAINT "request_indexers_manager_id_request_indexer_managers_id_fk" FOREIGN KEY ("manager_id") REFERENCES "public"."request_indexer_managers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "request_indexers_manager_external_uidx" ON "request_indexers" USING btree ("manager_id","manager_external_id");--> statement-breakpoint
 CREATE INDEX "request_indexers_manager_idx" ON "request_indexers" USING btree ("manager_id");--> statement-breakpoint
+ALTER TABLE "download_clients" ADD CONSTRAINT "download_clients_adapter_type_chk" CHECK ("download_clients"."adapter_type" in ('qbittorrent', 'transmission', 'deluge', 'nzbget', 'sabnzbd'));--> statement-breakpoint
 ALTER TABLE "request_indexers" ADD CONSTRAINT "request_indexers_manager_fields_chk" CHECK (("request_indexers"."manager_id" is null and "request_indexers"."manager_external_id" is null and "request_indexers"."manager_metadata" is null) or ("request_indexers"."manager_id" is not null and "request_indexers"."manager_external_id" is not null and "request_indexers"."manager_metadata" is not null and "request_indexers"."credentials_enc" is null and "request_indexers"."adapter_type" in ('torznab', 'newznab')));
