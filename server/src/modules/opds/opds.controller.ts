@@ -30,6 +30,7 @@ import { OpdsUser } from './opds-user.decorator';
 import { OpdsBookService } from './opds-book.service';
 import { OpdsService } from './opds.service';
 import { BookService } from '../book/book.service';
+import { MetadataService } from '../metadata/metadata.service';
 
 @Controller('opds')
 @Public()
@@ -42,6 +43,7 @@ export class OpdsController {
     private readonly opdsBookService: OpdsBookService,
     private readonly config: ConfigService,
     private readonly bookService: BookService,
+    private readonly metadataService: MetadataService,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -246,20 +248,29 @@ export class OpdsController {
     await this.opdsBookService.validateBookAccess(bookId, user.userId, user.isSuperuser, user.contentFilters);
     reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
     const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
+    let mtimeMs: number;
     try {
-      const { mtimeMs } = await stat(thumbnailPath);
-      const etag = `"${Math.floor(mtimeMs)}"`;
-      if (ifNoneMatch === etag) {
-        reply.status(304).send();
-        return;
-      }
-      reply.header('Cache-Control', 'no-cache');
-      reply.header('ETag', etag);
-      reply.type('image/jpeg');
-      reply.send(createReadStream(thumbnailPath));
+      ({ mtimeMs } = await stat(thumbnailPath));
     } catch {
-      throw new NotFoundException('No thumbnail');
+      // A thumbnail can be missing beside an intact cover (issue #1475); rebuild it once on demand.
+      const repaired = await this.metadataService.ensureThumbnailForBook(bookId);
+      if (!repaired) throw new NotFoundException('No thumbnail');
+      try {
+        ({ mtimeMs } = await stat(repaired));
+      } catch {
+        throw new NotFoundException('No thumbnail');
+      }
     }
+
+    const etag = `"${Math.floor(mtimeMs)}"`;
+    if (ifNoneMatch === etag) {
+      reply.status(304).send();
+      return;
+    }
+    reply.header('Cache-Control', 'no-cache');
+    reply.header('ETag', etag);
+    reply.type('image/jpeg');
+    reply.send(createReadStream(thumbnailPath));
   }
 
   @Get(':bookId/download')

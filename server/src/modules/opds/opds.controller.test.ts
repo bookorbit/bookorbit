@@ -55,12 +55,16 @@ function makeController() {
   const bookService = {
     resolveDownloadFilename: vi.fn().mockResolvedValue('BadTitle - Author.epub'),
   } as never;
+  const metadataService = {
+    ensureThumbnailForBook: vi.fn().mockResolvedValue(null),
+  };
 
   return {
-    controller: new OpdsController(opdsService, opdsBookService, config, bookService),
+    controller: new OpdsController(opdsService, opdsBookService, config, bookService, metadataService as never),
     opdsService,
     opdsBookService,
     bookService,
+    metadataService,
   };
 }
 
@@ -317,6 +321,21 @@ describe('OpdsController', () => {
     expect(reply.status).toHaveBeenCalledWith(304);
     expect(reply.send).toHaveBeenCalledWith();
     expect(mockCreateReadStream).not.toHaveBeenCalled();
+  });
+
+  it('serves a thumbnail rebuilt on demand when the file is missing beside an intact cover', async () => {
+    const { controller, metadataService } = makeController();
+    const reply = makeReply();
+    const stream = { kind: 'repaired-thumbnail-stream' };
+    mockStat.mockRejectedValueOnce(new Error('missing thumbnail')).mockResolvedValueOnce({ mtimeMs: 7777 });
+    metadataService.ensureThumbnailForBook.mockResolvedValueOnce('/books/covers/12/thumbnail.jpg');
+    mockCreateReadStream.mockReturnValue(stream);
+
+    await controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, reply);
+
+    expect(metadataService.ensureThumbnailForBook).toHaveBeenCalledWith(12);
+    expect(reply.header).toHaveBeenCalledWith('ETag', '"7777"');
+    expect(reply.send).toHaveBeenCalledWith(stream);
   });
 
   it('throws NotFoundException when thumbnail file is missing', async () => {

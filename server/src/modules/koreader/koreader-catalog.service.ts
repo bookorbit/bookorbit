@@ -3,8 +3,7 @@ import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { basename } from 'path';
 
-import { BadRequestException, Inject, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
-import type { ConfigType } from '@nestjs/config';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { DEFAULT_KOREADER_DEVICE_PATTERN, resolveUploadPath } from '@bookorbit/types';
@@ -36,13 +35,11 @@ import type {
   KoreaderCatalogSort,
   KoreaderCatalogSortOrder,
 } from '@bookorbit/types';
-import { bookThumbnailPath } from '../../common/book-cover-storage';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { storageConfig } from '../../config/config';
 import { BookReadService } from '../book/book-read.service';
 import { BookService } from '../book/book.service';
 import { BrowseCountsService } from '../browse-counts/browse-counts.service';
@@ -151,7 +148,6 @@ export class KoreaderCatalogService {
     private readonly appSettingsService: AppSettingsService,
     private readonly koreaderService: KoreaderService,
     private readonly pluginService: KoreaderPluginService,
-    @Inject(storageConfig.KEY) private readonly storage: ConfigType<typeof storageConfig>,
   ) {}
 
   getRoot(): { sections: KoreaderCatalogEntry[] } {
@@ -481,8 +477,8 @@ export class KoreaderCatalogService {
   }
 
   async streamThumbnail(user: RequestUser, bookId: number, reply: FastifyReply, ifNoneMatch?: string): Promise<void> {
-    await this.bookService.verifyBookAccess(bookId, user);
-    const thumbnailPath = bookThumbnailPath(this.storage.appDataPath, bookId);
+    const thumbnailPath = await this.bookService.getThumbnailPath(bookId, user);
+    if (!thumbnailPath) throw new NotFoundException('No thumbnail');
     try {
       const { mtimeMs } = await stat(thumbnailPath);
       const etag = `"${Math.floor(mtimeMs)}"`;

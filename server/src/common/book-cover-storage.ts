@@ -25,10 +25,6 @@ export function findPreferredBookCoverFileName(files: readonly string[]): string
   return files.find(isCustomBookCoverFileName) ?? files.find(isExtractedBookCoverFileName) ?? files.find(isLegacyBookCoverFileName) ?? null;
 }
 
-export function findExtractedBookCoverFileName(files: readonly string[]): string | null {
-  return files.find(isExtractedBookCoverFileName) ?? null;
-}
-
 function isLegacyBookCoverFileName(fileName: string): boolean {
   return fileName.startsWith(COVER_LEGACY_FILE_PREFIX);
 }

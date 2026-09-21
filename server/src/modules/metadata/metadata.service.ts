@@ -2,15 +2,18 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { mkdir, readdir, rm, writeFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { link, mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import {
   COVER_EXTRACTED_FILE_PREFIX,
+  COVER_THUMBNAIL_FILE_NAME,
   bookCoverDirPath,
   bookThumbnailPath,
+  findPreferredBookCoverFileName,
   isCustomBookCoverFileName,
   isExtractedBookCoverFileName,
 } from '../../common/book-cover-storage';
@@ -51,6 +54,7 @@ interface RelationMutationOptions {
 
 const MAX_RELATION_NAME_LENGTH = 200;
 const EXTRACTED_COVER_SOURCE = 'extracted';
+const THUMBNAIL_REPAIR_CONCURRENCY = 4;
 const MIN_PUBLISHED_YEAR = 1000;
 const MAX_PUBLISHED_YEAR = 2200;
 const NORMALIZED_AUTHOR_NAME_SQL = normalizeMetadataTextKeySql(authors.name);
@@ -67,6 +71,9 @@ function normalizePublishedYear(year: number | null | undefined): number | null 
 export class MetadataService {
   private readonly logger = new Logger(MetadataService.name);
   private readonly appDataPath: string;
+  private readonly thumbnailRepairs = new Map<number, Promise<string | null>>();
+  private readonly thumbnailRepairWaiters: Array<() => void> = [];
+  private activeThumbnailRepairs = 0;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -258,6 +265,24 @@ export class MetadataService {
       `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} refreshed=true - cover refresh completed`,
     );
     return true;
+  }
+
+  /**
+   * Regenerates a thumbnail that went missing beside an intact cover (issue #1475). Resolves to
+   * null rather than throwing, so a cover that sharp cannot read stays a 404 placeholder in the
+   * grid instead of failing the request.
+   */
+  async ensureThumbnailForBook(bookId: number): Promise<string | null> {
+    const existing = this.thumbnailRepairs.get(bookId);
+    if (existing) return existing;
+
+    const pending = this.withThumbnailRepairSlot(() => this.repairMissingThumbnail(bookId));
+    this.thumbnailRepairs.set(bookId, pending);
+    try {
+      return await pending;
+    } finally {
+      if (this.thumbnailRepairs.get(bookId) === pending) this.thumbnailRepairs.delete(bookId);
+    }
   }
 
   // ── Audio helpers ────────────────────────────────────────────────────────────
@@ -859,7 +884,13 @@ export class MetadataService {
       .from(bookMetadata)
       .where(eq(bookMetadata.bookId, bookId))
       .limit(1);
-    const preserveCustom = !overwrite && currentCover?.coverSource === 'custom';
+    const customCoverFileName = files.find(isCustomBookCoverFileName);
+    const storedCustomCoverMissing = !overwrite && currentCover?.coverSource === 'custom' && customCoverFileName === undefined;
+    const preserveCustom = !overwrite && currentCover?.coverSource === 'custom' && customCoverFileName !== undefined;
+    // An empty listing cannot tell a deleted custom cover apart from cover storage that failed to
+    // mount, and mkdir above recreates the directory either way. Only demote the stored source when
+    // some other artifact proves the directory is the real one.
+    const replaceMissingCustom = storedCustomCoverMissing && files.length > 0;
 
     const staleCoverFiles = files.filter(
       (fileName) => isExtractedBookCoverFileName(fileName) || (!preserveCustom && isCustomBookCoverFileName(fileName)),
@@ -868,14 +899,21 @@ export class MetadataService {
 
     await writeFile(join(dir, `${COVER_EXTRACTED_FILE_PREFIX}${ext}`), bytes);
 
-    if (!preserveCustom) {
+    let thumbnailUpdated = false;
+    if (preserveCustom && customCoverFileName && !files.includes(COVER_THUMBNAIL_FILE_NAME)) {
+      const customCover = await readFile(join(dir, customCoverFileName));
+      const thumbnail = await generateThumbnail(customCover);
+      await writeFile(bookThumbnailPath(this.appDataPath, bookId), thumbnail);
+      thumbnailUpdated = true;
+    } else if (!preserveCustom) {
       const thumbnail = await generateThumbnail(bytes);
       await writeFile(bookThumbnailPath(this.appDataPath, bookId), thumbnail);
+      thumbnailUpdated = true;
     }
 
     const now = new Date();
 
-    if (overwrite) {
+    if (overwrite || replaceMissingCustom) {
       await this.db.update(bookMetadata).set({ coverSource: EXTRACTED_COVER_SOURCE, updatedAt: now }).where(eq(bookMetadata.bookId, bookId));
     } else {
       await this.db
@@ -884,12 +922,104 @@ export class MetadataService {
         .where(and(eq(bookMetadata.bookId, bookId), isNull(bookMetadata.coverSource)));
     }
 
-    if (!preserveCustom) {
-      // The extracted cover and its thumbnail were just rewritten, so the served image moved even
-      // when the first-writer-wins update above matched no row.
+    if (thumbnailUpdated) {
+      // A served cover artifact was rewritten, so its cache version must move even when the
+      // first-writer-wins update above matched no row.
       await this.db.update(bookMetadata).set({ coverUpdatedAt: now }).where(eq(bookMetadata.bookId, bookId));
       await this.db.update(books).set({ updatedAt: now }).where(eq(books.id, bookId));
     }
+  }
+
+  private async repairMissingThumbnail(bookId: number): Promise<string | null> {
+    const event = 'metadata.thumbnail_repair';
+    const startedAt = Date.now();
+    const dir = bookCoverDirPath(this.appDataPath, bookId);
+    const thumbnailPath = bookThumbnailPath(this.appDataPath, bookId);
+
+    try {
+      const files = await readdir(dir);
+      if (files.includes(COVER_THUMBNAIL_FILE_NAME)) return thumbnailPath;
+
+      const coverFileName = findPreferredBookCoverFileName(files);
+      if (!coverFileName) {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} repaired=false coverFound=false - thumbnail repair skipped`,
+        );
+        return null;
+      }
+
+      const cover = await readFile(join(dir, coverFileName));
+      const thumbnail = await generateThumbnail(cover);
+      await this.publishRepairedThumbnail(dir, thumbnailPath, thumbnail);
+      this.logger.log(
+        `[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} repaired=true source="${sanitizeLogValue(coverFileName)}" - thumbnail repair completed`,
+      );
+      return thumbnailPath;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} repaired=false coverFound=false - thumbnail repair skipped`,
+        );
+        return null;
+      }
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `[${event}] [fail] bookId=${bookId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - thumbnail repair failed`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Publishes the repaired thumbnail through a hard link so an interrupted write cannot leave a
+   * truncated file that every later request would then accept. The link also keeps the create
+   * exclusive, so a cover write that landed first keeps its own thumbnail. Filesystems without hard
+   * links fall back to an exclusive direct write, which is what this path did before.
+   */
+  private async publishRepairedThumbnail(dir: string, thumbnailPath: string, bytes: Buffer): Promise<void> {
+    const tempPath = join(dir, `.thumbnail-repair-${randomUUID()}.tmp`);
+    try {
+      await writeFile(tempPath, bytes);
+      try {
+        await link(tempPath, thumbnailPath);
+        return;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException | undefined)?.code === 'EEXIST') return;
+      }
+      await writeFile(thumbnailPath, bytes, { flag: 'wx' });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code !== 'EEXIST') throw error;
+    } finally {
+      await rm(tempPath, { force: true });
+    }
+  }
+
+  private async withThumbnailRepairSlot<T>(operation: () => Promise<T>): Promise<T> {
+    await this.acquireThumbnailRepairSlot();
+    try {
+      return await operation();
+    } finally {
+      this.releaseThumbnailRepairSlot();
+    }
+  }
+
+  private async acquireThumbnailRepairSlot(): Promise<void> {
+    if (this.activeThumbnailRepairs < THUMBNAIL_REPAIR_CONCURRENCY) {
+      this.activeThumbnailRepairs++;
+      return;
+    }
+    await new Promise<void>((resolve) => this.thumbnailRepairWaiters.push(resolve));
+  }
+
+  private releaseThumbnailRepairSlot(): void {
+    const next = this.thumbnailRepairWaiters.shift();
+    if (next) {
+      next();
+      return;
+    }
+    this.activeThumbnailRepairs--;
   }
 
   private normalizeUniqueRelationNames(values: string[]): string[] {

@@ -7,7 +7,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import { basename, join } from 'path';
 
-import { bookCoverDirPath, bookThumbnailPath, findExtractedBookCoverFileName } from '../../common/book-cover-storage';
+import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName, isCustomBookCoverFileName } from '../../common/book-cover-storage';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { ensureSafeRemoteHost } from '../../common/utils/ssrf.utils';
@@ -167,8 +167,8 @@ export class CoverService {
       const dir = bookCoverDirPath(this.appDataPath, bookId);
       await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
 
-      const extractedPath = await this.findExtractedCover(bookId);
-      if (!extractedPath) {
+      const fallbackPath = await this.findFallbackCover(bookId);
+      if (!fallbackPath) {
         await this.removeFileIfPresent(bookThumbnailPath(this.appDataPath, bookId));
         await this.setCoverSource(bookId, null);
         this.logger.log(
@@ -177,7 +177,7 @@ export class CoverService {
         return null;
       }
 
-      const bytes = await readFile(extractedPath);
+      const bytes = await readFile(fallbackPath);
       const thumb = await generateThumbnail(bytes);
       await writeFile(bookThumbnailPath(this.appDataPath, bookId), thumb);
       await this.setCoverSource(bookId, 'extracted');
@@ -281,10 +281,15 @@ export class CoverService {
     }
   }
 
-  private async findExtractedCover(bookId: number): Promise<string | null> {
+  /**
+   * Resolves the cover left behind once the custom cover is deleted. This must use the same
+   * preference order the cover endpoint serves from, including legacy `cover.*` files: matching on
+   * extracted covers alone dropped the thumbnail for a book the endpoint still served (issue #1475).
+   */
+  private async findFallbackCover(bookId: number): Promise<string | null> {
     const dir = bookCoverDirPath(this.appDataPath, bookId);
     const files = await this.readDirIfExists(dir);
-    const found = findExtractedBookCoverFileName(files);
+    const found = findPreferredBookCoverFileName(files.filter((fileName) => !isCustomBookCoverFileName(fileName)));
     return found ? join(dir, found) : null;
   }
 
