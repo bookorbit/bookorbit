@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "bookorbit/bookorbit",
-  "updatedAt": "2026-09-20",
+  "updatedAt": "2026-09-21",
   "lastExactFetch": "2026-07-27",
   "source": "snapshot",
   "points": [
@@ -416,6 +416,10 @@
     {
       "date": "2026-09-20",
       "stars": 4506
+    },
+    {
+      "date": "2026-09-21",
+      "stars": 4543
     }
   ]
 }
