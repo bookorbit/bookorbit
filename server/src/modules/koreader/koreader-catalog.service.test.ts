@@ -145,6 +145,7 @@ function makeService(
   const bookService = {
     getDetail: vi.fn().mockResolvedValue(makeDetail()),
     verifyBookAccess: vi.fn().mockResolvedValue(undefined),
+    getThumbnailPath: vi.fn().mockResolvedValue(join('/data', 'covers', '10', 'thumbnail.jpg')),
     bulkSetRating: vi.fn().mockResolvedValue(undefined),
     verifyFileAccess: vi.fn().mockResolvedValue({
       id: 100,
@@ -274,7 +275,6 @@ function makeService(
       getDeviceFileNamingPattern: vi.fn().mockResolvedValue(deviceOrganization),
     } as never,
     pluginService as never,
-    { appDataPath: '/data', bookDockPath: '/data/book-dock' },
   );
 
   return {
@@ -852,7 +852,7 @@ describe('KoreaderCatalogService', () => {
 
     await service.streamThumbnail(makeUser(), 10, reply as never);
 
-    expect(bookService.verifyBookAccess).toHaveBeenCalledWith(10, expect.objectContaining({ id: 1 }));
+    expect(bookService.getThumbnailPath).toHaveBeenCalledWith(10, expect.objectContaining({ id: 1 }));
     expect(reply.header).toHaveBeenCalledWith('ETag', '"5000"');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
     expect(mockCreateReadStream).toHaveBeenCalledWith(join('/data', 'covers', '10', 'thumbnail.jpg'));
@@ -908,6 +908,9 @@ describe('KoreaderCatalogService', () => {
     await expect(service.streamFile(makeUser(), 200, makeReply() as never)).rejects.toThrow(NotFoundException);
 
     mockStat.mockRejectedValueOnce(new Error('missing'));
+    await expect(service.streamThumbnail(makeUser(), 10, makeReply() as never)).rejects.toThrow(NotFoundException);
+
+    bookService.getThumbnailPath.mockResolvedValueOnce(null);
     await expect(service.streamThumbnail(makeUser(), 10, makeReply() as never)).rejects.toThrow(NotFoundException);
   });
 

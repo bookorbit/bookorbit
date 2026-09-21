@@ -55,12 +55,16 @@ function makeController() {
   const bookService = {
     resolveDownloadFilename: vi.fn().mockResolvedValue('BadTitle - Author.epub'),
   } as never;
+  const metadataService = {
+    ensureThumbnailForBook: vi.fn().mockResolvedValue(null),
+  };
 
   return {
-    controller: new OpdsController(opdsService, opdsBookService, config, bookService),
+    controller: new OpdsController(opdsService, opdsBookService, config, bookService, metadataService as never),
     opdsService,
     opdsBookService,
     bookService,
+    metadataService,
   };
 }
 
@@ -319,11 +323,35 @@ describe('OpdsController', () => {
     expect(mockCreateReadStream).not.toHaveBeenCalled();
   });
 
-  it('throws NotFoundException when thumbnail file is missing', async () => {
-    const { controller } = makeController();
-    mockStat.mockRejectedValue(new Error('missing thumbnail'));
+  it('serves a thumbnail rebuilt on demand when the file is missing beside an intact cover', async () => {
+    const { controller, metadataService } = makeController();
+    const reply = makeReply();
+    const stream = { kind: 'repaired-thumbnail-stream' };
+    mockStat.mockRejectedValueOnce(Object.assign(new Error('missing thumbnail'), { code: 'ENOENT' })).mockResolvedValueOnce({ mtimeMs: 7777 });
+    metadataService.ensureThumbnailForBook.mockResolvedValueOnce('/books/covers/12/thumbnail.jpg');
+    mockCreateReadStream.mockReturnValue(stream);
+
+    await controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, reply);
+
+    expect(metadataService.ensureThumbnailForBook).toHaveBeenCalledWith(12);
+    expect(reply.header).toHaveBeenCalledWith('ETag', '"7777"');
+    expect(reply.send).toHaveBeenCalledWith(stream);
+  });
+
+  it('does not attempt a repair when the thumbnail stat fails for a reason other than a missing file', async () => {
+    const { controller, metadataService } = makeController();
+    mockStat.mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
 
     await expect(controller.thumbnail(42, { userId: 7, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
+    expect(metadataService.ensureThumbnailForBook).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundException when thumbnail file is missing and no cover can rebuild it', async () => {
+    const { controller, metadataService } = makeController();
+    mockStat.mockRejectedValue(Object.assign(new Error('missing thumbnail'), { code: 'ENOENT' }));
+
+    await expect(controller.thumbnail(42, { userId: 7, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
+    expect(metadataService.ensureThumbnailForBook).toHaveBeenCalledWith(42);
   });
 
   it('downloads file with sanitized attachment name', async () => {

@@ -172,6 +172,7 @@ function makeService(overrides: { bookMetadataLockService?: unknown } = {}) {
     emitAuthorsReplaced: vi.fn(),
     downloadAndSaveCover: vi.fn().mockResolvedValue(undefined),
     refreshCoverForBook: vi.fn(),
+    ensureThumbnailForBook: vi.fn().mockResolvedValue(null),
   };
   const pipeline = {
     run: vi.fn(),
@@ -853,7 +854,7 @@ describe('BookService', () => {
     });
 
     it('returns thumbnail path only when file is accessible', async () => {
-      const { service, bookRepo } = makeService();
+      const { service, bookRepo, metadataService } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
       mockAccess.mockResolvedValue(undefined);
 
@@ -861,6 +862,18 @@ describe('BookService', () => {
 
       mockAccess.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
       await expect(service.getThumbnailPath(9, makeUser())).resolves.toBeNull();
+      expect(metadataService.ensureThumbnailForBook).toHaveBeenCalledWith(9);
+    });
+
+    it('repairs and returns a missing thumbnail from the active cover', async () => {
+      const { service, bookRepo, metadataService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+      mockAccess.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+      metadataService.ensureThumbnailForBook.mockResolvedValue('/tmp/books/covers/9/thumbnail.jpg');
+
+      await expect(service.getThumbnailPath(9, makeUser())).resolves.toBe('/tmp/books/covers/9/thumbnail.jpg');
+
+      expect(metadataService.ensureThumbnailForBook).toHaveBeenCalledWith(9);
     });
 
     it('throws when thumbnail access fails for non-missing errors', async () => {

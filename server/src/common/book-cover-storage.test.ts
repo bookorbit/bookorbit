@@ -3,7 +3,6 @@ import { join } from 'path';
 import {
   bookCoverDirPath,
   bookThumbnailPath,
-  findExtractedBookCoverFileName,
   findPreferredBookCoverFileName,
   isCustomBookCoverFileName,
   isExtractedBookCoverFileName,
@@ -28,10 +27,5 @@ describe('book-cover-storage', () => {
     expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover.jpg'])).toBe('cover.jpg');
     expect(findPreferredBookCoverFileName(['thumbnail.jpg', 'cover.png'])).toBe('cover.png');
     expect(findPreferredBookCoverFileName(['thumbnail.jpg'])).toBeNull();
-  });
-
-  it('finds extracted cover files when present', () => {
-    expect(findExtractedBookCoverFileName(['cover_custom.png', 'cover_extracted.jpg'])).toBe('cover_extracted.jpg');
-    expect(findExtractedBookCoverFileName(['cover_custom.png'])).toBeNull();
   });
 });

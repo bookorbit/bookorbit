@@ -1,6 +1,9 @@
 vi.mock('fs/promises', () => ({
+  access: vi.fn(),
+  link: vi.fn(),
   mkdir: vi.fn(),
   readFile: vi.fn(),
+  rename: vi.fn(),
   writeFile: vi.fn(),
   readdir: vi.fn().mockResolvedValue([]),
   rm: vi.fn(),
@@ -84,7 +87,7 @@ vi.mock('./extractors/audio.extractor', () => ({
   probeAudioChapters: vi.fn().mockImplementation(() => Promise.resolve({ chapters: [], durationMs: null })),
 }));
 
-import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
+import { access, link, mkdir, readFile, readdir, rename, rm, writeFile } from 'fs/promises';
 import { Logger } from '@nestjs/common';
 
 import { authors, bookAuthors, bookGenres, bookMetadata, books, bookTags, genres, tags } from '../../db/schema';
@@ -101,6 +104,9 @@ import { METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 import { MetadataService } from './metadata.service';
 import { MetadataExtractionService } from './metadata-extraction.service';
 
+const mockAccess = access as MockedFunction<typeof access>;
+const mockLink = link as MockedFunction<typeof link>;
+const mockRename = rename as MockedFunction<typeof rename>;
 const mockMkdir = mkdir as MockedFunction<typeof mkdir>;
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
 const mockWriteFile = writeFile as MockedFunction<typeof writeFile>;
@@ -173,6 +179,9 @@ describe('MetadataService', () => {
     config.get.mockReturnValue('/books');
     embedder.embedBook.mockResolvedValue(undefined);
 
+    mockAccess.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    mockLink.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
     mockMkdir.mockResolvedValue(undefined);
     mockReadFile.mockResolvedValue('');
     mockWriteFile.mockResolvedValue(undefined);
@@ -242,6 +251,37 @@ describe('MetadataService', () => {
     );
   }
 
+  function stubEpubCoverExtraction(cover: Buffer): void {
+    mockExtractEpubMetadata.mockResolvedValueOnce({
+      title: 'Refreshable book',
+      subtitle: null,
+      description: null,
+      isbn10: null,
+      isbn13: null,
+      publisher: null,
+      publishedYear: null,
+      language: null,
+      seriesName: null,
+      seriesIndex: null,
+      authors: [],
+      narrators: [],
+      genres: [],
+      tags: [],
+      rating: null,
+      pageCount: null,
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      hardcoverEditionId: null,
+      openLibraryId: null,
+      ranobedbId: null,
+      itunesId: null,
+      coverBuffer: null,
+    });
+    mockExtractEpubCover.mockResolvedValueOnce(cover);
+  }
+
   it('downloadAndSaveCover writes cover/thumbnail and updates metadata when download is valid', async () => {
     const { db, updateSet } = makeDb();
     const service = makeService(db);
@@ -275,37 +315,6 @@ describe('MetadataService', () => {
   // The Kobo CoverImageId is versioned from coverUpdatedAt, so it must move whenever the served
   // image does, and stay put when it does not (issue #943).
   describe('coverUpdatedAt stamping', () => {
-    function stubEpubCoverExtraction(cover: Buffer): void {
-      mockExtractEpubMetadata.mockResolvedValueOnce({
-        title: 'Refreshable book',
-        subtitle: null,
-        description: null,
-        isbn10: null,
-        isbn13: null,
-        publisher: null,
-        publishedYear: null,
-        language: null,
-        seriesName: null,
-        seriesIndex: null,
-        authors: [],
-        narrators: [],
-        genres: [],
-        tags: [],
-        rating: null,
-        pageCount: null,
-        googleBooksId: null,
-        goodreadsId: null,
-        amazonId: null,
-        hardcoverId: null,
-        hardcoverEditionId: null,
-        openLibraryId: null,
-        ranobedbId: null,
-        itunesId: null,
-        coverBuffer: null,
-      });
-      mockExtractEpubCover.mockResolvedValueOnce(cover);
-    }
-
     it('stamps coverUpdatedAt when an overwriting extraction replaces the cover', async () => {
       const { db, updateSet } = makeDb();
       const service = makeService(db);
@@ -397,6 +406,157 @@ describe('MetadataService', () => {
     expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/13/cover_extracted.png', Buffer.from('image-bytes'));
     expect(mockWriteFile).not.toHaveBeenCalledWith('/books/covers/13/thumbnail.jpg', expect.any(Buffer));
     expect(db.update).not.toHaveBeenCalledWith(books);
+  });
+
+  it('refreshCoverForBook repairs a missing thumbnail from the active custom cover', async () => {
+    const { db, selectLimit, updateSet } = makeDb();
+    const service = makeService(db);
+    selectLimit.mockResolvedValue([{ coverSource: 'custom' }]);
+    mockReaddir.mockResolvedValue(['cover_custom.jpg', 'cover_extracted.png']);
+    mockReadFile.mockResolvedValue(Buffer.from('custom-cover-bytes'));
+    stubEpubCoverExtraction(Buffer.from('extracted-cover-bytes'));
+
+    await expect(service.refreshCoverForBook(14, '/book.epub', 'epub')).resolves.toBe(true);
+
+    expect(mockReadFile).toHaveBeenCalledWith('/books/covers/14/cover_custom.jpg');
+    expect(mockGenerateThumbnail).toHaveBeenCalledWith(Buffer.from('custom-cover-bytes'));
+    expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/14/thumbnail.jpg', Buffer.from('thumbnail-bytes'));
+    expect(updateSet).toHaveBeenCalledWith({ coverUpdatedAt: expect.any(Date) });
+    expect(db.update).toHaveBeenCalledWith(books);
+  });
+
+  it('refreshCoverForBook promotes the extracted cover when the stored custom cover is missing', async () => {
+    const { db, selectLimit, updateSet } = makeDb();
+    const service = makeService(db);
+    selectLimit.mockResolvedValue([{ coverSource: 'custom' }]);
+    mockReaddir.mockResolvedValue(['cover_extracted.jpg']);
+    stubEpubCoverExtraction(Buffer.from('extracted-cover-bytes'));
+
+    await expect(service.refreshCoverForBook(16, '/book.epub', 'epub')).resolves.toBe(true);
+
+    expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/16/thumbnail.jpg', Buffer.from('thumbnail-bytes'));
+    expect(updateSet).toHaveBeenCalledWith({ coverSource: 'extracted', updatedAt: expect.any(Date) });
+  });
+
+  it('refreshCoverForBook keeps the custom cover source when the cover directory reads back empty', async () => {
+    const { db, selectLimit, updateSet } = makeDb();
+    const service = makeService(db);
+    selectLimit.mockResolvedValue([{ coverSource: 'custom' }]);
+    // An unmounted cover volume is recreated by mkdir and then lists empty, which must not be read
+    // as "the user deleted their custom cover".
+    mockReaddir.mockResolvedValue([]);
+    stubEpubCoverExtraction(Buffer.from('extracted-cover-bytes'));
+
+    await expect(service.refreshCoverForBook(19, '/book.epub', 'epub')).resolves.toBe(true);
+
+    expect(updateSet).not.toHaveBeenCalledWith({ coverSource: 'extracted', updatedAt: expect.any(Date) });
+  });
+
+  it('ensureThumbnailForBook lazily repairs a missing thumbnail from the preferred cover', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    mockReaddir.mockResolvedValue(['cover_extracted.png', 'cover_custom.jpg']);
+    mockReadFile.mockResolvedValue(Buffer.from('custom-cover-bytes'));
+
+    await expect(service.ensureThumbnailForBook(15)).resolves.toBe('/books/covers/15/thumbnail.jpg');
+
+    expect(mockReadFile).toHaveBeenCalledWith('/books/covers/15/cover_custom.jpg');
+    expect(mockGenerateThumbnail).toHaveBeenCalledWith(Buffer.from('custom-cover-bytes'));
+
+    // The thumbnail is staged in the cover directory and hard-linked into place, so an interrupted
+    // write can never leave a truncated thumbnail.jpg that later requests would accept.
+    const [tempPath, tempBytes] = mockWriteFile.mock.calls[0]!;
+    expect(tempPath).toMatch(/^\/books\/covers\/15\/\.thumbnail-repair-.+\.tmp$/);
+    expect(tempBytes).toEqual(Buffer.from('thumbnail-bytes'));
+    expect(mockLink).toHaveBeenCalledWith(tempPath, '/books/covers/15/thumbnail.jpg');
+    expect(mockRm).toHaveBeenCalledWith(tempPath, { force: true });
+  });
+
+  it('ensureThumbnailForBook keeps a thumbnail created by a concurrent cover update', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    mockReaddir.mockResolvedValue(['cover_custom.jpg']);
+    mockReadFile.mockResolvedValue(Buffer.from('custom-cover-bytes'));
+    mockLink.mockRejectedValue(Object.assign(new Error('already exists'), { code: 'EEXIST' }));
+
+    await expect(service.ensureThumbnailForBook(17)).resolves.toBe('/books/covers/17/thumbnail.jpg');
+    expect(mockWriteFile).not.toHaveBeenCalledWith('/books/covers/17/thumbnail.jpg', expect.anything(), expect.anything());
+  });
+
+  it('ensureThumbnailForBook publishes by rename when the filesystem has no hard links', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    mockReaddir.mockResolvedValue(['cover_custom.jpg']);
+    mockReadFile.mockResolvedValue(Buffer.from('custom-cover-bytes'));
+    mockLink.mockRejectedValue(Object.assign(new Error('operation not permitted'), { code: 'EPERM' }));
+
+    await expect(service.ensureThumbnailForBook(26)).resolves.toBe('/books/covers/26/thumbnail.jpg');
+
+    // The bytes must reach the served path through a rename of a fully written file, never a direct
+    // write, so an interrupted repair cannot leave a truncated thumbnail that nothing revalidates.
+    const [tempPath] = mockWriteFile.mock.calls[0]!;
+    expect(tempPath).toMatch(/^\/books\/covers\/26\/\.thumbnail-repair-.+\.tmp$/);
+    expect(mockRename).toHaveBeenCalledWith(tempPath, '/books/covers/26/thumbnail.jpg');
+    expect(mockWriteFile).not.toHaveBeenCalledWith('/books/covers/26/thumbnail.jpg', expect.anything(), expect.anything());
+  });
+
+  it('ensureThumbnailForBook leaves a published thumbnail alone when hard links are unavailable', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    mockReaddir.mockResolvedValue(['cover_custom.jpg']);
+    mockReadFile.mockResolvedValue(Buffer.from('custom-cover-bytes'));
+    mockLink.mockRejectedValue(Object.assign(new Error('operation not permitted'), { code: 'EPERM' }));
+    mockAccess.mockResolvedValue(undefined);
+
+    await expect(service.ensureThumbnailForBook(27)).resolves.toBe('/books/covers/27/thumbnail.jpg');
+
+    expect(mockRename).not.toHaveBeenCalled();
+  });
+
+  it('ensureThumbnailForBook resolves null instead of throwing when the cover cannot be read', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    mockReaddir.mockResolvedValue(['cover_custom.jpg']);
+    mockReadFile.mockResolvedValue(Buffer.from('custom-cover-bytes'));
+    mockGenerateThumbnail.mockRejectedValueOnce(new Error('Input buffer contains unsupported image format'));
+
+    await expect(service.ensureThumbnailForBook(18)).resolves.toBeNull();
+  });
+
+  it('ensureThumbnailForBook bounds concurrent thumbnail generation', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    let active = 0;
+    let peak = 0;
+    const releases: Array<() => void> = [];
+    mockReaddir.mockResolvedValue(['cover_custom.jpg']);
+    mockReadFile.mockImplementation(
+      () =>
+        new Promise<Buffer>((resolve) => {
+          active++;
+          peak = Math.max(peak, active);
+          releases.push(() => {
+            active--;
+            resolve(Buffer.from('custom-cover-bytes'));
+          });
+        }),
+    );
+
+    const repairs = [21, 22, 23, 24, 25].map((bookId) => service.ensureThumbnailForBook(bookId));
+    await vi.waitFor(() => expect(releases).toHaveLength(4));
+
+    expect(peak).toBe(4);
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases.splice(0).forEach((release) => release());
+
+    await expect(Promise.all(repairs)).resolves.toEqual([
+      '/books/covers/21/thumbnail.jpg',
+      '/books/covers/22/thumbnail.jpg',
+      '/books/covers/23/thumbnail.jpg',
+      '/books/covers/24/thumbnail.jpg',
+      '/books/covers/25/thumbnail.jpg',
+    ]);
   });
 
   it('downloadAndSaveCover no-ops on empty payloads and network failures', async () => {

@@ -1315,7 +1315,7 @@ export class BookService {
       await access(path);
       return path;
     } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) return null;
+      if (this.isMissingFilesystemEntry(err)) return this.metadataService.ensureThumbnailForBook(id);
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       const pathValue = sanitizeLogValue(path);
