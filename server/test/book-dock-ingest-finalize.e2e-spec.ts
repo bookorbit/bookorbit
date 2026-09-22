@@ -12,6 +12,8 @@ import {
 } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
+import { parseFb2File } from '../src/modules/metadata/lib/fb2-parser';
+import { waitForCondition } from './e2e/app-harness';
 import { buildFb2Fixture } from './e2e/book-dock/book-dock-fixture-builder';
 import { createPdfFixture } from './e2e/metadata-write/metadata-write-fixture-builder';
 import {
@@ -523,6 +525,57 @@ describe('Book Dock ingest + finalize (e2e)', () => {
 
       expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub', 'm4b'], primary: 'epub' });
     });
+  });
+
+  it('finalize writes the dock metadata into the file when the library writes metadata to files', async () => {
+    const destination = await createLibraryWithFolder(context, {
+      fileWriteEnabled: true,
+      fileWriteFb2Enabled: true,
+    });
+    const uploader = await createUserAndLogin(context, { permissions: [Permission.ManageBookDock] });
+    const bookDockRow = await createBookDockRow(context, {
+      fileName: 'write-back.fb2',
+      content: buildFb2Fixture({ title: 'Uploaded File Title', authors: ['Uploaded File Author'] }),
+      embeddedMetadata: { title: 'Uploaded File Title', authors: ['Uploaded File Author'] },
+      selectedMetadata: { title: 'Dock Edited Title', authors: ['Dock Edited Author'] },
+      targetLibraryId: destination.libraryId,
+      targetFolderId: destination.libraryFolderId,
+      uploadedBy: uploader.userId,
+    });
+
+    const response = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/finalize',
+      headers: authHeader(context.adminToken),
+      payload: { fileIds: [bookDockRow.id] },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as BookDockFinalizeResult;
+    expect(body).toMatchObject({ total: 1, succeeded: 1, failed: 0 });
+    const finalizedBookId = body.results[0]!.bookId!;
+
+    const [bookFile] = await context.db
+      .select({ absolutePath: schema.bookFiles.absolutePath })
+      .from(schema.bookFiles)
+      .where(eq(schema.bookFiles.bookId, finalizedBookId))
+      .limit(1);
+    expect(bookFile).toBeDefined();
+
+    // The write is debounced, so the file is polled rather than drained: draining cancels a timer
+    // that has not fired yet.
+    await waitForCondition(async () => {
+      const parsed = await parseFb2File(bookFile!.absolutePath);
+      expect(parsed?.title).toBe('Dock Edited Title');
+      expect(parsed?.authors.map((author) => author.name)).toEqual(['Dock Edited Author']);
+    });
+
+    const [writeLog] = await context.db
+      .select({ status: schema.fileWriteLog.status, triggeredBy: schema.fileWriteLog.triggeredBy, userId: schema.fileWriteLog.userId })
+      .from(schema.fileWriteLog)
+      .where(eq(schema.fileWriteLog.bookId, finalizedBookId))
+      .limit(1);
+    expect(writeLog).toMatchObject({ status: 'success', triggeredBy: 'auto', userId: uploader.userId });
   });
 
   it('finalize returns partial success with duplicate and destination conflicts', async () => {

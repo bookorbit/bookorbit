@@ -53,6 +53,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, libraries, libraryFolders } from '../../db/schema';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
@@ -234,6 +235,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     private readonly gateway: BookDockGateway,
     private readonly notificationService: NotificationService,
     private readonly processingState: BookDockProcessingStateService,
+    private readonly fileWriteService: FileWriteService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
   ) {
@@ -408,6 +410,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         // Several ids only in a loose-file library, where each format is its own book. They are the
         // same work, so they get the same metadata rather than one of them getting all of it.
         for (const created of written.bookIds) await this.applyMetadata(created, row, created === bookId);
+
+        // Schedule a write-back once we know every book has its metadata and file write is enabled.
+        if (library.fileWriteEnabled) {
+          for (const created of written.bookIds) {
+            this.fileWriteService.scheduleWrite(created, 'auto', row.uploadedBy ?? undefined);
+          }
+        }
       } catch (err) {
         // The books committed before the failure, and metadata runs against services that cannot
         // join that transaction, so the compensation is explicit: take back exactly what this unit
