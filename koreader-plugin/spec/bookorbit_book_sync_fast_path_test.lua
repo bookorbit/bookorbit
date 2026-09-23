@@ -226,6 +226,8 @@ exchange_skippable = true
 requests, acks = run{}
 assertEqual(requests, "progress",
     "a known unchanged book only pushes what actually changed")
+assertEqual(book.progressSyncedAt, 1000,
+    "an acknowledged progress upload becomes the device's sync point for the book")
 assertEqual(acks, "match,stats,annotations,state,progress",
     "skipped phases are still acknowledged, so the outbox entry can complete")
 

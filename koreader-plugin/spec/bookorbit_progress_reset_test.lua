@@ -52,7 +52,12 @@ package.loaded["ui/uimanager"] = {
 package.loaded["logger"] = { dbg = function() end, warn = function() end }
 package.loaded["ui/time"] = { s = function(value) return value end }
 package.loaded["util"] = { partialMD5 = function(file) return "digest:" .. tostring(file) end }
-package.loaded["bookorbit_state_manager"] = { repairFileIdentity = function() end }
+local stored_book
+package.loaded["bookorbit_state_manager"] = {
+    repairFileIdentity = function() end,
+    getBook = function() return stored_book end,
+    mutateScoped = function(_, fn) fn({ getBook = function() return stored_book end }) end,
+}
 
 package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
 
@@ -74,6 +79,9 @@ local function makePlugin(body, opts)
     confirm_boxes = {}
     events = {}
     shown_texts = {}
+    -- By default a device that uploaded this book before sync points were recorded, which is
+    -- what every device holding a reset book looked like when resets shipped.
+    stored_book = opts.stored_book or { progressPushedPct = 0.42 }
 
     local plugin = {
         SYNC_STRATEGY = { PROMPT = 1, SILENT = 2, DISABLE = 3 },
@@ -169,5 +177,14 @@ local own = makePlugin({
 })
 own:getProgress(false, false)
 assertEqual(#confirm_boxes, 0, "progress from this device is skipped, which is why the reset is not attributed to it")
+
+-- 7. Once a device has a sync point for the book, the reset is judged against it, so a page
+--    turned after the reset was stamped no longer hides it.
+local synced = makePlugin(RESET_BODY_REFLOWABLE, {
+    last_page_turn_timestamp = 9000,
+    stored_book = { progressPushedPct = 0.42, progressSyncedAt = 4000 },
+})
+synced:getProgress(false, false)
+assertEqual(#confirm_boxes, 1, "a reset newer than the sync point prompts despite a later page turn")
 
 print("bookorbit_progress_reset_test.lua: ok")

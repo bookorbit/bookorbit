@@ -101,7 +101,43 @@ function ProgressSync:syncToProgress(progress, percentage_fallback)
     end
 end
 
-function ProgressSync:remoteProgressIsNewer(body, local_percentage)
+-- Judges a server position against the last one this device and BookOrbit
+-- agreed on for the book (its own upload, or a server position it applied or
+-- declined), not against the last page turn. A device that has just started a
+-- book turns every page after the other device's push, so the page-turn clock
+-- files that push as older, drops it, and the next upload writes over it.
+-- Returns nil for a book this device uploaded before the agreement was
+-- recorded, leaving that book to the page-turn heuristic until it syncs again.
+function ProgressSync:remoteNewerThanLastSync(body, digest)
+    if body.timestamp == nil then return nil end
+    local book = BookOrbitStateManager.getBook(digest)
+    if book and type(book.progressSyncedAt) == "number" then
+        return body.timestamp > book.progressSyncedAt
+    end
+    if book and book.progressPushedPct ~= nil then return nil end
+    -- Nothing from this device has reached BookOrbit for this book yet.
+    return true
+end
+
+function ProgressSync:recordProgressSynced(digest, timestamp)
+    if not digest or type(timestamp) ~= "number" then return end
+    local book = BookOrbitStateManager.getBook(digest)
+    if not book or book.progressSyncedAt == timestamp then return end
+    local ok, err = pcall(BookOrbitStateManager.mutateScoped, {
+        digests = { digest },
+        global = false,
+    }, function(state)
+        local current = state:getBook(digest)
+        if current then current.progressSyncedAt = timestamp end
+    end)
+    if not ok then
+        logger.warn("BookOrbit: could not record progress sync point:", err)
+    end
+end
+
+function ProgressSync:remoteProgressIsNewer(body, local_percentage, digest)
+    local newer = self:remoteNewerThanLastSync(body, digest)
+    if newer ~= nil then return newer end
     local local_timestamp = self.last_page_turn_timestamp or 0
     if body.timestamp ~= nil then
         if local_timestamp > 0 then
@@ -112,8 +148,9 @@ function ProgressSync:remoteProgressIsNewer(body, local_percentage)
     return body.percentage > local_percentage
 end
 
-function ProgressSync:applyRemoteProgress(body, on_done)
+function ProgressSync:applyRemoteProgress(body, on_done, digest)
     self:syncToProgress(body.progress, body.percentage)
+    self:recordProgressSynced(digest, body.timestamp)
     if on_done then
         UIManager:scheduleIn(0.1, function()
             on_done(false)
@@ -161,10 +198,10 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
         return true
     end
 
-    local remote_newer = self:remoteProgressIsNewer(body, local_percentage)
+    local remote_newer = self:remoteProgressIsNewer(body, local_percentage, digest)
     local strategy = remote_newer and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
-        self:applyRemoteProgress(body, on_done)
+        self:applyRemoteProgress(body, on_done, digest)
         return true
     elseif strategy == SYNC_STRATEGY.PROMPT then
         local template = remote_newer and _("Sync to latest location %1% from device '%2' before uploading this book?")
@@ -172,9 +209,12 @@ function ProgressSync:reconcileProgressBeforeBookSync(digest, on_done)
         UIManager:show(ConfirmBox:new{
             text = T(template, Math.round(body.percentage * 100), body.device),
             ok_callback = function()
-                self:applyRemoteProgress(body, on_done)
+                self:applyRemoteProgress(body, on_done, digest)
             end,
             cancel_callback = function()
+                -- Declined positions stop counting as news, otherwise a device
+                -- whose only upload is this sync would be asked on every run.
+                self:recordProgressSynced(digest, body.timestamp)
                 on_done(remote_newer)
             end,
         })
@@ -339,6 +379,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
 
     if interactive then
         self:syncToProgress(body.progress, body.percentage)
+        self:recordProgressSynced(digest, body.timestamp)
         if self.recordSyncSuccess then
             self:recordSyncSuccess("progress_pull", _("Progress pulled"))
         end
@@ -346,16 +387,19 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         return
     end
 
-    local self_older
-    if body.timestamp ~= nil then
-        self_older = (body.timestamp > self.last_page_turn_timestamp)
-    else
-        self_older = (body.percentage > percentage)
+    local self_older = self:remoteNewerThanLastSync(body, digest)
+    if self_older == nil then
+        if body.timestamp ~= nil then
+            self_older = (body.timestamp > self.last_page_turn_timestamp)
+        else
+            self_older = (body.percentage > percentage)
+        end
     end
 
     local strategy = self_older and self.settings.sync_forward or self.settings.sync_backward
     if strategy == SYNC_STRATEGY.SILENT then
         self:syncToProgress(body.progress, body.percentage)
+        self:recordProgressSynced(digest, body.timestamp)
         if self.recordSyncSuccess then
             self:recordSyncSuccess("progress_pull", _("Progress pulled"))
         end
@@ -367,9 +411,13 @@ function ProgressSync:getProgress(ensure_networking, interactive)
             text = T(template, Math.round(body.percentage * 100), body.device),
             ok_callback = function()
                 self:syncToProgress(body.progress, body.percentage)
+                self:recordProgressSynced(digest, body.timestamp)
                 if self.recordSyncSuccess then
                     self:recordSyncSuccess("progress_pull", _("Progress pulled"))
                 end
+            end,
+            cancel_callback = function()
+                self:recordProgressSynced(digest, body.timestamp)
             end,
         })
     end

@@ -781,6 +781,7 @@ stepProgress = function(ctx)
     end
 
     book.progressPushedPct = pct
+    book.progressSyncedAt = ctx.snap.ts
     if not acknowledge(ctx, "progress") then return end
     return finish(ctx)
 end
