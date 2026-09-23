@@ -1,11 +1,9 @@
 name: CI
 run-name: >-
-  ${{ (github.event_name == 'push' && format('CI - {0} ({1})', github.event.head_commit.message, github.ref_name)) || (github.event_name == 'pull_request' && format('CI - PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title)) || (github.event_name == 'schedule' && 'CI - nightly') || 'CI - manual' }}
+  ${{ (github.event_name == 'push' && format('CI - {0} ({1})', github.event.head_commit.message, github.ref_name)) || (github.event_name == 'pull_request' && format('CI - PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title)) || 'CI - manual' }}
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 4 * * *"
   pull_request:
     branches: [main]
   push:
@@ -17,245 +15,34 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_VERSION: "26"
   PNPM_VERSION: "11"
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  dependency-review:
-    # Enable only when repository security analysis supports dependency review.
-    if: github.event_name == 'pull_request' && vars.ENABLE_DEPENDENCY_REVIEW == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Dependency review
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-
-  pr-conventions:
-    name: PR Conventions
-    if: github.event_name == 'pull_request'
+  detect-changes:
+    name: Detect Changed Paths
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
-      issues: read
       pull-requests: read
-    steps:
-      - name: Checkout trusted pull request base
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.sha }}
-
-      - name: Classify Crowdin pull request
-        id: crowdin
-        shell: bash
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_REPO: ${{ github.repository }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-        run: |
-          set -euo pipefail
-          args=("$PR_BASE_SHA" "$PR_HEAD_SHA" "$BASE_REPO" "$HEAD_REPO" "$HEAD_BRANCH")
-          if git cat-file -e "$PR_BASE_SHA:scripts/classify-crowdin-pr.sh" 2>/dev/null; then
-            is_crowdin="$(git show "$PR_BASE_SHA:scripts/classify-crowdin-pr.sh" | bash -s -- "${args[@]}")"
-          else
-            is_crowdin="$(git show "$PR_HEAD_SHA:scripts/classify-crowdin-pr.sh" | bash -s -- "${args[@]}")"
-          fi
-          echo "is_crowdin=$is_crowdin" >> "$GITHUB_OUTPUT"
-
-      - name: Validate PR branch name
-        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true'
-        shell: bash
-        env:
-          PR_BRANCH: ${{ github.head_ref }}
-        run: |
-          set -euo pipefail
-          pattern='^BO-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
-          if [[ ! "$PR_BRANCH" =~ $pattern ]]; then
-            echo "::error::Branch name '$PR_BRANCH' is invalid."
-            echo "::error::Use BO-<issue-number>-<short-description> (example: BO-123-fix-reader-sync)."
-            exit 1
-          fi
-
-      - name: Validate referenced issues exist
-        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true'
-        shell: bash
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
-          PR_BRANCH: ${{ github.head_ref }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          set -euo pipefail
-
-          validate_issue_exists() {
-            local issue_repo="$1"
-            local issue_number="$2"
-            local reference_context="$3"
-            local response_file
-            local http_code
-            local api_url
-            local state
-            local reference_label
-
-            response_file="$(mktemp)"
-            api_url="https://api.github.com/repos/${issue_repo}/issues/${issue_number}"
-            http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "${api_url}")"
-
-            if [[ "${issue_repo}" == "${GH_REPO}" ]]; then
-              reference_label="#${issue_number}"
-            else
-              reference_label="${issue_repo}#${issue_number}"
-            fi
-
-            if [[ "${http_code}" != "200" ]]; then
-              echo "::error::${reference_context} references ${reference_label}, but it does not exist or is not accessible."
-              rm -f "${response_file}"
-              return 1
-            fi
-
-            if jq -e '.pull_request != null' "${response_file}" > /dev/null; then
-              echo "::error::${reference_context} references ${reference_label}, but that number is a pull request, not an issue."
-              rm -f "${response_file}"
-              return 1
-            fi
-
-            state="$(jq -r '.state // "unknown"' "${response_file}")"
-            echo "${reference_context}: issue ${reference_label} exists (state=${state})."
-            rm -f "${response_file}"
-          }
-
-          if [[ "${PR_BRANCH}" =~ ^BO-([0-9]+)- ]]; then
-            branch_issue_number="${BASH_REMATCH[1]}"
-          else
-            echo "::error::Unable to extract issue number from branch '${PR_BRANCH}'."
-            exit 1
-          fi
-
-          validate_issue_exists "${GH_REPO}" "${branch_issue_number}" "Branch name"
-
-          closing_keyword_pattern='(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)'
-          issue_reference_pattern="(^|[^[:alnum:]_])${closing_keyword_pattern}([[:space:]]*:[[:space:]]*|[[:space:]]+)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[1-9][0-9]*"
-          issue_matches="$(printf '%s\n' "${PR_BODY}" | grep -Eio "${issue_reference_pattern}" || true)"
-          if [[ -z "${issue_matches}" ]]; then
-            echo "::error::PR description must include at least one GitHub closing-keyword issue reference (for example: 'Closes #123', 'Fixes: #123', or 'RESOLVED owner/repo#123')."
-            exit 1
-          fi
-
-          issue_refs="$(printf '%s\n' "${issue_matches}" \
-            | tr '[:upper:]' '[:lower:]' \
-            | sed -E 's/^[^a-z0-9_]*//' \
-            | sed -E "s/^${closing_keyword_pattern}([[:space:]]*:[[:space:]]*|[[:space:]]+)//" \
-            | sort -u)"
-          while IFS= read -r issue_ref; do
-            [[ -z "${issue_ref}" ]] && continue
-
-            if [[ "${issue_ref}" =~ ^([a-z0-9_.-]+/[a-z0-9_.-]+)#([1-9][0-9]*)$ ]]; then
-              issue_repo="${BASH_REMATCH[1]}"
-              issue_number="${BASH_REMATCH[2]}"
-            elif [[ "${issue_ref}" =~ ^#([1-9][0-9]*)$ ]]; then
-              issue_repo="${GH_REPO}"
-              issue_number="${BASH_REMATCH[1]}"
-            else
-              echo "::error::Unable to parse issue reference '${issue_ref}' in PR description."
-              exit 1
-            fi
-
-            validate_issue_exists "${issue_repo}" "${issue_number}" "PR description"
-          done <<< "${issue_refs}"
-
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
-
-      - name: Enforce localization change policy
-        shell: bash
-        env:
-          IS_CROWDIN: ${{ steps.crowdin.outputs.is_crowdin }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          validator="$RUNNER_TEMP/validate-locale-pr.mjs"
-          if git cat-file -e "$PR_BASE_SHA:scripts/validate-locale-pr.mjs" 2>/dev/null; then
-            git show "$PR_BASE_SHA:scripts/validate-locale-pr.mjs" > "$validator"
-          else
-            git show "$PR_HEAD_SHA:scripts/validate-locale-pr.mjs" > "$validator"
-          fi
-          node "$validator" "$PR_BASE_SHA" "$PR_HEAD_SHA" "$IS_CROWDIN"
-
-      - name: Test PR policy scripts
-        run: node --test scripts/validate-locale-pr.test.mjs
-
-      - name: Lint PR title
-        shell: bash
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint --config commitlint.config.cjs
-
-      - name: Lint PR commit headers
-        shell: bash
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          pnpm exec commitlint --config commitlint.config.cjs --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
-
-  detect-changes:
-    name: Detect Changed Paths
-    runs-on: ubuntu-latest
-    needs: [dependency-review, pr-conventions]
-    timeout-minutes: 10
-    if: >
-      always() &&
-      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
-      (needs.pr-conventions.result == 'success' || needs.pr-conventions.result == 'skipped')
     outputs:
-      server: ${{ steps.manual.outputs.server || steps.changes.outputs.server }}
-      client: ${{ steps.manual.outputs.client || steps.changes.outputs.client }}
+      packages: ${{ steps.select.outputs.packages }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
-      - name: Manual and nightly runs include all scopes
-        id: manual
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-        shell: bash
-        run: |
-          echo "server=true" >> "$GITHUB_OUTPUT"
-          echo "client=true" >> "$GITHUB_OUTPUT"
 
       # For push events dorny/paths-filter diffs github.event.before..github.sha.
       # New-branch pushes (before = 0000...) are handled by treating all files as changed.
       # Force-push edge cases (before SHA no longer reachable) may mark all files changed too.
       - name: Compute changed scopes
         id: changes
-        if: github.event_name != 'workflow_dispatch' && github.event_name != 'schedule'
+        if: github.event_name != 'workflow_dispatch'
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
           filters: |
@@ -278,508 +65,68 @@ jobs:
               - 'pnpm-workspace.yaml'
               - '.github/actions/setup-node-pnpm/action.yml'
               - '.github/workflows/ci.yml'
+              # Client tests read the Crowdin workflow's catalog list.
               - '.github/workflows/crowdin-translations.yml'
 
-      - name: Print change scope
+      # An unchanged package gets no runner at all: even a job that only decides
+      # to skip is billed a full minute.
+      - name: Select packages to check
+        id: select
         shell: bash
+        env:
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          SERVER_CHANGED: ${{ steps.changes.outputs.server }}
+          CLIENT_CHANGED: ${{ steps.changes.outputs.client }}
         run: |
-          echo "server=${{ steps.manual.outputs.server || steps.changes.outputs.server }}"
-          echo "client=${{ steps.manual.outputs.client || steps.changes.outputs.client }}"
+          selected=""
+          if [[ "$MANUAL" == "true" || "$SERVER_CHANGED" == "true" ]]; then selected='"server"'; fi
+          if [[ "$MANUAL" == "true" || "$CLIENT_CHANGED" == "true" ]]; then selected="${selected:+$selected,}\"client\""; fi
+          echo "packages=[$selected]" >> "$GITHUB_OUTPUT"
+          echo "packages=[$selected]"
 
-  lint:
-    name: Lint (${{ matrix.package_label }})
+  # Lint, format, type check and tests share one job per package so the
+  # dependency install is paid once instead of three times.
+  checks:
+    name: Checks (${{ matrix.package }})
     runs-on: ubuntu-latest
-    needs: [dependency-review, detect-changes]
-    timeout-minutes: 10
-    if: >
-      always() &&
-      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
-      needs.detect-changes.result == 'success'
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.packages != '[]'
+    timeout-minutes: 30
     strategy:
       fail-fast: ${{ github.event_name == 'pull_request' }}
       matrix:
-        package: [server, client]
-        include:
-          - package: server
-            package_label: Server
-          - package: client
-            package_label: Client
-    permissions:
-      contents: read
-    steps:
-      - name: Check for package changes
-        id: has-changes
-        shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-          SERVER_CHANGED: ${{ needs.detect-changes.outputs.server }}
-          CLIENT_CHANGED: ${{ needs.detect-changes.outputs.client }}
-        run: |
-          if [[ "$PACKAGE" == "server" && "$SERVER_CHANGED" == "true" ]] || \
-             [[ "$PACKAGE" == "client" && "$CLIENT_CHANGED" == "true" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout
-        if: steps.has-changes.outputs.run == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Node.js and pnpm
-        if: steps.has-changes.outputs.run == 'true'
-        uses: ./.github/actions/setup-node-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
-          prefetch: "true"
-
-      - name: Run lint checks
-        if: steps.has-changes.outputs.run == 'true'
-        shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-        run: |
-          if [[ "$PACKAGE" == "server" ]]; then
-            pnpm --filter server lint:check
-          else
-            pnpm --filter client lint:check
-          fi
-
-      - name: Run format checks
-        if: steps.has-changes.outputs.run == 'true'
-        shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-        run: |
-          if [[ "$PACKAGE" == "server" ]]; then
-            pnpm --filter server format:check
-          else
-            pnpm --filter client format:check
-          fi
-
-  typecheck:
-    name: Type Check (${{ matrix.package_label }})
-    runs-on: ubuntu-latest
-    needs: [dependency-review, detect-changes]
-    timeout-minutes: 10
-    if: >
-      always() &&
-      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
-      needs.detect-changes.result == 'success'
-    strategy:
-      fail-fast: ${{ github.event_name == 'pull_request' }}
-      matrix:
-        package: [server, client]
-        include:
-          - package: server
-            package_label: Server
-          - package: client
-            package_label: Client
-    permissions:
-      contents: read
-    steps:
-      - name: Check for package changes
-        id: has-changes
-        shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-          SERVER_CHANGED: ${{ needs.detect-changes.outputs.server }}
-          CLIENT_CHANGED: ${{ needs.detect-changes.outputs.client }}
-        run: |
-          if [[ "$PACKAGE" == "server" && "$SERVER_CHANGED" == "true" ]] || \
-             [[ "$PACKAGE" == "client" && "$CLIENT_CHANGED" == "true" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout
-        if: steps.has-changes.outputs.run == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Node.js and pnpm
-        if: steps.has-changes.outputs.run == 'true'
-        uses: ./.github/actions/setup-node-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
-          prefetch: "true"
-
-      - name: Run typecheck
-        if: steps.has-changes.outputs.run == 'true'
-        shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-        run: |
-          if [[ "$PACKAGE" == "server" ]]; then
-            pnpm --filter server type-check
-          else
-            pnpm --filter @bookorbit/types build
-            pnpm --filter client type-check
-          fi
-
-  tests:
-    name: Tests (${{ matrix.package_label }})
-    runs-on: ubuntu-latest
-    needs: [dependency-review, detect-changes]
-    timeout-minutes: 20
-    if: >
-      always() &&
-      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
-      needs.detect-changes.result == 'success'
-    strategy:
-      fail-fast: ${{ github.event_name == 'pull_request' }}
-      matrix:
-        package: [server, client]
-        include:
-          - package: server
-            package_label: Server
-          - package: client
-            package_label: Client
-    permissions:
-      contents: read
-      checks: write
+        package: ${{ fromJSON(needs.detect-changes.outputs.packages) }}
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      PACKAGE: ${{ matrix.package }}
     steps:
-      - name: Check for package changes
-        id: has-changes
-        shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-          SERVER_CHANGED: ${{ needs.detect-changes.outputs.server }}
-          CLIENT_CHANGED: ${{ needs.detect-changes.outputs.client }}
-        run: |
-          if [[ "$PACKAGE" == "server" && "$SERVER_CHANGED" == "true" ]] || \
-             [[ "$PACKAGE" == "client" && "$CLIENT_CHANGED" == "true" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout
-        if: steps.has-changes.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js and pnpm
-        if: steps.has-changes.outputs.run == 'true'
         uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
           pnpm-version: ${{ env.PNPM_VERSION }}
           prefetch: "true"
 
-      - name: Prepare test report directory
-        if: steps.has-changes.outputs.run == 'true'
-        shell: bash
-        run: mkdir -p "$GITHUB_WORKSPACE/test-results/${{ matrix.package }}"
+      - name: Lint
+        run: pnpm --filter "$PACKAGE" lint:check
 
-      - name: Run tests
-        if: steps.has-changes.outputs.run == 'true'
+      - name: Format
+        run: pnpm --filter "$PACKAGE" format:check
+
+      - name: Build shared types
+        if: matrix.package == 'client'
+        run: pnpm --filter @bookorbit/types build
+
+      - name: Type check
+        run: pnpm --filter "$PACKAGE" type-check
+
+      - name: Tests
         shell: bash
-        env:
-          PACKAGE: ${{ matrix.package }}
-          JUNIT_OUTPUT: ${{ github.workspace }}/test-results/${{ matrix.package }}/junit.xml
         run: |
           if [[ "$PACKAGE" == "server" ]]; then
-            pnpm --filter server exec vitest --run --coverage --reporter=default --reporter=github-actions --reporter=junit --outputFile.junit="$JUNIT_OUTPUT"
+            pnpm --filter server exec vitest --run --reporter=default --reporter=github-actions
           else
-            pnpm --filter client exec vitest --run --coverage --reporter=default --reporter=junit --outputFile="$JUNIT_OUTPUT"
-          fi
-
-      - name: Upload coverage reports to Codecov
-        if: steps.has-changes.outputs.run == 'true' && env.CODECOV_TOKEN != ''
-        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
-        with:
-          token: ${{ env.CODECOV_TOKEN }}
-          files: ${{ matrix.package == 'server' && 'server/coverage/lcov.info' || 'client/coverage/lcov.info' }}
-          flags: ${{ matrix.package }}
-          name: ${{ matrix.package }}-coverage
-          verbose: true
-
-      - name: Upload coverage reports to Codecov for fork PR
-        if: >
-          steps.has-changes.outputs.run == 'true' &&
-          env.CODECOV_TOKEN == '' &&
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name != github.repository &&
-          github.event.repository.private == false
-        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7.1.0
-        with:
-          files: ${{ matrix.package == 'server' && 'server/coverage/lcov.info' || 'client/coverage/lcov.info' }}
-          flags: ${{ matrix.package }}
-          name: ${{ matrix.package }}-coverage
-          verbose: true
-
-      - name: Publish test report annotations
-        if: >
-          always() &&
-          steps.has-changes.outputs.run == 'true' &&
-          hashFiles(format('test-results/{0}/junit.xml', matrix.package)) != '' &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: EnricoMi/publish-unit-test-result-action@d0a4676d0e0b938bc201470d88276b7c74c712b3 # v2
-        with:
-          check_name: ${{ matrix.package == 'server' && 'Server Unit Tests' || 'Client Unit Tests' }}
-          files: ${{ format('test-results/{0}/junit.xml', matrix.package) }}
-          fail_on: nothing
-          comment_mode: off
-
-      - name: Upload test report artifact
-        if: >
-          always() &&
-          steps.has-changes.outputs.run == 'true' &&
-          hashFiles(format('test-results/{0}/junit.xml', matrix.package)) != '' &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: test-report-${{ matrix.package }}
-          path: test-results/${{ matrix.package }}
-          retention-days: 7
-
-  quality-gate:
-    name: Quality Gate
-    runs-on: ubuntu-latest
-    needs:
-      - dependency-review
-      - pr-conventions
-      - detect-changes
-      - lint
-      - typecheck
-      - tests
-    timeout-minutes: 5
-    if: always()
-    steps:
-      - name: Fail if any quality job failed
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
-        run: |
-          echo "One or more quality jobs failed."
-          exit 1
-
-      - name: Quality checks complete
-        run: |
-          echo "dependency-review=${{ needs.dependency-review.result }}"
-          echo "pr-conventions=${{ needs.pr-conventions.result }}"
-          echo "detect-changes=${{ needs.detect-changes.result }}"
-          echo "lint=${{ needs.lint.result }}"
-          echo "typecheck=${{ needs.typecheck.result }}"
-          echo "tests=${{ needs.tests.result }}"
-
-  e2e-setup:
-    name: Detect E2E Suites
-    runs-on: ubuntu-latest
-    needs: [quality-gate]
-    if: always() && needs.quality-gate.result == 'success' && github.event_name == 'schedule'
-    timeout-minutes: 10
-    outputs:
-      matrix: ${{ steps.build-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Build suite matrix
-        id: build-matrix
-        shell: bash
-        env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-          GITHUB_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: |
-          MATRIX=$(node scripts/e2e/select-matrix.mjs)
-          echo "matrix=$(echo "$MATRIX" | jq -c .)" >> "$GITHUB_OUTPUT"
-          echo "selected_suites=$(echo "$MATRIX" | jq -c .)"
-
-  e2e:
-    needs: [e2e-setup]
-    if: github.event_name == 'schedule' && needs.e2e-setup.outputs.matrix != '[]'
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: ${{ fromJSON(needs.e2e-setup.outputs.matrix) }}
-    permissions:
-      contents: read
-      checks: write
-    uses: ./.github/workflows/e2e-runner.yml
-    with:
-      suite-id: ${{ matrix.suite.id }}
-      check-name: "E2E - ${{ matrix.suite.name }}"
-      artifact-name: "e2e-${{ matrix.suite.id }}-report"
-      job-timeout-minutes: ${{ matrix.suite.timeout }}
-
-  ci-gate:
-    name: CI Gate
-    runs-on: ubuntu-latest
-    needs: [quality-gate, e2e-setup, e2e]
-    timeout-minutes: 5
-    if: always()
-    steps:
-      - name: Fail if any job failed or was cancelled
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
-        run: |
-          echo "One or more CI jobs failed or were cancelled."
-          exit 1
-
-      - name: CI complete
-        run: |
-          echo "quality-gate=${{ needs.quality-gate.result }}"
-          echo "e2e-setup=${{ needs.e2e-setup.result }}"
-          echo "e2e=${{ needs.e2e.result }}"
-
-  pr-image-scan:
-    name: PR Image Scan
-    runs-on: ubuntu-latest
-    needs: [ci-gate]
-    timeout-minutes: 45
-    if: >
-      always() &&
-      github.event_name == 'pull_request' &&
-      needs.ci-gate.result == 'success'
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Prepare PR image tag
-        id: pr-meta
-        shell: bash
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          short_sha="${HEAD_SHA:0:12}"
-          scan_tag="pr-scan-${PR_NUMBER}-${short_sha}"
-          echo "scan_tag=${scan_tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
-
-      - name: Build image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pr-meta.outputs.scan_tag }}
-          platforms: linux/amd64
-          cache-from: type=gha,scope=ci-yml-pr-image
-          cache-to: type=gha,mode=max,scope=ci-yml-pr-image
-
-      - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pr-meta.outputs.scan_tag }}
-          format: table
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: "1"
-
-  pr-image-publish:
-    name: PR Image Publish
-    runs-on: ubuntu-latest
-    needs: [ci-gate, pr-image-scan]
-    timeout-minutes: 45
-    if: >
-      always() &&
-      github.event_name == 'pull_request' &&
-      needs.ci-gate.result == 'success' &&
-      needs.pr-image-scan.result == 'success' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Prepare PR publish tag
-        id: pr-meta
-        shell: bash
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          short_sha="${HEAD_SHA:0:12}"
-          publish_tag="pr-${PR_NUMBER}-${short_sha}"
-          echo "publish_tag=${publish_tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || github.token }}
-
-      - name: Build and push PR image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.pr-meta.outputs.publish_tag }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha,scope=ci-yml-pr-image
-          cache-to: type=gha,mode=max,scope=ci-yml-pr-image
-
-  ci-performance:
-    name: CI Performance
-    runs-on: ubuntu-latest
-    needs: [ci-gate]
-    if: always()
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Compare duration with previous successful run
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          CURRENT_JSON=$(gh api "repos/${GH_REPO}/actions/runs/${RUN_ID}")
-          CURRENT_STARTED=$(echo "$CURRENT_JSON" | jq -r '.run_started_at // .created_at')
-          CURRENT_UPDATED=$(echo "$CURRENT_JSON" | jq -r '.updated_at')
-          CURRENT_DURATION=$(node -e 'const [start, end] = process.argv.slice(1); console.log(Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 1000)));' "$CURRENT_STARTED" "$CURRENT_UPDATED")
-
-          PREVIOUS_JSON=$(gh api "repos/${GH_REPO}/actions/workflows/ci.yml/runs?per_page=30&event=${EVENT_NAME}&status=completed")
-          PREVIOUS_STARTED=$(echo "$PREVIOUS_JSON" | jq -r --arg run_id "${RUN_ID}" '.workflow_runs[] | select((.id | tostring) != $run_id and .conclusion == "success") | (.run_started_at // .created_at)' | head -n1)
-          PREVIOUS_UPDATED=$(echo "$PREVIOUS_JSON" | jq -r --arg run_id "${RUN_ID}" '.workflow_runs[] | select((.id | tostring) != $run_id and .conclusion == "success") | .updated_at' | head -n1)
-
-          {
-            echo "## CI Runtime"
-            echo ""
-            echo "- Event: \`${EVENT_NAME}\`"
-            echo "- Current run duration: \`${CURRENT_DURATION}s\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [[ -z "$PREVIOUS_STARTED" || -z "$PREVIOUS_UPDATED" ]]; then
-            echo "- Baseline: unavailable (no previous successful run for this event)" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          PREVIOUS_DURATION=$(node -e 'const [start, end] = process.argv.slice(1); console.log(Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 1000)));' "$PREVIOUS_STARTED" "$PREVIOUS_UPDATED")
-          RATIO=$(node -e 'const [current, previous] = process.argv.slice(1).map(Number); if (previous === 0) { console.log("N/A"); process.exit(0); } console.log((current / previous).toFixed(2));' "$CURRENT_DURATION" "$PREVIOUS_DURATION")
-          echo "- Previous successful run: \`${PREVIOUS_DURATION}s\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Ratio (current/previous): \`${RATIO}\`" >> "$GITHUB_STEP_SUMMARY"
-
-          if [[ "$RATIO" != "N/A" ]] && node -e 'process.exit(Number(process.argv[1]) > 1.2 ? 0 : 1)' "$RATIO"; then
-            echo "::warning::CI duration regression detected: current=${CURRENT_DURATION}s previous=${PREVIOUS_DURATION}s ratio=${RATIO}"
+            pnpm --filter client exec vitest --run
           fi
