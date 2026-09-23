@@ -16,7 +16,7 @@
   <rect width="458" height="736" x="1" y="1" class="card" />
 
   <text x="20" y="35" class="title">Translation Progress</text>
-  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 49% average</text>
+  <text x="440" y="35" text-anchor="end" class="subtitle">Crowdin · 24 languages · 50% average</text>
 
   <line x1="20" y1="51" x2="440" y2="51" class="grid" />
 
@@ -26,8 +26,8 @@
   <text x="440" y="78" text-anchor="end" class="pct-label">100%</text>
   <text x="20" y="103" class="lang-label">🇫🇷  French</text>
   <rect x="142" y="95" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="95" width="246" height="6" rx="3" class="bar-done" />
-  <text x="440" y="103" text-anchor="end" class="pct-label">100%</text>
+  <rect x="142" y="95" width="244" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="103" text-anchor="end" class="pct-label">99%</text>
   <text x="20" y="128" class="lang-label">🇧🇷  Portuguese</text>
   <rect x="142" y="120" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="120" width="214" height="6" rx="3" class="bar-progress" />
@@ -42,8 +42,8 @@
   <text x="440" y="178" text-anchor="end" class="pct-label">69%</text>
   <text x="20" y="203" class="lang-label">🇮🇹  Italian</text>
   <rect x="142" y="195" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="195" width="157" height="6" rx="3" class="bar-low" />
-  <text x="440" y="203" text-anchor="end" class="pct-label">64%</text>
+  <rect x="142" y="195" width="162" height="6" rx="3" class="bar-low" />
+  <text x="440" y="203" text-anchor="end" class="pct-label">66%</text>
   <text x="20" y="228" class="lang-label">🇨🇳  Chinese (S)</text>
   <rect x="142" y="220" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="220" width="153" height="6" rx="3" class="bar-low" />
@@ -92,11 +92,11 @@
   <rect x="142" y="495" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="495" width="121" height="6" rx="3" class="bar-low" />
   <text x="440" y="503" text-anchor="end" class="pct-label">49%</text>
-  <text x="20" y="528" class="lang-label">🇫🇮  Finnish</text>
+  <text x="20" y="528" class="lang-label">🇳🇱  Dutch</text>
   <rect x="142" y="520" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="520" width="118" height="6" rx="3" class="bar-low" />
-  <text x="440" y="528" text-anchor="end" class="pct-label">48%</text>
-  <text x="20" y="553" class="lang-label">🇳🇱  Dutch</text>
+  <rect x="142" y="520" width="116" height="6" rx="3" class="bar-low" />
+  <text x="440" y="528" text-anchor="end" class="pct-label">47%</text>
+  <text x="20" y="553" class="lang-label">🇫🇮  Finnish</text>
   <rect x="142" y="545" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="545" width="116" height="6" rx="3" class="bar-low" />
   <text x="440" y="553" text-anchor="end" class="pct-label">47%</text>
