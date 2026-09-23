@@ -204,6 +204,13 @@ do -- semver comparison
     assertEqual(BookOrbitUpdater.isNewer("1.3.1", "1.4.0"), false, "an older version is not newer")
     assertEqual(BookOrbitUpdater.isNewer("1.10.0", "1.9.0"), true, "minor versions compare numerically")
     assertEqual(BookOrbitUpdater.isNewer(nil, "1.4.0"), false, "a missing candidate is not newer")
+    assertEqual(BookOrbitUpdater.isNewer("1.5.4.1", "1.5.4"), true, "a fourth part is newer than its patch release")
+    assertEqual(BookOrbitUpdater.isNewer("1.5.4.2", "1.5.4.1"), true, "fourth parts compare numerically")
+    assertEqual(BookOrbitUpdater.isNewer("1.5.4.10", "1.5.4.9"), true, "fourth parts compare as numbers")
+    assertEqual(BookOrbitUpdater.isNewer("1.5.5", "1.5.4.3"), true, "the next patch release is newer than any fourth part")
+    assertEqual(BookOrbitUpdater.isNewer("1.5.4", "1.5.4.1"), false, "a patch release is older than its fourth parts")
+    assertEqual(BookOrbitUpdater.isNewer("1.5.4.0", "1.5.4"), false, "a zero fourth part equals the patch release")
+    assertEqual(BookOrbitUpdater.isNewer("1.5.34", "1.5.4.1"), true, "a longer patch number is not read as a fourth part")
 end
 
 do -- the Archiver path strips the zip's single root directory

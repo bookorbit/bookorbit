@@ -25,19 +25,22 @@ local Transfer = require("bookorbit_download_transfer")
 local BookOrbitUpdater = {}
 
 -- Returns true if `candidate` is strictly newer than `current` (semver, optional "v" prefix).
+-- An optional fourth part orders builds between patch releases: 1.5.4 < 1.5.4.1 < 1.5.5.
 function BookOrbitUpdater.isNewer(candidate, current)
     local function parse(v)
         if type(v) ~= "string" then return nil end
         local a, b, c = v:match("^v?(%d+)%.(%d+)%.(%d+)")
         if not a then return nil end
-        return { tonumber(a), tonumber(b), tonumber(c) }
+        local d = v:match("^v?%d+%.%d+%.%d+%.(%d+)")
+        return { tonumber(a), tonumber(b), tonumber(c), tonumber(d) or 0 }
     end
     local c = parse(candidate)
     local cur = parse(current)
     if not c or not cur then return false end
-    if c[1] ~= cur[1] then return c[1] > cur[1] end
-    if c[2] ~= cur[2] then return c[2] > cur[2] end
-    return c[3] > cur[3]
+    for i = 1, 4 do
+        if c[i] ~= cur[i] then return c[i] > cur[i] end
+    end
+    return false
 end
 
 -- Wraps a path in POSIX single quotes, escaping any embedded single quotes.
