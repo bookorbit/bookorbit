@@ -203,6 +203,7 @@ beforeEach(() => {
   mockReaddir.mockResolvedValue([]);
   mockStat.mockResolvedValue({ isFile: () => true, ino: 2001n, size: 1024, mtime: new Date('2024-01-01') } as any);
   delete (mockMetadata as Record<string, unknown>).extractAndSaveIfAvailable;
+  delete (mockMetadata as Record<string, unknown>).extractAndSaveSource;
 });
 
 // ── startScan — precondition checks ──────────────────────────────────────────
@@ -972,6 +973,118 @@ describe('genuinely new primary file', () => {
     expect(extractAndSaveIfAvailable).toHaveBeenNthCalledWith(1, expect.any(Number), '/library/Book/metadata.opf', 'opf');
     expect(extractAndSaveIfAvailable).toHaveBeenNthCalledWith(2, expect.any(Number), '/library/Book/book.epub', 'epub');
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
+  });
+
+  describe('comic without ComicInfo next to a sidecar OPF (#1167)', () => {
+    function comicWithOpf() {
+      const cbz = makeFileStat({
+        absolutePath: '/library/Blake et Mortimer T01/Blake et Mortimer T01.cbz',
+        relPath: 'Blake et Mortimer T01/Blake et Mortimer T01.cbz',
+        format: 'cbz',
+        role: 'content',
+      });
+      const opf = makeFileStat({
+        absolutePath: '/library/Blake et Mortimer T01/metadata.opf',
+        relPath: 'Blake et Mortimer T01/metadata.opf',
+        ino: 1002n,
+        format: 'opf',
+        role: 'metadata',
+      });
+      mockFindCandidates.mockResolvedValue({
+        candidates: [makeCandidate('/library/Blake et Mortimer T01', [cbz, opf])],
+        skippedDirs: new Set(),
+        unchangedDirs: new Set(),
+        dirMtimes: new Map(),
+      });
+      return { cbz, opf };
+    }
+
+    async function scanWith(extractAndSaveSource: ReturnType<typeof vi.fn>) {
+      (mockMetadata as Record<string, unknown>).extractAndSaveSource = extractAndSaveSource;
+      const repo = makeRepo({
+        findLibrarySettings: vi.fn().mockResolvedValue({
+          allowedFormats: [],
+          formatPriority: DEFAULT_FORMAT_PRIORITY,
+          metadataPrecedence: ['embedded', 'opfFile'],
+          excludePatterns: [],
+          organizationMode: 'book_per_folder',
+        }),
+      });
+      const done = awaitScan(repo);
+      const { service } = makeService(repo);
+      await service.startScan(1, 'manual');
+      await done;
+      return repo;
+    }
+
+    it('lets the OPF supply metadata when the embedded source is filename-only', async () => {
+      const { cbz, opf } = comicWithOpf();
+      const extractAndSaveSource = vi.fn().mockResolvedValueOnce('deferred').mockResolvedValueOnce('saved');
+
+      await scanWith(extractAndSaveSource);
+
+      expect(extractAndSaveSource).toHaveBeenCalledTimes(2);
+      expect(extractAndSaveSource).toHaveBeenNthCalledWith(1, expect.any(Number), cbz.absolutePath, 'cbz', { deferFilenameOnly: true });
+      expect(extractAndSaveSource).toHaveBeenNthCalledWith(2, expect.any(Number), opf.absolutePath, 'opf', { deferFilenameOnly: false });
+    });
+
+    it('keeps embedded metadata ahead of the OPF when the comic has ComicInfo', async () => {
+      const { cbz } = comicWithOpf();
+      const extractAndSaveSource = vi.fn().mockResolvedValueOnce('saved');
+
+      await scanWith(extractAndSaveSource);
+
+      expect(extractAndSaveSource).toHaveBeenCalledTimes(1);
+      expect(extractAndSaveSource).toHaveBeenCalledWith(expect.any(Number), cbz.absolutePath, 'cbz', { deferFilenameOnly: true });
+    });
+
+    it('falls back to the filename-only record when the OPF has no usable metadata', async () => {
+      const { cbz, opf } = comicWithOpf();
+      const extractAndSaveSource = vi.fn().mockResolvedValueOnce('deferred').mockResolvedValueOnce('unavailable').mockResolvedValueOnce('saved');
+
+      await scanWith(extractAndSaveSource);
+
+      expect(extractAndSaveSource).toHaveBeenCalledTimes(3);
+      expect(extractAndSaveSource).toHaveBeenNthCalledWith(2, expect.any(Number), opf.absolutePath, 'opf', { deferFilenameOnly: false });
+      expect(extractAndSaveSource).toHaveBeenNthCalledWith(3, expect.any(Number), cbz.absolutePath, 'cbz', { deferFilenameOnly: false });
+    });
+
+    it('falls back to the filename-only record when the OPF extraction throws', async () => {
+      const { cbz } = comicWithOpf();
+      const extractAndSaveSource = vi
+        .fn()
+        .mockResolvedValueOnce('deferred')
+        .mockRejectedValueOnce(new Error('bad opf'))
+        .mockResolvedValueOnce('saved');
+
+      const repo = await scanWith(extractAndSaveSource);
+
+      expect(extractAndSaveSource).toHaveBeenCalledTimes(3);
+      expect(extractAndSaveSource).toHaveBeenNthCalledWith(3, expect.any(Number), cbz.absolutePath, 'cbz', { deferFilenameOnly: false });
+      expect(repo.completeScanJob).toHaveBeenCalled();
+      expect(repo.failScanJob).not.toHaveBeenCalled();
+    });
+
+    it('saves the comic directly when there is no OPF to defer to', async () => {
+      const cbz = makeFileStat({
+        absolutePath: '/library/Largo Winch T01/Largo Winch T01.cbz',
+        relPath: 'Largo Winch T01/Largo Winch T01.cbz',
+        format: 'cbz',
+        role: 'content',
+      });
+      mockFindCandidates.mockResolvedValue({
+        candidates: [makeCandidate('/library/Largo Winch T01', [cbz])],
+        skippedDirs: new Set(),
+        unchangedDirs: new Set(),
+        dirMtimes: new Map(),
+      });
+      const extractAndSaveSource = vi.fn().mockResolvedValueOnce('saved');
+
+      await scanWith(extractAndSaveSource);
+
+      expect(extractAndSaveSource).toHaveBeenCalledTimes(1);
+      expect(extractAndSaveSource).toHaveBeenCalledWith(expect.any(Number), cbz.absolutePath, 'cbz', { deferFilenameOnly: false });
+    });
   });
 
   it('does not fall back to embedded metadata when preferred OPF extraction throws', async () => {
