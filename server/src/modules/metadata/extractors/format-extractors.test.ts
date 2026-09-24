@@ -484,6 +484,51 @@ describe('metadata format extractors', () => {
     expect(result).toEqual(expect.objectContaining({ title: 'Blake et Mortimer T01', hasEmbeddedMetadata: false }));
   });
 
+  it.each([
+    ['an ISBN', { isbn13: '9782205058373' }],
+    ['a subtitle', { subtitle: 'Edition speciale' }],
+  ])('comic extractor treats a ComicInfo with only %s as filename-only, since it does not pass that field on', async (_label, fields) => {
+    mockExtractCbzMetadata.mockResolvedValue({
+      title: null,
+      subtitle: null,
+      seriesName: null,
+      seriesIndex: null,
+      seriesTotalBooks: null,
+      description: null,
+      publisher: null,
+      publishedDate: null,
+      publishedYear: null,
+      language: null,
+      pageCount: 48,
+      rating: null,
+      isbn10: null,
+      isbn13: null,
+      authors: [],
+      genres: [],
+      tags: [],
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      hardcoverEditionId: null,
+      openLibraryId: null,
+      ranobedbId: null,
+      koboId: null,
+      comicvineId: null,
+      lubimyczytacId: null,
+      aladinId: null,
+      itunesId: null,
+      comicMetadata: null,
+      ...fields,
+    } as never);
+    mockExtractCbzCover.mockResolvedValue(null);
+    mockParseBookFilename.mockReturnValue({ title: 'Blake et Mortimer T01', publishedYear: null });
+
+    const result = await new ComicFormatExtractor('cbz').extract('/books/bm01.cbz');
+
+    expect(result?.hasEmbeddedMetadata).toBe(false);
+  });
+
   it('comic extractor prefers explicit metadata fields and keeps comic metadata payload', async () => {
     mockExtractCbrMetadata.mockResolvedValue({
       title: 'Batman',

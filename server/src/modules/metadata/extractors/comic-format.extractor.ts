@@ -22,20 +22,17 @@ const coverExtractors: Record<ComicFormat, (path: string) => Promise<Buffer | nu
 
 type ComicInfoMetadata = NonNullable<Awaited<ReturnType<typeof extractCbzMetadata>>>;
 
-// A ComicInfo.xml that only lists pages or a language says nothing about the book, so it must not
-// keep a sidecar OPF from supplying the series.
+// Only fields this extractor passes on count: a ComicInfo.xml with nothing but pages, a language or an
+// ISBN would otherwise keep a sidecar OPF from supplying the series and still save none of it.
 function hasBibliographicFields(metadata: ComicInfoMetadata): boolean {
   return Boolean(
     metadata.title ||
-    metadata.subtitle ||
     metadata.seriesName ||
     metadata.seriesIndex ||
     metadata.description ||
     metadata.publisher ||
     metadata.publishedDate ||
     metadata.publishedYear ||
-    metadata.isbn10 ||
-    metadata.isbn13 ||
     metadata.authors.length > 0,
   );
 }
