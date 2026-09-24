@@ -65,7 +65,8 @@ import { readFile } from 'fs/promises';
 import { extractFb2Cover } from '../lib/cover-fb2';
 import { extractCbrCover } from '../lib/cover-cbr';
 import { extractCbzCover } from '../lib/cover-cbz';
-import { extractCbrMetadata, extractCbzMetadata } from '../lib/cbz-metadata';
+import { extractCb7Cover } from '../lib/cover-cb7';
+import { extractCb7Metadata, extractCbrMetadata, extractCbzMetadata } from '../lib/cbz-metadata';
 import { parseBookFilename } from '../lib/filename-parser';
 import { parseFb2File } from '../lib/fb2-parser';
 import { extractEpubMetadata } from '../lib/epub';
@@ -88,8 +89,10 @@ const mockParseFb2File = parseFb2File as MockedFunction<typeof parseFb2File>;
 const mockExtractFb2Cover = extractFb2Cover as MockedFunction<typeof extractFb2Cover>;
 const mockExtractCbzMetadata = extractCbzMetadata as MockedFunction<typeof extractCbzMetadata>;
 const mockExtractCbrMetadata = extractCbrMetadata as MockedFunction<typeof extractCbrMetadata>;
+const mockExtractCb7Metadata = extractCb7Metadata as MockedFunction<typeof extractCb7Metadata>;
 const mockExtractCbzCover = extractCbzCover as MockedFunction<typeof extractCbzCover>;
 const mockExtractCbrCover = extractCbrCover as MockedFunction<typeof extractCbrCover>;
+const mockExtractCb7Cover = extractCb7Cover as MockedFunction<typeof extractCb7Cover>;
 const mockParseBookFilename = parseBookFilename as MockedFunction<typeof parseBookFilename>;
 const mockParseMobiFile = parseMobiFile as MockedFunction<typeof parseMobiFile>;
 const mockExtractMobiCover = extractMobiCover as MockedFunction<typeof extractMobiCover>;
@@ -431,6 +434,54 @@ describe('metadata format extractors', () => {
         hasEmbeddedMetadata: false,
       }),
     );
+  });
+
+  it.each([
+    ['cbz', () => mockExtractCbzMetadata],
+    ['cbr', () => mockExtractCbrMetadata],
+    ['cb7', () => mockExtractCb7Metadata],
+  ] as const)('comic extractor treats a %s ComicInfo without bibliographic fields as filename-only', async (format, metadataMock) => {
+    const pagesOnly = {
+      title: null,
+      subtitle: null,
+      seriesName: null,
+      seriesIndex: null,
+      seriesTotalBooks: null,
+      description: null,
+      publisher: null,
+      publishedDate: null,
+      publishedYear: null,
+      language: 'fr',
+      pageCount: 48,
+      rating: null,
+      isbn10: null,
+      isbn13: null,
+      authors: [],
+      genres: [],
+      tags: [],
+      googleBooksId: null,
+      goodreadsId: null,
+      amazonId: null,
+      hardcoverId: null,
+      hardcoverEditionId: null,
+      openLibraryId: null,
+      ranobedbId: null,
+      koboId: null,
+      comicvineId: null,
+      lubimyczytacId: null,
+      aladinId: null,
+      itunesId: null,
+      comicMetadata: null,
+    };
+    metadataMock().mockResolvedValue(pagesOnly as never);
+    mockExtractCbzCover.mockResolvedValue(null);
+    mockExtractCbrCover.mockResolvedValue(null);
+    mockExtractCb7Cover.mockResolvedValue(null);
+    mockParseBookFilename.mockReturnValue({ title: 'Blake et Mortimer T01', publishedYear: null });
+
+    const result = await new ComicFormatExtractor(format).extract(`/books/bm01.${format}`);
+
+    expect(result).toEqual(expect.objectContaining({ title: 'Blake et Mortimer T01', hasEmbeddedMetadata: false }));
   });
 
   it('comic extractor prefers explicit metadata fields and keeps comic metadata payload', async () => {

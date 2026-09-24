@@ -20,6 +20,26 @@ const coverExtractors: Record<ComicFormat, (path: string) => Promise<Buffer | nu
   cb7: extractCb7Cover,
 };
 
+type ComicInfoMetadata = NonNullable<Awaited<ReturnType<typeof extractCbzMetadata>>>;
+
+// A ComicInfo.xml that only lists pages or a language says nothing about the book, so it must not
+// keep a sidecar OPF from supplying the series.
+function hasBibliographicFields(metadata: ComicInfoMetadata): boolean {
+  return Boolean(
+    metadata.title ||
+    metadata.subtitle ||
+    metadata.seriesName ||
+    metadata.seriesIndex ||
+    metadata.description ||
+    metadata.publisher ||
+    metadata.publishedDate ||
+    metadata.publishedYear ||
+    metadata.isbn10 ||
+    metadata.isbn13 ||
+    metadata.authors.length > 0,
+  );
+}
+
 export class ComicFormatExtractor implements FormatExtractor {
   constructor(private readonly format: ComicFormat) {}
 
@@ -57,7 +77,7 @@ export class ComicFormatExtractor implements FormatExtractor {
       itunesId: comicMetadata?.itunesId ?? null,
       cover: cover ?? null,
       comicMetadata: comicMetadata?.comicMetadata ?? null,
-      hasEmbeddedMetadata: comicMetadata !== null,
+      hasEmbeddedMetadata: comicMetadata !== null && hasBibliographicFields(comicMetadata),
     };
   }
 }
