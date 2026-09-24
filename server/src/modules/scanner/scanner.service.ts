@@ -23,7 +23,7 @@ import type {
 import { NotificationType } from '@bookorbit/types';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
-import { MetadataService } from '../metadata/metadata.service';
+import { MetadataService, type MetadataSourceOutcome } from '../metadata/metadata.service';
 import { NotificationService } from '../notification/notification.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
@@ -1870,30 +1870,56 @@ export class ScannerService implements OnApplicationBootstrap {
   }
 
   private async extractFirstAvailableMetadataSource(bookId: number, sources: MetadataExtractionSource[]): Promise<void> {
-    for (const source of sources) {
+    // A comic without ComicInfo only yields a filename-derived title, so a later source such as an
+    // OPF gets a chance first. If none delivers, the deferred record is still saved.
+    let deferred: MetadataExtractionSource | null = null;
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
       try {
-        const extracted = await this.extractMetadataSource(bookId, source.file.absolutePath, source.format);
-        if (extracted) return;
+        const outcome = await this.extractMetadataSource(bookId, source.file.absolutePath, source.format, {
+          deferFilenameOnly: i < sources.length - 1,
+        });
+        if (outcome === 'saved') return;
+        if (outcome === 'deferred') deferred ??= source;
       } catch (err) {
         this.logger.warn(
           `[scanner.extract_metadata] [fail] bookId=${bookId} source=${source.key} path="${sanitizeLogValue(source.file.absolutePath)}" format=${source.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - metadata extraction failed`,
         );
-        return;
+        break;
       }
+    }
+
+    if (!deferred) return;
+    try {
+      await this.extractMetadataSource(bookId, deferred.file.absolutePath, deferred.format, { deferFilenameOnly: false });
+    } catch (err) {
+      this.logger.warn(
+        `[scanner.extract_metadata] [fail] bookId=${bookId} source=${deferred.key} path="${sanitizeLogValue(deferred.file.absolutePath)}" format=${deferred.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - deferred metadata extraction failed`,
+      );
     }
   }
 
-  private async extractMetadataSource(bookId: number, absolutePath: string, format: string): Promise<boolean> {
+  private async extractMetadataSource(
+    bookId: number,
+    absolutePath: string,
+    format: string,
+    options: { deferFilenameOnly: boolean },
+  ): Promise<MetadataSourceOutcome> {
     const metadataService = this.metadataService as MetadataService & {
+      extractAndSaveSource?: MetadataService['extractAndSaveSource'];
       extractAndSaveIfAvailable?: (bookId: number, absolutePath: string, format: string) => Promise<boolean>;
     };
 
+    if (typeof metadataService.extractAndSaveSource === 'function') {
+      return metadataService.extractAndSaveSource(bookId, absolutePath, format, options);
+    }
+
     if (typeof metadataService.extractAndSaveIfAvailable === 'function') {
-      return metadataService.extractAndSaveIfAvailable(bookId, absolutePath, format);
+      return (await metadataService.extractAndSaveIfAvailable(bookId, absolutePath, format)) ? 'saved' : 'unavailable';
     }
 
     await this.metadataService.extractAndSave(bookId, absolutePath, format);
-    return true;
+    return 'saved';
   }
 
   private async upsertBook(

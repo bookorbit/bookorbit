@@ -67,6 +67,8 @@ function normalizePublishedYear(year: number | null | undefined): number | null 
   return year;
 }
 
+export type MetadataSourceOutcome = 'saved' | 'unavailable' | 'deferred';
+
 @Injectable()
 export class MetadataService {
   private readonly logger = new Logger(MetadataService.name);
@@ -99,6 +101,19 @@ export class MetadataService {
   }
 
   async extractAndSaveIfAvailable(bookId: number, absolutePath: string, format: string): Promise<boolean> {
+    return (await this.extractAndSaveSource(bookId, absolutePath, format)) === 'saved';
+  }
+
+  /**
+   * With `deferFilenameOnly`, a record whose text is only derived from the filename is not saved:
+   * its cover is kept and `deferred` tells the caller to try its next metadata source.
+   */
+  async extractAndSaveSource(
+    bookId: number,
+    absolutePath: string,
+    format: string,
+    options: { deferFilenameOnly?: boolean } = {},
+  ): Promise<MetadataSourceOutcome> {
     const event = 'metadata.extract_and_save';
     const startedAt = Date.now();
     this.logger.debug(`[${event}] [start] bookId=${bookId} format=${format} - metadata extraction started`);
@@ -108,7 +123,7 @@ export class MetadataService {
         this.logger.debug(
           `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} extractorFound=false - metadata extraction skipped`,
         );
-        return false;
+        return 'unavailable';
       }
 
       const data = await this.extractionService.extract(absolutePath, format);
@@ -116,7 +131,15 @@ export class MetadataService {
         this.logger.debug(
           `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} parsed=false - metadata extraction skipped`,
         );
-        return false;
+        return 'unavailable';
+      }
+
+      if (options.deferFilenameOnly && data.hasEmbeddedMetadata === false) {
+        if (data.cover) await this.persistCover(bookId, data.cover, true);
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} filenameOnly=true coverExtracted=${data.cover != null} - metadata deferred to next source`,
+        );
+        return 'deferred';
       }
 
       await Promise.all([
@@ -130,7 +153,7 @@ export class MetadataService {
       this.logger.debug(
         `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} coverExtracted=${data.cover != null} - metadata extraction completed`,
       );
-      return true;
+      return 'saved';
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
       const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));

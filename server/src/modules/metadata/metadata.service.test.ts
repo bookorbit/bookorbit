@@ -636,6 +636,82 @@ describe('MetadataService', () => {
     expect(replaceAuthorsSpy).toHaveBeenCalledWith(55, [{ name: 'Sidecar Author', sortName: null }]);
   });
 
+  describe('extractAndSaveSource', () => {
+    it('defers a comic with no ComicInfo when a later source may follow, keeping only its cover', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      mockExtractCbzMetadata.mockResolvedValue(null);
+      mockExtractCbzCover.mockResolvedValue(Buffer.from('archive-cover'));
+
+      await expect(service.extractAndSaveSource(60, '/books/Blake et Mortimer T01.cbz', 'cbz', { deferFilenameOnly: true })).resolves.toBe(
+        'deferred',
+      );
+
+      expect(mockWriteFile).toHaveBeenCalledWith('/books/covers/60/cover_extracted.png', Buffer.from('archive-cover'));
+      expect(updateSet).not.toHaveBeenCalledWith(expect.objectContaining({ title: expect.anything() }));
+      expect(updateSet).not.toHaveBeenCalledWith(expect.objectContaining({ seriesName: expect.anything() }));
+    });
+
+    it('saves the filename-only comic record when it is the last source', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      mockExtractCbzMetadata.mockResolvedValue(null);
+
+      await expect(service.extractAndSaveSource(61, '/books/Blake et Mortimer T01.cbz', 'cbz', { deferFilenameOnly: false })).resolves.toBe('saved');
+
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ title: 'Fallback Title' }));
+    });
+
+    it('saves a comic with ComicInfo even when later sources exist', async () => {
+      const { db, updateSet } = makeDb();
+      const service = makeService(db);
+      mockExtractCbzMetadata.mockResolvedValue({
+        title: 'La Marque jaune',
+        subtitle: null,
+        description: null,
+        publisher: null,
+        publishedDate: null,
+        publishedYear: null,
+        language: null,
+        seriesName: 'Blake et Mortimer',
+        seriesIndex: '6',
+        seriesTotalBooks: null,
+        authors: [],
+        genres: [],
+        tags: [],
+        googleBooksId: null,
+        goodreadsId: null,
+        amazonId: null,
+        hardcoverId: null,
+        hardcoverEditionId: null,
+        openLibraryId: null,
+        ranobedbId: null,
+        koboId: null,
+        comicvineId: null,
+        lubimyczytacId: null,
+        aladinId: null,
+        itunesId: null,
+        comicMetadata: null,
+      });
+
+      await expect(service.extractAndSaveSource(62, '/books/bm06.cbz', 'cbz', { deferFilenameOnly: true })).resolves.toBe('saved');
+
+      expect(updateSet).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'La Marque jaune', seriesName: 'Blake et Mortimer', seriesIndex: '6' }),
+      );
+    });
+
+    it('reports unsupported formats and empty parser output as unavailable', async () => {
+      const { db } = makeDb();
+      const service = makeService(db);
+
+      await expect(service.extractAndSaveSource(63, '/books/book.unknown', 'unknown', { deferFilenameOnly: true })).resolves.toBe('unavailable');
+      mockParsePdfFile.mockResolvedValueOnce(null);
+      await expect(service.extractAndSaveSource(63, '/books/book.pdf', 'pdf', { deferFilenameOnly: true })).resolves.toBe('unavailable');
+      expect(db.update).not.toHaveBeenCalled();
+    });
+  });
+
   it('refreshCoverForBook returns false and avoids db writes when extractor reports no cover', async () => {
     const { db } = makeDb();
     const service = makeService(db);
