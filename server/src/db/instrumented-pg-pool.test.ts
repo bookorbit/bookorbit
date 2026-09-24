@@ -93,4 +93,35 @@ describe('InstrumentedPgPool', () => {
     // Kept, because the recovery is worth seeing -- just not on its own.
     expect(line).toContain('totalCount=17 idleCount=9 waitingCount=0');
   });
+
+  // The other direction, and the reason `acquisitionKind` is documented rather
+  // than fixed: it is sampled before `super.connect()` and nothing reserves the
+  // idle connection it saw. A concurrent acquire can take it first, so a
+  // failure can be labelled `acquisitionKind=idle` having never had one.
+  // Without the start counters that label is unfalsifiable from the log; with
+  // them, `startIdle=1 idleCount=0` shows plainly what happened.
+  it('keeps the stale acquisitionKind but shows the idle connection was taken', async () => {
+    const failure = new Error('timeout exceeded when trying to connect');
+    vi.spyOn(Pool.prototype, 'connect').mockRejectedValue(failure);
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+    const pool = new InstrumentedPgPool({ max: 20 });
+    // One connection idle at the instant we classify, so this acquire is 'idle'.
+    let counts = { totalCount: 10, idleCount: 1, waitingCount: 0 };
+    Object.defineProperty(pool, 'totalCount', { get: () => counts.totalCount });
+    Object.defineProperty(pool, 'idleCount', { get: () => counts.idleCount });
+    Object.defineProperty(pool, 'waitingCount', { get: () => counts.waitingCount });
+
+    const acquiring = pool.connect();
+    // A concurrent acquire takes that connection and the pool saturates behind it.
+    counts = { totalCount: 20, idleCount: 0, waitingCount: 3 };
+
+    await expect(acquiring).rejects.toBe(failure);
+
+    const line = warnSpy.mock.calls[0]?.[0] as string;
+    // Stale by construction -- it was idle when we looked, gone when we asked.
+    expect(line).toContain('acquisitionKind=idle');
+    expect(line).toContain('startTotal=10 startIdle=1 startWaiting=0');
+    expect(line).toContain('totalCount=20 idleCount=0 waitingCount=3');
+  });
 });
