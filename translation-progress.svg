@@ -30,8 +30,8 @@
   <text x="440" y="103" text-anchor="end" class="pct-label">99%</text>
   <text x="20" y="128" class="lang-label">🇧🇷  Portuguese</text>
   <rect x="142" y="120" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="120" width="214" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="128" text-anchor="end" class="pct-label">87%</text>
+  <rect x="142" y="120" width="221" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="128" text-anchor="end" class="pct-label">90%</text>
   <text x="20" y="153" class="lang-label">🇪🇸  Spanish</text>
   <rect x="142" y="145" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="145" width="214" height="6" rx="3" class="bar-progress" />
@@ -50,8 +50,8 @@
   <text x="440" y="228" text-anchor="end" class="pct-label">62%</text>
   <text x="20" y="253" class="lang-label">🇩🇪  German</text>
   <rect x="142" y="245" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="245" width="150" height="6" rx="3" class="bar-low" />
-  <text x="440" y="253" text-anchor="end" class="pct-label">61%</text>
+  <rect x="142" y="245" width="148" height="6" rx="3" class="bar-low" />
+  <text x="440" y="253" text-anchor="end" class="pct-label">60%</text>
   <text x="20" y="278" class="lang-label">🇸🇮  Slovenian</text>
   <rect x="142" y="270" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="270" width="138" height="6" rx="3" class="bar-low" />
@@ -102,8 +102,8 @@
   <text x="440" y="553" text-anchor="end" class="pct-label">47%</text>
   <text x="20" y="578" class="lang-label">🇭🇺  Hungarian</text>
   <rect x="142" y="570" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="570" width="96" height="6" rx="3" class="bar-low" />
-  <text x="440" y="578" text-anchor="end" class="pct-label">39%</text>
+  <rect x="142" y="570" width="106" height="6" rx="3" class="bar-low" />
+  <text x="440" y="578" text-anchor="end" class="pct-label">43%</text>
   <text x="20" y="603" class="lang-label">🇹🇼  Chinese (T)</text>
   <rect x="142" y="595" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="595" width="0" height="6" rx="3" class="bar-low" />
