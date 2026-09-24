@@ -67,13 +67,13 @@ export class InstrumentedPgPool extends Pool {
    * connections sitting unused while acquisition timed out. They were not
    * unused during the wait. Three expensive requests held the pool at
    * `totalCount=19` of `max: 20`, and by the time the timeout fired and the
-   * line was written they had finished and released — so the log described the
+   * line was written they had finished and released, so the log described the
    * recovery and hid the cause.
    *
    * `acquisitionKind` has the same problem in the other direction: it is
    * sampled before `super.connect()` and nothing holds the idle connection it
    * saw, so a concurrent acquire can take it first. That is how a failure comes
-   * to be labelled `acquisitionKind=idle` — it was idle when we looked, and
+   * to be labelled `acquisitionKind=idle`: it was idle when we looked, and
    * gone when we asked.
    */
   private logAcquire(startedAt: number, acquisitionKind: AcquisitionKind, atStart: PoolCounts, error?: unknown): void {

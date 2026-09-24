@@ -62,8 +62,8 @@ describe('InstrumentedPgPool', () => {
   // The bug these lines were hiding.
   //
   // A real incident logged `idleCount=9 waitingCount=0` on every failure, which
-  // reads as nine connections sitting unused while acquisition timed out --
-  // impossible, and it sent the investigation looking for an accounting bug in
+  // reads as nine connections sitting unused while acquisition timed out.
+  // Impossible, and it sent the investigation looking for an accounting bug in
   // the pool. There was none. The counters were simply read when the line was
   // written, five seconds after the acquire began, by which point the requests
   // holding the pool had finished and released.
@@ -90,7 +90,7 @@ describe('InstrumentedPgPool', () => {
     const line = warnSpy.mock.calls[0]?.[0] as string;
     // The state that explains the failure.
     expect(line).toContain('startTotal=19 startIdle=0 startWaiting=8');
-    // Kept, because the recovery is worth seeing -- just not on its own.
+    // Kept, because the recovery is worth seeing, just not on its own.
     expect(line).toContain('totalCount=17 idleCount=9 waitingCount=0');
   });
 
@@ -119,7 +119,7 @@ describe('InstrumentedPgPool', () => {
     await expect(acquiring).rejects.toBe(failure);
 
     const line = warnSpy.mock.calls[0]?.[0] as string;
-    // Stale by construction -- it was idle when we looked, gone when we asked.
+    // Stale by construction: it was idle when we looked, gone when we asked.
     expect(line).toContain('acquisitionKind=idle');
     expect(line).toContain('startTotal=10 startIdle=1 startWaiting=0');
     expect(line).toContain('totalCount=20 idleCount=0 waitingCount=3');
