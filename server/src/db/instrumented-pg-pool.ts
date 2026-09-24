@@ -23,7 +23,7 @@ export class InstrumentedPgPool extends Pool {
     const acquisitionKind = this.classifyAcquisition();
     // Sampled now, not when the line is written. A failing acquire logs five
     // seconds after it began, by which time whatever was holding the pool has
-    // usually finished — so the counters read at log time describe the
+    // usually finished, so the counters read at log time describe the
     // recovery, not the problem. See `logAcquire`.
     const countsAtStart = this.counts();
 
