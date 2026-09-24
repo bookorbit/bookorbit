@@ -36,6 +36,29 @@ describe('LibraryCreatorModal', () => {
     wrapper.unmount()
   })
 
+  it('clears series from folders when leaving file-as-book mode', async () => {
+    const full = { ...useLibraryCreator().form, id: 7, name: 'Library', icon: 'BookOpen', folders: [], organizationMode: 'book_per_file' }
+    apiMock.mockImplementation(async () => ({ ok: true, json: async () => full }) as Response)
+    const listEntry = { id: 7, name: 'Library', folders: [], coverAspectRatio: '2/3' } as unknown as Library
+    const wrapper = shallowMount(LibraryCreatorModal, { props: { library: listEntry }, global: { stubs: { teleport: true } } })
+    await flushPromises()
+    await wrapper
+      .findAll('nav button')
+      .find((button) => button.text().includes('Scanning'))!
+      .trigger('click')
+    const scanner = () => wrapper.getComponent(LibraryCreatorScanner)
+
+    scanner().vm.$emit('update:deriveSeriesFromFolder', true)
+    await flushPromises()
+    expect(scanner().props('deriveSeriesFromFolder')).toBe(true)
+
+    scanner().vm.$emit('update:organizationMode', 'book_per_folder')
+    await flushPromises()
+    expect(scanner().props('organizationMode')).toBe('book_per_folder')
+    expect(scanner().props('deriveSeriesFromFolder')).toBe(false)
+    wrapper.unmount()
+  })
+
   it('renders an accessible responsive dialog with required setup identified', async () => {
     const wrapper = shallowMount(LibraryCreatorModal, {
       attachTo: document.body,

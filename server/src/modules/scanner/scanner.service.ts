@@ -23,7 +23,7 @@ import type {
 import { NotificationType } from '@bookorbit/types';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
-import { MetadataService } from '../metadata/metadata.service';
+import { MetadataService, type MetadataSourceOutcome } from '../metadata/metadata.service';
 import { NotificationService } from '../notification/notification.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
@@ -90,6 +90,7 @@ interface LibraryScanSettings {
   metadataPrecedence: string[];
   excludePatterns: string[];
   organizationMode: OrganizationMode;
+  deriveSeriesFromFolder: boolean;
   addedAtSource: AddedAtSource;
 }
 
@@ -175,6 +176,12 @@ interface ProcessCandidateResult {
 
 function normalizeOrganizationMode(mode: string | null | undefined): OrganizationMode {
   return mode === 'book_per_file' ? 'book_per_file' : 'book_per_folder';
+}
+
+function derivesSeriesFromFolder(
+  settings: { organizationMode?: string | null; deriveSeriesFromFolder?: boolean | null } | null | undefined,
+): boolean {
+  return settings?.deriveSeriesFromFolder === true && normalizeOrganizationMode(settings.organizationMode) === 'book_per_file';
 }
 
 function normalizeAddedAtSource(source: string | null | undefined): AddedAtSource {
@@ -305,8 +312,9 @@ export class ScannerService implements OnApplicationBootstrap {
     metadataPrecedence: string[],
     excludePatterns: string[],
     organizationMode: string,
+    deriveSeriesFromFolder: boolean,
   ): string {
-    const payload = JSON.stringify({ allowedFormats, formatPriority, metadataPrecedence, excludePatterns, organizationMode });
+    const payload = JSON.stringify({ allowedFormats, formatPriority, metadataPrecedence, excludePatterns, organizationMode, deriveSeriesFromFolder });
     return createHash('sha256').update(payload).digest('hex').slice(0, 16);
   }
 
@@ -682,12 +690,20 @@ export class ScannerService implements OnApplicationBootstrap {
       const metadataPrecedence = settings?.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT];
       const excludePatterns = settings?.excludePatterns ?? [];
       const organizationMode = normalizeOrganizationMode(settings?.organizationMode);
+      const deriveSeriesFromFolder = derivesSeriesFromFolder(settings);
       const addedAtSource = normalizeAddedAtSource(settings?.addedAtSource);
 
       // Invalidate incremental scan cache when scan-affecting settings change.
       // On first scan after restart (no stored hash), force full scan to avoid
       // using stale dir state that was built under different settings.
-      const currentHash = ScannerService.computeSettingsHash(allowedFormats, formatPriority, metadataPrecedence, excludePatterns, organizationMode);
+      const currentHash = ScannerService.computeSettingsHash(
+        allowedFormats,
+        formatPriority,
+        metadataPrecedence,
+        excludePatterns,
+        organizationMode,
+        deriveSeriesFromFolder,
+      );
       const lastHash = this.lastSettingsHash.get(libraryId);
       if (lastHash === undefined || lastHash !== currentHash) {
         forceFullScan = true;
@@ -711,6 +727,7 @@ export class ScannerService implements OnApplicationBootstrap {
         metadataPrecedence,
         excludePatterns,
         organizationMode,
+        deriveSeriesFromFolder,
         addedAtSource,
         forceFullScan,
       ).catch((err) => {
@@ -879,10 +896,19 @@ export class ScannerService implements OnApplicationBootstrap {
       metadataPrecedence: rawSettings?.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT],
       excludePatterns: rawSettings?.excludePatterns ?? [],
       organizationMode: normalizeOrganizationMode(rawSettings?.organizationMode),
+      deriveSeriesFromFolder: derivesSeriesFromFolder(rawSettings),
       addedAtSource: normalizeAddedAtSource(rawSettings?.addedAtSource),
     };
 
     if (settings.organizationMode === 'book_per_file') {
+      // One new file can renumber its siblings, so the whole series directory is rescanned.
+      const seriesDirectory = dirname(filePath);
+      if (settings.deriveSeriesFromFolder && seriesDirectory !== libraryFolder.path) {
+        this.logger.log(
+          `[${event}] [end] libraryId=${libraryId} path="${sanitizeLogValue(filePath)}" durationMs=${Date.now() - startedAt} action=escalate_to_series_directory - targeted book scan handed to directory scan`,
+        );
+        return this.scanBookDirectory(seriesDirectory, libraryId);
+      }
       return this.handleScanBookPerFile(filePath, libraryId, libraryFolder, settings, event, startedAt);
     }
 
@@ -922,6 +948,7 @@ export class ScannerService implements OnApplicationBootstrap {
       metadataPrecedence: rawSettings?.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT],
       excludePatterns: rawSettings?.excludePatterns ?? [],
       organizationMode: normalizeOrganizationMode(rawSettings?.organizationMode),
+      deriveSeriesFromFolder: derivesSeriesFromFolder(rawSettings),
       addedAtSource: normalizeAddedAtSource(rawSettings?.addedAtSource),
     };
 
@@ -934,7 +961,11 @@ export class ScannerService implements OnApplicationBootstrap {
     let skippedDirs: Set<string>;
     try {
       if (settings.organizationMode === 'book_per_file') {
-        const walkResult = await findLooseFileCandidates(dirPath, settings.excludePatterns, walkLogger);
+        const walkResult = settings.deriveSeriesFromFolder
+          ? await findLooseFileCandidates(dirPath, settings.excludePatterns, walkLogger, undefined, {
+              deriveSeriesFromFolder: { libraryRoot: libraryFolder.path },
+            })
+          : await findLooseFileCandidates(dirPath, settings.excludePatterns, walkLogger);
         candidates = walkResult.candidates;
         skippedDirs = walkResult.skippedDirs;
       } else {
@@ -1298,6 +1329,7 @@ export class ScannerService implements OnApplicationBootstrap {
     metadataPrecedence: string[],
     excludePatterns: string[],
     organizationMode: OrganizationMode,
+    deriveSeriesFromFolder: boolean,
     addedAtSource: AddedAtSource,
     forceFullScan = false,
   ): Promise<void> {
@@ -1347,7 +1379,11 @@ export class ScannerService implements OnApplicationBootstrap {
             );
           const walkResult: WalkResult =
             organizationMode === 'book_per_file'
-              ? await findLooseFileCandidates(folder.path, excludePatterns, walkLogger, knownDirMtimes)
+              ? await (deriveSeriesFromFolder
+                  ? findLooseFileCandidates(folder.path, excludePatterns, walkLogger, knownDirMtimes, {
+                      deriveSeriesFromFolder: { libraryRoot: folder.path },
+                    })
+                  : findLooseFileCandidates(folder.path, excludePatterns, walkLogger, knownDirMtimes))
               : await findBookCandidates(folder.path, excludePatterns, walkLogger, knownDirMtimes);
           candidates = walkResult.candidates;
           skippedDirs = walkResult.skippedDirs;
@@ -1783,6 +1819,19 @@ export class ScannerService implements OnApplicationBootstrap {
       await this.extractFirstAvailableMetadataSource(book.id, metadataSources);
     }
 
+    // Series from folders: applied to every book of a rescanned directory, not only changed files,
+    // because adding a sibling can renumber the folder.
+    if (candidate.derivedSeries && !selfWriteInProgress) {
+      try {
+        const outcome = await this.metadataService.applyFolderSeries(book.id, candidate.derivedSeries);
+        if (outcome === 'updated' && !book.created) counts.updated++;
+      } catch (err) {
+        this.logger.warn(
+          `[scanner.apply_folder_series] [fail] bookId=${book.id} path="${sanitizeLogValue(candidate.folderPath)}" errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - folder series not applied`,
+        );
+      }
+    }
+
     // 3c: Write per-file duration for new, changed, or historically unprobed audio files.
     //     Including the winner ensures aggregateAudioDuration has accurate data for the total.
     if (audioFilesNeedingDuration.length > 0) {
@@ -1870,30 +1919,56 @@ export class ScannerService implements OnApplicationBootstrap {
   }
 
   private async extractFirstAvailableMetadataSource(bookId: number, sources: MetadataExtractionSource[]): Promise<void> {
-    for (const source of sources) {
+    // A comic without ComicInfo only yields a filename-derived title, so a later source such as an
+    // OPF gets a chance first. If none delivers, the deferred record is still saved.
+    let deferred: MetadataExtractionSource | null = null;
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
       try {
-        const extracted = await this.extractMetadataSource(bookId, source.file.absolutePath, source.format);
-        if (extracted) return;
+        const outcome = await this.extractMetadataSource(bookId, source.file.absolutePath, source.format, {
+          deferFilenameOnly: i < sources.length - 1,
+        });
+        if (outcome === 'saved') return;
+        if (outcome === 'deferred') deferred ??= source;
       } catch (err) {
         this.logger.warn(
           `[scanner.extract_metadata] [fail] bookId=${bookId} source=${source.key} path="${sanitizeLogValue(source.file.absolutePath)}" format=${source.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - metadata extraction failed`,
         );
-        return;
+        break;
       }
+    }
+
+    if (!deferred) return;
+    try {
+      await this.extractMetadataSource(bookId, deferred.file.absolutePath, deferred.format, { deferFilenameOnly: false });
+    } catch (err) {
+      this.logger.warn(
+        `[scanner.extract_metadata] [fail] bookId=${bookId} source=${deferred.key} path="${sanitizeLogValue(deferred.file.absolutePath)}" format=${deferred.format} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - deferred metadata extraction failed`,
+      );
     }
   }
 
-  private async extractMetadataSource(bookId: number, absolutePath: string, format: string): Promise<boolean> {
+  private async extractMetadataSource(
+    bookId: number,
+    absolutePath: string,
+    format: string,
+    options: { deferFilenameOnly: boolean },
+  ): Promise<MetadataSourceOutcome> {
     const metadataService = this.metadataService as MetadataService & {
+      extractAndSaveSource?: MetadataService['extractAndSaveSource'];
       extractAndSaveIfAvailable?: (bookId: number, absolutePath: string, format: string) => Promise<boolean>;
     };
 
+    if (typeof metadataService.extractAndSaveSource === 'function') {
+      return metadataService.extractAndSaveSource(bookId, absolutePath, format, options);
+    }
+
     if (typeof metadataService.extractAndSaveIfAvailable === 'function') {
-      return metadataService.extractAndSaveIfAvailable(bookId, absolutePath, format);
+      return (await metadataService.extractAndSaveIfAvailable(bookId, absolutePath, format)) ? 'saved' : 'unavailable';
     }
 
     await this.metadataService.extractAndSave(bookId, absolutePath, format);
-    return true;
+    return 'saved';
   }
 
   private async upsertBook(

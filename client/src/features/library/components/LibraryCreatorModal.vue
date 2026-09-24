@@ -172,6 +172,7 @@ const sectionProps = computed(() => ({
   scanner: {
     organizationMode: form.organizationMode,
     organizationModeLocked: mode.value === 'edit',
+    deriveSeriesFromFolder: form.deriveSeriesFromFolder,
     allowedFormats: form.allowedFormats,
     addedAtSource: form.addedAtSource,
     canRecomputeAddedAt: mode.value === 'edit',
@@ -305,6 +306,12 @@ function handleLocalFoldersUpdate(value: string[]) {
 
 function handleOrganizationModeUpdate(value: OrganizationMode) {
   form.organizationMode = value
+  // The server rejects the flag outside book_per_file.
+  if (value !== 'book_per_file') form.deriveSeriesFromFolder = false
+}
+
+function handleDeriveSeriesFromFolderUpdate(value: boolean) {
+  form.deriveSeriesFromFolder = value
 }
 
 function handleAddedAtSourceUpdate(value: Library['addedAtSource']) {
@@ -327,6 +334,7 @@ const sectionListeners = {
   'update:folders': handleFoldersUpdate,
   'update:localFolders': handleLocalFoldersUpdate,
   'update:organizationMode': handleOrganizationModeUpdate,
+  'update:deriveSeriesFromFolder': handleDeriveSeriesFromFolderUpdate,
   'update:addedAtSource': handleAddedAtSourceUpdate,
   recompute: handleRecomputeAddedAt,
   'update:metadataPrecedence': (value: string[]) => (form.metadataPrecedence = value),

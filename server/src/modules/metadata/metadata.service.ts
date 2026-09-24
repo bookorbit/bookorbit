@@ -67,6 +67,10 @@ function normalizePublishedYear(year: number | null | undefined): number | null 
   return year;
 }
 
+export type MetadataSourceOutcome = 'saved' | 'unavailable' | 'deferred';
+
+export type FolderSeriesOutcome = 'updated' | 'unchanged' | 'kept';
+
 @Injectable()
 export class MetadataService {
   private readonly logger = new Logger(MetadataService.name);
@@ -99,6 +103,19 @@ export class MetadataService {
   }
 
   async extractAndSaveIfAvailable(bookId: number, absolutePath: string, format: string): Promise<boolean> {
+    return (await this.extractAndSaveSource(bookId, absolutePath, format)) === 'saved';
+  }
+
+  /**
+   * With `deferFilenameOnly`, a record whose text is only derived from the filename is not saved:
+   * its cover is kept and `deferred` tells the caller to try its next metadata source.
+   */
+  async extractAndSaveSource(
+    bookId: number,
+    absolutePath: string,
+    format: string,
+    options: { deferFilenameOnly?: boolean } = {},
+  ): Promise<MetadataSourceOutcome> {
     const event = 'metadata.extract_and_save';
     const startedAt = Date.now();
     this.logger.debug(`[${event}] [start] bookId=${bookId} format=${format} - metadata extraction started`);
@@ -108,7 +125,7 @@ export class MetadataService {
         this.logger.debug(
           `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} extractorFound=false - metadata extraction skipped`,
         );
-        return false;
+        return 'unavailable';
       }
 
       const data = await this.extractionService.extract(absolutePath, format);
@@ -116,7 +133,15 @@ export class MetadataService {
         this.logger.debug(
           `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} parsed=false - metadata extraction skipped`,
         );
-        return false;
+        return 'unavailable';
+      }
+
+      if (options.deferFilenameOnly && data.hasEmbeddedMetadata === false) {
+        if (data.cover) await this.persistCover(bookId, data.cover, true);
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} filenameOnly=true coverExtracted=${data.cover != null} - metadata deferred to next source`,
+        );
+        return 'deferred';
       }
 
       await Promise.all([
@@ -130,7 +155,7 @@ export class MetadataService {
       this.logger.debug(
         `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} coverExtracted=${data.cover != null} - metadata extraction completed`,
       );
-      return true;
+      return 'saved';
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
       const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
@@ -139,6 +164,43 @@ export class MetadataService {
       );
       throw error;
     }
+  }
+
+  /**
+   * The folder only fills in: it names a book that has no series and keeps the index of a book already
+   * in the folder's series in step. A series named by ComicInfo, an OPF or the user is left alone, and
+   * a folder that has no number for the file never clears an existing index.
+   */
+  async applyFolderSeries(bookId: number, series: { name: string; index: string | null }): Promise<FolderSeriesOutcome> {
+    const [current] = await this.db
+      .select({ seriesName: bookMetadata.seriesName, seriesIndex: bookMetadata.seriesIndex })
+      .from(bookMetadata)
+      .where(eq(bookMetadata.bookId, bookId))
+      .limit(1);
+    if (!current) return 'unchanged';
+
+    const name = normalizeMetadataText(series.name);
+    if (!name) return 'unchanged';
+    const currentKey = normalizeMetadataTextKey(current.seriesName);
+    const sameSeries = currentKey !== null && currentKey === normalizeMetadataTextKey(name);
+
+    if (currentKey !== null && !sameSeries) return 'kept';
+    if (sameSeries && (series.index === null || current.seriesIndex === series.index)) return 'unchanged';
+
+    const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
+      ...(sameSeries ? {} : { seriesName: name }),
+      ...(series.index !== null ? { seriesIndex: series.index } : {}),
+    });
+    const scalarFields: Partial<typeof schema.bookMetadata.$inferInsert> = {};
+    if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
+    if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
+    if (Object.keys(scalarFields).length === 0) return 'kept';
+
+    scalarFields.updatedAt = new Date();
+    const patch = (await this.seriesIdentity?.resolveMetadataPatch(scalarFields)) ?? scalarFields;
+    await this.db.update(bookMetadata).set(patch).where(eq(bookMetadata.bookId, bookId));
+    await this.seriesMemberships?.syncPrimaryFromMetadata(bookId);
+    return 'updated';
   }
 
   // Called when ebook is the winner but audio files are also present.

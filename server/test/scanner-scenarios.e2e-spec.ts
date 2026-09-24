@@ -1,5 +1,9 @@
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
 import { dirname, join } from 'path';
+import { eq } from 'drizzle-orm';
+
+import { bookMetadata, books } from '../src/db/schema';
 
 import type { FixtureEntry } from './e2e/scanner/scanner-fixture-builder';
 import { createFixtureTree, file } from './e2e/scanner/scanner-fixture-builder';
@@ -472,4 +476,105 @@ describe('Scanner structures (e2e)', () => {
       );
     }
   });
+});
+
+describe('Scanner series from folders (e2e, #1167)', () => {
+  let context: ScannerE2EContext | null = null;
+  let appDataPath: string | null = null;
+  const previousAppDataPath = process.env.APP_DATA_PATH;
+
+  beforeAll(async () => {
+    appDataPath = await mkdtemp(join(tmpdir(), 'scanner-e2e-series-appdata-'));
+    process.env.APP_DATA_PATH = appDataPath;
+    context = await createScannerE2EContext({ realMetadata: true });
+  });
+
+  afterAll(async () => {
+    if (context) await closeScannerE2EContext(context);
+    if (previousAppDataPath === undefined) delete process.env.APP_DATA_PATH;
+    else process.env.APP_DATA_PATH = previousAppDataPath;
+    if (appDataPath) await rm(appDataPath, { recursive: true, force: true });
+  });
+
+  async function seriesByRelativePath(libraryId: number, rootPath: string): Promise<Record<string, { series: string | null; index: string | null }>> {
+    const rows = await context!.db
+      .select({ folderPath: books.folderPath, seriesName: bookMetadata.seriesName, seriesIndex: bookMetadata.seriesIndex })
+      .from(books)
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(eq(books.libraryId, libraryId));
+    return Object.fromEntries(rows.map((row) => [row.folderPath.slice(rootPath.length + 1), { series: row.seriesName, index: row.seriesIndex }]));
+  }
+
+  it(
+    'groups each folder into a series and renumbers it when a chapter file appears',
+    async () => {
+      if (!context) throw new Error('E2E context not initialized');
+      const fixture = await createFixtureTree(
+        [
+          file('Blake et Mortimer/Blake et Mortimer T02.cbz'),
+          file('Blake et Mortimer/Blake et Mortimer T01.cbz'),
+          file('Tintin/Tintin au Tibet.cbz'),
+          file('Tintin/Tintin au Congo.cbz'),
+          file('Solo Leveling/Solo Leveling v01.cbz'),
+          file('loose.cbz'),
+        ],
+        'scanner-e2e-series-from-folders-',
+      );
+      try {
+        const { libraryId } = await seedLibrary(context.db, {
+          rootPath: fixture.rootPath,
+          mode: 'book_per_file',
+          deriveSeriesFromFolder: true,
+          metadataPrecedence: ['embedded', 'opfFile'],
+        });
+
+        await waitForScanCompletion(context.db, await triggerLibraryScan(context, libraryId));
+        expect(await seriesByRelativePath(libraryId, fixture.rootPath)).toEqual({
+          'Blake et Mortimer/Blake et Mortimer T01.cbz': { series: 'Blake et Mortimer', index: '1' },
+          'Blake et Mortimer/Blake et Mortimer T02.cbz': { series: 'Blake et Mortimer', index: '2' },
+          'Tintin/Tintin au Congo.cbz': { series: 'Tintin', index: '1' },
+          'Tintin/Tintin au Tibet.cbz': { series: 'Tintin', index: '2' },
+          'Solo Leveling/Solo Leveling v01.cbz': { series: 'Solo Leveling', index: '1' },
+          'loose.cbz': { series: null, index: null },
+        });
+
+        await writeFile(join(fixture.rootPath, 'Solo Leveling/Solo Leveling c010.cbz'), 'x'.repeat(4096));
+        await waitForScanCompletion(context.db, await triggerLibraryScan(context, libraryId));
+        const rescanned = await seriesByRelativePath(libraryId, fixture.rootPath);
+        expect(rescanned['Solo Leveling/Solo Leveling c010.cbz']).toEqual({ series: 'Solo Leveling', index: '10' });
+        // The folder is now chapter-indexed and has no number for the volume file, which keeps the
+        // index it already had rather than losing it.
+        expect(rescanned['Solo Leveling/Solo Leveling v01.cbz']).toEqual({ series: 'Solo Leveling', index: '1' });
+        await assertNoIntegrityViolations(context.db);
+      } finally {
+        await fixture.cleanup();
+      }
+    },
+    SCENARIO_TIMEOUT_MS,
+  );
+
+  it(
+    'leaves series untouched when the option is off',
+    async () => {
+      if (!context) throw new Error('E2E context not initialized');
+      // Content differs from the scenario above: identical bytes would let the scanner adopt that
+      // scenario's book (and its series) as a file moved in from another library.
+      const fixture = await createFixtureTree(
+        [file('Blake et Mortimer/Blake et Mortimer T01.cbz', 'series-off\n'.repeat(600))],
+        'scanner-e2e-series-off-',
+      );
+      try {
+        const { libraryId } = await seedLibrary(context.db, { rootPath: fixture.rootPath, mode: 'book_per_file' });
+
+        await waitForScanCompletion(context.db, await triggerLibraryScan(context, libraryId));
+
+        expect(await seriesByRelativePath(libraryId, fixture.rootPath)).toEqual({
+          'Blake et Mortimer/Blake et Mortimer T01.cbz': { series: null, index: null },
+        });
+      } finally {
+        await fixture.cleanup();
+      }
+    },
+    SCENARIO_TIMEOUT_MS,
+  );
 });

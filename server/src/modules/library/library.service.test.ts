@@ -546,6 +546,83 @@ describe('LibraryService', () => {
     expect(scannerService.startScanAsync).not.toHaveBeenCalled();
   });
 
+  it('create rejects series from folders outside book_per_file', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+
+    await expect(service.create({ name: 'BD', icon: 'BookOpen', folders: ['/a'], deriveSeriesFromFolder: true } as any)).rejects.toThrow(
+      BadRequestException,
+    );
+
+    expect(libraryRepo.insert).not.toHaveBeenCalled();
+  });
+
+  it('create stores series from folders for a book_per_file library', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'BD', icon: 'BookOpen', organizationMode: 'book_per_file' }]);
+    libraryRepo.insertFolders.mockResolvedValue([{ id: 11, path: '/a' }]);
+
+    await service.create({ name: 'BD', icon: 'BookOpen', folders: ['/a'], organizationMode: 'book_per_file', deriveSeriesFromFolder: true } as any);
+
+    expect(libraryRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ organizationMode: 'book_per_file', deriveSeriesFromFolder: true }));
+  });
+
+  it('create leaves series from folders off by default', async () => {
+    libraryRepo.findByName.mockResolvedValue([]);
+    libraryRepo.insert.mockResolvedValue([{ id: 5, type: 'books', name: 'Sci-Fi', icon: 'BookOpen' }]);
+    libraryRepo.insertFolders.mockResolvedValue([{ id: 11, path: '/a' }]);
+
+    await service.create({ name: 'Sci-Fi', icon: 'BookOpen', folders: ['/a'] } as any);
+
+    expect(libraryRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ deriveSeriesFromFolder: false }));
+  });
+
+  it('update rejects series from folders on a book_per_folder library', async () => {
+    libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: 'book_per_folder' }]);
+
+    await expect(service.update(10, { deriveSeriesFromFolder: true } as any)).rejects.toThrow(BadRequestException);
+
+    expect(libraryRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('update rescans when series from folders is switched on', async () => {
+    const existing = {
+      id: 10,
+      type: 'books',
+      name: 'BD',
+      icon: 'BookOpen',
+      watch: false,
+      organizationMode: 'book_per_file',
+      deriveSeriesFromFolder: false,
+    };
+    libraryRepo.findById.mockResolvedValue([existing]);
+    libraryRepo.update.mockResolvedValue([{ ...existing, deriveSeriesFromFolder: true }]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    await service.update(10, { deriveSeriesFromFolder: true } as any);
+
+    expect(libraryRepo.update).toHaveBeenCalledWith(10, { deriveSeriesFromFolder: true });
+    expect(scannerService.startScanAsync).toHaveBeenCalledWith(10);
+  });
+
+  it('update does not rescan when series from folders is resent unchanged', async () => {
+    const existing = {
+      id: 10,
+      type: 'books',
+      name: 'BD',
+      icon: 'BookOpen',
+      watch: false,
+      organizationMode: 'book_per_file',
+      deriveSeriesFromFolder: true,
+    };
+    libraryRepo.findById.mockResolvedValue([existing]);
+    libraryRepo.update.mockResolvedValue([existing]);
+    libraryRepo.findFoldersByLibrary.mockResolvedValue([{ id: 1, path: '/books' }]);
+
+    await service.update(10, { deriveSeriesFromFolder: true } as any);
+
+    expect(scannerService.startScanAsync).not.toHaveBeenCalled();
+  });
+
   it('update accepts the same organization mode without triggering a scan', async () => {
     libraryRepo.findById.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: 'book_per_file' }]);
     libraryRepo.update.mockResolvedValue([{ id: 10, name: 'Current', icon: 'BookOpen', watch: false, organizationMode: 'book_per_file' }]);

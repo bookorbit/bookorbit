@@ -22,9 +22,10 @@ const emit = defineEmits<{ edit: [library: Library] }>()
 
 const { t } = useI18n()
 
-const organizationLabel = computed(() =>
-  props.library.organizationMode === 'book_per_file' ? t('settings.admin.libraries.fileMode') : t('settings.admin.libraries.folderMode'),
-)
+const organizationLabel = computed(() => {
+  if (props.library.organizationMode !== 'book_per_file') return t('settings.admin.libraries.folderMode')
+  return props.library.deriveSeriesFromFolder ? t('settings.admin.libraries.fileModeSeriesFromFolders') : t('settings.admin.libraries.fileMode')
+})
 const excludeLabel = computed(() =>
   props.library.excludePatterns.length === 0
     ? t('settings.admin.libraries.detail.none')

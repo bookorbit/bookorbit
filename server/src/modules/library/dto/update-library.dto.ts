@@ -104,6 +104,10 @@ export class UpdateLibraryDto {
   @IsIn(LIBRARY_ORGANIZATION_MODES)
   organizationMode?: OrganizationMode;
 
+  @IsOptional()
+  @IsBoolean()
+  deriveSeriesFromFolder?: boolean;
+
   @ValidateIf((_, value) => value !== undefined)
   @IsIn(LIBRARY_ADDED_AT_SOURCES)
   addedAtSource?: AddedAtSource;

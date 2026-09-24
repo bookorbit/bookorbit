@@ -79,6 +79,8 @@ export interface Library {
   formatPriority: string[];
   allowedFormats: string[];
   organizationMode: OrganizationMode;
+  /** Only valid with `book_per_file`. */
+  deriveSeriesFromFolder: boolean;
   addedAtSource: AddedAtSource;
   excludePatterns: string[];
   readingThreshold: number;
