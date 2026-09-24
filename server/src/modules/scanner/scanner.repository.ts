@@ -107,6 +107,7 @@ export class ScannerRepository {
         metadataPrecedence: libraries.metadataPrecedence,
         excludePatterns: libraries.excludePatterns,
         organizationMode: libraries.organizationMode,
+        deriveSeriesFromFolder: libraries.deriveSeriesFromFolder,
         addedAtSource: libraries.addedAtSource,
       })
       .from(libraries)

@@ -13,6 +13,7 @@ function mountScanner(overrides: Partial<InstanceType<typeof LibraryCreatorScann
   return mount(LibraryCreatorScanner, {
     props: {
       organizationMode: 'book_per_folder',
+      deriveSeriesFromFolder: false,
       organizationModeLocked: false,
       allowedFormats: [],
       addedAtSource: 'imported',
@@ -32,6 +33,39 @@ describe('LibraryCreatorScanner', () => {
     await wrapper.findAll('button')[1]!.trigger('click')
 
     expect(wrapper.emitted('update:organizationMode')).toEqual([['book_per_file']])
+  })
+
+  it('hides series from folders unless each file is its own book', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_folder' })
+
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+  })
+
+  it('offers series from folders in file mode and explains who it is for', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file' })
+
+    const checkbox = wrapper.find('input[type="checkbox"]')
+    expect(checkbox.exists()).toBe(true)
+    expect((checkbox.element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.text()).toContain('Komga')
+    expect(wrapper.text()).toContain('Kavita')
+    expect(wrapper.text()).toContain('Leave it off if your folders are grouped by author')
+  })
+
+  it('emits series from folders when toggled', async () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file' })
+
+    await wrapper.find('input[type="checkbox"]').setValue(true)
+
+    expect(wrapper.emitted('update:deriveSeriesFromFolder')).toEqual([[true]])
+  })
+
+  it('stays available when the organization mode is locked', () => {
+    const wrapper = mountScanner({ organizationMode: 'book_per_file', organizationModeLocked: true, deriveSeriesFromFolder: true })
+
+    const checkbox = wrapper.find('input[type="checkbox"]')
+    expect(checkbox.attributes('disabled')).toBeUndefined()
+    expect((checkbox.element as HTMLInputElement).checked).toBe(true)
   })
 
   it('disables organization mode changes when locked', async () => {

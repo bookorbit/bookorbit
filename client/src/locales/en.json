@@ -1083,6 +1083,7 @@
         "booksUnit": "{count, plural, one {book} other {books}}",
         "folderCount": "{count, plural, =0 {no folders} one {# folder} other {# folders}}",
         "fileMode": "File mode",
+        "fileModeSeriesFromFolders": "File mode, series from folders",
         "folderMode": "Folder mode",
         "emptyTitle": "No libraries yet",
         "emptyHint": "Add a library to start organizing your books.",
@@ -8380,6 +8381,15 @@
             "title": "File as Book",
             "hint": "Treats every file as an individual book. Best suited for libraries with one format per title. Avoid if your audiobooks span multiple files."
           }
+        },
+        "seriesFromFolders": {
+          "title": "Group files into series by folder",
+          "badge": "Komga / Kavita layout",
+          "why": "Recommended if you are coming from Komga or Kavita, or if your comics and manga are organised with one folder per series and carry no ComicInfo.xml. Without this option, every file stays a standalone book.",
+          "how": "Each folder becomes a series and each file in it one volume or chapter, numbered from its name: T01, Vol. 2, #3, c12, chapter 5, 12화, 第3巻. When nothing in a folder is numbered, files follow their alphabetical order.",
+          "example": "Blake et Mortimer/Blake et Mortimer T01.cbz → series \"Blake et Mortimer\", book 1",
+          "whenNot": "Leave it off if your folders are grouped by author, publisher or genre rather than by series.",
+          "precedence": "A series named inside a file (ComicInfo.xml, OPF) is kept; the folder fills in books that have none. Turning this on or off rescans the library."
         },
         "addedAt": {
           "title": "Date added",

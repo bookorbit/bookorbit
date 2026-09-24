@@ -204,6 +204,7 @@ beforeEach(() => {
   mockStat.mockResolvedValue({ isFile: () => true, ino: 2001n, size: 1024, mtime: new Date('2024-01-01') } as any);
   delete (mockMetadata as Record<string, unknown>).extractAndSaveIfAvailable;
   delete (mockMetadata as Record<string, unknown>).extractAndSaveSource;
+  delete (mockMetadata as Record<string, unknown>).applyFolderSeries;
 });
 
 // ── startScan — precondition checks ──────────────────────────────────────────
@@ -3990,5 +3991,145 @@ describe('incremental scan — settings invalidation', () => {
     await done;
 
     expect(repo.clearDirScanState).not.toHaveBeenCalled();
+  });
+});
+
+// ── Series from folders (#1167) ──────────────────────────────────────────────
+
+describe('book_per_file mode: series from folders', () => {
+  const seriesFile = makeFileStat({
+    absolutePath: '/library/Blake et Mortimer/Blake et Mortimer T01.cbz',
+    relPath: 'Blake et Mortimer/Blake et Mortimer T01.cbz',
+    format: 'cbz',
+    role: 'content',
+  });
+  const seriesCandidate = {
+    folderPath: seriesFile.absolutePath,
+    files: [seriesFile],
+    derivedSeries: { name: 'Blake et Mortimer', index: '1' },
+  };
+
+  function settings(overrides: Record<string, unknown> = {}) {
+    return {
+      allowedFormats: [],
+      formatPriority: DEFAULT_FORMAT_PRIORITY,
+      metadataPrecedence: ['embedded', 'opfFile'],
+      excludePatterns: [],
+      organizationMode: 'book_per_file',
+      deriveSeriesFromFolder: true,
+      ...overrides,
+    };
+  }
+
+  async function runFullScan(librarySettings: Record<string, unknown>) {
+    const applyFolderSeries = vi.fn().mockResolvedValue('updated');
+    (mockMetadata as Record<string, unknown>).applyFolderSeries = applyFolderSeries;
+    const repo = makeRepo({ findLibrarySettings: vi.fn().mockResolvedValue(librarySettings) });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+    return { applyFolderSeries, repo };
+  }
+
+  it('asks the walker for folder series with the library folder as root', async () => {
+    await runFullScan(settings());
+
+    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library', [], expect.any(Function), undefined, {
+      deriveSeriesFromFolder: { libraryRoot: '/library' },
+    });
+  });
+
+  it('ignores the flag outside book_per_file', async () => {
+    await runFullScan(settings({ organizationMode: 'book_per_folder' }));
+
+    expect(mockFindLooseCandidates).not.toHaveBeenCalled();
+    expect(mockFindCandidates).toHaveBeenCalled();
+  });
+
+  it('writes the derived series, filling gaps when file sources rank first', async () => {
+    mockFindLooseCandidates.mockResolvedValue({
+      candidates: [seriesCandidate],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const { applyFolderSeries } = await runFullScan(settings());
+
+    expect(applyFolderSeries).toHaveBeenCalledWith(expect.any(Number), { name: 'Blake et Mortimer', index: '1' }, { leads: false });
+  });
+
+  it('lets the folder lead when folderStructure ranks above every file source', async () => {
+    mockFindLooseCandidates.mockResolvedValue({
+      candidates: [seriesCandidate],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const { applyFolderSeries } = await runFullScan(settings({ metadataPrecedence: ['folderStructure', 'embedded', 'opfFile'] }));
+
+    expect(applyFolderSeries).toHaveBeenCalledWith(expect.any(Number), expect.anything(), { leads: true });
+  });
+
+  it('does not touch series for candidates without a derived series', async () => {
+    const plain = makeFileStat({ absolutePath: '/library/loose.cbz', relPath: 'loose.cbz', format: 'cbz', role: 'content' });
+    mockFindLooseCandidates.mockResolvedValue({
+      candidates: [{ folderPath: plain.absolutePath, files: [plain] }],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const { applyFolderSeries } = await runFullScan(settings());
+
+    expect(applyFolderSeries).not.toHaveBeenCalled();
+  });
+
+  it('keeps the scan going when writing a folder series fails', async () => {
+    mockFindLooseCandidates.mockResolvedValue({
+      candidates: [seriesCandidate],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    (mockMetadata as Record<string, unknown>).applyFolderSeries = vi.fn().mockRejectedValue(new Error('db down'));
+    const repo = makeRepo({ findLibrarySettings: vi.fn().mockResolvedValue(settings()) });
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.completeScanJob).toHaveBeenCalled();
+    expect(repo.failScanJob).not.toHaveBeenCalled();
+  });
+
+  it('rescans the whole series directory when one file changes', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue(settings()),
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookFolder('/library/Blake et Mortimer/Blake et Mortimer T02.cbz', 1);
+
+    expect(mockFindLooseCandidates).toHaveBeenCalledWith('/library/Blake et Mortimer', [], expect.any(Function), undefined, {
+      deriveSeriesFromFolder: { libraryRoot: '/library' },
+    });
+    expect(repo.createBook).not.toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/Blake et Mortimer/Blake et Mortimer T02.cbz' }));
+  });
+
+  it('still scans a file at the library root on its own', async () => {
+    const repo = makeRepo({
+      findLibrarySettings: vi.fn().mockResolvedValue(settings()),
+      findLibraryFolders: vi.fn().mockResolvedValue([{ id: 1, path: '/library', libraryId: 1 }]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookFolder('/library/loose.cbz', 1);
+
+    expect(mockFindLooseCandidates).not.toHaveBeenCalled();
+    expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: '/library/loose.cbz' }));
   });
 });

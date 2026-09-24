@@ -106,13 +106,16 @@ export interface E2EContext {
   adminToken: string;
 }
 
-export async function createE2EContext(): Promise<E2EContext> {
-  const moduleFixture = await Test.createTestingModule({
+export interface E2EContextOptions {
+  /** Keep the real MetadataService, for suites that assert what the scanner writes. */
+  realMetadata?: boolean;
+}
+
+export async function createE2EContext(options: E2EContextOptions = {}): Promise<E2EContext> {
+  const builder = Test.createTestingModule({
     imports: [AppModule],
-  })
-    .overrideProvider(MetadataService)
-    .useValue(makeMetadataNoopMock())
-    .compile();
+  });
+  const moduleFixture = await (options.realMetadata ? builder : builder.overrideProvider(MetadataService).useValue(makeMetadataNoopMock())).compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');
@@ -145,6 +148,8 @@ export interface SeedLibraryInput {
   excludePatterns?: string[];
   watch?: boolean;
   name?: string;
+  deriveSeriesFromFolder?: boolean;
+  metadataPrecedence?: string[];
 }
 
 export async function seedLibrary(db: Db, input: SeedLibraryInput): Promise<{ libraryId: number; libraryFolderId: number }> {
@@ -155,6 +160,8 @@ export async function seedLibrary(db: Db, input: SeedLibraryInput): Promise<{ li
       name: input.name ?? `e2e-${input.mode}-${randomUUID()}`,
       watch: input.watch ?? false,
       organizationMode: input.mode,
+      deriveSeriesFromFolder: input.deriveSeriesFromFolder ?? false,
+      ...(input.metadataPrecedence ? { metadataPrecedence: input.metadataPrecedence } : {}),
       allowedFormats: input.allowedFormats ?? [],
       excludePatterns: input.excludePatterns ?? [],
       formatPriority: [...DEFAULT_FORMAT_PRIORITY],

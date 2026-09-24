@@ -60,6 +60,7 @@ const BOOK_ONLY_LIBRARY_FIELDS = [
   'formatPriority',
   'allowedFormats',
   'organizationMode',
+  'deriveSeriesFromFolder',
   'excludePatterns',
   'readingThreshold',
   'markAsFinishedPercentComplete',
@@ -178,6 +179,10 @@ export class LibraryService {
       throw new BadRequestException('Icon is required');
     }
 
+    const organizationMode =
+      libraryType === 'books' ? (dto.organizationMode ?? DEFAULT_LIBRARY_ORGANIZATION_MODE) : DEFAULT_LIBRARY_ORGANIZATION_MODE;
+    assertSeriesFromFolderAllowed(dto.deriveSeriesFromFolder, organizationMode);
+
     const [library] = await this.libraryRepo.insert({
       type: libraryType,
       name: dto.name,
@@ -189,7 +194,8 @@ export class LibraryService {
       metadataPrecedence: libraryType === 'books' ? (dto.metadataPrecedence ?? [...LIBRARY_METADATA_PRECEDENCE_DEFAULT]) : [],
       formatPriority: libraryType === 'books' ? (dto.formatPriority ?? [...DEFAULT_FORMAT_PRIORITY]) : [],
       allowedFormats: libraryType === 'books' ? (dto.allowedFormats ?? []) : [],
-      organizationMode: libraryType === 'books' ? (dto.organizationMode ?? DEFAULT_LIBRARY_ORGANIZATION_MODE) : DEFAULT_LIBRARY_ORGANIZATION_MODE,
+      organizationMode,
+      deriveSeriesFromFolder: dto.deriveSeriesFromFolder ?? false,
       addedAtSource: dto.addedAtSource ?? DEFAULT_LIBRARY_ADDED_AT_SOURCE,
       excludePatterns: libraryType === 'books' ? (dto.excludePatterns ?? []) : [],
       coverAspectRatio: dto.coverAspectRatio ?? (libraryType === 'podcasts' ? '1/1' : DEFAULT_LIBRARY_COVER_ASPECT_RATIO),
@@ -242,6 +248,7 @@ export class LibraryService {
         'Library organization mode cannot be changed after creation. Create a new library to use a different organization mode.',
       );
     }
+    assertSeriesFromFolderAllowed(dto.deriveSeriesFromFolder, existingOrganizationMode);
 
     if (dto.name && dto.name !== existing.name) {
       await this.assertNameAvailable(dto.name, id);
@@ -325,8 +332,14 @@ export class LibraryService {
       );
     }
 
+    const seriesFromFolderChanged =
+      dto.deriveSeriesFromFolder !== undefined && dto.deriveSeriesFromFolder !== (existing.deriveSeriesFromFolder ?? false);
     const shouldRescan =
-      dto.formatPriority !== undefined || dto.allowedFormats !== undefined || dto.excludePatterns !== undefined || folderInputs !== undefined;
+      dto.formatPriority !== undefined ||
+      dto.allowedFormats !== undefined ||
+      dto.excludePatterns !== undefined ||
+      folderInputs !== undefined ||
+      seriesFromFolderChanged;
     if (shouldRescan && existing.type === 'books') this.scannerService.startScanAsync(id);
 
     return { ...normalizeLibraryOrganizationMode(updated), folders };
@@ -733,6 +746,12 @@ async function resolveExistingRoot(path: string): Promise<string | null> {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+function assertSeriesFromFolderAllowed(deriveSeriesFromFolder: boolean | undefined, organizationMode: OrganizationMode): void {
+  if (deriveSeriesFromFolder === true && organizationMode !== 'book_per_file') {
+    throw new BadRequestException('Series from folders is only available when each file is its own book (book_per_file).');
+  }
 }
 
 function normalizeOrganizationMode(mode: string | null | undefined): OrganizationMode {
