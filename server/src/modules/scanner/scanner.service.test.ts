@@ -4057,10 +4057,10 @@ describe('book_per_file mode: series from folders', () => {
 
     const { applyFolderSeries } = await runFullScan(settings());
 
-    expect(applyFolderSeries).toHaveBeenCalledWith(expect.any(Number), { name: 'Blake et Mortimer', index: '1' }, { leads: false });
+    expect(applyFolderSeries).toHaveBeenCalledWith(expect.any(Number), { name: 'Blake et Mortimer', index: '1' });
   });
 
-  it('lets the folder lead when folderStructure ranks above every file source', async () => {
+  it('only fills in with the server default precedence, which lists folderStructure first', async () => {
     mockFindLooseCandidates.mockResolvedValue({
       candidates: [seriesCandidate],
       skippedDirs: new Set(),
@@ -4068,9 +4068,10 @@ describe('book_per_file mode: series from folders', () => {
       dirMtimes: new Map(),
     });
 
-    const { applyFolderSeries } = await runFullScan(settings({ metadataPrecedence: ['folderStructure', 'embedded', 'opfFile'] }));
+    const { applyFolderSeries } = await runFullScan(settings({ metadataPrecedence: undefined }));
 
-    expect(applyFolderSeries).toHaveBeenCalledWith(expect.any(Number), expect.anything(), { leads: true });
+    expect(applyFolderSeries).toHaveBeenCalledTimes(1);
+    expect(applyFolderSeries.mock.calls[0]).toEqual([expect.any(Number), { name: 'Blake et Mortimer', index: '1' }]);
   });
 
   it('does not touch series for candidates without a derived series', async () => {

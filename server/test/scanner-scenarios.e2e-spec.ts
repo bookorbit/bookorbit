@@ -542,7 +542,9 @@ describe('Scanner series from folders (e2e, #1167)', () => {
         await waitForScanCompletion(context.db, await triggerLibraryScan(context, libraryId));
         const rescanned = await seriesByRelativePath(libraryId, fixture.rootPath);
         expect(rescanned['Solo Leveling/Solo Leveling c010.cbz']).toEqual({ series: 'Solo Leveling', index: '10' });
-        expect(rescanned['Solo Leveling/Solo Leveling v01.cbz']).toEqual({ series: 'Solo Leveling', index: null });
+        // The folder is now chapter-indexed and has no number for the volume file, which keeps the
+        // index it already had rather than losing it.
+        expect(rescanned['Solo Leveling/Solo Leveling v01.cbz']).toEqual({ series: 'Solo Leveling', index: '1' });
         await assertNoIntegrityViolations(context.db);
       } finally {
         await fixture.cleanup();

@@ -184,18 +184,6 @@ function derivesSeriesFromFolder(
   return settings?.deriveSeriesFromFolder === true && normalizeOrganizationMode(settings.organizationMode) === 'book_per_file';
 }
 
-// The folder's series overrides file metadata only when `folderStructure` is ranked above every
-// file source; otherwise it only fills gaps.
-function folderSeriesLeads(metadataPrecedence: string[]): boolean {
-  const configured: readonly string[] = metadataPrecedence.length > 0 ? metadataPrecedence : LIBRARY_METADATA_PRECEDENCE_DEFAULT;
-  const folderRank = configured.indexOf('folderStructure');
-  if (folderRank === -1) return false;
-  return SCANNER_METADATA_SOURCES.every((source) => {
-    const rank = configured.indexOf(source);
-    return rank === -1 || folderRank < rank;
-  });
-}
-
 function normalizeAddedAtSource(source: string | null | undefined): AddedAtSource {
   return source === 'file_modified' || source === 'file_created' ? source : 'imported';
 }
@@ -1835,9 +1823,7 @@ export class ScannerService implements OnApplicationBootstrap {
     // because adding a sibling can renumber the folder.
     if (candidate.derivedSeries && !selfWriteInProgress) {
       try {
-        const outcome = await this.metadataService.applyFolderSeries(book.id, candidate.derivedSeries, {
-          leads: folderSeriesLeads(metadataPrecedence),
-        });
+        const outcome = await this.metadataService.applyFolderSeries(book.id, candidate.derivedSeries);
         if (outcome === 'updated' && !book.created) counts.updated++;
       } catch (err) {
         this.logger.warn(

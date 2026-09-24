@@ -647,7 +647,7 @@ describe('MetadataService', () => {
       const { db, updateSet } = withCurrentSeries(null, null);
       const service = makeService(db);
 
-      await expect(service.applyFolderSeries(70, { name: 'Blake et Mortimer', index: '1' }, { leads: false })).resolves.toBe('updated');
+      await expect(service.applyFolderSeries(70, { name: 'Blake et Mortimer', index: '1' })).resolves.toBe('updated');
 
       expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ seriesName: 'Blake et Mortimer', seriesIndex: '1' }));
     });
@@ -656,7 +656,7 @@ describe('MetadataService', () => {
       const { db, updateSet } = withCurrentSeries('blake et mortimer', '3');
       const service = makeService(db);
 
-      await expect(service.applyFolderSeries(71, { name: 'Blake et Mortimer', index: '2' }, { leads: false })).resolves.toBe('updated');
+      await expect(service.applyFolderSeries(71, { name: 'Blake et Mortimer', index: '2' })).resolves.toBe('updated');
 
       expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ seriesIndex: '2' }));
     });
@@ -665,7 +665,7 @@ describe('MetadataService', () => {
       const { db } = withCurrentSeries('Blake et Mortimer', '2');
       const service = makeService(db);
 
-      await expect(service.applyFolderSeries(72, { name: 'Blake et Mortimer', index: '2' }, { leads: false })).resolves.toBe('unchanged');
+      await expect(service.applyFolderSeries(72, { name: 'Blake et Mortimer', index: '2' })).resolves.toBe('unchanged');
 
       expect(db.update).not.toHaveBeenCalled();
     });
@@ -674,18 +674,29 @@ describe('MetadataService', () => {
       const { db } = withCurrentSeries('Blake & Mortimer', '6');
       const service = makeService(db);
 
-      await expect(service.applyFolderSeries(73, { name: 'Blake et Mortimer', index: '6' }, { leads: false })).resolves.toBe('kept');
+      await expect(service.applyFolderSeries(73, { name: 'Blake et Mortimer', index: '6' })).resolves.toBe('kept');
 
       expect(db.update).not.toHaveBeenCalled();
     });
 
-    it('replaces that series when the library ranks the folder first', async () => {
-      const { db, updateSet } = withCurrentSeries('Blake & Mortimer', '6');
+    it('never clears an existing index when the folder has no number for the file', async () => {
+      const { db } = withCurrentSeries('Blake et Mortimer', '6');
       const service = makeService(db);
 
-      await expect(service.applyFolderSeries(74, { name: 'Blake et Mortimer', index: '6' }, { leads: true })).resolves.toBe('updated');
+      await expect(service.applyFolderSeries(74, { name: 'Blake et Mortimer', index: null })).resolves.toBe('unchanged');
 
-      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ seriesName: 'Blake et Mortimer', seriesIndex: '6' }));
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('names a book that has no series without writing a null index', async () => {
+      const { db, updateSet } = withCurrentSeries(null, null);
+      const service = makeService(db);
+
+      await expect(service.applyFolderSeries(76, { name: 'Blake et Mortimer', index: null })).resolves.toBe('updated');
+
+      expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ seriesName: 'Blake et Mortimer' }));
+      expect(updateSet).not.toHaveBeenCalledWith(expect.objectContaining({ seriesIndex: expect.anything() }));
+      expect(updateSet).not.toHaveBeenCalledWith(expect.objectContaining({ seriesIndex: null }));
     });
 
     it('respects locked series fields', async () => {
@@ -697,7 +708,7 @@ describe('MetadataService', () => {
         },
       });
 
-      await expect(service.applyFolderSeries(75, { name: 'Blake et Mortimer', index: '1' }, { leads: true })).resolves.toBe('kept');
+      await expect(service.applyFolderSeries(75, { name: 'Blake et Mortimer', index: '1' })).resolves.toBe('kept');
 
       expect(db.update).not.toHaveBeenCalled();
     });
