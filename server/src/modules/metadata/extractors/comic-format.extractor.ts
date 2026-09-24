@@ -57,6 +57,7 @@ export class ComicFormatExtractor implements FormatExtractor {
       itunesId: comicMetadata?.itunesId ?? null,
       cover: cover ?? null,
       comicMetadata: comicMetadata?.comicMetadata ?? null,
+      hasEmbeddedMetadata: comicMetadata !== null,
     };
   }
 }

@@ -428,6 +428,7 @@ describe('metadata format extractors', () => {
         authors: [],
         genres: [],
         comicvineId: null,
+        hasEmbeddedMetadata: false,
       }),
     );
   });
@@ -457,6 +458,7 @@ describe('metadata format extractors', () => {
         ranobedbId: 'comic-ranobe',
         comicvineId: '140529',
         comicMetadata: { issueNumber: '55', volumeName: 'Batman' },
+        hasEmbeddedMetadata: true,
       }),
     );
   });
