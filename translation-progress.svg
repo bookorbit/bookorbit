@@ -30,8 +30,8 @@
   <text x="440" y="103" text-anchor="end" class="pct-label">99%</text>
   <text x="20" y="128" class="lang-label">🇧🇷  Portuguese</text>
   <rect x="142" y="120" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="120" width="221" height="6" rx="3" class="bar-progress" />
-  <text x="440" y="128" text-anchor="end" class="pct-label">90%</text>
+  <rect x="142" y="120" width="224" height="6" rx="3" class="bar-progress" />
+  <text x="440" y="128" text-anchor="end" class="pct-label">91%</text>
   <text x="20" y="153" class="lang-label">🇪🇸  Spanish</text>
   <rect x="142" y="145" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="145" width="214" height="6" rx="3" class="bar-progress" />
@@ -72,38 +72,38 @@
   <rect x="142" y="370" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="370" width="125" height="6" rx="3" class="bar-low" />
   <text x="440" y="378" text-anchor="end" class="pct-label">51%</text>
-  <text x="20" y="403" class="lang-label">🇷🇺  Russian</text>
+  <text x="20" y="403" class="lang-label">🇭🇺  Hungarian</text>
   <rect x="142" y="395" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="395" width="123" height="6" rx="3" class="bar-low" />
   <text x="440" y="403" text-anchor="end" class="pct-label">50%</text>
-  <text x="20" y="428" class="lang-label">🇨🇿  Czech</text>
+  <text x="20" y="428" class="lang-label">🇷🇺  Russian</text>
   <rect x="142" y="420" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="420" width="121" height="6" rx="3" class="bar-low" />
-  <text x="440" y="428" text-anchor="end" class="pct-label">49%</text>
-  <text x="20" y="453" class="lang-label">🇩🇰  Danish</text>
+  <rect x="142" y="420" width="123" height="6" rx="3" class="bar-low" />
+  <text x="440" y="428" text-anchor="end" class="pct-label">50%</text>
+  <text x="20" y="453" class="lang-label">🇨🇿  Czech</text>
   <rect x="142" y="445" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="445" width="121" height="6" rx="3" class="bar-low" />
   <text x="440" y="453" text-anchor="end" class="pct-label">49%</text>
-  <text x="20" y="478" class="lang-label">🇸🇪  Swedish</text>
+  <text x="20" y="478" class="lang-label">🇩🇰  Danish</text>
   <rect x="142" y="470" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="470" width="121" height="6" rx="3" class="bar-low" />
   <text x="440" y="478" text-anchor="end" class="pct-label">49%</text>
-  <text x="20" y="503" class="lang-label">🇺🇦  Ukrainian</text>
+  <text x="20" y="503" class="lang-label">🇸🇪  Swedish</text>
   <rect x="142" y="495" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="495" width="121" height="6" rx="3" class="bar-low" />
   <text x="440" y="503" text-anchor="end" class="pct-label">49%</text>
-  <text x="20" y="528" class="lang-label">🇳🇱  Dutch</text>
+  <text x="20" y="528" class="lang-label">🇺🇦  Ukrainian</text>
   <rect x="142" y="520" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="520" width="116" height="6" rx="3" class="bar-low" />
-  <text x="440" y="528" text-anchor="end" class="pct-label">47%</text>
-  <text x="20" y="553" class="lang-label">🇫🇮  Finnish</text>
+  <rect x="142" y="520" width="121" height="6" rx="3" class="bar-low" />
+  <text x="440" y="528" text-anchor="end" class="pct-label">49%</text>
+  <text x="20" y="553" class="lang-label">🇳🇱  Dutch</text>
   <rect x="142" y="545" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="545" width="116" height="6" rx="3" class="bar-low" />
   <text x="440" y="553" text-anchor="end" class="pct-label">47%</text>
-  <text x="20" y="578" class="lang-label">🇭🇺  Hungarian</text>
+  <text x="20" y="578" class="lang-label">🇫🇮  Finnish</text>
   <rect x="142" y="570" width="246" height="6" rx="3" class="bar-bg" />
-  <rect x="142" y="570" width="106" height="6" rx="3" class="bar-low" />
-  <text x="440" y="578" text-anchor="end" class="pct-label">43%</text>
+  <rect x="142" y="570" width="116" height="6" rx="3" class="bar-low" />
+  <text x="440" y="578" text-anchor="end" class="pct-label">47%</text>
   <text x="20" y="603" class="lang-label">🇹🇼  Chinese (T)</text>
   <rect x="142" y="595" width="246" height="6" rx="3" class="bar-bg" />
   <rect x="142" y="595" width="0" height="6" rx="3" class="bar-low" />
