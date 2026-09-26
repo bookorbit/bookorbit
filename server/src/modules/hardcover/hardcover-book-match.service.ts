@@ -97,6 +97,18 @@ query FindBookEditionsById($id: Int!) {
   }
 }`;
 
+// Resolves the cached edition by id, scoped to the book, instead of checking membership in the
+// capped list above: popular works have hundreds of editions, and a pick past the cap is still
+// the user's edition. Without this, the next sync would silently replace it via pickBestEdition.
+const FIND_BOOK_EDITION_METRICS_BY_ID_QUERY = `
+query FindBookEditionMetricsById($id: Int!, $editionId: Int!) {
+  books(where: { id: { _eq: $id } }, limit: 1) {
+    id
+    editions(where: { id: { _eq: $editionId } }, limit: 1) {${EDITION_FIELDS}
+    }
+  }
+}`;
+
 const AUDIO_FORMATS = new Set(['m4b', 'm4a', 'mp3', 'aax', 'aacx', 'aac', 'flac', 'ogg', 'opus', 'wma', 'mka']);
 
 interface HardcoverEdition {
@@ -448,19 +460,18 @@ export class HardcoverBookMatchService {
     cachedEditionId: number | null,
   ): Promise<{ hardcoverEditionId: number | null; editionPages: number | null; editionAudioSeconds: number | null }> {
     try {
-      const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_EDITIONS_BY_HARDCOVER_ID_QUERY, {
-        id: hardcoverBookId,
-      });
-      const hardcoverBook = data.books?.[0];
-      if (!hardcoverBook) {
-        return { hardcoverEditionId: cachedEditionId, editionPages: null, editionAudioSeconds: null };
-      }
-
-      const editions = hardcoverBook.editions ?? [];
-
       // A missing progress metric is not a reason to silently re-point the user's edition.
       if (cachedEditionId != null) {
-        const cachedEdition = editions.find((edition) => edition.id === cachedEditionId);
+        const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_EDITION_METRICS_BY_ID_QUERY, {
+          id: hardcoverBookId,
+          editionId: cachedEditionId,
+        });
+        const hardcoverBook = data.books?.[0];
+        if (!hardcoverBook) {
+          return { hardcoverEditionId: cachedEditionId, editionPages: null, editionAudioSeconds: null };
+        }
+
+        const cachedEdition = hardcoverBook.editions?.find((edition) => edition.id === cachedEditionId);
         if (cachedEdition) {
           return {
             hardcoverEditionId: cachedEditionId,
@@ -470,7 +481,16 @@ export class HardcoverBookMatchService {
         }
       }
 
-      const edition = this.pickBestEdition(editions, book);
+      // No usable cached edition on this book: fall back to the best edition among the capped list.
+      const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOK_EDITIONS_BY_HARDCOVER_ID_QUERY, {
+        id: hardcoverBookId,
+      });
+      const hardcoverBook = data.books?.[0];
+      if (!hardcoverBook) {
+        return { hardcoverEditionId: cachedEditionId, editionPages: null, editionAudioSeconds: null };
+      }
+
+      const edition = this.pickBestEdition(hardcoverBook.editions ?? [], book);
       if (!edition) {
         return { hardcoverEditionId: cachedEditionId, editionPages: null, editionAudioSeconds: null };
       }
