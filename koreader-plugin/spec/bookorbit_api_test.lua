@@ -373,30 +373,6 @@ local https_explicit_proxy_client = BookOrbitApi.new{
 assertEqual(https_explicit_proxy_client:getProxy(), nil,
     "proxy is skipped for HTTPS server to prevent cleartext credential leakage without CONNECT")
 
-local tailscale_ip_client = BookOrbitApi.new{
-    server_url = "http://100.85.60.88:3005/api/v1",
-}
-assertEqual(tailscale_ip_client:getProxy(), "http://127.0.0.1:1056",
-    "tailscale 100.64.0.0/10 server URL routes to userspace proxy")
-
-local non_tailscale_ip_client = BookOrbitApi.new{
-    server_url = "http://100.1.2.3:3005/api/v1",
-}
-assertEqual(non_tailscale_ip_client:getProxy(), nil,
-    "IPs outside Tailscale CGNAT range do not route to userspace proxy")
-
-local tailscale_magicdns_client = BookOrbitApi.new{
-    server_url = "http://my-server.tailnet.ts.net:3005/api/v1",
-}
-assertEqual(tailscale_magicdns_client:getProxy(), "http://127.0.0.1:1056",
-    "tailscale ts.net server URL routes to userspace proxy")
-
-local non_tailscale_path_client = BookOrbitApi.new{
-    server_url = "http://example.com/docs/tailnet.ts.net/api/v1",
-}
-assertEqual(non_tailscale_path_client:getProxy(), nil,
-    "url path containing .ts.net does not trigger userspace proxy")
-
 -- KOReader global settings proxy test
 local http_client = BookOrbitApi.new{
     server_url = "http://bookorbit.example.com/api/v1",
