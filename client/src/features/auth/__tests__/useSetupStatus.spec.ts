@@ -24,7 +24,7 @@ describe('useSetupStatus', () => {
     const { fetchSetupStatus, needsSetup, allowRegistration } = await loadComposable()
     await fetchSetupStatus()
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/setup-status', { credentials: 'include' })
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/setup-status', { credentials: 'include', redirect: 'manual' })
     expect(needsSetup.value).toBe(false)
     expect(allowRegistration.value).toBe(true)
   })

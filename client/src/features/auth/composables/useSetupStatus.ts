@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { fetchWithAuthProxyRecovery } from '@/lib/api'
 
 const needsSetup = ref<boolean | null>(null)
 const allowRegistration = ref(false)
@@ -12,7 +13,7 @@ export function useSetupStatus() {
 
     inFlight = (async () => {
       try {
-        const res = await fetch('/api/v1/auth/setup-status', { credentials: 'include' })
+        const res = await fetchWithAuthProxyRecovery('/api/v1/auth/setup-status', { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to load setup status')
         const data = (await res.json()) as { needsSetup?: boolean; allowRegistration?: boolean }
         setupStatusError.value = null
