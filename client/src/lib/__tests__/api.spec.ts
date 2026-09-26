@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { api, getValidToken, onAuthRecovered, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
+import { api, getValidToken, NetworkError, onAuthRecovered, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
 
 /** A token shaped like a real JWT, so the client can read `exp` out of it. Never verified here. */
 function signedToken(expiresInSeconds: number): string {
@@ -257,6 +257,77 @@ describe('api wrapper', () => {
       await api('/api/v1/books/1')
 
       expect(recovered).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('edge auth proxy redirects', () => {
+    /** What `fetch` hands back for a 3xx when the request used `redirect: 'manual'`. */
+    function opaqueRedirect(): Response {
+      const res = new Response(null)
+      Object.defineProperty(res, 'type', { value: 'opaqueredirect' })
+      return res
+    }
+
+    let reload: ReturnType<typeof vi.fn<() => void>>
+
+    beforeEach(() => {
+      sessionStorage.clear()
+      reload = vi.fn<() => void>()
+      vi.stubGlobal('location', { ...window.location, reload })
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('asks fetch not to follow redirects, so a proxy redirect is observable', async () => {
+      const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(new Response('{}', { status: 200 })))
+      globalThis.fetch = fetchMock as never
+
+      await api('/api/v1/books/1')
+
+      expect(fetchMock.mock.calls[0]![1]?.redirect).toBe('manual')
+    })
+
+    it('reloads the page instead of treating a proxy redirect as a logged-out session', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(() => Promise.resolve(opaqueRedirect())) as never
+      const onAuthFailure = vi.fn<() => void>()
+      setOnAuthFailure(onAuthFailure)
+
+      const settled = vi.fn<() => void>()
+      void api('/api/v1/books/1').then(settled, settled)
+      await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(onAuthFailure).not.toHaveBeenCalled()
+      expect(settled).not.toHaveBeenCalled()
+    })
+
+    it('reloads when the session refresh itself is redirected by the proxy', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(() => Promise.resolve(opaqueRedirect())) as never
+
+      void refreshAccessToken().catch(() => null)
+
+      await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+    })
+
+    it('gives up with an error instead of looping when the reload is redirected again right away', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(() => Promise.resolve(opaqueRedirect())) as never
+
+      void api('/api/v1/books/1')
+      await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+
+      await expect(api('/api/v1/books/1')).rejects.toBeInstanceOf(NetworkError)
+      expect(reload).toHaveBeenCalledTimes(1)
+    })
+
+    it('reloads again once the loop window has passed', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(() => Promise.resolve(opaqueRedirect())) as never
+      sessionStorage.setItem('bookorbit:auth-proxy-reload-at', String(Date.now() - 60_000))
+
+      void api('/api/v1/books/1')
+
+      await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
     })
   })
 })

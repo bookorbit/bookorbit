@@ -10,6 +10,9 @@ const EXPIRY_SKEW_MS = 30_000
 /** After a failed proactive refresh, stop trying for this long. Reactive 401 refreshes ignore it. */
 const REFRESH_COOLDOWN_MS = 5_000
 
+const AUTH_PROXY_RELOAD_KEY = 'bookorbit:auth-proxy-reload-at'
+const AUTH_PROXY_RELOAD_WINDOW_MS = 15_000
+
 let _accessToken: string | null = null
 let _accessTokenExpiresAt: number | null = null
 let _onAuthFailure: (() => void) | null = null
@@ -110,15 +113,51 @@ export class NetworkError extends Error {
   }
 }
 
+/**
+ * True when a same-origin request came back redirected elsewhere. With `redirect: 'manual'` this is
+ * how an edge auth proxy (Cloudflare Access, an OAuth2 gateway) shows up once its session cookie has
+ * expired: it can't be told apart from a logged-out app any other way, since `fetch` either follows the
+ * redirect into a CORS failure or throws before the caller ever sees a status code.
+ */
+export function isAuthProxyRedirect(res: Response): boolean {
+  return res.type === 'opaqueredirect'
+}
+
+/**
+ * A fetch can't complete a proxy's redirect to its login page itself. A full navigation can, so that's
+ * the only way through. Normally returns a promise that never settles: the reload is about to tear down this
+ * page, and letting the caller's `.then`/`.catch` run first (e.g. routing to the app's own login screen)
+ * would just flash the wrong UI for a moment.
+ */
+export function reloadForAuthProxy(): Promise<never> {
+  // If the reload is answered from the service worker cache again (e.g. the network-first route timed
+  // out), a second reload would loop forever. Give up and let the caller surface an error instead.
+  const now = Date.now()
+  let lastReload = 0
+  try {
+    lastReload = Number(sessionStorage.getItem(AUTH_PROXY_RELOAD_KEY)) || 0
+    sessionStorage.setItem(AUTH_PROXY_RELOAD_KEY, String(now))
+  } catch {
+    // Storage unavailable: fall through and reload once.
+  }
+  if (now - lastReload < AUTH_PROXY_RELOAD_WINDOW_MS) {
+    return Promise.reject(new NetworkError('auth proxy redirect'))
+  }
+  window.location.reload()
+  return new Promise<never>(() => {})
+}
+
 async function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers)
   if (_accessToken) headers.set('Authorization', `Bearer ${_accessToken}`)
+  let res: Response
   try {
-    return await fetch(input, { ...init, headers, credentials: 'include' })
+    res = await fetch(input, { redirect: 'manual', ...init, headers, credentials: 'include' })
   } catch (reason) {
     if (reason instanceof TypeError) throw new NetworkError(reason.message)
     throw reason
   }
+  return isAuthProxyRedirect(res) ? reloadForAuthProxy() : res
 }
 
 async function attemptRefresh(): Promise<string> {

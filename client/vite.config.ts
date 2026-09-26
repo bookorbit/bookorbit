@@ -90,9 +90,29 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         globIgnores: ['**/assets/foliate/**'],
-        navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        // vite-plugin-pwa defaults this to 'index.html' when omitted, which registers a cache-only
+        // NavigationRoute ahead of the network-first route below and shadows it.
+        navigateFallback: null,
         runtimeCaching: [
+          {
+            // Page loads must hit the network first: an edge auth proxy (e.g. Cloudflare Access) needs to
+            // see every navigation to redirect an expired session to its login page. Serving the precached
+            // shell unconditionally (the old `navigateFallback` behavior) hid the request from the proxy
+            // entirely and left the app stuck logged out with no way back in short of clearing site data.
+            urlPattern: ({ request, url }) => request.mode === 'navigate' && !url.pathname.startsWith('/api/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-shell',
+              networkTimeoutSeconds: 10,
+              precacheFallback: {
+                fallbackURL: 'index.html',
+              },
+              // Status 0 here would include an auth proxy's opaqueredirect and cache it as the page.
+              cacheableResponse: {
+                statuses: [200],
+              },
+            },
+          },
           {
             urlPattern: /^.*\/api\/v1\/books\/\d+\/cover\?(?:[^#]*&)?t=[^#]*$/,
             handler: 'CacheFirst',
