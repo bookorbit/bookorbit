@@ -694,6 +694,13 @@
       "when": 1790398181669,
       "tag": "0098_add_subtitle_search_index",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1790450071640,
+      "tag": "0099_add_mangabaka_columns",
+      "breakpoints": true
     }
   ]
 }

@@ -91,6 +91,7 @@ function makeDetail(overrides: Partial<BookDetail> = {}): BookDetail {
     covers: { ebook: null, audio: null },
     coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
     hardcoverEditionId: null,
+    mangabakaSeriesId: null,
     providerIds: {},
     authors: [],
     genres: [],

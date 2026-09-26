@@ -13,6 +13,7 @@ import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib
 import { coverFieldMedium, coverTileState, otherMedium } from '../../../lib/cover-slots'
 import MetadataSearchPanel from './MetadataSearchPanel.vue'
 import MetadataDiffPanel from './MetadataDiffPanel.vue'
+import MangabakaVolumeBrowser from '../mangabaka/MangabakaVolumeBrowser.vue'
 
 const props = defineProps<{ book: BookDetail; lockedFields: BookMetadataLockField[] }>()
 const emit = defineEmits<{
@@ -104,6 +105,7 @@ const secondCoverPriority = computed(() => (secondCoverMedium.value === 'audio' 
 
 const view = ref<'search' | 'diff'>('search')
 const selectedCandidate = ref<MetadataCandidate | null>(null)
+const lastSearchTitle = ref<string | undefined>(undefined)
 const drawerTitle = computed(() =>
   view.value === 'search' ? t('book.detail.editMetadata.searchDrawer.searchTitle') : t('book.detail.editMetadata.searchDrawer.compareTitle'),
 )
@@ -136,6 +138,7 @@ function runMetadataSearch(params: { title: string; author: string; isbn: string
 function handleSearch(params: { title: string; author: string; isbn: string }) {
   selectedCandidate.value = null
   view.value = 'search'
+  lastSearchTitle.value = params.title
   runMetadataSearch(params)
 }
 
@@ -216,7 +219,11 @@ function handleApply(patch: MetadataDiffApply) {
           @clear-filter="handleClearProviderFilter"
           @select-field-rules="handleSelectFieldRules"
           @select="handleSelect"
-        />
+        >
+          <template #results-extra>
+            <MangabakaVolumeBrowser :candidates="filteredResults" :query-title="lastSearchTitle" @select="handleSelect" />
+          </template>
+        </MetadataSearchPanel>
 
         <MetadataDiffPanel
           v-else-if="view === 'diff' && selectedCandidate"

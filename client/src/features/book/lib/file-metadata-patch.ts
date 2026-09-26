@@ -28,6 +28,7 @@ const FILE_METADATA_PATCH_FIELDS = [
   'ranobedbId',
   'lubimyczytacId',
   'aladinId',
+  'mangabakaId',
   'authors',
   'genres',
   'narrators',

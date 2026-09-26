@@ -1,5 +1,12 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { CoverMedia, MetadataCandidate, MetadataProviderKey, MetadataProviderSearchOutcome, MetadataProviderSearchStatus } from '@bookorbit/types';
+import {
+  CoverMedia,
+  MangabakaCollectionSummary,
+  MetadataCandidate,
+  MetadataProviderKey,
+  MetadataProviderSearchOutcome,
+  MetadataProviderSearchStatus,
+} from '@bookorbit/types';
 import { filter, from, map, merge, Observable, switchMap } from 'rxjs';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -10,6 +17,7 @@ import { ProviderThrottleTracker } from './provider-throttle.tracker';
 import { ProviderRegistry } from './provider-registry';
 import { PROVIDER_TIMEOUT_MS as PROVIDER_TIMEOUTS } from './providers/provider-constants';
 import { isIdentifiable, MetadataProvider } from './providers/metadata-provider';
+import { MangabakaProvider } from './providers/mangabaka/mangabaka.provider';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 import { sanitizeLogError } from './providers/provider-utils';
 
@@ -75,6 +83,20 @@ export class MetadataFetchService {
     return candidate ? withCoverShape(provider, candidate) : null;
   }
 
+  async getMangabakaCollections(seriesId: number): Promise<MangabakaCollectionSummary[]> {
+    const provider = this.registry.find(MetadataProviderKey.MANGABAKA);
+    if (!provider) return [];
+    const mangabaka = provider as MangabakaProvider;
+    return mangabaka.fetchSeriesCollections(seriesId);
+  }
+
+  async getMangabakaWorks(collectionId: string, seriesId: number, preferredLanguage?: string): Promise<MetadataCandidate[]> {
+    const provider = this.registry.find(MetadataProviderKey.MANGABAKA);
+    if (!provider) return [];
+    const mangabaka = provider as MangabakaProvider;
+    return mangabaka.fetchCollectionWorks(collectionId, seriesId, preferredLanguage);
+  }
+
   async getStoredProviderIds(bookId: number, user: RequestUser): Promise<Partial<Record<MetadataProviderKey, string>>> {
     const context = await this.getStoredProviderContext(bookId, user);
     return context.providerIds;
@@ -123,6 +145,7 @@ export class MetadataFetchService {
       [MetadataProviderKey.RANOBEDB]: row.ranobedbId ?? undefined,
       [MetadataProviderKey.LUBIMYCZYTAC]: row.lubimyczytacId ?? undefined,
       [MetadataProviderKey.ALADIN]: row.aladinId ?? undefined,
+      [MetadataProviderKey.MANGABAKA]: row.mangabakaId ?? undefined,
     };
   }
 

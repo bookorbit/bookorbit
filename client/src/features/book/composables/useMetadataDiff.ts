@@ -55,6 +55,7 @@ export type DiffFieldKey =
   | 'hardcoverEditionId'
   | ProviderIdPatchField
   | 'sourceUrl'
+  | 'mangabakaSeriesId'
   | ComicDiffFieldKey
 
 export interface ProviderFieldValue {
@@ -120,6 +121,8 @@ export interface MetadataPatch {
   ranobedbId?: string | null
   lubimyczytacId?: string | null
   aladinId?: string | null
+  mangabakaId?: string | null
+  mangabakaSeriesId?: string | null
   comicMetadata?: ComicMetadataFields
   customMetadata?: CustomMetadataBookValueInput[]
 }
@@ -173,6 +176,8 @@ export const FIELD_DEFS: { key: DiffFieldKey; labelKey: string }[] = (
     'durationSeconds',
     'abridged',
     'hardcoverEditionId',
+    'mangabakaId',
+    'mangabakaSeriesId',
   ] as const
 ).map((key) => ({ key, labelKey: `${FIELD_LABEL_PREFIX}.${key}` }))
 
@@ -220,6 +225,7 @@ export type ProviderIdPatchField =
   | 'ranobedbId'
   | 'lubimyczytacId'
   | 'aladinId'
+  | 'mangabakaId'
 
 export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField | undefined> = {
   google: 'googleBooksId',
@@ -236,6 +242,7 @@ export const PROVIDER_ID_FIELD: Record<MetadataProviderKey, ProviderIdPatchField
   kobo: 'koboId',
   lubimyczytac: 'lubimyczytacId',
   aladin: 'aladinId',
+  mangabaka: 'mangabakaId',
 }
 
 const PROVIDER_ID_PATCH_FIELDS = new Set<string>(Object.values(PROVIDER_ID_FIELD).filter((v): v is ProviderIdPatchField => v !== undefined))
@@ -280,6 +287,7 @@ function normalizeSeriesMemberships(values: readonly MetadataSeriesMembership[] 
     out.push({
       seriesName,
       seriesIndex: value.seriesIndex ?? null,
+      expectedBookCount: value.expectedBookCount ?? null,
     })
   }
   return out

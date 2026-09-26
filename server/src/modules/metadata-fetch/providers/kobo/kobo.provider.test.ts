@@ -29,6 +29,9 @@ describe('KoboProvider', () => {
     ranobedb: { enabled: false },
     kobo: { enabled: true, country: 'us', language: 'en' },
     lubimyczytac: { enabled: false },
+    mangabaka: { enabled: false },
+    librofm: { enabled: false },
+    aladin: { enabled: false, ttbKey: '' },
   };
 
   beforeEach(async () => {

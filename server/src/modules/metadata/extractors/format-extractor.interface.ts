@@ -29,6 +29,8 @@ export interface ParsedBookData {
   comicvineId?: string | null;
   lubimyczytacId?: string | null;
   aladinId?: string | null;
+  mangabakaId?: string | null;
+  mangabakaSeriesId?: string | null;
   itunesId?: string | null;
   audibleId?: string | null;
   librofmId?: string | null;

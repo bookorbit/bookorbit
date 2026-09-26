@@ -23,6 +23,8 @@ describe('provider ID fields', () => {
       'ranobedbId',
       'lubimyczytacId',
       'aladinId',
+      'mangabakaId',
+      'mangabakaSeriesId',
     ])
   })
 

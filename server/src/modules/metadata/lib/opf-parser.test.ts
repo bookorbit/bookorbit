@@ -526,6 +526,24 @@ describe('parseOpf', () => {
       expect(r.itunesId).toBe('123456789');
     });
 
+    it('parses MangaBaka ID from opf:scheme attribute', () => {
+      const xml = epub2Opf(`<dc:identifier opf:scheme="MANGABAKA">019e1d69-4210-767b-acd5-1de151bd138b</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.mangabakaId).toBe('019e1d69-4210-767b-acd5-1de151bd138b');
+    });
+
+    it('parses MangaBaka ID from urn: format', () => {
+      const xml = epub2Opf(`<dc:identifier>urn:mangabaka:019e1d69-4210-767b-acd5-1de151bd138b</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.mangabakaId).toBe('019e1d69-4210-767b-acd5-1de151bd138b');
+    });
+
+    it('parses MangaBaka ID from prefix format', () => {
+      const xml = epub3Opf(`<dc:identifier>mangabaka:019e1d69-4210-767b-acd5-1de151bd138b</dc:identifier>`);
+      const r = parseOpf(xml);
+      expect(r.mangabakaId).toBe('019e1d69-4210-767b-acd5-1de151bd138b');
+    });
+
     it('parses RanobeDB ID from opf:scheme attribute', () => {
       const xml = epub2Opf(`<dc:identifier opf:scheme="RANOBEDB">ranobe-1</dc:identifier>`);
       const r = parseOpf(xml);

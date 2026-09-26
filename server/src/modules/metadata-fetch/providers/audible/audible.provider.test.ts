@@ -42,6 +42,8 @@ const baseConfig: ProviderConfigurations = {
   kobo: { enabled: false, country: 'us', language: 'en' },
   lubimyczytac: { enabled: false },
   aladin: { enabled: false, ttbKey: '' },
+  mangabaka: { enabled: false },
+  librofm: { enabled: false },
 };
 
 function makeProvider(config: ProviderConfigurations = baseConfig): {

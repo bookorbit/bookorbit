@@ -19,9 +19,9 @@ function render(props: Partial<{ weights: MetadataScoreWeights; saved: MetadataS
 describe('ScoreWeightsLedger', () => {
   it('shows what a field is worth as a share rather than only its raw weight', () => {
     const text = render().text()
-    // Title is 10 of 78 points, and one decimal keeps it distinct from Description at 10.3%.
-    expect(text).toContain('12.8%')
-    expect(text).toContain('10.3%')
+    // Title is 10 of 80 points, and one decimal keeps it distinct from Description at 10.0%.
+    expect(text).toContain('12.5%')
+    expect(text).toContain('10.0%')
   })
 
   it('ranks the heaviest field first', () => {
@@ -45,7 +45,7 @@ describe('ScoreWeightsLedger', () => {
   it('renders a spinbutton per field, labelled by the visible field name', () => {
     const wrapper = render()
     const inputs = wrapper.findAll('input[type="number"]')
-    expect(inputs).toHaveLength(24)
+    expect(inputs).toHaveLength(26)
     expect(inputs[0].attributes('aria-labelledby')).toBe('score-field-title')
     expect(wrapper.find('#score-field-title').text()).toBe('Title')
   })

@@ -375,7 +375,7 @@ describe('useMetadataDiff', () => {
       seriesName: 'Sword of Truth',
       seriesIndex: '11',
       seriesMemberships: [
-        { seriesName: 'Sword of Truth', seriesIndex: '11' },
+        { seriesName: 'Sword of Truth', seriesIndex: '11', expectedBookCount: 12 },
         { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
       ],
     }
@@ -389,8 +389,8 @@ describe('useMetadataDiff', () => {
     toggleField('seriesIndex')
 
     expect(buildPatch().formPatch.seriesMemberships).toEqual([
-      { seriesName: 'Sword of Truth', seriesIndex: '11' },
-      { seriesName: 'Chainfire Trilogy', seriesIndex: '3' },
+      { seriesName: 'Sword of Truth', seriesIndex: '11', expectedBookCount: 12 },
+      { seriesName: 'Chainfire Trilogy', seriesIndex: '3', expectedBookCount: null },
     ])
   })
 

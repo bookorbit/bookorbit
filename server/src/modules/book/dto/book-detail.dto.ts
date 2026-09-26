@@ -65,6 +65,7 @@ export class BookDetailDto {
   covers: Record<CoverMedium, BookCoverSlot | null>;
   coverVersion: string;
   hardcoverEditionId: string | null;
+  mangabakaSeriesId: string | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];
   genres: string[];

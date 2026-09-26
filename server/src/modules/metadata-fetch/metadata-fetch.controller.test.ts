@@ -345,7 +345,7 @@ describe('MetadataFetchController', () => {
         lubimyczytac: { enabled: false },
       }),
     );
-    service.search.mockReturnValue(of({ provider: MetadataProviderKey.KOBO, providerId: 'dune-1', title: 'Dune' }));
+    service.search.mockReturnValue(of(candidateEvent({ provider: MetadataProviderKey.KOBO, providerId: 'dune-1', title: 'Dune' })));
 
     const stream = await controller.stream({ title: 'Dune' }, user);
     await firstValueFrom(stream.pipe(toArray()));
@@ -711,5 +711,6 @@ function makeProviderConfig(overrides: Partial<ProviderConfigurations> = {}): Pr
     kobo: { enabled: true, country: 'us', language: 'en', ...overrides.kobo },
     lubimyczytac: { enabled: false, ...overrides.lubimyczytac },
     aladin: { enabled: false, ttbKey: '', ...overrides.aladin },
+    mangabaka: { enabled: false, ...overrides.mangabaka },
   };
 }
