@@ -9,6 +9,7 @@ vi.mock('fs/promises', () => ({
 }));
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { access, lstat, readdir, readFile, stat, unlink } from 'fs/promises';
 import { DatabaseError } from 'pg';
 
@@ -18,7 +19,23 @@ import {
   NotificationType,
   type BookDockMetadata,
 } from '@bookorbit/types';
+import { SeriesMembershipService } from '../../common/services/series-membership.service';
+import { DB } from '../../db';
+import { AppSettingsService } from '../app-settings/app-settings.service';
+import { BookReadService } from '../book/book-read.service';
+import { FileWriteService } from '../file-write/file-write.service';
+import { LibraryService } from '../library/library.service';
+import { MetadataService } from '../metadata/metadata.service';
+import { MetadataScoreService } from '../metadata-score/metadata-score.service';
+import { NotificationService } from '../notification/notification.service';
+import { UploadProcessorService } from '../upload/upload-processor.service';
+import { UploadStorageService } from '../upload/upload-storage.service';
+import { UploadValidatorService } from '../upload/upload-validator.service';
+import { BookDockEventsService } from './book-dock-events.service';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
+import { BookDockProcessingStateService } from './book-dock-processing-state.service';
+import { BookDockGateway } from './book-dock.gateway';
+import { BookDockRepository } from './book-dock.repository';
 
 const mockAccess = vi.mocked(access);
 const mockLstat = vi.mocked(lstat);
@@ -27,7 +44,7 @@ const mockReadFile = vi.mocked(readFile);
 const mockStat = vi.mocked(stat);
 const mockUnlink = vi.mocked(unlink);
 
-function makeService() {
+async function makeService() {
   const db = {
     select: vi.fn(),
     update: vi.fn(),
@@ -100,25 +117,28 @@ function makeService() {
     scheduleWrite: vi.fn(),
   };
 
-  const service = new BookDockFinalizeService(
-    db as never,
-    repo as never,
-    libraryService as never,
-    appSettings as never,
-    metadataService as never,
-    metadataScoreService as never,
-    bookReadService as never,
-    validator as never,
-    storage as never,
-    processor as never,
-    events as never,
-    gateway as never,
-    notificationService as never,
-    processingState as never,
-    fileWriteService as never,
-    undefined as never,
-    seriesMemberships as never,
-  );
+  const module = await Test.createTestingModule({
+    providers: [
+      BookDockFinalizeService,
+      { provide: DB, useValue: db },
+      { provide: BookDockRepository, useValue: repo },
+      { provide: LibraryService, useValue: libraryService },
+      { provide: AppSettingsService, useValue: appSettings },
+      { provide: MetadataService, useValue: metadataService },
+      { provide: MetadataScoreService, useValue: metadataScoreService },
+      { provide: BookReadService, useValue: bookReadService },
+      { provide: UploadValidatorService, useValue: validator },
+      { provide: UploadStorageService, useValue: storage },
+      { provide: UploadProcessorService, useValue: processor },
+      { provide: BookDockEventsService, useValue: events },
+      { provide: BookDockGateway, useValue: gateway },
+      { provide: NotificationService, useValue: notificationService },
+      { provide: BookDockProcessingStateService, useValue: processingState },
+      { provide: FileWriteService, useValue: fileWriteService },
+      { provide: SeriesMembershipService, useValue: seriesMemberships },
+    ],
+  }).compile();
+  const service = module.get(BookDockFinalizeService);
 
   return {
     service,
@@ -191,7 +211,7 @@ describe('BookDockFinalizeService', () => {
 
   describe('triggerAutoFinalize', () => {
     it('does not load settings or rows while Book Dock processing is paused', async () => {
-      const { service, repo, appSettings, processingState } = makeService();
+      const { service, repo, appSettings, processingState } = await makeService();
       processingState.isPaused.mockResolvedValue(true);
       const pauseSpy = vi.spyOn((service as any).autoFinalizeQueue, 'pause');
 
@@ -207,7 +227,7 @@ describe('BookDockFinalizeService', () => {
      * library or file it before that module's own verification ran, and both fail silently.
      */
     it('skips a row whose finalization another module owns', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       const row = makeRow({ autoFinalizeSuppressed: true });
 
       appSettings.getAutoFinalizeSettings.mockResolvedValue({
@@ -226,7 +246,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('merges embedded and fetched metadata when auto-finalizing and selected metadata is empty', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       const fetched = { title: 'Fetched Title', authors: ['Fetched Author'] } as BookDockMetadata;
       const row = makeRow({ selectedMetadata: null, fetchedMetadata: fetched });
 
@@ -259,7 +279,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('lets selected metadata override fetched and embedded values during auto-finalize', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       const manual = { title: 'Manual Title' } as BookDockMetadata;
       const fetched = { title: 'Fetched Title', authors: ['Fetched Author'] } as BookDockMetadata;
       const row = makeRow({ selectedMetadata: manual, fetchedMetadata: fetched });
@@ -293,7 +313,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('uses fetched metadata only (plus manual selection) in fetched_only mode', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       const manual = { title: 'Manual Title' } as BookDockMetadata;
       const fetched = { authors: ['Fetched Author'] } as BookDockMetadata;
       const row = makeRow({ selectedMetadata: manual, fetchedMetadata: fetched });
@@ -325,7 +345,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('uses embedded metadata only (plus manual selection) in embedded_only mode', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       const row = makeRow({
         selectedMetadata: null,
         fetchedMetadata: { title: 'Fetched Title', authors: ['Fetched Author'] } as BookDockMetadata,
@@ -358,7 +378,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('ignores confidence threshold in embedded_only mode', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       const row = makeRow({ confidence: null });
 
       appSettings.getAutoFinalizeSettings.mockResolvedValue({
@@ -384,7 +404,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('still requires confidence threshold in fetched_only mode', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       const row = makeRow({ confidence: null, fetchedMetadata: { title: 'Fetched Title' } as BookDockMetadata });
 
       appSettings.getAutoFinalizeSettings.mockResolvedValue({
@@ -409,7 +429,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('requeueAutoFinalizeCandidates queues ready rows that match current settings', async () => {
-      const { service, repo, appSettings } = makeService();
+      const { service, repo, appSettings } = await makeService();
       appSettings.getAutoFinalizeSettings.mockResolvedValue({
         enabled: true,
         threshold: 85,
@@ -439,7 +459,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('requeueAutoFinalizeCandidates does no work when paused or disabled', async () => {
-      const { service, repo, appSettings, processingState } = makeService();
+      const { service, repo, appSettings, processingState } = await makeService();
       processingState.isPaused.mockResolvedValueOnce(true);
       await expect(service.requeueAutoFinalizeCandidates()).resolves.toBe(0);
       expect(repo.findSelectionBatch).not.toHaveBeenCalled();
@@ -453,7 +473,7 @@ describe('BookDockFinalizeService', () => {
 
   describe('finalize', () => {
     it('returns missing-row failures for explicit ids not found in repository', async () => {
-      const { service, repo, notificationService } = makeService();
+      const { service, repo, notificationService } = await makeService();
       const rowOne = makeRow({ id: 1 });
       repo.findByIds.mockResolvedValue([rowOne]);
       vi.spyOn(service as never, 'prepareFinalizeBatch').mockResolvedValue({
@@ -489,7 +509,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('iterates selectAll batches until no rows remain', async () => {
-      const { service, repo } = makeService();
+      const { service, repo } = await makeService();
       repo.findSelectionBatch.mockResolvedValueOnce([makeRow({ id: 1 }), makeRow({ id: 2 })]).mockResolvedValueOnce([]);
       vi.spyOn(service as never, 'prepareFinalizeBatch').mockImplementation(
         (rows: unknown[]) =>
@@ -520,7 +540,7 @@ describe('BookDockFinalizeService', () => {
 
   describe('finalizeFile', () => {
     it('fails early when destination library or folder is missing', async () => {
-      const { service } = makeService();
+      const { service } = await makeService();
 
       await expect((service as any).finalizeFile(makeRow(), undefined, undefined, new Map(), 1, true)).resolves.toEqual({
         fileId: 1,
@@ -531,7 +551,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('fails when target file already exists at resolved destination', async () => {
-      const { service, validator } = makeService();
+      const { service, validator } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({ id: 5, allowedFormats: ['epub'], fileNamingPattern: null } as never);
       vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
       vi.spyOn(service as never, 'resolveDestination').mockResolvedValue('/library/existing.epub' as never);
@@ -556,7 +576,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('marks an occupied indexed destination as a duplicate', async () => {
-      const { service, repo } = makeService();
+      const { service, repo } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({ id: 5, allowedFormats: ['epub'], fileNamingPattern: null } as never);
       vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
       vi.spyOn(service as never, 'resolveDestination').mockResolvedValue('/library/new.epub' as never);
@@ -575,7 +595,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('allows a stale indexed destination when the physical file is missing', async () => {
-      const { service, repo, processor } = makeService();
+      const { service, repo, processor } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
         allowedFormats: ['epub'],
@@ -605,7 +625,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('rolls back moved files and reports failure when book record creation fails', async () => {
-      const { service, storage, processor } = makeService();
+      const { service, storage, processor } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({ id: 5, allowedFormats: ['epub'], fileNamingPattern: null } as never);
       vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
       vi.spyOn(service as never, 'resolveDestination').mockResolvedValue('/library/new/book.epub' as never);
@@ -626,7 +646,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('returns a friendly metadata validation message when book metadata constraints fail', async () => {
-      const { service, storage, processor } = makeService();
+      const { service, storage, processor } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({ id: 5, allowedFormats: ['epub'], fileNamingPattern: null } as never);
       vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
       vi.spyOn(service as never, 'resolveDestination').mockResolvedValue('/library/new/book.epub' as never);
@@ -661,7 +681,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('returns success with relative newName when finalize flow completes', async () => {
-      const { service, processor } = makeService();
+      const { service, processor } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({ id: 5, allowedFormats: ['epub'], fileNamingPattern: null } as never);
       vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
       vi.spyOn(service as never, 'resolveDestination').mockResolvedValue('/library/new/book.epub' as never);
@@ -694,7 +714,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('files a book_per_file book under the pattern folders instead of the library root', async () => {
-      const { service, appSettings, processor, storage } = makeService();
+      const { service, appSettings, processor, storage } = await makeService();
       appSettings.getUploadPattern.mockResolvedValue(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE);
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
@@ -732,7 +752,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('uses the file path as bookFolderPath in book_per_file mode', async () => {
-      const { service, processor } = makeService();
+      const { service, processor } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
         allowedFormats: ['epub'],
@@ -765,7 +785,7 @@ describe('BookDockFinalizeService', () => {
 
     describe('organization modes', () => {
       it('attaches pdf to existing book folder in book_per_folder mode', async () => {
-        const { service, processor } = makeService();
+        const { service, processor } = await makeService();
         vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
           id: 5,
           allowedFormats: ['epub', 'pdf'],
@@ -807,7 +827,7 @@ describe('BookDockFinalizeService', () => {
       });
 
       it('creates a separate book record in book_per_file mode', async () => {
-        const { service, processor } = makeService();
+        const { service, processor } = await makeService();
         vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
           id: 6,
           allowedFormats: ['epub', 'pdf'],
@@ -852,7 +872,7 @@ describe('BookDockFinalizeService', () => {
 
   describe('targetFileName override', () => {
     it('replaces the basename of the resolved destination with the sanitized targetFileName', async () => {
-      const { service, processor } = makeService();
+      const { service, processor } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
         allowedFormats: ['epub'],
@@ -893,7 +913,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('classifies an occupied indexed renamed destination as a duplicate', async () => {
-      const { service, repo } = makeService();
+      const { service, repo } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
         allowedFormats: ['epub'],
@@ -925,7 +945,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('targetFileName still fails when the renamed dest also already exists', async () => {
-      const { service } = makeService();
+      const { service } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
         allowedFormats: ['epub'],
@@ -956,7 +976,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('passes targetFileName through the finalize public API via overrides array', async () => {
-      const { service, repo } = makeService();
+      const { service, repo } = await makeService();
       repo.findByIds.mockResolvedValue([makeRow({ id: 4, targetLibraryId: 5, targetFolderId: 9 })]);
       const row = makeRow({ id: 4, targetLibraryId: 5, targetFolderId: 9 });
       const prepareSpy = vi.spyOn(service as never, 'prepareFinalizeBatch').mockResolvedValue({
@@ -978,7 +998,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('strips extension from targetFileName if user includes it to avoid double extension', async () => {
-      const { service, processor } = makeService();
+      const { service, processor } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
         allowedFormats: ['epub'],
@@ -1019,7 +1039,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('rejects targetFileName that would escape the destination directory', async () => {
-      const { service } = makeService();
+      const { service } = await makeService();
       vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({
         id: 5,
         allowedFormats: ['epub'],
@@ -1054,7 +1074,7 @@ describe('BookDockFinalizeService', () => {
 
   describe('finalize preflight and duplicate discard', () => {
     it('previews ready, duplicate, and destination conflict candidates', async () => {
-      const { service, repo } = makeService();
+      const { service, repo } = await makeService();
       const duplicateRow = makeRow({ id: 1, fileName: 'duplicate.epub', targetLibraryId: 5, targetFolderId: 9 });
       const conflictRow = makeRow({ id: 2, fileName: 'conflict.epub', targetLibraryId: 5, targetFolderId: 9 });
       const readyRow = makeRow({ id: 3, fileName: 'ready.epub', targetLibraryId: 5, targetFolderId: 9 });
@@ -1098,7 +1118,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('discards only duplicate candidates and cleans their files', async () => {
-      const { service, repo } = makeService();
+      const { service, repo } = await makeService();
       const duplicateRow = makeRow({
         id: 1,
         fileName: 'duplicate.epub',
@@ -1134,13 +1154,13 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('previewNames returns [] for empty explicit selection', async () => {
-    const { service } = makeService();
+    const { service } = await makeService();
 
     await expect(service.previewNames([], false, [], 5, 1, true)).resolves.toEqual([]);
   });
 
   it('previewNames uses selectAll ids and preserves original filename when no pattern resolves', async () => {
-    const { service, repo, appSettings, db } = makeService();
+    const { service, repo, appSettings, db } = await makeService();
     repo.findAllIds.mockResolvedValue([1]);
     repo.findByIds.mockResolvedValue([makeRow({ id: 1 })]);
     appSettings.getUploadPattern.mockResolvedValue(null);
@@ -1156,7 +1176,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('previewNames uses folder-mode global pattern for book_per_folder library', async () => {
-    const { service, repo, appSettings, db } = makeService();
+    const { service, repo, appSettings, db } = await makeService();
     repo.findByIds.mockResolvedValue([makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: { title: 'Dune' } as BookDockMetadata })]);
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{title}/');
     db.select.mockReturnValue({
@@ -1170,7 +1190,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('previewNames uses file-mode global pattern for book_per_file library', async () => {
-    const { service, repo, appSettings, db } = makeService();
+    const { service, repo, appSettings, db } = await makeService();
     repo.findByIds.mockResolvedValue([makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: { title: 'Dune' } as BookDockMetadata })]);
     appSettings.getUploadPattern.mockResolvedValue('{title}.{extension}');
     db.select.mockReturnValue({
@@ -1184,7 +1204,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('previewNames library-specific pattern wins over mode-specific global pattern', async () => {
-    const { service, repo, appSettings, db } = makeService();
+    const { service, repo, appSettings, db } = await makeService();
     repo.findByIds.mockResolvedValue([makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: { title: 'Dune' } as BookDockMetadata })]);
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{authors:first}/{title}/');
     db.select.mockReturnValue({
@@ -1198,7 +1218,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('previewNames sanitizes generated names when cross-platform mode is enabled', async () => {
-    const { service, repo, appSettings, db } = makeService();
+    const { service, repo, appSettings, db } = await makeService();
     appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(true);
     appSettings.getUploadPattern.mockResolvedValue('{authors:first}/{title}');
     repo.findByIds.mockResolvedValue([makeRow({ id: 1, selectedMetadata: { title: 'AUX', authors: ['CON'] } as BookDockMetadata })]);
@@ -1216,7 +1236,7 @@ describe('BookDockFinalizeService', () => {
     ['book_per_file', DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE, 'Frank Herbert/Dune/01. Dune (1965).epub'],
     ['book_per_folder', DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER, 'Frank Herbert/Dune/01. Dune (1965)/01. Dune (1965).epub'],
   ])('previewNames promises the destination finalize actually uses for a %s library', async (organizationMode, pattern, expected) => {
-    const { service, repo, appSettings, db } = makeService();
+    const { service, repo, appSettings, db } = await makeService();
     const library = { id: 10, name: 'Books', fileNamingPattern: null, organizationMode };
     const row = makeRow({ id: 1, targetLibraryId: 10, selectedMetadata: defaultPatternMetadata() });
     repo.findByIds.mockResolvedValue([row]);
@@ -1236,7 +1256,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata updates scalar metadata fields and related author/genre rows', async () => {
-    const { service, db, metadataService, metadataScoreService } = makeService();
+    const { service, db, metadataService, metadataScoreService } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1283,7 +1303,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata propagates score persistence failures', async () => {
-    const { service, db, metadataScoreService } = makeService();
+    const { service, db, metadataScoreService } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1296,7 +1316,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata nulls publishedYear when it is outside database bounds', async () => {
-    const { service, db } = makeService();
+    const { service, db } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1323,7 +1343,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata preserves legacy fetched duration and strips rating timestamps during finalization', async () => {
-    const { service, db, bookReadService } = makeService();
+    const { service, db, bookReadService } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1355,7 +1375,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata persists provider IDs and every structured field emitted by metadata search', async () => {
-    const { service, db, metadataService, bookReadService, seriesMemberships } = makeService();
+    const { service, db, metadataService, bookReadService, seriesMemberships } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1428,7 +1448,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata prefers selected coverUrl and skips extracted cover copy when download succeeds', async () => {
-    const { service, db, metadataService } = makeService();
+    const { service, db, metadataService } = await makeService();
     metadataService.downloadAndSaveCover.mockResolvedValueOnce(true);
     const updateChain = {
       set: vi.fn(),
@@ -1452,7 +1472,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata persists duration, chapters and narrators extracted from the audiobook', async () => {
-    const { service, db, metadataService } = makeService();
+    const { service, db, metadataService } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1494,7 +1514,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata keeps audio facts from embeddedMetadata even when scalar fields were edited', async () => {
-    const { service, db, metadataService } = makeService();
+    const { service, db, metadataService } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1528,7 +1548,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata omits audio fields and skips narrators when none were extracted', async () => {
-    const { service, db, metadataService } = makeService();
+    const { service, db, metadataService } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1552,7 +1572,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata sanitizes malformed chapters and drops non-positive duration before persisting', async () => {
-    const { service, db, metadataService } = makeService();
+    const { service, db, metadataService } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1590,7 +1610,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata coerces a string-typed duration into a rounded integer', async () => {
-    const { service, db } = makeService();
+    const { service, db } = await makeService();
     const updateChain = {
       set: vi.fn(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -1611,7 +1631,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata writes the staged cover of an audiobook into the audio slot, and never into a sibling book', async () => {
-    const { service, db, metadataService } = makeService();
+    const { service, db, metadataService } = await makeService();
     const updateChain = { set: vi.fn(), where: vi.fn().mockResolvedValue(undefined) };
     updateChain.set.mockReturnValue(updateChain);
     db.update.mockReturnValue(updateChain);
@@ -1632,7 +1652,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('applyMetadata falls back to extracted cover bytes when cover download is unavailable', async () => {
-    const { service, db, metadataService } = makeService();
+    const { service, db, metadataService } = await makeService();
     metadataService.downloadAndSaveCover.mockResolvedValueOnce(false);
     const updateChain = {
       set: vi.fn(),
@@ -1704,7 +1724,7 @@ describe('BookDockFinalizeService', () => {
     ];
 
     function arrange(
-      harness: ReturnType<typeof makeService>,
+      harness: Awaited<ReturnType<typeof makeService>>,
       options: {
         organizationMode?: string;
         formatPriority?: string[];
@@ -1732,7 +1752,7 @@ describe('BookDockFinalizeService', () => {
       mockStat.mockResolvedValue({ size: 10 } as never);
     }
 
-    function finalize(harness: ReturnType<typeof makeService>, row: ReturnType<typeof unitRow>) {
+    function finalize(harness: Awaited<ReturnType<typeof makeService>>, row: ReturnType<typeof unitRow>) {
       return (harness.service as any).finalizeFile(row, undefined, undefined, new Map(), 1, true);
     }
 
@@ -1741,7 +1761,7 @@ describe('BookDockFinalizeService', () => {
      * because the book row that carries `primaryFileId` is the one created for it.
      */
     it.each([UNIT_DIR, null])('places every file into one book with directory ownership %s', async (unitDirectory) => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness);
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [77], createdBookIds: [77], attachedFileIds: [] });
@@ -1768,7 +1788,7 @@ describe('BookDockFinalizeService', () => {
      * been moved back to the dock is the worst outcome this feature can produce.
      */
     it('takes back the book rows it created when the metadata pass fails', async () => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness);
       const written = { bookIds: [77], createdBookIds: [77], attachedFileIds: [9] };
@@ -1785,7 +1805,7 @@ describe('BookDockFinalizeService', () => {
 
     /** A rollback that throws must not replace the error that caused it. */
     it('reports the original failure even when the rollback itself fails', async () => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness);
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [77], createdBookIds: [77], attachedFileIds: [] });
@@ -1802,7 +1822,7 @@ describe('BookDockFinalizeService', () => {
      * the second on top of the first, and filed the book under `CD 1` rather than under the book.
      */
     it.each([UNIT_DIR, null])('preserves distinct disc paths with directory ownership %s', async (unitDirectory) => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue([
         {
           id: 1,
@@ -1842,7 +1862,7 @@ describe('BookDockFinalizeService', () => {
 
     /** Twenty of thirty-one files moved and then EXDEV must not leave a half-placed folder. */
     it('puts back every file it moved when one of them fails', async () => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness);
       harness.storage.moveToPath.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('EXDEV'));
@@ -1858,7 +1878,7 @@ describe('BookDockFinalizeService', () => {
 
     /** A folder in a book_per_file library is split apart by the next scan: data loss, not taste. */
     it.each([UNIT_DIR, null])('holds multipart audio for a book_per_file library with directory ownership %s', async (unitDirectory) => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness, { organizationMode: 'book_per_file' });
 
@@ -1870,7 +1890,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('discards every recorded file of a shared-folder unit without removing its directory', async () => {
-      const { service, repo } = makeService();
+      const { service, repo } = await makeService();
       repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       await (service as any).cleanupDiscardedBookDockFile(unitRow({ unitDirectory: null }));
       expect(new Set(mockUnlink.mock.calls.map(([path]) => path))).toEqual(new Set(AUDIO_UNIT_FILES.map((file) => file.absolutePath)));
@@ -1914,7 +1934,7 @@ describe('BookDockFinalizeService', () => {
     }
 
     it('keeps every format of one book when the setting says all available', async () => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(MULTI_FORMAT_FILES);
       arrange(harness, { destPath: '/library/Dune/Dune.epub', importFormats: 'all' });
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [78], createdBookIds: [78], attachedFileIds: [] });
@@ -1926,7 +1946,7 @@ describe('BookDockFinalizeService', () => {
     });
 
     it('keeps only the library preferred format when the setting says preferred only', async () => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(MULTI_FORMAT_FILES);
       arrange(harness, { formatPriority: ['pdf', 'epub'], destPath: '/library/Dune/Dune.epub', importFormats: 'preferred' });
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [78], createdBookIds: [78], attachedFileIds: [] });
@@ -1947,7 +1967,7 @@ describe('BookDockFinalizeService', () => {
      * not importing it.
      */
     it('makes one book per format in a book_per_file library when keeping all formats', async () => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(MULTI_FORMAT_FILES);
       arrange(harness, { organizationMode: 'book_per_file', destPath: '/library/Dune.epub', importFormats: 'all' });
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [81, 82], createdBookIds: [81, 82], attachedFileIds: [] });
@@ -1968,7 +1988,7 @@ describe('BookDockFinalizeService', () => {
 
     describe('metadata write-back', () => {
       it('schedules a write for every book the unit produced, attributed to the uploader', async () => {
-        const harness = makeService();
+        const harness = await makeService();
         harness.repo.findUnitFiles.mockResolvedValue(MULTI_FORMAT_FILES);
         arrange(harness, { organizationMode: 'book_per_file', destPath: '/library/Dune.epub', fileWriteEnabled: true });
         harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101, 102], createdBookIds: [101, 102], attachedFileIds: [] });
@@ -1983,7 +2003,7 @@ describe('BookDockFinalizeService', () => {
       });
 
       it('does not schedule a write when the library does not write metadata to files', async () => {
-        const harness = makeService();
+        const harness = await makeService();
         harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
         arrange(harness, { fileWriteEnabled: false });
         harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] });
@@ -1995,7 +2015,7 @@ describe('BookDockFinalizeService', () => {
       });
 
       it('does not schedule a write for any book when a later book of the unit fails', async () => {
-        const harness = makeService();
+        const harness = await makeService();
         harness.repo.findUnitFiles.mockResolvedValue(MULTI_FORMAT_FILES);
         arrange(harness, { organizationMode: 'book_per_file', destPath: '/library/Dune.epub', fileWriteEnabled: true });
         harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101, 102], createdBookIds: [102], attachedFileIds: [9] });
@@ -2011,7 +2031,7 @@ describe('BookDockFinalizeService', () => {
       });
 
       it('does not schedule a write when dock record cleanup fails', async () => {
-        const harness = makeService();
+        const harness = await makeService();
         harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
         arrange(harness, { fileWriteEnabled: true });
         harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] });
@@ -2029,7 +2049,7 @@ describe('BookDockFinalizeService', () => {
      * library folder root. Without a floor every unit would land there and merge into one book.
      */
     it('never places a unit directly in the library folder root', async () => {
-      const harness = makeService();
+      const harness = await makeService();
       harness.repo.findUnitFiles.mockResolvedValue(AUDIO_UNIT_FILES);
       arrange(harness, { destPath: '/library/track-01.mp3' });
       harness.processor.createUnitBookRecords.mockResolvedValue({ bookIds: [79], createdBookIds: [79], attachedFileIds: [] });
@@ -2048,7 +2068,7 @@ describe('BookDockFinalizeService', () => {
    * person who asked for the book. The cause belongs in the log, not in their status line.
    */
   it('does not put a database error into the message a requester reads', async () => {
-    const harness = makeService();
+    const harness = await makeService();
     const row = makeRow({ targetLibraryId: 5, targetFolderId: 9, unitDirectory: '/dock/request-7-Dune' });
     const databaseError = Object.assign(new DatabaseError('syntax error at or near "asc"', 0, 'error'), { code: '42601' });
     const failure = Object.assign(new Error('Failed query: select "id" from "book_dock_unit_files" where ...'), {
@@ -2078,7 +2098,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it.each(['EXDEV', 'EPERM', 'EACCES', 'ENOENT'])('logs %s from a failed file move without exposing paths to the requester', async (code) => {
-    const harness = makeService();
+    const harness = await makeService();
     const row = makeRow({ absolutePath: '/dock/book.epub' });
     const prepared = {
       fileId: row.id,
@@ -2120,7 +2140,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('cleanupBookDockRecord deletes cover files and bucket row id', async () => {
-    const { service, repo } = makeService();
+    const { service, repo } = await makeService();
     mockUnlink.mockResolvedValue(undefined);
 
     await (service as any).cleanupBookDockRecord(makeRow({ id: 44, coverPath: '/tmp/cover.png' }));
@@ -2131,7 +2151,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('findLibraryOrFail and findFolderOrFail throw typed errors for invalid destination records', async () => {
-    const { service, db } = makeService();
+    const { service, db } = await makeService();
     const selectChain = {
       from: vi.fn(),
       where: vi.fn(),
@@ -2147,7 +2167,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('prepares one batched destination lookup and ignores matching metadata', async () => {
-    const { service, repo } = makeService();
+    const { service, repo } = await makeService();
     const rows = [
       makeRow({ id: 1, fileName: 'one.epub', selectedMetadata: { title: 'Same', isbn13: '9780306406157' } }),
       makeRow({ id: 2, fileName: 'two.epub', selectedMetadata: { title: 'Same', isbn13: '9780306406157' } }),
@@ -2170,7 +2190,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('scopes indexed destination matches to the target library', async () => {
-    const { service } = makeService();
+    const { service } = await makeService();
     const analysis = {
       fileId: 1,
       fileName: 'book.epub',
@@ -2190,7 +2210,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('reports non-ENOENT destination access failures without moving the file', async () => {
-    const { service, storage } = makeService();
+    const { service, storage } = await makeService();
     const warn = vi.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
     const analysis = {
       fileId: 1,
@@ -2217,7 +2237,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination builds names from patterns and falls back per organization mode', async () => {
-    const { service, appSettings } = makeService();
+    const { service, appSettings } = await makeService();
     appSettings.getUploadPattern.mockResolvedValue(null);
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue(null);
     const rowWithMeta = makeRow({
@@ -2237,7 +2257,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination files legacy BookDock metadata with a numeric series index', async () => {
-    const { service } = makeService();
+    const { service } = await makeService();
     const row = makeRow({
       fileName: 'Day, Sylvia - Crossfire 03 - Entwined With You - Day, Sylvia.epub',
       selectedMetadata: {
@@ -2259,7 +2279,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination uses folder-mode global pattern for book_per_folder libraries', async () => {
-    const { service, appSettings } = makeService();
+    const { service, appSettings } = await makeService();
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{title}/');
     const row = makeRow({ fileName: 'book.epub', selectedMetadata: { title: 'Foundation' } as BookDockMetadata });
 
@@ -2271,7 +2291,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination uses file-mode global pattern for book_per_file libraries', async () => {
-    const { service, appSettings } = makeService();
+    const { service, appSettings } = await makeService();
     appSettings.getUploadPattern.mockResolvedValue('{title}.{extension}');
     const row = makeRow({ fileName: 'book.epub', selectedMetadata: { title: 'Foundation' } as BookDockMetadata });
 
@@ -2283,7 +2303,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination keeps the folder segments a book_per_file pattern defines', async () => {
-    const { service, appSettings } = makeService();
+    const { service, appSettings } = await makeService();
     appSettings.getUploadPattern.mockResolvedValue('{authors:first}/{series}/{title}');
     const row = makeRow({
       fileName: 'book.epub',
@@ -2296,7 +2316,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination files a book_per_file library under the shipped default pattern', async () => {
-    const { service, appSettings } = makeService();
+    const { service, appSettings } = await makeService();
     appSettings.getUploadPattern.mockResolvedValue(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FILE);
     const row = makeRow({ fileName: 'book.epub', selectedMetadata: defaultPatternMetadata() });
 
@@ -2306,7 +2326,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination library pattern wins over mode-specific global pattern', async () => {
-    const { service, appSettings } = makeService();
+    const { service, appSettings } = await makeService();
     appSettings.getUploadPatternBookPerFolder.mockResolvedValue('{authors:first}/{title}/');
     const row = makeRow({ fileName: 'book.epub', selectedMetadata: { title: 'Dune' } as BookDockMetadata });
 
@@ -2318,7 +2338,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('resolveDestination sanitizes token-derived names when cross-platform mode is enabled', async () => {
-    const { service, appSettings } = makeService();
+    const { service, appSettings } = await makeService();
     appSettings.isCrossPlatformPathSanitizationEnabled.mockResolvedValue(true);
     const row = makeRow({ fileName: 'book.epub', selectedMetadata: { title: 'AUX', authors: ['CON'] } as BookDockMetadata });
 
@@ -2328,7 +2348,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('triggerAutoFinalize skips when auto-finalize is disabled or destination is incomplete', async () => {
-    const { service, appSettings, repo } = makeService();
+    const { service, appSettings, repo } = await makeService();
     appSettings.getAutoFinalizeSettings.mockResolvedValueOnce({
       enabled: false,
       threshold: 80,
@@ -2351,7 +2371,7 @@ describe('BookDockFinalizeService', () => {
   });
 
   it('onModuleInit subscribes to ingestion events and triggers auto-finalize callback', async () => {
-    const { service, events } = makeService();
+    const { service, events } = await makeService();
     const triggerSpy = vi.spyOn(service, 'triggerAutoFinalize').mockResolvedValue(undefined);
 
     service.onModuleInit();
