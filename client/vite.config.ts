@@ -10,6 +10,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 const apiAgent = new Agent({ keepAlive: true })
 /** Lets a second dev client point at a throwaway API instance, so restart testing leaves the main stack alone. */
 const apiTarget = process.env.BOOKORBIT_API_TARGET ?? 'http://localhost:6262'
+const offlineShellUrl = 'index.html?bookorbit-offline-shell=1'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -90,8 +91,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         globIgnores: ['**/assets/foliate/**'],
-        // vite-plugin-pwa defaults this to 'index.html' when omitted, which registers a cache-only
-        // NavigationRoute ahead of the network-first route below and shadows it.
+        // Keep the offline shell in the precache under a query key. Workbox otherwise maps '/' to
+        // precached index.html before the NetworkFirst route gets a chance to contact the auth proxy.
+        manifestTransforms: [
+          (entries) => ({
+            manifest: entries.map((entry) => (entry.url === 'index.html' ? { ...entry, url: offlineShellUrl } : entry)),
+          }),
+        ],
         navigateFallback: null,
         runtimeCaching: [
           {
@@ -109,7 +115,7 @@ export default defineConfig({
                 maxAgeSeconds: 60 * 60 * 24 * 7,
               },
               precacheFallback: {
-                fallbackURL: 'index.html',
+                fallbackURL: offlineShellUrl,
               },
               // Status 0 here would include an auth proxy's opaqueredirect and cache it as the page.
               cacheableResponse: {

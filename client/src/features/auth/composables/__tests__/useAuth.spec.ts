@@ -26,6 +26,7 @@ vi.mock('@/router', () => ({
 
 vi.mock('@/lib/api', () => ({
   api: apiMock,
+  fetchWithAuthProxyRecovery: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, redirect: 'manual' }),
   refreshAccessToken: refreshAccessTokenMock,
   setAccessToken: setAccessTokenMock,
   setOnAuthFailure: setOnAuthFailureMock,

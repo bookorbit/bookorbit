@@ -1,4 +1,5 @@
 import type { OidcCallbackResponse, OidcProviderPublic } from '@bookorbit/types'
+import { fetchWithAuthProxyRecovery } from '@/lib/api'
 
 export async function generatePkce(): Promise<{ codeVerifier: string; codeChallenge: string }> {
   const array = new Uint8Array(32)
@@ -52,7 +53,7 @@ export function useOidc() {
       sessionStorage.setItem('oidc_redirect', redirectTarget)
     }
 
-    const stateRes = await fetch(`/api/v1/auth/oidc/${provider.slug}/state`, { method: 'POST', credentials: 'include' })
+    const stateRes = await fetchWithAuthProxyRecovery(`/api/v1/auth/oidc/${provider.slug}/state`, { method: 'POST', credentials: 'include' })
     if (!stateRes.ok) throw new OidcLoginError(undefined, 'Failed to generate state')
     const { state, authorizationEndpoint } = (await stateRes.json()) as { state: string; authorizationEndpoint: string }
 
@@ -87,7 +88,7 @@ export function useOidc() {
 
     const redirectUri = `${window.location.origin}/oauth2-callback`
 
-    const res = await fetch('/api/v1/auth/oidc/callback', {
+    const res = await fetchWithAuthProxyRecovery('/api/v1/auth/oidc/callback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

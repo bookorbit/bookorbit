@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import type { LoginOptionsResponse } from '@bookorbit/types'
-import { isAuthProxyRedirect, reloadForAuthProxy } from '@/lib/api'
+import { fetchWithAuthProxyRecovery } from '@/lib/api'
 
 const loginOptions = ref<LoginOptionsResponse | null>(null)
 const loginOptionsError = ref<string | null>(null)
@@ -13,8 +13,7 @@ export function useLoginOptions() {
 
     inFlight = (async () => {
       try {
-        const res = await fetch('/api/v1/auth/login-options', { credentials: 'include', redirect: 'manual' })
-        if (isAuthProxyRedirect(res)) return reloadForAuthProxy()
+        const res = await fetchWithAuthProxyRecovery('/api/v1/auth/login-options', { credentials: 'include' })
         if (!res.ok) throw new Error('Failed to load sign-in options')
         const data = (await res.json()) as LoginOptionsResponse
         loginOptions.value = data

@@ -148,17 +148,20 @@ export function reloadForAuthProxy(): Promise<never> {
   return new Promise<never>(() => {})
 }
 
+export async function fetchWithAuthProxyRecovery(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, { ...init, redirect: 'manual' })
+  return isAuthProxyRedirect(res) ? reloadForAuthProxy() : res
+}
+
 async function rawFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers)
   if (_accessToken) headers.set('Authorization', `Bearer ${_accessToken}`)
-  let res: Response
   try {
-    res = await fetch(input, { ...init, headers, credentials: 'include', redirect: 'manual' })
+    return await fetchWithAuthProxyRecovery(input, { ...init, headers, credentials: 'include' })
   } catch (reason) {
     if (reason instanceof TypeError) throw new NetworkError(reason.message)
     throw reason
   }
-  return isAuthProxyRedirect(res) ? reloadForAuthProxy() : res
 }
 
 async function attemptRefresh(): Promise<string> {

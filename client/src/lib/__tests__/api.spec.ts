@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { api, getValidToken, NetworkError, onAuthRecovered, refreshAccessToken, setAccessToken, setOnAuthFailure } from '@/lib/api'
+import {
+  api,
+  fetchWithAuthProxyRecovery,
+  getValidToken,
+  NetworkError,
+  onAuthRecovered,
+  refreshAccessToken,
+  setAccessToken,
+  setOnAuthFailure,
+} from '@/lib/api'
 
 /** A token shaped like a real JWT, so the client can read `exp` out of it. Never verified here. */
 function signedToken(expiresInSeconds: number): string {
@@ -296,6 +305,18 @@ describe('api wrapper', () => {
       await api('/api/v1/books/1', { redirect: 'follow' })
 
       expect(fetchMock.mock.calls[0]![1]?.redirect).toBe('manual')
+    })
+
+    it('reloads for a direct sign-in request redirected by the proxy', async () => {
+      const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(opaqueRedirect()))
+      globalThis.fetch = fetchMock as never
+
+      const settled = vi.fn<() => void>()
+      void fetchWithAuthProxyRecovery('/api/v1/auth/login', { method: 'POST', redirect: 'follow' }).then(settled, settled)
+
+      await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+      expect(fetchMock.mock.calls[0]![1]?.redirect).toBe('manual')
+      expect(settled).not.toHaveBeenCalled()
     })
 
     it('does not reload when storage is unavailable, since a loop could not be detected', async () => {
