@@ -14,7 +14,10 @@
     "previous": "Önceki",
     "retry": "Tekrar Dene",
     "yes": "Evet",
-    "no": "Hayır"
+    "no": "Hayır",
+    "show": "Göster",
+    "hide": "Gizle",
+    "undo": "Geri Al"
   },
   "settings": {
     "privacySharing": {

@@ -1,6 +1,6 @@
 {
   "common": {
-    "resetSortAria": "Restablecer orden al predeterminado",
+    "resetSortAria": "Restablecer orden predeterminado",
     "save": "Guardar",
     "cancel": "Cancelar",
     "delete": "Eliminar",
@@ -47,7 +47,7 @@
         "books": "Títulos de libros actuales, recientes y más leídos",
         "authors": "Autores principales",
         "series": "Series destacadas",
-        "narrators": "Narradores principales"
+        "narrators": "Narradores destacados"
       },
       "confirm": {
         "shareTitle": "¿Habilitar {level}?",
@@ -174,7 +174,7 @@
           "hint": "Controla aspectos destacados y elementos interactivos."
         },
         "cornerRadius": {
-          "label": "Radio de esquina",
+          "label": "Curvatura de las esquinas",
           "hint": "Redondez de tarjetas y elementos de interfaz de usuario"
         },
         "surfaceBrightness": {
@@ -1437,7 +1437,7 @@
         "display": "Visualización",
         "reader": "Lector",
         "metadata": "Metadatos",
-        "usersAccess": "Usuarios y Acceso",
+        "usersAccess": "Usuarios y acceso",
         "email": "Correo electrónico",
         "opds": "OPDS",
         "kobo": "Kobo",
@@ -3371,7 +3371,7 @@
       "groups": {
         "you": "Tú",
         "library": "Biblioteca",
-        "devices": "Dispositivos y sincronización",
+        "devices": "Dispositivos",
         "accounts": "Cuentas",
         "server": "Servidor"
       },
@@ -7306,7 +7306,7 @@
       "fieldPlaceholder": "Dejar en blanco para borrar",
       "fieldPlaceholderArray": "Separados por comas (dejar en blanco para borrar)",
       "deleteConfirm": "{count, plural, =0 {Eliminar # libro?} one {Eliminar # libro?} other {Eliminar # libros?} many {Eliminar # libros?}}",
-      "typeDelete": "Tipo BORRAR"
+      "typeDelete": "Escribe BORRAR"
     },
     "viewHeader": {
       "select": "Seleccionar",

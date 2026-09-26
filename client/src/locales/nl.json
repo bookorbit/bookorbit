@@ -15,6 +15,7 @@
     "retry": "Opnieuw proberen",
     "yes": "Ja",
     "no": "Nee",
+    "hide": "Verbergen",
     "undo": "Undo"
   },
   "settings": {
@@ -487,7 +488,8 @@
         "accountTypeLocal": "Lokaal",
         "nameRequired": "Naam is verplicht",
         "updateFailed": "Bijwerken van profiel mislukt",
-        "updated": "Profiel bijgewerkt"
+        "updated": "Profiel bijgewerkt",
+        "passwordHintOidc": "Uw wachtwoord wordt beheerd door uw identiteitsprovider."
       },
       "readingPreferences": {
         "title": "Leesvoorkeuren",
@@ -6349,15 +6351,15 @@
       "seasonEpisode": "S{season} E{episode}",
       "season": "S{season}",
       "episode": "E{episode}",
+      "episodeTypeTrailer": "Trailer",
+      "episodeTypeBonus": "Bonus",
+      "pinnedHint": "Pinned episodes are protected from storage retention removal.",
       "explicit": "Explicit",
       "lastListened": "Listened {time}",
       "timeLeft": "{time} left",
       "pinnedEpisode": "Pinned episode",
       "newEpisodeCount": "{count} new",
-      "unplayedShort": "{count} unplayed",
-      "episodeTypeTrailer": "Trailer",
-      "episodeTypeBonus": "Bonus",
-      "pinnedHint": "Pinned episodes are protected from storage retention removal."
+      "unplayedShort": "{count} unplayed"
     },
     "acquisition": {
       "title": "Automatische downloads",
@@ -6390,12 +6392,12 @@
       "backSeconds": "{count} seconden terug",
       "forwardSeconds": "{count} seconden vooruit",
       "episodePosition": "Positie in aflevering",
+      "toggleTimeDisplay": "Toggle remaining and total time",
       "positionValue": "{elapsed} afgespeeld van {duration}",
       "playingAnnouncement": "Playing {title} from {podcast}",
       "pausedAnnouncement": "Paused {title} from {podcast}",
       "volume": "Volume",
-      "positionValueWithChapter": "{elapsed} elapsed of {duration}, chapter {chapter}",
-      "toggleTimeDisplay": "Toggle remaining and total time"
+      "positionValueWithChapter": "{elapsed} elapsed of {duration}, chapter {chapter}"
     },
     "bookmarks": {
       "title": "Bladwijzers",
@@ -6421,7 +6423,6 @@
       "unplayed": "Niet beluisterd",
       "finished": "Voltooid",
       "health": "Status",
-      "feedHealth": "Feedstatus",
       "search": "Podcasts zoeken",
       "clearSearch": "Podcastzoekopdracht wissen",
       "import": "Importeren",
@@ -6873,14 +6874,14 @@
       "skipForward": "Skip forward",
       "next": "Next episode",
       "previous": "Previous episode",
-      "help": "Show this list",
-      "spaceKey": "Space",
       "speedDown": "Decrease playback speed",
       "speedUp": "Increase playback speed",
       "mute": "Mute or unmute",
       "volumeUp": "Increase volume",
       "volumeDown": "Decrease volume",
       "bookmark": "Add bookmark",
+      "help": "Show this list",
+      "spaceKey": "Space",
       "groups": {
         "playback": "Playback",
         "navigation": "Navigation",
