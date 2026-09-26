@@ -337,6 +337,7 @@ export class UploadService {
       });
 
       this.processor.extractAudioDurationAsync(bookId, destination, format);
+      this.processor.extractAddedAudioChaptersAsync(bookId, format);
       this.processor.reconcileCoversAsync([bookId]);
 
       this.logger.log(

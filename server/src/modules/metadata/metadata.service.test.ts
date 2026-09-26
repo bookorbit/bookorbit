@@ -76,6 +76,7 @@ vi.mock('./extractors/audio.extractor', () => ({
 }));
 
 import sharp from 'sharp';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { readFile } from 'fs/promises';
 import { Logger } from '@nestjs/common';
 
@@ -1999,23 +2000,43 @@ describe('MetadataService', () => {
 
     expect(primaryWhere).toHaveBeenCalledTimes(1);
     expect(aggregateWhere).toHaveBeenCalledTimes(1);
+    expect(new PgDialect().sqlToQuery(aggregateWhere.mock.calls[0]![0]).params).toEqual([42, 'content', 'm4b']);
     expect(updateSet).toHaveBeenCalledWith({ durationSeconds: 3600 });
   });
 
-  it('aggregateAudioDuration no-ops when selected primary file is not an audio format', async () => {
-    const primaryWhere = vi.fn().mockResolvedValue([]);
+  it('aggregateAudioDuration sums attached audio when an EPUB is primary', async () => {
+    const primaryWhere = vi.fn().mockResolvedValue([{ format: 'epub' }]);
     const primaryInnerJoin = vi.fn().mockReturnValue({ where: primaryWhere });
     const primaryFrom = vi.fn().mockReturnValue({ innerJoin: primaryInnerJoin });
 
+    const aggregateWhere = vi.fn().mockResolvedValue([{ total: 3600 }]);
+    const aggregateFrom = vi.fn().mockReturnValue({ where: aggregateWhere });
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
     const db = {
-      select: vi.fn().mockReturnValueOnce({ from: primaryFrom }),
-      update: vi.fn(),
+      select: vi.fn().mockReturnValueOnce({ from: primaryFrom }).mockReturnValueOnce({ from: aggregateFrom }),
+      update: vi.fn().mockReturnValue({ set: updateSet }),
     };
 
     const service = makeService(db);
 
     await service.aggregateAudioDuration(99);
 
+    expect(new PgDialect().sqlToQuery(aggregateWhere.mock.calls[0]![0]).params).toEqual([99, 'content', 'm4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac']);
+    expect(updateSet).toHaveBeenCalledWith({ durationSeconds: 3600 });
+  });
+
+  it('aggregateAudioDuration no-ops without a selected primary file', async () => {
+    const primaryWhere = vi.fn().mockResolvedValue([]);
+    const primaryInnerJoin = vi.fn().mockReturnValue({ where: primaryWhere });
+    const primaryFrom = vi.fn().mockReturnValue({ innerJoin: primaryInnerJoin });
+    const db = {
+      select: vi.fn().mockReturnValueOnce({ from: primaryFrom }),
+      update: vi.fn(),
+    };
+
+    const service = makeService(db);
+    await service.aggregateAudioDuration(99);
     expect(db.update).not.toHaveBeenCalled();
   });
 });

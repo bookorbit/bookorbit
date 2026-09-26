@@ -102,6 +102,7 @@ describe('UploadService', () => {
     processNewBookImportAsync: vi.fn(),
     extractMetadataAsync: vi.fn(),
     extractAudioDurationAsync: vi.fn(),
+    extractAddedAudioChaptersAsync: vi.fn(),
     reconcileCoversAsync: vi.fn(),
   };
 
@@ -1093,6 +1094,20 @@ describe('UploadService', () => {
       expect(processor.reconcileCoversAsync).toHaveBeenCalledWith([10]);
     });
 
+    it('schedules audio chapter extraction when an M4B is added to an EPUB-primary book', async () => {
+      mockUploadedFormat('m4b');
+      db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
+      mockElection({ primaryFileId: 99, status: 'present', formatPriority: ['epub', 'm4b'] }, [
+        { id: 99, format: 'epub', sizeBytes: 1000 },
+        { id: 55, format: 'm4b', sizeBytes: 456 },
+      ]);
+
+      await service.addFileToBook(10, 'book.m4b', {} as any, user);
+
+      expect(processor.extractAudioDurationAsync).toHaveBeenCalledWith(10, expect.stringMatching(/book\.m4b$/), 'm4b');
+      expect(processor.extractAddedAudioChaptersAsync).toHaveBeenCalledWith(10, 'm4b');
+    });
+
     it('delegates duration extraction to the processor regardless of format (processor gates on audio)', async () => {
       db.select.mockReturnValueOnce(selectJoinChain([makeBookRow()])).mockReturnValueOnce(noHashConflict());
 
@@ -1238,6 +1253,7 @@ describe('UploadService', () => {
       await expect(service.addFileToBook(10, 'book.epub', {} as any, user)).rejects.toThrow('primary update failed');
 
       expect(processor.extractAudioDurationAsync).not.toHaveBeenCalled();
+      expect(processor.extractAddedAudioChaptersAsync).not.toHaveBeenCalled();
       expect(storage.cleanup).toHaveBeenCalledWith('/tmp/upload.bin');
       expect(storage.cleanup).not.toHaveBeenCalledWith('/library/Book Title/book.epub');
     });

@@ -1,11 +1,13 @@
 import { Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
 import { stat } from 'fs/promises';
+import { basename } from 'path';
 import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { isAudioFormat } from '@bookorbit/types';
 import type { FileRole as BookFileRole } from '../scanner/lib/classify';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
+import { naturalCompare } from '../../common/utils/natural-sort.utils';
 import { FORMATS_WITH_UNBOUNDED_METADATA_READS, MAX_BUFFERED_METADATA_BYTES } from '../../common/constants/upload.constants';
 
 import { DB } from '../../db';
@@ -15,6 +17,7 @@ import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/boo
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { MetadataService } from '../metadata/metadata.service';
+import { METADATA_AUDIO_FORMATS } from '../metadata/metadata-extraction.service';
 import { computeFileHash } from '../scanner/lib/hash';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
 
@@ -463,5 +466,44 @@ export class UploadProcessorService {
           `[${event}] [fail] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - audio duration extraction failed`,
         );
       });
+  }
+
+  extractAddedAudioChaptersAsync(bookId: number, format: string): void {
+    if (!isAudioFormat(format)) return;
+
+    const event = 'book.extract_added_audio_chapters';
+    const startedAt = Date.now();
+    this.logger.debug(`[${event}] [start] bookId=${bookId} format=${format} - added audio chapter extraction started`);
+    this.extractAddedAudioChapters(bookId)
+      .then(() => {
+        this.logger.debug(
+          `[${event}] [end] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} - added audio chapter extraction completed`,
+        );
+      })
+      .catch((err: Error) => {
+        const errorClass = err.name ?? 'Error';
+        const errorMessage = sanitizeLogValue(err.message);
+        this.logger.warn(
+          `[${event}] [fail] bookId=${bookId} format=${format} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - added audio chapter extraction failed`,
+        );
+      });
+  }
+
+  private async extractAddedAudioChapters(bookId: number): Promise<void> {
+    const files = await this.db
+      .select({ absolutePath: bookFiles.absolutePath, format: bookFiles.format })
+      .from(bookFiles)
+      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'content'), inArray(bookFiles.format, [...METADATA_AUDIO_FORMATS])));
+    const orderedFiles = files.sort((left, right) => naturalCompare(basename(left.absolutePath), basename(right.absolutePath)));
+    const firstAudio = orderedFiles[0];
+    if (!firstAudio?.format) return;
+    await this.metadataService.extractAudioChaptersAndNarrators(bookId, firstAudio.absolutePath, firstAudio.format);
+    if (orderedFiles.length > 1) {
+      await this.metadataService.extractMergedAudioChapters(
+        bookId,
+        orderedFiles.map((file) => file.absolutePath),
+        { filesChanged: true },
+      );
+    }
   }
 }

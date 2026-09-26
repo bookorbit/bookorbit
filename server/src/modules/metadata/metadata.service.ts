@@ -451,13 +451,14 @@ export class MetadataService {
       .select({ format: schema.bookFiles.format })
       .from(schema.books)
       .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
-      .where(and(eq(schema.books.id, bookId), inArray(schema.bookFiles.format, [...METADATA_AUDIO_FORMATS])));
+      .where(eq(schema.books.id, bookId));
     if (!primary?.format) return;
 
+    const audioFormats = isAudioFormat(primary.format) ? [primary.format] : [...METADATA_AUDIO_FORMATS];
     const rows = await this.db
       .select({ total: sql<number>`COALESCE(SUM(${schema.bookFiles.durationSeconds}), 0)` })
       .from(schema.bookFiles)
-      .where(and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.role, 'content'), eq(schema.bookFiles.format, primary.format)));
+      .where(and(eq(schema.bookFiles.bookId, bookId), eq(schema.bookFiles.role, 'content'), inArray(schema.bookFiles.format, audioFormats)));
 
     const total = Number(rows[0]?.total ?? 0);
     if (total > 0) {

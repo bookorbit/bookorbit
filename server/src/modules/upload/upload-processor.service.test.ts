@@ -16,6 +16,8 @@ describe('UploadProcessorService', () => {
   const metadataService = {
     extractAndSave: vi.fn(),
     extractAndAggregateAudioDuration: vi.fn(),
+    extractAudioChaptersAndNarrators: vi.fn(),
+    extractMergedAudioChapters: vi.fn(),
   };
   const orchestrator = {
     scheduleImportedBooksIfEligible: vi.fn(),
@@ -69,13 +71,17 @@ describe('UploadProcessorService', () => {
   };
 
   const db = {
+    select: vi.fn(),
     transaction: vi.fn(async (callback: (innerTx: typeof tx) => Promise<unknown>) => callback(tx)),
   };
+  const audioFilesWhere = vi.fn();
 
   let service: UploadProcessorService;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    db.select.mockReturnValue({ from: () => ({ where: audioFilesWhere }) });
+    audioFilesWhere.mockResolvedValue([{ absolutePath: '/path/to/library/book.m4b', format: 'm4b' }]);
 
     selectFrom.mockReturnValue({ where: selectWhere, innerJoin: selectInnerJoin });
     selectInnerJoin.mockReturnValue({ where: selectWhere });
@@ -334,6 +340,48 @@ describe('UploadProcessorService', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('aggregate failed'));
+  });
+
+  it('extractAddedAudioChaptersAsync ignores non-audio formats', () => {
+    service.extractAddedAudioChaptersAsync(7, 'epub');
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('extractAddedAudioChaptersAsync extracts chapters for a single audio file', async () => {
+    metadataService.extractAudioChaptersAndNarrators.mockResolvedValue(undefined);
+
+    service.extractAddedAudioChaptersAsync(7, 'm4b');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(metadataService.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(7, '/path/to/library/book.m4b', 'm4b');
+    expect(metadataService.extractMergedAudioChapters).not.toHaveBeenCalled();
+  });
+
+  it('extractAddedAudioChaptersAsync merges chapters across files in playback order', async () => {
+    audioFilesWhere.mockResolvedValue([
+      { absolutePath: '/path/to/library/10.mp3', format: 'mp3' },
+      { absolutePath: '/path/to/library/2.mp3', format: 'mp3' },
+    ]);
+    metadataService.extractAudioChaptersAndNarrators.mockResolvedValue(undefined);
+    metadataService.extractMergedAudioChapters.mockResolvedValue(undefined);
+
+    service.extractAddedAudioChaptersAsync(7, 'mp3');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(metadataService.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(7, '/path/to/library/2.mp3', 'mp3');
+    expect(metadataService.extractMergedAudioChapters).toHaveBeenCalledWith(7, ['/path/to/library/2.mp3', '/path/to/library/10.mp3'], {
+      filesChanged: true,
+    });
+  });
+
+  it('extractAddedAudioChaptersAsync logs and suppresses extraction errors', async () => {
+    const warn = vi.spyOn((service as unknown as { logger: { warn: (m: string) => void } }).logger, 'warn').mockImplementation();
+    metadataService.extractAudioChaptersAndNarrators.mockRejectedValue(new Error('chapter probe failed'));
+
+    service.extractAddedAudioChaptersAsync(7, 'm4b');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('chapter probe failed'));
   });
 
   describe('with undefined orchestrator', () => {
