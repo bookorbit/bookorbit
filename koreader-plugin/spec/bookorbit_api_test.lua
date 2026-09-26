@@ -72,14 +72,32 @@ package.loaded["ltn12"] = {
 local last_request_url
 local last_request_headers
 local last_request_proxy
+local last_global_proxy
+local mock_http_error = false
+local mock_http_queue
+local request_history = {}
 local request_count = 0
 package.loaded["socket.http"] = {
     request = function(request)
+        last_global_proxy = package.loaded["socket.http"].PROXY
+        if mock_http_error then error("simulated transport failure") end
         request_count = request_count + 1
         request_ran_in_subprocess = in_subprocess
         last_request_url = request.url
         last_request_headers = request.headers
         last_request_proxy = request.proxy
+        table.insert(request_history, {
+            url = request.url,
+            proxy = request.proxy,
+            global_proxy = last_global_proxy,
+            redirect = request.redirect,
+            create = request.create,
+        })
+        if mock_http_queue then
+            local response = table.remove(mock_http_queue, 1)
+            if response.body then request.sink(response.body) end
+            return 1, response.code, response.headers or {}, "HTTP " .. tostring(response.code)
+        end
         if mock_http_body then
             request.sink(mock_http_body)
         end
@@ -323,6 +341,7 @@ local background_identity_client = BookOrbitApi.new{
     background_requests = true,
 }
 body, err = background_identity_client:getPluginVersion()
+assertEqual(body ~= nil, true, "background update check has a response body")
 assertEqual(err, nil, "background update check succeeds")
 assertEqual(subprocess_calls, 2, "background update check uses subprocess")
 assertEqual(last_request_headers["x-bookorbit-device-id"], "background-device",
@@ -345,6 +364,7 @@ wrapped = false
 request_ran_in_subprocess = false
 body, err = background_client:auth()
 assertEqual(body.ok, true, "unwrapped request falls back safely")
+assertEqual(err, nil, "unwrapped request succeeds")
 assertEqual(subprocess_calls, 4, "unwrapped request does not start subprocess")
 assertEqual(request_ran_in_subprocess, false, "unwrapped fallback runs in current process")
 
@@ -370,8 +390,60 @@ local https_explicit_proxy_client = BookOrbitApi.new{
     server_url = "https://bookorbit.example.com/api/v1",
     proxy = "http://127.0.0.1:8080",
 }
-assertEqual(https_explicit_proxy_client:getProxy(), nil,
-    "proxy is skipped for HTTPS server to prevent cleartext credential leakage without CONNECT")
+assertEqual(https_explicit_proxy_client:getProxy(), "http://127.0.0.1:8080",
+    "explicit proxy is returned for HTTPS server")
+
+local mock_http = package.loaded["socket.http"]
+mock_http.PROXY = "http://127.0.0.1:8080"
+https_explicit_proxy_client:auth()
+assertEqual(last_global_proxy, nil, "HTTPS request clears LuaSocket's global proxy")
+assertEqual(last_request_proxy, nil, "HTTPS request does not send a proxy URL to LuaSocket")
+assertEqual(type(request_history[#request_history].create), "function",
+    "HTTPS request uses a CONNECT socket")
+assertEqual(mock_http.PROXY, "http://127.0.0.1:8080", "HTTPS request restores the global proxy")
+
+mock_http_error = true
+local _, transport_error = https_explicit_proxy_client:auth()
+assertEqual(transport_error:find("simulated transport failure", 1, true) ~= nil, true,
+    "HTTPS transport failure is reported")
+assertEqual(mock_http.PROXY, "http://127.0.0.1:8080",
+    "HTTPS transport failure restores the global proxy")
+mock_http_error = false
+mock_http.PROXY = nil
+
+mock_http.PROXY = "http://127.0.0.1:8080"
+mock_http_queue = {
+    { code = 302, headers = { location = "https://attacker.example.com/api/v1" } },
+}
+local before_redirect = #request_history
+local _, unsafe_redirect = https_explicit_proxy_client:auth()
+assertEqual(unsafe_redirect, "unsafe_redirect", "cross-host API redirect is rejected")
+assertEqual(#request_history, before_redirect + 1, "cross-host API redirect sends one request")
+assertEqual(request_history[#request_history].redirect, false,
+    "LuaSocket cannot automatically forward API credentials")
+assertEqual(request_history[#request_history].global_proxy, nil,
+    "HTTPS redirect response cannot use the global HTTP proxy")
+mock_http_queue = {
+    { code = 302, headers = { location = "/api/v1/redirected" } },
+    { code = 200, body = "{\"ok\":true}" },
+}
+local same_origin_body, same_origin_error = https_explicit_proxy_client:auth()
+assertEqual(same_origin_error, nil, "same-origin API redirect succeeds")
+assertEqual(same_origin_body.ok, true, "same-origin API redirect decodes the final body")
+assertEqual(request_history[#request_history].url,
+    "https://bookorbit.example.com/api/v1/redirected", "same-origin redirect uses the new URL")
+assertEqual(request_history[#request_history].global_proxy, nil,
+    "same-origin HTTPS redirect stays off the global HTTP proxy")
+mock_http_queue = {
+    { code = 302, headers = { location = "?refresh=1" } },
+    { code = 200, body = "{\"ok\":true}" },
+}
+https_explicit_proxy_client:auth()
+assertEqual(request_history[#request_history].url,
+    "https://bookorbit.example.com/api/v1/koreader/users/auth?refresh=1",
+    "query-only redirect preserves the original path")
+mock_http_queue = nil
+mock_http.PROXY = nil
 
 -- KOReader global settings proxy test
 local http_client = BookOrbitApi.new{
@@ -395,6 +467,30 @@ assertEqual(http_client:getProxy(), "http://192.168.1.1:3128",
 http_client:auth()
 assertEqual(last_request_proxy, "http://192.168.1.1:3128",
     "G_reader_settings proxy is passed to request table")
+assertEqual(last_global_proxy, nil, "HTTP requests do not change LuaSocket's global proxy")
+
+mock_http.PROXY = "http://192.168.1.1:3128"
+mock_http_queue = {
+    { code = 301, headers = { location = "https://bookorbit.example.com/api/v1/redirected" } },
+    { code = 200, body = "{\"ok\":true}" },
+}
+local upgraded_body, upgraded_error = http_client:auth()
+assertEqual(upgraded_error, nil, "same-host HTTPS upgrade succeeds")
+assertEqual(upgraded_body.ok, true, "same-host HTTPS upgrade decodes the final body")
+assertEqual(request_history[#request_history - 1].proxy, "http://192.168.1.1:3128",
+    "HTTP upgrade starts through the configured proxy")
+assertEqual(request_history[#request_history - 1].global_proxy, "http://192.168.1.1:3128",
+    "HTTP upgrade leaves KOReader's global proxy intact")
+assertEqual(request_history[#request_history].proxy, nil,
+    "HTTPS upgrade keeps the proxy URL out of LuaSocket's request")
+assertEqual(type(request_history[#request_history].create), "function",
+    "HTTPS upgrade uses a CONNECT socket")
+assertEqual(request_history[#request_history].global_proxy, nil,
+    "HTTPS upgrade clears LuaSocket's global HTTP proxy")
+assertEqual(mock_http.PROXY, "http://192.168.1.1:3128",
+    "HTTPS upgrade restores LuaSocket's global HTTP proxy")
+mock_http_queue = nil
+mock_http.PROXY = nil
 
 mock_settings.http_proxy_enabled = false
 assertEqual(http_client:getProxy(), nil,

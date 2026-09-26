@@ -16,6 +16,7 @@ local util = require("util")
 
 local TransferPolicy = require("bookorbit_transfer_policy")
 local TransferProgress = require("bookorbit_transfer_progress")
+local Proxy = require("bookorbit_proxy")
 
 local MAX_BODY_BYTES = 900 * 1024 -- stays under the server's 1 MiB body limit
 local MATCH_HASH_LENGTH = 32
@@ -136,6 +137,12 @@ local function absoluteUrl(base, location)
     if location:match("^https?://") then return location end
     local parsed = parseHttpUrl(base)
     if not parsed then return nil end
+    if location:sub(1, 1) == "?" then
+        return base:gsub("[?#].*$", "") .. location
+    end
+    if location:sub(1, 1) == "#" then
+        return base:gsub("#.*$", "") .. location
+    end
     if location:sub(1, 2) == "//" then
         return parsed.scheme .. ":" .. location
     end
@@ -143,6 +150,18 @@ local function absoluteUrl(base, location)
     if location:sub(1, 1) == "/" then return origin .. location end
     local directory = base:match("^(.*)/") or origin
     return directory .. "/" .. location
+end
+
+local function safeRequestRedirect(initial_url, current_url, location)
+    if type(location) ~= "string" or location == "" then return nil end
+    local resolved = absoluteUrl(current_url, location:gsub("%s", ""))
+    local initial = parseHttpUrl(initial_url)
+    local current = parseHttpUrl(current_url)
+    local target = parseHttpUrl(resolved)
+    if not initial or not current or not target or target.host ~= initial.host then return nil end
+    if target.scheme == current.scheme and target.port == current.port then return resolved end
+    if current.scheme == "http" and target.scheme == "https" then return resolved end
+    return nil
 end
 
 local function forkSafeServerUrl(value)
@@ -175,7 +194,6 @@ function BookOrbitApi.normalizeServerUrl(input)
     return url
 end
 
--- Creates a new BookOrbitApi instance with the provided options.
 function BookOrbitApi.new(opts)
     opts = opts or {}
     return setmetatable({
@@ -192,13 +210,10 @@ end
 
 -- Resolves the HTTP proxy for a target URL.
 -- Prefers an explicit proxy option, then KOReader's enabled global HTTP proxy.
--- Skips proxying for HTTPS targets since LuaSocket lacks CONNECT tunneling.
 function BookOrbitApi:getProxy(target_url)
     local url = (target_url and tostring(target_url):match("^https?://")) and tostring(target_url) or self.server_url
     local parsed = parseHttpUrl(url)
-    if not parsed or parsed.scheme == "https" then
-        return nil
-    end
+    if not parsed then return nil end
 
     if self.proxy and self.proxy ~= "" then
         return self.proxy
@@ -214,6 +229,26 @@ function BookOrbitApi:getProxy(target_url)
     return nil
 end
 
+local function sendHttpRequest(request)
+    if not request.url:lower():match("^https://") then
+        return http.request(request)
+    end
+
+    local transport_request = {}
+    for key, value in pairs(request) do transport_request[key] = value end
+    if request.proxy then
+        transport_request.create = Proxy.connectSocket(request.proxy)
+        transport_request.proxy = nil
+    end
+    -- LuaSocket's global proxy overrides a custom HTTPS socket unless cleared.
+    local global_proxy = http.PROXY
+    http.PROXY = nil
+    local ok, result, code, headers, status = pcall(http.request, transport_request)
+    http.PROXY = global_proxy
+    if not ok then return nil, tostring(result) end
+    return result, code, headers, status
+end
+
 function BookOrbitApi:isConfigured()
     return self.server_url ~= nil and self.username ~= nil and self.userkey ~= nil
 end
@@ -221,11 +256,11 @@ end
 -- Returns decoded_body on success, or nil, err_code, decoded_error_body.
 -- err_code is a number for HTTP errors and a string for transport errors.
 function BookOrbitApi:requestBlocking(method, path, body, extra_headers)
-    local sink = {}
+    local initial_url = self.server_url .. path
     local request = {
-        url = self.server_url .. path,
+        url = initial_url,
         method = method,
-        sink = ltn12.sink.table(sink),
+        redirect = false,
         headers = {
             ["accept"] = "application/json",
             ["x-auth-user"] = self.username,
@@ -235,11 +270,6 @@ function BookOrbitApi:requestBlocking(method, path, body, extra_headers)
 
     for name, value in pairs(extra_headers or {}) do
         request.headers[name] = value
-    end
-
-    local proxy = self:getProxy(request.url)
-    if proxy then
-        request.proxy = proxy
     end
 
     if body then
@@ -255,26 +285,40 @@ function BookOrbitApi:requestBlocking(method, path, body, extra_headers)
         request.headers["Content-Length"] = #body_json
     end
 
-    socketutil:set_timeout(socketutil.LARGE_BLOCK_TIMEOUT, socketutil.LARGE_TOTAL_TIMEOUT)
-    local code, _, status = socket.skip(1, http.request(request))
-    socketutil:reset_timeout()
+    local current_url = initial_url
+    for redirect_count = 0, MAX_DOWNLOAD_REDIRECTS do
+        local sink = {}
+        request.url = current_url
+        request.sink = ltn12.sink.table(sink)
+        request.proxy = self:getProxy(current_url)
 
-    if type(code) ~= "number" then
-        logger.dbg("BookOrbit: network error:", status or code)
-        return nil, tostring(status or code or "network_error")
+        socketutil:set_timeout(socketutil.LARGE_BLOCK_TIMEOUT, socketutil.LARGE_TOTAL_TIMEOUT)
+        local code, headers, status = socket.skip(1, sendHttpRequest(request))
+        socketutil:reset_timeout()
+
+        if type(code) ~= "number" then
+            logger.dbg("BookOrbit: network error:", status or code)
+            return nil, tostring(status or code or "network_error")
+        end
+
+        if not request.source and (method == "GET" or method == "HEAD")
+                and (code == 301 or code == 302 or code == 303 or code == 307 or code == 308) then
+            if redirect_count >= MAX_DOWNLOAD_REDIRECTS then
+                return nil, "too_many_redirects"
+            end
+            local location = headers and (headers.location or headers.Location)
+            local redirected = safeRequestRedirect(initial_url, current_url, location)
+            if not redirected then return nil, "unsafe_redirect" end
+            current_url = redirected
+        else
+            local decoded, decode_err = decodeResponse(sink)
+            if code < 200 or code >= 300 then return nil, code, decoded end
+            if decode_err then return nil, decode_err end
+            return decoded or {}
+        end
     end
 
-    local decoded, decode_err = decodeResponse(sink)
-
-    if code < 200 or code >= 300 then
-        return nil, code, decoded
-    end
-
-    if decode_err then
-        return nil, decode_err
-    end
-
-    return decoded or {}
+    return nil, "too_many_redirects"
 end
 
 -- True when this call may fork its own background worker: the client is in
@@ -374,27 +418,14 @@ function BookOrbitApi:downloadBlocking(path, local_path, opts)
         generation = opts.progress_generation,
         total = tonumber(opts.expected_bytes) or 0,
     })
-    local current_url = self.server_url .. path
-    local origin = parseHttpUrl(current_url)
+    local initial_url = self.server_url .. path
+    local current_url = initial_url
     local total_received = 0
 
     local function fail(out, err)
         if out then pcall(function() out:close() end) end
         util.removeFile(temp_path)
         return nil, err
-    end
-
-    local function sameOriginRedirect(location)
-        if type(location) ~= "string" or location == "" then return nil end
-        local resolved = absoluteUrl(current_url, location:gsub("%s", ""))
-        local parsed = parseHttpUrl(resolved)
-        if not origin or not parsed
-                or parsed.scheme ~= origin.scheme
-                or parsed.host ~= origin.host
-                or parsed.port ~= origin.port then
-            return nil
-        end
-        return resolved
     end
 
     for redirect_count = 0, MAX_DOWNLOAD_REDIRECTS do
@@ -433,15 +464,12 @@ function BookOrbitApi:downloadBlocking(path, local_path, opts)
             },
         }
 
-        local proxy = self:getProxy(current_url)
-        if proxy then
-            request.proxy = proxy
-        end
+        request.proxy = self:getProxy(current_url)
 
         socketutil:set_timeout(
             opts.block_timeout or socketutil.FILE_BLOCK_TIMEOUT,
             opts.total_timeout or socketutil.FILE_TOTAL_TIMEOUT)
-        local code, headers, status = socket.skip(1, http.request(request))
+        local code, headers, status = socket.skip(1, sendHttpRequest(request))
         socketutil:reset_timeout()
 
         if too_large then return fail(out, "response_too_large") end
@@ -456,7 +484,7 @@ function BookOrbitApi:downloadBlocking(path, local_path, opts)
                 return nil, "too_many_redirects"
             end
             local location = headers and (headers.location or headers.Location)
-            local redirected = sameOriginRedirect(location)
+            local redirected = safeRequestRedirect(initial_url, current_url, location)
             if not redirected then return nil, "unsafe_redirect" end
             current_url = redirected
         else
