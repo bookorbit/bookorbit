@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useLoginOptions } from '../useLoginOptions'
+import type { useLoginOptions as UseLoginOptions } from '../useLoginOptions'
 
 describe('useLoginOptions', () => {
   const originalFetch = globalThis.fetch
   let reload: ReturnType<typeof vi.fn<() => void>>
+  let useLoginOptions: typeof UseLoginOptions
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // The composable keeps its cache and in-flight request at module level; a fresh module per test
+    // keeps one test's state from leaking into the next.
+    vi.resetModules()
+    ;({ useLoginOptions } = await import('../useLoginOptions'))
     sessionStorage.clear()
     reload = vi.fn<() => void>()
     vi.stubGlobal('location', { ...window.location, reload })
