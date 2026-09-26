@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Check,
@@ -20,11 +20,12 @@ import type {
   BookCommunityRating,
   BookDetail,
   BookMetadataLockField,
+  CoverMedium,
   CustomMetadataPrimitiveValue,
   MetadataProviderInfo,
   WriteResult,
 } from '@bookorbit/types'
-import { BOOK_FILE_WRITE_FIELD_LABELS, FORMAT_TO_GROUP, isValidSeriesIndex, parseSeriesIndex } from '@bookorbit/types'
+import { BOOK_FILE_WRITE_FIELD_LABELS, FORMAT_TO_GROUP, getPrimaryBookFile, isValidSeriesIndex, parseSeriesIndex } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { metadataScoreColor } from '@/lib/metadata-score-color'
@@ -35,7 +36,7 @@ import MetadataFieldLabel from './MetadataFieldLabel.vue'
 import RichDescriptionEditor from './RichDescriptionEditor.vue'
 import SeriesMembershipEditor from './SeriesMembershipEditor.vue'
 import WriteAndRenameResultPanel from '../WriteAndRenameResultPanel.vue'
-import type { MetadataPatch } from '../../../composables/useMetadataDiff'
+import type { MetadataDiffApply, MetadataPatch } from '../../../composables/useMetadataDiff'
 import { type EditableSeriesMembership, normalizeSeriesMemberships, useMetadataEditor } from '../../../composables/useMetadataEditor'
 import { type MetadataRefreshPreview, useRefreshMetadata } from '../../../composables/useRefreshMetadata'
 import { type FileMetadata, useFileMetadata } from '../../../composables/useFileMetadata'
@@ -51,6 +52,7 @@ import { buildFileMetadataPatch } from '@/features/book/lib/file-metadata-patch'
 import { metadataRefreshAppliedMessage, metadataRefreshEmptyMessage } from '@/features/book/lib/metadata-refresh-feedback'
 import { filterProviderIdFields, isProviderIdFieldAvailable, isProviderIdFormField } from '@/features/book/lib/provider-id-fields'
 import { formatCommunityRatingLine } from '@/features/book/lib/community-rating'
+import { coverFieldMedium, coverLockField } from '@/features/book/lib/cover-slots'
 import { formatList } from '@/i18n/formatters'
 import MetadataSourceCard from './MetadataSourceCard.vue'
 
@@ -60,7 +62,7 @@ const props = defineProps<{ book: BookDetail }>()
 const emit = defineEmits<{
   saved: [BookDetail]
   locksChanged: [BookMetadataLockField[]]
-  coverChanged: ['extracted' | 'custom' | null]
+  coverChanged: [medium: CoverMedium | null]
   fileRenamed: []
 }>()
 
@@ -109,7 +111,7 @@ const COMIC_FIELD_MAP = {
   locations: 'comicLocations',
 } as const
 
-const primaryFile = computed(() => props.book.files.find((f) => f.role === 'primary') ?? props.book.files[0] ?? null)
+const primaryFile = computed(() => getPrimaryBookFile(props.book.files))
 const isPrimaryAudio = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'audio')
 const isPrimaryComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GROUP[primaryFile.value.format] === 'cbx')
 const fileWriteStatus = computed(() => props.book.fileWriteStatus ?? null)
@@ -339,7 +341,7 @@ const comicWideFields = computed(
 )
 
 const hasLockedFields = computed(() => lockedFields.value.length > 0)
-const hasPendingChanges = computed(() => isDirty.value || locksDirty.value)
+const hasPendingChanges = computed(() => isDirty.value || locksDirty.value || Boolean(coverPanel.value?.hasPending))
 const hasInvalidSeriesIndex = computed(() =>
   form.seriesMemberships.some((membership) => membership.seriesIndex !== null && !isValidSeriesIndex(membership.seriesIndex)),
 )
@@ -348,25 +350,36 @@ const communityRatingLines = computed(() =>
   form.communityRatings.map((rating) => formatCommunityRatingLine(rating, availableMetadataProviders.value ?? [])),
 )
 
+/**
+ * Locks here save with the form, so a pending cover whose slot is locked on the server can only be
+ * written after the form has unlocked it. Every other pending cover is written first, and a failure
+ * there stops the form save.
+ */
 async function submit() {
   if (submitDisabled.value) return
-  if (coverPanel.value?.hasPending) {
-    const ok = await coverPanel.value.confirm()
-    if (ok) emit('coverChanged', 'custom')
-  }
+  const panel = coverPanel.value
+  const pendingMedia = panel?.pendingMedia ?? []
+  const lockedOnServer = (medium: CoverMedium | null) => props.book.lockedFields.includes(coverLockField(medium))
+  if (panel && !(await panel.confirm(pendingMedia.filter((medium) => !lockedOnServer(medium))))) return
+
   const locksChanged = locksDirty.value
   const result = await save(props.book.id, lockedFields.value)
-  if (result) {
-    markLocksPersisted(result.book.lockedFields)
-    emit('saved', result.book)
-    if (locksChanged) emit('locksChanged', result.book.lockedFields)
-    showSaveResultToast(result.write, result.libraryAutoWriteEnabled)
-  }
+  if (!result) return
+  markLocksPersisted(result.book.lockedFields)
+  emit('saved', result.book)
+  if (locksChanged) emit('locksChanged', result.book.lockedFields)
+  showSaveResultToast(result.write, result.libraryAutoWriteEnabled)
+
+  const unlockedBySave = pendingMedia.filter((medium) => lockedOnServer(medium) && !result.book.lockedFields.includes(coverLockField(medium)))
+  if (!panel || unlockedBySave.length === 0) return
+  await nextTick()
+  await panel.confirm(unlockedBySave)
 }
 
 function handleReset() {
   reset()
   resetLocks()
+  coverPanel.value?.reset()
 }
 
 const hoverRating = ref<number | null>(null)
@@ -397,10 +410,7 @@ function clearHoverRating() {
 }
 
 function formatWritableFormatList(formats: string[]): string {
-  const labels = formats.map((format) => format.toUpperCase())
-  if (labels.length <= 1) return labels[0] ?? ''
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`
-  return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`
+  return formatList(formats.map((format) => format.toUpperCase()))
 }
 
 function toggleComicSection() {
@@ -589,7 +599,9 @@ function applyCustomMetadataPatch(formPatch: MetadataPatch): number {
   return updated
 }
 
-function applyPatchToForm(formPatch: MetadataPatch, coverUrl: string | undefined): { skippedFields: BookMetadataLockField[]; updatedCount: number } {
+type FetchedCovers = Partial<Record<CoverMedium, string>>
+
+function applyPatchToForm(formPatch: MetadataPatch, covers: FetchedCovers): { skippedFields: BookMetadataLockField[]; updatedCount: number } {
   const skippedFields: BookMetadataLockField[] = []
   let updatedCount = 0
   const hasSeriesMembershipPatch = formPatch.seriesMemberships !== undefined
@@ -604,11 +616,14 @@ function applyPatchToForm(formPatch: MetadataPatch, coverUrl: string | undefined
   updatedCount += applyAudioPatch(formPatch, skippedFields)
   updatedCount += applyCustomMetadataPatch(formPatch)
 
-  if (coverUrl) {
-    if (isLocked('cover')) {
-      trackLockedField('cover', skippedFields)
+  for (const [medium, url] of Object.entries(covers) as [CoverMedium, string | undefined][]) {
+    if (!url) continue
+    const target = props.book.coverMedia.includes(medium) ? medium : coverFieldMedium(props.book)
+    const coverField = coverLockField(target)
+    if (isLocked(coverField)) {
+      trackLockedField(coverField, skippedFields)
     } else {
-      coverPanel.value?.setUrl(coverUrl)
+      coverPanel.value?.setUrl(url, target ?? undefined)
       updatedCount++
     }
   }
@@ -623,9 +638,9 @@ function showApplyResult(skippedFields: BookMetadataLockField[], updatedCount: n
   toast.info(t('book.detail.editMetadata.applyResult', { skipped: skippedPart, updated: updatedPart }))
 }
 
-function handleApply({ formPatch, coverUrl }: { formPatch: MetadataPatch; coverUrl?: string }) {
+function handleApply({ formPatch, coverUrl, audioCoverUrl }: MetadataDiffApply) {
   if (formDisabled.value) return
-  const { skippedFields, updatedCount } = applyPatchToForm(formPatch, coverUrl)
+  const { skippedFields, updatedCount } = applyPatchToForm(formPatch, { ebook: coverUrl, audio: audioCoverUrl })
   showApplyResult(skippedFields, updatedCount)
 }
 
@@ -735,7 +750,7 @@ async function autoFill() {
   const result = await previewRefresh(props.book.id)
   if (formDisabled.value) return
   if (!result) {
-    toast.error('Auto-fill failed')
+    toast.error(t('book.detail.editMetadata.autoFillFailed'))
     return
   }
 
@@ -749,7 +764,7 @@ async function autoFill() {
     return
   }
 
-  const { skippedFields, updatedCount } = applyPatchToForm(buildPreviewPatch(preview), preview.coverUrl)
+  const { skippedFields, updatedCount } = applyPatchToForm(buildPreviewPatch(preview), { ebook: preview.coverUrl, audio: preview.audioCoverUrl })
   if (skippedFields.length > 0) {
     showApplyResult(skippedFields, updatedCount)
     return
@@ -761,7 +776,7 @@ async function autoFill() {
 }
 
 function applyFileMetadataToForm(meta: FileMetadata): number {
-  const { updatedCount } = applyPatchToForm(buildFileMetadataPatch(meta), undefined)
+  const { updatedCount } = applyPatchToForm(buildFileMetadataPatch(meta), {})
   return updatedCount
 }
 
@@ -817,8 +832,8 @@ async function handleSeriesLockToggle() {
   await replaceLocks(props.book.id, next, 'seriesName')
 }
 
-function handleCoverLockToggle() {
-  handleLockToggle('cover')
+function handleCoverLockToggle(field: 'cover' | 'audioCover') {
+  void handleLockToggle(field)
 }
 
 async function handleLockAll() {
@@ -831,8 +846,8 @@ async function handleUnlockAll() {
   await unlockAll(props.book.id)
 }
 
-function handleCoverChanged(source: 'extracted' | 'custom' | null) {
-  emit('coverChanged', source)
+function handleCoverChanged(medium: CoverMedium | null) {
+  emit('coverChanged', medium)
 }
 </script>
 
@@ -1027,7 +1042,7 @@ function handleCoverChanged(source: 'extracted' | 'custom' | null) {
             <CoverEditorPanel
               ref="coverPanel"
               :book="props.book"
-              :locked="isLocked('cover')"
+              :locked-fields="lockedFields"
               :disabled="formDisabled"
               @cover-changed="handleCoverChanged"
               @toggle-lock="handleCoverLockToggle"

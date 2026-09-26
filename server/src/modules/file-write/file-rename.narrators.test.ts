@@ -72,6 +72,7 @@ describe('FileRenameService narrator-specific editions', () => {
       notificationService as never,
       config,
       new SelfWriteRegistry(),
+      { slotsForAdoption: vi.fn().mockResolvedValue([]), adoptSlots: vi.fn(), removeCoverDirectory: vi.fn() } as never,
     );
 
     const simonResult = await service.performRename(1, 7);

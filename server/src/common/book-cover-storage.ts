@@ -1,4 +1,5 @@
 import { join } from 'path';
+import type { CoverMedium } from '@bookorbit/types';
 
 export const COVER_CUSTOM_FILE_PREFIX = 'cover_custom.';
 export const COVER_EXTRACTED_FILE_PREFIX = 'cover_extracted.';
@@ -9,8 +10,12 @@ export function bookCoverDirPath(appDataPath: string, bookId: number): string {
   return join(appDataPath, 'covers', String(bookId));
 }
 
-export function bookThumbnailPath(appDataPath: string, bookId: number): string {
-  return join(bookCoverDirPath(appDataPath, bookId), COVER_THUMBNAIL_FILE_NAME);
+export function bookCoverSlotDirPath(appDataPath: string, bookId: number, medium: CoverMedium): string {
+  return join(bookCoverDirPath(appDataPath, bookId), medium);
+}
+
+export function bookCoverSlotThumbnailPath(appDataPath: string, bookId: number, medium: CoverMedium): string {
+  return join(bookCoverSlotDirPath(appDataPath, bookId, medium), COVER_THUMBNAIL_FILE_NAME);
 }
 
 export function isCustomBookCoverFileName(fileName: string): boolean {

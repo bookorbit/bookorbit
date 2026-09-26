@@ -2,7 +2,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 
 import { OidcService } from './oidc.service';
 
-const APP_URL = 'http://localhost:5173';
+const APP_URL = 'http://localhost:6263';
 const VALID_REDIRECT_URI = `${APP_URL}/oauth2-callback`;
 const NATIVE_REDIRECT_URI = 'bookorbit://oauth2-callback';
 
@@ -82,13 +82,7 @@ function makeService() {
   const auditEvents = {
     emit: vi.fn(),
   };
-  const configService = {
-    get: vi.fn().mockImplementation((key: string) => {
-      if (key === 'app.appUrl') return APP_URL;
-      if (key === 'app.nativeRedirectUri') return NATIVE_REDIRECT_URI;
-      return undefined;
-    }),
-  };
+  const appConfiguration = { appUrl: APP_URL, nativeRedirectUri: NATIVE_REDIRECT_URI };
   const authenticationPolicy = {
     isPasswordLoginEnabled: vi.fn().mockReturnValue(true),
   };
@@ -106,7 +100,7 @@ function makeService() {
     userService as never,
     authService as never,
     auditEvents as never,
-    configService as never,
+    appConfiguration as never,
     authenticationPolicy as never,
   );
 

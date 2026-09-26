@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef, CoverAspectRatio } from '@bookorbit/types'
-import { FORMAT_TO_GROUP, getBookMediaProfile, READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import { getFormatColor } from '../lib/format-colors'
+import { getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import BookFormatChip from './BookFormatChip.vue'
+import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -12,7 +13,6 @@ import {
   Eye,
   FolderInput,
   FolderPlus,
-  Headphones,
   Image,
   Lock,
   LockOpen,
@@ -53,7 +53,7 @@ import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { fetchAuthors } from '@/features/author/api/author'
 import { useI18n } from 'vue-i18n'
-import { hasReadAlong, READ_ALONG_FORMAT_COLOR, READ_ALONG_FORMAT_TITLE } from '@/features/book/lib/file-capabilities'
+import { toast } from 'vue-sonner'
 
 const { t } = useI18n()
 
@@ -80,31 +80,22 @@ const emit = defineEmits<{
 const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
 
-const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
-const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
-const mediaProfile = computed(() => getBookMediaProfile(readableFiles.value))
-const readAlongFile = computed(() => readableFiles.value.find((file) => hasReadAlong(file)) ?? null)
-const formatOverlayFile = computed(() => readAlongFile.value ?? primaryFile.value)
+// Card files arrive in edition order, so the first entry is the primary edition.
+const formatEntries = computed(() => bookFormatEntries(props.book.files))
+/** One file per edition: an audiobook downloads as a whole and opens from its first track. */
+const downloadableFiles = computed(() => formatEntries.value.map((entry) => entry.files[0]!))
+const openableFiles = computed(() => downloadableFiles.value.filter((file) => READER_OPENABLE_FORMATS.has(file.format!.toLowerCase())))
+const primaryFile = computed(() => openableFiles.value.find((f) => f.role === 'primary') ?? openableFiles.value[0] ?? null)
+const primaryDownloadFile = computed(() => downloadableFiles.value[0] ?? null)
+const mediaProfile = computed(() => getBookMediaProfile(formatEntries.value.flatMap((entry) => entry.files)))
+const formatOverlayKey = computed(() => formatEntries.value[0]?.key ?? null)
 const isAudiobook = computed(() => mediaProfile.value.primaryMediaKind === 'audiobook')
 const isComic = computed(() => mediaProfile.value.primaryMediaKind === 'comic')
 
-// For multi-file audiobooks, collapse all tracks into one representative entry.
-// The audio reader loads the full track queue from the book, so opening any track is equivalent.
-const isMultiTrackAudio = computed(() => {
-  const audioFiles = readableFiles.value.filter((f) => FORMAT_TO_GROUP[f.format!] === 'audio')
-  return audioFiles.length > 1
-})
-const openableFiles = computed(() => {
-  if (isMultiTrackAudio.value) {
-    const first = readableFiles.value.find((f) => FORMAT_TO_GROUP[f.format!] === 'audio')
-    const nonAudio = readableFiles.value.filter((f) => FORMAT_TO_GROUP[f.format!] !== 'audio')
-    return first ? [first, ...nonAudio] : nonAudio
-  }
-  return readableFiles.value
-})
+const isMultiTrackAudio = computed(() => formatEntries.value.some((entry) => entry.audio && entry.files.length > 1))
 
 const { coverUrl, bumpVersion } = useCoverVersions()
-const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.updatedAt ?? props.book.addedAt))
+const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.coverVersion))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 const { isRefreshing } = useRefreshingBooks()
@@ -115,8 +106,14 @@ async function reExtractCover() {
   if (reExtractingCover.value) return
   reExtractingCover.value = true
   try {
-    await fetch(`/api/v1/books/${props.book.id}/re-extract-cover`, { method: 'POST' })
+    const res = await fetch(`/api/v1/books/${props.book.id}/re-extract-cover`, { method: 'POST' })
+    if (!res.ok) {
+      toast.error(t('book.coverRegeneration.failed'))
+      return
+    }
     bumpVersion(props.book.id)
+  } catch {
+    toast.error(t('book.coverRegeneration.failed'))
   } finally {
     reExtractingCover.value = false
   }
@@ -136,7 +133,7 @@ const showSendDialog = ref(false)
 
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
-const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && formatOverlayFile.value?.format != null)
+const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && formatOverlayKey.value != null)
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
 const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
 const metadataLocked = computed(() => props.book.hasMetadataLocks)
@@ -161,13 +158,6 @@ const ratingColor = computed(() => {
   if (r === 3) return '#ca8a04'
   if (r === 4) return '#65a30d'
   return '#059669'
-})
-
-const formatOverlayStyle = computed(() => {
-  const file = formatOverlayFile.value
-  if (!file?.format) return {}
-  const color = hasReadAlong(file) ? READ_ALONG_FORMAT_COLOR : getFormatColor(file.format)
-  return { backgroundColor: `${color}e6` }
 })
 
 const coverLoaded = ref(false)
@@ -361,7 +351,12 @@ const showBelowCoverLabelArea = computed(() => props.showLabel && cardInfoMode.v
 const { downloadFile, exportBooks } = useBookDownload()
 
 function isAudioFile(file: BookFileRef) {
-  return !!file.format && FORMAT_TO_GROUP[file.format] === 'audio'
+  return !!file.format && isAudioFormat(file.format)
+}
+
+function fileFormatName(file: BookFileRef): string {
+  const key = fileFormatKey(file)
+  return key ? formatKeyName(key) : t('book.unknownFormat')
 }
 
 function handleDownloadFile(file: BookFileRef) {
@@ -505,14 +500,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             class="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-0.5 pointer-events-none transition-opacity duration-150"
             :class="overlayFadeClass"
           >
-            <span
-              class="inline-flex items-center gap-0.5 text-[8px] font-semibold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
-              :style="formatOverlayStyle"
-              :title="hasReadAlong(formatOverlayFile) ? READ_ALONG_FORMAT_TITLE : undefined"
-            >
-              {{ formatOverlayFile!.format!.toUpperCase() }}
-              <Headphones v-if="hasReadAlong(formatOverlayFile)" class="size-2.5 shrink-0" :stroke-width="2.5" aria-hidden="true" />
-            </span>
+            <BookFormatChip
+              :format-key="formatOverlayKey!"
+              variant="solid"
+              class="gap-0.5 rounded px-1.5 py-0.5 text-[8px] font-semibold tracking-widest opacity-90"
+            />
           </div>
 
           <!-- Reading progress bar - bottom edge -->
@@ -644,8 +636,8 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                        <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
-                        <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                        <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.file.audiobook') }}</span>
+                        <span v-else>{{ fileFormatName(file) }}</span>
                         <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                           t('book.file.primary')
                         }}</span>
@@ -659,21 +651,21 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
 
                   <!-- Download submenu -->
                   <DropdownMenuItem
-                    v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
-                    @click="handleDownloadFile(primaryFile)"
+                    v-if="hasPermission('library_download') && downloadableFiles.length === 1 && primaryDownloadFile"
+                    @click="handleDownloadFile(primaryDownloadFile)"
                   >
                     <Download class="size-4 mr-2" />
                     {{ t('book.actions.download') }}
                   </DropdownMenuItem>
-                  <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
+                  <DropdownMenuSub v-else-if="hasPermission('library_download') && downloadableFiles.length > 1">
                     <DropdownMenuSubTrigger>
                       <Download class="size-4 mr-2" />
                       {{ t('book.actions.download') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                      <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
+                      <DropdownMenuItem v-for="file in downloadableFiles" :key="file.id" @click="handleDownloadFile(file)">
                         <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
-                        <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                        <span v-else>{{ fileFormatName(file) }}</span>
                         <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                           t('book.file.primary')
                         }}</span>
@@ -703,7 +695,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                         <RefreshCw v-else class="size-4 mr-2" />
                         {{ t('book.actions.refreshMetadata') }}
                       </DropdownMenuItem>
-                      <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
+                      <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover">
                         <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
                         <Image v-else class="size-4 mr-2" />
                         {{ t('book.actions.regenerateCover') }}
@@ -787,8 +779,8 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                  <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
-                  <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                  <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.file.audiobook') }}</span>
+                  <span v-else>{{ fileFormatName(file) }}</span>
                   <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                     t('book.file.primary')
                   }}</span>
@@ -801,21 +793,21 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              v-if="hasPermission('library_download') && openableFiles.length === 1 && primaryFile"
-              @click="handleDownloadFile(primaryFile)"
+              v-if="hasPermission('library_download') && downloadableFiles.length === 1 && primaryDownloadFile"
+              @click="handleDownloadFile(primaryDownloadFile)"
             >
               <Download class="size-4 mr-2" />
               {{ t('book.actions.download') }}
             </DropdownMenuItem>
-            <DropdownMenuSub v-else-if="hasPermission('library_download') && openableFiles.length > 1">
+            <DropdownMenuSub v-else-if="hasPermission('library_download') && downloadableFiles.length > 1">
               <DropdownMenuSubTrigger>
                 <Download class="size-4 mr-2" />
                 {{ t('book.actions.download') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="handleDownloadFile(file)">
+                <DropdownMenuItem v-for="file in downloadableFiles" :key="file.id" @click="handleDownloadFile(file)">
                   <span v-if="isMultiTrackAudio && isAudioFile(file)">{{ t('book.download.audiobookZip') }}</span>
-                  <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                  <span v-else>{{ fileFormatName(file) }}</span>
                   <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
                     t('book.file.primary')
                   }}</span>
@@ -845,7 +837,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                   <RefreshCw v-else class="size-4 mr-2" />
                   {{ t('book.actions.refreshMetadata') }}
                 </DropdownMenuItem>
-                <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover()">
+                <DropdownMenuItem :disabled="reExtractingCover" @click="reExtractCover">
                   <Loader2 v-if="reExtractingCover" class="size-4 mr-2 animate-spin" />
                   <Image v-else class="size-4 mr-2" />
                   {{ t('book.actions.regenerateCover') }}

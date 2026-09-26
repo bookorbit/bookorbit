@@ -28,8 +28,11 @@ import {
 } from '@lucide/vue'
 import type { AudiobookManifest, AudiobookManifestAsset, AudiobookManifestChapter, BookDetail } from '@bookorbit/types'
 import { api } from '@/lib/api'
+import CoverFill from '@/features/book/components/CoverFill.vue'
 import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { bookCoverPalette } from '@/features/book/lib/book-cover'
+import { createCoverFillArtworkUrl } from '@/features/book/lib/cover-fill-artwork'
 import { useAudioProgress } from './composables/useAudioProgress'
 import { useAudioQueue } from './composables/useAudioQueue'
 import { useAudioSettings } from './composables/useAudioSettings'
@@ -42,6 +45,7 @@ const { t } = useI18n()
 const props = defineProps<{ bookId: number; fileId: number; peekMode?: boolean }>()
 const route = useRoute()
 const router = useRouter()
+const { coverUrl } = useCoverVersions()
 const trackingEnabled = computed(() => !props.peekMode)
 
 const detail = ref<BookDetail | null>(null)
@@ -212,9 +216,19 @@ watch(isPlaying, (val) => {
 })
 
 let mounted = true
+let mediaSessionArtworkUrl: string | null = null
+let mediaSessionArtworkRevision = 0
+
+function releaseMediaSessionArtwork() {
+  mediaSessionArtworkRevision++
+  if (!mediaSessionArtworkUrl) return
+  URL.revokeObjectURL(mediaSessionArtworkUrl)
+  mediaSessionArtworkUrl = null
+}
 
 onUnmounted(() => {
   mounted = false
+  releaseMediaSessionArtwork()
   stopQueuePlayingWatch?.()
   stopQueuePlayingWatch = null
   queue?.destroy()
@@ -241,6 +255,7 @@ const displayTitle = computed(() => {
 
 const coverSeed = computed(() => detail.value?.title ?? detail.value?.folderPath.split('/').pop() ?? String(props.bookId))
 const coverPalette = computed(() => bookCoverPalette(coverSeed.value))
+const coverSrc = computed(() => (detail.value?.coverSource ? coverUrl(props.bookId, 'cover', detail.value.coverVersion, 'audio') : null))
 
 // ── Media Session ─────────────────────────────────────────────────────────────
 
@@ -254,6 +269,32 @@ function updateMediaPlaybackState() {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = isPlaying.value ? 'playing' : 'paused'
   }
+}
+
+function updateMediaSessionMetadata(book: BookDetail) {
+  if (!('mediaSession' in navigator)) return
+  releaseMediaSessionArtwork()
+  const revision = mediaSessionArtworkRevision
+  const src = book.coverSource ? coverUrl(props.bookId, 'cover', book.coverVersion, 'audio') : null
+  const metadata = (artwork: MediaImage[] = []) =>
+    new MediaMetadata({
+      title: displayTitle.value,
+      artist: book.authors.map((author) => author.name).join(', '),
+      artwork,
+    })
+
+  navigator.mediaSession.metadata = metadata()
+  if (!src) return
+
+  void createCoverFillArtworkUrl(src).then((artworkUrl) => {
+    if (!artworkUrl) return
+    if (!mounted || revision !== mediaSessionArtworkRevision) {
+      URL.revokeObjectURL(artworkUrl)
+      return
+    }
+    mediaSessionArtworkUrl = artworkUrl
+    navigator.mediaSession.metadata = metadata([{ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' }])
+  })
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
@@ -711,11 +752,7 @@ onMounted(async () => {
     manifest.value = manifestRes
 
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: displayTitle.value,
-        artist: detailRes.authors.map((a: { name: string }) => a.name).join(', '),
-        artwork: detailRes.coverSource ? [{ src: `/api/v1/books/${props.bookId}/cover`, sizes: '512x512', type: 'image/jpeg' }] : [],
-      })
+      updateMediaSessionMetadata(detailRes)
       navigator.mediaSession.setActionHandler('play', togglePlay)
       navigator.mediaSession.setActionHandler('pause', togglePlay)
       navigator.mediaSession.setActionHandler('seekbackward', skipBack)
@@ -761,9 +798,9 @@ onMounted(async () => {
     <!-- Blurred cover backdrop -->
     <div class="absolute inset-0">
       <div
-        v-if="detail?.coverSource"
+        v-if="coverSrc"
         class="absolute inset-0 scale-110"
-        :style="{ backgroundImage: `url(/api/v1/books/${props.bookId}/cover)`, backgroundSize: 'cover', backgroundPosition: 'center' }"
+        :style="{ backgroundImage: `url(${coverSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }"
       />
       <div v-else class="absolute inset-0" :style="{ background: coverPalette.gradient }" />
       <div class="absolute inset-0 backdrop-blur-3xl bg-black/60" />
@@ -838,14 +875,14 @@ onMounted(async () => {
               class="absolute -inset-4 rounded-2xl blur-3xl pointer-events-none transition-opacity duration-700"
               :class="isPlaying ? 'opacity-50' : 'opacity-15'"
               :style="
-                detail.coverSource
-                  ? { backgroundImage: `url(/api/v1/books/${props.bookId}/cover)`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                coverSrc
+                  ? { backgroundImage: `url(${coverSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                   : { background: coverPalette.gradient }
               "
             />
             <!-- Cover -->
             <div class="absolute inset-0 rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl">
-              <img v-if="detail.coverSource" :src="`/api/v1/books/${props.bookId}/cover`" class="w-full h-full object-cover" :alt="displayTitle" />
+              <CoverFill v-if="coverSrc" :src="coverSrc" :alt="displayTitle" loading="eager" />
               <BookCoverPlaceholder
                 v-else
                 :title="detail.title"

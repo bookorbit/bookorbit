@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -8,15 +8,12 @@ function makeImporter() {
   const repo = {
     setRunMetric: vi.fn().mockResolvedValue(undefined),
   };
-  const importRepo = {
-    fetchLibraryIdsByBookIds: vi.fn().mockResolvedValue(new Map<number, number>()),
-    markCoverAsCustom: vi.fn().mockResolvedValue(undefined),
+  const coverStore = {
+    chooseWriteMedium: vi.fn().mockResolvedValue('ebook'),
+    saveCustom: vi.fn().mockResolvedValue(true),
   };
-  const scanGateway = {
-    emitCoverRefreshed: vi.fn(),
-  };
-  const importer = new CoverImporter(repo as never, importRepo as never, scanGateway as never);
-  return { importer, repo, importRepo, scanGateway };
+  const importer = new CoverImporter(repo as never, coverStore as never);
+  return { importer, repo, coverStore };
 }
 
 describe('CoverImporter', () => {
@@ -25,8 +22,7 @@ describe('CoverImporter', () => {
   });
 
   it('counts rejected per-book tasks as failed while continuing batch processing', async () => {
-    const { importer, repo, importRepo, scanGateway } = makeImporter();
-    importRepo.fetchLibraryIdsByBookIds.mockResolvedValue(new Map([[901, 12]]));
+    const { importer, repo } = makeImporter();
     const processSingleMatch = vi
       .spyOn(importer as any, 'processSingleMatch')
       .mockResolvedValueOnce('imported')
@@ -48,7 +44,6 @@ describe('CoverImporter', () => {
     );
 
     expect(processSingleMatch).toHaveBeenCalledTimes(2);
-    expect(scanGateway.emitCoverRefreshed).toHaveBeenCalledWith({ bookId: 901, libraryId: 12 });
     expect(repo.setRunMetric).toHaveBeenCalledWith(
       41,
       'book_covers',
@@ -63,12 +58,17 @@ describe('CoverImporter', () => {
 
   it('returns failed when importing a single cover throws after reading source cover bytes', async () => {
     const { importer } = makeImporter();
-    vi.spyOn(importer as any, 'readOptionalFile').mockResolvedValue(Buffer.from('cover-bytes'));
-    vi.spyOn(importer as any, 'importSingleCover').mockRejectedValue(new Error('invalid image payload'));
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cover-importer-failure-'));
+    try {
+      const sourceDir = join(tempRoot, 'images', 'source-1');
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(join(sourceDir, 'cover.jpg'), Buffer.from('cover-bytes'));
+      vi.spyOn(importer as any, 'importSingleCover').mockRejectedValue(new Error('invalid image payload'));
 
-    await expect((importer as any).processSingleMatch(99, { sourceBookId: 'source-1', targetBookId: 901 }, '/app', '/source-media')).resolves.toBe(
-      'failed',
-    );
+      await expect((importer as any).processSingleMatch(99, { sourceBookId: 'source-1', targetBookId: 901 }, tempRoot)).resolves.toBe('failed');
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it('readOptionalFile returns null for ENOENT and rethrows non-ENOENT read errors', async () => {
@@ -82,35 +82,37 @@ describe('CoverImporter', () => {
     }
   });
 
-  it('deleteFilesByPrefix removes only matching files and keeps unrelated entries', async () => {
-    const { importer } = makeImporter();
-    const tempRoot = await mkdtemp(join(tmpdir(), 'cover-importer-delete-'));
-    try {
-      await writeFile(join(tempRoot, 'cover_custom.jpg'), 'cover');
-      await writeFile(join(tempRoot, 'cover_custom.png'), 'cover');
-      await writeFile(join(tempRoot, 'thumbnail.jpg'), 'thumb');
+  it('routes imported bytes through the slot store as a legacy custom cover', async () => {
+    const { importer, coverStore } = makeImporter();
+    const bytes = Buffer.from('cover-bytes');
 
-      await (importer as any).deleteFilesByPrefix(tempRoot, 'cover_custom.');
-      const remaining = await readdir(tempRoot);
+    await (importer as any).importSingleCover(901, bytes);
 
-      expect(remaining).toEqual(['thumbnail.jpg']);
-    } finally {
-      await rm(tempRoot, { recursive: true, force: true });
-    }
+    expect(coverStore.chooseWriteMedium).toHaveBeenCalledWith(901, bytes);
+    expect(coverStore.saveCustom).toHaveBeenCalledWith(901, 'ebook', bytes, { origin: 'legacy' });
   });
 
-  it('readDirIfExists/removeFileIfPresent handle ENOENT and still surface other fs errors', async () => {
-    const { importer } = makeImporter();
-    const tempRoot = await mkdtemp(join(tmpdir(), 'cover-importer-fs-'));
-    const existingFile = join(tempRoot, 'existing.txt');
-    await writeFile(existingFile, 'x');
+  it('rejects source identifiers that escape the images directory', async () => {
+    const { importer, coverStore } = makeImporter();
 
+    await expect((importer as any).processSingleMatch(99, { sourceBookId: '../escape', targetBookId: 901 }, '/source-media')).resolves.toBe(
+      'unresolved',
+    );
+    expect(coverStore.saveCustom).not.toHaveBeenCalled();
+  });
+
+  it('rejects a source cover symlink that escapes its source directory', async () => {
+    const { importer, coverStore } = makeImporter();
+    const tempRoot = await mkdtemp(join(tmpdir(), 'cover-importer-symlink-'));
     try {
-      await expect((importer as any).readDirIfExists(join(tempRoot, 'missing-dir'))).resolves.toEqual([]);
-      await expect((importer as any).removeFileIfPresent(join(tempRoot, 'missing.txt'))).resolves.toBeUndefined();
+      const sourceDir = join(tempRoot, 'images', 'source-1');
+      const outsideCover = join(tempRoot, 'outside.jpg');
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(outsideCover, Buffer.from('outside-cover'));
+      await symlink(outsideCover, join(sourceDir, 'cover.jpg'));
 
-      await expect((importer as any).readDirIfExists(existingFile)).rejects.toBeInstanceOf(Error);
-      await expect((importer as any).removeFileIfPresent(tempRoot)).rejects.toBeInstanceOf(Error);
+      await expect((importer as any).processSingleMatch(99, { sourceBookId: 'source-1', targetBookId: 901 }, tempRoot)).resolves.toBe('unresolved');
+      expect(coverStore.saveCustom).not.toHaveBeenCalled();
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

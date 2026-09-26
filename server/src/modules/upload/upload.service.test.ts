@@ -102,6 +102,7 @@ describe('UploadService', () => {
     processNewBookImportAsync: vi.fn(),
     extractMetadataAsync: vi.fn(),
     extractAudioDurationAsync: vi.fn(),
+    reconcileCoversAsync: vi.fn(),
   };
 
   const user = { id: 7, isSuperuser: false, permissions: [] } as any;
@@ -1089,6 +1090,7 @@ describe('UploadService', () => {
       await service.addFileToBook(10, 'chapter-02.mp3', {} as any, user);
 
       expect(processor.extractAudioDurationAsync).toHaveBeenCalledWith(10, '/library/Book Title/chapter-02.mp3', 'mp3');
+      expect(processor.reconcileCoversAsync).toHaveBeenCalledWith([10]);
     });
 
     it('delegates duration extraction to the processor regardless of format (processor gates on audio)', async () => {

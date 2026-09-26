@@ -1,7 +1,6 @@
 export {
   assertNoIntegrityViolations,
   closeE2EContext as closeScannerE2EContext,
-  createE2EContext as createScannerE2EContext,
   loadLibraryBookState,
   seedLibrary,
   triggerAndWaitForLibraryScan,
@@ -14,7 +13,12 @@ export {
 } from '../app-harness';
 
 import { FileWatcherService } from '../../../src/modules/scanner/file-watcher.service';
-import type { E2EContext } from '../app-harness';
+import { createE2EContext, type E2EContext } from '../app-harness';
+
+/** Scans write covers, so every scanner suite gets its own data folder. */
+export function createScannerE2EContext(): Promise<E2EContext> {
+  return createE2EContext({ isolateAppData: true });
+}
 
 export async function startLibraryWatcher(ctx: E2EContext, libraryId: number, paths: string[]): Promise<void> {
   const watcher = ctx.app.get(FileWatcherService);

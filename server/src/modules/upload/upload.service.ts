@@ -7,7 +7,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
-import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
+import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -36,8 +36,6 @@ import { uploadError } from './upload-errors';
 
 type Db = NodePgDatabase<typeof schema>;
 type StoredUploadResult = UploadResult & { absolutePath: string; created: boolean; libraryId: number };
-
-type PrimaryFileCandidate = Pick<typeof bookFiles.$inferSelect, 'id' | 'format' | 'sizeBytes' | 'mediaOverlayAvailable'>;
 
 @Injectable()
 export class UploadService {
@@ -315,7 +313,7 @@ export class UploadService {
           .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'content')))
           .orderBy(asc(bookFiles.id));
 
-        const winner = this.pickPrimaryFile(contentFiles, lockedBook.primaryFileId, lockedBook.formatPriority);
+        const winner = selectPrimaryFileKeepingCurrent(contentFiles, lockedBook.primaryFileId, lockedBook.formatPriority);
         const nextPrimaryFileId = winner?.id ?? null;
         const needsPrimaryUpdate = nextPrimaryFileId !== lockedBook.primaryFileId;
         const needsStatusUpdate = lockedBook.status === 'missing';
@@ -339,6 +337,7 @@ export class UploadService {
       });
 
       this.processor.extractAudioDurationAsync(bookId, destination, format);
+      this.processor.reconcileCoversAsync([bookId]);
 
       this.logger.log(
         `[${event}] [end] bookId=${bookId} userId=${user.id} fileId=${inserted.id} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - add file to book completed`,
@@ -372,14 +371,6 @@ export class UploadService {
       ]);
       throw err;
     }
-  }
-
-  private pickPrimaryFile(files: PrimaryFileCandidate[], currentPrimaryFileId: number | null, formatPriority: string[]): PrimaryFileCandidate | null {
-    const ordered =
-      currentPrimaryFileId == null
-        ? files
-        : [...files.filter((file) => file.id === currentPrimaryFileId), ...files.filter((file) => file.id !== currentPrimaryFileId)];
-    return selectPrimaryFile(ordered, formatPriority);
   }
 
   async renameBookFiles(bookId: number, user: RequestUser): Promise<void> {

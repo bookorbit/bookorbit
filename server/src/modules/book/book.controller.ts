@@ -46,6 +46,8 @@ import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
+import { CoverReadQueryDto } from './dto/cover-read-query.dto';
+import { CoverMediumQueryDto } from '../cover/dto/cover-medium-query.dto';
 import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
@@ -212,8 +214,10 @@ export class BookController {
 
   @Post(':id/re-extract-cover')
   @RequirePermission(Permission.LibraryEditMetadata)
-  reExtractCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    return this.bookService.bulkReExtractCover([id], user);
+  reExtractCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Query() query?: CoverMediumQueryDto) {
+    return query?.medium
+      ? this.bookService.bulkReExtractCover([id], user, undefined, { medium: query.medium })
+      : this.bookService.bulkReExtractCover([id], user);
   }
 
   @Post('export')
@@ -338,15 +342,15 @@ export class BookController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
-    @Query('t') t?: string,
+    @Query() query: CoverReadQueryDto = {},
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
-    const coverPath = await this.bookService.getCoverPath(id, user);
+    const coverPath = await this.bookService.getCoverPath(id, user, { medium: query.medium, strict: query.strict });
     if (!coverPath) throw new NotFoundException(`No cover for book ${id}`);
 
     const { mtimeMs } = await stat(coverPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
-    const cacheControl = t ? 'public, max-age=31536000, immutable' : 'private, max-age=86400';
+    const cacheControl = query.t ? 'public, max-age=31536000, immutable' : 'private, max-age=86400';
 
     if (ifNoneMatch === etag) {
       reply.status(304).header('Cache-Control', cacheControl).header('ETag', etag).send();
@@ -365,15 +369,15 @@ export class BookController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
-    @Query('t') t?: string,
+    @Query() query: CoverReadQueryDto = {},
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
-    const thumbnailPath = await this.bookService.getThumbnailPath(id, user);
+    const thumbnailPath = await this.bookService.getThumbnailPath(id, user, { medium: query.medium, strict: query.strict });
     if (!thumbnailPath) throw new NotFoundException(`No thumbnail for book ${id}`);
 
     const { mtimeMs } = await stat(thumbnailPath);
     const etag = `"${Math.floor(mtimeMs)}"`;
-    const cacheControl = t ? 'public, max-age=31536000, immutable' : 'private, max-age=86400';
+    const cacheControl = query.t ? 'public, max-age=31536000, immutable' : 'private, max-age=86400';
 
     if (ifNoneMatch === etag) {
       reply.status(304).header('Cache-Control', cacheControl).header('ETag', etag).send();

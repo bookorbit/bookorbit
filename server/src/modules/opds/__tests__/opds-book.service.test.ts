@@ -259,9 +259,41 @@ describe('OpdsBookService', () => {
     await expect(service.getBookFiles(7)).resolves.toEqual({
       absolutePath: '/books/a.epub',
       format: 'unknown',
+      readAlong: false,
       title: 'book-7',
       authorName: '',
     });
+  });
+
+  it('serves a readable edition by default when the primary is an audiobook', async () => {
+    const rows = [
+      {
+        id: 1,
+        absolutePath: '/books/a.m4b',
+        format: 'm4b',
+        role: 'content',
+        sizeBytes: 9,
+        mediaOverlayAvailable: false,
+        title: 'A',
+        primaryFileId: 1,
+        formatPriority: null,
+      },
+      {
+        id: 2,
+        absolutePath: '/books/a.epub',
+        format: 'epub',
+        role: 'content',
+        sizeBytes: 9,
+        mediaOverlayAvailable: true,
+        title: 'A',
+        primaryFileId: 1,
+        formatPriority: null,
+      },
+    ];
+    const { service } = makeService([rows, [{ name: 'Author' }], rows, [{ name: 'Author' }]]);
+
+    await expect(service.getBookFiles(7)).resolves.toMatchObject({ absolutePath: '/books/a.epub', format: 'epub', readAlong: true });
+    await expect(service.getBookFiles(7, 1)).resolves.toMatchObject({ absolutePath: '/books/a.m4b', readAlong: false });
   });
 
   it('applies text search inside smartScope when q is provided', async () => {

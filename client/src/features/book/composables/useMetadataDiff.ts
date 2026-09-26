@@ -3,7 +3,9 @@ import type {
   BookCommunityRating,
   BookMetadataLockField,
   ComicMetadataFields,
+  CoverMedium,
   MetadataCandidate,
+  MetadataCoverShape,
   MetadataProviderInfo,
   MetadataProviderKey,
   MetadataSeriesMembership,
@@ -13,6 +15,7 @@ import type {
 } from '@bookorbit/types'
 import { getProviderLabel, toDisplayCoverUrl } from '../lib/metadata-fetch'
 import { formatCommunityRatingLine, formatCommunityRatingValue } from '../lib/community-rating'
+import { COVER_FIT_RANK, coverFit, coverLockField, statedCoverShape, type CoverFit } from '../lib/cover-slots'
 
 type ComicDiffFieldKey =
   | 'comicIssueNumber'
@@ -47,6 +50,8 @@ export type DiffFieldKey =
   | 'durationSeconds'
   | 'abridged'
   | 'coverUrl'
+  /** The cover of a book's other medium, when it has two. */
+  | 'secondCoverUrl'
   | 'hardcoverEditionId'
   | ProviderIdPatchField
   | 'sourceUrl'
@@ -61,7 +66,8 @@ export interface ProviderFieldValue {
 
 export interface DiffField {
   key: DiffFieldKey
-  label: string
+  /** An i18n key; the row translates it. */
+  labelKey: string
   bookValue: string
   currentDisplay: string
   candidateDisplay: string
@@ -71,6 +77,10 @@ export interface DiffField {
   pickedProvider: MetadataProviderKey | null
   pickedDisplay: string
   isCover: boolean
+  /** The slot a cover row fills, which also sets the shape its frames take. */
+  coverMedium?: CoverMedium
+  /** How the offered cover's shape fits its slot; set on a cover row that offers one. */
+  candidateCoverFit?: CoverFit
   isLocked: boolean
   isCopyable: boolean
   providerValues: ProviderFieldValue[]
@@ -114,6 +124,15 @@ export interface MetadataPatch {
   customMetadata?: CustomMetadataBookValueInput[]
 }
 
+/** What the diff hands back: the form fields, plus a cover for each slot that was picked. */
+export interface MetadataDiffApply {
+  formPatch: MetadataPatch
+  /** For the ebook slot. */
+  coverUrl?: string
+  /** For the audio slot. */
+  audioCoverUrl?: string
+}
+
 export type GenreWriteMode = 'merge' | 'replace'
 
 export function mergeGenreLists(existing: readonly string[], incoming: readonly string[]): string[] {
@@ -131,47 +150,53 @@ export function mergeGenreLists(existing: readonly string[], incoming: readonly 
   return merged
 }
 
-export const FIELD_DEFS: { key: DiffFieldKey; label: string }[] = [
-  { key: 'coverUrl', label: 'Cover' },
-  { key: 'title', label: 'Title' },
-  { key: 'subtitle', label: 'Subtitle' },
-  { key: 'authors', label: 'Authors' },
-  { key: 'description', label: 'Description' },
-  { key: 'publisher', label: 'Publisher' },
-  { key: 'publishedDate', label: 'Published' },
-  { key: 'language', label: 'Language' },
-  { key: 'pageCount', label: 'Page Count' },
-  { key: 'communityRating', label: 'Community Rating' },
-  { key: 'seriesName', label: 'Series' },
-  { key: 'seriesIndex', label: 'Series Index' },
-  { key: 'isbn13', label: 'ISBN-13' },
-  { key: 'isbn10', label: 'ISBN-10' },
-  { key: 'genres', label: 'Genres' },
-  { key: 'narrators', label: 'Narrators' },
-  { key: 'durationSeconds', label: 'Duration (seconds)' },
-  { key: 'abridged', label: 'Abridged' },
-  { key: 'hardcoverEditionId', label: 'Hardcover Edition ID' },
-]
+const FIELD_LABEL_PREFIX = 'book.detail.editMetadata.diff.fields'
+
+export const FIELD_DEFS: { key: DiffFieldKey; labelKey: string }[] = (
+  [
+    'coverUrl',
+    'title',
+    'subtitle',
+    'authors',
+    'description',
+    'publisher',
+    'publishedDate',
+    'language',
+    'pageCount',
+    'communityRating',
+    'seriesName',
+    'seriesIndex',
+    'isbn13',
+    'isbn10',
+    'genres',
+    'narrators',
+    'durationSeconds',
+    'abridged',
+    'hardcoverEditionId',
+  ] as const
+).map((key) => ({ key, labelKey: `${FIELD_LABEL_PREFIX}.${key}` }))
 
 export interface ComicFieldDef {
   key: ComicDiffFieldKey
-  label: string
+  labelKey: string
   comicKey: keyof ComicMetadataFields
 }
 
-export const COMIC_FIELD_DEFS: ComicFieldDef[] = [
-  { key: 'comicIssueNumber', label: 'Issue Number', comicKey: 'issueNumber' },
-  { key: 'comicVolumeName', label: 'Volume', comicKey: 'volumeName' },
-  { key: 'comicPencillers', label: 'Pencillers', comicKey: 'pencillers' },
-  { key: 'comicInkers', label: 'Inkers', comicKey: 'inkers' },
-  { key: 'comicColorists', label: 'Colorists', comicKey: 'colorists' },
-  { key: 'comicLetterers', label: 'Letterers', comicKey: 'letterers' },
-  { key: 'comicCoverArtists', label: 'Cover Artists', comicKey: 'coverArtists' },
-  { key: 'comicCharacters', label: 'Characters', comicKey: 'characters' },
-  { key: 'comicTeams', label: 'Teams', comicKey: 'teams' },
-  { key: 'comicLocations', label: 'Locations', comicKey: 'locations' },
-  { key: 'comicStoryArcs', label: 'Story Arcs', comicKey: 'storyArcs' },
-]
+export const COMIC_FIELD_DEFS: ComicFieldDef[] = (
+  [
+    ['comicIssueNumber', 'issueNumber'],
+    ['comicVolumeName', 'volumeName'],
+    ['comicPencillers', 'pencillers'],
+    ['comicInkers', 'inkers'],
+    ['comicColorists', 'colorists'],
+    ['comicLetterers', 'letterers'],
+    ['comicCoverArtists', 'coverArtists'],
+    ['comicCharacters', 'characters'],
+    ['comicTeams', 'teams'],
+    ['comicLocations', 'locations'],
+    ['comicStoryArcs', 'storyArcs'],
+  ] as const
+).map(([key, comicKey]) => ({ key, labelKey: `${FIELD_LABEL_PREFIX}.${key}`, comicKey }))
 
 export const COMIC_KEY_MAP: Record<ComicDiffFieldKey, keyof ComicMetadataFields> = Object.fromEntries(
   COMIC_FIELD_DEFS.map((d) => [d.key, d.comicKey]),
@@ -219,21 +244,9 @@ export function isProviderIdPatchField(key: DiffFieldKey): key is ProviderIdPatc
   return PROVIDER_ID_PATCH_FIELDS.has(key)
 }
 
-export const PROVIDER_ID_LABEL: Record<MetadataProviderKey, string> = {
-  google: 'Google Books ID',
-  goodreads: 'Goodreads ID',
-  amazon: 'Amazon ID',
-  hardcover: 'Hardcover ID',
-  openLibrary: 'Open Library ID',
-  itunes: 'iTunes ID',
-  audible: 'Audible ID',
-  audnexus: 'Audible ID',
-  librofm: 'Libro.fm ISBN',
-  comicvine: 'ComicVine ID',
-  ranobedb: 'RanobeDB ID',
-  kobo: 'Kobo ID',
-  lubimyczytac: 'LubimyCzytac ID',
-  aladin: 'Aladin ID',
+/** The i18n key naming each provider's id row. AudNexus stores an Audible id. */
+export function providerIdLabelKey(provider: MetadataProviderKey): string {
+  return `book.detail.editMetadata.diff.providerIds.${provider === 'audnexus' ? 'audible' : provider}`
 }
 
 export function getCandidateValueFrom(candidate: MetadataCandidate, key: DiffFieldKey): string {
@@ -272,22 +285,39 @@ function normalizeSeriesMemberships(values: readonly MetadataSeriesMembership[] 
   return out
 }
 
+export interface MetadataDiffOptions {
+  /** The slot the cover row fills. Defaults to the ebook slot. */
+  coverMedium?: MaybeRefOrGetter<CoverMedium | undefined>
+  /** Overrides the cover row's label, for a book that shows one cover row per medium. */
+  coverLabelKey?: MaybeRefOrGetter<string | undefined>
+  /** A candidate cover's shape. Defaults to the shape its provider states. */
+  coverShapeOf?: (candidate: MetadataCandidate) => MetadataCoverShape
+}
+
 export function useMetadataDiff(
   current: MetadataSource,
   candidates: MaybeRefOrGetter<MetadataCandidate[]>,
   activeProvider: MaybeRefOrGetter<MetadataProviderKey>,
   providerInfos: MaybeRefOrGetter<MetadataProviderInfo[]>,
-  currentCoverUrl?: string,
+  currentCoverUrl?: MaybeRefOrGetter<string | undefined>,
   providerIds?: MaybeRefOrGetter<ProviderIds | undefined>,
   lockedFields?: MaybeRefOrGetter<readonly BookMetadataLockField[] | undefined>,
+  options: MetadataDiffOptions = {},
 ) {
   const pickedSources = reactive(new Map<DiffFieldKey, MetadataProviderKey>())
   const pickedCommunityRatingProviders = reactive(new Set<MetadataProviderKey>())
   const genreWriteMode = ref<GenreWriteMode>('merge')
   const lockedFieldSet = computed(() => new Set(toValue(lockedFields) ?? []))
+  const coverMedium = computed<CoverMedium>(() => toValue(options.coverMedium) ?? 'ebook')
+  const coverShapeOf = options.coverShapeOf ?? statedCoverShape
+
+  function candidateCoverFit(candidate: MetadataCandidate): CoverFit {
+    return coverFit(coverShapeOf(candidate), coverMedium.value)
+  }
 
   function resolveLockField(key: DiffFieldKey): BookMetadataLockField | null {
-    if (key === 'coverUrl') return 'cover'
+    if (key === 'coverUrl') return coverLockField(coverMedium.value)
+    if (key === 'secondCoverUrl') return coverLockField(coverMedium.value === 'audio' ? 'ebook' : 'audio')
     if (key === 'sourceUrl') return null
     if (key === 'publishedDate') return 'publishedYear'
     return key
@@ -298,7 +328,7 @@ export function useMetadataDiff(
     if (key === 'authors') return current.authors.join(', ')
     if (key === 'genres') return current.genres.join(', ')
     if (key === 'narrators') return current.narrators?.join(', ') ?? ''
-    if (key === 'coverUrl') return currentCoverUrl ?? ''
+    if (key === 'coverUrl') return toValue(currentCoverUrl) ?? ''
     if (key === 'communityRating') {
       const ap = toValue(activeProvider)
       const existing = current.communityRatings?.find((r) => r.provider === ap)
@@ -312,7 +342,7 @@ export function useMetadataDiff(
   function buildProviderValues(key: DiffFieldKey): ProviderFieldValue[] {
     const allCandidates = toValue(candidates)
     const infos = toValue(providerInfos)
-    const result: ProviderFieldValue[] = []
+    const result: { value: ProviderFieldValue; fitRank: number }[] = []
     const seenProviders = new Set<MetadataProviderKey>()
 
     for (const c of allCandidates) {
@@ -321,17 +351,20 @@ export function useMetadataDiff(
       const display = getCandidateValueFrom(c, key)
       if (!display) continue
       result.push({
-        provider: c.provider,
-        label: getProviderLabel(c.provider, infos),
-        display,
-        isPicked: key === 'communityRating' ? pickedCommunityRatingProviders.has(c.provider) : pickedSources.get(key) === c.provider,
+        value: {
+          provider: c.provider,
+          label: getProviderLabel(c.provider, infos),
+          display,
+          isPicked: key === 'communityRating' ? pickedCommunityRatingProviders.has(c.provider) : pickedSources.get(key) === c.provider,
+        },
+        fitRank: key === 'coverUrl' ? COVER_FIT_RANK[candidateCoverFit(c)] : 0,
       })
     }
 
-    return result
+    return result.sort((a, b) => a.fitRank - b.fitRank).map(({ value }) => value)
   }
 
-  function makeRow(key: DiffFieldKey, label: string): DiffField | null {
+  function makeRow(key: DiffFieldKey, labelKey: string): DiffField | null {
     const allCandidates = toValue(candidates)
     const ap = toValue(activeProvider)
     const activeCandidate = allCandidates.find((c) => c.provider === ap)
@@ -380,7 +413,7 @@ export function useMetadataDiff(
 
     return {
       key,
-      label,
+      labelKey: key === 'coverUrl' ? (toValue(options.coverLabelKey) ?? labelKey) : labelKey,
       bookValue: bookVal,
       currentDisplay: isPicked ? pickedDisplay : bookVal,
       candidateDisplay: candidateVal,
@@ -390,6 +423,8 @@ export function useMetadataDiff(
       pickedProvider,
       pickedDisplay,
       isCover: key === 'coverUrl',
+      ...(key === 'coverUrl' ? { coverMedium: coverMedium.value } : {}),
+      ...(key === 'coverUrl' && activeCandidate && candidateVal ? { candidateCoverFit: candidateCoverFit(activeCandidate) } : {}),
       isLocked: lockField ? lockedFieldSet.value.has(lockField) : false,
       isCopyable: true,
       providerValues: buildProviderValues(key),
@@ -404,13 +439,13 @@ export function useMetadataDiff(
     const activeCandidate = allCandidates.find((c) => c.provider === ap)
 
     for (const def of FIELD_DEFS) {
-      const row = makeRow(def.key, def.label)
+      const row = makeRow(def.key, def.labelKey)
       if (row) rows.push(row)
     }
 
     if (activeCandidate?.comicMetadata) {
       for (const def of COMIC_FIELD_DEFS) {
-        const row = makeRow(def.key, def.label)
+        const row = makeRow(def.key, def.labelKey)
         if (row) rows.push(row)
       }
     }
@@ -427,7 +462,7 @@ export function useMetadataDiff(
 
       rows.push({
         key: providerIdKey,
-        label: PROVIDER_ID_LABEL[ap] ?? 'Provider ID',
+        labelKey: providerIdLabelKey(ap),
         bookValue: existingProviderId ?? '',
         currentDisplay: pickedFromActive ? pickedDisplay : (existingProviderId ?? ''),
         candidateDisplay: activeProviderIdVal,
@@ -446,7 +481,7 @@ export function useMetadataDiff(
     if (activeCandidate?.sourceUrl) {
       rows.push({
         key: 'sourceUrl',
-        label: 'Source URL',
+        labelKey: `${FIELD_LABEL_PREFIX}.sourceUrl`,
         bookValue: '',
         currentDisplay: '',
         candidateDisplay: activeCandidate.sourceUrl,
@@ -496,10 +531,12 @@ export function useMetadataDiff(
     }
   }
 
+  /** Like the automatic fetch, a bulk copy never swaps a cover for art of the other shape; the row's own arrow still can. */
   function copyAll() {
     const ap = toValue(activeProvider)
     for (const f of fields.value) {
       if (!f.isCopyable || f.isLocked) continue
+      if (f.isCover && f.bookValue && f.candidateCoverFit === 'mismatch') continue
       if (f.key === 'communityRating') pickedCommunityRatingProviders.add(ap)
       else pickedSources.set(f.key, ap)
     }

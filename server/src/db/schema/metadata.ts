@@ -92,6 +92,7 @@ export const bookMetadata = pgTable(
     index('bm_title_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.title}) gin_trgm_ops`),
     index('bm_title_lower_idx').on(sql`lower(${t.title})`),
     index('bm_title_book_id_idx').on(t.title, t.bookId),
+    index('bm_subtitle_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.subtitle}) gin_trgm_ops`),
     index('bm_series_trgm_idx').using('gin', t.seriesName.op('gin_trgm_ops')),
     index('bm_series_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.seriesName}) gin_trgm_ops`),
     index('bm_series_id_idx').on(t.seriesId),

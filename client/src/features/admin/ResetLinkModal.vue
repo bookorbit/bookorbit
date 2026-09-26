@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { copyToClipboard } from '@/lib/clipboard'
+import { resolveResetLinkUrl } from './lib/reset-link'
 
 const { t } = useI18n()
 
 const props = defineProps<{ resetUrl: string }>()
 const emit = defineEmits<{ close: [] }>()
+const displayedUrl = computed(() => resolveResetLinkUrl(props.resetUrl, window.location.origin))
 
 const copied = ref(false)
 const copyFailed = ref(false)
@@ -46,7 +48,7 @@ function handleClose() {
 }
 
 function handleCopy() {
-  void copy(props.resetUrl)
+  void copy(displayedUrl.value)
 }
 </script>
 
@@ -64,7 +66,7 @@ function handleCopy() {
 
       <div class="flex gap-2">
         <input
-          :value="resetUrl"
+          :value="displayedUrl"
           readonly
           class="flex-1 rounded-md border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none overflow-x-auto"
         />

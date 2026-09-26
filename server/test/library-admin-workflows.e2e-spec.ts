@@ -20,7 +20,8 @@ import {
   type AuthorizationMatrixE2EContext,
   type TestUserSession,
 } from './e2e/authorization-matrix/authorization-matrix-harness';
-import { createEpubFixture, writeFixtureFile } from './e2e/authorization-matrix/authorization-matrix-fixture-builder';
+import { createEpubFixture } from './e2e/authorization-matrix/authorization-matrix-fixture-builder';
+import { createSlotCoverArtifacts } from './e2e/slot-cover-artifacts';
 
 type InjectResponse = Awaited<ReturnType<AuthorizationMatrixE2EContext['app']['inject']>>;
 
@@ -734,7 +735,8 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
         format: 'epub',
       });
       expect(uploadedBookFile?.absolutePath).toContain('Uploaded Contract Title.epub');
-      expect(uploadedBookFile?.relPath).toBe('Uploaded Contract Title.epub');
+      // The default upload pattern files a book under its first author, and this fixture names none.
+      expect(uploadedBookFile?.relPath).toBe('Unknown Author/Uploaded Contract Title.epub');
 
       const uploadedMetadataRow = await ctx.db.query.bookMetadata.findFirst({
         where: eq(schema.bookMetadata.bookId, uploadBody.bookId),
@@ -880,8 +882,10 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
         },
       ]);
 
-      await writeFixtureFile(ctx.fixture.booksPath, `covers/${uploadedBookId}/cover_custom.jpg`, Buffer.from('cover', 'utf8'));
-      await writeFixtureFile(ctx.fixture.booksPath, `covers/${uploadedBookId}/thumbnail.jpg`, Buffer.from('thumb', 'utf8'));
+      await createSlotCoverArtifacts(ctx, uploadedBookId, {
+        coverContent: Buffer.from('cover', 'utf8'),
+        thumbnailContent: Buffer.from('thumb', 'utf8'),
+      });
 
       const reorderResponse = await ctx.app.inject({
         method: 'POST',

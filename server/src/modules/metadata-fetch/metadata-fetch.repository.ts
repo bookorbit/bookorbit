@@ -2,9 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { CoverMedia } from '@bookorbit/types';
+
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookMetadata, books, userLibraryAccess } from '../../db/schema';
+import { coverMediaSql } from '../book-cover-store/book-cover-store.repository';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -26,6 +29,7 @@ export interface StoredProviderIdsRow {
   ranobedbId: string | null;
   lubimyczytacId: string | null;
   aladinId: string | null;
+  coverMedia: CoverMedia;
 }
 
 @Injectable()
@@ -33,6 +37,7 @@ export class MetadataFetchRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   async findStoredProviderIdsRow(bookId: number): Promise<StoredProviderIdsRow | null> {
+    const media = coverMediaSql(books.id);
     const [row] = await this.db
       .select({
         libraryId: books.libraryId,
@@ -52,13 +57,17 @@ export class MetadataFetchRepository {
         ranobedbId: bookMetadata.ranobedbId,
         lubimyczytacId: bookMetadata.lubimyczytacId,
         aladinId: bookMetadata.aladinId,
+        hasEbook: media.hasEbook,
+        hasAudio: media.hasAudio,
       })
       .from(books)
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .where(eq(books.id, bookId))
       .limit(1);
 
-    return row ?? null;
+    if (!row) return null;
+    const { hasEbook, hasAudio, ...stored } = row;
+    return { ...stored, coverMedia: { hasEbook: hasEbook === true, hasAudio: hasAudio === true } };
   }
 
   async hasLibraryAccess(userId: number, libraryId: number): Promise<boolean> {

@@ -5,7 +5,7 @@ import { MODULE_METADATA } from '@nestjs/common/constants';
 import { CommonModule } from '../../common/common.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { BookModule } from '../book/book.module';
-import { MetadataModule } from '../metadata/metadata.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { UserModule } from '../user/user.module';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import { OpdsBookService } from './opds-book.service';
@@ -21,7 +21,7 @@ describe('OpdsModule', () => {
     expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, OpdsModule)).toEqual([
       AppSettingsModule,
       BookModule,
-      MetadataModule,
+      BookCoverStoreModule,
       UserModule,
       CommonModule,
     ]);

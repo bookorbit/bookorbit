@@ -229,7 +229,7 @@ describe('BookController', () => {
     bookService.getCoverPath.mockResolvedValue('/tmp/cover.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 1234 } as never);
 
-    await controller.getCover(7, makeUser(), reply, '1234567890', '"1234"');
+    await controller.getCover(7, makeUser(), reply, { t: '1234567890' }, '"1234"');
 
     expect(reply.status).toHaveBeenCalledWith(304);
     expect(headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
@@ -256,7 +256,7 @@ describe('BookController', () => {
     bookService.getCoverPath.mockResolvedValue('/tmp/cover.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 4321 } as never);
 
-    await controller.getCover(7, makeUser(), reply, '1234567890', undefined);
+    await controller.getCover(7, makeUser(), reply, { t: '1234567890' }, undefined);
 
     expect(headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
@@ -732,7 +732,7 @@ describe('BookController', () => {
     bookService.getThumbnailPath.mockResolvedValue('/tmp/thumb.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 1000 } as never);
 
-    await controller.getThumbnail(7, makeUser(), reply, '1234567890', undefined);
+    await controller.getThumbnail(7, makeUser(), reply, { t: '1234567890' }, undefined);
     expect(headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
   });
 
@@ -752,6 +752,16 @@ describe('BookController', () => {
     await controller.reExtractCover(42, user);
 
     expect(bookService.bulkReExtractCover).toHaveBeenCalledWith([42], user);
+  });
+
+  it('passes an explicit medium through re-extract-cover', async () => {
+    const { controller, bookService } = makeController();
+    const user = makeUser();
+    bookService.bulkReExtractCover.mockResolvedValue({ processed: 1, updated: 1 });
+
+    await controller.reExtractCover(42, user, { medium: 'audio' });
+
+    expect(bookService.bulkReExtractCover).toHaveBeenCalledWith([42], user, undefined, { medium: 'audio' });
   });
 
   it('logs and rethrows download failures', async () => {

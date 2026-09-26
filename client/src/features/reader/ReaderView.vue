@@ -33,6 +33,7 @@ import { useMediaOverlay } from './media-overlay/composables/useMediaOverlay'
 import { resolveMediaOverlayResume, type MediaOverlayResumePosition } from './media-overlay/lib/media-overlay-resume'
 import { injectMediaOverlayHighlightCss, MEDIA_OVERLAY_DEFAULT_ACTIVE_CLASS } from './media-overlay/lib/media-overlay-highlight'
 import { startMediaOverlayWithFallback } from './media-overlay/lib/media-overlay-start'
+import { mediaOverlayEntriesOverlapping } from './media-overlay/lib/media-overlay-range'
 import TtsResumePrompt from '@/features/tts/components/TtsResumePrompt.vue'
 import ReaderHeader from './epub/components/ReaderHeader.vue'
 import ReaderFooter from './epub/components/ReaderFooter.vue'
@@ -54,12 +55,14 @@ import { findMatchingCfiRange } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
 import { resolveReaderResumeTarget } from '@/lib/reading-checkpoint'
 import { api } from '@/lib/api'
+import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
 const PdfV4ReaderView = defineAsyncComponent(() => import('./pdf-v4/PdfV4ReaderView.vue'))
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const { coverUrl } = useCoverVersions()
 const bookId = Number(route.params.bookId)
 const fileId = Number(route.params.fileId)
 const fileFormat = (route.query.format as string) || 'epub'
@@ -457,7 +460,7 @@ async function buildTtsBook(): Promise<{
     bookFileId: fileId,
     title: bookMeta.value.title ?? chapterTitle.value ?? 'Book',
     author: bookMeta.value.authors?.[0]?.name ?? null,
-    coverUrl: bookMeta.value.coverSource ? `/api/v1/books/${bookId}/cover` : null,
+    coverUrl: bookMeta.value.coverSource ? coverUrl(bookId, 'cover', bookMeta.value.coverVersion, 'audio') : null,
     totalChapters: totalSections.value,
   }
 }
@@ -575,14 +578,6 @@ async function resolveSavedNarrationPos(): Promise<MediaOverlayResumePosition | 
   return null
 }
 
-// Walk up to the nearest ancestor with an id - the sentence <span id="..."> that
-// SMIL media-overlay fragments point at.
-function nearestSentenceId(node: Node | null): string | null {
-  let el: Element | null = node instanceof Element ? node : (node?.parentElement ?? null)
-  while (el && !el.id) el = el.parentElement
-  return el?.id || null
-}
-
 // Persist the exact narrated sentence so playback can resume there after reload.
 watch(
   () => mediaOverlay.currentFragment.value,
@@ -602,11 +597,10 @@ watch(
   },
 )
 
-// Starts media-overlay narration in `sectionIdx`. When `target` is given it
-// begins at that sentence (matched by full SMIL fragment when byId=false, or by
-// element id when byId=true); if no matching <par> plays, it falls back to the
-// start of the section instead of staying silent.
-async function beginNarration(sectionIdx: number, target: string | null, byId: boolean) {
+// Starts media-overlay narration in `sectionIdx` at the first <par> that
+// `matches` accepts; if none plays, it falls back to the start of the section
+// instead of staying silent.
+async function beginNarration(sectionIdx: number, matches: ((item: { text: string }) => boolean) | null) {
   const startId = ++mediaOverlayStartId
   const mo = getMediaOverlay()
   if (!mo) {
@@ -617,12 +611,6 @@ async function beginNarration(sectionIdx: number, target: string | null, byId: b
   if (!book) return
 
   clearResumeNarrationHighlight()
-
-  const matches = target
-    ? byId
-      ? (item: { text: string }) => item.text.split('#')[1] === target
-      : (item: { text: string }) => item.text === target
-    : null
 
   await mediaOverlay.start(
     mo,
@@ -643,13 +631,13 @@ async function handleStartMediaOverlay() {
 
   const saved = await resolveSavedNarrationPos()
   if (saved) {
-    await beginNarration(saved.section, saved.fragment, false)
+    await beginNarration(saved.section, (item) => item.text === saved.fragment)
     return
   }
 
   // No saved sentence: start from the first narrated sentence on the current page.
-  const visibleId = nearestSentenceId(getVisibleRange()?.startContainer ?? null)
-  await beginNarration(sectionIndex.value, visibleId, true)
+  const visible = getVisibleRange()
+  await beginNarration(sectionIndex.value, visible ? mediaOverlayEntriesOverlapping(visible) : null)
 }
 
 async function handleReadFromHere() {
@@ -663,8 +651,7 @@ async function handleReadFromHere() {
     showSettings.value = false
     showTapZones.value = false
     hideOverlays(true)
-    const id = nearestSentenceId(range?.startContainer ?? null)
-    await beginNarration(sectionIndex.value, id, true)
+    await beginNarration(sectionIndex.value, range ? mediaOverlayEntriesOverlapping(range) : null)
     return
   }
 

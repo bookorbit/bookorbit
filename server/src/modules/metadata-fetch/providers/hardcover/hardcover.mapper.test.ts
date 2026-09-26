@@ -80,6 +80,7 @@ describe('mapSearchDocument', () => {
       seriesName: 'The Kingkiller Chronicle',
       seriesIndex: '1',
       coverUrl: 'https://assets.hardcover.app/cover.jpg',
+      coverShape: 'unknown',
       sourceUrl: 'https://hardcover.app/books/the-name-of-the-wind',
       communityRating: 4.42,
       communityRatingCount: 12345,
@@ -302,6 +303,7 @@ describe('mapBookWithEditions', () => {
       communityRating: 4.42,
       communityRatingCount: 12345,
       coverUrl: 'https://assets.hardcover.app/edition-cover.jpg',
+      coverShape: 'portrait',
       sourceUrl: 'https://hardcover.app/books/the-name-of-the-wind',
     });
   });
@@ -609,6 +611,54 @@ describe('mapBookWithEditions', () => {
     expect(results[0].pageCount).toBe(700);
     expect(results[1].isbn13).toBe('AUDIO');
     expect(results[1].pageCount).toBeUndefined();
+  });
+
+  it('ranks audiobook editions first when asked for the audio medium, with square art', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      editions: [
+        { ...baseBook.editions![0], id: 2, isbn_13: 'PRINT', reading_format_id: 1, pages: 700 },
+        {
+          ...baseBook.editions![0],
+          id: 1,
+          isbn_13: 'AUDIO',
+          reading_format_id: 2,
+          pages: undefined,
+          image: { url: 'https://assets.hardcover.app/audio.jpg', width: 1000, height: 1000 },
+        },
+      ],
+    };
+    const results = mapBookWithEditions(book, 'audio');
+    expect(results.map((result) => result.isbn13)).toEqual(['AUDIO', 'PRINT']);
+    expect(results[0]).toMatchObject({
+      coverUrl: 'https://assets.hardcover.app/audio.jpg',
+      coverShape: 'square',
+      coverWidth: 1000,
+      coverHeight: 1000,
+    });
+    expect(results[1].coverShape).toBe('portrait');
+  });
+
+  it('reads the shape from the stated size, and does not assume an audiobook edition is square without one', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      editions: [
+        { ...baseBook.editions![0], id: 1, reading_format_id: 2, image: { url: 'https://assets.hardcover.app/cd.jpg' } },
+        { ...baseBook.editions![0], id: 2, reading_format_id: 2, image: { url: 'https://assets.hardcover.app/jacket.jpg', width: 400, height: 600 } },
+      ],
+    };
+    const [unsized, jacket] = mapBookWithEditions(book, 'audio');
+    expect(unsized!.coverShape).toBe('unknown');
+    expect(jacket).toMatchObject({ coverShape: 'portrait', coverWidth: 400, coverHeight: 600 });
+  });
+
+  it('calls a cover borrowed from the book unknown, since it may belong to any edition', () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      image: { url: 'https://assets.hardcover.app/book.jpg' },
+      editions: [{ ...baseBook.editions![0], reading_format_id: 2, image: undefined }],
+    };
+    expect(mapBookWithEditions(book, 'audio')[0]).toMatchObject({ coverUrl: 'https://assets.hardcover.app/book.jpg', coverShape: 'unknown' });
   });
 
   it('ranks editions with a page count ahead of those without when format is equal', () => {

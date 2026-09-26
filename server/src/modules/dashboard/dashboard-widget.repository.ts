@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type {
@@ -25,6 +25,7 @@ import {
   bookMetadata,
   books,
   genres,
+  libraries,
   readingProgress,
   readingAttempts,
   readingSessions,
@@ -107,9 +108,11 @@ export class DashboardWidgetRepository {
         fileId: bookFiles.id,
         fileFormat: bookFiles.format,
         primaryFileId: books.primaryFileId,
+        formatPriority: libraries.formatPriority,
       })
       .from(userBookStatus)
       .innerJoin(books, eq(books.id, userBookStatus.bookId))
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .leftJoin(readingProgress, and(isNotNull(bookFiles.id), eq(readingProgress.bookFileId, bookFiles.id), eq(readingProgress.userId, userId)))
@@ -148,7 +151,8 @@ export class DashboardWidgetRepository {
           mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
         })
         .from(bookFiles)
-        .where(inArray(bookFiles.bookId, bookIds)),
+        .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content')))
+        .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id)),
     ]);
 
     const authorsByBookId = new Map<number, string[]>();
@@ -173,7 +177,7 @@ export class DashboardWidgetRepository {
       hasCover: row.coverSource != null,
       fileId: row.fileId ?? null,
       fileFormat: row.fileFormat ?? null,
-      ...resolveResumeModes(filesByBookId.get(row.bookId) ?? [], row.primaryFileId),
+      ...resolveResumeModes(filesByBookId.get(row.bookId) ?? [], row.primaryFileId, row.formatPriority as string[] | null),
     }));
 
     return { books: result };

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, ChevronUp, GripVertical } from '@lucide/vue'
-import { METADATA_LABELS, FORMAT_LABELS } from '../composables/useLibraryCreator'
+import { ChevronDown, ChevronUp, GripVertical, Headphones } from '@lucide/vue'
+import { isReadAlongFormatKey } from '@bookorbit/types'
+import { formatKeyCode, formatKeyName } from '@/features/book/lib/book-formats'
+import { METADATA_LABELS } from '../composables/useLibraryCreator'
 
 const { t } = useI18n()
 
@@ -105,7 +107,7 @@ function moveFormat(index: number, direction: -1 | 1) {
               type="button"
               class="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
               :disabled="index === 0"
-              :aria-label="`Move ${METADATA_LABELS[key] ?? key} up`"
+              :aria-label="t('library.creator.metadata.moveUp', { item: METADATA_LABELS[key] ?? key })"
               @click="moveMetadata(index, -1)"
             >
               <ChevronUp :size="14" />
@@ -114,7 +116,7 @@ function moveFormat(index: number, direction: -1 | 1) {
               type="button"
               class="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
               :disabled="index === metadataPrecedence.length - 1"
-              :aria-label="`Move ${METADATA_LABELS[key] ?? key} down`"
+              :aria-label="t('library.creator.metadata.moveDown', { item: METADATA_LABELS[key] ?? key })"
               @click="moveMetadata(index, 1)"
             >
               <ChevronDown :size="14" />
@@ -147,14 +149,17 @@ function moveFormat(index: number, direction: -1 | 1) {
           <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10.5px] font-bold shrink-0">
             {{ index + 1 }}
           </span>
-          <span class="flex-1 text-sm font-mono text-foreground uppercase">{{ fmt }}</span>
-          <span class="hidden text-xs text-muted-foreground sm:block">{{ FORMAT_LABELS[fmt] ?? fmt }}</span>
+          <span class="flex flex-1 items-center gap-1.5 text-sm font-mono text-foreground">
+            {{ formatKeyCode(fmt) }}
+            <Headphones v-if="isReadAlongFormatKey(fmt)" :size="13" :stroke-width="2.5" aria-hidden="true" />
+          </span>
+          <span class="sr-only text-xs text-muted-foreground sm:not-sr-only">{{ formatKeyName(fmt) }}</span>
           <div class="flex items-center gap-0.5">
             <button
               type="button"
               class="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
               :disabled="index === 0"
-              :aria-label="`Move ${fmt.toUpperCase()} up`"
+              :aria-label="t('library.creator.metadata.moveUp', { item: formatKeyName(fmt) })"
               @click="moveFormat(index, -1)"
             >
               <ChevronUp :size="14" />
@@ -163,7 +168,7 @@ function moveFormat(index: number, direction: -1 | 1) {
               type="button"
               class="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
               :disabled="index === formatPriority.length - 1"
-              :aria-label="`Move ${fmt.toUpperCase()} down`"
+              :aria-label="t('library.creator.metadata.moveDown', { item: formatKeyName(fmt) })"
               @click="moveFormat(index, 1)"
             >
               <ChevronDown :size="14" />

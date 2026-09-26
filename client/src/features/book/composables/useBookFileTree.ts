@@ -1,6 +1,15 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS, type BookDetail, type BookDetailFile } from '@bookorbit/types'
+import {
+  FORMAT_TO_GROUP,
+  isAudioFormat,
+  isComicFormat,
+  isContentBookFile,
+  READER_OPENABLE_FORMATS,
+  type BookDetail,
+  type BookDetailFile,
+} from '@bookorbit/types'
+import { bookFormatEntries, fileFormatKey } from '@/features/book/lib/book-formats'
 import { api } from '@/lib/api'
 import { applyCommonStem } from '@/features/book/lib/filename-stem'
 
@@ -17,6 +26,8 @@ export type FileGroupKey = (typeof GROUP_ORDER)[number]
 export type TreeFile = BookDetailFile & {
   /** Lower-cased format, or an empty string when the scan could not name one. */
   formatKey: string
+  /** The edition a content file belongs to (`epub:readalong` or its format); null for covers and sidecars. */
+  editionKey: string | null
   group: FileGroupKey
   /** Filename with no directory part, always present even when `filename` is null. */
   leaf: string
@@ -38,7 +49,8 @@ export type FileGroup = {
 }
 
 export type FormatShare = {
-  format: string
+  /** Edition key, as `bookFormatEntries` gives it. */
+  key: string
   count: number
   sizeBytes: number
   /** Share of the folder's bytes, 0-1. */
@@ -48,12 +60,13 @@ export type FormatShare = {
 export type SortKey = 'name' | 'format' | 'size' | 'date'
 export type SortDirection = 'asc' | 'desc'
 
-function groupOf(format: string): FileGroupKey {
-  const group = FORMAT_TO_GROUP[format]
-  if (group === 'audio') return 'audio'
-  if (group === 'pdf') return 'document'
-  if (group === 'cbx') return 'comic'
-  return group === 'epub' ? 'ebook' : 'extras'
+function groupOf(file: BookDetailFile): FileGroupKey {
+  if (!isContentBookFile(file)) return 'extras'
+  const format = file.format!.toLowerCase()
+  if (isAudioFormat(format)) return 'audio'
+  if (format === 'pdf') return 'document'
+  if (isComicFormat(format)) return 'comic'
+  return 'ebook'
 }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
@@ -81,7 +94,8 @@ export function useBookFileTree(book: Ref<BookDetail>) {
       return {
         ...file,
         formatKey,
-        group: formatKey ? groupOf(formatKey) : 'extras',
+        editionKey: isContentBookFile(file) ? fileFormatKey(file) : null,
+        group: groupOf(file),
         leaf: file.filename ?? file.absolutePath.split('/').pop() ?? '-',
         display: file.filename ?? file.absolutePath.split('/').pop() ?? '-',
         track: audioIds.get(file.id) ?? null,
@@ -104,19 +118,16 @@ export function useBookFileTree(book: Ref<BookDetail>) {
     return summed > 0 ? summed : null
   })
 
+  /** The book's editions and what share of their bytes each holds; covers and sidecars are not editions. */
   const formatShares = computed<FormatShare[]>(() => {
-    const byFormat = new Map<string, FormatShare>()
-    for (const file of files.value) {
-      const format = file.formatKey || '?'
-      const entry = byFormat.get(format) ?? { format, count: 0, sizeBytes: 0, fraction: 0 }
-      entry.count += 1
-      entry.sizeBytes += file.sizeBytes ?? 0
-      byFormat.set(format, entry)
-    }
-    const total = totalBytes.value
-    return [...byFormat.values()]
-      .map((entry) => ({ ...entry, fraction: total > 0 ? entry.sizeBytes / total : 0 }))
-      .sort((a, b) => b.sizeBytes - a.sizeBytes)
+    const entries = bookFormatEntries(book.value.files, book.value.formatPriority)
+    const total = entries.reduce((sum, entry) => sum + entry.sizeBytes, 0)
+    return entries.map((entry) => ({
+      key: entry.key,
+      count: entry.files.length,
+      sizeBytes: entry.sizeBytes,
+      fraction: total > 0 ? entry.sizeBytes / total : 0,
+    }))
   })
 
   function compare(a: TreeFile, b: TreeFile): number {

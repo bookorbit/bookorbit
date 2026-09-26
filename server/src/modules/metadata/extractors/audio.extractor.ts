@@ -174,6 +174,19 @@ function mapChapters(chapters: FfprobeChapter[]): AudiobookChapter[] {
   });
 }
 
+/** Reads only the embedded picture, for callers that need a cover without the rest of the tags. */
+export async function extractAudioCover(absolutePath: string): Promise<Buffer | null> {
+  try {
+    const { stdout } = await execFile(FFPROBE_PATH, ['-v', 'quiet', '-print_format', 'json', '-show_streams', absolutePath], {
+      maxBuffer: FFPROBE_OUTPUT_MAX_BUFFER_BYTES,
+    });
+    const data: FfprobeOutput = JSON.parse(stdout);
+    return await extractCoverBytes(absolutePath, data.streams ?? []);
+  } catch {
+    return null;
+  }
+}
+
 async function extractCoverBytes(absolutePath: string, streams: FfprobeStream[]): Promise<Buffer | null> {
   const hasEmbeddedImage = streams.some((s) => s.codec_type === 'video');
   if (!hasEmbeddedImage) return null;

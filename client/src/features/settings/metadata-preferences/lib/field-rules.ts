@@ -3,13 +3,27 @@ import type { FieldPreference, MetadataField, MetadataProviderKey, ProviderStatu
 
 /** Display grouping for the rule table. Every metadata field belongs to exactly one group. */
 export const FIELD_GROUPS: { id: string; fields: MetadataField[] }[] = [
-  { id: 'core', fields: ['title', 'subtitle', 'description', 'cover'] },
+  { id: 'core', fields: ['title', 'subtitle', 'description', 'cover', 'audioCover'] },
   { id: 'contributors', fields: ['authors'] },
   { id: 'publication', fields: ['publisher', 'publishedYear', 'language', 'pageCount', 'communityRating'] },
   { id: 'series', fields: ['seriesName', 'seriesIndex'] },
   { id: 'classification', fields: ['genres'] },
   { id: 'audiobook', fields: ['narrators', 'duration', 'abridged'] },
 ]
+
+/**
+ * Rules the bulk reorder leaves alone. The Audiobook cover rule puts audiobook sources first on
+ * purpose, and "make first everywhere" would quietly undo that.
+ */
+export const BULK_REORDER_EXEMPT_FIELDS: ReadonlySet<MetadataField> = new Set<MetadataField>(['audioCover'])
+
+/**
+ * The rule editor names the ebook cover rule "Book cover" to tell it from the Audiobook cover
+ * rule. Everywhere else, such as the auto-fetch picker and score weights, "Cover" means either.
+ */
+export function fieldRuleLabelKey(field: MetadataField): string {
+  return field === 'cover' ? 'settings.metadata.fieldRules.bookCover' : `settings.metadata.fields.${field}`
+}
 
 /** Why a provider that sits in a priority order will not be consulted. */
 export type ProviderSkipReason = 'disabled' | 'notConfigured'

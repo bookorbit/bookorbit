@@ -20,6 +20,8 @@ import { MetadataPreferencesService } from '../metadata-preferences/metadata-pre
 import { MetadataPreferenceResolver } from '../metadata-preferences/metadata-preference-resolver';
 import { ProviderThrottleTracker } from './provider-throttle.tracker';
 
+const AUDIOBOOK_ONLY = new Set<MetadataProviderKey>([MetadataProviderKey.AUDIBLE, MetadataProviderKey.AUDNEXUS, MetadataProviderKey.LIBROFM]);
+
 function candidateEvent(candidate: MetadataCandidate): MetadataSearchEvent {
   return { kind: 'candidate', candidate };
 }
@@ -48,7 +50,6 @@ describe('MetadataFetchController', () => {
       search: vi.fn(),
       getStoredProviderIds: vi.fn(),
       getStoredProviderContext: vi.fn(),
-      getAccessibleBookLibraryId: vi.fn(),
       lookupById: vi.fn(),
     } as unknown as Mocked<MetadataFetchService>;
 
@@ -59,6 +60,7 @@ describe('MetadataFetchController', () => {
     registry = {
       all: vi.fn(),
       keysForMediaKind: vi.fn(),
+      servesOnlyAudiobooks: vi.fn((key: MetadataProviderKey) => AUDIOBOOK_ONLY.has(key)),
     } as unknown as Mocked<ProviderRegistry>;
 
     providerConfig = {
@@ -102,13 +104,21 @@ describe('MetadataFetchController', () => {
     ] as never);
 
     await expect(controller.listProviders({}, user)).resolves.toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 4 },
-      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, coverPriority: 5 },
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 4, audioCoverPriority: 6 },
+      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, coverPriority: 5, audioCoverPriority: 7 },
     ]);
   });
 
   it('returns provider metadata scoped to the current book library when bookId is provided', async () => {
-    service.getAccessibleBookLibraryId.mockResolvedValue(9);
+    const coverMedia = { hasEbook: true, hasAudio: false };
+    service.getStoredProviderContext.mockResolvedValue({
+      libraryId: 9,
+      title: null,
+      seriesName: null,
+      seriesIndex: null,
+      providerIds: {},
+      coverMedia,
+    });
     pipeline.getEffectiveProviderKeys.mockResolvedValue([MetadataProviderKey.KOBO, MetadataProviderKey.GOOGLE]);
     registry.all.mockReturnValue([
       { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
@@ -118,20 +128,35 @@ describe('MetadataFetchController', () => {
 
     const result = await controller.listProviders({ bookId: 12 }, user);
 
-    expect(service.getAccessibleBookLibraryId).toHaveBeenCalledWith(12, user);
-    expect(pipeline.getEffectiveProviderKeys).toHaveBeenCalledWith(9);
+    expect(service.getStoredProviderContext).toHaveBeenCalledWith(12, user);
+    expect(pipeline.getEffectiveProviderKeys).toHaveBeenCalledWith(9, coverMedia);
     expect(metadataPreferences.getForLibrary).toHaveBeenCalledWith(9);
     expect(result).toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, selectedByFieldRules: true, coverPriority: 4 },
-      { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, selectedByFieldRules: false, coverPriority: 5 },
-      { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true, selectedByFieldRules: true, coverPriority: 2 },
+      {
+        key: MetadataProviderKey.GOOGLE,
+        label: 'Google Books',
+        identifiable: true,
+        selectedByFieldRules: true,
+        coverPriority: 4,
+        audioCoverPriority: 6,
+      },
+      {
+        key: MetadataProviderKey.OPEN_LIBRARY,
+        label: 'OpenLibrary',
+        identifiable: false,
+        selectedByFieldRules: false,
+        coverPriority: 5,
+        audioCoverPriority: 7,
+      },
+      { key: MetadataProviderKey.KOBO, label: 'Kobo', identifiable: true, selectedByFieldRules: true, coverPriority: 2, audioCoverPriority: 4 },
     ]);
   });
 
-  it('exposes the configured Cover field order independently of registry order', async () => {
+  it('exposes the configured Cover and Audiobook cover orders independently of registry order', async () => {
     const resolver = new MetadataPreferenceResolver();
     const preferences = resolver.getDefaultPreferences();
     preferences.fields.cover.providers = [MetadataProviderKey.OPEN_LIBRARY, MetadataProviderKey.GOOGLE];
+    preferences.fields.audioCover.providers = [MetadataProviderKey.GOOGLE];
     metadataPreferences.getGlobal.mockResolvedValue(preferences);
     registry.all.mockReturnValue([
       { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true },
@@ -141,7 +166,7 @@ describe('MetadataFetchController', () => {
     const result = await controller.listProviders({}, user);
 
     expect(result).toEqual([
-      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 1 },
+      { key: MetadataProviderKey.GOOGLE, label: 'Google Books', identifiable: true, coverPriority: 1, audioCoverPriority: 0 },
       { key: MetadataProviderKey.OPEN_LIBRARY, label: 'OpenLibrary', identifiable: false, coverPriority: 0 },
     ]);
   });

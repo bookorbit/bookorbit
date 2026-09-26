@@ -30,9 +30,10 @@ import type {
   MetadataSeriesMembership,
 } from '@bookorbit/types';
 import {
-  DEFAULT_FORMAT_PRIORITY,
+  formatKeyRank,
   isAudioFormat,
   MetadataProviderKey,
+  normalizeFormatPriority,
   NotificationType,
   parseSeriesIndex,
   Permission,
@@ -190,16 +191,15 @@ function reduceUnitForLibrary(
 
   if (importFormats === 'all') return { files: kept };
 
-  const priority = library.formatPriority?.length ? library.formatPriority : [...DEFAULT_FORMAT_PRIORITY];
+  const priority = normalizeFormatPriority(library.formatPriority);
   const best = [...content].sort((a, b) => formatRank(a.format, priority) - formatRank(b.format, priority))[0]!;
   // The chosen format keeps the artwork and sidecars that came with the unit; the other formats go.
   return { files: looseFileLibrary ? [best] : [best, ...unitFiles.filter((file) => file.role !== 'content')] };
 }
 
-function formatRank(format: string | null, priority: string[]): number {
-  if (!format) return Number.MAX_SAFE_INTEGER;
-  const index = priority.indexOf(format.toLowerCase());
-  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+/** Dock files are not inspected for media overlays yet, so an EPUB ranks by the plain `epub` entry. */
+function formatRank(format: string | null, priority: readonly string[]): number {
+  return format ? formatKeyRank(format.toLowerCase(), priority) : Number.MAX_SAFE_INTEGER;
 }
 
 /**
@@ -407,7 +407,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         bookId = written.bookIds[0]!;
         // Several ids only in a loose-file library, where each format is its own book. They are the
         // same work, so they get the same metadata rather than one of them getting all of it.
-        for (const created of written.bookIds) await this.applyMetadata(created, row);
+        for (const created of written.bookIds) await this.applyMetadata(created, row, created === bookId);
       } catch (err) {
         // The books committed before the failure, and metadata runs against services that cannot
         // join that transaction, so the compensation is explicit: take back exactly what this unit
@@ -417,6 +417,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         throw err;
       }
 
+      this.processor.reconcileCoversAsync(written.bookIds);
       await this.cleanupBookDockRecord(row);
       existingDestinations.set(this.destinationKey(library.id, destPath), bookId);
       existingDestinations.set(this.destinationKey(library.id, persistedDestPath), bookId);
@@ -1110,20 +1111,25 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     });
   }
 
-  private async applyMetadata(bookId: number, row: BookDockFileRow): Promise<void> {
+  /**
+   * The staged cover was read from the unit's primary file, so it fills only that file's medium on
+   * the book that owns it. The other books of a loose-file unit get their own art from reconcile.
+   */
+  private async applyMetadata(bookId: number, row: BookDockFileRow, ownsStagedCover = true): Promise<void> {
     const meta = normalizeFinalizeMetadata(row.selectedMetadata ?? row.embeddedMetadata);
     const audio = resolveAudioFinalizeFields(row.embeddedMetadata, row.selectedMetadata);
     let selectedCoverApplied = false;
 
+    const medium = row.format && isAudioFormat(row.format) ? 'audio' : 'ebook';
     const selectedCoverUrl = meta.coverUrl;
     if (selectedCoverUrl) {
-      selectedCoverApplied = await this.metadataService.downloadAndSaveCover(selectedCoverUrl, bookId);
+      selectedCoverApplied = await this.metadataService.downloadAndSaveCover([{ url: selectedCoverUrl }], bookId, medium, { userChosen: true });
     }
 
-    if (!selectedCoverApplied && row.coverPath) {
+    if (!selectedCoverApplied && ownsStagedCover && row.coverPath) {
       try {
         const bytes = await readFile(row.coverPath);
-        await this.metadataService.saveExtractedCoverBytes(bookId, bytes);
+        await this.metadataService.saveExtractedCoverBytes(bookId, bytes, medium);
       } catch (err) {
         this.logger.warn(`Failed to copy Book Dock cover to book ${bookId}: ${err instanceof Error ? err.message : String(err)}`);
       }

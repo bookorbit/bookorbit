@@ -1,6 +1,7 @@
+import type { CoverMedium } from '@bookorbit/types'
 import { ref } from 'vue'
 
-const STORAGE_KEY = 'cover-versions'
+const STORAGE_KEY = 'cover-versions-v2'
 type CoverVersionInput = number | string | Date | null | undefined
 
 function load(): Map<number, number> {
@@ -23,23 +24,24 @@ function persist(map: Map<number, number>) {
 
 const versions = ref<Map<number, number>>(load())
 
-function normalizeVersion(value: CoverVersionInput): number | undefined {
-  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? Math.trunc(value) : undefined
+function normalizeVersion(value: CoverVersionInput): string | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? String(Math.trunc(value)) : undefined
   if (value instanceof Date) {
     const time = value.getTime()
-    return Number.isFinite(time) && time > 0 ? time : undefined
+    return Number.isFinite(time) && time > 0 ? String(time) : undefined
   }
   if (typeof value !== 'string') return undefined
 
   const trimmed = value.trim()
   if (!trimmed) return undefined
   const numeric = Number(trimmed)
-  if (Number.isFinite(numeric) && numeric > 0) return Math.trunc(numeric)
+  if (Number.isFinite(numeric) && numeric > 0) return String(Math.trunc(numeric))
   const parsed = Date.parse(trimmed)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  if (Number.isFinite(parsed) && parsed > 0) return String(parsed)
+  return trimmed
 }
 
-function versionToken(localVersion: number | undefined, serverVersion: number | undefined): string | undefined {
+function versionToken(localVersion: number | undefined, serverVersion: string | undefined): string | undefined {
   if (serverVersion !== undefined && localVersion !== undefined) return `${serverVersion}-${localVersion}`
   if (serverVersion !== undefined) return String(serverVersion)
   if (localVersion !== undefined) return String(localVersion)
@@ -57,12 +59,16 @@ export function useCoverVersions() {
     return versions.value.get(bookId)
   }
 
-  function coverUrl(bookId: number, type: 'thumbnail' | 'cover' = 'thumbnail', sourceVersion?: CoverVersionInput): string {
+  function coverUrl(bookId: number, type: 'thumbnail' | 'cover' = 'thumbnail', sourceVersion?: CoverVersionInput, medium?: CoverMedium): string {
     const base = `/api/v1/books/${bookId}/${type}`
     const localVersion = versions.value.get(bookId)
     const serverVersion = normalizeVersion(sourceVersion)
     const token = versionToken(localVersion, serverVersion)
-    return token ? `${base}?t=${token}` : base
+    const params = new URLSearchParams()
+    if (token) params.set('t', token)
+    if (medium) params.set('medium', medium)
+    const query = params.toString()
+    return query ? `${base}?${query}` : base
   }
 
   return { getVersion, bumpVersion, coverUrl }

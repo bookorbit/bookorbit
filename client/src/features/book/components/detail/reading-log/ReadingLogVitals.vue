@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { Check, ChevronDown, Clock, Minus, Plus, TrendingDown, TrendingUp } from '@lucide/vue'
 import type { BookDetail, BookReadingSessionStats, ReadStatus, UserBookStatus } from '@bookorbit/types'
 import { isAudioFormat } from '@bookorbit/types'
+import { bookFormatEntries, formatKeyName } from '@/features/book/lib/book-formats'
 import { api } from '@/lib/api'
 import { formatDate, formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -257,8 +258,8 @@ const momentumTitle = computed(() => {
 })
 
 const formatLine = computed(() =>
-  [...new Set(props.book.files.map((file) => file.format).filter((format): format is string => format != null && format.length > 0))]
-    .map((format) => format.toUpperCase())
+  bookFormatEntries(props.book.files, props.book.formatPriority)
+    .map((entry) => formatKeyName(entry.key))
     .join(' · '),
 )
 

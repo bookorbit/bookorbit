@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey, MetadataProviderSearchOutcome, MetadataProviderSearchStatus } from '@bookorbit/types';
+import { CoverMedia, MetadataCandidate, MetadataProviderKey, MetadataProviderSearchOutcome, MetadataProviderSearchStatus } from '@bookorbit/types';
 import { filter, from, map, merge, Observable, switchMap } from 'rxjs';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -37,6 +37,7 @@ export interface StoredProviderContext {
   seriesName: string | null;
   seriesIndex: string | null;
   providerIds: Partial<Record<MetadataProviderKey, string>>;
+  coverMedia: CoverMedia;
 }
 
 @Injectable()
@@ -70,7 +71,8 @@ export class MetadataFetchService {
   async lookupById(key: MetadataProviderKey, providerId: string): Promise<MetadataCandidate | null> {
     const provider = this.registry.find(key);
     if (!provider || !isIdentifiable(provider)) return null;
-    return provider.lookupById(providerId);
+    const candidate = await provider.lookupById(providerId);
+    return candidate ? withCoverShape(provider, candidate) : null;
   }
 
   async getStoredProviderIds(bookId: number, user: RequestUser): Promise<Partial<Record<MetadataProviderKey, string>>> {
@@ -86,12 +88,8 @@ export class MetadataFetchService {
       seriesName: row.seriesName,
       seriesIndex: row.seriesIndex,
       providerIds: this.mapStoredProviderIds(row),
+      coverMedia: row.coverMedia,
     };
-  }
-
-  async getAccessibleBookLibraryId(bookId: number, user: RequestUser): Promise<number> {
-    const row = await this.getAccessibleStoredProviderIdsRow(bookId, user);
-    return row.libraryId;
   }
 
   private async getAccessibleStoredProviderIdsRow(bookId: number, user: RequestUser): Promise<StoredProviderIdsRow> {
@@ -146,14 +144,14 @@ export class MetadataFetchService {
       this.logger.log(
         `[metadata_fetch.provider_search] [end] provider=${provider.key} durationMs=${Date.now() - startedAt} resultCount=${results.length} - provider fetch completed`,
       );
-      return { candidates: results, outcome: null };
+      return { candidates: results.map((candidate) => withCoverShape(provider, candidate)), outcome: null };
     } catch (error) {
       if (error instanceof ProviderThrottleError) {
         this.throttleTracker.record(provider.key, error.retryAfterSeconds);
         // A provider throttled part-way through hands back what it had already assembled. The
         // cooldown covers the requests it can no longer make; it is not a reason to drop finished
         // candidates, and the status event still tells the client the provider was cut short.
-        const salvaged = filterAndRank([...error.partialCandidates], params);
+        const salvaged = filterAndRank([...error.partialCandidates], params).map((candidate) => withCoverShape(provider, candidate));
         this.logger.warn(
           `[metadata_fetch.provider_search] [fail] provider=${provider.key} durationMs=${Date.now() - startedAt} resultCount=${salvaged.length} errorClass=ProviderThrottleError error="provider throttled" - provider fetch failed`,
         );
@@ -237,6 +235,12 @@ export class MetadataFetchService {
       controller.abort();
     });
   }
+}
+
+/** Every candidate with a cover states its shape, so neither the pipeline nor a client has to guess. */
+function withCoverShape(provider: MetadataProvider, candidate: MetadataCandidate): MetadataCandidate {
+  if (!candidate.coverUrl || candidate.coverShape) return candidate;
+  return { ...candidate, coverShape: provider.coverShape ?? 'unknown' };
 }
 
 function toSearchEvents(provider: MetadataProviderKey, result: ProviderSearchResult): MetadataSearchEvent[] {

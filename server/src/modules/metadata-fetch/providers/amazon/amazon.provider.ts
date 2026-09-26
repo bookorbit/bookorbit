@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
+import { coverShapeFromSize, MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { amazonRequestHeaders, isAmazonBotChallenge } from '../../../../common/utils/amazon-http.utils';
@@ -83,6 +83,12 @@ export class AmazonProvider implements IdentifiableProvider {
       seriesIndex: parseSeriesIndex(data.seriesIndex) ?? undefined,
       seriesTotalBooks: data.seriesTotalBooks,
       coverUrl: data.coverUrl,
+      ...(data.coverUrl
+        ? {
+            coverShape: coverShapeFromSize(data.coverWidth, data.coverHeight),
+            ...(data.coverWidth && data.coverHeight ? { coverWidth: data.coverWidth, coverHeight: data.coverHeight } : {}),
+          }
+        : {}),
       genres: data.tags?.length ? data.tags : undefined,
       sourceUrl: url.toString(),
       ...(data.communityRating !== undefined ? { communityRating: data.communityRating } : {}),

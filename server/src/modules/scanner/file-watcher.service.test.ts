@@ -32,6 +32,7 @@ function makeService(db: any = {}) {
     bufferBookMissingEvent: vi.fn(),
     bufferBooksUnavailableNotification: vi.fn(),
     bufferBooksRestoredNotification: vi.fn(),
+    reconcileCoverSlotsAsync: vi.fn(),
   } as unknown as ScannerService;
 
   const selfWriteRegistry = new SelfWriteRegistry();
@@ -102,6 +103,7 @@ describe('process()', () => {
     expect(processor.handleCreate).toHaveBeenCalledWith('/books/Author/book.epub', 1);
     expect((gateway as any).emitBookRestored).toHaveBeenCalledWith({ libraryId: 1, bookIds: [7] });
     expect((scannerService as any).bufferBooksRestoredNotification).toHaveBeenCalledWith(1, [7]);
+    expect((scannerService as any).reconcileCoverSlotsAsync).toHaveBeenCalledWith([7]);
     expect(gateway.emitBookMissing).not.toHaveBeenCalled();
   });
 
@@ -383,6 +385,9 @@ describe('reconcile()', () => {
     expect((scannerService as any).bufferBooksUnavailableNotification).toHaveBeenCalledWith(1, [20]);
     expect(gateway.emitBookMoved).toHaveBeenCalledWith({ libraryId: 1, bookIds: [30] });
     expect((gateway as any).emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 1, toLibraryId: 2, bookIds: [40] });
+    expect((scannerService as any).reconcileCoverSlotsAsync).toHaveBeenCalledWith([30]);
+    expect((scannerService as any).reconcileCoverSlotsAsync).toHaveBeenCalledWith([40]);
+    expect((scannerService as any).reconcileCoverSlotsAsync).not.toHaveBeenCalledWith([20]);
   });
 
   it('emits book-transferred from cross-library reconcile results', async () => {

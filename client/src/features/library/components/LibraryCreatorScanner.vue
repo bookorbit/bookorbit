@@ -5,7 +5,7 @@ import { Lock, Plus, RefreshCw, X } from '@lucide/vue'
 import type { AddedAtRecomputeJob, AddedAtSource, OrganizationMode } from '@bookorbit/types'
 import { formatNumber } from '@/i18n/formatters'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { FORMAT_LABELS } from '../composables/useLibraryCreator'
+import { BOOK_FORMATS } from '@bookorbit/types'
 
 const { t } = useI18n()
 
@@ -93,7 +93,7 @@ function handleSelectFileMode() {
 
 // ── Allowed formats ──────────────────────────────────────────────────────────
 
-const ALL_FORMATS = Object.keys(FORMAT_LABELS)
+const ALL_FORMATS: readonly string[] = BOOK_FORMATS
 
 function toggleAllowedFormat(fmt: string) {
   const current = [...props.allowedFormats]
@@ -347,7 +347,7 @@ function onPatternKeydown(e: KeyboardEvent) {
           </button>
         </div>
         <p v-if="allowedFormats.length > 0" class="mt-2 text-xs font-medium text-foreground">
-          Books in other formats already in the library will be marked as missing on the next scan.
+          {{ t('library.creator.scanner.allowedFormats.warning') }}
         </p>
       </div>
 

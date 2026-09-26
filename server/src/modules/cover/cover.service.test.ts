@@ -1,34 +1,16 @@
 import { type LookupAddress, lookup } from 'dns/promises';
-import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'fs/promises';
+import { BadRequestException } from '@nestjs/common';
 import type { CoverSearchResult } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { coverDirPath, generateThumbnail, imageExt, normalizeProgressiveJpeg } from '../metadata/lib/cover';
-import { COVER_CUSTOM_FILE_PREFIX, COVER_PROXY_MAX_IMAGE_BYTES, COVER_PROXY_USER_AGENT, COVER_THUMBNAIL_FILE_NAME } from './constants';
+import { COVER_PROXY_MAX_IMAGE_BYTES, COVER_PROXY_USER_AGENT } from './constants';
 import { CoverService } from './cover.service';
 import type { CoverProviderRegistry } from './provider-registry';
 import { DUCKDUCKGO_PROVIDER_KEY, ITUNES_PROVIDER_KEY } from './providers/cover-provider';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
-import { books } from '../../db/schema';
 
 vi.mock('dns/promises', () => ({
   lookup: vi.fn(),
-}));
-
-vi.mock('fs/promises', () => ({
-  mkdir: vi.fn(),
-  readdir: vi.fn(),
-  readFile: vi.fn(),
-  rename: vi.fn(),
-  writeFile: vi.fn(),
-  unlink: vi.fn(),
-}));
-
-vi.mock('../metadata/lib/cover', () => ({
-  coverDirPath: vi.fn(),
-  generateThumbnail: vi.fn(),
-  imageExt: vi.fn(),
-  normalizeProgressiveJpeg: vi.fn(),
 }));
 
 function makeResult(url: string, previewUrl: string): CoverSearchResult {
@@ -97,42 +79,33 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
 }
 
 function createService(providerRegistry: CoverProviderRegistry, options?: { assertFieldsUnlocked?: ReturnType<typeof vi.fn> }): CoverService {
-  return new CoverService(
-    {} as never,
-    { findLibraryIdByBookId: vi.fn().mockResolvedValue(7) } as never,
-    { assertFieldsUnlocked: options?.assertFieldsUnlocked ?? vi.fn().mockResolvedValue(undefined) } as never,
-    { scheduleWrite: vi.fn() } as never,
-    { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
-    { get: vi.fn().mockReturnValue('/tmp/books') } as never,
-    providerRegistry,
-    { calculateAndSave: vi.fn().mockResolvedValue(undefined) } as never,
-  );
+  return createMutationService({ ...options, providerRegistry }).service;
 }
 
-function createMutationService(options?: { assertFieldsUnlocked?: ReturnType<typeof vi.fn> }) {
-  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
-  const insert = vi.fn().mockReturnValue({ values });
-  const updateWhere = vi.fn().mockResolvedValue(undefined);
-  const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
-  const update = vi.fn().mockReturnValue({ set: updateSet });
-  const mockDb = { insert, update };
+function createMutationService(options?: { assertFieldsUnlocked?: ReturnType<typeof vi.fn>; providerRegistry?: CoverProviderRegistry }) {
   const scoreService = {
     calculateAndSave: vi.fn().mockResolvedValue(undefined),
   };
+  const fileWriteService = { scheduleWrite: vi.fn() };
+  const assertFieldsUnlocked = options?.assertFieldsUnlocked ?? vi.fn().mockResolvedValue(undefined);
+  const coverStore = {
+    chooseWriteMedium: vi.fn().mockResolvedValue('ebook'),
+    faceMediumFor: vi.fn().mockResolvedValue('ebook'),
+    saveCustom: vi.fn().mockResolvedValue(true),
+    revert: vi.fn().mockResolvedValue('extracted'),
+  };
 
   const service = new CoverService(
-    mockDb as never,
     { findLibraryIdByBookId: vi.fn().mockResolvedValue(7) } as never,
-    { assertFieldsUnlocked: options?.assertFieldsUnlocked ?? vi.fn().mockResolvedValue(undefined) } as never,
-    { scheduleWrite: vi.fn() } as never,
+    { assertFieldsUnlocked } as never,
+    fileWriteService as never,
     { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
-    { get: vi.fn().mockReturnValue('/tmp/books') } as never,
-    { select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry,
+    options?.providerRegistry ?? ({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry),
     scoreService as never,
+    coverStore as never,
   );
 
-  return { service, mockDb, updateSet, scoreService, values, onConflictDoUpdate };
+  return { service, scoreService, fileWriteService, assertFieldsUnlocked, coverStore };
 }
 
 describe('CoverService', () => {
@@ -146,7 +119,6 @@ describe('CoverService', () => {
     lookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 } as LookupAddress]);
     fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
-    vi.mocked(normalizeProgressiveJpeg).mockImplementation((bytes) => Promise.resolve(bytes));
   });
 
   afterEach(() => {
@@ -444,226 +416,131 @@ describe('CoverService', () => {
   });
 
   describe('manual cover mutations', () => {
-    it('blocks upload when cover is locked', async () => {
+    it('blocks upload when the chosen slot is locked', async () => {
       const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
-      const service = createService({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry, { assertFieldsUnlocked });
+      const { service, coverStore } = createMutationService({ assertFieldsUnlocked });
 
       await expect(service.uploadCover(12, Buffer.from('img'), 'image/png', makeUser())).rejects.toThrow('locked');
 
+      expect(coverStore.chooseWriteMedium).toHaveBeenCalledWith(12);
       expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['cover']);
+      expect(coverStore.saveCustom).not.toHaveBeenCalled();
     });
 
-    it('blocks URL upload when cover is locked', async () => {
+    it('checks the audio cover lock for an upload into the audio slot', async () => {
       const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
-      const service = createService({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry, { assertFieldsUnlocked });
+      const { service, coverStore } = createMutationService({ assertFieldsUnlocked });
 
-      await expect(service.uploadCoverFromUrl(12, 'https://example.com/cover.jpg', makeUser())).rejects.toThrow('locked');
+      await expect(service.uploadCover(12, Buffer.from('img'), 'image/png', makeUser(), 'audio')).rejects.toThrow('locked');
+
+      expect(coverStore.chooseWriteMedium).not.toHaveBeenCalled();
+      expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['audioCover']);
+    });
+
+    it('checks a requested slot lock before fetching a URL upload', async () => {
+      const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
+      const { service, coverStore } = createMutationService({ assertFieldsUnlocked });
+
+      await expect(service.uploadCoverFromUrl(12, 'https://example.com/cover.jpg', makeUser(), 'ebook')).rejects.toThrow('locked');
 
       expect(fetchMock).not.toHaveBeenCalled();
       expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['cover']);
+      expect(coverStore.saveCustom).not.toHaveBeenCalled();
     });
 
-    it('blocks delete when cover is locked', async () => {
+    it('puts an upload that names no slot in the face slot, whatever its shape, checking that lock before fetching', async () => {
       const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
-      const service = createService({ select: vi.fn().mockReturnValue([]) } as unknown as CoverProviderRegistry, { assertFieldsUnlocked });
+      const { service, coverStore } = createMutationService({ assertFieldsUnlocked });
+      coverStore.chooseWriteMedium.mockResolvedValue('audio');
+
+      await expect(service.uploadCoverFromUrl(12, 'https://example.com/cover.jpg', makeUser())).rejects.toThrow('locked');
+
+      expect(coverStore.chooseWriteMedium).toHaveBeenCalledWith(12);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(assertFieldsUnlocked).toHaveBeenCalledTimes(1);
+      expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['audioCover']);
+      expect(coverStore.saveCustom).not.toHaveBeenCalled();
+    });
+
+    it('saves a URL upload into the chosen slot', async () => {
+      const { service, coverStore, scoreService, fileWriteService } = createMutationService();
+      fetchMock.mockResolvedValueOnce(makeImageResponse(Buffer.from('remote'), 'image/png'));
+
+      await service.uploadCoverFromUrl(12, 'https://example.com/cover.png', makeUser());
+
+      expect(coverStore.saveCustom).toHaveBeenCalledWith(12, 'ebook', Buffer.from('remote'));
+      expect(scoreService.calculateAndSave).toHaveBeenCalledWith(12);
+      expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(12, 'auto', 1);
+    });
+
+    it('blocks delete when the face slot is locked', async () => {
+      const assertFieldsUnlocked = vi.fn().mockRejectedValue(new Error('locked'));
+      const { service, coverStore } = createMutationService({ assertFieldsUnlocked });
 
       await expect(service.deleteCover(12, makeUser())).rejects.toThrow('locked');
 
+      expect(coverStore.faceMediumFor).toHaveBeenCalledWith(12);
       expect(assertFieldsUnlocked).toHaveBeenCalledWith(12, ['cover']);
+      expect(coverStore.revert).not.toHaveBeenCalled();
     });
 
     it('rejects non-image mimetype on upload', async () => {
-      const { service } = createMutationService();
+      const { service, coverStore } = createMutationService();
 
       await expect(service.uploadCover(12, Buffer.from('img'), 'text/plain', makeUser())).rejects.toThrow('File must be an image');
+      expect(coverStore.saveCustom).not.toHaveBeenCalled();
     });
 
-    it('saves custom cover file and thumbnail when unlocked', async () => {
-      const { service, mockDb, updateSet, scoreService } = createMutationService();
+    it('saves the custom cover into the chosen slot when unlocked', async () => {
+      const { service, coverStore, scoreService, fileWriteService } = createMutationService();
       const source = Buffer.from('image-data');
-      const normalized = Buffer.from('normalized-image');
-
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(normalizeProgressiveJpeg).mockResolvedValue(normalized);
-      vi.mocked(imageExt).mockReturnValue('jpg');
-      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
-      vi.mocked(readdir).mockResolvedValue([] as never);
-      vi.mocked(mkdir).mockResolvedValue(undefined as never);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-      vi.mocked(rename).mockResolvedValue(undefined);
 
       await service.uploadCover(12, source, 'image/jpeg', makeUser());
 
-      expect(normalizeProgressiveJpeg).toHaveBeenCalledWith(source);
-      expect(generateThumbnail).toHaveBeenCalledWith(normalized);
-      expect(mkdir).toHaveBeenCalledWith('/tmp/books/covers/12', { recursive: true });
-      expect(writeFile).toHaveBeenCalledTimes(2);
-      expect(writeFile).toHaveBeenCalledWith(expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.jpg\.tmp$/), normalized);
-      expect(writeFile).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.thumbnail\.tmp$/),
-        Buffer.from('thumb'),
-      );
-      expect(rename).toHaveBeenNthCalledWith(
-        1,
-        expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.thumbnail\.tmp$/),
-        `/tmp/books/covers/12/${COVER_THUMBNAIL_FILE_NAME}`,
-      );
-      expect(rename).toHaveBeenNthCalledWith(
-        2,
-        expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.jpg\.tmp$/),
-        `/tmp/books/covers/12/${COVER_CUSTOM_FILE_PREFIX}jpg`,
-      );
-      expect(mockDb.update).toHaveBeenCalledWith(books);
-      expect(updateSet).toHaveBeenCalledWith({ updatedAt: expect.any(Date) });
+      expect(coverStore.saveCustom).toHaveBeenCalledWith(12, 'ebook', source);
       expect(scoreService.calculateAndSave).toHaveBeenCalledWith(12);
+      expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(12, 'auto', 1);
     });
 
-    it('propagates score persistence failures after updating the cover source', async () => {
-      const { service, scoreService } = createMutationService();
-      scoreService.calculateAndSave.mockRejectedValue(new Error('score failed'));
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(imageExt).mockReturnValue('jpg');
-      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
-      vi.mocked(readdir).mockResolvedValue([] as never);
-      vi.mocked(mkdir).mockResolvedValue(undefined as never);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-      vi.mocked(rename).mockResolvedValue(undefined);
-
-      await expect(service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser())).rejects.toThrow('score failed');
-    });
-
-    it('preserves the existing cover when image normalization fails', async () => {
-      const { service, mockDb } = createMutationService();
-      vi.mocked(normalizeProgressiveJpeg).mockRejectedValue(new Error('invalid image'));
+    it('propagates an invalid image from the store without scoring or scheduling a write', async () => {
+      const { service, coverStore, scoreService, fileWriteService } = createMutationService();
+      coverStore.saveCustom.mockRejectedValue(new BadRequestException('Invalid image file'));
 
       await expect(service.uploadCover(12, Buffer.from('invalid'), 'image/jpeg', makeUser())).rejects.toThrow('Invalid image file');
 
-      expect(mkdir).not.toHaveBeenCalled();
-      expect(writeFile).not.toHaveBeenCalled();
-      expect(rename).not.toHaveBeenCalled();
-      expect(unlink).not.toHaveBeenCalled();
-      expect(mockDb.insert).not.toHaveBeenCalled();
+      expect(scoreService.calculateAndSave).not.toHaveBeenCalled();
+      expect(fileWriteService.scheduleWrite).not.toHaveBeenCalled();
     });
 
-    it('removes obsolete custom-cover formats only after replacing both files', async () => {
-      const { service } = createMutationService();
+    it('propagates score persistence failures after saving the cover', async () => {
+      const { service, coverStore, scoreService } = createMutationService();
+      scoreService.calculateAndSave.mockRejectedValue(new Error('score failed'));
 
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(imageExt).mockReturnValue('jpg');
-      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
-      vi.mocked(readdir).mockResolvedValue(['cover_custom.png', 'cover_custom.jpg'] as never);
-      vi.mocked(mkdir).mockResolvedValue(undefined as never);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-      vi.mocked(rename).mockResolvedValue(undefined);
-      vi.mocked(unlink).mockResolvedValue(undefined);
-
-      await service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser());
-
-      expect(unlink).toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.png');
-      expect(unlink).not.toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.jpg');
-      expect(vi.mocked(unlink).mock.invocationCallOrder[0]).toBeGreaterThan(vi.mocked(rename).mock.invocationCallOrder[1]);
+      await expect(service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser())).rejects.toThrow('score failed');
+      expect(coverStore.saveCustom).toHaveBeenCalled();
     });
 
-    it('keeps the old custom cover when atomic replacement fails', async () => {
-      const { service, mockDb } = createMutationService();
+    it('reverts the requested slot and schedules a write when a cover remains', async () => {
+      const { service, coverStore, scoreService, fileWriteService } = createMutationService();
 
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(imageExt).mockReturnValue('jpg');
-      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
-      vi.mocked(mkdir).mockResolvedValue(undefined as never);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-      vi.mocked(rename).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('rename failed'));
-      vi.mocked(unlink).mockRejectedValue(new Error('cleanup failed'));
-
-      await expect(service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser())).rejects.toThrow('rename failed');
-
-      expect(readdir).not.toHaveBeenCalled();
-      expect(unlink).not.toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.jpg');
-      expect(unlink).toHaveBeenCalledWith(expect.stringMatching(/^\/tmp\/books\/covers\/12\/\.cover-upload-.*\.jpg\.tmp$/));
-      expect(mockDb.insert).not.toHaveBeenCalled();
-    });
-
-    it('removes custom cover and restores extracted if available', async () => {
-      const { service } = createMutationService();
-
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg', 'cover_extracted.png'] as never);
-      vi.mocked(readFile).mockResolvedValue(Buffer.from('extracted-img'));
-      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
-      vi.mocked(unlink).mockResolvedValue(undefined);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-
-      const result = await service.deleteCover(12, makeUser());
+      const result = await service.deleteCover(12, makeUser(), 'audio');
 
       expect(result).toBe('extracted');
-      expect(unlink).toHaveBeenCalledWith('/tmp/books/covers/12/cover_custom.jpg');
+      expect(coverStore.faceMediumFor).not.toHaveBeenCalled();
+      expect(coverStore.revert).toHaveBeenCalledWith(12, 'audio');
+      expect(scoreService.calculateAndSave).toHaveBeenCalledWith(12);
+      expect(fileWriteService.scheduleWrite).toHaveBeenCalledWith(12, 'auto', 1);
     });
 
-    it('returns null when no extracted cover exists after delete', async () => {
-      const { service } = createMutationService();
-
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg'] as never);
-      vi.mocked(unlink).mockResolvedValue(undefined);
+    it('returns null and schedules no write when no cover remains after delete', async () => {
+      const { service, coverStore, fileWriteService } = createMutationService();
+      coverStore.revert.mockResolvedValue(null);
 
       const result = await service.deleteCover(12, makeUser());
 
       expect(result).toBeNull();
-    });
-  });
-
-  // A Kobo device keys its locally stored cover by CoverImageId, which is versioned from
-  // coverUpdatedAt. Leaving the stamp behind here strands the device on a stale picture.
-  describe('coverUpdatedAt stamping (issue #943)', () => {
-    it('stamps coverUpdatedAt when a custom cover is uploaded', async () => {
-      const { service, values, onConflictDoUpdate } = createMutationService();
-
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(imageExt).mockReturnValue('jpg');
-      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
-      vi.mocked(readdir).mockResolvedValue([] as never);
-      vi.mocked(mkdir).mockResolvedValue(undefined as never);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-      vi.mocked(rename).mockResolvedValue(undefined);
-
-      await service.uploadCover(12, Buffer.from('image-data'), 'image/jpeg', makeUser());
-
-      expect(values).toHaveBeenCalledWith({ bookId: 12, coverSource: 'custom', coverUpdatedAt: expect.any(Date), updatedAt: expect.any(Date) });
-      expect(onConflictDoUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ set: { coverSource: 'custom', coverUpdatedAt: expect.any(Date), updatedAt: expect.any(Date) } }),
-      );
-    });
-
-    it('stamps coverUpdatedAt when deleting the last cover leaves the book without one', async () => {
-      const { service, values } = createMutationService();
-
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg'] as never);
-      vi.mocked(unlink).mockResolvedValue(undefined);
-
-      await service.deleteCover(12, makeUser());
-
-      expect(values).toHaveBeenCalledWith({ bookId: 12, coverSource: null, coverUpdatedAt: expect.any(Date), updatedAt: expect.any(Date) });
-    });
-
-    it('stamps coverUpdatedAt when deleting a custom cover falls back to the extracted one', async () => {
-      const { service, values } = createMutationService();
-
-      vi.mocked(coverDirPath).mockReturnValue('/tmp/books/covers/12');
-      vi.mocked(readdir).mockResolvedValue(['cover_custom.jpg', 'cover_extracted.png'] as never);
-      vi.mocked(readFile).mockResolvedValue(Buffer.from('extracted-img'));
-      vi.mocked(generateThumbnail).mockResolvedValue(Buffer.from('thumb'));
-      vi.mocked(unlink).mockResolvedValue(undefined);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-
-      await service.deleteCover(12, makeUser());
-
-      expect(values).toHaveBeenCalledWith({
-        bookId: 12,
-        coverSource: 'extracted',
-        coverUpdatedAt: expect.any(Date),
-        updatedAt: expect.any(Date),
-      });
+      expect(coverStore.revert).toHaveBeenCalledWith(12, 'ebook');
+      expect(fileWriteService.scheduleWrite).not.toHaveBeenCalled();
     });
   });
 });

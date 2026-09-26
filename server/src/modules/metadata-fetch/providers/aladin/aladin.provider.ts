@@ -31,6 +31,7 @@ export class AladinProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.ALADIN;
   readonly label = 'Aladin';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
 
   private readonly logger = new Logger(AladinProvider.name);
 

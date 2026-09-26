@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowLeft, RotateCcw, CheckCircle2, X, ZoomIn, Layers } from '@lucide/vue'
 import type { MetadataProviderInfo, MetadataProviderKey } from '@bookorbit/types'
 import type { DiffField, DiffFieldKey, GenreWriteMode } from '../../../composables/useMetadataDiff'
 import { hideOnError, providerBadgeStyle } from '../../../lib/metadata-fetch'
+import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../../../lib/cover-aspect-ratio'
 import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
@@ -27,9 +28,37 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const coverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+const libraryAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
+/** A cover row's frames take its slot's shape; without a slot they follow the library. */
+const coverAspectRatio = computed(() => {
+  if (props.field.coverMedium === 'audio') return '1/1'
+  if (props.field.coverMedium === 'ebook') return '2/3'
+  return libraryAspectRatio.value
+})
+const isAudioCover = computed(() => props.field.coverMedium === 'audio')
+const coverShapeHintId = `cover-shape-hint-${useId()}`
+/** Art of the other shape for this slot: offered, but named, since a letterboxed cover is a downgrade from a fitting one. */
+const coverShapeHint = computed(() => {
+  if (props.field.candidateCoverFit !== 'mismatch' || !props.field.candidateDisplay) return ''
+  return isAudioCover.value
+    ? t('book.detail.editMetadata.diff.coverShapeHint.portraitForAudio')
+    : t('book.detail.editMetadata.diff.coverShapeHint.squareForBook')
+})
 
 const lightboxSrc = ref<string | null>(null)
+
+function openCurrentCoverPreview() {
+  if (props.field.isPicked) lightboxSrc.value = props.field.pickedDisplay || props.field.candidateDisplay
+  else if (props.field.bookValue) lightboxSrc.value = props.field.bookValue
+}
+
+function openCandidateCoverPreview() {
+  if (props.field.candidateDisplay) lightboxSrc.value = props.field.candidateDisplay
+}
+
+function handleCoverPreviewOpenChange(open: boolean) {
+  if (!open) lightboxSrc.value = null
+}
 const isCurrentExpanded = ref(false)
 const isCandidateExpanded = ref(false)
 
@@ -55,6 +84,12 @@ const CLAMPABLE_TEXT_FIELDS = new Set<DiffFieldKey>([
   'comicLocations',
   'comicStoryArcs',
 ])
+
+const toggleLabel = computed(() =>
+  props.field.isPicked
+    ? t('book.detail.editMetadata.diff.keepCurrent', { field: t(props.field.labelKey) })
+    : t('book.detail.editMetadata.diff.useNew', { field: t(props.field.labelKey) }),
+)
 
 const canClampCurrent = computed(
   () => CLAMPABLE_TEXT_FIELDS.has(props.field.key) && props.field.currentDisplay.length > 160 && props.field.key !== 'sourceUrl',
@@ -102,7 +137,7 @@ watch(
   <!-- Cover row -->
   <div v-if="field.isCover" class="py-3.5 border-b border-border/40">
     <div class="mb-2.5 flex items-center gap-2">
-      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ field.label }}</p>
+      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t(field.labelKey) }}</p>
       <span v-if="field.isLocked" class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
         {{ t('book.detail.editMetadata.diff.locked') }}
       </span>
@@ -113,9 +148,7 @@ watch(
         class="w-16 rounded-lg overflow-hidden bg-muted transition-all duration-300 shadow-sm ring-1 relative group"
         :class="field.isPicked ? 'ring-primary ring-2' : field.bookValue ? 'ring-border cursor-zoom-in' : 'ring-border opacity-50'"
         :style="{ aspectRatio: coverAspectRatio }"
-        @click="
-          field.isPicked ? (lightboxSrc = field.pickedDisplay || field.candidateDisplay) : field.bookValue ? (lightboxSrc = field.bookValue) : null
-        "
+        @click="openCurrentCoverPreview"
       >
         <template v-if="field.isPicked && field.pickedDisplay">
           <img
@@ -141,7 +174,7 @@ watch(
           />
         </template>
         <div v-else class="absolute inset-0">
-          <BookCoverPlaceholder :title="bookSeed ?? null" :author-line="bookAuthorLine ?? null" :is-audio="false" :seed="bookSeed ?? 'book'" />
+          <BookCoverPlaceholder :title="bookSeed ?? null" :author-line="bookAuthorLine ?? null" :is-audio="isAudioCover" :seed="bookSeed ?? 'book'" />
         </div>
         <div
           v-if="field.isPicked || field.bookValue"
@@ -171,6 +204,9 @@ watch(
               : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'
           "
           :disabled="field.isLocked"
+          :aria-label="toggleLabel"
+          :aria-pressed="field.isPicked"
+          :aria-describedby="coverShapeHint ? coverShapeHintId : undefined"
           @click="handleToggle"
         >
           <RotateCcw v-if="field.isPicked && field.pickedFromActive" class="size-3.5" />
@@ -225,7 +261,7 @@ watch(
             : 'ring-border opacity-50'
         "
         :style="{ aspectRatio: coverAspectRatio }"
-        @click="field.candidateDisplay ? (lightboxSrc = field.candidateDisplay) : null"
+        @click="openCandidateCoverPreview"
       >
         <template v-if="field.candidateDisplay">
           <img
@@ -245,7 +281,7 @@ watch(
           <BookCoverPlaceholder
             :title="candidateSeed ?? null"
             :author-line="candidateAuthorLine ?? null"
-            :is-audio="false"
+            :is-audio="isAudioCover"
             :seed="candidateSeed ?? 'candidate'"
           />
         </div>
@@ -257,12 +293,20 @@ watch(
         </div>
       </div>
     </div>
+    <div v-if="coverShapeHint" class="grid grid-cols-[1fr_auto_1fr] gap-2">
+      <p :id="coverShapeHintId" class="col-start-3 mt-1.5 min-w-0 text-[11px] leading-snug text-muted-foreground">{{ coverShapeHint }}</p>
+    </div>
+    <div v-if="$slots.coverResults" class="grid grid-cols-[1fr_auto_1fr] gap-2">
+      <div class="col-start-3 min-w-0">
+        <slot name="coverResults" />
+      </div>
+    </div>
   </div>
 
   <!-- Text row -->
   <div v-else class="py-2.5 border-b border-border/40">
     <div class="mb-1.5 flex items-center gap-2">
-      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ field.label }}</p>
+      <p class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t(field.labelKey) }}</p>
       <span v-if="field.isLocked" class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
         {{ t('book.detail.editMetadata.diff.locked') }}
       </span>
@@ -303,7 +347,7 @@ watch(
         class="min-w-0 rounded-lg px-3 py-2 transition-all duration-200"
         :class="!field.hasDiff ? 'bg-muted/30 opacity-50' : field.isPicked ? 'bg-muted/30 opacity-40' : 'bg-background ring-1 ring-border'"
       >
-        <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">Current</p>
+        <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">{{ t('book.detail.editMetadata.diffPanel.current') }}</p>
         <p
           class="wrap-break-word leading-snug text-sm w-full"
           :class="[!field.currentDisplay ? 'text-muted-foreground italic' : 'text-foreground', currentTextClass]"
@@ -334,6 +378,8 @@ watch(
               : 'bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5'
           "
           :disabled="field.isLocked"
+          :aria-label="toggleLabel"
+          :aria-pressed="field.isPicked"
           @click="handleToggle"
         >
           <RotateCcw v-if="field.isPicked && field.pickedFromActive" class="size-3.5" />
@@ -386,7 +432,7 @@ watch(
           !field.hasDiff ? 'bg-muted/30 opacity-50' : field.isPicked && field.pickedFromActive ? 'bg-primary/8 ring-1 ring-primary/20' : 'bg-muted/40'
         "
       >
-        <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">New</p>
+        <p class="text-[10px] font-medium text-muted-foreground mb-0.5 sm:hidden">{{ t('book.detail.editMetadata.diffPanel.new') }}</p>
         <a
           v-if="field.key === 'sourceUrl' && field.candidateDisplay"
           :href="field.candidateDisplay"
@@ -414,22 +460,31 @@ watch(
     </div>
   </div>
 
-  <!-- Lightbox -->
-  <Teleport to="body">
-    <div v-if="lightboxSrc" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm" @click="lightboxSrc = null">
-      <button
-        class="absolute top-4 right-4 size-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
-        @click="lightboxSrc = null"
-      >
-        <X class="size-5" />
-      </button>
-      <img
-        :src="lightboxSrc"
-        :alt="t('book.detail.editMetadata.diff.coverPreviewAlt')"
-        class="max-h-[85vh] max-w-[85vw] rounded-lg shadow-2xl object-contain"
-        @click.stop
-        @error="hideOnError"
+  <!-- A nested dialog, so a drawer or sheet around the diff treats it as its own child layer. -->
+  <DialogRoot :open="lightboxSrc !== null" @update:open="handleCoverPreviewOpenChange">
+    <DialogPortal>
+      <DialogOverlay
+        class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:animate-none"
       />
-    </div>
-  </Teleport>
+      <DialogContent
+        :aria-describedby="undefined"
+        class="fixed left-1/2 top-1/2 z-[60] -translate-x-1/2 -translate-y-1/2 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 motion-reduce:animate-none"
+      >
+        <DialogTitle class="sr-only">{{ t('book.detail.coverLightbox.title') }}</DialogTitle>
+        <img
+          v-if="lightboxSrc"
+          :src="lightboxSrc"
+          :alt="t('book.detail.editMetadata.diff.coverPreviewAlt')"
+          class="max-h-[85vh] max-w-[85vw] rounded-lg shadow-2xl object-contain"
+          @error="hideOnError"
+        />
+        <DialogClose
+          class="absolute -top-3 -right-3 rounded-full border border-border bg-background p-1 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          :aria-label="t('common.close')"
+        >
+          <X class="size-4" aria-hidden="true" />
+        </DialogClose>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>

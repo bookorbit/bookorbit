@@ -4,6 +4,7 @@ import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { AnnotationModule } from '../annotation/annotation.module';
 import { BookModule } from '../book/book.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
 import { ReadingSessionModule } from '../reading-session/reading-session.module';
@@ -42,6 +43,7 @@ import { KoboAnalyticsService } from './services/kobo-analytics.service';
     AchievementModule,
     AnnotationModule,
     BookModule,
+    BookCoverStoreModule,
     MetadataModule,
     PositionConverterModule,
     UserModule,

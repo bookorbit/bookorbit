@@ -1,7 +1,7 @@
 import { basename } from 'path';
 
 import type { BookCard, BookMetadataLockField, CollapsedSeriesInfo, CustomMetadataBookValue, UserBookStatus } from '@bookorbit/types';
-import { BOOK_METADATA_LOCK_FIELDS, compareSeriesIndices, normalizeCoverAspectRatio } from '@bookorbit/types';
+import { BOOK_METADATA_LOCK_FIELDS, compareSeriesIndices, isContentBookFile, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { mediaOverlayCapabilityFromFields } from '../../reader/epub/epub-media-overlay-capability';
 
 const LOCK_FIELD_SET = new Set<string>(BOOK_METADATA_LOCK_FIELDS);
@@ -190,11 +190,10 @@ export function assembleBookCards(
 
   return rows.map((row) => {
     const rawFiles = filesByBook.get(row.id) ?? [];
+    // A cover or sidecar is never the primary: a book with no content file has none.
     const primaryFile =
       (row.primaryFileId != null ? rawFiles.find((f) => f.id === row.primaryFileId) : undefined) ??
-      rawFiles.find((f) => f.role === 'primary') ??
-      rawFiles.find((f) => f.role === 'content') ??
-      rawFiles[0] ??
+      rawFiles.find((f) => isContentBookFile(f)) ??
       null;
     const files = rawFiles.map((f) => {
       const mediaOverlay = mediaOverlayCapabilityFromFields(f);
@@ -237,6 +236,7 @@ export function assembleBookCards(
       readStatus: statusByBookId.get(row.id) ?? null,
       addedAt: row.addedAt.toISOString(),
       updatedAt: row.updatedAt?.toISOString() ?? null,
+      coverVersion: `legacy:${(row.updatedAt ?? row.addedAt).toISOString()}`,
       metadataScore: row.metadataScore ?? null,
       hasCover: row.coverSource != null,
       hasMetadataLocks: (row.lockedFields?.length ?? 0) > 0,

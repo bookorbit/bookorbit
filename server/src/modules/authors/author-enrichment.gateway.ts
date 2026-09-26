@@ -1,5 +1,5 @@
-import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ForbiddenException, Inject, Logger, UnauthorizedException } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Permission, type AuthenticationMethod, type AuthorEnrichmentStatusEvent } from '@bookorbit/types';
@@ -12,6 +12,7 @@ import { AuthorEnrichmentRepository } from './author-enrichment.repository';
 import { AuthorEnrichmentSessionService } from './author-enrichment-session.service';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
+import { appConfig } from '../../config/config';
 
 export const AUTHOR_ENRICHMENT_STATUS_EVENT = 'author-enrichment:status';
 
@@ -27,9 +28,9 @@ export class AuthorEnrichmentGateway implements OnGatewayInit, OnGatewayConnecti
     private readonly queueRepo: AuthorEnrichmentRepository,
     private readonly enrichmentConfig: AuthorEnrichmentConfigService,
     private readonly session: AuthorEnrichmentSessionService,
-    config: ConfigService,
+    @Inject(appConfig.KEY) app: ConfigType<typeof appConfig>,
   ) {
-    this.clientOrigin = config.get<string>('app.appUrl') ?? 'http://localhost:5173';
+    this.clientOrigin = app.appUrl;
   }
 
   afterInit(server: Server): void {

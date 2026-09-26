@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { BookMetadataFetchModule } from '../book-metadata-fetch/book-metadata-fetch.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
@@ -17,7 +18,7 @@ import { UploadSessionRepository } from './upload-session.repository';
 import { UploadSessionService } from './upload-session.service';
 
 @Module({
-  imports: [AppSettingsModule, LibraryModule, MetadataModule, BookMetadataFetchModule, FileWriteModule, PathModule],
+  imports: [AppSettingsModule, BookCoverStoreModule, LibraryModule, MetadataModule, BookMetadataFetchModule, FileWriteModule, PathModule],
   controllers: [UploadController, BookFileUploadController, UploadSessionController],
   providers: [UploadService, UploadValidatorService, UploadStorageService, UploadProcessorService, UploadSessionRepository, UploadSessionService],
   exports: [UploadValidatorService, UploadStorageService, UploadProcessorService, UploadService],

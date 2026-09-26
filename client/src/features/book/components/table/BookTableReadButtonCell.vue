@@ -4,9 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { BookOpen, ChevronDown, Eye, Play } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import { isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import type { BookCard, BookFileRef } from '@bookorbit/types'
-import { getFormatColor } from '@/features/book/lib/format-colors'
+import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
+import { bookFormatEntries, fileFormatKey, formatKeyName } from '@/features/book/lib/book-formats'
 
 const props = defineProps<{
   book: BookCard
@@ -15,78 +16,31 @@ const props = defineProps<{
 const router = useRouter()
 const { t } = useI18n()
 
-const readableFiles = computed(() => {
-  const normalized = props.book.files.filter((file) => {
-    const format = file.format?.trim().toLowerCase()
-    return format ? READER_OPENABLE_FORMATS.has(format) : false
-  })
-  const primary = normalized.find((file) => file.role === 'primary')
-  return primary ? [primary, ...normalized.filter((file) => file.id !== primary.id)] : normalized
-})
+const entries = computed(() => bookFormatEntries(props.book.files))
+const isMultiTrackAudio = computed(() => entries.value.some((entry) => entry.audio && entry.files.length > 1))
 
-const isMultiTrackAudio = computed(() => {
-  const audioFiles = readableFiles.value.filter((file) => {
-    const format = file.format?.toLowerCase()
-    return format ? FORMAT_TO_GROUP[format] === 'audio' : false
-  })
-  return audioFiles.length > 1
-})
-
-const openableFiles = computed<BookFileRef[]>(() => {
-  const collapsed = isMultiTrackAudio.value
-    ? (() => {
-        const firstAudio = readableFiles.value.find((file) => {
-          const format = file.format?.toLowerCase()
-          return format ? FORMAT_TO_GROUP[format] === 'audio' : false
-        })
-        const nonAudio = readableFiles.value.filter((file) => {
-          const format = file.format?.toLowerCase()
-          return format ? FORMAT_TO_GROUP[format] !== 'audio' : false
-        })
-        return firstAudio ? [firstAudio, ...nonAudio] : nonAudio
-      })()
-    : readableFiles.value
-
-  const seen = new Set<string>()
-  return collapsed.filter((file) => {
-    const key = file.format!.trim().toLowerCase()
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-})
+/** One file per edition the reader can open; an audiobook opens from its first track. */
+const openableFiles = computed<BookFileRef[]>(() =>
+  entries.value.map((entry) => entry.files[0]!).filter((file) => READER_OPENABLE_FORMATS.has(file.format!.toLowerCase())),
+)
 
 const primaryFile = computed(() => openableFiles.value.find((file) => file.role === 'primary') ?? openableFiles.value[0] ?? null)
-
-const primaryIsAudio = computed(() => {
-  const format = primaryFile.value?.format?.toLowerCase()
-  return format ? FORMAT_TO_GROUP[format] === 'audio' : false
-})
 
 const canOpen = computed(() => props.book.status !== 'missing' && !!primaryFile.value)
 const hasMultipleFormats = computed(() => openableFiles.value.length > 1)
 
-function actionVerb(file: BookFileRef | null): string {
-  const format = file?.format?.toLowerCase()
-  return format && FORMAT_TO_GROUP[format] === 'audio' ? t('book.table.read.play') : t('book.table.read.read')
-}
-
 function isAudioFile(file: BookFileRef | null): boolean {
-  const format = file?.format?.toLowerCase()
-  return format ? FORMAT_TO_GROUP[format] === 'audio' : false
+  return file?.format != null && isAudioFormat(file.format)
 }
 
 function formatLabel(file: BookFileRef | null): string {
-  return file?.format?.trim().toUpperCase() ?? t('book.table.read.fileFallback')
+  const key = file ? fileFormatKey(file) : null
+  return key ? formatKeyName(key) : t('book.table.read.fileFallback')
 }
 
-function formatBadgeStyle(format: string) {
-  const color = getFormatColor(format)
-  return {
-    color,
-    borderColor: `${color}66`,
-    backgroundColor: `${color}1a`,
-  }
+function actionLabel(file: BookFileRef | null): string {
+  const format = formatLabel(file)
+  return isAudioFile(file) ? t('book.table.read.playFormat', { format }) : t('book.table.read.readFormat', { format })
 }
 
 function openFile(file: BookFileRef | null, mode?: 'peek') {
@@ -113,11 +67,11 @@ function peekPrimaryFile() {
       <button
         type="button"
         class="inline-flex h-7 w-7 items-center justify-center rounded-l-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        :aria-label="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
-        :title="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
+        :aria-label="actionLabel(primaryFile)"
+        :title="actionLabel(primaryFile)"
         @click.stop="openPrimaryFile"
       >
-        <Play v-if="primaryIsAudio" :size="13" class="text-sky-500" />
+        <Play v-if="isAudioFile(primaryFile)" :size="13" class="text-sky-500" />
         <BookOpen v-else :size="13" class="text-emerald-500" />
       </button>
       <div class="w-px shrink-0 bg-border/80" />
@@ -134,13 +88,8 @@ function peekPrimaryFile() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-48">
           <DropdownMenuItem v-for="file in openableFiles" :key="file.id" class="gap-2" @select="openFile(file)">
-            <span
-              class="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-              :style="formatBadgeStyle(file.format?.toLowerCase() ?? '?')"
-            >
-              {{ file.format }}
-            </span>
-            <span class="flex-1 truncate text-xs">{{ actionVerb(file) }} {{ formatLabel(file) }}</span>
+            <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="rounded px-1.5 py-0.5 text-[10px] tracking-wide" />
+            <span class="flex-1 truncate text-xs">{{ actionLabel(file) }}</span>
             <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary">{{ t('book.table.read.primary') }}</span>
           </DropdownMenuItem>
           <DropdownMenuItem v-for="file in openableFiles" :key="`peek-${file.id}`" class="gap-2" @select="openFile(file, 'peek')">
@@ -155,8 +104,8 @@ function peekPrimaryFile() {
       <button
         type="button"
         class="inline-flex h-7 w-7 items-center justify-center rounded-l-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-        :aria-label="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
-        :title="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
+        :aria-label="actionLabel(primaryFile)"
+        :title="actionLabel(primaryFile)"
         @click.stop="openPrimaryFile"
       >
         <Play v-if="isAudioFile(primaryFile)" :size="13" class="text-sky-500" />

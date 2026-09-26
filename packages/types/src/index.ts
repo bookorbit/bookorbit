@@ -23,6 +23,7 @@ export * from "./media";
 export * from "./collection";
 export * from "./smart-scope";
 export * from "./library";
+export * from "./format-priority";
 export * from "./maintenance";
 export * from "./metadata-fetch";
 export * from "./pattern-resolver";

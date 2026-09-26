@@ -3,6 +3,7 @@ import { dirname, relative } from 'path';
 
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { FileLockService, bookOperationLockKey } from '../file-write/file-lock.service';
 import type { BookMovePlan, PlannedFileMove } from './book-move-planner.service';
 import type { BookFileMoveUpdate, MoveTargetLibrary } from './book-move.repository';
@@ -53,6 +54,7 @@ export class BookMoveExecutorService {
     private readonly moveRepo: BookMoveRepository,
     private readonly lockService: FileLockService,
     private readonly selfWriteRegistry: SelfWriteRegistry,
+    private readonly coverStore: BookCoverStore,
   ) {}
 
   async execute(input: ExecuteMoveInput): Promise<ExecuteMoveResult> {
@@ -130,6 +132,7 @@ export class BookMoveExecutorService {
       );
 
       if (applied.mergedBookId != null) {
+        await this.coverStore.removeCoverDirectory(applied.mergedBookId).catch(() => undefined);
         return { status: 'merged', crossDevice, mergedBookId: applied.mergedBookId };
       }
       return { status: 'success', crossDevice };

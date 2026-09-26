@@ -21,7 +21,8 @@ import {
   userLibraryAccess,
 } from '../../db/schema';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
-import type { ContentFilterRules, GroupRule } from '@bookorbit/types';
+import { isAudioFormat, type ContentFilterRules, type GroupRule } from '@bookorbit/types';
+import { rankFileRowsByBook, rankFilesByFormatPriority } from '../../common/utils/primary-file-selection.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 
@@ -131,6 +132,20 @@ export interface OpdsManifestBookRow {
   isbn10: string | null;
   isbn13: string | null;
   files: OpdsManifestFileRow[];
+}
+
+/**
+ * A read-along EPUB downloads over OPDS without its audio, so beside a plain EPUB of the same book
+ * it would be a second link to the same text. The plain one stands for both.
+ */
+function isRedundantReadAlong(
+  row: { bookId: number; id: number; format: string | null; mediaOverlayAvailable: boolean },
+  rows: readonly { bookId: number; id: number; format: string | null; mediaOverlayAvailable: boolean }[],
+): boolean {
+  if (row.format?.toLowerCase() !== 'epub' || !row.mediaOverlayAvailable) return false;
+  return rows.some(
+    (other) => other.bookId === row.bookId && other.id !== row.id && other.format?.toLowerCase() === 'epub' && !other.mediaOverlayAvailable,
+  );
 }
 
 @Injectable()
@@ -655,20 +670,41 @@ export class OpdsBookService {
     }
   }
 
-  async getBookFiles(bookId: number, fileId?: number): Promise<{ absolutePath: string; format: string; title: string; authorName: string } | null> {
-    const fileQuery = this.db
+  /**
+   * The file a download serves: the one asked for when it is a content file, otherwise the edition an
+   * OPDS reader can open, the primary unless that is an audiobook with a readable edition beside it.
+   */
+  async getBookFiles(
+    bookId: number,
+    fileId?: number,
+  ): Promise<{ absolutePath: string; format: string; readAlong: boolean; title: string; authorName: string } | null> {
+    const candidates = await this.db
       .select({
+        id: bookFiles.id,
         absolutePath: bookFiles.absolutePath,
         format: bookFiles.format,
+        role: bookFiles.role,
+        sizeBytes: bookFiles.sizeBytes,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
         title: bookMetadata.title,
+        primaryFileId: books.primaryFileId,
+        formatPriority: libraries.formatPriority,
       })
       .from(bookFiles)
-      .leftJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .leftJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
-      .where(fileId ? and(eq(bookFiles.id, fileId), eq(bookFiles.bookId, bookId)) : and(eq(books.id, bookId), eq(bookFiles.id, books.primaryFileId)))
-      .limit(1);
+      .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.role, 'content')))
+      .orderBy(bookFiles.sortOrder, bookFiles.id);
 
-    const [file] = await fileQuery;
+    const first = candidates[0];
+    if (!first) return null;
+    const file = fileId
+      ? candidates.find((candidate) => candidate.id === fileId)
+      : (() => {
+          const ranked = rankFilesByFormatPriority(candidates, first.formatPriority as string[] | null, first.primaryFileId);
+          return ranked.find((candidate) => candidate.format != null && !isAudioFormat(candidate.format)) ?? ranked[0];
+        })();
     if (!file) return null;
 
     const [authorRow] = await this.db
@@ -682,6 +718,7 @@ export class OpdsBookService {
     return {
       absolutePath: file.absolutePath,
       format: file.format ?? 'unknown',
+      readAlong: file.format?.toLowerCase() === 'epub' && file.mediaOverlayAvailable,
       title: file.title ?? `book-${bookId}`,
       authorName: authorRow?.name ?? '',
     };
@@ -817,9 +854,12 @@ export class OpdsBookService {
           publisher: bookMetadata.publisher,
           isbn13: bookMetadata.isbn13,
           coverSource: bookMetadata.coverSource,
+          primaryFileId: books.primaryFileId,
+          formatPriority: libraries.formatPriority,
         })
         .from(books)
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+        .leftJoin(libraries, eq(libraries.id, books.libraryId))
         .where(inArray(books.id, bookIds)),
       this.db
         .select({ bookId: bookAuthors.bookId, name: authors.name })
@@ -828,7 +868,14 @@ export class OpdsBookService {
         .where(inArray(bookAuthors.bookId, bookIds))
         .orderBy(bookAuthors.displayOrder),
       this.db
-        .select({ bookId: books.id, id: bookFiles.id, format: bookFiles.format, role: bookFiles.role })
+        .select({
+          bookId: books.id,
+          id: bookFiles.id,
+          format: bookFiles.format,
+          role: bookFiles.role,
+          sizeBytes: bookFiles.sizeBytes,
+          mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+        })
         .from(bookFiles)
         .innerJoin(books, eq(books.id, bookFiles.bookId))
         .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content')))
@@ -843,9 +890,13 @@ export class OpdsBookService {
       authorsByBook.set(row.bookId, list);
     }
 
+    const rankedFileRows = rankFileRowsByBook(
+      fileRows,
+      new Map(metaRows.map((row) => [row.id, { formatPriority: row.formatPriority as string[] | null, primaryFileId: row.primaryFileId }])),
+    );
     const filesByBook = new Map<number, { id: number; format: string }[]>();
-    for (const row of fileRows) {
-      if (row.role !== 'content') continue;
+    for (const row of rankedFileRows) {
+      if (row.role !== 'content' || isRedundantReadAlong(row, rankedFileRows)) continue;
       const list = filesByBook.get(row.bookId) ?? [];
       list.push({ id: row.id, format: row.format ?? 'unknown' });
       filesByBook.set(row.bookId, list);

@@ -20,6 +20,8 @@ export interface AmazonBookData {
   seriesIndex?: string;
   seriesTotalBooks?: number;
   coverUrl?: string;
+  coverWidth?: number;
+  coverHeight?: number;
   tags?: string[];
   communityRating?: number;
   communityRatingCount?: number;
@@ -46,7 +48,7 @@ export function parseBookPage(html: string): AmazonBookData {
     seriesName: extractSeriesName($),
     seriesIndex: extractSeriesIndex($),
     seriesTotalBooks: extractSeriesTotalBooks($),
-    coverUrl: extractCoverUrl($),
+    ...extractCover($),
     tags: extractCategories($),
     communityRating: extractCommunityRating($),
     communityRatingCount: extractCommunityRatingCount($),
@@ -241,11 +243,12 @@ function extractSeriesTotalBooks($: CheerioAPI): number | undefined {
   return match ? normalizeSeriesTotalBooks(match[1]) : undefined;
 }
 
-function extractCoverUrl($: CheerioAPI): string | undefined {
+function extractCover($: CheerioAPI): Pick<AmazonBookData, 'coverUrl' | 'coverWidth' | 'coverHeight'> {
   const img = $('#landingImage, #imgBlkFront').first();
 
-  // data-a-dynamic-image is a JSON map of url -> [width, height] with all available sizes.
-  // Cheerio decodes HTML entities in attr(), so &quot; becomes " automatically.
+  // data-a-dynamic-image is a JSON map of variant url -> size, one entry per available size. The
+  // pairs are [height, width]: every page checked in September 2026 agreed once the images were
+  // measured. Cheerio decodes HTML entities in attr(), so &quot; becomes " automatically.
   const dynamicRaw = img.attr('data-a-dynamic-image');
   if (dynamicRaw) {
     try {
@@ -255,7 +258,7 @@ function extractCoverUrl($: CheerioAPI): string | undefined {
         // Strip the size modifier (e.g. ._SY342_) from any variant URL to get
         // the full-resolution original. All entries are the same image at different sizes.
         const [sampleUrl] = entries[0];
-        return sampleUrl.replace(/\._[^.]+_\./, '.');
+        return { coverUrl: sampleUrl.replace(/\._[^.]+_\./, '.'), ...largestDeclaredSize(entries) };
       }
     } catch {
       // fall through
@@ -263,9 +266,29 @@ function extractCoverUrl($: CheerioAPI): string | undefined {
   }
 
   const hires = img.attr('data-old-hires');
-  if (hires) return hires;
+  if (hires) return { coverUrl: hires };
   const src = img.attr('src');
-  return src ? src.replace(/\._[A-Z0-9_,]+_\./i, '.') : undefined;
+  return src ? { coverUrl: src.replace(/\._[A-Z0-9_,]+_\./i, '.') } : {};
+}
+
+/**
+ * The largest declared size, which is the least rounded. A variant url sized by one side
+ * (`._SY522_` for height, `._SX300_` for width) settles which number is which; otherwise the pair
+ * is read as [height, width].
+ */
+function largestDeclaredSize(entries: [string, unknown][]): Pick<AmazonBookData, 'coverWidth' | 'coverHeight'> {
+  let best: { coverWidth: number; coverHeight: number } | undefined;
+  for (const [variantUrl, size] of entries) {
+    if (!Array.isArray(size)) continue;
+    const [first, second] = size as unknown[];
+    if (typeof first !== 'number' || typeof second !== 'number' || first <= 0 || second <= 0) continue;
+    const sizedWidth = Number(/\._SX(\d+)_/.exec(variantUrl)?.[1]);
+    const sizedHeight = Number(/\._SY(\d+)_/.exec(variantUrl)?.[1]);
+    const firstIsWidth = sizedWidth === first || (sizedHeight === second && sizedHeight !== first);
+    const declared = firstIsWidth ? { coverWidth: first, coverHeight: second } : { coverWidth: second, coverHeight: first };
+    if (!best || declared.coverWidth * declared.coverHeight > best.coverWidth * best.coverHeight) best = declared;
+  }
+  return best ?? {};
 }
 
 function extractCommunityRating($: CheerioAPI): number | undefined {

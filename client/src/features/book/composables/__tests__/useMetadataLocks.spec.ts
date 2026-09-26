@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookDetail } from '@bookorbit/types'
+import { BOOK_METADATA_LOCK_FIELDS, type BookDetail } from '@bookorbit/types'
 
 import { useMetadataLocks } from '../useMetadataLocks'
 
@@ -8,6 +8,8 @@ const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: Request
 vi.mock('@/lib/api', () => ({
   api: apiMock,
 }))
+
+const BOOK_FIELDS_WITHOUT_AUDIO_COVER = BOOK_METADATA_LOCK_FIELDS.filter((field) => field !== 'audioCover')
 
 function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   return {
@@ -35,6 +37,9 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: null,
+    coverMedia: [],
+    covers: { ebook: null, audio: null },
+    coverVersion: 'legacy:2024-01-01T00:00:00.000Z',
     hardcoverEditionId: null,
     providerIds: {},
     authors: [],
@@ -94,7 +99,6 @@ describe('useMetadataLocks', () => {
   })
 
   it('lockAll sends every lockable field', async () => {
-    const { BOOK_METADATA_LOCK_FIELDS } = await import('@bookorbit/types')
     const allLocked = makeBook({ lockedFields: [...BOOK_METADATA_LOCK_FIELDS] })
     apiMock.mockResolvedValue({ ok: true, json: async () => allLocked })
 
@@ -103,6 +107,15 @@ describe('useMetadataLocks', () => {
 
     expect(result?.lockedFields).toHaveLength(BOOK_METADATA_LOCK_FIELDS.length)
     expect(areAllLocked.value).toBe(true)
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(req.body)).lockedFields).toEqual(expect.arrayContaining(['cover', 'audioCover']))
+  })
+
+  it('does not count a book as fully locked while its audiobook cover is unlocked', () => {
+    const { load, areAllLocked } = useMetadataLocks()
+    load(makeBook({ lockedFields: BOOK_FIELDS_WITHOUT_AUDIO_COVER }))
+
+    expect(areAllLocked.value).toBe(false)
   })
 
   it('unlockAll sends an empty lock set', async () => {

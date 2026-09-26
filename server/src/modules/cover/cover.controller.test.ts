@@ -80,4 +80,24 @@ describe('CoverController', () => {
     expect(coverService.uploadCoverFromUrl).toHaveBeenCalledWith(11, 'https://example.com/cover.jpg', user);
     expect(coverService.deleteCover).toHaveBeenCalledWith(11, user);
   });
+
+  it('forwards an explicit cover medium on every write route', async () => {
+    const buffer = Buffer.from('bytes');
+    const req = {
+      file: vi.fn().mockResolvedValue({
+        mimetype: 'image/png',
+        toBuffer: vi.fn().mockResolvedValue(buffer),
+      }),
+    };
+    const user = { id: 9 };
+    coverService.deleteCover.mockResolvedValue('custom');
+
+    await controller.uploadCover(11, user as never, req as never, { medium: 'audio' });
+    await controller.uploadCoverFromUrl(11, { url: 'https://example.com/cover.jpg' }, user as never, { medium: 'audio' });
+    await controller.deleteCover(11, user as never, { medium: 'audio' });
+
+    expect(coverService.uploadCover).toHaveBeenCalledWith(11, buffer, 'image/png', user, 'audio');
+    expect(coverService.uploadCoverFromUrl).toHaveBeenCalledWith(11, 'https://example.com/cover.jpg', user, 'audio');
+    expect(coverService.deleteCover).toHaveBeenCalledWith(11, user, 'audio');
+  });
 });

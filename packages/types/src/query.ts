@@ -21,6 +21,8 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
  * - `fileSize` - resolved via `book_files.size_bytes` (primary file; rule values are bytes)
  * - `isbn` - matches both `isbn10` and `isbn13` in `book_metadata`
  * - `publishedDate` - uses full dates when available and falls back to published year
+ * - `cover` - either cover slot filled (`book_metadata.cover_source` is the summary of both)
+ * - `audioCover` - books whose cover media include audio, by whether their audio cover slot is filled
  * - `lockStatus` - derived from `book_metadata.locked_fields` (non-empty array = locked)
  * - `seriesStatus` - computed per-user: "up next in series" (next unstarted book whose earlier series entries are all finished)
  *
@@ -55,6 +57,7 @@ export type StaticRuleField =
   | "isbn"
   | "metadataScore"
   | "cover"
+  | "audioCover"
   | "lockStatus"
   | "seriesStatus";
 
@@ -131,6 +134,7 @@ export const FIELD_OPERATORS: Record<StaticRuleField, RuleOperator[]> = {
   isbn: ["isEmpty", "isNotEmpty", "eq"],
   metadataScore: ["gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   cover: ["isMissing", "isPresent"],
+  audioCover: ["isMissing", "isPresent"],
   lockStatus: ["isLocked", "isUnlocked"],
   seriesStatus: ["isUpNext"],
 };

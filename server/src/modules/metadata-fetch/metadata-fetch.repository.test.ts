@@ -31,7 +31,7 @@ function makeRepository() {
 describe('MetadataFetchRepository', () => {
   it('returns provider-id row for a known book', async () => {
     const { repo, limit } = makeRepository();
-    const row: StoredProviderIdsRow = {
+    const row = {
       libraryId: 5,
       googleBooksId: 'google-1',
       goodreadsId: 'goodreads-1',
@@ -42,9 +42,12 @@ describe('MetadataFetchRepository', () => {
       audibleId: 'audible-1',
       comicvineId: 'comicvine-1',
     };
-    limit.mockResolvedValue([row]);
+    limit.mockResolvedValue([{ ...row, hasEbook: true, hasAudio: false }]);
 
-    await expect(repo.findStoredProviderIdsRow(99)).resolves.toEqual(row);
+    await expect(repo.findStoredProviderIdsRow(99)).resolves.toEqual({
+      ...row,
+      coverMedia: { hasEbook: true, hasAudio: false },
+    } satisfies Partial<StoredProviderIdsRow>);
   });
 
   it('returns null when provider-id row is missing for a book', async () => {

@@ -6,6 +6,7 @@ import { EmbeddingModule } from '../embedding/embedding.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
 import { BookMetadataLockModule } from '../book-metadata-lock/book-metadata-lock.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { CustomMetadataModule } from '../custom-metadata/custom-metadata.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
@@ -29,6 +30,7 @@ import { ReadingAttemptController } from './reading-attempt.controller';
   imports: [
     forwardRef(() => LibraryModule),
     BookMetadataLockModule,
+    BookCoverStoreModule,
     CustomMetadataModule,
     MetadataModule,
     EmbeddingModule,

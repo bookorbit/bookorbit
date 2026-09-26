@@ -1,9 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { COVER_MEDIA } from '@bookorbit/types';
 import { ConfigService } from '@nestjs/config';
 import { rm } from 'fs/promises';
 import { join } from 'path';
 import type {
   BrokenCoverEntry,
+  BrokenCoverSlot,
+  CoverMedium,
   CoverSweep,
   MissingBookEntry,
   MissingResourceCleanupResult,
@@ -15,9 +18,18 @@ import type {
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookService } from '../book/book.service';
+import type { BookCoverSlotRow } from '../book-cover-store/book-cover-store.repository';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { LibraryService } from '../library/library.service';
 import { CoverSweepStore, type SweepRecord } from './cover-sweep.store';
-import { COVER_DISK_CONCURRENCY, hasServableCover, mapWithConcurrency, measureCoverDir, readCoverDirBookIds } from './lib/cover-disk';
+import {
+  COVER_DISK_CONCURRENCY,
+  findBrokenCoverSlots,
+  hasServableCover,
+  mapWithConcurrency,
+  measureCoverDir,
+  readCoverDirBookIds,
+} from './lib/cover-disk';
 import { MissingResourcesRepository } from './missing-resources.repository';
 import type { MissingResourceCleanupDto } from './dto/missing-resources.dto';
 
@@ -36,6 +48,7 @@ export class MissingResourcesService {
     private readonly libraryService: LibraryService,
     private readonly bookService: BookService,
     config: ConfigService,
+    private readonly coverStore: BookCoverStore,
   ) {
     this.coversRoot = join(config.get<string>('storage.appDataPath')!, 'covers');
   }
@@ -84,6 +97,7 @@ export class MissingResourcesService {
     const pageIds = record.brokenCoverBookIds.slice((page - 1) * pageSize, page * pageSize);
     const rows = await this.repo.findBrokenCoverEntries(pageIds);
     const byId = new Map(rows.map((row) => [row.id, row]));
+    const brokenSlots = await this.brokenSlotsFor(pageIds);
     return {
       items: pageIds.flatMap((bookId) => {
         const row = byId.get(bookId);
@@ -96,6 +110,7 @@ export class MissingResourcesService {
             libraryId: row.libraryId,
             libraryName: row.libraryName,
             coverSource: row.coverSource,
+            slots: brokenSlots.get(bookId) ?? [],
           },
         ];
       }),
@@ -157,14 +172,17 @@ export class MissingResourcesService {
       `[${event}] [start] userId=${user.id} requested=${requestedIds.length} candidates=${candidates.length} - broken cover cleanup started`,
     );
     try {
-      const stillBroken: number[] = [];
-      await mapWithConcurrency(candidates, COVER_DISK_CONCURRENCY, async (bookId) => {
-        if (!(await hasServableCover(this.coversRoot, bookId))) stillBroken.push(bookId);
-      });
+      const stillBroken = await this.findBrokenBookIds(candidates);
 
       let cleaned = 0;
-      for (let index = 0; index < stillBroken.length; index += DELETE_BATCH_SIZE) {
-        cleaned += await this.repo.clearCoverSource(stillBroken.slice(index, index + DELETE_BATCH_SIZE));
+      const legacyBroken: number[] = [];
+      for (const bookId of stillBroken) {
+        const result = await this.coverStore.removeBrokenSlots(bookId);
+        if (result.hadSlots) cleaned += result.removed > 0 ? 1 : 0;
+        else legacyBroken.push(bookId);
+      }
+      for (let index = 0; index < legacyBroken.length; index += DELETE_BATCH_SIZE) {
+        cleaned += await this.repo.clearCoverSource(legacyBroken.slice(index, index + DELETE_BATCH_SIZE));
       }
       const handled = new Set(requestedIds);
       record.brokenCoverBookIds = record.brokenCoverBookIds.filter((bookId) => !handled.has(bookId));
@@ -240,6 +258,45 @@ export class MissingResourcesService {
     }
   }
 
+  /**
+   * A book with slots is broken as soon as one slot has lost its image, even while the other still
+   * serves. A book the upgrade has not converted yet is judged by its folder as a whole.
+   */
+  private async findBrokenBookIds(bookIds: readonly number[]): Promise<number[]> {
+    const slotsByBook = await this.slotRowsFor(bookIds);
+    const flags = await mapWithConcurrency(bookIds, COVER_DISK_CONCURRENCY, async (bookId) => {
+      const media = (slotsByBook.get(bookId) ?? []).map((slot) => slot.medium as CoverMedium);
+      if (media.length === 0) return !(await hasServableCover(this.coversRoot, bookId));
+      return (await findBrokenCoverSlots(this.coversRoot, bookId, media)).length > 0;
+    });
+    return bookIds.filter((_, index) => flags[index]);
+  }
+
+  private async brokenSlotsFor(bookIds: readonly number[]): Promise<Map<number, BrokenCoverSlot[]>> {
+    const slotsByBook = await this.slotRowsFor(bookIds);
+    const entries = await mapWithConcurrency(bookIds, COVER_DISK_CONCURRENCY, async (bookId) => {
+      const slots = slotsByBook.get(bookId) ?? [];
+      const broken = new Set(
+        await findBrokenCoverSlots(
+          this.coversRoot,
+          bookId,
+          slots.map((slot) => slot.medium as CoverMedium),
+        ),
+      );
+      const brokenSlots = COVER_MEDIA.flatMap((medium) => {
+        const slot = slots.find((candidate) => candidate.medium === medium);
+        return slot && broken.has(medium) ? [{ medium, source: slot.source as BrokenCoverSlot['source'] }] : [];
+      });
+      return [bookId, brokenSlots] as const;
+    });
+    return new Map(entries);
+  }
+
+  private async slotRowsFor(bookIds: readonly number[]): Promise<Map<number, BookCoverSlotRow[]>> {
+    if (bookIds.length === 0) return new Map();
+    return this.coverStore.slotsFor([...bookIds]);
+  }
+
   private async runSweep(user: RequestUser, record: SweepRecord): Promise<void> {
     const event = 'maintenance.cover_sweep';
     const startedAt = Date.now();
@@ -256,9 +313,7 @@ export class MissingResourcesService {
 
         const onDisk = batch.filter((bookId) => diskBookIds.has(bookId));
         const broken = batch.filter((bookId) => !diskBookIds.has(bookId));
-        await mapWithConcurrency(onDisk, COVER_DISK_CONCURRENCY, async (bookId) => {
-          if (!(await hasServableCover(this.coversRoot, bookId))) broken.push(bookId);
-        });
+        broken.push(...(await this.findBrokenBookIds(onDisk)));
 
         this.store.addBrokenCovers(record, broken);
         record.processedBooks += batch.length;

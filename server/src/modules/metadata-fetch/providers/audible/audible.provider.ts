@@ -19,6 +19,7 @@ export class AudibleProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.AUDIBLE;
   readonly label = 'Audible';
   readonly identifiable = true as const;
+  readonly coverShape = 'square' as const;
   readonly mediaKinds = ['audiobook'] as const;
 
   private readonly logger = new Logger(AudibleProvider.name);
@@ -37,6 +38,8 @@ export class AudibleProvider implements IdentifiableProvider {
     url.searchParams.set('num_results', '10');
     url.searchParams.set('keywords', query);
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
+    // Without it the catalog lists only the 500px image.
+    url.searchParams.set('image_sizes', '500,1024');
     const requestUrl = url.toString();
     const startedAt = Date.now();
     const safeQuery = sanitizeLogValue(query);
@@ -75,6 +78,8 @@ export class AudibleProvider implements IdentifiableProvider {
 
     const url = new URL(`/1.0/catalog/products/${encodeURIComponent(providerId)}`, audibleApiOrigin(normalizedDomain));
     url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
+    // Without it the catalog lists only the 500px image.
+    url.searchParams.set('image_sizes', '500,1024');
     const requestUrl = url.toString();
     const startedAt = Date.now();
     this.logger.log(`[audible] [start] op=lookup providerId="${providerId}"`);

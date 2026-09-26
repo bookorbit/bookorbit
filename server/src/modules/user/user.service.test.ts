@@ -52,7 +52,7 @@ describe('UserService', () => {
     replaceFilters: vi.fn(),
   };
 
-  const config = { get: vi.fn() };
+  const appConfiguration = { appUrl: '' };
   const appSettingsService = {
     getDefaultLibraryAccessLibraryIds: vi.fn(),
   };
@@ -68,13 +68,21 @@ describe('UserService', () => {
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     events = new UserEventsService();
-    service = new UserService(userRepo as any, config as any, contentFilterRepo as any, appSettingsService as any, userStatistics as any, events, {
-      assertPasswordLoginEnabled: vi.fn(),
-    } as any);
+    service = new UserService(
+      userRepo as any,
+      appConfiguration as any,
+      contentFilterRepo as any,
+      appSettingsService as any,
+      userStatistics as any,
+      events,
+      {
+        assertPasswordLoginEnabled: vi.fn(),
+      } as any,
+    );
 
     mockHash.mockResolvedValue('hashed-secret');
     mockRandomBytes.mockReturnValue(Buffer.from('abcd', 'hex'));
-    config.get.mockReturnValue('https://app.example.com');
+    appConfiguration.appUrl = 'https://app.example.com';
     appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
 
     userRepo.create.mockResolvedValue({ id: 10, username: 'newuser', name: 'New User' });
@@ -196,7 +204,6 @@ describe('UserService', () => {
 
   it('createUser skips permission/library writes when lists are empty', async () => {
     userRepo.findByUsername.mockResolvedValue(null);
-    config.get.mockReturnValue(undefined);
 
     const result = await service.createUser({
       username: 'newuser',
@@ -208,7 +215,7 @@ describe('UserService', () => {
 
     expect(userRepo.setPermissions).not.toHaveBeenCalled();
     expect(userRepo.assignViewerLibraries).not.toHaveBeenCalled();
-    expect(result.resetUrl).toBe('http://localhost:5173/reset-password?token=reset-token');
+    expect(result.resetUrl).toBe('https://app.example.com/reset-password?token=reset-token');
   });
 
   it('findById returns user and throws when missing', async () => {
@@ -775,13 +782,13 @@ describe('UserService', () => {
     await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('adminResetPassword returns default app URL when config is missing', async () => {
+  it('adminResetPassword builds the reset link from the configured app URL', async () => {
     userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false, provisioningMethod: 'local' });
     userRepo.generateResetToken.mockResolvedValue('token-2');
-    config.get.mockReturnValue(undefined);
+    appConfiguration.appUrl = 'http://localhost:6263';
 
     await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).resolves.toEqual({
-      resetUrl: 'http://localhost:5173/reset-password?token=token-2',
+      resetUrl: 'http://localhost:6263/reset-password?token=token-2',
     });
   });
 });
@@ -814,7 +821,7 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
     findByUserIdWithNames: vi.fn(),
     replaceFilters: vi.fn(),
   };
-  const config = { get: vi.fn() };
+  const appConfiguration = { appUrl: '' };
   const appSettingsService = {
     getDefaultLibraryAccessLibraryIds: vi.fn(),
   };
@@ -824,11 +831,11 @@ describe('UserService.updateSeriesCollapsePreferences', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    config.get.mockReturnValue('http://localhost:5173');
+    appConfiguration.appUrl = 'http://localhost:6263';
     appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
     service = new UserService(
       userRepo as any,
-      config as any,
+      appConfiguration as any,
       contentFilterRepo as any,
       appSettingsService as any,
       userStatistics as any,

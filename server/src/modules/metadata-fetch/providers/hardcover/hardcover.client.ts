@@ -23,7 +23,7 @@ const BOOK_FIELDS = `
   pages
   release_date
   release_year
-  image { url }
+  image { url width height }
 `;
 
 const EDITION_FIELDS = `
@@ -34,7 +34,7 @@ const EDITION_FIELDS = `
   pages
   release_date
   release_year
-  image { url }
+  image { url width height }
   publisher { name }
   isbn_10
   isbn_13

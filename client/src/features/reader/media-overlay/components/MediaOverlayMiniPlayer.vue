@@ -6,6 +6,7 @@ import { useMediaOverlay } from '../composables/useMediaOverlay'
 import { useTtsMiniPlayerUi } from '@/features/tts/composables/useTtsMiniPlayerUi'
 import TtsSpeedControl from '@/features/tts/components/TtsSpeedControl.vue'
 import TtsSleepTimerPicker from '@/features/tts/components/TtsSleepTimerPicker.vue'
+import CoverFill from '@/features/book/components/CoverFill.vue'
 
 const { t } = useI18n()
 const { isActive, isPlaying, rate, currentBook, error, sleepTimer, toggle, nextSentence, prevSentence, setRate, stop } = useMediaOverlay()
@@ -51,7 +52,7 @@ function handleStop() {
             :aria-expanded="showPanel"
             @click="togglePanel"
           >
-            <img v-if="currentBook?.coverUrl" :src="currentBook.coverUrl" alt="" class="w-full h-full object-cover" />
+            <CoverFill v-if="currentBook?.coverUrl" :src="currentBook.coverUrl" />
             <Headphones v-else class="w-4 h-4 text-muted-foreground" />
           </button>
 

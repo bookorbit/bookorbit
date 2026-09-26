@@ -69,6 +69,7 @@ const globalStubs = {
     DialogOverlay: { template: '<div />' },
     DialogContent: { template: '<div><slot /></div>' },
     DialogClose: { template: '<button><slot /></button>' },
+    BookCoverLightbox: true,
     AddToCollectionSheet: true,
     MoveToLibrarySheet: true,
     DeleteBookDialog: true,
@@ -101,6 +102,9 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
     personalNoteUpdatedAt: null,
     communityRatings: [],
     coverSource: null,
+    coverMedia: [],
+    covers: { ebook: null, audio: null },
+    coverVersion: 'legacy:2024-01-01T00:00:00.000Z',
     hardcoverEditionId: null,
     providerIds: {},
     authors: [],
@@ -167,6 +171,29 @@ describe('DetailsTab - missing state', () => {
 })
 
 describe('DetailsTab - present state', () => {
+  it('hands the shared cover lightbox the book, opening on the face', async () => {
+    const book = makeBook({
+      coverSource: 'extracted',
+      coverMedia: ['ebook', 'audio'],
+      covers: {
+        ebook: { source: 'extracted', updatedAt: '2026-09-01T00:00:00.000Z', width: 600, height: 900 },
+        audio: { source: 'custom', updatedAt: '2026-09-02T00:00:00.000Z', width: 800, height: 800 },
+      },
+    })
+    const wrapper = mount(DetailsTab, { props: { book }, global: globalStubs })
+    // Only a cover that has loaded can be opened, so the button appears with it.
+    expect(wrapper.find('button[aria-label="View larger cover"]').exists()).toBe(false)
+    wrapper.getComponent({ name: 'BookCoverArtwork' }).vm.$emit('load', 2 / 3)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('button[aria-label="View larger cover"]').trigger('click')
+
+    const lightbox = wrapper.getComponent({ name: 'BookCoverLightbox' })
+    expect(lightbox.props('open')).toBe(true)
+    expect(lightbox.props('book')).toStrictEqual(book)
+    expect(lightbox.props('medium')).toBeUndefined()
+  })
+
   it('does not render the warning banner', () => {
     const wrapper = mount(DetailsTab, {
       props: { book: makeBook({ status: 'present' }) },
@@ -569,7 +596,7 @@ describe('DetailsTab - present state', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('epub')
+    expect(wrapper.text()).toContain('Read-along EPUB')
     expect(wrapper.text()).toContain('25%')
   })
 
@@ -614,7 +641,7 @@ describe('DetailsTab - present state', () => {
 
     await flushPromises()
 
-    const fileResetButton = wrapper.find('button[aria-label="Reset file progress"]')
+    const fileResetButton = wrapper.find('button[aria-label="Reset progress for EPUB e-book"]')
     expect(fileResetButton.exists()).toBe(true)
 
     await fileResetButton.trigger('click')

@@ -127,6 +127,35 @@ describe('MetadataFetchService', () => {
     expect(openLibrary.search).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }));
   });
 
+  it('states every cover shape, from the provider when the candidate does not say', async () => {
+    const withCover = (id: string, data: Partial<MetadataCandidate> = {}) => ({
+      ...candidate(MetadataProviderKey.GOOGLE, id, 'Dune'),
+      coverUrl: `https://img/${id}.jpg`,
+      ...data,
+    });
+    const fixed: MetadataProvider = {
+      key: MetadataProviderKey.GOOGLE,
+      label: 'Google',
+      identifiable: false,
+      coverShape: 'portrait',
+      search: vi
+        .fn()
+        .mockResolvedValue([withCover('a'), withCover('b', { coverShape: 'square' }), candidate(MetadataProviderKey.GOOGLE, 'c', 'Dune')]),
+    };
+    const unknown: MetadataProvider = {
+      key: MetadataProviderKey.OPEN_LIBRARY,
+      label: 'OpenLibrary',
+      identifiable: false,
+      search: vi.fn().mockResolvedValue([{ ...withCover('d'), provider: MetadataProviderKey.OPEN_LIBRARY }]),
+    };
+    registry.select.mockReturnValue([fixed, unknown]);
+
+    const results = await firstValueFrom(service.search({ title: 'Dune' }).pipe(candidatesOnly(), toArray()));
+    const shapes = Object.fromEntries(results.map((result) => [result.providerId, result.coverShape]));
+
+    expect(shapes).toEqual({ a: 'portrait', b: 'square', c: undefined, d: 'unknown' });
+  });
+
   it('starts selected providers concurrently within one search', async () => {
     let active = 0;
     let maxActive = 0;

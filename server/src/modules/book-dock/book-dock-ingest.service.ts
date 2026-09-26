@@ -357,6 +357,13 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     this.emitChange();
     try {
       const { resolved, sources, providerIds = {} } = await this.metadataFetchPipeline.runWithSources(params, {});
+      // A dock file has one medium, so its one cover is that medium's slot.
+      if (params.isAudiobook) {
+        resolved.coverUrl = resolved.audioCoverUrl;
+        if (sources.audioCoverUrl) sources.coverUrl = sources.audioCoverUrl;
+      }
+      delete resolved.audioCoverUrl;
+      delete sources.audioCoverUrl;
       const fetched = normalizeBookDockMetadata(resolved) ?? {};
       for (const [provider, providerId] of Object.entries(providerIds)) {
         const field = BOOK_DOCK_PROVIDER_ID_FIELDS[provider as MetadataProviderKey];

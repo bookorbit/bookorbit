@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Res, UseGuards } from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -89,8 +89,12 @@ export class KoreaderPluginController {
   }
 
   @Get('version')
-  getVersion(@CurrentUser() user: RequestUser) {
-    return this.packageService.getVersionInfoForSelfUpdate(user.id);
+  getVersion(
+    @CurrentUser() user: RequestUser,
+    @Headers('x-bookorbit-device-id') deviceId?: string,
+    @Headers('x-bookorbit-plugin-version') pluginVersion?: string,
+  ) {
+    return this.packageService.getVersionInfoForSelfUpdate(user.id, { deviceId, pluginVersion });
   }
 
   @Get('package')

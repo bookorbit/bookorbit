@@ -36,7 +36,7 @@ env:
   JWT_EXPIRES_IN: 15m
   JWT_REFRESH_EXPIRES_IN: 7d
   BOOKS_PATH: ../local/data
-  APP_URL: http://localhost:5173
+  APP_URL: http://localhost:6263
 
 jobs:
   run-suite:

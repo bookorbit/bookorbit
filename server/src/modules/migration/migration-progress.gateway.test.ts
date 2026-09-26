@@ -35,11 +35,9 @@ function makeGateway() {
     findRunById: vi.fn(),
     listRunMetrics: vi.fn(),
   };
-  const configService = {
-    get: vi.fn().mockReturnValue('http://localhost:5173'),
-  };
+  const appConfiguration = { appUrl: 'http://localhost:6263' };
 
-  const gateway = new MigrationProgressGateway(jwtService as never, authService as never, repo as never, configService as never);
+  const gateway = new MigrationProgressGateway(jwtService as never, authService as never, repo as never, appConfiguration as never);
   return { gateway, jwtService, authService, repo };
 }
 
@@ -64,7 +62,7 @@ describe('MigrationProgressGateway', () => {
 
     expect(server.engine.opts.cors).toEqual({
       methods: ['GET'],
-      origin: 'http://localhost:5173',
+      origin: 'http://localhost:6263',
       credentials: true,
     });
   });

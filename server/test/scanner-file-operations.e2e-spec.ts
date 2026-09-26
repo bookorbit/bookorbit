@@ -7,6 +7,7 @@ import { and, count, eq, like } from 'drizzle-orm';
 import * as schema from '../src/db/schema';
 import { WATCHER_DEBOUNCE_MS } from '../src/modules/scanner/file-watcher.service';
 import type { FixtureEntry, FixtureTree } from './e2e/scanner/scanner-fixture-builder';
+import { jpeg, writeEpubWithCover, writeImage } from './e2e/scanner/cover-slot-fixtures';
 import { createFixtureTree, file } from './e2e/scanner/scanner-fixture-builder';
 import {
   assertNoIntegrityViolations,
@@ -623,7 +624,8 @@ const structuralScenarios: StructuralScenario[] = [
     requiresCaseRename: true,
   },
   {
-    id: 'watcher-non-content-file-creates-ignored',
+    // A folder image can fill an empty cover slot, so a new one rescans its book folder.
+    id: 'watcher-folder-image-create-rescans-book',
     trigger: 'watcher',
     libraries: [{ key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' }],
     entries: [file('lib-a/Book/book.epub')],
@@ -631,15 +633,22 @@ const structuralScenarios: StructuralScenario[] = [
       { type: 'writeFile', path: 'lib-a/Book/cover.jpg' },
       { type: 'writeFile', path: 'lib-a/Book/metadata.opf' },
     ],
-    expected: { a: { statusByFolder: { Book: 'present' }, presentCount: 1, missingCount: 0 } },
+    expected: {
+      a: {
+        statusByFolder: { Book: 'present' },
+        fileOwners: { 'Book/book.epub': 'Book', 'Book/cover.jpg': 'Book', 'Book/metadata.opf': 'Book' },
+        presentCount: 1,
+        missingCount: 0,
+      },
+    },
   },
   {
-    id: 'watcher-non-content-file-delete-ignored',
+    id: 'watcher-folder-image-delete-keeps-book',
     trigger: 'watcher',
     libraries: [{ key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' }],
     entries: [file('lib-a/Book/book.epub'), file('lib-a/Book/cover.jpg')],
     operations: [{ type: 'deleteFile', path: 'lib-a/Book/cover.jpg' }],
-    expected: { a: { statusByFolder: { Book: 'present' }, presentCount: 1, missingCount: 0 } },
+    expected: { a: { statusByFolder: { Book: 'present' }, absentFilePaths: ['Book/cover.jpg'], presentCount: 1, missingCount: 0 } },
   },
   {
     id: 'watcher-book-per-file-delete-then-restore',
@@ -1245,6 +1254,50 @@ async function runStatefulScenario(context: ScannerE2EContext, scenario: Statefu
 }
 
 const statefulScenarios: StatefulScenario[] = [
+  {
+    id: 'stateful-mixed-media-cover-slots',
+    trigger: 'manual',
+    fixturePrefix: 'scanner-file-ops-cover-slots-',
+    fixtureEntries: [file('lib-a/Book/01.mp3')],
+    run: async (context, fixture) => {
+      await writeEpubWithCover(join(fixture.rootPath, 'lib-a/Book/book.epub'), await jpeg(200, 300));
+      await writeImage(join(fixture.rootPath, 'lib-a/Book/folder.jpg'), 500, 500);
+      const rootA = await realpath(join(fixture.rootPath, 'lib-a'));
+      const library = await seedLibrary(context.db, {
+        rootPath: rootA,
+        mode: 'book_per_folder',
+        watch: false,
+        name: `scanner-file-ops-cover-slots-${randomUUID()}`,
+      });
+
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+      const book = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Book'));
+      const slots = async () =>
+        Object.fromEntries(
+          (await context.db.select().from(schema.bookCovers).where(eq(schema.bookCovers.bookId, book.id))).map((slot) => [slot.medium, slot]),
+        );
+      // The EPUB's own art is the book cover; the mp3 has none, so the square folder image is the audiobook cover.
+      expect(await slots()).toMatchObject({
+        ebook: { origin: 'embedded', source: 'extracted', width: 200, height: 300, dormantSince: null },
+        audio: { origin: 'folder_image', source: 'extracted', width: 500, height: 500, dormantSince: null },
+      });
+      const coverDir = join(context.isolatedAppData!.path, 'covers', String(book.id));
+      await expect(stat(join(coverDir, 'ebook', 'thumbnail.jpg'))).resolves.toBeDefined();
+      await expect(stat(join(coverDir, 'audio', 'thumbnail.jpg'))).resolves.toBeDefined();
+
+      await applyOperation(fixture.rootPath, { type: 'deleteFile', path: 'lib-a/Book/01.mp3' });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+      expect((await slots()).audio?.dormantSince).toBeInstanceOf(Date);
+      const [metadata] = await context.db.select().from(schema.bookMetadata).where(eq(schema.bookMetadata.bookId, book.id));
+      expect(metadata?.coverSource).toBe('extracted');
+
+      await applyOperation(fixture.rootPath, { type: 'writeFile', path: 'lib-a/Book/01.mp3' });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+      expect((await slots()).audio).toMatchObject({ origin: 'folder_image', dormantSince: null });
+      await assertNoIntegrityViolations(context.db);
+    },
+  },
   {
     id: 'stateful-manual-delete-primary-preserves-data',
     trigger: 'manual',

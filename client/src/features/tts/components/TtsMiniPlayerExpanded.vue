@@ -10,6 +10,7 @@ import TtsSpeedControl from './TtsSpeedControl.vue'
 import TtsSleepTimerPicker from './TtsSleepTimerPicker.vue'
 import TtsVoicePicker from './TtsVoicePicker.vue'
 import { formatVoiceDisplayName, formatVoiceLocaleLabel } from '../lib/voice-display'
+import CoverFill from '@/features/book/components/CoverFill.vue'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -180,7 +181,7 @@ async function handleSaveDefaultVoice() {
   <div class="bg-card border border-border rounded-xl shadow-2xl p-4 space-y-4">
     <div class="flex items-start gap-3">
       <div class="flex-shrink-0 w-16 h-20 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
-        <img v-if="currentBook?.coverUrl" :src="currentBook.coverUrl" alt="" class="w-full h-full object-cover" />
+        <CoverFill v-if="currentBook?.coverUrl" :src="currentBook.coverUrl" />
         <Headphones v-else class="w-8 h-8 text-muted-foreground" />
       </div>
       <div class="flex-1 min-w-0">

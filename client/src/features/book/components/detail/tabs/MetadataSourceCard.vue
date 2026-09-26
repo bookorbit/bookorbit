@@ -2,23 +2,25 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { FileCheck, FileX } from '@lucide/vue'
-import type { BookDetail } from '@bookorbit/types'
+import { getPrimaryBookFile, type BookDetail } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 import { formatRelativeFromNow } from '@/i18n/formatters'
+import { fileFormatKey, formatKeyName, rankedContentFiles } from '@/features/book/lib/book-formats'
 
 const props = defineProps<{ book: BookDetail }>()
 
 const { t } = useI18n()
 
-const primaryFile = computed(() => props.book.files.find((file) => file.role === 'primary') ?? props.book.files[0] ?? null)
-const otherFiles = computed(() => props.book.files.filter((file) => file !== primaryFile.value))
+const primaryFile = computed(() => getPrimaryBookFile(props.book.files))
+const otherFiles = computed(() => rankedContentFiles(props.book.files, props.book.formatPriority).filter((file) => file !== primaryFile.value))
 const writeStatus = computed(() => props.book.fileWriteStatus ?? null)
 const writeEnabled = computed(() => writeStatus.value?.enabled === true)
 const writableFieldCount = computed(() => writeStatus.value?.writableFields?.length ?? 0)
 const lastWritten = computed(() => (props.book.lastWrittenAt ? formatRelativeFromNow(new Date(props.book.lastWrittenAt)) : null))
 
-function formatLabel(format: string | null): string {
-  return format ? format.toUpperCase() : t('book.detail.editMetadata.unknownFormat')
+function formatLabel(file: BookDetail['files'][number]): string {
+  const key = fileFormatKey(file)
+  return key ? formatKeyName(key) : t('book.detail.editMetadata.unknownFormat')
 }
 </script>
 
@@ -41,7 +43,7 @@ function formatLabel(format: string | null): string {
         <dt class="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">{{ t('book.detail.editMetadata.primaryRow') }}</dt>
         <dd class="flex min-w-0 items-center justify-end gap-1.5">
           <span class="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-primary">
-            {{ formatLabel(primaryFile.format) }}
+            {{ formatLabel(primaryFile) }}
           </span>
           <span class="truncate text-muted-foreground">{{ formatBytes(primaryFile.sizeBytes) }}</span>
         </dd>
@@ -63,7 +65,7 @@ function formatLabel(format: string | null): string {
 
       <template v-for="file in otherFiles" :key="file.id">
         <dt class="truncate text-[10px] font-semibold tracking-wide text-muted-foreground uppercase" :title="file.filename ?? undefined">
-          {{ formatLabel(file.format) }}
+          {{ formatLabel(file) }}
         </dt>
         <dd class="truncate text-right text-muted-foreground">{{ formatBytes(file.sizeBytes) }}</dd>
       </template>

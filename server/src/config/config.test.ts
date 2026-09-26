@@ -64,7 +64,7 @@ describe('config', () => {
     expect(appConfig()).toEqual({
       nodeEnv: 'development',
       host: '0.0.0.0',
-      appUrl: 'http://localhost:5173',
+      appUrl: 'http://localhost:6263',
       nativeRedirectUri: 'bookorbit://oauth2-callback',
       version: 'Local build',
       githubReleasesRepo: 'bookorbit/bookorbit',

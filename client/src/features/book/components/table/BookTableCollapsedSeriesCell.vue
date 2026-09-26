@@ -29,7 +29,7 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
 const { coverUrl } = useCoverVersions()
 
 function thumbnailUrl(bookId: number): string {
-  const version = bookId === props.book.id ? (props.book.updatedAt ?? props.book.addedAt) : collapsed.value.coverUpdatedAtByBookId?.[bookId]
+  const version = bookId === props.book.id ? props.book.coverVersion : collapsed.value.coverUpdatedAtByBookId?.[bookId]
   return coverUrl(bookId, 'thumbnail', version)
 }
 

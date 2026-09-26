@@ -5,6 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookReadService } from '../book/book-read.service';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { SmartScopeService } from '../smart-scope/smart-scope.service';
 import { LibraryService } from '../library/library.service';
@@ -24,6 +25,7 @@ export class DashboardService {
     private readonly bookReadService: BookReadService,
     private readonly libraryService: LibraryService,
     private readonly smartScopeService: SmartScopeService,
+    private readonly coverStore: BookCoverStore,
   ) {}
 
   private async loadCardsByIds(bookIds: number[], userId: number): Promise<BookCard[]> {
@@ -33,6 +35,7 @@ export class DashboardService {
       userId,
     );
     const cards = assembleBookCards(rows, authorRows, fileRows, genreRows, progressRows, statusRows, narratorRows, tagRows);
+    await this.coverStore.enrichCardVersions(cards);
     const cardsById = new Map(cards.map((card) => [card.id, card]));
     return bookIds.map((id) => cardsById.get(id)).filter((card): card is BookCard => card != null);
   }

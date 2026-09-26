@@ -9,7 +9,7 @@ function makeGateway() {
   const queueRepo = { getStatusSummary: vi.fn() };
   const enrichmentConfig = { isPaused: vi.fn() };
   const session = { getSnapshot: vi.fn() };
-  const configService = { get: vi.fn().mockReturnValue('http://localhost:5173') };
+  const appConfiguration = { appUrl: 'http://localhost:6263' };
 
   const gateway = new AuthorEnrichmentGateway(
     jwtService as any,
@@ -17,7 +17,7 @@ function makeGateway() {
     queueRepo as any,
     enrichmentConfig as any,
     session as any,
-    configService as any,
+    appConfiguration as any,
   );
 
   return { gateway, jwtService, authService, queueRepo, enrichmentConfig, session };
@@ -90,7 +90,7 @@ describe('AuthorEnrichmentGateway', () => {
 
     expect(server.engine.opts.cors).toEqual({
       methods: ['GET'],
-      origin: 'http://localhost:5173',
+      origin: 'http://localhost:6263',
       credentials: true,
     });
   });

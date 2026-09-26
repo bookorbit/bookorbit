@@ -13,7 +13,7 @@ function makeGateway() {
     publishImportProgress: vi.fn(),
     publishRetentionEvicted: vi.fn(),
   };
-  const config = { get: vi.fn().mockReturnValue('http://localhost:5173') };
+  const config = { appUrl: 'http://localhost:6263' };
   const gateway = new PodcastGateway(jwtService as never, authService as never, libraries as never, events as never, config as never);
   return { gateway, jwtService, authService, libraries, events };
 }

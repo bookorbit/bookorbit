@@ -5,6 +5,8 @@ import { z } from 'zod';
 
 import { APP_FEATURES } from '@bookorbit/types';
 
+import { DEV_CLIENT_ORIGIN } from './dev-client-origin';
+
 const BOOLEAN_ENV_VALUES = ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'];
 const TRUST_PROXY_BOOLEAN_VALUES = ['true', 'false', 'yes', 'no', 'on', 'off'];
 
@@ -66,6 +68,7 @@ const envSchema = z.object({
   SETUP_BOOTSTRAP_TOKEN: z.string().optional(),
   DISABLE_LOCAL_AUTH: booleanEnvFlag('DISABLE_LOCAL_AUTH'),
   APP_DATA_PATH: z.string().default('/data'),
+  COVER_SLOTS_BACKFILL_MODE: z.enum(['background', 'sync', 'skip']).optional(),
   BOOK_DOCK_PATH: z
     .string()
     .transform((val) => val.trim())
@@ -81,7 +84,7 @@ const envSchema = z.object({
   AUDIOLESS_EPUB_MAX_METADATA_BYTES: z.coerce.number().int().positive().optional(),
   AUDIOLESS_EPUB_MAX_OUTPUT_BYTES: z.coerce.number().int().positive().optional(),
   CLIENT_URL: z.string().url().optional(),
-  APP_URL: z.string().url().default('http://localhost:5173'),
+  APP_URL: z.string().url().default(DEV_CLIENT_ORIGIN),
   TRUST_PROXY: trustProxyEnv(),
   EMAIL_ENCRYPTION_KEY: z.string().optional(),
   MIGRATION_ENCRYPTION_KEY: z.string().optional(),

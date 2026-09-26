@@ -96,7 +96,7 @@ describe('KoboSyncController', () => {
     const req = {
       headers: {
         'x-forwarded-host': '192.168.8.134',
-        'x-forwarded-port': '5173',
+        'x-forwarded-port': '6263',
         'x-forwarded-proto': 'http',
         host: '192.168.8.134',
       },
@@ -108,9 +108,9 @@ describe('KoboSyncController', () => {
     const payload = controller.initialization({ deviceToken: 'dev' } as never, req as never);
     const resources = payload.Resources as Record<string, string>;
 
-    expect(resources.image_host).toBe('http://192.168.8.134:5173');
-    expect(resources.library_sync).toBe('http://192.168.8.134:5173/api/v1/kobo/dev/v1/library/sync');
-    expect(resources.reading_state).toBe('http://192.168.8.134:5173/api/v1/kobo/dev/v1/library/{Ids}/state');
+    expect(resources.image_host).toBe('http://192.168.8.134:6263');
+    expect(resources.library_sync).toBe('http://192.168.8.134:6263/api/v1/kobo/dev/v1/library/sync');
+    expect(resources.reading_state).toBe('http://192.168.8.134:6263/api/v1/kobo/dev/v1/library/{Ids}/state');
   });
 
   it('initialization does not append x-forwarded-port when it is the default for the scheme', () => {

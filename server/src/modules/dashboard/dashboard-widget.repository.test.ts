@@ -142,15 +142,22 @@ describe('resolveResumeModes', () => {
     expect(resolveResumeModes(files, 1)).toMatchObject({ readFileId: 1, readFileFormat: 'pdf' });
   });
 
-  it('falls back to the best readable file when the primary is an audiobook', () => {
+  it("falls back to the library's best readable file when the primary is an audiobook", () => {
     const files = [file(1, 'm4b'), file(2, 'pdf'), file(3, 'mobi')];
 
     expect(resolveResumeModes(files, 1)).toEqual({
-      readFileId: 3,
-      readFileFormat: 'mobi',
+      readFileId: 2,
+      readFileFormat: 'pdf',
       readAlongFileId: null,
       hasAudio: true,
     });
+    expect(resolveResumeModes(files, 1, ['m4b', 'mobi', 'pdf'])).toMatchObject({ readFileId: 3, readFileFormat: 'mobi' });
+  });
+
+  it('reads the plain EPUB and keeps the read-along copy for read-along', () => {
+    const files = [file(1, 'm4b'), file(2, 'epub', true), file(3, 'epub')];
+
+    expect(resolveResumeModes(files, 1)).toMatchObject({ readFileId: 3, readAlongFileId: 2, hasAudio: true });
   });
 
   it('offers no read file for an audio-only book', () => {

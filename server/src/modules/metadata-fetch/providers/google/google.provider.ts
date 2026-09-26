@@ -20,6 +20,7 @@ export class GoogleProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.GOOGLE;
   readonly label = 'Google Books';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
 
   private readonly logger = new Logger(GoogleProvider.name);
   private readonly coverValidator = new GoogleCoverValidator();

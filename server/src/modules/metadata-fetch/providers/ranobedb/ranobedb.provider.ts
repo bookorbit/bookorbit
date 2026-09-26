@@ -13,6 +13,7 @@ export class RanobeDbProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.RANOBEDB;
   readonly label = 'RanobeDB';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
 
   private readonly logger = new Logger(RanobeDbProvider.name);
 

@@ -139,6 +139,9 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     try {
       const results = await this.processor.reconcileMissingBooks(libraryIds);
       for (const result of results) {
+        if (result.type === 'book-restored' || result.type === 'book-moved' || result.type === 'book-transferred') {
+          this.scannerService.reconcileCoverSlotsAsync(result.bookIds);
+        }
         if (result.type === 'book-missing') {
           this.scannerService.bufferBookMissingEvent(result.libraryId, result.bookIds);
           this.scannerService.bufferBooksUnavailableNotification(result.libraryId, result.bookIds);
@@ -493,6 +496,10 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
       if (result.type === 'noop') {
         result = await this.processor.handleUnlinkDir(path, libraryId);
       }
+    }
+
+    if (result.type === 'book-restored' || result.type === 'book-moved' || result.type === 'book-transferred') {
+      this.scannerService.reconcileCoverSlotsAsync(result.bookIds);
     }
 
     if (result.type === 'book-missing') {

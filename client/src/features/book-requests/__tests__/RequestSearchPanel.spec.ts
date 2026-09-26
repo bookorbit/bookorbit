@@ -36,6 +36,7 @@ const state = vi.hoisted(
       routeQuery: Record<string, string>
       toastError: ReturnType<typeof vi.fn>
       lastFailure: Ref<{ code: string | null; meta: Record<string, unknown> | null; message: string | null } | null>
+      coverOrder: Ref<readonly string[]> | null
     },
 )
 
@@ -72,7 +73,8 @@ vi.mock('@/features/book/composables/useMetadataSearch', async () => {
   return {
     useMetadataSearch: () => ({
       filteredResults: ref([]),
-      coverProviderOrder: ref([]),
+      coverProviderOrder: ref(['amazon', 'itunes']),
+      audioCoverProviderOrder: ref(['audible', 'itunes']),
       resultProviderOrder: ref([]),
       interruptedProviders: ref([]),
       isStreaming: ref(false),
@@ -108,7 +110,12 @@ vi.mock('../composables/useRequestSubmission', async (importOriginal) => {
 vi.mock('../composables/useCandidateGroups', async () => {
   const { ref } = await import('vue')
   state.groups = ref([])
-  return { useCandidateGroups: () => ({ groups: state.groups }) }
+  return {
+    useCandidateGroups: (_results: unknown, _mediaKind: unknown, _availability: unknown, coverOrder: Ref<readonly string[]>) => {
+      state.coverOrder = coverOrder
+      return { groups: state.groups }
+    },
+  }
 })
 
 vi.mock('../composables/useRequestDestinationDefault', async (importOriginal) => {
@@ -794,5 +801,13 @@ describe('RequestSearchPanel free-text fallback', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(state.push).not.toHaveBeenCalled()
+  })
+
+  it('orders an audiobook request’s cover art by the Audiobook cover rule', async () => {
+    await render()
+
+    expect(state.coverOrder?.value).toEqual(['amazon', 'itunes'])
+    state.mediaKind.value = 'audiobook'
+    expect(state.coverOrder?.value).toEqual(['audible', 'itunes'])
   })
 })

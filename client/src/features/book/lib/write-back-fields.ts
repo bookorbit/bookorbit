@@ -1,4 +1,11 @@
-import { BOOK_FILE_WRITE_FIELD_LABELS, type BookDetail, type BookFileWriteField } from '@bookorbit/types'
+import {
+  BOOK_FILE_WRITE_FIELD_LABELS,
+  getPrimaryBookFile,
+  isAudioFormat,
+  type BookDetail,
+  type BookFileWriteField,
+  type CoverMedium,
+} from '@bookorbit/types'
 
 export type WriteBackField = {
   field: BookFileWriteField
@@ -54,7 +61,7 @@ function resolveValue(book: BookDetail, field: BookFileWriteField): string | nul
     case 'description':
       return plainText(book.description)
     case 'coverBytes':
-      return book.coverSource
+      return writtenCoverSource(book)
     case 'seriesIndex':
       return book.seriesIndex != null ? String(book.seriesIndex) : null
     case 'seriesName':
@@ -77,4 +84,16 @@ function resolveValue(book: BookDetail, field: BookFileWriteField): string | nul
       return provider != null && provider !== '' ? String(provider) : null
     }
   }
+}
+
+/**
+ * Write-back embeds only the written file's own medium: the EPUB gets the book cover and the audio
+ * tracks the audiobook cover. A book with no slots yet still serves its one legacy cover.
+ */
+function writtenCoverSource(book: BookDetail): string | null {
+  const covers = book.covers ?? { ebook: null, audio: null }
+  if (!covers.ebook && !covers.audio) return book.coverSource
+  const format = getPrimaryBookFile(book.files ?? [])?.format?.toLowerCase()
+  const medium: CoverMedium = format && isAudioFormat(format) ? 'audio' : 'ebook'
+  return covers[medium]?.source ?? null
 }

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { BookModule } from '../book/book.module';
-import { MetadataModule } from '../metadata/metadata.module';
+import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { UserModule } from '../user/user.module';
 import { CommonModule } from '../../common/common.module';
 import { OpdsAuthGuard } from './opds-auth.guard';
@@ -14,7 +14,7 @@ import { OpdsUserController } from './opds-user.controller';
 import { OpdsUserService } from './opds-user.service';
 
 @Module({
-  imports: [AppSettingsModule, BookModule, MetadataModule, UserModule, CommonModule],
+  imports: [AppSettingsModule, BookModule, BookCoverStoreModule, UserModule, CommonModule],
   controllers: [OpdsController, OpdsUserController],
   providers: [OpdsService, OpdsBookService, OpdsUserService, OpdsAuthGuard, OpdsEnabledGuard],
   exports: [OpdsBookService],

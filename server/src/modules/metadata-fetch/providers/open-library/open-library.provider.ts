@@ -20,6 +20,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.OPEN_LIBRARY;
   readonly label = 'OpenLibrary';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
 
   private readonly logger = new Logger(OpenLibraryProvider.name);
 

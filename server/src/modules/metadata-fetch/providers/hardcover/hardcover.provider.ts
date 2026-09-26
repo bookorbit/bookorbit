@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
+import { MetadataCandidate, MetadataProviderKey, type CoverMedium } from '@bookorbit/types';
 
 import { ProviderConfigService } from '../../../metadata-preferences/provider-config.service';
 import { candidateHasNormalizedIsbn, normalizeMetadataIsbn } from '../../isbn-match';
@@ -8,11 +8,16 @@ import { MetadataSearchParams } from '../metadata-search-params';
 import { HardcoverClient } from './hardcover.client';
 import { mapBookWithEditions, mapSearchDocument } from './hardcover.mapper';
 
+function editionMedium(params: MetadataSearchParams | undefined): CoverMedium {
+  return params?.isAudiobook ? 'audio' : 'ebook';
+}
+
 @Injectable()
 export class HardcoverProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.HARDCOVER;
   readonly label = 'Hardcover';
   readonly identifiable = true as const;
+  readonly editionFollowsMedium = true;
 
   private readonly logger = new Logger(HardcoverProvider.name);
 
@@ -29,7 +34,7 @@ export class HardcoverProvider implements IdentifiableProvider {
     if (params.isbn) {
       const books = signal ? await this.client.searchByIsbn(params.isbn, apiKey, signal) : await this.client.searchByIsbn(params.isbn, apiKey);
       if (books.length > 0) {
-        const candidates = books.flatMap(mapBookWithEditions);
+        const candidates = books.flatMap((book) => mapBookWithEditions(book, editionMedium(params)));
         const pinned = params.hardcoverEditionId
           ? candidates.find((candidate) => candidate.hardcoverEditionId === params.hardcoverEditionId)
           : undefined;
@@ -60,7 +65,7 @@ export class HardcoverProvider implements IdentifiableProvider {
     const book = signal ? await this.client.lookupBySlug(providerId, apiKey, signal) : await this.client.lookupBySlug(providerId, apiKey);
     if (!book) return null;
 
-    const candidates = mapBookWithEditions(book);
+    const candidates = mapBookWithEditions(book, editionMedium(params));
 
     if (params?.hardcoverEditionId) {
       const pinned = candidates.find((candidate) => candidate.hardcoverEditionId === params.hardcoverEditionId);

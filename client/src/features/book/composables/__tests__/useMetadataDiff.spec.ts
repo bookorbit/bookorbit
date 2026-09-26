@@ -161,7 +161,7 @@ describe('useMetadataDiff', () => {
     ])
 
     expect(fields.value.find((field) => field.key === 'librofmId')).toMatchObject({
-      label: 'Libro.fm ISBN',
+      labelKey: 'book.detail.editMetadata.diff.providerIds.librofm',
       candidateDisplay: '9781234567890',
     })
 
@@ -189,7 +189,7 @@ describe('useMetadataDiff', () => {
     )
 
     expect(fields.value.find((field) => field.key === 'audibleId')).toMatchObject({
-      label: 'Audible ID',
+      labelKey: 'book.detail.editMetadata.diff.providerIds.audible',
       bookValue: 'B0OLD12345',
       candidateDisplay: 'B0TEST12345',
     })
@@ -537,5 +537,85 @@ describe('useMetadataDiff', () => {
 
     const coverField = fields.value.find((f) => f.key === 'coverUrl')
     expect(coverField?.candidateDisplay).toBe(sameOriginCover)
+  })
+
+  it('gives the cover row the lock, label and frame of the slot it fills, and reads the current cover live', () => {
+    const candidates = ref([mockCandidate1])
+    const activeProvider = ref<MetadataProviderKey>('google')
+    const currentCover = ref('')
+    const { fields, toggleField, buildPatch } = useMetadataDiff(
+      mockCurrent,
+      candidates,
+      activeProvider,
+      providers,
+      () => currentCover.value,
+      undefined,
+      ['audioCover'],
+      { coverMedium: 'audio', coverLabelKey: 'book.detail.editMetadata.diff.fields.audioCover' },
+    )
+
+    expect(fields.value.find((f) => f.key === 'coverUrl')).toMatchObject({
+      labelKey: 'book.detail.editMetadata.diff.fields.audioCover',
+      coverMedium: 'audio',
+      isLocked: true,
+      bookValue: '',
+    })
+    toggleField('coverUrl')
+    expect(buildPatch().coverUrl).toBeUndefined()
+
+    currentCover.value = '/api/v1/books/1/cover?medium=audio'
+    expect(fields.value.find((f) => f.key === 'coverUrl')?.bookValue).toBe('/api/v1/books/1/cover?medium=audio')
+  })
+
+  describe('cover shape', () => {
+    const hardcover: MetadataCandidate = { provider: 'hardcover', providerId: 'h1', title: 'The Silver Chair', coverUrl: '/covers/hardcover.jpg' }
+    const audible: MetadataCandidate = {
+      provider: 'audible',
+      providerId: 'a1',
+      title: 'The Silver Chair',
+      coverUrl: '/covers/audible.jpg',
+      coverShape: 'square',
+    }
+    const google: MetadataCandidate = {
+      provider: 'google',
+      providerId: 'g1',
+      title: 'The Silver Chair',
+      coverUrl: '/covers/google.jpg',
+      coverShape: 'portrait',
+    }
+    const measuredPortrait = (candidate: MetadataCandidate) => (candidate === hardcover ? 'portrait' : (candidate.coverShape ?? 'unknown'))
+
+    function audioDiff(currentCover: string) {
+      return useMetadataDiff(mockCurrent, [hardcover, google, audible], 'hardcover', communityRatingProviders, () => currentCover, undefined, [], {
+        coverMedium: 'audio',
+        coverShapeOf: measuredPortrait,
+      })
+    }
+
+    it('names the fit of the offered cover and lists square alternatives first for the audio slot', () => {
+      const { fields } = audioDiff('/api/v1/books/1/cover?medium=audio')
+      const cover = fields.value.find((f) => f.key === 'coverUrl')
+
+      expect(cover?.candidateCoverFit).toBe('mismatch')
+      expect(cover?.providerValues.map((value) => value.provider)).toEqual(['audible', 'hardcover', 'google'])
+    })
+
+    it('keeps Copy All from swapping a cover for art of the other shape, but the arrow still can', () => {
+      const { copyAll, buildPatch, toggleField } = audioDiff('/api/v1/books/1/cover?medium=audio')
+
+      copyAll()
+      expect(buildPatch().coverUrl).toBeUndefined()
+      expect(buildPatch().formPatch.title).toBe('The Silver Chair')
+
+      toggleField('coverUrl')
+      expect(buildPatch().coverUrl).toBe('/covers/hardcover.jpg')
+    })
+
+    it('lets Copy All fill an empty slot with art of the other shape', () => {
+      const { copyAll, buildPatch } = audioDiff('')
+
+      copyAll()
+      expect(buildPatch().coverUrl).toBe('/covers/hardcover.jpg')
+    })
   })
 })

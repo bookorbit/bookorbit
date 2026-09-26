@@ -26,7 +26,7 @@ import { RouterLink } from 'vue-router'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PILL_CLASS, sourcePill, statusPill } from '@/features/annotations/lib/pill-styles'
-import { getFormatColor } from '@/features/book/lib/format-colors'
+import { formatChipStyle } from '@/features/book/lib/format-colors'
 import HighlightNoteEditor from '@/features/book/components/detail/tabs/HighlightNoteEditor.vue'
 import AnnotationBookThumb from './AnnotationBookThumb.vue'
 import AnnotationSyncDetailPanel from './AnnotationSyncDetailPanel.vue'
@@ -95,10 +95,7 @@ const jumpFileFormat = computed(() => {
   const format = props.annotation.jumpFileFormat?.trim()
   return format ? format.toUpperCase() : null
 })
-const jumpFileFormatStyle = computed(() => {
-  const color = getFormatColor(jumpFileFormat.value)
-  return { color, borderColor: `${color}66`, backgroundColor: `${color}1a` }
-})
+const jumpFileFormatStyle = computed(() => formatChipStyle(jumpFileFormat.value))
 const canJump = computed(() => props.annotation.jumpFileId != null && (props.mode !== 'hub' || jumpFileFormat.value != null) && !props.trashed)
 const isLong = computed(() => props.annotation.text.length > (props.density === 'compact' ? 180 : 260))
 const isApproximate = computed(() => props.annotation.cfi == null && props.annotation.origin !== 'web')

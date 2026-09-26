@@ -70,12 +70,14 @@ package.loaded["ltn12"] = {
 }
 
 local last_request_url
+local last_request_headers
 local request_count = 0
 package.loaded["socket.http"] = {
     request = function(request)
         request_count = request_count + 1
         request_ran_in_subprocess = in_subprocess
         last_request_url = request.url
+        last_request_headers = request.headers
         if mock_http_body then
             request.sink(mock_http_body)
         end
@@ -179,6 +181,37 @@ assertEqual(last_request_url,
     "https://bookorbit.example.com/api/v1/koreader/plugin/catalog/dashboard/sections/up-next-in-series",
     "the dashboard-section endpoint is addressed by source type")
 
+client:getPluginVersion()
+assertEqual(last_request_headers["x-bookorbit-device-id"], nil,
+    "a legacy client sends no partial self-update identity")
+assertEqual(last_request_headers["x-bookorbit-plugin-version"], nil,
+    "a legacy client sends no partial self-update version")
+
+local partial_identity_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    device_id = "device-id",
+}
+partial_identity_client:getPluginVersion()
+assertEqual(last_request_headers["x-bookorbit-device-id"], nil,
+    "an incomplete identity sends no device header")
+assertEqual(last_request_headers["x-bookorbit-plugin-version"], nil,
+    "an incomplete identity sends no version header")
+
+local unsafe_identity_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    device_id = "device-id\r\ninjected",
+    plugin_version = "1.5.4",
+}
+unsafe_identity_client:getPluginVersion()
+assertEqual(last_request_headers["x-bookorbit-device-id"], nil,
+    "an unsafe device id sends no identity headers")
+assertEqual(last_request_headers["x-bookorbit-plugin-version"], nil,
+    "an unsafe device id sends no version header")
+
 local match_client = BookOrbitApi.new{
     server_url = "https://bookorbit.example.com/api/v1",
     username = "reader",
@@ -192,6 +225,12 @@ local hash_b = string.rep("B", 32)
 local invalid_hash = "not-an-md5"
 local oversized_title = string.rep("t", 501)
 local oversized_authors = string.rep("a", 1001)
+
+match_client:getPluginVersion()
+assertEqual(last_request_headers["x-bookorbit-device-id"], "device-id",
+    "the update check identifies the requesting device")
+assertEqual(last_request_headers["x-bookorbit-plugin-version"], "1.5.1",
+    "the update check reports the requesting plugin version")
 
 mock_http_body = "{\"ok\":true}"
 mock_http_code = 200
@@ -273,6 +312,22 @@ assertEqual(err, nil, "background request preserves success result")
 assertEqual(subprocess_calls, 1, "wrapped background request uses subprocess")
 assertEqual(request_ran_in_subprocess, true, "HTTP request runs inside subprocess task")
 
+local background_identity_client = BookOrbitApi.new{
+    server_url = "https://bookorbit.example.com/api/v1",
+    username = "reader",
+    userkey = "secret",
+    device_id = "background-device",
+    plugin_version = "1.5.4",
+    background_requests = true,
+}
+body, err = background_identity_client:getPluginVersion()
+assertEqual(err, nil, "background update check succeeds")
+assertEqual(subprocess_calls, 2, "background update check uses subprocess")
+assertEqual(last_request_headers["x-bookorbit-device-id"], "background-device",
+    "the subprocess preserves the requesting device header")
+assertEqual(last_request_headers["x-bookorbit-plugin-version"], "1.5.4",
+    "the subprocess preserves the requesting version header")
+
 subprocess_result_mode = "missing"
 body, err = background_client:auth()
 assertEqual(body, nil, "missing subprocess payload has no response body")
@@ -288,7 +343,7 @@ wrapped = false
 request_ran_in_subprocess = false
 body, err = background_client:auth()
 assertEqual(body.ok, true, "unwrapped request falls back safely")
-assertEqual(subprocess_calls, 3, "unwrapped request does not start subprocess")
+assertEqual(subprocess_calls, 4, "unwrapped request does not start subprocess")
 assertEqual(request_ran_in_subprocess, false, "unwrapped fallback runs in current process")
 
 print("bookorbit_api_test.lua: ok")

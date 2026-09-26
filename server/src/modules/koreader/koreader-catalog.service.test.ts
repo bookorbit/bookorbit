@@ -852,7 +852,7 @@ describe('KoreaderCatalogService', () => {
 
     await service.streamThumbnail(makeUser(), 10, reply as never);
 
-    expect(bookService.getThumbnailPath).toHaveBeenCalledWith(10, expect.objectContaining({ id: 1 }));
+    expect(bookService.getThumbnailPath).toHaveBeenCalledWith(10, expect.objectContaining({ id: 1 }), { medium: 'ebook' });
     expect(reply.header).toHaveBeenCalledWith('ETag', '"5000"');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
     expect(mockCreateReadStream).toHaveBeenCalledWith(join('/data', 'covers', '10', 'thumbnail.jpg'));

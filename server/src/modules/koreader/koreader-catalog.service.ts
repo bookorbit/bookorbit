@@ -477,7 +477,7 @@ export class KoreaderCatalogService {
   }
 
   async streamThumbnail(user: RequestUser, bookId: number, reply: FastifyReply, ifNoneMatch?: string): Promise<void> {
-    const thumbnailPath = await this.bookService.getThumbnailPath(bookId, user);
+    const thumbnailPath = await this.bookService.getThumbnailPath(bookId, user, { medium: 'ebook' });
     if (!thumbnailPath) throw new NotFoundException('No thumbnail');
     try {
       const { mtimeMs } = await stat(thumbnailPath);

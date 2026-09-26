@@ -285,4 +285,55 @@ describe('MetadataPreferenceResolver', () => {
 
     expect(result.fields.title.providers).toEqual([]);
   });
+
+  describe('audiobook cover rule', () => {
+    it('defaults to audiobook sources first and leaves Audnexus out', () => {
+      const { audioCover } = new MetadataPreferenceResolver().getDefaultPreferences().fields;
+
+      expect(audioCover).toEqual({
+        enabled: true,
+        mergeStrategy: 'overwriteIfProvided',
+        providers: [
+          MetadataProviderKey.AUDIBLE,
+          MetadataProviderKey.LIBROFM,
+          MetadataProviderKey.ITUNES,
+          MetadataProviderKey.AMAZON,
+          MetadataProviderKey.KOBO,
+          MetadataProviderKey.GOODREADS,
+          MetadataProviderKey.GOOGLE,
+          MetadataProviderKey.OPEN_LIBRARY,
+        ],
+      });
+    });
+
+    it('seeds a stored scope that predates it from its Cover rule, keeping the switch and merge strategy', () => {
+      const resolver = new MetadataPreferenceResolver();
+      const stored = {
+        fields: { cover: { enabled: false, mergeStrategy: 'fillMissing', providers: [MetadataProviderKey.AMAZON, MetadataProviderKey.GOOGLE] } },
+      } as unknown as MetadataFetchPreferences;
+
+      const { audioCover } = resolver.resolve(stored).fields;
+
+      expect(audioCover.enabled).toBe(false);
+      expect(audioCover.mergeStrategy).toBe('fillMissing');
+      expect(audioCover.providers).toEqual(resolver.getDefaultPreferences().fields.audioCover.providers);
+    });
+
+    it('keeps a Cover provider list that was already tuned for audiobooks', () => {
+      const resolver = new MetadataPreferenceResolver();
+      const tuned = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.AMAZON];
+
+      expect(resolver.seedAudioCoverRule({ enabled: true, mergeStrategy: 'overwrite', providers: tuned }).providers).toEqual(tuned);
+    });
+
+    it('leaves a stored Audiobook cover rule alone', () => {
+      const resolver = new MetadataPreferenceResolver();
+      const audioCover = { enabled: true, mergeStrategy: 'overwrite' as const, providers: [MetadataProviderKey.LIBROFM] };
+      const stored = {
+        fields: { cover: { enabled: false, mergeStrategy: 'fillMissing', providers: [] }, audioCover },
+      } as unknown as MetadataFetchPreferences;
+
+      expect(resolver.resolve(stored).fields.audioCover).toEqual(audioCover);
+    });
+  });
 });

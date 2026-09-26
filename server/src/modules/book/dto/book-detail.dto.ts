@@ -6,6 +6,8 @@ import type {
   BookCommunityRating,
   CustomMetadataBookValue,
   ComicMetadataFields,
+  BookCoverSlot,
+  CoverMedium,
   NarratorRef,
   ProviderIds,
   ReadAloudProgressSync,
@@ -59,6 +61,9 @@ export class BookDetailDto {
   personalNoteUpdatedAt: Date | null;
   communityRatings: BookCommunityRating[];
   coverSource: 'extracted' | 'custom' | null;
+  coverMedia: CoverMedium[];
+  covers: Record<CoverMedium, BookCoverSlot | null>;
+  coverVersion: string;
   hardcoverEditionId: string | null;
   providerIds: ProviderIds;
   authors: { id: number; name: string; sortName: string | null }[];

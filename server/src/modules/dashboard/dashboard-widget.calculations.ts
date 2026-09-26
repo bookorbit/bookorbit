@@ -1,4 +1,4 @@
-import { isAudioFormat } from '@bookorbit/types';
+import { formatKeyRank, isAudioFormat, normalizeFormatPriority } from '@bookorbit/types';
 import type {
   ChallengeType,
   DiversityScoreWidgetData,
@@ -432,11 +432,11 @@ export function computeRhythm(days: { readingSeconds: number }[]): Omit<ReadingR
 // ── Currently Reading resume modes ──────────────────────────────────
 
 /**
- * Formats a BookOrbit reader opens, best first. KEPUB is deliberately absent: it is a Kobo
- * delivery format that no reader in the product opens directly, so offering it as the read file
- * would hand a client a file it cannot display.
+ * Formats a BookOrbit reader opens. KEPUB is deliberately absent: it is a Kobo delivery format that
+ * no reader in the product opens directly, so offering it as the read file would hand a client a
+ * file it cannot display. Which of them wins is the library's format priority.
  */
-const READABLE_FORMAT_PRIORITY = ['epub', 'mobi', 'azw3', 'azw', 'fb2', 'pdf', 'cbz', 'cbr', 'cb7'];
+const READABLE_FORMATS = new Set(['epub', 'mobi', 'azw3', 'azw', 'fb2', 'pdf', 'cbz', 'cbr', 'cb7']);
 
 export type ResumeModeFile = {
   id: number;
@@ -451,13 +451,8 @@ export type ResumeModes = {
   hasAudio: boolean;
 };
 
-function readableRank(format: string | null): number {
-  const index = READABLE_FORMAT_PRIORITY.indexOf((format ?? '').toLowerCase());
-  return index === -1 ? READABLE_FORMAT_PRIORITY.length : index;
-}
-
 function isReadable(format: string | null): boolean {
-  return readableRank(format) < READABLE_FORMAT_PRIORITY.length;
+  return READABLE_FORMATS.has((format ?? '').toLowerCase());
 }
 
 /**
@@ -465,16 +460,21 @@ function isReadable(format: string | null): boolean {
  *
  * The primary file wins the read slot when it is readable at all, so the resumed file matches the
  * one the book's own page leads with; otherwise the best readable file stands in, which is what
- * lets an audiobook-primary book still be read. Read-along needs an EPUB with media overlays, and
- * prefers the primary for the same reason.
+ * lets an audiobook-primary book still be read. That stand-in follows the library's format priority,
+ * and a plain EPUB beats a read-along copy, which has a slot of its own. Read-along needs an EPUB with
+ * media overlays, and prefers the primary for the same reason.
  */
-export function resolveResumeModes(files: ResumeModeFile[], primaryFileId: number | null): ResumeModes {
+export function resolveResumeModes(files: ResumeModeFile[], primaryFileId: number | null, formatPriority?: readonly string[] | null): ResumeModes {
   const primary = files.find((file) => file.id === primaryFileId) ?? null;
+  const priority = normalizeFormatPriority(formatPriority);
+  const rank = (file: ResumeModeFile) => formatKeyRank((file.format ?? '').toLowerCase(), priority);
 
   const readFile =
     primary && isReadable(primary.format)
       ? primary
-      : ([...files.filter((file) => isReadable(file.format))].sort((a, b) => readableRank(a.format) - readableRank(b.format))[0] ?? null);
+      : ([...files.filter((file) => isReadable(file.format))].sort(
+          (a, b) => rank(a) - rank(b) || Number(a.mediaOverlayAvailable) - Number(b.mediaOverlayAvailable),
+        )[0] ?? null);
 
   const overlayFiles = files.filter((file) => file.mediaOverlayAvailable && (file.format ?? '').toLowerCase() === 'epub');
   const readAlongFile = overlayFiles.find((file) => file.id === primaryFileId) ?? overlayFiles[0] ?? null;

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { readdir, stat } from 'fs/promises';
 import type { BigIntStats } from 'fs';
 import { dirname, join, relative } from 'path';
@@ -6,6 +6,8 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
+import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { classifyFile, DEFAULT_FORMAT_PRIORITY } from './lib/classify';
 import { ScannerRepository } from './scanner.repository';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
@@ -26,7 +28,11 @@ const DUPLICATE_MOVE_REPAIR_WINDOW_MS = 30 * 60 * 1000;
 export class FileEventProcessorService {
   private readonly logger = new Logger(FileEventProcessorService.name);
 
-  constructor(private readonly scannerRepo: ScannerRepository) {}
+  constructor(
+    private readonly scannerRepo: ScannerRepository,
+    private readonly coverStore: BookCoverStore,
+    @Optional() private readonly coverReconciler?: CoverSlotReconciler,
+  ) {}
 
   private async inspectMediaOverlayFields(absolutePath: string, format: string | null) {
     return inspectEpubMediaOverlayFields(absolutePath, format, (err) => {
@@ -51,6 +57,7 @@ export class FileEventProcessorService {
 
     if (!shouldReevaluate) {
       await this.scannerRepo.deleteBookFile(file.id);
+      if (file.role === 'content') void this.coverReconciler?.enqueue([file.bookId], { filesChanged: true });
       this.logger.log(
         `[scanner.file_event.unlink] [end] libraryId=${rowLibraryId} bookId=${file.bookId} path="${sanitizeLogValue(absolutePath)}" action=remove_non_selected - non-selected file removed`,
       );
@@ -116,6 +123,7 @@ export class FileEventProcessorService {
     if (fileStat.isDirectory()) return this.handleCreateDir(absolutePath, scopeLibraryId);
 
     const { role, format } = classifyFile(absolutePath);
+    if (role === 'cover') return this.handleFolderImageChange(absolutePath, scopeLibraryId);
     if (role !== 'content') return { type: 'noop' };
 
     const existing = await this.scannerRepo.findBookFileByAbsolutePath(absolutePath, scopeLibraryId);
@@ -219,6 +227,18 @@ export class FileEventProcessorService {
 
     const moveResult = await this.detectMovedFile(absolutePath, fileStat, scopeLibraryId);
     return moveResult.type === 'noop' ? { type: 'scan-required', scope: 'file' } : moveResult;
+  }
+
+  /**
+   * A folder image can fill an empty cover slot or replace one that came from a folder image, so a
+   * new or edited one inside a known book folder is registered by rescanning that folder.
+   */
+  private async handleFolderImageChange(absolutePath: string, scopeLibraryId?: number): Promise<FileEventResult> {
+    const folderPath = dirname(absolutePath);
+    const books = await this.scannerRepo.findBooksByFolderPath(folderPath, scopeLibraryId);
+    return books.some((book) => book.folderPath === folderPath && book.status !== 'missing')
+      ? { type: 'scan-required', scope: 'file' }
+      : { type: 'noop' };
   }
 
   async reconcileMissingBooks(libraryIds: number[]): Promise<FileEventResult[]> {
@@ -362,6 +382,7 @@ export class FileEventProcessorService {
         duplicateFileId: candidate.file.id,
       });
       if (!moved) continue;
+      await this.coverStore.removeCoverDirectory(moved.duplicateBookId).catch(() => undefined);
 
       this.logger.log(
         `[scanner.file_event.duplicate_move] [end] libraryId=${moved.libraryId} bookId=${bookId} duplicateBookId=${moved.duplicateBookId} from="${sanitizeLogValue(sourceFile.absolutePath)}" to="${sanitizeLogValue(candidate.file.absolutePath)}" - duplicate import reconciled as moved book`,

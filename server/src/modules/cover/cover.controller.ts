@@ -9,6 +9,7 @@ import { CoverService } from './cover.service';
 import { SearchCoversQueryDto } from './dto/search-covers-query.dto';
 import { UploadCoverFromUrlDto } from './dto/upload-cover-from-url.dto';
 import { ProxyCoverQueryDto } from './dto/proxy-cover-query.dto';
+import { CoverMediumQueryDto } from './dto/cover-medium-query.dto';
 
 @Controller('books')
 export class CoverController {
@@ -35,24 +36,37 @@ export class CoverController {
   @Post(':id/cover')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.LibraryEditMetadata)
-  async uploadCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
+  async uploadCover(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: RequestUser,
+    @Req() req: MultipartRequest,
+    @Query() query?: CoverMediumQueryDto,
+  ) {
     const data = await req.file();
     if (!data) throw new BadRequestException('No file provided');
     const buffer = await data.toBuffer();
-    await this.coverService.uploadCover(id, buffer, data.mimetype, user);
+    if (query?.medium) await this.coverService.uploadCover(id, buffer, data.mimetype, user, query.medium);
+    else await this.coverService.uploadCover(id, buffer, data.mimetype, user);
   }
 
   @Post(':id/cover/from-url')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.LibraryEditMetadata)
-  uploadCoverFromUrl(@Param('id', ParseIntPipe) id: number, @Body() dto: UploadCoverFromUrlDto, @CurrentUser() user: RequestUser) {
-    return this.coverService.uploadCoverFromUrl(id, dto.url, user);
+  uploadCoverFromUrl(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UploadCoverFromUrlDto,
+    @CurrentUser() user: RequestUser,
+    @Query() query?: CoverMediumQueryDto,
+  ) {
+    return query?.medium
+      ? this.coverService.uploadCoverFromUrl(id, dto.url, user, query.medium)
+      : this.coverService.uploadCoverFromUrl(id, dto.url, user);
   }
 
   @Delete(':id/cover')
   @RequirePermission(Permission.LibraryEditMetadata)
-  async deleteCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    const coverSource = await this.coverService.deleteCover(id, user);
+  async deleteCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Query() query?: CoverMediumQueryDto) {
+    const coverSource = query?.medium ? await this.coverService.deleteCover(id, user, query.medium) : await this.coverService.deleteCover(id, user);
     return { coverSource };
   }
 }

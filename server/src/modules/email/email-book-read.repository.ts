@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { authors, bookAuthors, bookFiles, bookMetadata, bookTags, books, tags } from '../../db/schema';
+import { authors, bookAuthors, bookFiles, bookMetadata, bookTags, books, libraries, tags } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -32,7 +32,17 @@ export class EmailBookReadRepository {
   }
 
   findFilesByBookId(bookId: number): Promise<(typeof bookFiles.$inferSelect)[]> {
-    return this.db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId));
+    return this.db.select().from(bookFiles).where(eq(bookFiles.bookId, bookId)).orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id));
+  }
+
+  async findLibraryFormatPriority(bookId: number): Promise<string[] | null> {
+    const [row] = await this.db
+      .select({ formatPriority: libraries.formatPriority })
+      .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .where(eq(books.id, bookId))
+      .limit(1);
+    return (row?.formatPriority as string[] | null | undefined) ?? null;
   }
 
   async findMetadataByBookId(bookId: number): Promise<typeof bookMetadata.$inferSelect | null> {

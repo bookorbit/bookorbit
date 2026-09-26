@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookSelectionPayload } from '@bookorbit/types'
+import type { BookFileRef, BookSelectionPayload } from '@bookorbit/types'
 import SendBookDialog from '../SendBookDialog.vue'
 
 const mockState = vi.hoisted(() => ({
@@ -63,7 +63,7 @@ function mountDialog(
     open: boolean
     selectionPayload: BookSelectionPayload
     selectedCount: number
-    bookFiles: Array<{ id: number; format: string | null; role: string }>
+    bookFiles: BookFileRef[]
   }> = {},
 ) {
   return mount(SendBookDialog, {
@@ -128,8 +128,8 @@ describe('SendBookDialog', () => {
       selectionPayload: { bookIds: [12, 13] },
       selectedCount: 2,
       bookFiles: [
-        { id: 101, format: 'epub', role: 'primary' },
-        { id: 102, format: 'pdf', role: 'secondary' },
+        { id: 101, format: 'epub', role: 'primary', sizeBytes: null },
+        { id: 102, format: 'pdf', role: 'content', sizeBytes: null },
       ],
     })
 

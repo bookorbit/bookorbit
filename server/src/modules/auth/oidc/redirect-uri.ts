@@ -6,7 +6,7 @@
  */
 
 export interface RedirectUriPolicy {
-  /** Web client origin, e.g. `http://localhost:5173`. Trailing slash already stripped. */
+  /** Web client origin, e.g. `https://books.example.com`. Trailing slash already stripped. */
   appUrl: string;
   /** Private-use scheme the native clients hand to the IdP, e.g. `bookorbit://oauth2-callback`. */
   nativeRedirectUri: string;

@@ -198,3 +198,32 @@ describe('AmazonScraper', () => {
     });
   });
 });
+
+describe('Amazon cover size', () => {
+  function page(dynamicImage: string): string {
+    return `<span id="productTitle">Dune</span><img id="landingImage" data-a-dynamic-image='${dynamicImage}'>`;
+  }
+
+  it('reads an unsized pair as height then width, the order Amazon pages use', () => {
+    expect(parseBookPage(page('{"https://m.media-amazon.com/images/I/1.jpg": [461, 300]}'))).toMatchObject({
+      coverWidth: 300,
+      coverHeight: 461,
+    });
+  });
+
+  it('lets the sized side of a variant url say which number is which', () => {
+    expect(parseBookPage(page('{"https://m.media-amazon.com/images/I/1._SY522_.jpg": [522, 340]}'))).toMatchObject({
+      coverWidth: 340,
+      coverHeight: 522,
+    });
+    expect(parseBookPage(page('{"https://m.media-amazon.com/images/I/1._SX300_.jpg": [300, 461]}'))).toMatchObject({
+      coverWidth: 300,
+      coverHeight: 461,
+    });
+  });
+
+  it('keeps the largest declared size', () => {
+    const map = '{"https://m.media-amazon.com/images/I/1._SY200_.jpg": [200, 130], "https://m.media-amazon.com/images/I/1._SY522_.jpg": [522, 340]}';
+    expect(parseBookPage(page(map))).toMatchObject({ coverWidth: 340, coverHeight: 522 });
+  });
+});

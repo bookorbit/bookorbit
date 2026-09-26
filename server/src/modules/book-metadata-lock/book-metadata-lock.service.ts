@@ -174,7 +174,18 @@ export class BookMetadataLockService {
 
     if (resolved.coverUrl !== undefined) {
       if (lockedSet.has('cover')) skippedFields.add('cover');
-      else filteredResolved.coverUrl = resolved.coverUrl;
+      else {
+        filteredResolved.coverUrl = resolved.coverUrl;
+        if (resolved.coverChoices !== undefined) filteredResolved.coverChoices = resolved.coverChoices;
+      }
+    }
+
+    if (resolved.audioCoverUrl !== undefined) {
+      if (lockedSet.has('audioCover')) skippedFields.add('audioCover');
+      else {
+        filteredResolved.audioCoverUrl = resolved.audioCoverUrl;
+        if (resolved.audioCoverChoices !== undefined) filteredResolved.audioCoverChoices = resolved.audioCoverChoices;
+      }
     }
 
     if (resolved.comicMetadata) {

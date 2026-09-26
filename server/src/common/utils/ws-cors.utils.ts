@@ -1,5 +1,4 @@
-/** What a dev client is served from, and the only origin allowed when nothing was configured. */
-const DEV_CLIENT_ORIGIN = 'http://localhost:5173';
+import { DEV_CLIENT_ORIGIN } from '../../config/dev-client-origin';
 
 /**
  * The origin a socket gateway's CORS check allows.

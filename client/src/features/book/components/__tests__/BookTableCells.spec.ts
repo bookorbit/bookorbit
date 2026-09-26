@@ -156,12 +156,12 @@ describe('BookTableFormatCell', () => {
 
   it('shows primary format badge', () => {
     const wrapper = mountFormat([{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }])
-    expect(wrapper.text()).toContain('epub')
+    expect(wrapper.text()).toContain('EPUB')
   })
 
   it('marks the EPUB format badge for media-overlay read-along files', () => {
     const wrapper = mountFormat([{ id: 1, format: 'epub', role: 'primary', sizeBytes: null, mediaOverlay: { available: true, durationSeconds: 42 } }])
-    expect(wrapper.text()).toContain('epub')
+    expect(wrapper.text()).toContain('EPUB')
     expect(wrapper.text()).not.toContain('NARR')
     expect(wrapper.text()).toContain('Read-along EPUB')
     expect(wrapper.find('.lucide-headphones').exists()).toBe(true)
@@ -170,17 +170,17 @@ describe('BookTableFormatCell', () => {
   it('shows multiple format badges for multiple files', () => {
     const wrapper = mountFormat([
       { id: 1, format: 'epub', role: 'primary', sizeBytes: null },
-      { id: 2, format: 'pdf', role: 'secondary', sizeBytes: null },
+      { id: 2, format: 'pdf', role: 'content', sizeBytes: null },
     ])
-    expect(wrapper.text()).toContain('epub')
-    expect(wrapper.text()).toContain('pdf')
+    expect(wrapper.text()).toContain('EPUB')
+    expect(wrapper.text()).toContain('PDF')
   })
 
   it('shows overflow indicator for more than 2 formats', () => {
     const wrapper = mountFormat([
       { id: 1, format: 'epub', role: 'primary', sizeBytes: null },
-      { id: 2, format: 'pdf', role: 'secondary', sizeBytes: null },
-      { id: 3, format: 'mobi', role: 'secondary', sizeBytes: null },
+      { id: 2, format: 'pdf', role: 'content', sizeBytes: null },
+      { id: 3, format: 'mobi', role: 'content', sizeBytes: null },
     ])
     expect(wrapper.text()).toContain('+1')
   })
@@ -244,6 +244,7 @@ describe('BookTableReadButtonCell', () => {
       readStatus: null,
       addedAt: '2026-01-01T00:00:00.000Z',
       updatedAt: null,
+      coverVersion: 'legacy:2026-01-01T00:00:00.000Z',
       metadataScore: null,
       hasCover: false,
       hasMetadataLocks: false,
@@ -286,7 +287,7 @@ describe('BookTableReadButtonCell', () => {
   it('opens the primary readable file in peek mode from the peek button', async () => {
     routerPush.mockReset()
     const wrapper = mountReadButton(makeBook([{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }]))
-    const peekButton = wrapper.findAll('button').find((button) => button.attributes('aria-label') === 'Peek EPUB')
+    const peekButton = wrapper.findAll('button').find((button) => button.attributes('aria-label') === 'Peek EPUB e-book')
     expect(peekButton).toBeTruthy()
     await peekButton!.trigger('click')
     expect(routerPush).toHaveBeenCalledWith({
@@ -301,7 +302,7 @@ describe('BookTableReadButtonCell', () => {
     const wrapper = mountReadButton(
       makeBook([
         { id: 10, format: 'm4b', role: 'primary', sizeBytes: null },
-        { id: 11, format: 'epub', role: 'secondary', sizeBytes: null },
+        { id: 11, format: 'epub', role: 'content', sizeBytes: null },
       ]),
     )
 

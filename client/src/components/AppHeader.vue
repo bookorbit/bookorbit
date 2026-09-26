@@ -14,7 +14,6 @@ import {
   Trophy,
   MoreVertical,
   BadgeQuestionMark,
-  Headphones,
   ExternalLink,
   Sparkles,
   Languages,
@@ -55,12 +54,12 @@ import NotificationSheet from '@/features/notifications/components/NotificationS
 import { useNotifications } from '@/features/notifications/composables/useNotifications'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { DEFAULT_FORMAT_PRIORITY, LOCALE_LABELS, Permission, type Locale } from '@bookorbit/types'
+import { LOCALE_LABELS, Permission, type Locale } from '@bookorbit/types'
 import { useThemeStore } from '@/stores/theme'
 import { useLocaleStore } from '@/stores/locale'
-import { getFormatColor } from '@/features/book/lib/format-colors'
+import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
+import { bookFormatEntries } from '@/features/book/lib/book-formats'
 import { useLegalNotices } from '@/components/legal/useLegalNotices'
-import { hasReadAlong, isReadAlongFormat, READ_ALONG_FORMAT_COLOR, READ_ALONG_FORMAT_TITLE } from '@/features/book/lib/file-capabilities'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -337,41 +336,8 @@ function highlightSegments(text: string | null, query: string) {
   return parts.map((part) => ({ text: part, match: part.toLowerCase() === lower }))
 }
 
-function sortFormats(formats: string[]): string[] {
-  return [...formats].sort((a, b) => {
-    const aIndex = (DEFAULT_FORMAT_PRIORITY as readonly string[]).indexOf(a.toLowerCase())
-    const bIndex = (DEFAULT_FORMAT_PRIORITY as readonly string[]).indexOf(b.toLowerCase())
-
-    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b)
-    if (aIndex === -1) return 1
-    if (bIndex === -1) return -1
-    return aIndex - bIndex
-  })
-}
-
-function resultFormats(result: GlobalSearchResult): string[] {
-  const formats = new Set<string>()
-  for (const file of result.files) {
-    const fmt = file.format?.toLowerCase()
-    if (fmt) formats.add(fmt)
-  }
-  return sortFormats([...formats])
-}
-
-function formatHasReadAlong(fmt: string, result: GlobalSearchResult): boolean {
-  return isReadAlongFormat(
-    fmt,
-    result.files.some((file) => hasReadAlong(file)),
-  )
-}
-
-function formatBadgeStyle(fmt: string, result?: GlobalSearchResult) {
-  const color = result && formatHasReadAlong(fmt, result) ? READ_ALONG_FORMAT_COLOR : getFormatColor(fmt)
-  return {
-    color,
-    backgroundColor: `color-mix(in oklch, ${color} 10%, transparent)`,
-    borderColor: `color-mix(in oklch, ${color} 20%, transparent)`,
-  }
+function resultFormatEntries(result: GlobalSearchResult) {
+  return bookFormatEntries(result.files)
 }
 </script>
 
@@ -430,7 +396,7 @@ function formatBadgeStyle(fmt: string, result?: GlobalSearchResult) {
                 <BookCoverImage
                   :book-id="row.result.id"
                   type="thumbnail"
-                  :version="row.result.updatedAt"
+                  :version="row.result.coverVersion"
                   class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
                   :alt="row.result.title ?? ''"
                 />
@@ -456,17 +422,13 @@ function formatBadgeStyle(fmt: string, result?: GlobalSearchResult) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
-                  <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    class="inline-flex items-center gap-0.5 text-[11px] font-semibold px-1 py-0.5 rounded border uppercase"
-                    :style="formatBadgeStyle(fmt, row.result)"
-                    :title="formatHasReadAlong(fmt, row.result) ? READ_ALONG_FORMAT_TITLE : undefined"
-                  >
-                    {{ fmt }}
-                    <Headphones v-if="formatHasReadAlong(fmt, row.result)" class="size-2.5 shrink-0" :stroke-width="2.5" aria-hidden="true" />
-                  </span>
+                <div v-if="resultFormatEntries(row.result).length" class="flex shrink-0 gap-1">
+                  <BookFormatChip
+                    v-for="entry in resultFormatEntries(row.result)"
+                    :key="entry.key"
+                    :format-key="entry.key"
+                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded"
+                  />
                 </div>
               </button>
             </div>
@@ -559,7 +521,7 @@ function formatBadgeStyle(fmt: string, result?: GlobalSearchResult) {
                 <BookCoverImage
                   :book-id="row.result.id"
                   type="thumbnail"
-                  :version="row.result.updatedAt"
+                  :version="row.result.coverVersion"
                   class="h-16 w-12 object-cover rounded shrink-0 bg-muted"
                   :alt="row.result.title ?? ''"
                 />
@@ -585,17 +547,13 @@ function formatBadgeStyle(fmt: string, result?: GlobalSearchResult) {
                     </template>
                   </p>
                 </div>
-                <div v-if="resultFormats(row.result).length" class="flex shrink-0 gap-1">
-                  <span
-                    v-for="fmt in resultFormats(row.result)"
-                    :key="fmt"
-                    class="inline-flex items-center gap-0.5 text-[11px] font-semibold px-1 py-0.5 rounded border uppercase"
-                    :style="formatBadgeStyle(fmt, row.result)"
-                    :title="formatHasReadAlong(fmt, row.result) ? READ_ALONG_FORMAT_TITLE : undefined"
-                  >
-                    {{ fmt }}
-                    <Headphones v-if="formatHasReadAlong(fmt, row.result)" class="size-2.5 shrink-0" :stroke-width="2.5" aria-hidden="true" />
-                  </span>
+                <div v-if="resultFormatEntries(row.result).length" class="flex shrink-0 gap-1">
+                  <BookFormatChip
+                    v-for="entry in resultFormatEntries(row.result)"
+                    :key="entry.key"
+                    :format-key="entry.key"
+                    class="gap-0.5 text-[11px] px-1 py-0.5 rounded"
+                  />
                 </div>
               </button>
             </div>

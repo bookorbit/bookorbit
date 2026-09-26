@@ -3,19 +3,17 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('fs/promises', () => ({
-  readdir: vi.fn(),
   stat: vi.fn(),
 }));
 
 import { createReadStream } from 'fs';
-import { readdir, stat } from 'fs/promises';
+import { stat } from 'fs/promises';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 
 import { OpdsController } from './opds.controller';
 
 const mockCreateReadStream = createReadStream as MockedFunction<typeof createReadStream>;
-const mockReaddir = readdir as MockedFunction<typeof readdir>;
 const mockStat = stat as MockedFunction<typeof stat>;
 
 function makeController() {
@@ -49,22 +47,19 @@ function makeController() {
       authorName: 'Author Name',
     }),
   } as never;
-  const config = {
-    get: vi.fn().mockReturnValue('/books'),
-  } as never;
   const bookService = {
     resolveDownloadFilename: vi.fn().mockResolvedValue('BadTitle - Author.epub'),
   } as never;
-  const metadataService = {
-    ensureThumbnailForBook: vi.fn().mockResolvedValue(null),
+  const coverStore = {
+    resolve: vi.fn().mockResolvedValue(null),
   };
 
   return {
-    controller: new OpdsController(opdsService, opdsBookService, config, bookService, metadataService as never),
+    controller: new OpdsController(opdsService, opdsBookService, bookService, coverStore as never),
     opdsService,
     opdsBookService,
     bookService,
-    metadataService,
+    coverStore,
   };
 }
 
@@ -252,30 +247,31 @@ describe('OpdsController', () => {
     expect(reply.send).toHaveBeenCalledWith('<search />');
   });
 
-  it('serves the preferred stored cover file for OPDS clients', async () => {
-    const { controller, opdsBookService } = makeController();
+  it('serves the ebook cover the slot store resolves for OPDS clients', async () => {
+    const { controller, opdsBookService, coverStore } = makeController();
     const reply = makeReply();
     const stream = { kind: 'stream' };
 
-    mockReaddir.mockResolvedValue(['cover_extracted.jpg', 'cover_custom.png'] as never);
+    coverStore.resolve.mockResolvedValue('/books/covers/42/ebook/cover_custom.png');
     mockStat.mockResolvedValue({ mtimeMs: 1234 } as never);
     mockCreateReadStream.mockReturnValue(stream as never);
 
     await controller.cover(42, { userId: 7, isSuperuser: false } as never, reply);
 
     expect(opdsBookService.validateBookAccess).toHaveBeenCalledWith(42, 7, false, undefined);
+    expect(coverStore.resolve).toHaveBeenCalledWith(42, { medium: 'ebook', variant: 'cover' });
     expect(reply.header).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
-    expect(mockCreateReadStream).toHaveBeenCalledWith('/books/covers/42/cover_custom.png');
+    expect(mockCreateReadStream).toHaveBeenCalledWith('/books/covers/42/ebook/cover_custom.png');
     expect(reply.header).toHaveBeenCalledWith('ETag', '"1234"');
     expect(reply.type).toHaveBeenCalledWith('image/png');
     expect(reply.send).toHaveBeenCalledWith(stream);
   });
 
   it('returns 304 when cover ETag matches If-None-Match', async () => {
-    const { controller } = makeController();
+    const { controller, coverStore } = makeController();
     const reply = makeReply();
 
-    mockReaddir.mockResolvedValue(['cover_custom.jpg'] as never);
+    coverStore.resolve.mockResolvedValue('/books/covers/42/ebook/cover_custom.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 5000 } as never);
 
     await controller.cover(42, { userId: 7, isSuperuser: false } as never, reply, '"5000"');
@@ -288,31 +284,35 @@ describe('OpdsController', () => {
 
   it('throws NotFoundException when no cover exists', async () => {
     const { controller } = makeController();
-    mockReaddir.mockRejectedValue(new Error('missing dir'));
 
     await expect(controller.cover(42, { userId: 7, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
+    expect(mockStat).not.toHaveBeenCalled();
   });
 
   it('serves thumbnail image when available', async () => {
-    const { controller } = makeController();
+    const { controller, coverStore } = makeController();
     const reply = makeReply();
     const stream = { kind: 'thumbnail-stream' };
 
+    coverStore.resolve.mockResolvedValue('/books/covers/12/ebook/thumbnail.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 2222 } as never);
     mockCreateReadStream.mockReturnValue(stream as never);
 
     await controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, reply);
 
+    expect(coverStore.resolve).toHaveBeenCalledWith(12, { medium: 'ebook', variant: 'thumbnail' });
     expect(reply.header).toHaveBeenCalledWith('Cross-Origin-Resource-Policy', 'cross-origin');
     expect(reply.type).toHaveBeenCalledWith('image/jpeg');
     expect(reply.header).toHaveBeenCalledWith('ETag', '"2222"');
+    expect(mockCreateReadStream).toHaveBeenCalledWith('/books/covers/12/ebook/thumbnail.jpg');
     expect(reply.send).toHaveBeenCalledWith(stream);
   });
 
   it('returns 304 for thumbnail when ETag matches', async () => {
-    const { controller } = makeController();
+    const { controller, coverStore } = makeController();
     const reply = makeReply();
 
+    coverStore.resolve.mockResolvedValue('/books/covers/12/ebook/thumbnail.jpg');
     mockStat.mockResolvedValue({ mtimeMs: 3333 } as never);
 
     await controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, reply, '"3333"');
@@ -323,35 +323,45 @@ describe('OpdsController', () => {
     expect(mockCreateReadStream).not.toHaveBeenCalled();
   });
 
+  it('throws NotFoundException when the book has no thumbnail to serve', async () => {
+    const { controller } = makeController();
+
+    await expect(controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
+    expect(mockStat).not.toHaveBeenCalled();
+  });
+
   it('serves a thumbnail rebuilt on demand when the file is missing beside an intact cover', async () => {
-    const { controller, metadataService } = makeController();
+    const { controller, coverStore } = makeController();
     const reply = makeReply();
     const stream = { kind: 'repaired-thumbnail-stream' };
+    coverStore.resolve.mockResolvedValue('/books/covers/12/ebook/thumbnail.jpg');
     mockStat.mockRejectedValueOnce(Object.assign(new Error('missing thumbnail'), { code: 'ENOENT' })).mockResolvedValueOnce({ mtimeMs: 7777 });
-    metadataService.ensureThumbnailForBook.mockResolvedValueOnce('/books/covers/12/thumbnail.jpg');
     mockCreateReadStream.mockReturnValue(stream);
 
     await controller.thumbnail(12, { userId: 1, isSuperuser: false } as never, reply);
 
-    expect(metadataService.ensureThumbnailForBook).toHaveBeenCalledWith(12);
+    expect(coverStore.resolve).toHaveBeenCalledTimes(2);
     expect(reply.header).toHaveBeenCalledWith('ETag', '"7777"');
     expect(reply.send).toHaveBeenCalledWith(stream);
   });
 
   it('does not attempt a repair when the thumbnail stat fails for a reason other than a missing file', async () => {
-    const { controller, metadataService } = makeController();
+    const { controller, coverStore } = makeController();
+    coverStore.resolve.mockResolvedValue('/books/covers/42/ebook/thumbnail.jpg');
     mockStat.mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
 
     await expect(controller.thumbnail(42, { userId: 7, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
-    expect(metadataService.ensureThumbnailForBook).not.toHaveBeenCalled();
+    expect(coverStore.resolve).toHaveBeenCalledTimes(1);
   });
 
   it('throws NotFoundException when thumbnail file is missing and no cover can rebuild it', async () => {
-    const { controller, metadataService } = makeController();
+    const { controller, coverStore } = makeController();
+    coverStore.resolve.mockResolvedValueOnce('/books/covers/42/ebook/thumbnail.jpg').mockResolvedValueOnce(null);
     mockStat.mockRejectedValue(Object.assign(new Error('missing thumbnail'), { code: 'ENOENT' }));
 
     await expect(controller.thumbnail(42, { userId: 7, isSuperuser: false } as never, makeReply())).rejects.toThrow(NotFoundException);
-    expect(metadataService.ensureThumbnailForBook).toHaveBeenCalledWith(42);
+    expect(coverStore.resolve).toHaveBeenCalledTimes(2);
+    expect(mockCreateReadStream).not.toHaveBeenCalled();
   });
 
   it('downloads file with sanitized attachment name', async () => {

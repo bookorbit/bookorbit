@@ -107,7 +107,7 @@ function handleCopyPath() {
 
     <div class="flex flex-col gap-3.5 px-3.5 py-3.5">
       <div class="flex items-start gap-3">
-        <FileFormatGlyph :format="file.formatKey" size="lg" />
+        <FileFormatGlyph :format="file.editionKey ?? file.formatKey" size="lg" />
         <div class="min-w-0 flex-1">
           <p class="line-clamp-3 text-[13.5px] font-semibold leading-snug [overflow-wrap:anywhere]" :title="file.leaf">{{ file.leaf }}</p>
           <div class="mt-2 flex flex-wrap items-center gap-1.5">

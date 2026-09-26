@@ -10,12 +10,11 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { access, mkdtemp, readdir, rm, stat, rename } from 'fs/promises';
+import { mkdtemp, rm, stat, rename } from 'fs/promises';
 import { inArray, type SQL } from 'drizzle-orm';
 
-import { bookCoverDirPath, bookThumbnailPath, findPreferredBookCoverFileName } from '../../common/book-cover-storage';
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
-import { resolveIsAudiobook } from '../../common/utils/book-media.utils';
+import { coverFetchInputs, resolveIsAudiobook } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
@@ -37,6 +36,7 @@ import { tmpdir } from 'os';
 import {
   BOOK_METADATA_LOCK_FIELDS,
   DEFAULT_DOWNLOAD_PATTERN,
+  COVER_MEDIA,
   DEFAULT_FORMAT_PRIORITY,
   MetadataProviderKey,
   Permission,
@@ -59,6 +59,7 @@ import type {
   BookWriteAndRenameResult,
   BooksPage,
   CustomMetadataFieldTypeMap,
+  CoverMedium,
   FileRenameResult,
   GroupRule,
   JumpBucketsResponse,
@@ -96,6 +97,9 @@ import {
   AchievementEventsService,
 } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
+import { selectEmbeddedCoverSources } from '../book-cover-store/cover-sources';
+import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sync.service';
 import { AudiolessEpubService } from './audioless-epub.service';
@@ -287,6 +291,7 @@ export class BookService {
     private readonly comicMetadataService: ComicMetadataRepository,
     private readonly customMetadataService: CustomMetadataService,
     private readonly bookMetadataLockService: BookMetadataLockService,
+    private readonly coverStore: BookCoverStore,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
     @Optional() private readonly fileRenameService: FileRenameService,
@@ -295,6 +300,7 @@ export class BookService {
     @Optional() private readonly seriesExpectedCount?: SeriesExpectedCountService,
     @Optional() private readonly audiobookEbookProgressSync?: AudiobookEbookProgressSyncService,
     @Optional() private readonly audiolessEpubService?: AudiolessEpubService,
+    @Optional() private readonly coverReconciler?: CoverSlotReconciler,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -418,6 +424,7 @@ export class BookService {
     if (r.seriesIndex !== undefined) preview.seriesIndex = r.seriesIndex as string | null;
     if (r.seriesMemberships !== undefined) preview.seriesMemberships = r.seriesMemberships as BookMetadataRefreshPreviewFields['seriesMemberships'];
     if (r.coverUrl !== undefined) preview.coverUrl = r.coverUrl as string;
+    if (r.audioCoverUrl !== undefined) preview.audioCoverUrl = r.audioCoverUrl as string;
     if (r.hardcoverEditionId !== undefined) preview.hardcoverEditionId = r.hardcoverEditionId as string | null;
     if (r.comicMetadata !== undefined) preview.comicMetadata = r.comicMetadata as BookMetadataRefreshPreviewFields['comicMetadata'];
 
@@ -1125,18 +1132,20 @@ export class BookService {
           ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
         });
       // Collapsed rows render BookTableCollapsedSeriesCell which does not display custom metadata.
+      const cards = assembleCollapsedBookCards(
+        rows,
+        authorRows,
+        fileRows,
+        genreRows,
+        progressRows,
+        statusRows,
+        narratorRows,
+        tagRows,
+        seriesMembershipRows,
+      );
+      await this.coverStore.enrichCardVersions(cards);
       const result = {
-        items: assembleCollapsedBookCards(
-          rows,
-          authorRows,
-          fileRows,
-          genreRows,
-          progressRows,
-          statusRows,
-          narratorRows,
-          tagRows,
-          seriesMembershipRows,
-        ),
+        items: cards,
         total,
         page,
         size,
@@ -1165,19 +1174,21 @@ export class BookService {
       });
     const bookIds = rows.map((r) => r.id);
     const customMetadataRows = await this.customMetadataService.getCardValues(bookIds);
+    const cards = assembleBookCards(
+      rows,
+      authorRows,
+      fileRows,
+      genreRows,
+      progressRows,
+      statusRows,
+      narratorRows,
+      tagRows,
+      seriesMembershipRows,
+      customMetadataRows,
+    );
+    await this.coverStore.enrichCardVersions(cards);
     const result = {
-      items: assembleBookCards(
-        rows,
-        authorRows,
-        fileRows,
-        genreRows,
-        progressRows,
-        statusRows,
-        narratorRows,
-        tagRows,
-        seriesMembershipRows,
-        customMetadataRows,
-      ),
+      items: cards,
       total,
       page,
       size,
@@ -1287,43 +1298,14 @@ export class BookService {
     }
   }
 
-  async getCoverPath(id: number, user: RequestUser): Promise<string | null> {
-    const event = 'book.get_cover_path';
+  async getCoverPath(id: number, user: RequestUser, options: { medium?: CoverMedium; strict?: boolean } = {}): Promise<string | null> {
     await this.verifyBookAccess(id, user);
-    const dir = bookCoverDirPath(this.appDataPath, id);
-    try {
-      const files = await readdir(dir);
-      const cover = findPreferredBookCoverFileName(files);
-      return cover ? join(dir, cover) : null;
-    } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) return null;
-      const errorClass = err instanceof Error ? err.name : 'Error';
-      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      const pathValue = sanitizeLogValue(dir);
-      this.logger.warn(
-        `[${event}] [fail] bookId=${id} userId=${user.id} path="${pathValue}" errorClass=${errorClass} error="${errorMessage}" - get cover path failed`,
-      );
-      throw err;
-    }
+    return this.coverStore.resolve(id, { variant: 'cover', ...options });
   }
 
-  async getThumbnailPath(id: number, user: RequestUser): Promise<string | null> {
-    const event = 'book.get_thumbnail_path';
+  async getThumbnailPath(id: number, user: RequestUser, options: { medium?: CoverMedium; strict?: boolean } = {}): Promise<string | null> {
     await this.verifyBookAccess(id, user);
-    const path = bookThumbnailPath(this.appDataPath, id);
-    try {
-      await access(path);
-      return path;
-    } catch (err) {
-      if (this.isMissingFilesystemEntry(err)) return this.metadataService.ensureThumbnailForBook(id);
-      const errorClass = err instanceof Error ? err.name : 'Error';
-      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-      const pathValue = sanitizeLogValue(path);
-      this.logger.warn(
-        `[${event}] [fail] bookId=${id} userId=${user.id} path="${pathValue}" errorClass=${errorClass} error="${errorMessage}" - get thumbnail path failed`,
-      );
-      throw err;
-    }
+    return this.coverStore.resolve(id, { variant: 'thumbnail', ...options });
   }
 
   private sanitizeFilenameSegment(raw: string, fallback = 'download'): string {
@@ -1591,10 +1573,10 @@ export class BookService {
       } else if (wasPrimary) {
         const contentFiles = remaining.filter((candidate) => candidate.role === 'content');
         const library = await this.libraryService.findOne(file.libraryId);
-        const newPrimary =
-          selectPrimaryFile(contentFiles, library.formatPriority ?? DEFAULT_FORMAT_PRIORITY, { allowZeroByteFallback: true }) ?? remaining[0];
+        const newPrimary = selectPrimaryFile(contentFiles, library.formatPriority ?? DEFAULT_FORMAT_PRIORITY, { allowZeroByteFallback: true });
         await this.bookRepo.updateBookPrimaryFile(file.bookId, newPrimary?.id ?? null);
       }
+      void this.coverReconciler?.enqueue([file.bookId], { filesChanged: true });
 
       this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} - delete file completed`);
     } catch (err) {
@@ -2884,16 +2866,19 @@ export class BookService {
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
-        cover: meta?.coverSource,
         duration: meta?.durationSeconds ?? undefined,
         abridged: meta?.abridged ?? undefined,
       };
+      const coverState = await this.coverStore.fetchState(id);
+      if (!coverState) throw new NotFoundException(`Book ${id} not found`);
+      const coverInputs = coverFetchInputs(coverState);
+      Object.assign(existingFields, coverInputs.existing);
 
       const {
         resolved,
         providerIds: resolvedProviderIds,
         diagnostics,
-      } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId);
+      } = await this.pipeline.runWithSources(searchParams, existingFields, book.books.libraryId, coverInputs.options);
 
       if (preview) {
         const previewResult = this.buildMetadataRefreshPreview(resolved, resolvedProviderIds);
@@ -2949,11 +2934,14 @@ export class BookService {
       await this.bookRepo.updateMetadataFields(id, { lastMetadataFetchAt: new Date(), updatedAt: new Date() });
 
       let coverDownloaded = false;
-      if (filteredResolved.coverUrl) {
-        await this.metadataService.downloadAndSaveCover(filteredResolved.coverUrl, id);
-        detail = await this.getDetail(id, user);
-        coverDownloaded = true;
+      for (const { medium, url, choices } of [
+        { medium: 'ebook' as const, url: filteredResolved.coverUrl, choices: filteredResolved.coverChoices },
+        { medium: 'audio' as const, url: filteredResolved.audioCoverUrl, choices: filteredResolved.audioCoverChoices },
+      ]) {
+        if (!url) continue;
+        if (await this.metadataService.downloadAndSaveCover(choices ?? [{ url }], id, medium)) coverDownloaded = true;
       }
+      if (coverDownloaded) detail = await this.getDetail(id, user);
 
       const result = detail ?? (await this.getDetail(id, user));
       this.logger.log(
@@ -3037,7 +3025,7 @@ export class BookService {
     bookIds: number[],
     user: RequestUser,
     onProgress?: (bookId: number) => void,
-    options?: { isCancelled?: () => boolean },
+    options?: { isCancelled?: () => boolean; medium?: CoverMedium },
   ): Promise<{ processed: number; updated: number }> {
     const event = 'book.bulk_reextract_cover';
     const startedAt = Date.now();
@@ -3049,11 +3037,18 @@ export class BookService {
       }
       await this.verifyLibraryAccessForBookIds(bookIds, user);
 
-      const [files, coverLockedBookIds] = await Promise.all([
-        this.bookRepo.findPrimaryFilesByBookIds(bookIds),
+      const [files, coverLockedBookIds, audioCoverLockedBookIds] = await Promise.all([
+        this.bookRepo.findCoverSourceFilesByBookIds(bookIds),
         this.bookMetadataLockService.getCoverLockedBookIds(bookIds),
+        this.bookMetadataLockService.getBookIdsWithLockedField(bookIds, 'audioCover'),
       ]);
-      const filesByBookId = new Map(files.map((f) => [f.bookId, f]));
+      const filesByBookId = new Map<number, (typeof files)[number][]>();
+      for (const file of files) {
+        const entries = filesByBookId.get(file.bookId) ?? [];
+        entries.push(file);
+        filesByBookId.set(file.bookId, entries);
+      }
+      const media: readonly CoverMedium[] = options?.medium ? [options.medium] : COVER_MEDIA;
 
       let processed = 0;
       let updated = 0;
@@ -3065,17 +3060,27 @@ export class BookService {
           cancelled = true;
           break;
         }
-        const file = filesByBookId.get(id);
-        if (!file) continue;
-        if (coverLockedBookIds.has(id)) {
+        const candidateFiles = filesByBookId.get(id) ?? [];
+        const sources = selectEmbeddedCoverSources(candidateFiles, candidateFiles[0]?.formatPriority ?? DEFAULT_FORMAT_PRIORITY);
+        const targets = media.flatMap((medium) => {
+          const source = sources[medium];
+          return source ? [{ medium, source }] : [];
+        });
+        if (targets.length === 0) continue;
+        const unlocked = targets.filter(({ medium }) => !(medium === 'audio' ? audioCoverLockedBookIds : coverLockedBookIds).has(id));
+        if (unlocked.length === 0) {
           skipped++;
           continue;
         }
         processed++;
-        const saved = await this.metadataService.refreshCoverForBook(id, file.absolutePath, file.format ?? '');
+        let saved = false;
+        for (const { medium, source } of unlocked) {
+          saved = (await this.metadataService.refreshCoverForBook(id, source.absolutePath, source.format ?? '', medium)) || saved;
+        }
         if (saved) {
           updated++;
         }
+        if (!options?.medium) await this.coverReconciler?.enqueue([id]);
         try {
           onProgress?.(id);
         } catch {
@@ -3205,7 +3210,7 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const [result, personalRating, personalNote, readStatus, comicMeta, collectionRows, readAloudSyncMode] = await Promise.all([
+    const [result, personalRating, personalNote, readStatus, comicMeta, collectionRows, readAloudSyncMode, coverContext] = await Promise.all([
       this.bookRepo.findById(id),
       this.bookRepo.findRatingByBookAndUser(id, user.id),
       this.userBookNoteService.findOne(user.id, id),
@@ -3213,6 +3218,7 @@ export class BookService {
       this.comicMetadataService.findByBookId(id),
       this.bookRepo.findCollectionsByBookId(id, user.id),
       this.bookRepo.findReadAloudSyncMode(user.id, id),
+      this.coverStore.contextFor(id),
     ]);
     if (!result) throw new NotFoundException(`Book ${id} not found`);
 
@@ -3266,6 +3272,13 @@ export class BookService {
       personalNoteUpdatedAt: personalNote ? new Date(personalNote.updatedAt) : null,
       communityRatings: this.mapCommunityRatingRows(communityRatingRows),
       coverSource: (meta?.coverSource as 'extracted' | 'custom' | null) ?? null,
+      coverMedia: [...(coverContext?.media.hasEbook ? (['ebook'] as const) : []), ...(coverContext?.media.hasAudio ? (['audio'] as const) : [])],
+      covers: coverContext ? this.coverStore.slotDtos(coverContext) : { ebook: null, audio: null },
+      coverVersion: this.coverStore.coverVersion(
+        book.libraries?.coverAspectRatio ?? '2/3',
+        coverContext?.slots ?? [],
+        (meta?.coverUpdatedAt ?? book.books.updatedAt ?? book.books.addedAt).toISOString(),
+      ),
       hardcoverEditionId: meta?.hardcoverEditionId ?? null,
       lockedFields: this.bookMetadataLockService.normalizeLockedFields(meta?.lockedFields),
       providerIds: {

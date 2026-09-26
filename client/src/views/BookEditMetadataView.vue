@@ -27,8 +27,9 @@ function onMetadataSaved(updated: BookDetail) {
   detail.value = updated
 }
 
-function onCoverChanged(source: 'extracted' | 'custom' | null) {
-  if (detail.value) detail.value = { ...detail.value, coverSource: source }
+// A cover write can change either slot, the summary and the face version, so take the server's view.
+function onCoverChanged() {
+  void fetch(bookId.value)
 }
 
 function onFileRenamed() {

@@ -3,6 +3,8 @@ vi.mock('drizzle-orm', () => {
     vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ type: 'sql', text: strings.join(''), values })),
     {
       raw: vi.fn((value: string) => ({ type: 'raw', value })),
+      join: vi.fn((chunks: unknown[]) => ({ type: 'join', chunks })),
+      identifier: vi.fn((value: string) => ({ type: 'identifier', value })),
     },
   );
 
@@ -22,6 +24,7 @@ vi.mock('drizzle-orm', () => {
     isNull: vi.fn((value: unknown) => ({ type: 'isNull', value })),
     isNotNull: vi.fn((value: unknown) => ({ type: 'isNotNull', value })),
     not: vi.fn((value: unknown) => ({ type: 'not', value })),
+    getTableName: vi.fn(() => 'table'),
     sql: sqlTag,
   };
 });
@@ -45,7 +48,7 @@ import {
 } from '@bookorbit/types';
 
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
-import { bookCustomMetadataValues, books } from '../../db/schema';
+import { bookCustomMetadataValues, bookMetadata, books } from '../../db/schema';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
 
@@ -775,22 +778,23 @@ describe('buildQuickSearch', () => {
 
     builder.buildQuickSearch('gracian');
 
-    expect(accentInsensitiveIlike).toHaveBeenCalledTimes(5);
+    expect(accentInsensitiveIlike).toHaveBeenCalledTimes(6);
     expect(accentInsensitiveIlike).toHaveBeenCalledWith(expect.anything(), '%gracian%');
   });
 
-  it('produces an OR of accent-insensitive title/series matches and author/series/narrator exists subqueries', () => {
+  it('matches subtitle alongside title, series, author, and narrator', () => {
     const { builder } = makeBuilder();
 
     const result = builder.buildQuickSearch('tolkien') as any;
 
     expect(result).toMatchObject({ type: 'or' });
-    expect(result.clauses).toHaveLength(5);
-    expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%tolkien%' });
-    expect(result.clauses[1]).toMatchObject({ type: 'sql' });
-    expect(result.clauses[2]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%tolkien%' });
-    expect(result.clauses[3]).toMatchObject({ type: 'sql' });
+    expect(result.clauses).toHaveLength(6);
+    expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', left: bookMetadata.title, pattern: '%tolkien%' });
+    expect(result.clauses[1]).toMatchObject({ type: 'accentInsensitiveIlike', left: bookMetadata.subtitle, pattern: '%tolkien%' });
+    expect(result.clauses[2]).toMatchObject({ type: 'sql' });
+    expect(result.clauses[3]).toMatchObject({ type: 'accentInsensitiveIlike', left: bookMetadata.seriesName, pattern: '%tolkien%' });
     expect(result.clauses[4]).toMatchObject({ type: 'sql' });
+    expect(result.clauses[5]).toMatchObject({ type: 'sql' });
   });
 
   it('uses phrase containment without trigram expansion for multi-word searches', () => {
@@ -799,8 +803,9 @@ describe('buildQuickSearch', () => {
 
     const result = builder.buildQuickSearch('The Wax Child');
 
-    expect(accentInsensitiveIlike).toHaveBeenCalledTimes(5);
+    expect(accentInsensitiveIlike).toHaveBeenCalledTimes(6);
     expect(accentInsensitiveIlike).toHaveBeenCalledWith(expect.anything(), '%The Wax Child%');
+    expect(accentInsensitiveIlike).toHaveBeenCalledWith(bookMetadata.subtitle, '%The Wax Child%');
     expect(collectSqlText(result).join(' ')).not.toContain(' % ');
   });
 
@@ -810,7 +815,8 @@ describe('buildQuickSearch', () => {
     const result = builder.buildQuickSearch('50% off') as any;
 
     expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%50\\% off%' });
-    expect(result.clauses[2]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%50\\% off%' });
+    expect(result.clauses[1]).toMatchObject({ type: 'accentInsensitiveIlike', left: bookMetadata.subtitle, pattern: '%50\\% off%' });
+    expect(result.clauses[3]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%50\\% off%' });
   });
 
   it('escapes underscore in q', () => {
@@ -819,6 +825,7 @@ describe('buildQuickSearch', () => {
     const result = builder.buildQuickSearch('book_one') as any;
 
     expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%book\\_one%' });
+    expect(result.clauses[1]).toMatchObject({ type: 'accentInsensitiveIlike', left: bookMetadata.subtitle, pattern: '%book\\_one%' });
   });
 
   it('uses the same containment predicate for two-character queries', () => {
@@ -827,7 +834,8 @@ describe('buildQuickSearch', () => {
     const result = builder.buildQuickSearch('du') as any;
 
     expect(result.clauses[0]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%du%' });
-    expect(result.clauses[2]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%du%' });
+    expect(result.clauses[1]).toMatchObject({ type: 'accentInsensitiveIlike', left: bookMetadata.subtitle, pattern: '%du%' });
+    expect(result.clauses[3]).toMatchObject({ type: 'accentInsensitiveIlike', pattern: '%du%' });
   });
 
   it('calls db.select three times for author, series membership, and narrator exists subqueries', () => {
@@ -1718,6 +1726,38 @@ describe('coverRuleToSql', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'cover', operator: 'isPresent' }) as never, BASE_CTX) as any;
     expect(getRuleSql(where)).toMatchObject({ type: 'isNotNull' });
+  });
+});
+
+describe('audioCoverRuleToSql', () => {
+  it('isMissing keeps books with audio cover media and no active audio slot', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'audioCover', operator: 'isMissing' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.type).toBe('and');
+    const [hasAudio, missingSlot] = clause.clauses;
+    expect(hasAudio.text).toContain("= 'epub'");
+    expect(missingSlot.type).toBe('not');
+    expect(missingSlot.value.values).toContain('audio');
+    expect(missingSlot.value.text).toContain('is null');
+  });
+
+  it('isPresent keeps books with audio cover media and an active audio slot', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'audioCover', operator: 'isPresent' }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause.type).toBe('and');
+    const [hasAudio, activeSlot] = clause.clauses;
+    expect(hasAudio.type).toBe('sql');
+    expect(activeSlot.type).toBe('sql');
+    expect(activeSlot.values).toContain('audio');
+  });
+
+  it('rejects operators the field does not offer', () => {
+    const { builder } = makeBuilder();
+    expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'audioCover', operator: 'isEmpty' }) as never, BASE_CTX)).toThrow(
+      BadRequestException,
+    );
   });
 });
 

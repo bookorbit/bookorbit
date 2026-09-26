@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
 import { basename, dirname, extname, isAbsolute, join, normalize, relative, sep } from 'path';
@@ -9,6 +9,9 @@ import { SelfWriteRegistry } from '../../common/services/self-write-registry.ser
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import type { BookCoverSlotRow } from '../book-cover-store/book-cover-store.repository';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
+import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { NotificationService } from '../notification/notification.service';
 import type { BookFilePathUpdate, BookRenameData } from './file-rename.repository';
 import { FileRenameRepository } from './file-rename.repository';
@@ -38,6 +41,8 @@ export class FileRenameService implements OnModuleDestroy {
     private readonly notificationService: NotificationService,
     private readonly config: ConfigService,
     private readonly selfWriteRegistry: SelfWriteRegistry,
+    private readonly coverStore: BookCoverStore,
+    @Optional() private readonly coverReconciler?: CoverSlotReconciler,
   ) {
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_RENAME_DEBOUNCE_MS);
   }
@@ -484,6 +489,8 @@ export class FileRenameService implements OnModuleDestroy {
       absolutePath: fileTargets.get(file.id)!,
       relPath: relative(data.libraryFolderPath, fileTargets.get(file.id)!),
     }));
+    // The merge deletes the source book and its slot rows with it, so they are read first.
+    const sourceSlots = await this.coverStore.slotsForAdoption(bookId);
 
     const movedFiles: Array<{ from: string; to: string }> = [];
     try {
@@ -522,8 +529,22 @@ export class FileRenameService implements OnModuleDestroy {
       throw error;
     }
 
+    await this.handOverCovers(bookId, sourceSlots, targetBookId);
     await this.tryRemoveEmptyDir(oldFolderPath);
     await this.tryRemoveEmptyDir(dirname(oldFolderPath));
+  }
+
+  /** The target keeps its own art and takes the source's for any medium it had no cover for. */
+  private async handOverCovers(sourceBookId: number, sourceSlots: BookCoverSlotRow[], targetBookId: number): Promise<void> {
+    try {
+      await this.coverStore.adoptSlots(sourceBookId, sourceSlots, targetBookId);
+      await this.coverStore.removeCoverDirectory(sourceBookId);
+    } catch (error) {
+      this.logger.warn(
+        `[${FILE_RENAME_EVENT}] [fail] bookId=${sourceBookId} targetBookId=${targetBookId} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - merged book covers not handed over`,
+      );
+    }
+    void this.coverReconciler?.enqueue([targetBookId], { filesChanged: true });
   }
 
   private async moveBookFilesIndividually(

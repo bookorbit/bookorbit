@@ -92,7 +92,7 @@ export class WatchDownloadController {
     @Res() reply: FastifyReply,
   ) {
     const user = await this.watchDownloads.authorize(authorization, bookId);
-    const path = await this.bookService.getCoverPath(bookId, user);
+    const path = await this.bookService.getCoverPath(bookId, user, { medium: 'audio' });
     if (!path) throw new NotFoundException(`No cover for book ${bookId}`);
     const info = await stat(path);
     reply.header('Content-Length', info.size);

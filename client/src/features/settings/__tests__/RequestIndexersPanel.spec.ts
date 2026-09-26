@@ -695,6 +695,16 @@ describe('RequestIndexersPanel', () => {
       expect(sheet().querySelector<HTMLInputElement>('#indexer-name')?.value).toBe('Demo Tracker')
     })
 
+    /** The plugin already settles the type, and switching it here would save a torznab feed under the plugin's name. */
+    it('does not offer the built-in type picker when setting up a plugin', async () => {
+      const wrapper = await mountPanel({ adapters: [descriptor(), PLUGIN] })
+
+      await clickInPanel(wrapper, 'Set up')
+
+      expect(sheet().querySelector('#indexer-name')).not.toBeNull()
+      expect(sheet().querySelector('#indexer-type')).toBeNull()
+    })
+
     /** Once something uses it, it is that source, and a second row for it would be a duplicate. */
     it('stops listing it separately once a source uses it', async () => {
       const wrapper = await mountPanel({

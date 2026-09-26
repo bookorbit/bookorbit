@@ -133,7 +133,7 @@ function updateCoverAspectRatio(event: Event) {
         </label>
       </div>
       <p id="cover-style-description" class="mt-2 text-xs text-muted-foreground">
-        {{ t('library.creator.details.coverStyle.hint') }}
+        {{ t('library.creator.details.coverStyle.hintSlots') }}
       </p>
     </fieldset>
   </div>

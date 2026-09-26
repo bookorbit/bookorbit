@@ -18,7 +18,7 @@ import {
 } from '@lucide/vue'
 import type { AnnotationHubItem, AnnotationItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
-import { getFormatColor } from '@/features/book/lib/format-colors'
+import { formatChipStyle } from '@/features/book/lib/format-colors'
 import AnnotationBookThumb from '../AnnotationBookThumb.vue'
 
 type EntryAnnotation = AnnotationItem | AnnotationHubItem
@@ -71,10 +71,7 @@ const hub = computed(() => ('bookTitle' in props.annotation ? props.annotation :
 const bookTitle = computed(() => hub.value?.bookTitle ?? t('annotations.unknownBook'))
 const author = computed(() => hub.value?.author ?? null)
 const format = computed(() => hub.value?.jumpFileFormat?.trim().toUpperCase() ?? null)
-const formatStyle = computed(() => {
-  const color = getFormatColor(format.value)
-  return { color, borderColor: `${color}66`, backgroundColor: `${color}1a` }
-})
+const formatStyle = computed(() => formatChipStyle(format.value))
 // A book page's rows carry no jumpFileFormat, so there it only needs a file to jump to.
 const canJump = computed(() => props.annotation.jumpFileId != null && (hub.value == null || format.value != null) && !props.trashed)
 const needsReview = computed(() => props.annotation.positionStatus != null && props.annotation.positionStatus !== 'exact')

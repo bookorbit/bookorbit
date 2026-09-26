@@ -154,6 +154,8 @@ const mockMetadata = {
 function makeService(
   repo: ReturnType<typeof makeRepo>,
   autoFetchOrchestrator?: { scheduleImportedBooksIfEligible: (...args: unknown[]) => Promise<number> },
+  coverStore: { enrichCardVersions: (cards: unknown[]) => Promise<void> } = { enrichCardVersions: vi.fn().mockResolvedValue(undefined) },
+  coverReconciler?: { enqueue: (...args: unknown[]) => Promise<void>; enqueueExpiredDormant?: (libraryId: number) => Promise<void> },
 ) {
   const jobStore = new ScanJobStore();
   const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
@@ -166,8 +168,10 @@ function makeService(
     mockGateway as any,
     notificationService as any,
     selfWriteRegistry,
+    coverStore as any,
     autoFetchOrchestrator as any,
     achievementEvents as any,
+    coverReconciler as any,
   );
   return { service, jobStore, notificationService, achievementEvents, selfWriteRegistry };
 }
@@ -3516,9 +3520,31 @@ describe('bootstrap, wrappers, and cover refresh', () => {
 
     expect(mockMetadata.refreshCoverForBook).toHaveBeenNthCalledWith(1, 1, '/library/Book/book.epub', 'epub');
     expect(mockMetadata.refreshCoverForBook).toHaveBeenNthCalledWith(2, 3, '/library/Book/book.pdf', 'pdf');
-    expect(mockGateway.emitCoverRefreshed).toHaveBeenCalledWith({ bookId: 1, libraryId: 1 });
+    expect(mockGateway.emitCoverRefreshed).not.toHaveBeenCalled();
     expect(mockGateway.emitCoverRefreshProgress).toHaveBeenNthCalledWith(1, { libraryId: 1, processed: 0, total: 2, status: 'running' });
     expect(mockGateway.emitCoverRefreshProgress).toHaveBeenNthCalledWith(2, { libraryId: 1, processed: 2, total: 2, status: 'completed' });
+  });
+
+  it('re-extracts every slot the book files can fill, then reconciles the book', async () => {
+    const repo = makeRepo({
+      findPrimaryBookFilesByLibrary: vi.fn().mockResolvedValue([{ bookId: 4, absolutePath: '/library/Book/book.epub', format: 'epub' }]),
+      findLibrarySettings: vi.fn().mockResolvedValue({ formatPriority: ['epub', 'm4b'] }),
+      findBookFilesByBookIds: vi.fn().mockResolvedValue([
+        { id: 40, bookId: 4, absolutePath: '/library/Book/book.epub', format: 'epub', role: 'content', sizeBytes: 10, mediaOverlayAvailable: false },
+        { id: 41, bookId: 4, absolutePath: '/library/Book/book.m4b', format: 'm4b', role: 'content', sizeBytes: 10, mediaOverlayAvailable: false },
+        { id: 42, bookId: 4, absolutePath: '/library/Book/cover.jpg', format: 'jpg', role: 'cover', sizeBytes: 10, mediaOverlayAvailable: false },
+      ]),
+    });
+    const coverReconciler = { enqueue: vi.fn().mockResolvedValue(undefined) };
+    mockMetadata.refreshCoverForBook.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const { service } = makeService(repo, undefined, undefined, coverReconciler);
+
+    await expect(service.refreshCovers(1)).resolves.toEqual({ queued: 1 });
+    await vi.waitFor(() => expect(coverReconciler.enqueue).toHaveBeenCalledWith([4]));
+
+    expect(mockMetadata.refreshCoverForBook).toHaveBeenCalledTimes(2);
+    expect(mockMetadata.refreshCoverForBook).toHaveBeenNthCalledWith(1, 4, '/library/Book/book.epub', 'epub', 'ebook');
+    expect(mockMetadata.refreshCoverForBook).toHaveBeenNthCalledWith(2, 4, '/library/Book/book.m4b', 'm4b', 'audio');
   });
 
   it('rethrows refreshCovers query failures', async () => {
@@ -3877,5 +3903,111 @@ describe('incremental scan — settings invalidation', () => {
     await done;
 
     expect(repo.clearDirScanState).not.toHaveBeenCalled();
+  });
+});
+
+// ── Cover slot reconcile ─────────────────────────────────────────────────────
+
+describe('cover slot reconcile after a scan', () => {
+  function makeReconciler() {
+    return { enqueue: vi.fn().mockResolvedValue(undefined), enqueueExpiredDormant: vi.fn().mockResolvedValue(undefined) };
+  }
+
+  it('reconciles a book whose files changed, and lets dormant slots expire, before the job completes', async () => {
+    const candidate = makeCandidate('/library/Book', [makeFileStat({ absolutePath: '/library/Book/book.epub', relPath: 'Book/book.epub' })]);
+    mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+    const repo = makeRepo();
+    const reconciler = makeReconciler();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo, undefined, undefined, reconciler);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(reconciler.enqueue).toHaveBeenCalledWith([1], { filesChanged: true });
+    expect(reconciler.enqueueExpiredDormant).toHaveBeenCalledWith(1);
+    expect(reconciler.enqueue.mock.invocationCallOrder[0]).toBeLessThan(repo.completeScanJob.mock.invocationCallOrder[0]!);
+  });
+
+  it('leaves a book with unchanged files alone', async () => {
+    const mtime = new Date('2024-01-01');
+    const fileStat = makeFileStat({ mtime });
+    const repo = makeRepo({
+      findBookFilesByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([makeBookFile({ mtime, sizeBytes: fileStat.sizeBytes, mediaOverlayCheckedAt: new Date('2024-01-01') })]),
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [fileStat])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    const reconciler = makeReconciler();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo, undefined, undefined, reconciler);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(reconciler.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('reconciles the book a file was taken from as well as the book it joined', async () => {
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.m4b', relPath: 'Author/Book/book.m4b', ino: 1001n, format: 'm4b' });
+    const repo = makeRepo({
+      findBookFilesByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([makeBookFile({ id: 5, bookId: 999, absolutePath: fileStat.absolutePath, ino: fileStat.ino, format: 'm4b' })]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [fileStat])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    const reconciler = makeReconciler();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo, undefined, undefined, reconciler);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(reconciler.enqueue).toHaveBeenCalledWith(expect.arrayContaining([1, 999]), { filesChanged: true });
+  });
+
+  it('reconciles a book whose EPUB turned out to carry read-along audio', async () => {
+    const mtime = new Date('2024-01-01T00:00:00Z');
+    const fileStat = makeFileStat({ absolutePath: '/library/Author/Book/book.epub', sizeBytes: 1024, mtime });
+    const repo = makeRepo({
+      findBookFilesByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([makeBookFile({ mtime, sizeBytes: fileStat.sizeBytes, mediaOverlayCheckedAt: null, mediaOverlayAvailable: false })]),
+      findBooksByLibraryFolder: vi
+        .fn()
+        .mockResolvedValue([{ id: 1, libraryId: 1, libraryFolderId: 1, folderPath: '/library/Author/Book', status: 'present' }]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [fileStat])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    const reconciler = makeReconciler();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo, undefined, undefined, reconciler);
+    vi.spyOn(service as unknown as { inspectMediaOverlayFields: () => Promise<unknown> }, 'inspectMediaOverlayFields').mockResolvedValue({
+      mediaOverlayAvailable: true,
+      mediaOverlayDurationSeconds: 60,
+      mediaOverlayCheckedAt: new Date(),
+    });
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(reconciler.enqueue).toHaveBeenCalledWith([1], { filesChanged: true });
   });
 });

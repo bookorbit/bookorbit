@@ -1,14 +1,40 @@
 import type { TtsCurrentBook } from '../lib/tts-state'
+import { createCoverFillArtworkUrl } from '@/features/book/lib/cover-fill-artwork'
 
 export function useTtsMediaSession() {
+  let artworkUrl: string | null = null
+  let metadataRevision = 0
+
+  function releaseArtwork() {
+    metadataRevision++
+    if (!artworkUrl) return
+    URL.revokeObjectURL(artworkUrl)
+    artworkUrl = null
+  }
+
   function setMetadata(book: TtsCurrentBook) {
     if (!('mediaSession' in navigator)) return
-    const artwork: MediaImage[] = book.coverUrl ? [{ src: book.coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: book.title,
-      artist: book.author ?? '',
-      album: 'BookOrbit',
-      artwork,
+    releaseArtwork()
+    const revision = metadataRevision
+    const metadata = (artwork: MediaImage[] = []) =>
+      new MediaMetadata({
+        title: book.title,
+        artist: book.author ?? '',
+        album: 'BookOrbit',
+        artwork,
+      })
+
+    navigator.mediaSession.metadata = metadata()
+    if (!book.coverUrl) return
+
+    void createCoverFillArtworkUrl(book.coverUrl).then((nextArtworkUrl) => {
+      if (!nextArtworkUrl) return
+      if (revision !== metadataRevision) {
+        URL.revokeObjectURL(nextArtworkUrl)
+        return
+      }
+      artworkUrl = nextArtworkUrl
+      navigator.mediaSession.metadata = metadata([{ src: nextArtworkUrl, sizes: '512x512', type: 'image/jpeg' }])
     })
   }
 
@@ -28,6 +54,7 @@ export function useTtsMediaSession() {
 
   function clearHandlers() {
     if (!('mediaSession' in navigator)) return
+    releaseArtwork()
     navigator.mediaSession.setActionHandler('play', null)
     navigator.mediaSession.setActionHandler('pause', null)
     navigator.mediaSession.setActionHandler('previoustrack', null)

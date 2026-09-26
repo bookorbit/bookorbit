@@ -193,7 +193,7 @@ end
 
 -- Returns decoded_body on success, or nil, err_code, decoded_error_body.
 -- err_code is a number for HTTP errors and a string for transport errors.
-function BookOrbitApi:requestBlocking(method, path, body)
+function BookOrbitApi:requestBlocking(method, path, body, extra_headers)
     local sink = {}
     local request = {
         url = self.server_url .. path,
@@ -205,6 +205,10 @@ function BookOrbitApi:requestBlocking(method, path, body)
             ["x-auth-key"] = self.userkey,
         },
     }
+
+    for name, value in pairs(extra_headers or {}) do
+        request.headers[name] = value
+    end
 
     if body then
         local body_json, encode_err = rapidjson.encode(body, ENCODE_OPTIONS)
@@ -287,13 +291,13 @@ function BookOrbitApi:runInSubprocess(fn, trap_widget)
     return true, result
 end
 
-function BookOrbitApi:request(method, path, body)
+function BookOrbitApi:request(method, path, body, extra_headers)
     if not self:canForkSubprocess() then
-        return self:requestBlocking(method, path, body)
+        return self:requestBlocking(method, path, body, extra_headers)
     end
 
     local completed, result = self:runInSubprocess(function()
-        return self:requestBlocking(method, path, body)
+        return self:requestBlocking(method, path, body, extra_headers)
     end)
     if not completed then
         return nil, "background_request_interrupted"
@@ -664,7 +668,18 @@ end
 -- Plugin self-update endpoints
 
 function BookOrbitApi:getPluginVersion()
-    return self:request("GET", "/koreader/plugin/version")
+    local headers = {}
+    local valid_device_id = type(self.device_id) == "string"
+        and #self.device_id <= 100
+        and self.device_id:match("^[A-Za-z0-9-]+$") ~= nil
+    local valid_plugin_version = type(self.plugin_version) == "string"
+        and #self.plugin_version <= 20
+        and self.plugin_version:find("[\r\n]") == nil
+    if valid_device_id and valid_plugin_version then
+        headers["x-bookorbit-device-id"] = self.device_id
+        headers["x-bookorbit-plugin-version"] = self.plugin_version
+    end
+    return self:request("GET", "/koreader/plugin/version", nil, headers)
 end
 
 function BookOrbitApi:downloadPluginUpdate(local_path, opts)

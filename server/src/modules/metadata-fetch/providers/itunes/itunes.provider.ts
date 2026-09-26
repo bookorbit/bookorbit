@@ -30,6 +30,7 @@ export class ITunesProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.ITUNES;
   readonly label = 'iTunes';
   readonly identifiable = true as const;
+  readonly editionFollowsMedium = true;
 
   private readonly logger = new Logger(ITunesProvider.name);
 

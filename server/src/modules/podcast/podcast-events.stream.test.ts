@@ -59,7 +59,7 @@ describe('podcast event stream over HTTP', () => {
 
     events = app.get(PodcastEventsService);
     socketEmit = vi.fn();
-    gateway = new PodcastGateway({} as never, {} as never, {} as never, events, { get: vi.fn().mockReturnValue('http://localhost:5173') } as never);
+    gateway = new PodcastGateway({} as never, {} as never, {} as never, events, { appUrl: 'http://localhost:6263' } as never);
     gateway['server'] = { to: vi.fn().mockReturnValue({ emit: socketEmit }) } as never;
   });
 

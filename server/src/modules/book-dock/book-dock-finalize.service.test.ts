@@ -77,6 +77,7 @@ function makeService() {
   const processor = {
     createUnitBookRecords: vi.fn().mockResolvedValue({ bookIds: [101], createdBookIds: [101], attachedFileIds: [] }),
     deleteUnitBookRecords: vi.fn().mockResolvedValue(undefined),
+    reconcileCoversAsync: vi.fn(),
   };
   const events = {
     on: vi.fn(),
@@ -1439,7 +1440,7 @@ describe('BookDockFinalizeService', () => {
       }),
     );
 
-    expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith('https://covers.example/1.jpg', 20);
+    expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith([{ url: 'https://covers.example/1.jpg' }], 20, 'ebook', { userChosen: true });
     expect(metadataService.saveExtractedCoverBytes).not.toHaveBeenCalled();
     expect(mockReadFile).not.toHaveBeenCalled();
   });
@@ -1603,6 +1604,27 @@ describe('BookDockFinalizeService', () => {
     expect(updateChain.set).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: 1000 }));
   });
 
+  it('applyMetadata writes the staged cover of an audiobook into the audio slot, and never into a sibling book', async () => {
+    const { service, db, metadataService } = makeService();
+    const updateChain = { set: vi.fn(), where: vi.fn().mockResolvedValue(undefined) };
+    updateChain.set.mockReturnValue(updateChain);
+    db.update.mockReturnValue(updateChain);
+    mockReadFile.mockResolvedValue(Buffer.from('square-art'));
+
+    await (service as any).applyMetadata(
+      31,
+      makeRow({ coverPath: '/tmp/cover.jpg', format: 'm4b', selectedMetadata: { title: 'T' } as BookDockMetadata }),
+    );
+    await (service as any).applyMetadata(
+      32,
+      makeRow({ coverPath: '/tmp/cover.jpg', format: 'm4b', selectedMetadata: { title: 'T' } as BookDockMetadata }),
+      false,
+    );
+
+    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledOnce();
+    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledWith(31, Buffer.from('square-art'), 'audio');
+  });
+
   it('applyMetadata falls back to extracted cover bytes when cover download is unavailable', async () => {
     const { service, db, metadataService } = makeService();
     metadataService.downloadAndSaveCover.mockResolvedValueOnce(false);
@@ -1622,7 +1644,7 @@ describe('BookDockFinalizeService', () => {
       }),
     );
 
-    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledWith(21, Buffer.from('cover-bytes'));
+    expect(metadataService.saveExtractedCoverBytes).toHaveBeenCalledWith(21, Buffer.from('cover-bytes'), 'ebook');
   });
 
   describe('multi-file units', () => {
@@ -1926,6 +1948,9 @@ describe('BookDockFinalizeService', () => {
       const [, , looseFiles] = harness.processor.createUnitBookRecords.mock.calls[0];
       expect(looseFiles.map((file: { folderPath: string }) => file.folderPath)).toEqual(['/library/Dune.epub', '/library/Dune.pdf']);
       expect(applyMetadata.mock.calls.map((call: unknown[]) => call[0])).toEqual([81, 82]);
+      // The staged cover came from the primary file, so only its book gets it; reconcile fills the rest.
+      expect(applyMetadata.mock.calls.map((call: unknown[]) => call[2])).toEqual([true, false]);
+      expect(harness.processor.reconcileCoversAsync).toHaveBeenCalledWith([81, 82]);
     });
 
     /**

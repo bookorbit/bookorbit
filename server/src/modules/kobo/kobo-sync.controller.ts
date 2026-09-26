@@ -31,12 +31,15 @@ import { KoboSyncService } from './services/kobo-sync.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import type { KoboProxyResponse } from './services/kobo-proxy.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
+import { DEV_CLIENT_ORIGIN } from '../../config/dev-client-origin';
 import { KOBO_STORE_RESOURCES } from './kobo-store-resources';
 import { KoboBookIdentityService } from './services/kobo-book-identity.service';
 import { KoboSyncHistoryService } from './services/kobo-sync-history.service';
 import { decodeSyncToken, isUsableKoboSyncToken, withKoboSyncToken } from './services/kobo-sync-token';
 
 const STORE_SYNC_TIMEOUT_MS = 8_000;
+// A request that reached the API through the Vite dev proxy names the client's port, not the API's.
+const DEV_CLIENT_PORT = new URL(DEV_CLIENT_ORIGIN).port;
 const KOBO_SYNC_TOKEN_HEADER = 'x-kobo-synctoken';
 
 // Kobo answers a delete for a tag it does not know with a client error, and the device keeps the
@@ -88,7 +91,7 @@ function buildReadingServicesBaseUrl(req: FastifyRequest, baseUrl: string): stri
   if (!localPort) return baseUrl;
 
   const url = new URL(baseUrl);
-  if (url.port !== '5173') return baseUrl;
+  if (url.port !== DEV_CLIENT_PORT) return baseUrl;
 
   const proto = readHeaderValue(req.headers['x-forwarded-proto']) ?? req.protocol;
   url.protocol = proto + ':';

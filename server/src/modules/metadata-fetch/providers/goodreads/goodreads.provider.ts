@@ -44,6 +44,7 @@ export class GoodreadsProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.GOODREADS;
   readonly label = 'Goodreads';
   readonly identifiable = true as const;
+  readonly coverShape = 'portrait' as const;
 
   private readonly logger = new Logger(GoodreadsProvider.name);
 

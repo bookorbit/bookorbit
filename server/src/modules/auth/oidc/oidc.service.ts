@@ -1,6 +1,6 @@
 import { OidcCallbackDto } from '../dto/oidc-callback.dto';
-import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { compare } from 'bcryptjs';
 import type { FastifyReply } from 'fastify';
 import { AuditAction, AuditResource, AuthenticationMethod, OidcCallbackResponse, OidcErrorCode, Permission } from '@bookorbit/types';
@@ -20,6 +20,7 @@ import { OidcStateService } from './oidc-state.service';
 import { OidcTokenClientService } from './oidc-token-client.service';
 import { OidcTokenValidatorService } from './oidc-token-validator.service';
 import { AuthenticationPolicyService } from '../../../common/services/authentication-policy.service';
+import { appConfig } from '../../../config/config';
 
 function isUniqueViolation(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -53,11 +54,11 @@ export class OidcService {
     private readonly userService: UserService,
     private readonly authService: AuthService,
     private readonly auditEvents: AuditEventsService,
-    private readonly configService: ConfigService,
+    @Inject(appConfig.KEY) appConfiguration: ConfigType<typeof appConfig>,
     private readonly authenticationPolicy: AuthenticationPolicyService,
   ) {
-    this.appUrl = (this.configService.get<string>('app.appUrl') ?? 'http://localhost:5173').replace(/\/$/, '');
-    this.nativeRedirectUri = this.configService.get<string>('app.nativeRedirectUri') ?? 'bookorbit://oauth2-callback';
+    this.appUrl = appConfiguration.appUrl.replace(/\/$/, '');
+    this.nativeRedirectUri = appConfiguration.nativeRedirectUri;
   }
 
   async generateState(providerSlug: string): Promise<{ state: string; authorizationEndpoint: string }> {

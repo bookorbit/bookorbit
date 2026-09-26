@@ -54,7 +54,7 @@ describe('EntityBrowsePager', () => {
   it('collapses long page runs around the current page', () => {
     const wrapper = mountPager({ page: 9 })
 
-    expect(pageLinks(wrapper).map((button) => button.text())).toEqual(['1', '8', '9', '10', '18'])
+    expect(pageLinks(wrapper).map((button) => button.text())).toEqual(['1', '2', '8', '9', '10', '17', '18'])
     expect(wrapper.text()).toContain('\u2026')
   })
 

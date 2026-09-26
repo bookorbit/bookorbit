@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { providerChipStyle, PROVIDER_SHORT_LABELS } from '@/lib/provider-colors'
-import { providerUsageCount, skipReasonFor, type ProviderBulkAction } from '../lib/field-rules'
+import { BULK_REORDER_EXEMPT_FIELDS, providerUsageCount, skipReasonFor, type ProviderBulkAction } from '../lib/field-rules'
 
 const { t } = useI18n()
 
@@ -45,6 +45,7 @@ const entries = computed(() =>
         short: PROVIDER_SHORT_LABELS[key] ?? key,
         usage: providerUsageCount(props.fields, key),
         skipReason: skipReasonFor(status),
+        keepsExemptOrder: [...BULK_REORDER_EXEMPT_FIELDS].some((field) => props.fields[field]?.providers.includes(key)),
       }
     })
     .sort((a, b) => b.usage - a.usage || a.label.localeCompare(b.label)),
@@ -120,6 +121,9 @@ function runBulk(provider: MetadataProviderKey, action: ProviderBulkAction) {
             <Trash2 :size="14" />
             {{ t('settings.metadata.fieldRules.toolbar.removeEverywhere') }}
           </DropdownMenuItem>
+          <p v-if="entry.keepsExemptOrder" class="px-2 pt-1 pb-1.5 text-xs text-muted-foreground">
+            {{ t('settings.metadata.fieldRules.toolbar.audioCoverOrderKept') }}
+          </p>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
     </DropdownMenuContent>

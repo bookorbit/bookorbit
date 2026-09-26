@@ -448,6 +448,83 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(await getBookDockRow(context, bookDockRow.id)).toBeUndefined();
   });
 
+  /**
+   * An ebook and its audiobook finalized one after the other land in one folder, so the second joins
+   * the book the first created. The book has to open with whichever the library ranks first, not
+   * with whichever arrived first.
+   */
+  describe('when a second format joins a finalized book', () => {
+    const metadata = { title: 'Two Media Title', authors: ['Two Media Author'] };
+
+    async function libraryRanking(formatPriority: string[] | null) {
+      const destination = await createLibraryWithFolder(context, { allowedFormats: ['epub', 'm4b'] });
+      if (formatPriority) {
+        await context.db.update(schema.libraries).set({ formatPriority }).where(eq(schema.libraries.id, destination.libraryId));
+      }
+      return destination;
+    }
+
+    async function finalizeInto(destination: Awaited<ReturnType<typeof createLibraryWithFolder>>, fileName: string): Promise<number> {
+      const row = await createBookDockRow(context, {
+        fileName,
+        selectedMetadata: metadata,
+        targetLibraryId: destination.libraryId,
+        targetFolderId: destination.libraryFolderId,
+      });
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/book-dock/finalize',
+        headers: authHeader(context.adminToken),
+        payload: { fileIds: [row.id] },
+      });
+      expect(response.statusCode).toBe(201);
+      const result = (response.json() as BookDockFinalizeResult).results[0];
+      expect(result).toMatchObject({ success: true, bookId: expect.any(Number) });
+      return result!.bookId!;
+    }
+
+    async function primaryFormatOf(bookId: number) {
+      const files = await context.db
+        .select({ id: schema.bookFiles.id, format: schema.bookFiles.format })
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.bookId, bookId));
+      const [book] = await context.db
+        .select({ primaryFileId: schema.books.primaryFileId })
+        .from(schema.books)
+        .where(eq(schema.books.id, bookId))
+        .limit(1);
+      return { formats: files.map((file) => file.format).sort(), primary: files.find((file) => file.id === book?.primaryFileId)?.format };
+    }
+
+    it('makes the audiobook primary when it joins an ebook in a library that ranks audio first', async () => {
+      const destination = await libraryRanking(['m4b', 'epub']);
+
+      const bookId = await finalizeInto(destination, 'two-media-audio-first.epub');
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub'], primary: 'epub' });
+
+      expect(await finalizeInto(destination, 'two-media-audio-first.m4b')).toBe(bookId);
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub', 'm4b'], primary: 'm4b' });
+    });
+
+    it('keeps the audiobook primary when an ebook joins it in a library that ranks audio first', async () => {
+      const destination = await libraryRanking(['m4b', 'epub']);
+
+      const bookId = await finalizeInto(destination, 'two-media-audio-kept.m4b');
+      expect(await finalizeInto(destination, 'two-media-audio-kept.epub')).toBe(bookId);
+
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub', 'm4b'], primary: 'm4b' });
+    });
+
+    it('keeps the ebook primary when an audiobook joins it under the default ranking', async () => {
+      const destination = await libraryRanking(null);
+
+      const bookId = await finalizeInto(destination, 'two-media-default.epub');
+      expect(await finalizeInto(destination, 'two-media-default.m4b')).toBe(bookId);
+
+      expect(await primaryFormatOf(bookId)).toEqual({ formats: ['epub', 'm4b'], primary: 'epub' });
+    });
+  });
+
   it('finalize returns partial success with duplicate and destination conflicts', async () => {
     const destination = await createLibraryWithFolder(context);
 

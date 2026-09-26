@@ -727,7 +727,11 @@ function handleTestCurrent() {
 
       <template #default>
         <SettingsSection :title="t('settings.system.requests.sections.connection')">
-          <SettingsField v-if="draft.id === null" :label="t('settings.system.requests.indexers.fields.type')" input-id="indexer-type">
+          <SettingsField
+            v-if="draft.id === null && isBuiltInAdapter(draft.adapterType)"
+            :label="t('settings.system.requests.indexers.fields.type')"
+            input-id="indexer-type"
+          >
             <template #default="{ describedBy }">
               <select
                 id="indexer-type"

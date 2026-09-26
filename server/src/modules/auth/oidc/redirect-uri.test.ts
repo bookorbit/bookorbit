@@ -1,22 +1,22 @@
 import { isAllowedRedirectUri } from './redirect-uri';
 
 const POLICY = {
-  appUrl: 'http://localhost:5173',
+  appUrl: 'http://localhost:6263',
   nativeRedirectUri: 'bookorbit://oauth2-callback',
 };
 
 describe('isAllowedRedirectUri', () => {
   describe('web redirect URI', () => {
     it('accepts the exact web callback', () => {
-      expect(isAllowedRedirectUri('http://localhost:5173/oauth2-callback', POLICY)).toBe(true);
+      expect(isAllowedRedirectUri('http://localhost:6263/oauth2-callback', POLICY)).toBe(true);
     });
 
     it('accepts a web callback carrying a query string', () => {
-      expect(isAllowedRedirectUri('http://localhost:5173/oauth2-callback?redirect=/library', POLICY)).toBe(true);
+      expect(isAllowedRedirectUri('http://localhost:6263/oauth2-callback?redirect=/library', POLICY)).toBe(true);
     });
 
     it('tolerates a trailing slash on the configured app URL', () => {
-      expect(isAllowedRedirectUri('http://localhost:5173/oauth2-callback', { ...POLICY, appUrl: 'http://localhost:5173/' })).toBe(true);
+      expect(isAllowedRedirectUri('http://localhost:6263/oauth2-callback', { ...POLICY, appUrl: 'http://localhost:6263/' })).toBe(true);
     });
 
     it('rejects a different origin', () => {
@@ -24,7 +24,7 @@ describe('isAllowedRedirectUri', () => {
     });
 
     it('rejects a different path on the right origin', () => {
-      expect(isAllowedRedirectUri('http://localhost:5173/somewhere-else', POLICY)).toBe(false);
+      expect(isAllowedRedirectUri('http://localhost:6263/somewhere-else', POLICY)).toBe(false);
     });
   });
 

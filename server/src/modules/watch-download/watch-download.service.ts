@@ -79,7 +79,7 @@ export class WatchDownloadService {
       },
     );
     const expiresAt = new Date(Date.now() + WATCH_DOWNLOAD_TTL_SECONDS * 1000).toISOString();
-    const coverPath = await this.bookService.getCoverPath(bookId, user);
+    const coverPath = await this.bookService.getCoverPath(bookId, user, { medium: 'audio' });
 
     return {
       token,
@@ -142,7 +142,7 @@ export class WatchDownloadService {
       },
     );
     const expiresAt = new Date(Date.now() + WATCH_DOWNLOAD_TTL_SECONDS * 1000).toISOString();
-    const coverPath = await this.bookService.getCoverPath(bookId, user);
+    const coverPath = await this.bookService.getCoverPath(bookId, user, { medium: 'audio' });
 
     return {
       token,

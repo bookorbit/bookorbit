@@ -109,4 +109,13 @@ describe('itunes.mapper', () => {
 
     expect(() => mapITunesResult(result)).toThrow('iTunes result missing both trackId and collectionId');
   });
+
+  it('states the cover shape from the kind of item, ebook jackets portrait and audiobooks square', () => {
+    const base: ITunesResult = { trackId: 1, trackName: 'Dune', artworkUrl100: 'https://is1-ssl.mzstatic.com/a/100x100bb.jpg' };
+
+    expect(mapITunesResult({ ...base, kind: 'ebook' }).coverShape).toBe('portrait');
+    expect(mapITunesResult({ ...base, kind: 'audiobook' }).coverShape).toBe('square');
+    expect(mapITunesResult({ ...base, wrapperType: 'audiobook' }).coverShape).toBe('square');
+    expect(mapITunesResult({ ...base, artworkUrl100: undefined, kind: 'ebook' }).coverShape).toBeUndefined();
+  });
 });

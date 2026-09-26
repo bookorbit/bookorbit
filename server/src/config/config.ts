@@ -1,10 +1,11 @@
 import { registerAs } from '@nestjs/config';
 import { join, resolve } from 'path';
 
+import { DEV_CLIENT_ORIGIN } from './dev-client-origin';
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   host: process.env.HOST?.trim() || '0.0.0.0',
-  appUrl: process.env.APP_URL ?? 'http://localhost:5173',
+  appUrl: process.env.APP_URL ?? DEV_CLIENT_ORIGIN,
   // Private-use scheme the iOS app registers with ASWebAuthenticationSession. Compiled into the
   // client binary, so it is the same for every provider on every deployment; configurable only so
   // a rebranded fork can change it.
@@ -42,6 +43,10 @@ export const storageConfig = registerAs('storage', () => {
     libraryBrowseRoot: resolve(libraryBrowseRoot || '/'),
   };
 });
+
+export const coverSlotsConfig = registerAs('coverSlots', () => ({
+  backfillMode: process.env.COVER_SLOTS_BACKFILL_MODE?.trim().toLowerCase() || (process.env.NODE_ENV === 'test' ? 'skip' : 'background'),
+}));
 
 export const fileWriteConfig = registerAs('fileWrite', () => ({
   debounceMs: parsePositiveInteger(process.env.FILE_WRITE_DEBOUNCE_MS, 3_000),

@@ -107,7 +107,7 @@ function handleSingleCoverError() {
 }
 
 function coverVersionFor(bookId: number): string | null | undefined {
-  if (bookId === props.book.id) return props.book.updatedAt ?? props.book.addedAt
+  if (bookId === props.book.id) return props.book.coverVersion
   return collapsed.value.coverUpdatedAtByBookId?.[bookId]
 }
 

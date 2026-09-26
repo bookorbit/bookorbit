@@ -571,6 +571,26 @@ describe('BookDockIngestService', () => {
       expect(metadataFetchPipeline.runWithSources).toHaveBeenCalledWith(expect.objectContaining({ isAudiobook: true }), {});
     });
 
+    it('stages the audiobook cover as the cover of a docked audio file', async () => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
+      repo.findById.mockResolvedValue({ id: 8, fileName: 'dune.m4b', format: 'm4b', status: 'ready', embeddedMetadata: { title: 'Dune' } });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({
+        resolved: { title: 'Dune', audioCoverUrl: 'https://audible/dune.jpg' },
+        sources: { title: 'audible', audioCoverUrl: 'audible' },
+      });
+
+      await (service as any).autoFetchMetadataAsync(8);
+
+      expect(repo.update).toHaveBeenLastCalledWith(
+        8,
+        expect.objectContaining({
+          fetchedMetadata: { title: 'Dune', coverUrl: 'https://audible/dune.jpg' },
+          fetchedMetadataSources: { title: 'audible', coverUrl: 'audible' },
+        }),
+      );
+    });
+
     it('updates fetched metadata and confidence after pipeline resolution', async () => {
       const { service, appSettings, repo, metadataFetchPipeline } = makeService();
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);

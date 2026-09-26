@@ -115,6 +115,7 @@ describe('AuthorsService', () => {
       enrichmentExecutor as any,
       enrichmentOrchestrator as any,
       metadataScoreService as any,
+      { enrichCardVersions: vi.fn().mockResolvedValue(undefined) } as any,
     );
     libraryService.findAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     libraryService.findAccessibleLibraryIds.mockResolvedValue([1, 2]);

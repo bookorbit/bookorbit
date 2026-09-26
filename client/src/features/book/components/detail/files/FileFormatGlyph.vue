@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Headphones } from '@lucide/vue'
+import { isReadAlongFormatKey } from '@bookorbit/types'
+import { formatKeyCode } from '@/features/book/lib/book-formats'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 
+/** `format` is a file format or an edition key; a read-along EPUB carries headphones under its code. */
 const props = withDefaults(defineProps<{ format: string | null; size?: 'sm' | 'md' | 'lg' }>(), { size: 'md' })
+
+const readAlong = computed(() => props.format != null && isReadAlongFormatKey(props.format))
 
 const sizeClass = computed(
   () =>
@@ -36,6 +42,9 @@ const glyphStyle = computed(() => {
     aria-hidden="true"
   >
     <span class="absolute right-0 top-0 bg-current opacity-25" :class="cornerClass" />
-    <span class="relative">{{ format || '?' }}</span>
+    <span class="relative flex flex-col items-center gap-[0.2em]">
+      <Headphones v-if="readAlong" class="size-[1.1em]" :stroke-width="2.5" />
+      {{ format ? formatKeyCode(format) : '?' }}
+    </span>
   </span>
 </template>

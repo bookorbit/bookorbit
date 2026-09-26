@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { READ_ALONG_FORMAT_PRIORITY } from '@bookorbit/types'
 import type { Library, PrescanResult } from '@bookorbit/types'
 
 const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>())
@@ -260,6 +261,28 @@ describe('useLibraryCreator', () => {
     expect(JSON.parse(apiMock.mock.calls[0]?.[1]?.body as string)).not.toHaveProperty('type')
     expect(creator.error.value).toBe('Name already exists')
     expect(creator.loading.value).toBe(false)
+  })
+
+  it('shows the read-along entry above EPUB and saves it only once it is moved', async () => {
+    const { useLibraryCreator } = await import('../useLibraryCreator')
+    const creator = useLibraryCreator()
+    creator.initEdit(makeLibrary({ id: 12, formatPriority: ['m4b', 'epub', 'pdf'] }))
+    apiMock.mockResolvedValue(jsonResponse(makeLibrary({ id: 12 })))
+
+    expect(creator.form.formatPriority.slice(0, 4)).toEqual(['m4b', READ_ALONG_FORMAT_PRIORITY, 'epub', 'pdf'])
+
+    await creator.save()
+    const unmoved = JSON.parse(apiMock.mock.calls[0]?.[1]?.body as string).formatPriority as string[]
+    expect(unmoved.slice(0, 3)).toEqual(['m4b', 'epub', 'pdf'])
+    expect(unmoved).not.toContain(READ_ALONG_FORMAT_PRIORITY)
+
+    creator.form.formatPriority = [
+      READ_ALONG_FORMAT_PRIORITY,
+      ...creator.form.formatPriority.filter((format) => format !== READ_ALONG_FORMAT_PRIORITY),
+    ]
+    await creator.save()
+    const moved = JSON.parse(apiMock.mock.calls[1]?.[1]?.body as string).formatPriority as string[]
+    expect(moved.slice(0, 3)).toEqual([READ_ALONG_FORMAT_PRIORITY, 'm4b', 'epub'])
   })
 })
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -19,6 +19,7 @@ import {
   userLibraryAccess,
   users,
 } from '../../db/schema';
+import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -583,12 +584,13 @@ export class ScannerRepository {
   async findBookCardData(bookIds: number[]) {
     if (bookIds.length === 0) return { rows: [], authorRows: [], fileRows: [], genreRows: [] };
 
-    const [rows, authorRows, fileRows, genreRows] = await Promise.all([
+    const [rows, authorRows, unrankedFileRows, genreRows] = await Promise.all([
       this.db
         .select({
           id: books.id,
           status: books.status,
           coverAspectRatio: libraries.coverAspectRatio,
+          formatPriority: libraries.formatPriority,
           primaryFileId: books.primaryFileId,
           folderPath: books.folderPath,
           addedAt: books.addedAt,
@@ -630,7 +632,8 @@ export class ScannerRepository {
           mediaOverlayCheckedAt: bookFiles.mediaOverlayCheckedAt,
         })
         .from(bookFiles)
-        .where(inArray(bookFiles.bookId, bookIds)),
+        .where(inArray(bookFiles.bookId, bookIds))
+        .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id)),
       this.db
         .select({ bookId: bookGenres.bookId, name: genres.name })
         .from(bookGenres)
@@ -638,6 +641,10 @@ export class ScannerRepository {
         .where(inArray(bookGenres.bookId, bookIds)),
     ]);
 
+    const fileRows = rankFileRowsByBook(
+      unrankedFileRows,
+      new Map(rows.map((row) => [row.id, { formatPriority: row.formatPriority as string[] | null, primaryFileId: row.primaryFileId }])),
+    );
     return { rows, authorRows, fileRows, genreRows };
   }
 

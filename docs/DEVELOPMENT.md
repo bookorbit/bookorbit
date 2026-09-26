@@ -12,8 +12,8 @@ BookOrbit is a pnpm monorepo with three workspaces: a Vue 3 single-page app, a N
 
 ```mermaid
 graph LR
-    Client["Client<br/><small>Vue 3 SPA</small><br/><small>localhost:5173</small>"]
-    Server["Server<br/><small>NestJS + Fastify</small><br/><small>localhost:3000/api</small>"]
+    Client["Client<br/><small>Vue 3 SPA</small><br/><small>localhost:6263</small>"]
+    Server["Server<br/><small>NestJS + Fastify</small><br/><small>localhost:6262/api</small>"]
     DB["PostgreSQL<br/><small>Drizzle ORM</small>"]
     WS["WebSocket<br/><small>Socket.IO</small>"]
     Types["Shared Types<br/><small>@bookorbit/types</small>"]
@@ -162,8 +162,8 @@ If everything worked, you will see the server, client, and types watcher start u
 
 | Check                                    | Expected                                   |
 | ---------------------------------------- | ------------------------------------------ |
-| Open http://localhost:5173               | BookOrbit login page loads                 |
-| Open http://localhost:3000/api/v1/health | Returns `{"status":"ok"}`                  |
+| Open http://localhost:6263               | BookOrbit login page loads                 |
+| Open http://localhost:6262/api/v1/health | Returns `{"status":"ok"}`                  |
 | `docker ps`                              | Shows `bookorbit-dev-db` container running |
 
 ---
@@ -178,8 +178,8 @@ This starts the server, client, and types watcher concurrently with hot reload.
 
 | Service | URL                       |
 | ------- | ------------------------- |
-| Client  | http://localhost:5173     |
-| API     | http://localhost:3000/api |
+| Client  | http://localhost:6263     |
+| API     | http://localhost:6262/api |
 
 If PostgreSQL is not running, start it first with `pnpm run db:up`.
 
@@ -195,8 +195,8 @@ When enabled, open:
 
 | Docs         | URL                                 |
 | ------------ | ----------------------------------- |
-| Swagger UI   | http://localhost:3000/api/docs      |
-| OpenAPI JSON | http://localhost:3000/api/docs-json |
+| Swagger UI   | http://localhost:6262/api/docs      |
+| OpenAPI JSON | http://localhost:6262/api/docs-json |
 
 <details>
 <summary>Running workspaces separately</summary>
@@ -234,7 +234,7 @@ These are the variables you are most likely to need during development. See `ser
 | `PODCAST_ENCRYPTION_KEY` | Podcast URL encryption key; required in production | Falls back to `JWT_SECRET` in development                 |
 | `APP_DATA_PATH`          | Storage for covers, avatars, cache                 | `../local/data`                                           |
 | `LIBRARY_BROWSE_ROOT`    | Library folder picker root                         | `/`                                                       |
-| `APP_URL`                | Base URL for email links                           | `http://localhost:5173`                                   |
+| `APP_URL`                | Base URL for email links                           | `http://localhost:6263`                                   |
 | `SWAGGER_ENABLED`        | Serve Swagger UI and OpenAPI JSON                  | `false`                                                   |
 | `DISABLE_LOCAL_AUTH`     | Disable password authentication                    | `false`                                                   |
 
@@ -471,7 +471,7 @@ pnpm run e2e:run -- <suite-id>
 
 **Port already in use**
 
-The server defaults to port 3000 (configured via `PORT` in `server/.env`) and the client to 5173 (Vite default). If either is occupied, find the process that owns it and stop it, or change the server port in `server/.env`.
+Local development runs the server on port 6262 (`PORT` in `server/.env`) and the client on 6263 (`server.port` in `client/vite.config.ts`, with `strictPort`, so Vite fails instead of silently moving). Both avoid 3000, which many other self-hosted apps and dev tools claim. A server started without `PORT`, such as the Docker image, still listens on 3000. If either is occupied, find the process that owns it and stop it, or change the server port in `server/.env`.
 
 **Hot reload not picking up changes**
 

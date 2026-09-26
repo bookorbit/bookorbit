@@ -518,6 +518,18 @@
   {
     "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
     "className": "ReaderPreferencesController",
+    "methodName": "patchPreference",
+    "httpMethod": "PATCH",
+    "path": "/reader/preferences/:bookFileId",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
     "methodName": "deletePreference",
     "httpMethod": "DELETE",
     "path": "/reader/preferences/:bookFileId",
@@ -544,6 +556,18 @@
     "className": "ReaderPreferencesController",
     "methodName": "upsertDefault",
     "httpMethod": "PUT",
+    "path": "/reader/defaults/:formatGroup",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/reader-preferences/reader-preferences.controller.ts",
+    "className": "ReaderPreferencesController",
+    "methodName": "patchDefault",
+    "httpMethod": "PATCH",
     "path": "/reader/defaults/:formatGroup",
     "permissions": [],
     "libraryAccess": [],

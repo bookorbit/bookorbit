@@ -17,6 +17,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizeMetadataText } from '../../common/utils/metadata-text-normalize.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookReadService } from '../book/book-read.service';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { LibraryService } from '../library/library.service';
 import { AuthorMetadataPreferencesService } from './author-metadata-preferences.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
@@ -51,6 +52,7 @@ export class AuthorsService {
     private readonly enrichmentExecutor: AuthorEnrichmentExecutorService,
     private readonly enrichmentOrchestrator: AuthorEnrichmentOrchestratorService,
     private readonly metadataScoreService: MetadataScoreService,
+    private readonly coverStore: BookCoverStore,
   ) {}
 
   private assertPaginationWindow(page: number, size: number): void {
@@ -174,7 +176,9 @@ export class AuthorsService {
       cardData.narratorRows,
       cardData.tagRows,
       cardData.seriesMembershipRows,
-    ).sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+    );
+    await this.coverStore.enrichCardVersions(items);
+    items.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
     return { items, total: page.total, bookTotal: page.total, page: page.page, size: page.size };
   }
@@ -217,6 +221,7 @@ export class AuthorsService {
       collapsed.tagRows,
       collapsed.seriesMembershipRows,
     );
+    await this.coverStore.enrichCardVersions(items);
 
     return { items, total: collapsed.total, bookTotal: collapsed.bookTotal, page, size };
   }

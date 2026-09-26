@@ -16,6 +16,7 @@ import type {
 import type { UnscopedBookRecommendation } from '@bookorbit/types';
 import { isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
 import { advanceIsoTimestamp } from '../../common/utils/iso-timestamp.utils';
 import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
@@ -608,6 +609,27 @@ export class BookRepository {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * Card files in edition order, so every card, row and search result lists a book's formats the
+   * way its library ranks them. Libraries are few, so their priorities come in one small query.
+   */
+  private async rankCardFileRows<
+    T extends { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null; mediaOverlayAvailable: boolean },
+  >(fileRows: T[], bookRefs: Array<{ id: number; primaryFileId: number | null }>): Promise<T[]> {
+    if (fileRows.length === 0) return fileRows;
+    const bookIds = [...new Set(fileRows.map((row) => row.bookId))];
+    const priorityRows = await this.db
+      .select({ bookId: books.id, formatPriority: libraries.formatPriority })
+      .from(books)
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
+      .where(inArray(books.id, bookIds));
+    const priorityByBook = new Map(priorityRows.map((row) => [row.bookId, row.formatPriority as string[] | null]));
+    const contextByBook = new Map(
+      bookRefs.map((book) => [book.id, { formatPriority: priorityByBook.get(book.id), primaryFileId: book.primaryFileId }]),
+    );
+    return rankFileRowsByBook(fileRows, contextByBook);
+  }
+
   private async enrichBookIds(bookRefs: Array<{ id: number; primaryFileId: number | null }>, userId: number) {
     const bookIds = bookRefs.map((book) => book.id);
     const primaryFileIds = bookRefs.map((book) => book.primaryFileId).filter((id): id is number => id != null);
@@ -650,7 +672,7 @@ export class BookRepository {
 
     // Keep book-card hydration below the database pool's capacity when list requests overlap.
     // Three small batches retain useful parallelism without allowing one request to claim nine connections.
-    const [authorRows, fileRows, genreRows] = await Promise.all([
+    const [authorRows, unrankedFileRows, genreRows] = await Promise.all([
       this.db
         .select({ bookId: bookAuthors.bookId, name: authors.name })
         .from(bookAuthors)
@@ -669,13 +691,16 @@ export class BookRepository {
           mediaOverlayCheckedAt: bookFiles.mediaOverlayCheckedAt,
         })
         .from(bookFiles)
-        .where(inArray(bookFiles.bookId, bookIds)),
+        .where(inArray(bookFiles.bookId, bookIds))
+        .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id)),
       this.db
         .select({ bookId: bookGenres.bookId, name: genres.name })
         .from(bookGenres)
         .innerJoin(genres, eq(genres.id, bookGenres.genreId))
         .where(inArray(bookGenres.bookId, bookIds)),
     ]);
+
+    const fileRows = await this.rankCardFileRows(unrankedFileRows, bookRefs);
 
     const [tagRows, narratorRows, seriesMembershipRows] = await Promise.all([
       this.db
@@ -1813,6 +1838,7 @@ export class BookRepository {
           ne(books.status, 'processing'),
           or(
             accentInsensitiveIlike(bookMetadata.title, pattern),
+            accentInsensitiveIlike(bookMetadata.subtitle, pattern),
             accentInsensitiveIlike(bookMetadata.seriesName, pattern),
             isNotNull(matchedAuthors.bookId),
             isNotNull(matchedSeries.bookId),
@@ -2069,6 +2095,37 @@ export class BookRepository {
         sortOrder: bookFiles.sortOrder,
       })
       .from(bookFiles)
+      .where(inArray(bookFiles.bookId, bookIds))
+      .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id));
+  }
+
+  async findCoverSourceFilesByBookIds(bookIds: number[]): Promise<
+    {
+      id: number;
+      bookId: number;
+      absolutePath: string;
+      format: string | null;
+      role: string;
+      sizeBytes: number | null;
+      mediaOverlayAvailable: boolean;
+      formatPriority: string[];
+    }[]
+  > {
+    if (bookIds.length === 0) return [];
+    return this.db
+      .select({
+        id: bookFiles.id,
+        bookId: bookFiles.bookId,
+        absolutePath: bookFiles.absolutePath,
+        format: bookFiles.format,
+        role: bookFiles.role,
+        sizeBytes: bookFiles.sizeBytes,
+        mediaOverlayAvailable: bookFiles.mediaOverlayAvailable,
+        formatPriority: libraries.formatPriority,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .where(inArray(bookFiles.bookId, bookIds))
       .orderBy(asc(bookFiles.bookId), asc(bookFiles.sortOrder), asc(bookFiles.id));
   }

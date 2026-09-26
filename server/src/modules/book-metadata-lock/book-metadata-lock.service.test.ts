@@ -255,4 +255,23 @@ describe('BookMetadataLockService', () => {
     });
     expect(result.skippedFields).toEqual(['authors', 'hardcoverEditionId', 'openLibraryId', 'librofmId', 'comicVolumeName', 'cover']);
   });
+
+  it('filters each cover slot by its own lock, carrying the fallback choices along', async () => {
+    const { service } = makeService(['audioCover']);
+    const coverChoices = [{ url: 'https://example.com/book.jpg', provider: MetadataProviderKey.AMAZON, fit: 'match' as const }];
+
+    const result = await service.filterResolvedMetadata(
+      12,
+      {
+        coverUrl: 'https://example.com/book.jpg',
+        coverChoices,
+        audioCoverUrl: 'https://example.com/audio.jpg',
+        audioCoverChoices: [{ url: 'https://example.com/audio.jpg', provider: MetadataProviderKey.AUDIBLE, fit: 'match' }],
+      },
+      {},
+    );
+
+    expect(result.resolved).toEqual({ coverUrl: 'https://example.com/book.jpg', coverChoices });
+    expect(result.skippedFields).toEqual(['audioCover']);
+  });
 });

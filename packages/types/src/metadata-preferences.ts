@@ -5,6 +5,7 @@ export type MetadataField =
   | "subtitle"
   | "description"
   | "cover"
+  | "audioCover"
   | "authors"
   | "publisher"
   | "publishedYear"
@@ -23,6 +24,7 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
   "subtitle",
   "description",
   "cover",
+  "audioCover",
   "authors",
   "publisher",
   "publishedYear",

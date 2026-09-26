@@ -38,8 +38,8 @@ export interface CoverRefreshProgressEvent {
 }
 
 export interface CoverRefreshedEvent {
-  bookId: number;
-  libraryId: number;
+  bookIds: number[];
+  libraryId?: number;
 }
 
 export interface BookMissingEvent {

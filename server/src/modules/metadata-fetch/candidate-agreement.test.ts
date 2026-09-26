@@ -1,7 +1,7 @@
 import { MetadataCandidate, MetadataProviderKey } from '@bookorbit/types';
 import { describe, expect, it } from 'vitest';
 
-import { resolveCandidateAgreement } from './candidate-agreement';
+import { acceptAgainstAnchor, resolveCandidateAgreement } from './candidate-agreement';
 import { MetadataSearchParams } from './providers/metadata-search-params';
 
 function candidate(provider: MetadataProviderKey, data: Partial<MetadataCandidate> = {}): MetadataCandidate {
@@ -158,5 +158,21 @@ describe('resolveCandidateAgreement', () => {
       expect(providersOf(result.accepted)).toEqual([MetadataProviderKey.COMICVINE, MetadataProviderKey.GOOGLE]);
       expect(providersOf(result.rejected)).toEqual([MetadataProviderKey.KOBO]);
     });
+  });
+});
+
+describe('acceptAgainstAnchor', () => {
+  const anchor = candidate(MetadataProviderKey.GOOGLE, { title: 'The Hobbit', authors: ['J.R.R. Tolkien'] });
+
+  it('checks even a lone candidate against the anchor, which a fresh agreement would accept unjudged', () => {
+    const wrong = candidate(MetadataProviderKey.ITUNES, { title: 'Dune', authors: ['Frank Herbert'] });
+
+    expect(acceptAgainstAnchor(anchor, [wrong])).toEqual({ accepted: [], rejected: [wrong] });
+  });
+
+  it('accepts the same book in another edition', () => {
+    const audiobook = candidate(MetadataProviderKey.ITUNES, { title: 'The Hobbit (Unabridged)', authors: ['J. R. R. Tolkien'] });
+
+    expect(providersOf(acceptAgainstAnchor(anchor, [audiobook]).accepted)).toEqual([MetadataProviderKey.ITUNES]);
   });
 });

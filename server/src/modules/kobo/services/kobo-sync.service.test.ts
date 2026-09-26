@@ -1406,6 +1406,28 @@ describe('KoboSyncService', () => {
       };
     }
 
+    it('announces a read-along EPUB by its size without audio, as the download converts it', async () => {
+      const rows = comicRows(false);
+      for (const batch of rows.select.slice(0, 2)) {
+        for (const row of batch as Array<Record<string, unknown>>) {
+          row.fileSizeBytes = 900 * 1024 * 1024;
+          row.fileMediaOverlayAvailable = true;
+        }
+      }
+      const service = makeService(makeDb(rows));
+      vi.spyOn(service as any, 'buildEligibleBooksWhereClause').mockResolvedValue({ where: true });
+      vi.spyOn(service as any, 'getDeliverySettings').mockResolvedValue({
+        convertToKepub: true,
+        forceEnableHyphenation: false,
+        kepubConversionLimitMb: 100,
+      });
+
+      await (service as any).fetchEligibleSnapshotRows(8, false, new Map());
+      const books = await (service as any).fetchEligibleBooksByIds(8, [5], false, new Map());
+
+      expect(books.get(5)?.deliveryFormat).toBe('KEPUB');
+    });
+
     it('announces a stored fixed-layout book as EPUB3FL in the payload the device receives', async () => {
       const db = makeDb(comicRows(true));
       const service = makeService(db);

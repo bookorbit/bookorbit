@@ -176,6 +176,7 @@ When adding user-facing text in code, add the Vue I18n key only to `client/src/l
 
 ## Support
 
+- **Support development:** [Open Collective](https://opencollective.com/bookorbit)
 - **Questions and discussion:** [GitHub Discussions](https://github.com/bookorbit/bookorbit/discussions)
 - **Bug reports:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=bug_report.yml)
 - **Feature requests:** [GitHub Issues](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml)

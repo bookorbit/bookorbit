@@ -139,14 +139,31 @@ describe('assembleBookCards', () => {
     expect(card.readingProgress).toBe(45);
   });
 
-  it('falls back to first file for progress when no primary file exists', () => {
+  it('falls back to the first content file for progress when no primary file exists', () => {
     const rows = [makeBookRow(1)];
-    const fileRows = [{ bookId: 1, id: 11, format: 'pdf', role: 'supplemental', sizeBytes: null }];
+    const fileRows = [
+      { bookId: 1, id: 10, format: 'jpg', role: 'cover', sizeBytes: null },
+      { bookId: 1, id: 11, format: 'pdf', role: 'content', sizeBytes: null },
+    ];
     const progressRows = [{ bookFileId: 11, percentage: 30 }];
 
     const [card] = assembleBookCards(rows, [], fileRows, [], progressRows);
 
     expect(card.readingProgress).toBe(30);
+    expect(card.files.find((file) => file.role === 'primary')?.id).toBe(11);
+  });
+
+  it('never makes a cover or sidecar the primary', () => {
+    const rows = [makeBookRow(1)];
+    const fileRows = [
+      { bookId: 1, id: 10, format: 'jpg', role: 'cover', sizeBytes: null },
+      { bookId: 1, id: 11, format: 'opf', role: 'metadata', sizeBytes: null },
+    ];
+
+    const [card] = assembleBookCards(rows, [], fileRows, [], [{ bookFileId: 10, percentage: 30 }]);
+
+    expect(card.files.some((file) => file.role === 'primary')).toBe(false);
+    expect(card.readingProgress).toBeNull();
   });
 
   it('returns null readingProgress when there are no files', () => {

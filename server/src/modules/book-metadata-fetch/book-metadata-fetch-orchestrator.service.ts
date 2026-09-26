@@ -2,7 +2,8 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, Optional }
 import type { BookMetadataFetchReason } from '@bookorbit/types';
 import { MetadataProviderKey, NotificationType, Permission, parseSeriesIndex } from '@bookorbit/types';
 import { NotificationService } from '../notification/notification.service';
-import { resolveIsAudiobook } from '../../common/utils/book-media.utils';
+import { coverFetchInputs, resolveIsAudiobook, type CoverFetchState } from '../../common/utils/book-media.utils';
+import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { BookReadService } from '../book/book-read.service';
@@ -46,6 +47,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     private readonly session: BookMetadataFetchSessionService,
     private readonly throttleTracker: ProviderThrottleTracker,
     private readonly notificationService: NotificationService,
+    private readonly coverStore: BookCoverStore,
     @Optional() private readonly gateway?: BookMetadataFetchGateway,
   ) {}
 
@@ -168,13 +170,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     try {
       const found = await this.bookReadService.findById(bookId);
       if (!found) {
-        await this.queueRepo.markDone(bookId);
-        this.session.incrementDone();
-        this.session.setCurrentItemName(null);
-        this.logger.debug(
-          `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=book_missing - metadata fetch completed`,
-        );
-        await this.emitStatus();
+        await this.completeMissingBook(bookId, startedAt);
         return;
       }
 
@@ -203,10 +199,15 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         return;
       }
 
+      const coverState = await this.coverStore.fetchState(bookId);
+      if (!coverState) {
+        await this.completeMissingBook(bookId, startedAt);
+        return;
+      }
       const preserveExisting = reason === 'event_import';
       if (preserveExisting) {
         const config = await this.configService.getEffectiveConfig(libraryId);
-        if (!config.enabled || !config.triggerOnImport || !this.eligibilityService.isEligible(this.toEligibilityData(found), config)) {
+        if (!config.enabled || !config.triggerOnImport || !this.eligibilityService.isEligible(this.toEligibilityData(found, coverState), config)) {
           await this.queueRepo.markDone(bookId);
           this.session.incrementDone();
           this.session.setCurrentItemName(null);
@@ -243,21 +244,23 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
-        cover: meta?.coverSource,
         duration: meta?.durationSeconds ?? undefined,
         abridged: meta?.abridged ?? undefined,
         narrators: narratorRows.map((n) => n.name),
         chapters: meta?.chapters,
         hardcoverEditionId: meta?.hardcoverEditionId,
       };
+      const coverInputs = coverFetchInputs(coverState);
+      Object.assign(existingFields, coverInputs.existing);
 
       if (preserveExisting) {
         existingFields.comicMetadata = await this.comicMetadataRepository.findByBookId(bookId);
       }
 
-      const { resolved, providerIds } = preserveExisting
-        ? await this.pipeline.runWithSources(searchParams, existingFields, libraryId, { preserveExisting: true })
-        : await this.pipeline.runWithSources(searchParams, existingFields, libraryId);
+      const { resolved, providerIds } = await this.pipeline.runWithSources(searchParams, existingFields, libraryId, {
+        ...coverInputs.options,
+        ...(preserveExisting ? { preserveExisting: true } : {}),
+      });
 
       await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, narratorRows);
 
@@ -405,11 +408,28 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     }
 
     if (filteredResolved.coverUrl) {
-      await this.metadataService.downloadAndSaveCover(filteredResolved.coverUrl, bookId);
+      await this.metadataService.downloadAndSaveCover(filteredResolved.coverChoices ?? [{ url: filteredResolved.coverUrl }], bookId, 'ebook');
+    }
+    if (filteredResolved.audioCoverUrl) {
+      await this.metadataService.downloadAndSaveCover(
+        filteredResolved.audioCoverChoices ?? [{ url: filteredResolved.audioCoverUrl }],
+        bookId,
+        'audio',
+      );
     }
   }
 
-  private toEligibilityData(found: BookReadResult) {
+  private async completeMissingBook(bookId: number, startedAt: number): Promise<void> {
+    await this.queueRepo.markDone(bookId);
+    this.session.incrementDone();
+    this.session.setCurrentItemName(null);
+    this.logger.debug(
+      `[book.metadata_fetch] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} outcome=book_missing - metadata fetch completed`,
+    );
+    await this.emitStatus();
+  }
+
+  private toEligibilityData(found: BookReadResult, coverState: CoverFetchState) {
     const { book, authorRows, genreRows, narratorRows, communityRatingRows } = found;
     const meta = book.book_metadata;
     return {
@@ -426,6 +446,8 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       seriesName: meta?.seriesName ?? null,
       seriesIndex: meta?.seriesIndex ?? null,
       coverSource: meta?.coverSource ?? null,
+      hasAudioCoverMedia: coverState.media.hasAudio,
+      hasAudioCover: coverState.filled.audio,
       hasAuthors: authorRows.length > 0,
       hasGenres: genreRows.length > 0,
       hasNarrators: narratorRows.length > 0,

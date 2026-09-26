@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, it, expect } from 'vitest'
+import { activateI18nLocale } from '@/i18n'
 import { useTableQuickFilters } from '../useTableQuickFilters'
+
+beforeAll(() => {
+  activateI18nLocale('en')
+})
 
 describe('useTableQuickFilters', () => {
   describe('getQuickFilterOptions', () => {
@@ -22,11 +27,13 @@ describe('useTableQuickFilters', () => {
       expect(options[1]!.key).toBe('missing')
     })
 
-    it('returns cover presence options for cover column in library view', () => {
+    it('returns cover presence options, plus a missing audiobook cover option, for the cover column', () => {
       const { getQuickFilterOptions } = useTableQuickFilters('library')
-      const options = getQuickFilterOptions('cover')
-      expect(options).toHaveLength(2)
-      expect(options[0]!.label).toContain('cover')
+      expect(getQuickFilterOptions('cover')).toEqual([
+        { key: 'present', label: 'Filter to books with covers' },
+        { key: 'missing', label: 'Filter to books missing covers' },
+        { key: 'missingAudio', label: 'Filter to books missing audiobook covers' },
+      ])
     })
 
     it('returns present/missing options for title column', () => {
@@ -80,6 +87,11 @@ describe('useTableQuickFilters', () => {
     it('returns cover isPresent rule for cover+present', () => {
       const rule = buildQuickFilterRule('cover', 'present')
       expect(rule).toEqual({ type: 'rule', field: 'cover', operator: 'isPresent' })
+    })
+
+    it('returns audioCover isMissing rule for cover+missingAudio', () => {
+      const rule = buildQuickFilterRule('cover', 'missingAudio')
+      expect(rule).toEqual({ type: 'rule', field: 'audioCover', operator: 'isMissing' })
     })
 
     it('returns title isEmpty rule for title+missing', () => {

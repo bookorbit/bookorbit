@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { ConcreteBookMediaKind, MetadataProviderKey } from '@bookorbit/types';
+import { ConcreteBookMediaKind, CoverMedia, MetadataProviderKey } from '@bookorbit/types';
 
 import { METADATA_PROVIDERS } from './constants';
 import { MetadataProvider } from './providers/metadata-provider';
@@ -38,5 +38,30 @@ export class ProviderRegistry {
       const mediaKinds = this.find(key)?.mediaKinds;
       return !mediaKinds || mediaKinds.includes(mediaKind);
     });
+  }
+
+  /**
+   * Narrows keys to the providers that can answer for a book with these media. Cover media fold
+   * comics into ebooks, and a comic can sit in any ebook container, so comic specialists stay
+   * eligible wherever there is an ebook.
+   */
+  keysForMedia(keys: MetadataProviderKey[], media: CoverMedia): MetadataProviderKey[] {
+    const kinds: ConcreteBookMediaKind[] = [];
+    if (media.hasEbook) kinds.push('ebook', 'comic');
+    if (media.hasAudio) kinds.push('audiobook');
+    return keys.filter((key) => {
+      const mediaKinds = this.find(key)?.mediaKinds;
+      return !mediaKinds || mediaKinds.some((kind) => kinds.includes(kind));
+    });
+  }
+
+  /** A provider that serves nothing but audiobooks, so a book without audio never needs it. */
+  servesOnlyAudiobooks(key: MetadataProviderKey): boolean {
+    const mediaKinds = this.find(key)?.mediaKinds;
+    return mediaKinds !== undefined && mediaKinds.length > 0 && mediaKinds.every((kind) => kind === 'audiobook');
+  }
+
+  editionFollowsMedium(key: MetadataProviderKey): boolean {
+    return this.find(key)?.editionFollowsMedium === true;
   }
 }

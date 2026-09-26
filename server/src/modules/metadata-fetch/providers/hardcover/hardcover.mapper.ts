@@ -1,4 +1,4 @@
-import { MetadataCandidate, MetadataProviderKey, parseSeriesIndex } from '@bookorbit/types';
+import { coverShapeFromSize, MetadataCandidate, MetadataProviderKey, parseSeriesIndex, type CoverMedium } from '@bookorbit/types';
 
 import { parsePublishedDateKey, parsePublishedYear, publishedYearFromDateKey } from '../../../../common/utils/published-date.utils';
 import { normalizeSeriesTotalBooks } from '../../../../common/utils/series-total-books.utils';
@@ -7,6 +7,7 @@ import {
   HardcoverCachedContributor,
   HardcoverCachedTags,
   HardcoverEdition,
+  HardcoverImage,
   HardcoverSearchDocument,
 } from './hardcover.types';
 
@@ -64,10 +65,12 @@ function isAudiobookEdition(edition: HardcoverEdition): boolean {
   return edition.reading_format_id === AUDIOBOOK_READING_FORMAT_ID || (edition.audio_seconds ?? 0) > 0;
 }
 
-// Lower rank sorts first: physical/ebook before audiobooks, and editions with a
-// real page count before those without.
-function editionRank(edition: HardcoverEdition): number {
-  return (isAudiobookEdition(edition) ? 2 : 0) + (edition.pages == null ? 1 : 0);
+// Lower rank sorts first: editions of the requested medium before the others (physical and
+// ebook editions for a book, audiobook editions for an audiobook), then editions with a real page
+// count before those without.
+function editionRank(edition: HardcoverEdition, medium: CoverMedium): number {
+  const otherMedium = isAudiobookEdition(edition) !== (medium === 'audio');
+  return (otherMedium ? 2 : 0) + (edition.pages == null ? 1 : 0);
 }
 
 function resolveEditionPublishedYear(edition: HardcoverEdition, book: HardcoverBookWithEditions): number | undefined {
@@ -131,15 +134,41 @@ export function mapSearchDocument(doc: HardcoverSearchDocument): MetadataCandida
     seriesName: doc.featured_series?.series?.name,
     seriesIndex: parseSeriesIndex(doc.featured_series?.position) ?? undefined,
     coverUrl: doc.image?.url,
+    ...coverFromImage(doc.image, 'unknown'),
     sourceUrl: `https://hardcover.app/books/${doc.slug}`,
     ...(communityRating !== undefined ? { communityRating } : {}),
     ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),
   };
 }
 
-export function mapBookWithEditions(book: HardcoverBookWithEditions): MetadataCandidate[] {
+export function mapBookWithEditions(book: HardcoverBookWithEditions, medium: CoverMedium = 'ebook'): MetadataCandidate[] {
   if (!book.editions || book.editions.length === 0) return [];
-  return [...book.editions].sort((a, b) => editionRank(a) - editionRank(b)).map((edition) => mapEdition(edition, book));
+  return [...book.editions].sort((a, b) => editionRank(a, medium) - editionRank(b, medium)).map((edition) => mapEdition(edition, book));
+}
+
+/**
+ * Hardcover states each image's size, so the shape comes from that. Without one, a print or ebook
+ * edition's own image is taken as portrait; an audiobook edition's is not taken as square, since
+ * many reuse the print jacket or show the CD box, and the book-level image may be any edition's.
+ */
+function editionCover(
+  edition: HardcoverEdition,
+  book: HardcoverBookWithEditions,
+): Pick<MetadataCandidate, 'coverShape' | 'coverWidth' | 'coverHeight'> {
+  if (edition.image?.url) return coverFromImage(edition.image, isAudiobookEdition(edition) ? 'unknown' : 'portrait');
+  return coverFromImage(book.image, 'unknown');
+}
+
+function coverFromImage(
+  image: HardcoverImage | undefined,
+  shapeWithoutSize: 'portrait' | 'unknown',
+): Pick<MetadataCandidate, 'coverShape' | 'coverWidth' | 'coverHeight'> {
+  if (!image?.url) return {};
+  const { width, height } = image;
+  if (typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0) {
+    return { coverShape: coverShapeFromSize(width, height), coverWidth: width, coverHeight: height };
+  }
+  return { coverShape: shapeWithoutSize };
 }
 
 function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions): MetadataCandidate {
@@ -170,6 +199,7 @@ function mapEdition(edition: HardcoverEdition, book: HardcoverBookWithEditions):
     seriesIndex: parseSeriesIndex(book.featured_book_series?.position) ?? undefined,
     seriesTotalBooks: normalizeSeriesTotalBooks(book.featured_book_series?.series?.books_count),
     coverUrl: edition.image?.url ?? book.image?.url,
+    ...editionCover(edition, book),
     sourceUrl: `https://hardcover.app/books/${book.slug}`,
     ...(communityRating !== undefined ? { communityRating } : {}),
     ...(communityRatingCount !== undefined ? { communityRatingCount } : {}),

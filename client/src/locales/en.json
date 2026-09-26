@@ -17,7 +17,14 @@
     "no": "No",
     "show": "Show",
     "hide": "Hide",
-    "undo": "Undo"
+    "undo": "Undo",
+    "pagination": {
+      "label": "Pagination",
+      "pageOf": "Page {page} of {totalPages}",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "goToPage": "Go to page {page}"
+    }
   },
   "settings": {
     "privacySharing": {
@@ -1504,6 +1511,7 @@
         "subtitle": "Subtitle",
         "description": "Description",
         "cover": "Cover",
+        "audioCover": "Audiobook cover",
         "authors": "Authors",
         "publisher": "Publisher",
         "publishedYear": "Published year",
@@ -1688,6 +1696,7 @@
         "clearAllProviders": "Clear All Providers",
         "clearAll": "Clear All",
         "resetToDefault": "Reset to Default",
+        "bookCover": "Book cover",
         "reset": "Reset",
         "dragProvidersHint": "Drag providers from here onto any field to add them",
         "dragProviderHere": "drag a provider here",
@@ -1822,6 +1831,7 @@
           "makeFirst": "Make first everywhere",
           "makeLast": "Make last everywhere",
           "removeEverywhere": "Remove from all fields",
+          "audioCoverOrderKept": "Reordering skips the Audiobook cover rule, which keeps audiobook sources first.",
           "allFields": "All fields",
           "overridesOnly": "Overrides only",
           "clearFilters": "Clear filters"
@@ -4782,6 +4792,26 @@
       "primary": "Primary",
       "audiobook": "Audiobook"
     },
+    "formats": {
+      "epub": "EPUB e-book",
+      "kepub": "KEPUB e-book",
+      "pdf": "PDF document",
+      "cbz": "CBZ comic",
+      "cbr": "CBR comic",
+      "cb7": "CB7 comic",
+      "mobi": "MOBI e-book",
+      "azw3": "AZW3 e-book",
+      "azw": "AZW e-book",
+      "fb2": "FictionBook",
+      "m4b": "M4B audiobook",
+      "mp3": "MP3 audio",
+      "m4a": "M4A audio",
+      "opus": "Opus audio",
+      "ogg": "OGG audio",
+      "flac": "FLAC audio",
+      "readAlong": "Read-along EPUB",
+      "primary": "Primary format"
+    },
     "actions": {
       "read": "Read",
       "listen": "Listen",
@@ -4805,6 +4835,12 @@
       "openAs": "Open as {format}",
       "openReadAlong": "Open read-along EPUB"
     },
+    "coverRegeneration": {
+      "failed": "Could not regenerate the cover",
+      "bulkInProgress": "Re-extracting covers",
+      "bulkFailed": "Could not re-extract covers",
+      "bulkCompleted": "Re-extracted {updated} of {processed, plural, one {# cover} other {# covers}}"
+    },
     "readStatus": {
       "unread": "Unread",
       "wantToRead": "Want to Read",
@@ -4825,7 +4861,10 @@
       "progressPercent": "Downloading {percent} of {total}",
       "progressBytes": "Downloading {transferred}",
       "failed": "Download failed",
-      "exportFailed": "Export failed"
+      "exportFailed": "Export failed",
+      "audiolessEpub": "KOReader EPUB",
+      "audiolessEpubHint": "Download EPUB for KOReader with audio files removed",
+      "noAudio": "no audio"
     },
     "sort": {
       "moveUp": "Move up",
@@ -4897,6 +4936,7 @@
         "isbn": "ISBN",
         "metadataScore": "Metadata Score",
         "cover": "Cover",
+        "audioCover": "Audiobook Cover",
         "lockStatus": "Lock Status",
         "seriesStatus": "Series Status"
       },
@@ -5200,7 +5240,32 @@
         "saving": "Saving...",
         "saveCover": "Save cover",
         "revertToOriginal": "Revert to original",
-        "regenerateCover": "Regenerate Cover"
+        "regenerateCover": "Regenerate Cover",
+        "slotsLabel": "Cover to edit",
+        "slotEbook": "Book",
+        "slotAudio": "Audiobook",
+        "slotEbookName": "Book cover",
+        "slotAudioName": "Audiobook cover",
+        "editingEbook": "Editing the book cover",
+        "editingAudio": "Editing the audiobook cover",
+        "lockEbookCover": "Lock book cover",
+        "unlockEbookCover": "Unlock book cover",
+        "lockAudioCover": "Lock audiobook cover",
+        "unlockAudioCover": "Unlock audiobook cover",
+        "viewLarger": "View larger",
+        "viewLargerEbook": "View larger book cover",
+        "viewLargerAudio": "View larger audiobook cover",
+        "sourceMode": "Image source",
+        "urlLabel": "Image URL",
+        "saveFailed": "Could not save the cover",
+        "revertFailed": "Could not revert the cover"
+      },
+      "coverLightbox": {
+        "title": "Cover preview",
+        "description": "The full-size cover. Press Escape to close.",
+        "switchLabel": "Cover to show",
+        "ebook": "Book",
+        "audio": "Audiobook"
       },
       "coverSearch": {
         "title": "Online Search",
@@ -5241,8 +5306,10 @@
           "cancelEditAria": "Cancel personal review edit"
         },
         "editCover": "Edit cover",
+        "viewCover": "View larger cover",
         "finished": "Finished",
         "resetFileProgress": "Reset file progress",
+        "resetEditionProgress": "Reset progress for {format}",
         "resetting": "Resetting...",
         "resetProgressConfirm": "Reset stored reading progress for {label}?",
         "moreCount": "+{count} more",
@@ -5380,6 +5447,7 @@
         "loadFromFileTooltip": "Load metadata from the primary book file",
         "writeToFile": "Write to file",
         "autoFill": "Auto-fill",
+        "autoFillFailed": "Auto-fill failed",
         "fetchingMetadata": "Fetching metadata...",
         "noExistingProviderIds": "No metadata fetched: none of the active Field Rule providers has an ID stored on this book.",
         "allFieldsLocked": "All fields are locked",
@@ -5449,9 +5517,19 @@
           "hideUnchanged": "Hide unchanged",
           "showUnchanged": "Show unchanged",
           "current": "Current",
+          "new": "New",
           "noMetadata": "No metadata available from this source.",
           "noChangedFields": "No changed or missing fields. Use Show unchanged to inspect everything.",
-          "applyToForm": "Apply to form"
+          "applyToForm": "Apply to form",
+          "secondCover": {
+            "audioResults": "Audiobook cover results",
+            "bookResults": "Book cover results",
+            "showCover": "Show the {provider} cover, {index} of {total}",
+            "searchingAudio": "Searching audiobook editions...",
+            "searchingBook": "Searching book editions...",
+            "noAudio": "No audiobook covers found.",
+            "noBook": "No book covers found."
+          }
         },
         "diff": {
           "locked": "Locked",
@@ -5460,8 +5538,14 @@
           "newCoverAlt": "New cover",
           "pickCoverFromProvider": "Pick cover from another provider",
           "pickCoverSource": "Pick cover source",
+          "coverShapeHint": {
+            "portraitForAudio": "Portrait image. Audiobook covers are square.",
+            "squareForBook": "Square image. Book covers are portrait."
+          },
           "pickFromProvider": "Pick from another provider",
           "pickSource": "Pick source",
+          "useNew": "Use the new {field}",
+          "keepCurrent": "Keep the current {field}",
           "genreWriteMode": {
             "label": "How to apply genres",
             "merge": "Merge",
@@ -5470,7 +5554,57 @@
           "empty": "empty",
           "showLess": "Show less",
           "showMore": "Show more",
-          "coverPreviewAlt": "Cover preview"
+          "coverPreviewAlt": "Cover preview",
+          "fields": {
+            "coverUrl": "Cover",
+            "bookCover": "Book cover",
+            "audioCover": "Audiobook cover",
+            "title": "Title",
+            "subtitle": "Subtitle",
+            "authors": "Authors",
+            "description": "Description",
+            "publisher": "Publisher",
+            "publishedDate": "Published",
+            "language": "Language",
+            "pageCount": "Page count",
+            "communityRating": "Community rating",
+            "seriesName": "Series",
+            "seriesIndex": "Series index",
+            "isbn13": "ISBN-13",
+            "isbn10": "ISBN-10",
+            "genres": "Genres",
+            "narrators": "Narrators",
+            "durationSeconds": "Duration (seconds)",
+            "abridged": "Abridged",
+            "hardcoverEditionId": "Hardcover edition ID",
+            "comicIssueNumber": "Issue number",
+            "comicVolumeName": "Volume",
+            "comicPencillers": "Pencillers",
+            "comicInkers": "Inkers",
+            "comicColorists": "Colorists",
+            "comicLetterers": "Letterers",
+            "comicCoverArtists": "Cover artists",
+            "comicCharacters": "Characters",
+            "comicTeams": "Teams",
+            "comicLocations": "Locations",
+            "comicStoryArcs": "Story arcs",
+            "sourceUrl": "Source URL"
+          },
+          "providerIds": {
+            "google": "Google Books ID",
+            "goodreads": "Goodreads ID",
+            "amazon": "Amazon ID",
+            "hardcover": "Hardcover ID",
+            "openLibrary": "Open Library ID",
+            "itunes": "iTunes ID",
+            "audible": "Audible ID",
+            "librofm": "Libro.fm ISBN",
+            "comicvine": "ComicVine ID",
+            "ranobedb": "RanobeDB ID",
+            "kobo": "Kobo ID",
+            "lubimyczytac": "LubimyCzytac ID",
+            "aladin": "Aladin ID"
+          }
         },
         "searchDrawer": {
           "searchTitle": "Search Metadata",
@@ -6147,6 +6281,15 @@
       "chips": {
         "addPlaceholder": "Add..."
       },
+      "quickFilter": {
+        "presentFiles": "Filter to present files",
+        "missingFiles": "Filter to missing files",
+        "withCovers": "Filter to books with covers",
+        "missingCovers": "Filter to books missing covers",
+        "missingAudioCovers": "Filter to books missing audiobook covers",
+        "withValues": "Filter to rows with values",
+        "emptyRows": "Filter to empty rows"
+      },
       "cover": {
         "previewDescription": "Book cover preview",
         "editDescription": "Edit book cover",
@@ -6193,6 +6336,8 @@
       "read": {
         "play": "Play",
         "read": "Read",
+        "readFormat": "Read {format}",
+        "playFormat": "Play {format}",
         "primary": "Primary",
         "peekFormat": "Peek {format}",
         "chooseFormat": "Choose format to read or play",
@@ -8324,7 +8469,8 @@
           "title": "Cover style",
           "portrait": "Portrait",
           "square": "Square",
-          "hint": "Portrait for ebook or mixed libraries. Square for audiobook-only libraries."
+          "hint": "Portrait for ebook or mixed libraries. Square for audiobook-only libraries.",
+          "hintSlots": "Portrait for ebook or mixed libraries, square for audiobook-only libraries. A book with both an ebook and an audiobook shows its book cover in a portrait library and its audiobook cover in a square one."
         },
         "icon": {
           "label": "Icon",
@@ -8447,7 +8593,9 @@
         "formatPriority": {
           "title": "Format priority",
           "hint": "When a book has multiple formats, the format highest in the list is preferred."
-        }
+        },
+        "moveUp": "Move {item} up",
+        "moveDown": "Move {item} down"
       },
       "fileWrite": {
         "maxFileSizeMb": "Max file size (MB)",
@@ -10328,10 +10476,21 @@
         "extracted": "Extracted",
         "custom": "Custom"
       },
+      "brokenSlot": {
+        "ebookExtracted": "Book cover, extracted",
+        "ebookCustom": "Book cover, custom",
+        "audioExtracted": "Audiobook cover, extracted",
+        "audioCustom": "Audiobook cover, custom"
+      },
       "table": {
         "selectPage": "Select everything on this page",
         "coverFolder": "Cover folder for book #{bookId}",
-        "fileCount": "{count, plural, one {# file} other {# files}}"
+        "fileCount": "{count, plural, one {# file} other {# files}}",
+        "orphanMedia": {
+          "ebook": "Book cover",
+          "audio": "Audiobook cover",
+          "both": "Book and audiobook covers"
+        }
       },
       "confirm": {
         "title": "Clean missing resources?",

@@ -101,4 +101,6 @@ export interface HardcoverCachedContributor {
 
 export interface HardcoverImage {
   url?: string;
+  width?: number | null;
+  height?: number | null;
 }

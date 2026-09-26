@@ -769,7 +769,7 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         url: '/api/v1/auth/logout',
         headers: {
           cookie: cookieHeader(session.jar),
-          origin: 'http://localhost:5173',
+          origin: 'http://localhost:6263',
         },
       });
       expect(logoutResponse.statusCode).toBe(200);

@@ -35,6 +35,7 @@ export function mergeBookCardWithDetail(book: BookCard, detail: BookDetail): Boo
     readStatus: detail.readStatus,
     metadataScore: detail.metadataScore,
     hasCover: detail.coverSource !== null,
+    coverVersion: detail.coverVersion,
     hasMetadataLocks: detail.lockedFields.length > 0,
     lockedFields: detail.lockedFields,
     narrators: detail.audioMetadata?.narrators.map((narrator) => narrator.name) ?? [],
@@ -94,7 +95,7 @@ export function detectChangedColumns(previous: BookCard, next: BookCard): Column
   if (previous.updatedAt !== next.updatedAt) changed.add('updatedAt')
   if (previous.addedAt !== next.addedAt) changed.add('addedAt')
   if (previous.status !== next.status) changed.add('read')
-  if (previous.hasCover !== next.hasCover || !sameFiles(previous.files, next.files)) {
+  if (previous.hasCover !== next.hasCover || previous.coverVersion !== next.coverVersion || !sameFiles(previous.files, next.files)) {
     changed.add('cover')
     changed.add('format')
     changed.add('fileSize')

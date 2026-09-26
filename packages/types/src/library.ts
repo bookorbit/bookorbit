@@ -28,24 +28,6 @@ export const DEFAULT_FORMAT_PRIORITY = [
   "flac",
 ] as const;
 
-export const FORMAT_LABELS: Record<string, string> = {
-  epub: "EPUB e-book",
-  kepub: "KEPUB e-book",
-  pdf: "PDF document",
-  cbz: "CBZ comic",
-  cbr: "CBR comic",
-  cb7: "CB7 comic",
-  mobi: "MOBI e-book",
-  azw3: "AZW3 e-book",
-  azw: "AZW e-book",
-  fb2: "FictionBook",
-  m4b: "M4B audiobook",
-  mp3: "MP3 audio",
-  m4a: "M4A audio",
-  opus: "Opus audio",
-  ogg: "OGG audio",
-  flac: "FLAC audio",
-};
 export type AccessLevel = "viewer" | "editor" | "owner";
 
 /**
